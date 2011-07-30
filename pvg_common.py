@@ -3,7 +3,7 @@
 #
 #       pvg_common.py
 #       
-#       Copyright 2011 Giorgio Gilestro <gg@bio-ggilestr>
+#       Copyright 2011 Giorgio Gilestro <giorgio@gilest.ro>
 #       
 #       This program is free software; you can redistribute it and/or modify
 #       it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@
 
 import wx, cv, os
 import pysolovideo as pv
-from configobj import ConfigObj
+import ConfigParser
 
 
 class pvg_config():
@@ -37,14 +37,26 @@ class pvg_config():
         self.filename_temp = '%s~' % self.filename
         
         self.config = None
-        self.defaultOptions = { "Monitors" : 9, 
-                                "Webcams"  : 1,
-                                "ThumbnailSize" : (320, 240),
-                                "FullSize" : (800, 600)
+        
+        
+        
+        
+        self.defaultOptions = { "Monitors" : [9, "Select the number of monitors connected to this machine"],
+                                "Webcams"  : [1, "Select the number of webcams connected to this machine"],
+                                "ThumbnailSize" : ['320, 240', "Specify the size for the thumbnail previews"], 
+                                "FullSize" : ['800, 600', "Specify the size for the actual acquisition from the webcams.\nMake sure your webcam supports this definition"], 
+                                "FPS_preview" : [5, "Refresh frequency (FPS) of the thumbnails during preview.\nSelect a low rate for slow computers"],  
+                                "FPS_recording" : [5, "Actual refresh rate (FPS) during acquisition and processing"]
                                }
-
+        
         self.monitorProperties = ['sourceType', 'source', 'track', 'maskfile']
         self.Read(temporary)
+
+    def New(self, filename):
+        '''
+        '''
+        self.filename = filename
+        self.Read()  
 
     def Read(self, temporary=False):
         '''
@@ -58,7 +70,9 @@ class pvg_config():
         else: filename = self.filename        
         
         if os.path.exists(filename):
-            self.config = ConfigObj(filename)
+            self.config = ConfigParser.RawConfigParser()
+            self.config.read(filename)   
+            
         else:
             self.Save(temporary, newfile=True)
 
@@ -70,40 +84,54 @@ class pvg_config():
         else: filename = self.filename
             
         if newfile:
-            self.config = ConfigObj(filename)
-            self.config['Options'] = {}
+            self.config = ConfigParser.RawConfigParser()
+            self.config.add_section('Options')
             
             for key in self.defaultOptions:
-                self.config['Options'][key] = self.defaultOptions[key]
+                self.config.set('Options', key, self.defaultOptions[key][0])
 
-        self.config.write()
-
+        with open(filename, 'wb') as configfile:
+            self.config.write(configfile)
+    
         if not temporary: self.Save(temporary=True)
 
 
     def SetValue(self, section, key, value):
         '''
         '''
-        if not self.config.has_key(section):
-            self.config[section]={}
         
-        self.config[section][key] = value
+        if not self.config.has_section(section):
+            self.config.add_section(section)
         
+        self.config.set(section, key, value)
         
     def GetValue(self, section, key):
         '''
+        get value from config file
+        Does some sanity checking to return tuple, integer and strings 
+        as required.
         '''
-        r = self.config[section][key]
+        r = self.config.get(section, key)
         
-        if type(r) == type([]) and len(r) == 2: #tuple
-            r = tuple([int(i) for i in r])
+        if type(r) == type(0) or type(r) == type(1.0): #native int and float
+            return r
+        elif type(r) == type(True): #native boolean
+            return r
+        elif type(r) == type(''):
+            r = r.split(',')
         
-        else:
+        if len(r) == 2: #tuple
+            r = tuple([int(i) for i in r]) # tuple
+        
+        elif len(r) < 2: #string or integer
             try:
-                r = int(r)
+                r = int(r[0]) #int as text
             except:
-                pass
-            
+                r = r[0] #string
+        
+        if r == 'False' or r == 'True':
+            r = (r == 'True') #bool
+        
         return r
                 
 
@@ -124,8 +152,9 @@ class pvg_config():
         '''
         mn = 'Monitor%s' % monitor
         md = []
-        for vn in self.monitorProperties:
-            md.append ( self.GetValue(mn, vn) )
+        if self.config.has_section(mn):
+            for vn in self.monitorProperties:
+                md.append ( self.GetValue(mn, vn) )
         return md
         
 class previewPanel(wx.Panel):
@@ -141,7 +170,8 @@ class previewPanel(wx.Panel):
 
         self.size = size
         self.SetMinSize(self.size)
-        fps = 15 ; self.interval = 1000/fps # fps determines refresh interval in ms
+        fps = options.GetOption('FPS_preview')
+        self.interval = 1000/fps # fps determines refresh interval in ms
 
         self.SetBackgroundColour('#A9A9A9')
 
@@ -173,7 +203,7 @@ class previewPanel(wx.Panel):
         '''
         Clear all ROIs
         '''
-        self.fsPanel.mon.delROI(-1)
+        self.mon.delROI(-1)
 
     def ClearLast(self, event=None):
         '''
@@ -192,7 +222,7 @@ class previewPanel(wx.Panel):
         '''
         save current selection
         '''
-        if self.allowEditing:
+        if self.allowEditing and self.selection:
             self.mon.addROI(self.selection, 1)
             self.selection = None
             self.polyPoints = []
