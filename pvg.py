@@ -24,8 +24,9 @@
 #       
 
 
-import wx
+import wx, os
 
+from pvg_options import optionsFrame
 from pvg_panel_one import panelOne
 from pvg_panel_two import panelLiveView
 from pvg_common import options
@@ -80,18 +81,22 @@ class mainFrame(wx.Frame):
         ID_FILE_OPEN = wx.NewId()
         ID_FILE_SAVE = wx.NewId()
         ID_FILE_SAVE_AS = wx.NewId()
-        ID_FILE_CLOSE =  wx.NewId()
+        #ID_FILE_CLOSE =  wx.NewId()
         ID_FILE_EXIT =  wx.NewId()
         ID_HELP_ABOUT =  wx.NewId()
+        ID_OPTIONS_SET =  wx.NewId()
 
         filemenu =  wx.Menu()
         filemenu. Append(ID_FILE_OPEN, '&Open File', 'Open a file')
         filemenu. Append(ID_FILE_SAVE, '&Save File', 'Save current file')
         filemenu. Append(ID_FILE_SAVE_AS, '&Save as...', 'Save current data in a new file')
-        filemenu. Append(ID_FILE_CLOSE, '&Close File', 'Close')
+        #filemenu. Append(ID_FILE_CLOSE, '&Close File', 'Close')
         filemenu. AppendSeparator()
         filemenu. Append(ID_FILE_EXIT, 'E&xit Program', 'Exit')
-        
+
+        optmenu =  wx.Menu()
+        optmenu. Append(ID_OPTIONS_SET, 'Confi&gure', 'View and change settings')
+
         helpmenu =  wx.Menu()
         helpmenu. Append(ID_HELP_ABOUT, 'Abou&t')
 
@@ -100,23 +105,76 @@ class mainFrame(wx.Frame):
 
         #Populate the MenuBar
         menubar. Append(filemenu, '&File')
+        menubar. Append(optmenu, '&Options')
         menubar. Append(helpmenu, '&Help')
 
         #and create the menubar
         self.SetMenuBar(menubar)        
 
-        #wx.EVT_MENU(self, ID_FILE_OPEN, partial (self.onFileOpen, None))
+        wx.EVT_MENU(self, ID_FILE_OPEN, self.onFileOpen)
         wx.EVT_MENU(self, ID_FILE_SAVE, self.onFileSave)
-        #wx.EVT_MENU(self, ID_FILE_SAVE_AS, self.onFileSaveAs)
+        wx.EVT_MENU(self, ID_FILE_SAVE_AS, self.onFileSaveAs)
         #wx.EVT_MENU(self, ID_FILE_CLOSE, self.onFileClose)
-        #wx.EVT_MENU(self, ID_FILE_EXIT, self.onFileExit)
+        wx.EVT_MENU(self, ID_FILE_EXIT, self.onFileExit)
+        wx.EVT_MENU(self, ID_OPTIONS_SET, self.onConfigure)
         
     def onFileSave(self, event):
         '''
         '''
         options.Save()
+        
+    def onFileSaveAs(self, event):
+        '''
+        '''
+        filename = 'config.cfg'
+        wildcard = "pySolo Video config file (*.cfg)|*.cfg|"
+        
+        dlg = wx.FileDialog(
+            self, message="Save file as ...", defaultDir=os.getcwd(), 
+            defaultFile=filename, wildcard=wildcard, style=wx.SAVE
+            )
 
+        #dlg.SetFilterIndex(2)
 
+        if dlg.ShowModal() == wx.ID_OK:
+            path = dlg.GetPath()
+            options.Save(path)
+            
+        dlg.Destroy()
+        
+    def onFileOpen(self, event):
+        '''
+        '''
+        wildcard = "pySolo Video config file (*.cfg)|*.cfg|"
+        
+        dlg = wx.FileDialog(
+            self, message="Choose a file",
+            defaultDir=os.getcwd(),
+            defaultFile="",
+            wildcard=wildcard,
+            style=wx.OPEN | wx.CHANGE_DIR
+            )
+
+        if dlg.ShowModal() == wx.ID_OK:
+            path = dlg.GetPath()
+            options.New(path)
+        
+        dlg.Destroy()
+
+    def onFileExit(self, event):
+        '''
+        '''
+        self.Close()
+    
+    def onConfigure(self, event):
+        '''
+        '''
+        frame_opt = optionsFrame(self, -1, '')
+        #app.SetTopWindow(frame_opt)
+        frame_opt.Show()
+    
+    
+    
 if __name__ == "__main__":
     
     app = wx.PySimpleApp(0)

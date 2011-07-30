@@ -3,7 +3,7 @@
 #
 #       pvg_panel_one.py
 #       
-#       Copyright 2011 Giorgio Gilestro <gg@bio-ggilestr>
+#       Copyright 2011 Giorgio Gilestro <giorgio@gilest.ro>
 #       
 #       This program is free software; you can redistribute it and/or modify
 #       it under the terms of the GNU General Public License as published by
@@ -20,9 +20,7 @@
 #       Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #       MA 02110-1301, USA.
 
-import os
-
-import wx
+import wx, os
 from pvg_common import previewPanel, options
 
 import wx.lib.newevent
@@ -175,8 +173,8 @@ class panelConfigure(wx.Panel):
         self.controls.append((rb3, source3))
 
         for radio, source in self.controls:
-            grid2.Add( radio , 0, wx.ALIGN_CENTRE|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
-            grid2.Add( source , 0, wx.ALIGN_CENTRE|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
+            grid2.Add( radio , 0, wx.ALIGN_LEFT|wx.ALIGN_CENTER_VERTICAL|wx.ALL, 2 )
+            grid2.Add( source , 0, wx.ALIGN_CENTRE|wx.ALIGN_CENTER_VERTICAL|wx.ALL, 2 )
             self.Bind(wx.EVT_RADIOBUTTON, self.onChangeSource, radio )
             source.Enable(False)
         
@@ -196,7 +194,7 @@ class panelConfigure(wx.Panel):
         self.activateTracking.SetValue(False)
         self.Bind ( wx.EVT_CHECKBOX, self.onActivateTracking)
         
-        self.pickMaskBrowser = FileBrowseButton(self, -1, labelText='Mask File', changeCallback = self.maskCallback)
+        self.pickMaskBrowser = FileBrowseButton(self, -1, labelText='Mask File')
                 
         sbSizer_3.Add ( self.activateTracking , 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
         sbSizer_3.Add ( self.pickMaskBrowser , 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP|wx.EXPAND, 5 )
@@ -223,6 +221,7 @@ class panelConfigure(wx.Panel):
 
     def onThumbnailClicked(self, evt):
         '''
+        Picking thumbnail by clicking on it
         '''
         self.monitor_number = evt.number
         self.thumbnail = evt.thumbnail
@@ -231,6 +230,7 @@ class panelConfigure(wx.Panel):
 
     def onChangingMonitor(self, evt):
         '''
+        Picking thumbnail by using the dropbox
         '''
         sel = evt.GetString()
         self.monitor_number = self.MonitorList.index(sel)
@@ -239,15 +239,23 @@ class panelConfigure(wx.Panel):
 
     def updateThumbnail(self):
         '''
+        Refreshing thumbnail data
         '''
+        m = options.GetMonitor(self.monitor_number)
+        
+        if m:
+            sourceType, source, track, mask_file = m
+        else:
+            sourceType, source, track, mask_file = [0, '', False, '']
 
+        self.source = self.thumbnail.source = source
+        self.sourceType = self.thumbnail.sourceType = sourceType
+        self.thumbnail.track = track
+        
         active = self.thumbnail.hasMonitor()
         self.applyButton.Enable ( active )
         self.btnPlay.Enable ( active )
         self.btnStop.Enable ( active and self.thumbnail.isPlaying )
-        
-        self.source = self.thumbnail.source
-        self.sourceType = self.thumbnail.sourceType
         
         for radio, source in self.controls:
             source.Enable(False); source.SetValue('')
@@ -258,67 +266,63 @@ class panelConfigure(wx.Panel):
         radio, source = self.controls[self.sourceType]
         radio.SetValue(True); source.Enable(True)
         source.SetValue(self.source)
-        
-        self.activateTracking.Enable(active)
-        self.pickMaskBrowser.Enable(active)
-        
+      
         self.activateTracking.SetValue(self.thumbnail.track)
-
+        self.pickMaskBrowser.SetValue(mask_file or '')
 
     def sourceCallback (self, event):
         '''
         '''
-        sourcebox = event.GetEventObject()
-        self.temp_source = sourcebox.GetValue()
         self.applyButton.Enable(True)
 
-    def maskCallback (self, event):
-        '''
-        '''
-        maskbox = event.GetEventObject()
-        self.mask_file = maskbox.GetValue()
-        
 
     def onChangeSource(self, event):
         '''
+        
         '''
         
         radio_selected = event.GetEventObject()
-        i = 0
-        
+
         for radio, source in self.controls:
             if radio is radio_selected:
                 source.Enable(True)
-                self.temp_source = source.GetValue()
-                self.sourceType = i
             else:
                 source.Enable(False)
-            i += 1
         
         self.applyButton.Enable(True)
  
     def onApplySource(self, event):
         '''
         '''
+        
+        for (r, s), st in zip(self.controls,range(3)):
+            if r.GetValue():
+                source = s.GetValue()
+                sourceType = st
+        
+        track = self.activateTracking.GetValue()
+        self.mask_file = self.pickMaskBrowser.GetValue()
+        
         if self.thumbnail:
 
-            self.thumbnail.source = self.source = self.temp_source
-            self.thumbnail.sourceType = self.sourceType
+            self.thumbnail.source = source
+            self.thumbnail.sourceType = sourceType
 
-            self.currentSource.SetValue( os.path.split(self.source)[1] )
+            self.currentSource.SetValue( os.path.split(source)[1] )
             
-            if self.sourceType > 0:
+            if sourceType > 0:
                 camera = {  
-                    'path' : self.source,
+                    'path' : source,
                     'start': None,
                     'step' : None,
                     'end'  : None,
                     'loop' : False
                 }
             else:
-                camera = self.WebcamsList.index(self.source)
-
-            self.thumbnail.setMonitor(camera, (320,240) ,  self.sourceType)
+                camera = self.WebcamsList.index(source)
+            
+            ts = self.thumbnail.size
+            self.thumbnail.setMonitor(camera, ts , sourceType)
             self.btnPlay.Enable(True)
             
             self.activateTracking.Enable(True)

@@ -1,4 +1,5 @@
-WHAT IS THIS
+README
+======
 
 pySolo-Video is a standalone program that provides video tracking
 capabilities meant for studying sleep in Drosophila
@@ -17,5 +18,4 @@ REQUIRES:
 * python 2.x
 * wxphyton 2.8
 * opencv
-(* configobj ) to be replaced by configparser
 (* numpy / scipy) not sure yet if we will need them

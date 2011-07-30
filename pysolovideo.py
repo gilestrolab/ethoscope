@@ -419,11 +419,9 @@ class Monitor(object):
         self.points_to_track = []
         self.firstFrame = True
         self.tracking = True
-        #
 
         self.use_average = False
         self.calculating_average = False
-
         self.imageCount = 0
         
 

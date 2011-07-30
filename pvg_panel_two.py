@@ -102,13 +102,32 @@ class panelLiveView(wx.Panel):
         sbSizer_3.Add (btnSizer_1, 0, wx.ALIGN_CENTRE|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
 
         ##
-    
+        
+        #Static box4: help
+        sb_4 = wx.StaticBox(self, -1, "Help")
+        sbSizer_4 = wx.StaticBoxSizer (sb_4, wx.VERTICAL)
+        titleFont = wx.Font(10, wx.SWISS, wx.NORMAL, wx.BOLD)
+        instr = [ ('Left mouse button - single click outside ROI', 'Start dragging ROI. ROI will be a perfect rectangle'),
+                  ('Left mouse button - single click inside ROI', 'Select ROI. ROI turns red.'),
+                  ('Left mouse button - double click', 'Select corner of ROI. Will close ROI after fourth selection'),
+                  ('Middle mouse button - single click', 'Add currently selected ROI. ROI turns white.'),
+                  ('Right mouse button - click', 'Remove selected currently selected ROI'),
+                  ('Auto Fill', 'Will fill 32 ROIS (16x2) to fit under the last two\nselected points. To use select first upper left corner,\n then the lower right corner, then hit the Auto Fill Button.')
+                  ]
+                  
+        for title, text in instr:
+            t = wx.StaticText(self, -1, title); t.SetFont(titleFont)
+            sbSizer_4.Add( t, 0, wx.ALL, 2 )
+            sbSizer_4.Add(wx.StaticText(self, -1, text) , 0 , wx.ALL, 2 )
+            sbSizer_4.Add ( (wx.StaticLine(self)), 0, wx.EXPAND|wx.TOP|wx.BOTTOM, 5 )
+        
         sizer_4.Add(sbSizer_1, 0, wx.ALIGN_CENTRE|wx.LEFT|wx.RIGHT|wx.TOP|wx.EXPAND, 5 )
         sizer_4.Add(sbSizer_2, 0, wx.ALIGN_CENTRE|wx.LEFT|wx.RIGHT|wx.TOP|wx.EXPAND, 5 )
         sizer_4.Add(sbSizer_3, 0, wx.ALIGN_CENTRE|wx.LEFT|wx.RIGHT|wx.TOP|wx.EXPAND, 5 )
+        sizer_4.Add(sbSizer_4, 0, wx.ALIGN_CENTRE|wx.LEFT|wx.RIGHT|wx.TOP|wx.EXPAND, 5 )
 
         
-        sizer_3.Add(self.fsPanel, 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
+        sizer_3.Add(self.fsPanel, 0, wx.LEFT|wx.TOP, 20 )
         sizer_3.Add(sizer_4, 0, wx.ALIGN_RIGHT|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
 
         sizer_1.Add(sizer_3, 0, wx.ALIGN_CENTRE|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
@@ -120,13 +139,22 @@ class panelLiveView(wx.Panel):
     def onChangeMonitor(self, event):
         '''
         '''
+        
+        if self.fsPanel.isPlaying: self.fsPanel.Stop()
+        
         sel = self.monitor_name = event.GetString()
         m = self.monitor_number = self.MonitorList.index(sel)
         
         n_cams = options.GetOption("Webcams")
         WebcamsList = [ 'Webcam %s' % (int(w) +1) for w in range( n_cams ) ]
         
-        self.fsPanel.sourceType, self.fsPanel.source, self.fsPanel.track, self.mask_file = options.GetMonitor(m)
+        md = options.GetMonitor(self.monitor_number)
+        
+        if md:
+            self.fsPanel.sourceType, self.fsPanel.source, self.fsPanel.track, self.mask_file = md
+        else:
+            self.fsPanel.sourceType, self.fsPanel.source, self.fsPanel.track, self.mask_file = [0, '', False, '']
+        
         
         if self.fsPanel.sourceType > 0:
             camera = {  
@@ -139,14 +167,15 @@ class panelLiveView(wx.Panel):
         else:
             camera = WebcamsList.index(self.fsPanel.source)
         
+        #if not self.fsPanel.hasMonitor():
         self.fsPanel.setMonitor(camera, self.fs_size , self.fsPanel.sourceType)
         
-        if self.fsPanel.hasMonitor():
-            self.fsPanel.Play()
+        if self.fsPanel.hasMonitor(): self.fsPanel.Play()
             
         if self.mask_file:
             self.fsPanel.mon.loadROIS(self.mask_file)
-            self.currentMaskTXT.SetValue(os.path.split(self.mask_file)[1])
+        
+        self.currentMaskTXT.SetValue(os.path.split(self.mask_file)[1] or '')
 
     def onSaveMask(self, event):
         '''
@@ -165,10 +194,10 @@ class panelLiveView(wx.Panel):
 
         if dlg.ShowModal() == wx.ID_OK:
             path = dlg.GetPath()
-        dlg.Destroy()
+            self.fsPanel.mon.saveROIS(path)
+            self.currentMaskTXT.SetValue(os.path.split(path)[1])
         
-        self.fsPanel.mon.saveROIS(path)
-        self.currentMaskTXT.SetValue(os.path.split(path)[1])
+        dlg.Destroy()
 
     def onLoadMask(self, event):
         '''
@@ -187,8 +216,9 @@ class panelLiveView(wx.Panel):
 
         if dlg.ShowModal() == wx.ID_OK:
             path = dlg.GetPath()
-
-        dlg.Destroy()
+            self.fsPanel.mon.loadROIS(path)
+            self.currentMaskTXT.SetValue(os.path.split(path)[1])
         
-        self.fsPanel.mon.loadROIS(path)
-        self.currentMaskTXT.SetValue(os.path.split(path)[1])
+        dlg.Destroy()
+       
+
