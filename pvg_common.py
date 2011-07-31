@@ -303,18 +303,12 @@ class previewPanel(wx.Panel):
         self.mon.autoMask(pt1, pt2)
          
 
-    def setMonitor(self, camera, resolution, srcType):
+    def setMonitor(self, camera, resolution):
         '''
         '''
         
         self.mon = pv.Monitor()
-        
-        if srcType == 0:
-            self.mon.CaptureFromCAM ( devnum=camera, resolution=resolution)
-        elif srcType == 1:
-            self.mon.CaptureFromMovie (camera, resolution=resolution)
-        elif srcType == 2:
-            self.mon.CaptureFromFrames (camera, resolution=resolution)
+        self.mon.setSource(camera, resolution)
         
         frame_big = self.mon.GetImage() 
         
