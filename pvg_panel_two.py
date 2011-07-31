@@ -147,11 +147,9 @@ class panelLiveView(wx.Panel):
         
         n_cams = options.GetOption("Webcams")
         WebcamsList = [ 'Webcam %s' % (int(w) +1) for w in range( n_cams ) ]
-        
-        md = options.GetMonitor(self.monitor_number)
-        
-        if md:
-            self.fsPanel.sourceType, self.fsPanel.source, self.fsPanel.track, self.mask_file = md
+
+        if options.HasMonitor(self.monitor_number):
+            self.fsPanel.sourceType, self.fsPanel.source, self.fsPanel.track, self.mask_file = options.GetMonitor(self.monitor_number)
         else:
             self.fsPanel.sourceType, self.fsPanel.source, self.fsPanel.track, self.mask_file = [0, '', False, '']
         

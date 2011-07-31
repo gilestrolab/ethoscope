@@ -156,6 +156,13 @@ class pvg_config():
             for vn in self.monitorProperties:
                 md.append ( self.GetValue(mn, vn) )
         return md
+
+    def HasMonitor(self, monitor):
+        '''
+        '''
+        mn = 'Monitor%s' % monitor
+        return self.config.has_section(mn)
+
         
 class previewPanel(wx.Panel):
     '''

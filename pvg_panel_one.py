@@ -28,7 +28,6 @@ ThumbnailClickedEvt, EVT_THUMBNAIL_CLICKED = wx.lib.newevent.NewCommandEvent()
 
 from wxPython.lib.filebrowsebutton import FileBrowseButton, DirBrowseButton
 
-
 class thumbnailPanel(previewPanel):
     '''
     A small preview Panel to be used as thumbnail
@@ -241,10 +240,8 @@ class panelConfigure(wx.Panel):
         '''
         Refreshing thumbnail data
         '''
-        m = options.GetMonitor(self.monitor_number)
-        
-        if m:
-            sourceType, source, track, mask_file = m
+        if options.HasMonitor(self.monitor_number):
+            sourceType, source, track, mask_file = options.GetMonitor(self.monitor_number)
         else:
             sourceType, source, track, mask_file = [0, '', False, '']
 
