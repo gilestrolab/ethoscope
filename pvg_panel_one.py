@@ -308,18 +308,12 @@ class panelConfigure(wx.Panel):
             self.currentSource.SetValue( os.path.split(source)[1] )
             
             if sourceType > 0:
-                camera = {  
-                    'path' : source,
-                    'start': None,
-                    'step' : None,
-                    'end'  : None,
-                    'loop' : False
-                }
+                camera = source
             else:
                 camera = self.WebcamsList.index(source)
             
             ts = self.thumbnail.size
-            self.thumbnail.setMonitor(camera, ts , sourceType)
+            self.thumbnail.setMonitor(camera, ts )
             self.btnPlay.Enable(True)
             
             self.activateTracking.Enable(True)
