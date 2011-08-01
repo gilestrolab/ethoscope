@@ -1,7 +1,28 @@
-#!/usr/bin/env python
-
-'''
-Version 1.2
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
+#
+#       pvg.py pysolovideogui
+#       
+#
+#       Copyright 2011 Giorgio Gilestro <giorgio@gilest.ro>
+#       
+#       This program is free software; you can redistribute it and/or modify
+#       it under the terms of the GNU General Public License as published by
+#       the Free Software Foundation; either version 2 of the License, or
+#       (at your option) any later version.
+#       
+#       This program is distributed in the hope that it will be useful,
+#       but WITHOUT ANY WARRANTY; without even the implied warranty of
+#       MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#       GNU General Public License for more details.
+#       
+#       You should have received a copy of the GNU General Public License
+#       along with this program; if not, write to the Free Software
+#       Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+#       MA 02110-1301, USA.
+#       
+#     
+"""Version 1.2
 
 Interaction with webcam:                opencv      liveShow.py / imageAquisition.py
 Saving movies as stream:                opencv      realCam
@@ -14,9 +35,9 @@ The class monitor is handling the motion detection and data processing while the
 IO of image sources
 
 Algorithm for motion analysis:          PIL through kmeans (vector quantization)
-#    http://en.wikipedia.org/wiki/Vector_quantization
-#    http://stackoverflow.com/questions/3923906/kmeans-in-opencv-python-interface
-'''
+    http://en.wikipedia.org/wiki/Vector_quantization
+    http://stackoverflow.com/questions/3923906/kmeans-in-opencv-python-interface
+"""
 
 import cv
 from math import sqrt
@@ -24,13 +45,10 @@ import os, sys, datetime, time
 import numpy as np
 import cPickle
 
-#TODO: FIX THINGS
-#FIX the way crops are handled (it's ugly and it's not elegant) see camshift.py 
-
 def getCameraCount():
-    '''
+    """
     FIX THIS
-    '''
+    """
     n = 0
     Cameras = True
     
@@ -43,14 +61,14 @@ def getCameraCount():
     return n
 
 class Cam:
-    '''
+    """
     shared by all cams
-    '''
+    """
     
     def __addText__(self, img, text = None):
-        '''
+        """
         Add current time as stamp to the image
-        '''
+        """
 
         normalfont = cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, 1, 1, 0, 1, 8)
         boldfont = cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, 1, 1, 0, 3, 8)
@@ -68,14 +86,14 @@ class Cam:
         return im
 
     def getResolution(self):
-        '''
+        """
         Returns frame resolution as tuple (w,h)
-        '''
+        """
         return self.resolution      
         
     def saveSnapshot(self, filename, quality=90, timestamp=False):
-        '''
-        '''
+        """
+        """
         img = self.getImage(timestamp, imgType)
         cv.SaveImage(filename, img) #with opencv
 
@@ -83,59 +101,59 @@ class Cam:
 
         
 class realCam(Cam):
-    '''
+    """
     a realCam class will handle a webcam connected to the system
     camera is handled through opencv and images can be transformed to PIL
-    '''
+    """
     def __init__(self, devnum=0, showVideoWindow=False, resolution=(640,480)):
         self.camera = cv.CaptureFromCAM(devnum)
         self.setResolution (*resolution)
 
     def getFrameTime(self):
-        '''
-        '''
+        """
+        """
         return time.time() #current time epoch in ms
 
     def addTimeStamp(self, img):
-        '''
-        '''
+        """
+        """
         return self.__addText__(img)
 
     def setResolution(self, x, y):
-        '''
+        """
         Set resolution of the camera we are aquiring from
-        '''
+        """
         x = int(x); y = int(y)
         self.resolution = (x, y)
         cv.SetCaptureProperty(self.camera, cv.CV_CAP_PROP_FRAME_WIDTH, x)
         cv.SetCaptureProperty(self.camera, cv.CV_CAP_PROP_FRAME_HEIGHT, y)
 
     def getImage( self, timestamp=False):
-        '''
+        """
         Returns frame
         
         timestamp   False   (Default) Does not add timestamp
                     True              Add timestamp to the image
                     
-        '''        
+        """        
         frame = cv.QueryFrame(self.camera)
         if timestamp: frame = self.__addText__(frame)
         
         return frame
 
     def isLastFrame(self):
-        '''
+        """
         Added for compatibility with other cams
-        '''
+        """
         return False
 
 class virtualCamMovie(Cam):
-    '''
+    """
     A Virtual cam to be used to pick images from a movie (avi, mov) rather than a real webcam
     Images are handled through opencv
-    '''
+    """
     def __init__(self, path, step = None, start = None, end = None, loop=False, resolution=None):
-        '''
+        """
         Specifies some of the parameters for working with the movie:
         
             path        the path to the file
@@ -149,7 +167,7 @@ class virtualCamMovie(Cam):
             loop        False   (Default)   Does not playback movie in a loop
                         True                Playback in a loop
         
-        '''
+        """
         self.path = path
         
         if start < 0: start = 0
@@ -180,9 +198,9 @@ class virtualCamMovie(Cam):
         cv.Zero(self.blackFrame)
         
     def getFrameTime(self, asString=None):
-        '''
+        """
         Return the time of the frame
-        '''
+        """
         
         frameTime = cv.GetCaptureProperty(self.capture, cv.CV_CAP_PROP_POS_MSEC)
         
@@ -192,7 +210,7 @@ class virtualCamMovie(Cam):
             return frameTime
     
     def getImage(self, timestamp=False):
-        '''
+        """
         Returns frame
         
         timestamp   False   (Default) Does not add timestamp
@@ -202,7 +220,7 @@ class virtualCamMovie(Cam):
                     BMP               Return a BMP image (slowest)
                     CV      (Default) Return a CV native image (IPL)
         
-        '''
+        """
 
         #cv.SetCaptureProperty(self.capture, cv.CV_CAP_PROP_POS_FRAMES, self.currentFrame) # this does not work properly. Image is very corrupted
         im = cv.QueryFrame(self.capture)
@@ -227,24 +245,24 @@ class virtualCamMovie(Cam):
 
       
     def setResolution(self, w, h):
-        '''
+        """
         Changes the output resolution
-        '''
+        """
         self.resolution = (w, h)
         self.scale = (self.resolution != self.in_resolution)
     
     def getTotalFrames(self):
-        '''
+        """
         Returns total number of frames
         Be aware of this bug
         https://code.ros.org/trac/opencv/ticket/851
-        '''
+        """
         return cv.GetCaptureProperty( self.capture , cv.CV_CAP_PROP_FRAME_COUNT )
 
     def isLastFrame(self):
-        '''
+        """
         Are we processing the last frame in the movie?
-        '''
+        """
 
         if ( self.currentFrame > self.totalFrames ) and not self.loop:
             return True
@@ -256,10 +274,10 @@ class virtualCamMovie(Cam):
 
 
 class virtualCamFrames(Cam):
-    '''
+    """
     A Virtual cam to be used to pick images from a folder rather than a webcam
     Images are handled through PIL
-    '''
+    """
     def __init__(self, path, step = None, start = None, end = None, loop = False):
         self.path = path
         self.fileList = self.__populateList__(start, end, step)
@@ -278,9 +296,9 @@ class virtualCamFrames(Cam):
         self.font = None
 
     def getFrameTime(self, fname):
-        '''
+        """
         Return the time of most recent content modification of the file fname
-        '''
+        """
         if fname:
             fileTime = os.stat(fname)[-2]
             return time.asctime(time.localtime(fileTime))
@@ -288,9 +306,9 @@ class virtualCamFrames(Cam):
             return self.last_time
             
     def __populateList__(self, start, end, step):
-        '''
+        """
         Populate the file list
-        '''
+        """
         
         fileList = []
         fileListTmp = os.listdir(self.path)
@@ -304,12 +322,12 @@ class virtualCamFrames(Cam):
 
 
     def getImage(self, timestamp=False):
-        '''
+        """
         Returns frame
         
         timestamp   False   (Default) Does not add timestamp
                     True              Add timestamp to the image
-        '''
+        """
         n = self.currentFrame
         fp = os.path.join(self.path, self.fileList[n])
 
@@ -334,10 +352,10 @@ class virtualCamFrames(Cam):
         return im
     
     def GetAverageImage(self, n = 50):
-        '''
+        """
         FIX THIS: using running average from open cv instead of PIL
         Return an image that is the average of n frames equally distanced from each other
-        '''
+        """
         tot_frames = len( self.fileList)
         step = tot_frames / n
 
@@ -355,15 +373,15 @@ class virtualCamFrames(Cam):
         return toimage(avg_array / len(avg_array))
 
     def getTotalFrames(self):
-        '''
+        """
         Return the total number of frames
-        '''
+        """
         return self.totalFrames
         
     def isLastFrame(self):
-        '''
+        """
         Are we processing the last frame in the folder?
-        '''
+        """
 
         if (self.currentFrame == self.totalFrames) and not self.loop:
             return True
@@ -374,18 +392,18 @@ class virtualCamFrames(Cam):
             return False        
 
     def setResolution(self, w, h):
-        '''
+        """
         Changes the output resolution
-        '''
+        """
         self.resolution = (w, h)
         self.scale = (self.resolution != self.in_resolution)
 
     def compressAllImages(self, compression=90, resolution=(960,720)):
-        '''
+        """
         FIX THIS: is this needed?
         good only for virtual cams
         Load all images one by one and save them in a new folder 
-        '''
+        """
         x,y = resolution[0], resolution[1]
         if self.isVirtualCam:
             in_path = self.cam.path
@@ -407,12 +425,13 @@ class virtualCamFrames(Cam):
             return False
 
 class Arena():
-    '''
-    '''
+    """
+    """
     def __init__(self):
         
         self.ROIS = []
         self.beams = []
+        self.trackType = 1
         
         self.period = 60 #in seconds
         self.rowline = 0
@@ -427,8 +446,8 @@ class Arena():
         self.outputFile = None
         
     def __ROItoRect(self, coords):
-        '''
-        '''
+        """
+        """
         (x1, y1), (x2, y2), (x3, y3), (x4, y4) = coords
         lx = min([x1,x2,x3,x4])
         rx = max([x1,x2,x3,x4])
@@ -438,15 +457,15 @@ class Arena():
         
     
     def __getMidline (self, coords):
-        '''
-        '''
+        """
+        """
         (pt1, pt2) = self.__ROItoRect(coords)
         return (pt2[0] - pt1[0])/2
     
     def addROI(self, coords, n_flies):
-        '''
+        """
         Add a new ROI to the arena
-        '''
+        """
         self.ROIS.append( coords )
         self.beams.append ( self.__getMidline (coords)  ) 
         self.points_to_track.append(n_flies)
@@ -454,9 +473,9 @@ class Arena():
         self.flyDataMin.append ( self.fa )
 
     def getROI(self, n):
-        '''
+        """
         Returns the coordinates of the nth crop area
-        '''
+        """
         if n > len(self.ROIS):
             coords = []
         else:
@@ -464,10 +483,10 @@ class Arena():
         return coords
         
     def delROI(self, n):
-        '''
+        """
         removes the nth crop area from the list
         if n -1, remove all
-        '''
+        """
         if n >= 0:
             self.ROIS.pop(n)
             self.points_to_track.pop(n)
@@ -477,9 +496,9 @@ class Arena():
             self.ROIS = []
         
     def saveROIS(self, filename):
-        '''
+        """
         Save the current crop data to a file
-        '''
+        """
         cf = open(filename, 'w')
         cPickle.dump(self.ROIS, cf)
         cPickle.dump(self.points_to_track, cf)
@@ -487,9 +506,9 @@ class Arena():
         cf.close()
         
     def loadROIS(self, filename):
-        '''
+        """
         Load the crop data from a file
-        '''
+        """
         try:
             cf = open(filename, 'r')
             self.ROIS = cPickle.load(cf)
@@ -506,10 +525,10 @@ class Arena():
             return False
 
     def resizeROIS(self, origSize, newSize):
-        '''
+        """
         Resize the mask to new size so that it would properly fit
         resized images
-        '''
+        """
         newROIS = []
         
         ox, oy = origSize
@@ -527,10 +546,10 @@ class Arena():
 
 
     def isPointInROI(self, pt):
-        '''
+        """
         Check if a given point falls whithin one of the ROI
         Returns the ROI number or else returns -1
-        '''
+        """
         x, y = pt
         
         for ROI in self.ROIS:
@@ -546,10 +565,10 @@ class Arena():
 
 
     def ROIStoRect(self):
-        '''
+        """
         translate ROI (list containing for points a tuples)
         into Rect (list containing two points as tuples)
-        '''
+        """
         newROIS = []
         for ROI in self.ROIS:
             newROIS. append ( self.__ROItoRect(ROI) )
@@ -557,25 +576,29 @@ class Arena():
         return newROIS
 
     def addFlyCoords(self, count, fly):
-        '''
-        '''
+        """
+        """
         if fly:
+            #calculate distance from previous point
             pf = self.flyDataBuffer[count][-1]
             d = np.sqrt ( (fly[0] - pf[0])**2 + (fly[1]-pf[1])**2 )
-            if d > 200: fly = self.flyDataBuffer[count][-1]
+            #exclude too wide movements unless it's the first movement the fly makes
+            if d > 200 and pf != (0,0): fly = self.flyDataBuffer[count][-1]
+            
             self.flyDataBuffer[count].append ( fly )
         else:
+            
             fly = self.flyDataBuffer[count][-1]
             self.flyDataBuffer[count].append ( fly )
     
         return fly
         
     def compactSeconds(self):
-        '''
-        '''
+        """
+        """
        
         if self.count_seconds == self.period:
-            self.writeDistances()
+            self.writeActivity()
             self.count_seconds = 0
             
         for c, f in enumerate(self.flyDataBuffer):
@@ -591,21 +614,38 @@ class Arena():
         
         self.count_seconds += 1
     
-    def writeDistances(self):
-        '''
-        Write final data to files.
-        Motion is written as distance in px per minutes
-        '''
-        
-        values = []
-        w,m,d,t,y = time.asctime(time.localtime()).split(' ')
-        date = '%s %s %s' % (d,m,y[:-2])
-        tt = '%s' % t
+    def writeActivity(self):
+        """
+        Write the activity to file
+        Kind of motion depends on user settings
+        """
+        year, month, day, hh, mn, sec = time.localtime()[0:6]
+        date = '%02d %02d %s' % (day,month,str(year)[:-2])
+        tt = '%02d:%02d:%02d' % (hh, mn, sec)
         active = '1'
         zeros = '0\t0\t0\t0'
 
         self.rowline +=1 
+
+        if self.trackType == 1:
+            activity = self.calculateDistances()
+        elif self.trackType == 0:
+            activity = self.calculateVBM()
+            
+        row_header = '%s\t'*5 % (self.rowline, date, tt, active, zeros)
+        row = row_header + activity + '\n'
         
+        fh = open(self.outputFile, 'a')
+        fh.write(row)
+        fh.close()
+            
+    
+    def calculateDistances(self):
+        """
+        Motion is calculated as distance in px per minutes
+        """
+        
+        values = []
         for fd in self.flyDataMin:
 
             fs = np.roll(fd, -1, 0)
@@ -619,23 +659,32 @@ class Arena():
             
             values. append ( d[:-1].sum() )
 
-        row_header = '%s\t'*5 % (self.rowline, date, tt, active, zeros)
-        data = '\t'.join( [str(v) for v in values] )
-        row = row_header + data + '\n'
+        activity = '\t'.join( [str(v) for v in values] )
+        return activity
+            
+            
+    def calculateVBM(self):
+        """
+        Motion is calculated as virtual beam crossing
+        """
+
+        values = []
+
+        for fd, md in zip(self.flyDataMin, self.beams):
+            
+            fs = np.roll(fd, -1, 0)
+            
+            x = fd[:,:1]
+            x1 = fs[:,:1]
         
-        fh = open(self.outputFile, 'a')
-        fh.write(row)
-        fh.close()
+            crossed = (x < md ) * ( md < x1) + (x > md) * (md > x1)
+            values .append ( crossed.sum() )
         
+        activity = '\t'.join( [str(v) for v in values] )
+        return activity
             
             
             
-    def writeVBM(self):
-        '''
-        Write final data to files
-        Motion is written as virtual beam crossin
-        '''
-        pass
     
 class Monitor(object):
     """
@@ -644,10 +693,10 @@ class Monitor(object):
 
     def __init__(self):
 
-        '''
+        """
         A Monitor contains a cam, which can be either virtual or real.
         Real CAMs are handled through opencv, frames through PIL.
-        '''
+        """
         self.grabMovie = False
         self.arena = Arena()
         
@@ -662,11 +711,11 @@ class Monitor(object):
 
 
     def __drawROI(self, img, ROI, color=None):
-        '''
+        """
         Draw ROI on img using given coordinates
         ROI is a tuple of 4 tuples ( (x1, y1), (x2, y2), (x3, y3), (x4, y4) )
         and does not have to be necessarily a rectangle
-        '''
+        """
 
         if not color: color = (255,255,255)
         width = 1
@@ -681,9 +730,9 @@ class Monitor(object):
         return img
 
     def __drawCross(self, img, pt, color=None):
-        '''
+        """
         Draw a cross around a point pt
-        '''
+        """
         if not color: color = (255,255,255)
         width = 1
         line_type = cv.CV_AA
@@ -701,9 +750,9 @@ class Monitor(object):
         
 
     def __getChannel(self, img, channel='R'):
-        '''
+        """
         Return only the asked channel R,G or B
-        '''
+        """
 
         cn = 'RGB'.find( channel.upper() )
         
@@ -712,15 +761,15 @@ class Monitor(object):
         return channels[cn]
 
     def __distance(self, x1, y1, x2, y2):
-        '''
+        """
         Calculate the distance between two cartesian points
-        '''
+        """
         return sqrt((x2-x1)**2 + (y2-y1)**2)
 
     def __angle(self, pt1, pt2, pt0):
-        '''
+        """
         Return the angle between three points
-        '''
+        """
         dx1 = pt1[0] - pt0[0]
         dy1 = pt1[1] - pt0[1]
         dx2 = pt2[0] - pt0[0]
@@ -728,8 +777,8 @@ class Monitor(object):
         return (dx1*dx2 + dy1*dy2)/sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10)
 
     def CaptureFromCAM(self, devnum=0, resolution=(640,480), options=None):
-        '''
-        '''
+        """
+        """
         self.resolution = resolution
         self.isVirtualCam = False
         self.cam = realCam(devnum=devnum)
@@ -737,8 +786,8 @@ class Monitor(object):
         self.numberOfFrames = 0
         
     def CaptureFromMovie(self, camera, resolution=None, options=None):
-        '''
-        '''
+        """
+        """
         self.isVirtualCam = True
         
         if options:
@@ -753,8 +802,8 @@ class Monitor(object):
         self.numberOfFrames = self.cam.getTotalFrames()
         
     def CaptureFromFrames(self, camera, resolution=None, options=None):
-        '''
-        '''
+        """
+        """
          
         if options:
             step = options['step']
@@ -768,31 +817,50 @@ class Monitor(object):
         self.numberOfFrames = self.cam.getTotalFrames()
     
     def setSource(self, camera, resolution, options=None):
-        '''
+        """
         Set source intelligently
-        '''
+        """
         if type(camera) == type(0): 
             self.CaptureFromCAM(camera, resolution, options)
         elif os.path.isfile(camera):
             self.CaptureFromMovie(camera, resolution, options)
         elif os.path.isdir(camera):
             self.CaptureFromFrames(camera, resolution, options)
+
+    def setTracking(self, track, trackType, mask_file, outputFile):
+        """
+        Set the tracking parameters
+        
+        track       Boolean     Do we do tracking of flies?
+        trackType   0           tracking using the virtual beam method
+                    1 (Default) tracking calculating distance moved
+        mask_file   text        the file used to load and store masks
+        outputFile  text        the txt file where results will be saved
+        """
+
+        self.track = track
+        self.arena.trackType = trackType
+        self.mask_file = mask_file
+        self.arena.outputFile = outputFile
+        
+        if mask_file: self.loadROIS(mask_file)
+
         
     def getFrameTime(self):
-        '''
-        '''
+        """
+        """
         return self.cam.getFrameTime()
     
     def isLastFrame(self):
-        '''
+        """
         Proxy to isLastFrame()
         Handled by camera
-        '''
+        """
         return self.cam.isLastFrame()
 
 
     def saveMovie(self, filename, fps=24, codec='FMP4'):
-        '''
+        """
         Determines whether all the frames grabbed through getImage will also 
         be saved as movie.
         
@@ -801,7 +869,7 @@ class Monitor(object):
         codec           FMP4 (Default)     codec to be used
         
         http://stackoverflow.com/questions/5426637/writing-video-with-opencv-python-mac
-        '''
+        """
         fourcc = cv.CV_FOURCC([c for c in codec])
         
         self.writer = cv.CreateVideoWriter(filename, fourcc, fps, self.resolution, 1)
@@ -809,17 +877,17 @@ class Monitor(object):
 
 
     def saveSnapshot(self, *args, **kwargs):
-        '''
+        """
         proxy to saveSnapshot
-        '''
+        """
         self.cam.saveSnapshot(*args, **kwargs)
     
     def SetLoop(self,loop):
-        '''
+        """
         Set Loop on or off.
         Will work only in virtual cam mode and not realCam
         Return current loopmode
-        '''
+        """
         if self.isVirtualCam:
             self.cam.loop = loop
             return self.cam.loop
@@ -827,8 +895,8 @@ class Monitor(object):
             return False
    
     def processFlyMovements(self):
-        '''
-        '''
+        """
+        """
         
         ct = self.getFrameTime()
         
@@ -838,59 +906,61 @@ class Monitor(object):
                 
 
     def addROI(self, coords, n_flies=1):
-        '''
+        """
         Add the coords for a new ROI and the number of flies we want to track in that area
         selection       (pt1, pt2, pt3, pt4)    A four point selection
         n_flies         1    (Default)      Number of flies to be tracked in that area
-        '''
+        """
         
         self.arena.addROI(coords, n_flies)
 
     def getROI(self, n):
-        '''
+        """
         Returns the coordinates of the nth crop area
-        '''
+        """
         return self.arena.getROI(n)
 
     def delROI(self, n):
-        '''
+        """
         removes the nth crop area from the list
         if n -1, remove all
-        '''
+        """
         self.arena.delROI(n)
         
-    def saveROIS(self, filename):
-        '''
+    def saveROIS(self, filename=None):
+        """
         Save the current crop data to a file
-        '''
+        """
+        if not filename: filename = self.mask_file
         self.arena.saveROIS(filename)
         
-    def loadROIS(self, filename):
-        '''
+    def loadROIS(self, filename=None):
+        """
         Load the crop data from a file
-        '''
+        """
+        if not filename: filename = self.mask_file
         return self.arena.loadROIS(filename)
 
     def resizeROIS(self, origSize, newSize):
-        '''
+        """
         Resize the mask to new size so that it would properly fit
         resized images
-        '''
+        """
         return self.arena.resizeROIS(origSize, newSize)
 
     def isPointInROI(self, pt):
-        '''
+        """
         Check if a given point falls whithin one of the ROI
         Returns the ROI number or else returns -1
-        '''
+        """
         return self.arena.isPointInROI(pt)
 
     def autoMask(self, pt1, pt2):
-        '''
+        """
         EXPERIMENTAL
         This is experimental
         For now it works only with one kind of arena
-        '''
+        """
         rows = 16
         cols = 2
         food = .10
@@ -916,10 +986,10 @@ class Monitor(object):
             self.arena.addROI( ( (x,y), (x,y1), (x1,y1), (x1,y) ), 1)
     
     def findOuterFrame(self, img, thresh=50):
-        '''
+        """
         EXPERIMENTAL
         Find the greater square 
-        '''
+        """
         N = 11
         sz = (img.width & -2, img.height & -2)
         storage = cv.CreateMemStorage(0)
@@ -1009,7 +1079,7 @@ class Monitor(object):
         return squares    
          
     def GetImage(self, drawROIs = False, selection=None, crosses=None, timestamp=False):
-        '''
+        """
         GetImage(self, drawROIs = False, selection=None, timestamp=0)
         
         drawROIs       False        (Default)   Will draw all ROIs to the image
@@ -1023,7 +1093,7 @@ class Monitor(object):
                        False        (Default)   
         
         Returns the last collected image
-        '''
+        """
 
         self.imageCount += 1
         frame = self.cam.getImage(timestamp)
@@ -1046,11 +1116,11 @@ class Monitor(object):
         return frame
 
     def doTrack(self, frame):
-        '''
+        """
         Track flies in ROIS using findContour algorhytm or opencv
         Each frame is compared against the moving average
         
-        '''
+        """
 
         grey_image = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
         temp = cv.CloneImage(frame)
@@ -1109,7 +1179,7 @@ class Monitor(object):
                     
                     fly_coords = ( pt1[0]+(pt2[0]-pt1[0])/2, pt1[1]+(pt2[1]-pt1[1])/2 )
                     area = (pt2[0]-pt1[0])*(pt2[1]-pt1[1])
-                    if area > 100: fly_coords = None
+                    if area > 400: fly_coords = None
                     #frame = self.__drawCross(frame, fly_coords)
 
             fly_coords = self.arena.addFlyCoords(fly_number, fly_coords) # for each frame adds fly coordinates to all ROIS

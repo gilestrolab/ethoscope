@@ -18,4 +18,4 @@ REQUIRES:
 * python 2.x
 * wxphyton 2.8
 * opencv
-(* numpy / scipy) not sure yet if we will need them
+* numpy 

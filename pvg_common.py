@@ -49,7 +49,7 @@ class pvg_config():
                                 "FPS_recording" : [5, "Actual refresh rate (FPS) during acquisition and processing"]
                                }
         
-        self.monitorProperties = ['sourceType', 'source', 'track', 'maskfile']
+        self.monitorProperties = ['sourceType', 'source', 'track', 'maskfile', 'trackType']
         self.Read(temporary)
 
     def New(self, filename):
@@ -186,6 +186,7 @@ class previewPanel(wx.Panel):
         self.source = ''
         self.mon = None
         self.track = False
+        self.trackType = 1
 
 
         self.recording = False
