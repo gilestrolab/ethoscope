@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 #
 #       pvg_common.py
@@ -25,21 +24,20 @@ import wx, cv, os
 import pysolovideo as pv
 import ConfigParser
 
-
 class pvg_config():
     """
     Handles program configuration
     Uses ConfigParser to store and retrieve
     """
     def __init__(self, filename='config.cfg', temporary=False):
-        
-        self.filename = filename
+
+        pDir = os.getcwd()
+        if not os.access(pDir, os.W_OK): pDir = os.environ['HOME']
+
+        self.filename = os.path.join (pDir, filename)
         self.filename_temp = '%s~' % self.filename
         
         self.config = None
-        
-        
-        
         
         self.defaultOptions = { "Monitors" : [9, "Select the number of monitors connected to this machine"],
                                 "Webcams"  : [1, "Select the number of webcams connected to this machine"],
@@ -376,4 +374,4 @@ class previewPanel(wx.Panel):
 
 #################
 
-options = pvg_config()
+options = pvg_config('config.cfg')
