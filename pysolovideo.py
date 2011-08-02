@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 #
 #       pvg.py pysolovideogui
@@ -62,7 +61,7 @@ def getCameraCount():
 
 class Cam:
     """
-    Here go properties and functions shared by all cams
+    Functions and properties inherited by all cams
     """
     
     def __addText__(self, img, text = None):
@@ -127,6 +126,9 @@ class realCam(Cam):
         self.resolution = (x, y)
         cv.SetCaptureProperty(self.camera, cv.CV_CAP_PROP_FRAME_WIDTH, x)
         cv.SetCaptureProperty(self.camera, cv.CV_CAP_PROP_FRAME_HEIGHT, y)
+        x1 = cv.GetCaptureProperty(self.camera, cv.CV_CAP_PROP_FRAME_WIDTH)
+        y1 = cv.GetCaptureProperty(self.camera, cv.CV_CAP_PROP_FRAME_HEIGHT)
+        return (x, y) == (x1, y1)
 
     def getImage( self, timestamp=False):
         """
@@ -207,7 +209,7 @@ class virtualCamMovie(Cam):
         if asString:
             return '%s - %s/%s' % (frameTime, self.currentFrame, self.totalFrames) #time.asctime(time.localtime(fileTime))
         else:
-            return frameTime
+            return frameTime / 1000.0 #returning second for compatibilty reasons
     
     def getImage(self, timestamp=False):
         """
@@ -222,8 +224,7 @@ class virtualCamMovie(Cam):
         
         """
 
-        #cv.SetCaptureProperty(self.capture, cv.CV_CAP_PROP_POS_FRAMES, self.currentFrame)
-        # this does not work properly. Image is very corrupted. Must be a bug in opencv
+        #cv.SetCaptureProperty(self.capture, cv.CV_CAP_PROP_POS_FRAMES, self.currentFrame) # this does not work properly. Image is very corrupted
         im = cv.QueryFrame(self.capture)
 
         if not im: im = self.blackFrame
@@ -233,6 +234,7 @@ class virtualCamMovie(Cam):
         #elif self.currentFrame > self.lastFrame and not self.loop: return False
 
         if self.scale:
+            #newsize = cv.CreateMat(self.resolution[0], self.resolution[1], cv.CV_8UC3)
             newsize = cv.CreateImage(self.resolution , cv.IPL_DEPTH_8U, 3)
             cv.Resize(im, newsize)
             im = newsize
@@ -299,9 +301,12 @@ class virtualCamFrames(Cam):
         """
         Return the time of most recent content modification of the file fname
         """
-        if fname:
+        if fname and asString:
             fileTime = os.stat(fname)[-2]
             return time.asctime(time.localtime(fileTime))
+        elif fname and not asString:
+            fileTime = os.stat(fname)[-2]
+            return time.localtime(fileTime)
         else:
             return self.last_time
             
@@ -351,27 +356,6 @@ class virtualCamFrames(Cam):
         
         return im
     
-    def GetAverageImage(self, n = 50):
-        """
-        FIX THIS: using running average from open cv instead of PIL
-        Return an image that is the average of n frames equally distanced from each other
-        """
-        tot_frames = len( self.fileList)
-        step = tot_frames / n
-
-        avg_list = self.fileList[::step]
-        n = len(avg_list)
-        
-        x, y = self.resolution
-        avg_array = np.zeros((y, x, 3))
-        
-        for i in range(n):
-            fp = os.path.join(self.path, avg_list[i])
-            avg_array += fromimage( Image.open(fp), flatten = False )
-
-            
-        return toimage(avg_array / len(avg_array))
-
     def getTotalFrames(self):
         """
         Return the total number of frames
@@ -401,7 +385,6 @@ class virtualCamFrames(Cam):
     def compressAllImages(self, compression=90, resolution=(960,720)):
         """
         FIX THIS: is this needed?
-        good only for virtual cams
         Load all images one by one and save them in a new folder 
         """
         x,y = resolution[0], resolution[1]
@@ -426,6 +409,9 @@ class virtualCamFrames(Cam):
 
 class Arena():
     """
+    The arena define the space where the flies move
+    Carries information about the ROI (coordinates defining each vial) and
+    the number of flies in each vial
     """
     def __init__(self):
         
@@ -442,11 +428,14 @@ class Arena():
         
         self.count_seconds = 0
         
-        self.fa = np.zeros( (self.period, 2), np.float16 )
+        self.fa = np.zeros( (self.period, 2), np.float )
         self.outputFile = None
         
     def __ROItoRect(self, coords):
         """
+        Used internally
+        Converts a ROI (a tuple of four points coordinates) into
+        a Rect (a tuple of two points coordinates)
         """
         (x1, y1), (x2, y2), (x3, y3), (x4, y4) = coords
         lx = min([x1,x2,x3,x4])
@@ -458,6 +447,7 @@ class Arena():
     
     def __getMidline (self, coords):
         """
+           Return the position of each ROI's midline
         """
         (pt1, pt2) = self.__ROItoRect(coords)
         return (pt2[0] - pt1[0])/2
@@ -577,13 +567,18 @@ class Arena():
 
     def addFlyCoords(self, count, fly):
         """
+        Add the provided coordinates to the existing list
+        count   int     the fly number in the arena 
+        fly     (x,y)   the coordinates to add 
         """
+        max_distance=200
+        
         if fly:
             #calculate distance from previous point
             pf = self.flyDataBuffer[count][-1]
             d = np.sqrt ( (fly[0] - pf[0])**2 + (fly[1]-pf[1])**2 )
             #exclude too wide movements unless it's the first movement the fly makes
-            if d > 200 and pf != (0,0): fly = self.flyDataBuffer[count][-1]
+            if d > max_distance and pf != (0,0): fly = self.flyDataBuffer[count][-1]
             
             self.flyDataBuffer[count].append ( fly )
         else:
@@ -595,6 +590,9 @@ class Arena():
         
     def compactSeconds(self):
         """
+        Compact the frames collected in the last second
+        by averaging the value of the coordinates
+        FIX THIS: this function is probably not needed
         """
        
         if self.count_seconds == self.period:
@@ -613,7 +611,7 @@ class Arena():
             self.flyDataBuffer[c] = [self.flyDataBuffer[c][-1]]
         
         self.count_seconds += 1
-    
+
     def writeActivity(self):
         """
         Write the activity to file
@@ -634,7 +632,7 @@ class Arena():
             
         row_header = '%s\t'*5 % (self.rowline, date, tt, active, zeros)
         row = row_header + activity + '\n'
-        
+
         fh = open(self.outputFile, 'a')
         fh.write(row)
         fh.close()
@@ -900,7 +898,7 @@ class Monitor(object):
         
         ct = self.getFrameTime()
         
-        if ( ct - self.lasttime) > 1000: # if one second has elapsed
+        if ( ct - self.lasttime) > 1: # if one second has elapsed
             self.lasttime = ct
             self.arena.compactSeconds() #average the coordinates and transfer from buffer to array
                 
@@ -957,7 +955,7 @@ class Monitor(object):
 
     def autoMask(self, pt1, pt2):
         """
-        EXPERIMENTAL
+        EXPERIMENTAL, FIX THIS
         This is experimental
         For now it works only with one kind of arena
         """
@@ -1119,7 +1117,6 @@ class Monitor(object):
         """
         Track flies in ROIS using findContour algorhytm or opencv
         Each frame is compared against the moving average
-        
         """
 
         grey_image = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
