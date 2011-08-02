@@ -55,7 +55,10 @@ def getMonitorsData(configfile):
     return monitors
  
 class acquireThread(threading.Thread):
-
+    """
+    The processing thread
+    Tracks motion and save results to file
+    """
     def __init__(self, monitor, source, resolution, mask_file, track_type):
         """
         """
@@ -72,12 +75,15 @@ class acquireThread(threading.Thread):
         
     def run(self):
         """
+        This is used internally
+        Use start() to start the thread instead
         """
         while self.keepGoing:
             self.mon.GetImage()
         
     def halt(self):
         """
+        Halting thread without killing it
         """
         self.keepGoing = False
 

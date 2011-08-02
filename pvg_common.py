@@ -27,10 +27,10 @@ import ConfigParser
 
 
 class pvg_config():
-    '''
+    """
     Handles program configuration
     Uses ConfigParser to store and retrieve
-    '''
+    """
     def __init__(self, filename='config.cfg', temporary=False):
         
         self.filename = filename
@@ -53,18 +53,18 @@ class pvg_config():
         self.Read(temporary)
 
     def New(self, filename):
-        '''
-        '''
+        """
+        """
         self.filename = filename
         self.Read()  
 
     def Read(self, temporary=False):
-        '''
+        """
         read the configuration file. Initiate one if does not exist
         
         temporary       True                Read the temporary file instead
                         False  (Default)     Read the actual file
-        '''
+        """
 
         if temporary: filename = self.filename_temp
         else: filename = self.filename        
@@ -78,8 +78,8 @@ class pvg_config():
 
                                
     def Save(self, temporary=False, newfile=False):
-        '''
-        '''
+        """
+        """
         if temporary: filename = self.filename_temp
         else: filename = self.filename
             
@@ -97,8 +97,8 @@ class pvg_config():
 
 
     def SetValue(self, section, key, value):
-        '''
-        '''
+        """
+        """
         
         if not self.config.has_section(section):
             self.config.add_section(section)
@@ -106,11 +106,11 @@ class pvg_config():
         self.config.set(section, key, value)
         
     def GetValue(self, section, key):
-        '''
+        """
         get value from config file
         Does some sanity checking to return tuple, integer and strings 
         as required.
-        '''
+        """
         r = self.config.get(section, key)
         
         if type(r) == type(0) or type(r) == type(1.0): #native int and float
@@ -136,20 +136,20 @@ class pvg_config():
                 
 
     def GetOption(self, key):
-        '''
-        '''
+        """
+        """
         return self.GetValue('Options', key)
         
     def SetMonitor(self, monitor, *args):
-        '''
-        '''
+        """
+        """
         mn = 'Monitor%s' % monitor
         for v, vn in zip( args, self.monitorProperties ):
             self.SetValue(mn, vn, v)
     
     def GetMonitor(self, monitor):
-        '''
-        '''
+        """
+        """
         mn = 'Monitor%s' % monitor
         md = []
         if self.config.has_section(mn):
@@ -158,17 +158,17 @@ class pvg_config():
         return md
 
     def HasMonitor(self, monitor):
-        '''
-        '''
+        """
+        """
         mn = 'Monitor%s' % monitor
         return self.config.has_section(mn)
 
         
 class previewPanel(wx.Panel):
-    '''
+    """
     A panel showing the video images. 
     Used for thumbnails
-    '''
+    """
     def __init__(self, parent, size):
 
         wx.Panel.__init__(self, parent, wx.ID_ANY)
@@ -208,15 +208,15 @@ class previewPanel(wx.Panel):
         self.Bind( wx.EVT_MIDDLE_DOWN, self.SaveCurrentSelection )
 
     def ClearAll(self, event=None):
-        '''
+        """
         Clear all ROIs
-        '''
+        """
         self.mon.delROI(-1)
 
     def ClearLast(self, event=None):
-        '''
+        """
         Cancel current drawing
-        '''
+        """
        
         if self.allowEditing:
             self.selection = None
@@ -227,18 +227,18 @@ class previewPanel(wx.Panel):
                 self.selROI = -1
 
     def SaveCurrentSelection(self, event=None):
-        '''
+        """
         save current selection
-        '''
+        """
         if self.allowEditing and self.selection:
             self.mon.addROI(self.selection, 1)
             self.selection = None
             self.polyPoints = []
         
     def AddPoint(self, event=None):
-        '''
+        """
         Add point
-        '''
+        """
         
         if self.allowEditing:
             if len(self.polyPoints) == 4:
@@ -254,8 +254,8 @@ class previewPanel(wx.Panel):
 
     
     def onLeftDown(self, event=None):
-        '''
-        '''
+        """
+        """
         
         if self.allowEditing:
             x = event.GetX()
@@ -269,8 +269,8 @@ class previewPanel(wx.Panel):
                 self.selROI = r
         
     def onLeftUp(self, event=None):
-        '''
-        '''
+        """
+        """
         if self.allowEditing:
             self.dragging = None
             self.track_window = self.selection
@@ -280,8 +280,8 @@ class previewPanel(wx.Panel):
                 self.polyPoints = []
             
     def onMotion(self, event=None):
-        '''
-        '''
+        """
+        """
         if self.allowEditing:
             x = event.GetX()
             y = event.GetY()
@@ -298,15 +298,15 @@ class previewPanel(wx.Panel):
                 self.selection = (x1,y1), (x2,y1), (x2,y2), (x1, y2)
 
     def AutoMask(self, event=None):
-        '''
-        '''
+        """
+        """
         pt1, pt2 = self.polyPoints[0], self.polyPoints[1]
         self.mon.autoMask(pt1, pt2)
          
 
     def setMonitor(self, camera, resolution):
-        '''
-        '''
+        """
+        """
         
         self.mon = pv.Monitor()
         self.mon.setSource(camera, resolution)
@@ -327,8 +327,8 @@ class previewPanel(wx.Panel):
         self.Bind(wx.EVT_TIMER, self.onNextFrame)
 
     def paintImg(self, img):
-        '''
-        '''
+        """
+        """
 
         frame = cv.CreateMat(self.size[1], self.size[0], cv.CV_8UC3)
         cv.Resize(img, frame)
@@ -339,8 +339,8 @@ class previewPanel(wx.Panel):
             self.Refresh()
 
     def onPaint(self, evt):
-        '''
-        '''
+        """
+        """
         if self.bmp:
             dc = wx.BufferedPaintDC(self)
             self.PrepareDC(dc)
@@ -348,15 +348,15 @@ class previewPanel(wx.Panel):
         evt.Skip()
 
     def onNextFrame(self, evt):
-        '''
-        '''
+        """
+        """
 
         self.paintImg( self.mon.GetImage(drawROIs = True, selection=self.selection, crosses=self.polyPoints) )
         if evt: evt.Skip()
       
     def Play(self, status=True):
-        '''
-        '''
+        """
+        """
 
         self.isPlaying = status
         if status:
@@ -365,13 +365,13 @@ class previewPanel(wx.Panel):
             self.playTimer.Stop()
             
     def Stop(self):
-        '''
-        '''
+        """
+        """
         self.Play(False)
 
     def hasMonitor(self):
-        '''
-        '''
+        """
+        """
         return (self.mon != None)
 
 #################

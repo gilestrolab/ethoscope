@@ -62,7 +62,7 @@ def getCameraCount():
 
 class Cam:
     """
-    shared by all cams
+    Here go properties and functions shared by all cams
     """
     
     def __addText__(self, img, text = None):
@@ -222,7 +222,8 @@ class virtualCamMovie(Cam):
         
         """
 
-        #cv.SetCaptureProperty(self.capture, cv.CV_CAP_PROP_POS_FRAMES, self.currentFrame) # this does not work properly. Image is very corrupted
+        #cv.SetCaptureProperty(self.capture, cv.CV_CAP_PROP_POS_FRAMES, self.currentFrame)
+        # this does not work properly. Image is very corrupted. Must be a bug in opencv
         im = cv.QueryFrame(self.capture)
 
         if not im: im = self.blackFrame
@@ -232,7 +233,6 @@ class virtualCamMovie(Cam):
         #elif self.currentFrame > self.lastFrame and not self.loop: return False
 
         if self.scale:
-            #newsize = cv.CreateMat(self.resolution[0], self.resolution[1], cv.CV_8UC3)
             newsize = cv.CreateImage(self.resolution , cv.IPL_DEPTH_8U, 3)
             cv.Resize(im, newsize)
             im = newsize

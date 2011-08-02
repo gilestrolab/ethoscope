@@ -24,22 +24,22 @@ import wx, os
 from pvg_common import previewPanel, options
 
 class fullSizePanel(previewPanel):
-    '''
+    """
     A small preview Panel to be used as thumbnail
-    '''
+    """
     
     def __init__(self, parent, size):
         previewPanel.__init__(self, parent, size)
         
         
 class panelLiveView(wx.Panel):
-    '''
+    """
     Panel Number 2
     Live view of selected camera
-    '''
+    """
     def __init__(self, *args, **kwds):
-        '''
-        '''
+        """
+        """
         wx.Panel.__init__(self, *args, **kwds)
 
         self.monitor_number = options.GetOption("Monitors")
@@ -137,8 +137,8 @@ class panelLiveView(wx.Panel):
         self.SetSizer(sizer_1) 
 
     def onChangeMonitor(self, event):
-        '''
-        '''
+        """
+        """
         
         if self.fsPanel.isPlaying: self.fsPanel.Stop()
         
@@ -162,9 +162,9 @@ class panelLiveView(wx.Panel):
         self.currentMaskTXT.SetValue(os.path.split(self.mask_file)[1] or '')
 
     def onSaveMask(self, event):
-        '''
+        """
         Save ROIs to File
-        '''
+        """
         
         filename = '%s.msk' % self.monitor_name
         wildcard = "pySolo mask file (*.msk)|*.msk|"
@@ -184,9 +184,9 @@ class panelLiveView(wx.Panel):
         dlg.Destroy()
 
     def onLoadMask(self, event):
-        '''
+        """
         Load Mask from file
-        '''
+        """
         
         wildcard = "pySolo mask file (*.msk)|*.msk|"
         

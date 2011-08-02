@@ -80,13 +80,13 @@ class pvg_OptionsPanel(wx.Panel):
 
         
     def onCancel(self, event):
-        '''
-        '''
+        """
+        """
         self.parent.Destroy()
         
     def onSave(self, event):
-        '''
-        '''
+        """
+        """
         values = [v.GetValue() for v in self.input]
         keys = [key for key in options.defaultOptions]
         
