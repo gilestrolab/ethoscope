@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
 #       pvg_acquire.py
@@ -22,12 +22,12 @@
 #       
 #       
 
-import os, threading
+import os, threading, signal
 import pysolovideo as pv
 from pvg_common import pvg_config
 
 
-def getMonitorsData(configfile):
+def getMonitorsData(configfile=None):
     """
     return a list containing the monitors that we need to track 
     based on info found in configfile
@@ -55,17 +55,14 @@ def getMonitorsData(configfile):
     return monitors
  
 class acquireThread(threading.Thread):
-    """
-    The processing thread
-    Tracks motion and save results to file
-    """
+
     def __init__(self, monitor, source, resolution, mask_file, track_type):
         """
         """
         threading.Thread.__init__(self)
         self.monitor = monitor
         self.keepGoing = True
-        outputFile = 'MON%s.txt' % monitor
+        outputFile = os.path.join('/home/sandfly/Desktop/DATA/', 'MON%s.txt' % monitor)
         
         self.mon = pv.Monitor()
         self.mon.setSource(source, resolution)
@@ -73,27 +70,29 @@ class acquireThread(threading.Thread):
         
         print "Setting monitor %s with source %s and mask %s. Output to %s " % (monitor, source, os.path.split(mask_file)[1], os.path.split(outputFile)[1] )
         
+        #signal.signal(signal.SIGINT, self.halt)
+
     def run(self):
         """
-        This is used internally
-        Use start() to start the thread instead
         """
         while self.keepGoing:
             self.mon.GetImage()
         
-    def halt(self):
+    def halt(self, signal, frame):
         """
-        Halting thread without killing it
         """
         self.keepGoing = False
+        print "Stopping capture"
 
 if __name__ == '__main__':
+
+    configfile = None
     
     if len(os.sys.argv) > 1 and os.path.isfile(os.sys.argv[1]):
         configfile = os.sys.argv[1]
     else:
-        print ('You need to specify the config file to be read')
-        exit()
+        print ('configfile not specified; using default file: config.cfg')
+        #exit()
         
     monitorsData = getMonitorsData(configfile)
     
