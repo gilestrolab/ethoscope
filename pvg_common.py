@@ -309,14 +309,14 @@ class previewPanel(wx.Panel):
         self.mon = pv.Monitor()
         self.mon.setSource(camera, resolution)
         
-        frame_big = self.mon.GetImage() 
+        #frame_big = self.mon.GetImage() 
         
         #resize
         frame = cv.CreateMat(self.size[1], self.size[0], cv.CV_8UC3)
-        cv.Resize(frame_big, frame)
+        #cv.Resize(frame_big, frame)
         
         #convert colors before transforming to RGB
-        cv.CvtColor(frame, frame, cv.CV_BGR2RGB)
+        #cv.CvtColor(frame, frame, cv.CV_BGR2RGB)
         self.bmp = wx.BitmapFromBuffer(self.size[0], self.size[1], frame.tostring())
 
         self.Bind(wx.EVT_PAINT, self.onPaint)
@@ -331,10 +331,9 @@ class previewPanel(wx.Panel):
         frame = cv.CreateMat(self.size[1], self.size[0], cv.CV_8UC3)
         cv.Resize(img, frame)
 
-        if frame:
-            cv.CvtColor(frame, frame, cv.CV_BGR2RGB)
-            self.bmp.CopyFromBuffer(frame.tostring())
-            self.Refresh()
+        cv.CvtColor(frame, frame, cv.CV_BGR2RGB)
+        self.bmp.CopyFromBuffer(frame.tostring())
+        self.Refresh()
 
     def onPaint(self, evt):
         """
