@@ -105,13 +105,15 @@ class realCam(Cam):
     camera is handled through opencv and images can be transformed to PIL
     """
     def __init__(self, devnum=0, showVideoWindow=False, resolution=(640,480)):
+        self.scale = False
+        self.resolution = resolution
         self.camera = cv.CaptureFromCAM(devnum)
         self.setResolution (*resolution)
 
     def getFrameTime(self):
         """
         """
-        return time.time() #current time epoch in ms
+        return time.time() #current time epoch in secs.ms
 
     def addTimeStamp(self, img):
         """
@@ -120,15 +122,23 @@ class realCam(Cam):
 
     def setResolution(self, x, y):
         """
-        Set resolution of the camera we are aquiring from
+        Set resolution of the camera we are acquiring from
         """
         x = int(x); y = int(y)
         self.resolution = (x, y)
         cv.SetCaptureProperty(self.camera, cv.CV_CAP_PROP_FRAME_WIDTH, x)
         cv.SetCaptureProperty(self.camera, cv.CV_CAP_PROP_FRAME_HEIGHT, y)
+        x1, y1 = self.getResolution()
+        self.scale = ( (x, y) != (x1, y1) ) # if the camera does not support resolution, we need to scale the image
+        
+    def getResolution(self):
+        """
+        Return real resolution
+        """
         x1 = cv.GetCaptureProperty(self.camera, cv.CV_CAP_PROP_FRAME_WIDTH)
         y1 = cv.GetCaptureProperty(self.camera, cv.CV_CAP_PROP_FRAME_HEIGHT)
-        return (x, y) == (x1, y1)
+        return (int(x1), int(y1))
+        
 
     def getImage( self, timestamp=False):
         """
@@ -139,6 +149,12 @@ class realCam(Cam):
                     
         """        
         frame = cv.QueryFrame(self.camera)
+
+        if self.scale:
+            newsize = cv.CreateImage(self.resolution , cv.IPL_DEPTH_8U, 3)
+            cv.Resize(frame, newsize)
+            frame = newsize
+        
         if timestamp: frame = self.__addText__(frame)
         
         return frame
@@ -209,7 +225,7 @@ class virtualCamMovie(Cam):
         if asString:
             return '%s - %s/%s' % (frameTime, self.currentFrame, self.totalFrames) #time.asctime(time.localtime(fileTime))
         else:
-            return frameTime / 1000.0 #returning second for compatibilty reasons
+            return frameTime / 1000.0 #returning seconds compatibility reasons
     
     def getImage(self, timestamp=False):
         """
@@ -218,13 +234,10 @@ class virtualCamMovie(Cam):
         timestamp   False   (Default) Does not add timestamp
                     True              Add timestamp to the image
                     
-        imgType     PIL               Return a PIL image
-                    BMP               Return a BMP image (slowest)
-                    CV      (Default) Return a CV native image (IPL)
-        
         """
 
-        #cv.SetCaptureProperty(self.capture, cv.CV_CAP_PROP_POS_FRAMES, self.currentFrame) # this does not work properly. Image is very corrupted
+        #cv.SetCaptureProperty(self.capture, cv.CV_CAP_PROP_POS_FRAMES, self.currentFrame)
+        # this does not work properly. Image is very corrupted
         im = cv.QueryFrame(self.capture)
 
         if not im: im = self.blackFrame
@@ -234,7 +247,6 @@ class virtualCamMovie(Cam):
         #elif self.currentFrame > self.lastFrame and not self.loop: return False
 
         if self.scale:
-            #newsize = cv.CreateMat(self.resolution[0], self.resolution[1], cv.CV_8UC3)
             newsize = cv.CreateImage(self.resolution , cv.IPL_DEPTH_8U, 3)
             cv.Resize(im, newsize)
             im = newsize
@@ -244,7 +256,6 @@ class virtualCamMovie(Cam):
             im = self.__addText__(im, text, imgType)
 
         return im
-
       
     def setResolution(self, w, h):
         """
@@ -633,9 +644,10 @@ class Arena():
         row_header = '%s\t'*5 % (self.rowline, date, tt, active, zeros)
         row = row_header + activity + '\n'
 
-        fh = open(self.outputFile, 'a')
-        fh.write(row)
-        fh.close()
+        if self.outputFile:
+            fh = open(self.outputFile, 'a')
+            fh.write(row)
+            fh.close()
             
     
     def calculateDistances(self):
@@ -781,6 +793,7 @@ class Monitor(object):
         self.isVirtualCam = False
         self.cam = realCam(devnum=devnum)
         self.cam.setResolution(*resolution)
+        self.resolution = self.cam.getResolution()
         self.numberOfFrames = 0
         
     def CaptureFromMovie(self, camera, resolution=None, options=None):
@@ -795,7 +808,6 @@ class Monitor(object):
             loop = options['loop']
 
         self.cam = virtualCamMovie(path=camera, resolution = resolution)
-                                   
         self.resolution = self.cam.getResolution()
         self.numberOfFrames = self.cam.getTotalFrames()
         
