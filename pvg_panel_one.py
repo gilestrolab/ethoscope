@@ -203,7 +203,7 @@ class panelConfigure(wx.Panel):
 
         #trackingTypeSizer = wx.Sizer(wx.HORIZONTAL)
         self.trackDistanceRadio = wx.RadioButton(self, -1, 'Activity as distance traveled', style=wx.RB_GROUP)
-        self.trackVirtualBM = wx.RadioButton(self, -1, 'Activity as virtual midline crossing')
+        self.trackVirtualBM = wx.RadioButton(self, -1, 'Activity as midline crossings count')
         sbSizer_3.Add (wx.StaticText ( self, -1, "Calculate fly activity as..."), 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
         sbSizer_3.Add (self.trackDistanceRadio, 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 2 )
         sbSizer_3.Add (self.trackVirtualBM, 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 2 )
@@ -312,7 +312,7 @@ class panelConfigure(wx.Panel):
         
         for (r, s), st in zip(self.controls,range(3)):
             if r.GetValue():
-                source = s.GetSelection()
+                source = s.GetValue()
                 sourceType = st
         
         track = self.activateTracking.GetValue()
@@ -320,16 +320,14 @@ class panelConfigure(wx.Panel):
         self.trackType = self.trackDistanceRadio.GetValue()
         
         if self.thumbnail:
+           
+            if sourceType > 0: camera = source
+            else: camera = self.WebcamsList.index(source)
 
-            self.thumbnail.source = source
+            self.thumbnail.source = camera
             self.thumbnail.sourceType = sourceType
 
             self.currentSource.SetValue( os.path.split(source)[1] )
-            
-            if sourceType > 0:
-                camera = source
-            else:
-                camera = self.WebcamsList.index(source)
             
             ts = self.thumbnail.size
             self.thumbnail.setMonitor(camera, ts )

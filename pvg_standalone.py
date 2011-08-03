@@ -1,4 +1,4 @@
-#!/usr/bin/env python2 
+#!/usr/bin/env python
 import wx, cv
 import pysolovideo as pv
 from pvg_common import previewPanel, pvg_config

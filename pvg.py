@@ -32,9 +32,9 @@ from pvg_panel_two import panelLiveView
 from pvg_common import options
         
 class mainNotebook(wx.Notebook):
-    '''
+    """
     The main notebook containing all the panels for data displaying and analysis
-    '''
+    """
     def __init__(self, *args, **kwds):
         # begin wxGlade: propertiesNotebook.__init__
         kwds["style"] = wx.NB_LEFT
@@ -49,9 +49,9 @@ class mainNotebook(wx.Notebook):
         self.Layout()
         
 class mainFrame(wx.Frame):
-    '''
+    """
     The main frame of the application
-    '''
+    """
     def __init__(self, *args, **kwds):
 
         kwds["style"] = wx.DEFAULT_FRAME_STYLE
@@ -119,13 +119,13 @@ class mainFrame(wx.Frame):
         wx.EVT_MENU(self, ID_OPTIONS_SET, self.onConfigure)
         
     def onFileSave(self, event):
-        '''
-        '''
+        """
+        """
         options.Save()
         
     def onFileSaveAs(self, event):
-        '''
-        '''
+        """
+        """
         filename = 'config.cfg'
         wildcard = "pySolo Video config file (*.cfg)|*.cfg|"
         
@@ -143,8 +143,8 @@ class mainFrame(wx.Frame):
         dlg.Destroy()
         
     def onFileOpen(self, event):
-        '''
-        '''
+        """
+        """
         wildcard = "pySolo Video config file (*.cfg)|*.cfg|"
         
         dlg = wx.FileDialog(
@@ -162,13 +162,13 @@ class mainFrame(wx.Frame):
         dlg.Destroy()
 
     def onFileExit(self, event):
-        '''
-        '''
+        """
+        """
         self.Close()
     
     def onConfigure(self, event):
-        '''
-        '''
+        """
+        """
         frame_opt = optionsFrame(self, -1, '')
         #app.SetTopWindow(frame_opt)
         frame_opt.Show()
