@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=pySolo-Video-GUI
+X-GNOME-FullName=pySolo Video GUI
+Comment=GUI to pySolo Video Extension
+Exec=pvg.py
+Terminal=false
+Type=Application
+Icon=pysolo-video.svg
+Categories=GNOME;AudioVideo;Scientific
