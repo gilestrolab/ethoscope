@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 import wx, cv
 import pysolovideo as pv
 from pvg_common import previewPanel, pvg_config
@@ -21,7 +21,7 @@ if __name__=="__main__":
     resolution = (800, 600)
     source = 0 # or filename or dirname
     track = True
-    mask_file = 'Monitor 2.msk'
+    mask_file = 'Monitor_2.msk'
     track_type = 0 # or 1
 
     outputFile = '' # or filename.txt to activate writing

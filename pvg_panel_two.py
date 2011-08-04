@@ -166,7 +166,7 @@ class panelLiveView(wx.Panel):
         Save ROIs to File
         """
         
-        filename = '%s.msk' % self.monitor_name
+        filename = '%s.msk' % self.monitor_name.replace(' ','_')
         wildcard = "pySolo mask file (*.msk)|*.msk|"
         
         dlg = wx.FileDialog(

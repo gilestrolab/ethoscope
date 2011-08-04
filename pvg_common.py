@@ -257,7 +257,7 @@ class previewPanel(wx.Panel):
         """
         """
         
-        if self.allowEditing:
+        if self.allowEditing and self.mon:
             x = event.GetX()
             y = event.GetY()
             r = self.mon.isPointInROI ( (x,y) )
