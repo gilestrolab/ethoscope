@@ -53,7 +53,7 @@ def getCameraCount():
     
     while Cameras:
         try:
-            print cv.CaptureFromCAM(n)
+            print ( cv.CaptureFromCAM(n) )
             n += 1
         except:
             Cameras = False
@@ -353,7 +353,7 @@ class virtualCamFrames(Cam):
             im = cv.LoadImage(fp) #using cv to open the file
             
         except:
-            print 'error with image %s' % fp
+            print ( 'error with image %s' % fp )
             raise
 
         if self.scale:
@@ -1083,7 +1083,7 @@ class Monitor(object):
                         if(s < 0.3):
                             pt = [result[i] for i in range(4)]
                             squares.append(pt)
-                            print 'current # of squares found %d' % len(squares)
+                            print ('current # of squares found %d' % len(squares))
                     contour = contour.h_next()
          
         return squares    

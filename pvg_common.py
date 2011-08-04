@@ -29,8 +29,9 @@ class pvg_config():
     Handles program configuration
     Uses ConfigParser to store and retrieve
     """
-    def __init__(self, filename='config.cfg', temporary=False):
+    def __init__(self, filename=None, temporary=False):
 
+        filename = filename or 'config.cfg'
         pDir = os.getcwd()
         if not os.access(pDir, os.W_OK): pDir = os.environ['HOME']
 
@@ -44,7 +45,8 @@ class pvg_config():
                                 "ThumbnailSize" : ['320, 240', "Specify the size for the thumbnail previews"], 
                                 "FullSize" : ['800, 600', "Specify the size for the actual acquisition from the webcams.\nMake sure your webcam supports this definition"], 
                                 "FPS_preview" : [5, "Refresh frequency (FPS) of the thumbnails during preview.\nSelect a low rate for slow computers"],  
-                                "FPS_recording" : [5, "Actual refresh rate (FPS) during acquisition and processing"]
+                                "FPS_recording" : [5, "Actual refresh rate (FPS) during acquisition and processing"],
+                                "Data_Folder" : ['', "Folder where the final data are saved"]
                                }
         
         self.monitorProperties = ['sourceType', 'source', 'track', 'maskfile', 'trackType']
