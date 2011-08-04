@@ -1,0 +1,10 @@
+TODO
+====
+
+Real support of not rectangular ROI
+Add support for polygons (more than 4 corners)
+GUI for acquisition
+Make DEBs and EXEs 
+Found a way to close stream from camera capture in opencv
+
+
