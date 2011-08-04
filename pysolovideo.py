@@ -44,6 +44,8 @@ import os, sys, datetime, time
 import numpy as np
 import cPickle
 
+pySoloVideoVersion ='0.8-master-git'
+
 def getCameraCount():
     """
     FIX THIS
