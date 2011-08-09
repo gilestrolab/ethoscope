@@ -169,15 +169,15 @@ class previewPanel(wx.Panel):
     A panel showing the video images. 
     Used for thumbnails
     """
-    def __init__(self, parent, size):
+    def __init__(self, parent, size, keymode=False):
 
-        wx.Panel.__init__(self, parent, wx.ID_ANY)
+        wx.Panel.__init__(self, parent, wx.ID_ANY, style=wx.WANTS_CHARS)
         
-        self.parent = parent 
+        self.parent = parent
 
         self.size = size
         self.SetMinSize(self.size)
-        fps = options.GetOption('FPS_preview')
+        fps = options.GetOption('FPS_preview') or 7
         self.interval = 1000/fps # fps determines refresh interval in ms
 
         self.SetBackgroundColour('#A9A9A9')
@@ -187,7 +187,7 @@ class previewPanel(wx.Panel):
         self.mon = None
         self.track = False
         self.trackType = 1
-
+        self.drawROI = True
 
         self.recording = False
         self.isPlaying = False
@@ -199,6 +199,7 @@ class previewPanel(wx.Panel):
         self.selection = None
         self.selROI = -1
         self.polyPoints = []
+        self.keymode = keymode
         
         self.Bind( wx.EVT_LEFT_DOWN, self.onLeftDown )
         self.Bind( wx.EVT_LEFT_UP, self.onLeftUp )
@@ -206,6 +207,10 @@ class previewPanel(wx.Panel):
         self.Bind( wx.EVT_MOTION, self.onMotion )
         self.Bind( wx.EVT_RIGHT_DOWN, self.ClearLast )
         self.Bind( wx.EVT_MIDDLE_DOWN, self.SaveCurrentSelection )
+        
+        if keymode: 
+            self.Bind( wx.EVT_CHAR, self.onKeyPressed )
+            self.SetFocus()
 
     def ClearAll(self, event=None):
         """
@@ -297,6 +302,19 @@ class previewPanel(wx.Panel):
                 x1, y1, x2, y2  = (xmin, ymin, xmax, ymax)
                 self.selection = (x1,y1), (x2,y1), (x2,y2), (x1, y2)
 
+    def onKeyPressed(self, event):
+        """
+        """
+        key = chr(event.GetKeyCode())
+        
+        if key == 'a': self.AutoMask()
+        if key == 'c': self.ClearLast()
+        if key == 'x': self.ClearAll()
+        if key == 's' and self.mon.writer: self.mon.grabMovie = not self.mon.grabMovie
+        if key == 'j': self.SaveCurrentSelection()
+        #if key == '': self.()
+            
+
     def AutoMask(self, event=None):
         """
         """
@@ -350,14 +368,15 @@ class previewPanel(wx.Panel):
         """
         """
 
-        self.paintImg( self.mon.GetImage(drawROIs = True, selection=self.selection, crosses=self.polyPoints) )
+        self.paintImg( self.mon.GetImage(drawROIs = self.drawROI, selection=self.selection, crosses=self.polyPoints, timestamp=True) )
         if evt: evt.Skip()
       
-    def Play(self, status=True):
+    def Play(self, status=True, showROIs=True):
         """
         """
-
+        self.drawROI = showROIs
         self.isPlaying = status
+        
         if status:
             self.playTimer.Start(self.interval)
         else:
