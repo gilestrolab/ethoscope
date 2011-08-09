@@ -66,25 +66,26 @@ class Cam:
     Functions and properties inherited by all cams
     """
     
-    def __addText__(self, img, text = None):
+    def __addText__(self, frame, text = None):
         """
         Add current time as stamp to the image
         """
 
-        normalfont = cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, 1, 1, 0, 1, 8)
-        boldfont = cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, 1, 1, 0, 3, 8)
-        font = normalfont
-
-        width, height = self.resolution
-        x = 10
-        y = height - 15
-        textcolor = 0xffffff
-        
         if not text: text = time.asctime(time.localtime(time.time()))
 
-        cv.PutText(im, text, (x, y), font, textcolor)
+        normalfont = cv.InitFont(cv.CV_FONT_HERSHEY_PLAIN, 1, 1, 0, 1, 8)
+        boldfont = cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, 1, 1, 0, 3, 8)
+        font = normalfont
+        textcolor = (255,255,255)
+
+        (x1, _), ymin = cv.GetTextSize(text, font)
+        width, height = frame.width, frame.height
+        x = width - x1 - (width/64)
+        y = height - ymin - 2
+
+        cv.PutText(frame, text, (x, y), font, textcolor)
         
-        return im
+        return frame
 
     def getResolution(self):
         """
@@ -223,8 +224,10 @@ class virtualCamMovie(Cam):
         """
         
         frameTime = cv.GetCaptureProperty(self.capture, cv.CV_CAP_PROP_POS_MSEC)
+
         
         if asString:
+            frameTime = str( datetime.timedelta(seconds=frameTime / 100.0) )
             return '%s - %s/%s' % (frameTime, self.currentFrame, self.totalFrames) #time.asctime(time.localtime(fileTime))
         else:
             return frameTime / 1000.0 #returning seconds compatibility reasons
@@ -255,7 +258,7 @@ class virtualCamMovie(Cam):
 
         if timestamp:
             text = self.getFrameTime(asString=True)
-            im = self.__addText__(im, text, imgType)
+            im = self.__addText__(im, text)
 
         return im
       
@@ -365,7 +368,7 @@ class virtualCamFrames(Cam):
         self.last_time = self.getFileTime(fp)
     
         if timestamp:
-            im = self.__addText__(im, self.last_time, imgType)
+            im = self.__addText__(im, self.last_time)
         
         return im
     
@@ -635,6 +638,7 @@ class Arena():
         tt = '%02d:%02d:%02d' % (hh, mn, sec)
         active = '1'
         zeros = '0\t0\t0\t0'
+        activity = ''
 
         self.rowline +=1 
 
@@ -855,7 +859,9 @@ class Monitor(object):
         self.mask_file = mask_file
         self.arena.outputFile = outputFile
         
-        if mask_file: self.loadROIS(mask_file)
+        if mask_file:
+            self.loadROIS(mask_file)
+            print mask_file
 
         
     def getFrameTime(self):
@@ -871,7 +877,7 @@ class Monitor(object):
         return self.cam.isLastFrame()
 
 
-    def saveMovie(self, filename, fps=24, codec='FMP4'):
+    def saveMovie(self, filename, fps=24, codec='FMP4', startOnKey=False):
         """
         Determines whether all the frames grabbed through getImage will also 
         be saved as movie.
@@ -882,10 +888,10 @@ class Monitor(object):
         
         http://stackoverflow.com/questions/5426637/writing-video-with-opencv-python-mac
         """
-        fourcc = cv.CV_FOURCC([c for c in codec])
+        fourcc = cv.CV_FOURCC(*[c for c in codec])
         
         self.writer = cv.CreateVideoWriter(filename, fourcc, fps, self.resolution, 1)
-        self.grabMovie = True
+        self.grabMovie = not startOnKey
 
 
     def saveSnapshot(self, *args, **kwargs):
@@ -1145,7 +1151,7 @@ class Monitor(object):
             cv.ConvertScale(frame, self.moving_average, 1.0, 0.0)
             self.firstFrame = False
         else:
-            cv.RunningAvg(frame, self.moving_average, 0.040, None) #0.020
+            cv.RunningAvg(frame, self.moving_average, 0.08, None) #0.040
             
             
         # Convert the scale of the moving average.
