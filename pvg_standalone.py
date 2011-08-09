@@ -1,5 +1,5 @@
-#!/usr/bin/env python2
-import wx, cv
+#!/usr/bin/env python
+import wx, cv, optparse
 import pysolovideo as pv
 from pvg_common import previewPanel, pvg_config
 
@@ -7,30 +7,61 @@ class CvMovieFrame(wx.Frame):
     def __init__(self, parent, source, resolution, track, track_type, mask_file, outputFile ):
         wx.Frame.__init__(self, parent)
         self.displayPanel = previewPanel(self, size=resolution)
+        self.SetSize(resolution)
+        self.Show()
 
         self.displayPanel.setMonitor(source, resolution)
         self.displayPanel.mon.setTracking(track, track_type, mask_file, outputFile)
         self.displayPanel.Play()
-        
+
+
         
 
-if __name__=="__main__":
+def start(source, resolution, track, track_type, mask_file, outputFile):
+    """
+    start the wx window
+    """
     
-    options = pvg_config('config.cfg')
-
-    resolution = (800, 600)
-    source = 0 # or filename or dirname
-    track = True
-    mask_file = 'Monitor_2.msk'
-    track_type = 0 # or 1
-
-    outputFile = '' # or filename.txt to activate writing
-
-    _,source,track,mask_file,track_type = options.GetMonitor(0)
-      
     app = wx.App()
     f = CvMovieFrame(None, source, resolution, track, track_type, mask_file, outputFile )
-    f.SetSize(resolution)
+    app.MainLoop()    
 
-    f.Show()
-    app.MainLoop()
+
+
+if __name__=="__main__":
+
+
+    parser = optparse.OptionParser(usage='%prog [options] [argument]>', version='%prog version 0.1')
+    parser.add_option('-c', '--config', dest='configfile', metavar="CONFIGFILE", help="Config mode | Use specified CONFIGFILE")
+    parser.add_option('-m', '--monitor', dest='monitor', metavar="MON", help="Config mode | Load monitor MON configfile")
+    parser.add_option('-i', '--input', dest='source', metavar="SOURCE", help="File mode | Specify a source (camera number, file or folder)")
+    parser.add_option('-k', '--mask', dest='mask_file', metavar="MASKFILE", help="File mode | Specify a maskfile to be used with file.")
+    parser.add_option('-t', '--tracktype', dest='track_type', metavar="TT", help="File mode | Specify track type: 0, distance; 1, trikinetics; 2, coordinates")
+    parser.add_option('-o', '--output', dest='outputFile', metavar="OUTFILE", help="All modes | Specify an output file where to store tracking results. A Mask must be loaded")
+    
+    (options, args) = parser.parse_args()
+
+    if options.configfile and options.monitor:
+
+        opts = pvg_config(options.configfile)
+        mon = int(options.monitor)
+        _,source,track,mask_file,track_type = opts.GetMonitor(mon)
+        resolution = opts.GetOption('FullSize')
+        outputFile = options.outputFile or ''
+        start( source, resolution, track, track_type, mask_file, outputFile )
+        
+    elif options.source:
+        
+        resolution = (640, 480)
+        source = options.source # integer or filename or dirname
+        
+        mask_file = options.mask_file
+        track_type = options.track_type
+        track = mask_file and track_type
+        outputFile = options.outputFile
+        start( source, resolution, track, track_type, mask_file, outputFile )
+
+    
+    else:
+        parser.print_help()
+
