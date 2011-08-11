@@ -368,7 +368,7 @@ class previewPanel(wx.Panel):
         """
         """
 
-        self.paintImg( self.mon.GetImage(drawROIs = self.drawROI, selection=self.selection, crosses=self.polyPoints, timestamp=True) )
+        self.paintImg( self.mon.GetImage(drawROIs = self.drawROI, selection=self.selection, crosses=self.polyPoints, timestamp=False) )
         if evt: evt.Skip()
       
     def Play(self, status=True, showROIs=True):

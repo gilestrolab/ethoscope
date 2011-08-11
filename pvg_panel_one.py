@@ -204,9 +204,11 @@ class panelConfigure(wx.Panel):
         #trackingTypeSizer = wx.Sizer(wx.HORIZONTAL)
         self.trackDistanceRadio = wx.RadioButton(self, -1, 'Activity as distance traveled', style=wx.RB_GROUP)
         self.trackVirtualBM = wx.RadioButton(self, -1, 'Activity as midline crossings count')
+        self.trackPosition = wx.RadioButton(self, -1, 'Only position of flies')
         sbSizer_3.Add (wx.StaticText ( self, -1, "Calculate fly activity as..."), 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
         sbSizer_3.Add (self.trackDistanceRadio, 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 2 )
         sbSizer_3.Add (self.trackVirtualBM, 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 2 )
+        sbSizer_3.Add (self.trackPosition, 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 2 )
   
         lowerSizer.Add(sbSizer_3, -1, wx.EXPAND|wx.ALL, 5)
 
@@ -283,7 +285,8 @@ class panelConfigure(wx.Panel):
         #update third static box
         self.activateTracking.SetValue(self.thumbnail.track)
         self.pickMaskBrowser.SetValue(mask_file or '')
-        self.trackDistanceRadio.SetValue(trackType)
+        [self.trackDistanceRadio, self.trackVirtualBM, self.trackPosition][trackType].SetValue(True)
+
 
     def sourceCallback (self, event):
         """
@@ -317,7 +320,10 @@ class panelConfigure(wx.Panel):
         
         track = self.activateTracking.GetValue()
         self.mask_file = self.pickMaskBrowser.GetValue()
-        self.trackType = self.trackDistanceRadio.GetValue()
+        
+        if self.trackDistanceRadio.GetValue(): self.trackType = 0
+        elif self.trackVirtualBM.GetValue(): self.trackType = 1
+        elif self.trackPosition.GetValue(): self.trackType = 2
         
         if self.thumbnail:
            

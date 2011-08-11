@@ -634,21 +634,28 @@ class Arena():
         Kind of motion depends on user settings
         """
         year, month, day, hh, mn, sec = time.localtime()[0:6]
-        date = '%02d %02d %s' % (day,month,str(year)[:-2])
+        date = '%02d %02d %s' % (day,month,str(year)[-2:])
         tt = '%02d:%02d:%02d' % (hh, mn, sec)
         active = '1'
         zeros = '0\t0\t0\t0'
-        activity = ''
+        
+        activity = []
+        row = ''
 
-        self.rowline +=1 
 
         if self.trackType == 1:
-            activity = self.calculateDistances()
+            activity = [self.calculateDistances(),]
+        
         elif self.trackType == 0:
-            activity = self.calculateVBM()
+            activity = [self.calculateVBM(),]
+        
+        elif self.trackType == 2:
+            activity = self.calculatePosition()
             
-        row_header = '%s\t'*5 % (self.rowline, date, tt, active, zeros)
-        row = row_header + activity + '\n'
+        for line in activity:
+            self.rowline +=1 
+            row_header = '%s\t'*5 % (self.rowline, date, tt, active, zeros)
+            row += row_header + line + '\n'
 
         if self.outputFile:
             fh = open(self.outputFile, 'a')
@@ -699,8 +706,24 @@ class Arena():
         activity = '\t'.join( [str(v) for v in values] )
         return activity
             
-            
-            
+    def calculatePosition(self, resolution=1):
+        """
+        Simply write out position of the fly at every time interval, as 
+        decided by "resolution" (seconds)
+        """
+        
+        activity = []
+
+        a = np.array( self.flyDataMin ) #( n_flies, interval, (x,y) )
+        a = a.transpose(1,0,2) # ( interval, n_flies, (x,y) )
+        
+        a = a.reshape(resolution, -1, 32, 2).mean(0)
+        
+        for fd in a:
+            onerow = '\t'.join( ['%s,%s' % (x,y) for (x,y) in fd] )
+            activity.append(onerow)
+        
+        return activity
     
 class Monitor(object):
     """
@@ -855,13 +878,12 @@ class Monitor(object):
         """
 
         self.track = track
-        self.arena.trackType = trackType
+        self.arena.trackType = int(trackType)
         self.mask_file = mask_file
         self.arena.outputFile = outputFile
         
         if mask_file:
             self.loadROIS(mask_file)
-            print mask_file
 
         
     def getFrameTime(self):
