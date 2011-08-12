@@ -643,10 +643,10 @@ class Arena():
         row = ''
 
 
-        if self.trackType == 1:
+        if self.trackType == 0:
             activity = [self.calculateDistances(),]
         
-        elif self.trackType == 0:
+        elif self.trackType == 1:
             activity = [self.calculateVBM(),]
         
         elif self.trackType == 2:
