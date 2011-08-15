@@ -500,6 +500,12 @@ class Arena():
             self.flyDataMin.pop(n)
         elif n < 0:
             self.ROIS = []
+            
+    def getROInumber(self):
+        """
+        Return the number of current active ROIS
+        """
+        return len(self.ROIS)
         
     def saveROIS(self, filename):
         """
@@ -610,7 +616,7 @@ class Arena():
         by averaging the value of the coordinates
         FIX THIS: this function is probably not needed
         """
-       
+        
         if self.count_seconds == self.period:
             self.writeActivity()
             self.count_seconds = 0
@@ -713,11 +719,12 @@ class Arena():
         """
         
         activity = []
-
+        rois = self.getROInumber()
+        
         a = np.array( self.flyDataMin ) #( n_flies, interval, (x,y) )
         a = a.transpose(1,0,2) # ( interval, n_flies, (x,y) )
         
-        a = a.reshape(resolution, -1, 32, 2).mean(0)
+        a = a.reshape(resolution, -1, rois, 2).mean(0)
         
         for fd in a:
             onerow = '\t'.join( ['%s,%s' % (x,y) for (x,y) in fd] )
@@ -818,8 +825,10 @@ class Monitor(object):
     def CaptureFromCAM(self, devnum=0, resolution=(640,480), options=None):
         """
         """
-        self.resolution = resolution
         self.isVirtualCam = False
+        self.source = camera
+
+        self.resolution = resolution
         self.cam = realCam(devnum=devnum)
         self.cam.setResolution(*resolution)
         self.resolution = self.cam.getResolution()
@@ -829,6 +838,7 @@ class Monitor(object):
         """
         """
         self.isVirtualCam = True
+        self.source = camera
         
         if options:
             step = options['step']
@@ -843,14 +853,15 @@ class Monitor(object):
     def CaptureFromFrames(self, camera, resolution=None, options=None):
         """
         """
-         
+        self.isVirtualCam = True
+        self.source = camera
+        
         if options:
             step = options['step']
             start = options['start']
             end = options['end']
             loop = options['loop'] 
          
-        self.isVirtualCam = True
         self.cam = virtualCamFrame(path = camera, resolution = resolution)
         self.resolution = self.cam.getResolution()
         self.numberOfFrames = self.cam.getTotalFrames()
@@ -866,7 +877,7 @@ class Monitor(object):
         elif os.path.isdir(camera):
             self.CaptureFromFrames(camera, resolution, options)
 
-    def setTracking(self, track, trackType, mask_file, outputFile):
+    def setTracking(self, track, trackType=0, mask_file='', outputFile=''):
         """
         Set the tracking parameters
         
@@ -876,6 +887,10 @@ class Monitor(object):
         mask_file   text        the file used to load and store masks
         outputFile  text        the txt file where results will be saved
         """
+
+        if trackType == None: trackType = 0
+        if mask_file == None: mask_file = ''
+        if outputFile == None: outputFile = ''
 
         self.track = track
         self.arena.trackType = int(trackType)

@@ -43,7 +43,7 @@ class pvg_config():
         self.defaultOptions = { "Monitors" : [9, "Select the number of monitors connected to this machine"],
                                 "Webcams"  : [1, "Select the number of webcams connected to this machine"],
                                 "ThumbnailSize" : ['320, 240', "Specify the size for the thumbnail previews"], 
-                                "FullSize" : ['800, 600', "Specify the size for the actual acquisition from the webcams.\nMake sure your webcam supports this definition"], 
+                                "FullSize" : ['640, 480', "Specify the size for the actual acquisition from the webcams.\nMake sure your webcam supports this definition"], 
                                 "FPS_preview" : [5, "Refresh frequency (FPS) of the thumbnails during preview.\nSelect a low rate for slow computers"],  
                                 "FPS_recording" : [5, "Actual refresh rate (FPS) during acquisition and processing"],
                                 "Data_Folder" : ['', "Folder where the final data are saved"]
@@ -169,7 +169,7 @@ class previewPanel(wx.Panel):
     A panel showing the video images. 
     Used for thumbnails
     """
-    def __init__(self, parent, size, keymode=False):
+    def __init__(self, parent, size, keymode=True):
 
         wx.Panel.__init__(self, parent, wx.ID_ANY, style=wx.WANTS_CHARS)
         
@@ -304,14 +304,22 @@ class previewPanel(wx.Panel):
 
     def onKeyPressed(self, event):
         """
+        Regulates key pressing responses:
+        a       create auto mask
+        c       clear last ROI selected
+        x       clear all
+        g       start or stop movie grabbing
+        j       add current selection
+        s       save current mask
         """
         key = chr(event.GetKeyCode())
         
         if key == 'a': self.AutoMask()
         if key == 'c': self.ClearLast()
         if key == 'x': self.ClearAll()
-        if key == 's' and self.mon.writer: self.mon.grabMovie = not self.mon.grabMovie
+        if key == 'g' and self.mon.writer: self.mon.grabMovie = not self.mon.grabMovie
         if key == 'j': self.SaveCurrentSelection()
+        if key == 's': self.SaveMask()
         #if key == '': self.()
             
 
@@ -321,6 +329,11 @@ class previewPanel(wx.Panel):
         pt1, pt2 = self.polyPoints[0], self.polyPoints[1]
         self.mon.autoMask(pt1, pt2)
          
+
+    def SaveMask(self, event=None):
+        """
+        """
+        self.mon.saveROIS()
 
     def setMonitor(self, camera, resolution):
         """
