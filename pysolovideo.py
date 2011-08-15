@@ -281,10 +281,10 @@ class virtualCamMovie(Cam):
         """
         Are we processing the last frame in the movie?
         """
-
-        if ( self.currentFrame > self.totalFrames ) and not self.loop:
+        
+        if ( self.currentFrame >= self.totalFrames ) and not self.loop:
             return True
-        elif ( self.currentFrame == self.totalFrames ) and self.loop:
+        elif ( self.currentFrame >= self.totalFrames ) and self.loop:
             self.currentFrame = self.start
             return False
         else:
@@ -912,7 +912,7 @@ class Monitor(object):
         Handled by camera
         """
         return self.cam.isLastFrame()
-
+        
 
     def saveMovie(self, filename, fps=24, codec='FMP4', startOnKey=False):
         """
