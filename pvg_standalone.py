@@ -21,7 +21,7 @@ class CvMovieFrame(wx.Frame):
             self.Show()
         else:
             print "Processing the video without output. This may take sometime..."
-            while True:
+            while not self.displayPanel.mon.isLastFrame():
                 self.displayPanel.mon.GetImage()
 
 if __name__=="__main__":
