@@ -23,31 +23,23 @@
 import wx, os
 from pvg_common import previewPanel, options
 
-class fullSizePanel(previewPanel):
-    """
-    A small preview Panel to be used as thumbnail
-    """
-    
-    def __init__(self, parent, size):
-        previewPanel.__init__(self, parent, size)
-        
-        
 class panelLiveView(wx.Panel):
     """
     Panel Number 2
     Live view of selected camera
     """
-    def __init__(self, *args, **kwds):
+    def __init__(self, parent):
         """
         """
-        wx.Panel.__init__(self, *args, **kwds)
+        
+        wx.Panel.__init__(self, parent, wx.ID_ANY)
 
         self.monitor_number = options.GetOption("Monitors")
         self.fs_size = options.GetOption("FullSize")
         self.monitor_name = ''
 
-        self.fsPanel = fullSizePanel(self, size=self.fs_size) 
-
+        self.fsPanel = previewPanel(self, size=self.fs_size)
+        
         sizer_1 = wx.BoxSizer(wx.VERTICAL)
         sizer_2 = wx.BoxSizer(wx.HORIZONTAL)
         sizer_3 = wx.BoxSizer(wx.HORIZONTAL)
