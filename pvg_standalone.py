@@ -4,6 +4,10 @@ import pysolovideo as pv
 from pvg_common import previewPanel, pvg_config
 from os.path import splitext
 
+##
+## find . -fname "*.avi" | xargs python2 pvg_standalone.py -i {}
+##
+
 class CvMovieFrame(wx.Frame):
     def __init__(self, parent, source, resolution, track, track_type, mask_file, outputFile, showROIs, record, trackonly ):
         wx.Frame.__init__(self, parent)
@@ -20,6 +24,7 @@ class CvMovieFrame(wx.Frame):
             self.displayPanel.Play(showROIs=showROIs)
             self.Show()
         else:
+            print "file: %s" % source
             print "Processing the video without output. This may take sometime..."
             while not self.displayPanel.mon.isLastFrame():
                 self.displayPanel.mon.GetImage()
@@ -53,7 +58,7 @@ if __name__=="__main__":
         resolution = (640, 480)
         source = options.source # integer or filename or dirname
 
-        track = mask_file and track_type
+        track = options.mask_file and options.track_type
         mask_file = options.mask_file or splitext(options.source)[0]+'.msk'
         track_type = options.track_type
         outputFile = options.outputFile or splitext(options.source)[0]+'.txt'
