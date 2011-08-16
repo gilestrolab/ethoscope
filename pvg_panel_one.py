@@ -26,7 +26,7 @@ from pvg_common import previewPanel, options
 import wx.lib.newevent
 ThumbnailClickedEvt, EVT_THUMBNAIL_CLICKED = wx.lib.newevent.NewCommandEvent()
 
-from wxPython.lib.filebrowsebutton import FileBrowseButton, DirBrowseButton
+from wx.lib.filebrowsebutton import FileBrowseButton, DirBrowseButton
 
 class thumbnailPanel(previewPanel):
     """
@@ -34,7 +34,7 @@ class thumbnailPanel(previewPanel):
     """
     
     def __init__( self, parent, monitor_number, thumbnailSize=(320,240) ):
-        previewPanel.__init__(self, parent, size=thumbnailSize)
+        previewPanel.__init__(self, parent, size=thumbnailSize, keymode=False)
 
         self.number = int(monitor_number)
         self.allowEditing = False
@@ -368,9 +368,9 @@ class panelOne(wx.Panel):
     Panel number One
     All the thumbnails
     """
-    def __init__(self, *args, **kwds):
+    def __init__(self, parent):
         
-        wx.Panel.__init__(self, *args, **kwds)
+        wx.Panel.__init__(self, parent)
     
         monitor_number = options.GetOption("Monitors")
         tn_size = options.GetOption("ThumbnailSize")
