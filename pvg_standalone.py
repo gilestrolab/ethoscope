@@ -52,10 +52,10 @@ if __name__=="__main__":
         
         resolution = (640, 480)
         source = options.source # integer or filename or dirname
-        
+
+        track = mask_file and track_type
         mask_file = options.mask_file or splitext(options.source)[0]+'.msk'
         track_type = options.track_type
-        track = mask_file and track_type
         outputFile = options.outputFile or splitext(options.source)[0]+'.txt'
 
     else:
