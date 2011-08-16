@@ -26,7 +26,7 @@ import os, threading, wx
 import pysolovideo as pv
 from pvg_common import pvg_config
 
-from wxPython.lib.filebrowsebutton import FileBrowseButton
+from wx.lib.filebrowsebutton import FileBrowseButton
 import wx.grid as gridlib
 
 class customDataTable(gridlib.PyGridTableBase):
