@@ -40,10 +40,10 @@ class mainNotebook(wx.Notebook):
         kwds["style"] = wx.NB_LEFT
         wx.Notebook.__init__(self, *args, **kwds)
         
-        self.panelOne = panelOne(self, wx.ID_ANY)
+        self.panelOne = panelOne(self)
         self.AddPage(self.panelOne, "Thumbnails")
 
-        self.panelTwo = panelLiveView(self, wx.ID_ANY)
+        self.panelTwo = panelLiveView(self)
         self.AddPage(self.panelTwo, "Live View")
         
         self.Layout()
@@ -170,7 +170,6 @@ class mainFrame(wx.Frame):
         """
         """
         frame_opt = optionsFrame(self, -1, '')
-        #app.SetTopWindow(frame_opt)
         frame_opt.Show()
     
     
