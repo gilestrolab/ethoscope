@@ -826,7 +826,7 @@ class Monitor(object):
         """
         """
         self.isVirtualCam = False
-        self.source = camera
+        self.source = devnum
 
         self.resolution = resolution
         self.cam = realCam(devnum=devnum)

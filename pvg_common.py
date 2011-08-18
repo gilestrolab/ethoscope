@@ -24,13 +24,19 @@ import wx, cv, os
 import pysolovideo as pv
 import ConfigParser
 
-class pvg_config():
+class myConfig():
     """
     Handles program configuration
     Uses ConfigParser to store and retrieve
+    From gg's toolbox
     """
-    def __init__(self, filename=None, temporary=False):
-
+    def __init__(self, filename=None, temporary=False, defaultOptions=None):
+        """
+        filename    the name of the configuration file
+        temporary   whether we are reading and storing values temporarily
+        defaultOptions  a dict containing the defaultOptions
+        """
+        
         filename = filename or 'config.cfg'
         pDir = os.getcwd()
         if not os.access(pDir, os.W_OK): pDir = os.environ['HOME']
@@ -40,16 +46,12 @@ class pvg_config():
         
         self.config = None
         
-        self.defaultOptions = { "Monitors" : [9, "Select the number of monitors connected to this machine"],
-                                "Webcams"  : [1, "Select the number of webcams connected to this machine"],
-                                "ThumbnailSize" : ['320, 240', "Specify the size for the thumbnail previews"], 
-                                "FullSize" : ['640, 480', "Specify the size for the actual acquisition from the webcams.\nMake sure your webcam supports this definition"], 
-                                "FPS_preview" : [5, "Refresh frequency (FPS) of the thumbnails during preview.\nSelect a low rate for slow computers"],  
-                                "FPS_recording" : [5, "Actual refresh rate (FPS) during acquisition and processing"],
-                                "Data_Folder" : ['', "Folder where the final data are saved"]
-                               }
+        if defaultOptions != None: 
+            self.defaultOptions = defaultOptions
+        else:
+            self.defaultOptions = { "option_1" : [0, "Description"],
+                                    }
         
-        self.monitorProperties = ['sourceType', 'source', 'track', 'maskfile', 'trackType']
         self.Read(temporary)
 
     def New(self, filename):
@@ -139,7 +141,27 @@ class pvg_config():
         """
         """
         return self.GetValue('Options', key)
+
+class pvg_config(myConfig):
+    """
+    Inheriting from myConfig
+    """
+    def __init__(self, filename=None, temporary=False):
+
         
+        defaultOptions = { "Monitors" : [9, "Select the number of monitors connected to this machine"],
+                            "Webcams"  : [1, "Select the number of webcams connected to this machine"],
+                            "ThumbnailSize" : ['320, 240', "Specify the size for the thumbnail previews"], 
+                            "FullSize" : ['640, 480', "Specify the size for the actual acquisition from the webcams.\nMake sure your webcam supports this definition"], 
+                            "FPS_preview" : [5, "Refresh frequency (FPS) of the thumbnails during preview.\nSelect a low rate for slow computers"],  
+                            "FPS_recording" : [5, "Actual refresh rate (FPS) during acquisition and processing"],
+                            "Data_Folder" : ['', "Folder where the final data are saved"]
+                           }
+
+        self.monitorProperties = ['sourceType', 'source', 'track', 'maskfile', 'trackType']
+
+        myConfig.__init__(self, filename, temporary, defaultOptions)
+
     def SetMonitor(self, monitor, *args):
         """
         """

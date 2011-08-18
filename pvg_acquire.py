@@ -721,8 +721,14 @@ class pvg_AcquirePanel(wx.Panel):
         self.monitors = {}
         
         for mn in monitorsData:
+            
             m = monitorsData[mn]
-            s = os.path.split(m['source'])[1]
+            
+            try:
+                s = os.path.split( m['source'] )[1]
+            except:
+                s = 'Camera %02d' % ( m['source'] + 1 )
+            
             mf = os.path.split(m['mask_file'])[1]
             df = 'MON%02d.txt' % mn
             row = [mn, s, mf, df, m['track_type'], m['track'] ]
