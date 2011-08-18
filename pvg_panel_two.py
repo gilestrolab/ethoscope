@@ -159,7 +159,7 @@ class panelLiveView(wx.Panel):
         """
         
         filename = '%s.msk' % self.monitor_name.replace(' ','_')
-        wildcard = "pySolo mask file (*.msk)|*.msk|"
+        wildcard = "pySolo mask file (*.msk)|*.msk"
         
         dlg = wx.FileDialog(
             self, message="Save file as ...", defaultDir=os.getcwd(), 
@@ -180,7 +180,7 @@ class panelLiveView(wx.Panel):
         Load Mask from file
         """
         
-        wildcard = "pySolo mask file (*.msk)|*.msk|"
+        wildcard = "pySolo mask file (*.msk)|*.msk"
         
         dlg = wx.FileDialog(
             self, message="Choose a file",

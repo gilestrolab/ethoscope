@@ -127,7 +127,7 @@ class mainFrame(wx.Frame):
         """
         """
         filename = 'config.cfg'
-        wildcard = "pySolo Video config file (*.cfg)|*.cfg|"
+        wildcard = "pySolo Video config file (*.cfg)|*.cfg"
         
         dlg = wx.FileDialog(
             self, message="Save file as ...", defaultDir=os.getcwd(), 
@@ -145,7 +145,7 @@ class mainFrame(wx.Frame):
     def onFileOpen(self, event):
         """
         """
-        wildcard = "pySolo Video config file (*.cfg)|*.cfg|"
+        wildcard = "pySolo Video config file (*.cfg)|*.cfg"
         
         dlg = wx.FileDialog(
             self, message="Choose a file",
