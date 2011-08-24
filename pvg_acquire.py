@@ -824,7 +824,6 @@ class acquireThread(threading.Thread):
         self.mon = pv.Monitor()
         self.mon.setSource(source, resolution)
         self.mon.setTracking(True, track_type, mask_file, outputFile)
-        self.start()
         
     def run(self):
         """
@@ -836,7 +835,7 @@ class acquireThread(threading.Thread):
         """
         """
         self.keepGoing = True
-        self.run()
+        self.start()
 
     def halt(self):
         """
