@@ -44,7 +44,8 @@ import os, sys, datetime, time
 import numpy as np
 import cPickle
 
-pySoloVideoVersion ='0.8-master-git'
+pySoloVideoVersion ='dev'
+MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug','Sep', 'Oct', 'Nov', 'Dec']
 
 def getCameraCount():
     """
@@ -634,20 +635,22 @@ class Arena():
         
         self.count_seconds += 1
 
-    def writeActivity(self):
+    def writeActivity(self, extend=True):
         """
         Write the activity to file
         Kind of motion depends on user settings
         """
         year, month, day, hh, mn, sec = time.localtime()[0:6]
+        month = MONTHS[month-1]
         date = '%02d %02d %s' % (day,month,str(year)[-2:])
         tt = '%02d:%02d:%02d' % (hh, mn, sec)
-        active = '1'
-        zeros = '0\t0\t0\t0'
-        
+        active = '1' # monitor is active
+        damscan = '0' # used for compatiblity reason - unused in fact
+        unused = '\t'.join([0,0,0,0]) #four unused zeros as for DAM user's manual
+        light = '?' #light is on or off 
+
         activity = []
         row = ''
-
 
         if self.trackType == 0:
             activity = [self.calculateDistances(),]
@@ -657,11 +660,19 @@ class Arena():
         
         elif self.trackType == 2:
             activity = self.calculatePosition()
+
+
+        flies = len ( activity[0] )
+        if extend and flies < 32:
+            extension = '\t' + '\t'.join(['0',] * (32-flies) )
+        else:
+            extension = ''
+
             
         for line in activity:
             self.rowline +=1 
-            row_header = '%s\t'*5 % (self.rowline, date, tt, active, zeros)
-            row += row_header + line + '\n'
+            row_header = '%s\t'*7 % (self.rowline, date, tt, active, damscan, unused, light)
+            row += row_header + line + extension + '\n'
 
         if self.outputFile:
             fh = open(self.outputFile, 'a')
