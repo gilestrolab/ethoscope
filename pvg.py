@@ -138,7 +138,7 @@ class mainFrame(wx.Frame):
 
         if dlg.ShowModal() == wx.ID_OK:
             path = dlg.GetPath()
-            options.Save(path)
+            options.Save(filename=path)
             
         dlg.Destroy()
         

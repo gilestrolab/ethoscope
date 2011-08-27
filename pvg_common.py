@@ -79,12 +79,13 @@ class myConfig():
             self.Save(temporary, newfile=True)
 
                                
-    def Save(self, temporary=False, newfile=False):
+    def Save(self, temporary=False, newfile=False, filename=None):
         """
         """
-        if temporary: filename = self.filename_temp
-        else: filename = self.filename
-            
+        
+        if temporary and not filename: filename = self.filename_temp
+        elif not temporary and not filename: filename = self.filename
+       
         if newfile:
             self.config = ConfigParser.RawConfigParser()
             self.config.add_section('Options')
