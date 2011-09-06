@@ -168,7 +168,22 @@ def getHeaders(filename):
         print "Error opening the file"
 
     return headers
+
+
+def detectFileType(filename):
+    """
+    Understand the file type by looking at the informative
+    byte in the last line of the file to open
+    """
+    position = 4
+    with open(filename, 'r') as inputfile:
+        lastline = inputfile.read().split('\n')[-2]
+
+    trackType = lastline.split('\t')[position]
     
+    return int(trackType)
+    
+#Conversion front-ends  
 
 def c2b(file_in, file_out, extend=True):
     """
@@ -236,10 +251,10 @@ def c2d(file_in, file_out, extend=True):
 
 if __name__ == '__main__':
     
-    fd = '/home/gg/Dropbox/Work/Projects/Sandflies/raw/MON0.txt'
-    fc = '/home/gg/Dropbox/Work/Projects/Sandflies/raw/MON01.txt'
-
-    c2b(fc, '/home/gg/Dropbox/Work/Projects/Sandflies/Monitor002.txt')
-
+ 
+    ctrl = '/home/gg/Dropbox/Work/Projects/Sandflies/raw/11.08.25/Monitor001.txt'
+    caff = '/home/gg/Dropbox/Work/Projects/Sandflies/raw/11.08.25/Monitor002.txt'
+    
+    c2d (caff, '/home/gg/Dropbox/Work/Projects/Sandflies/converted/new/Monitor002.txt')
     
 
