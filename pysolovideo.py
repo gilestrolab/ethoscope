@@ -39,10 +39,9 @@ Algorithm for motion analysis:          PIL through kmeans (vector quantization)
 """
 
 import cv
-from math import sqrt
+import cPickle
 import os, sys, datetime, time
 import numpy as np
-import cPickle
 
 pySoloVideoVersion ='dev'
 MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug','Sep', 'Oct', 'Nov', 'Dec']
@@ -432,9 +431,10 @@ class Arena():
     """
     def __init__(self):
         
-        self.ROIS = []
+        self.ROIS = [] #Regions of interest
         self.beams = []
         self.trackType = 1
+        self.ROAS = [] #Regions of Action
         
         self.period = 60 #in seconds
         self.rowline = 0
@@ -464,7 +464,8 @@ class Arena():
     
     def __getMidline (self, coords):
         """
-           Return the position of each ROI's midline
+        Return the position of each ROI's midline
+        Will automatically determine the orientation of the vial
         """
         (x1,y1), (x2,y2) = self.__ROItoRect(coords)
 
@@ -565,8 +566,6 @@ class Arena():
 
         return newROIS
 
-
-
     def point_in_poly(self, pt, poly):
         """
         Determine if a point is inside a given polygon or not
@@ -608,7 +607,6 @@ class Arena():
                 return self.ROIS.index(ROI)
         
         return -1
-
 
     def ROIStoRect(self):
         """
@@ -742,7 +740,7 @@ class Arena():
         return activity
             
             
-    def calculateVBM(self):
+a    def calculateVBM(self):
         """
         Motion is calculated as virtual beam crossing
         Detects automatically beam orientation (vertical vs horizontal)
@@ -875,7 +873,7 @@ class Monitor(object):
         """
         Calculate the distance between two cartesian points
         """
-        return sqrt((x2-x1)**2 + (y2-y1)**2)
+        return np.sqrt((x2-x1)**2 + (y2-y1)**2)
 
     def __angle(self, pt1, pt2, pt0):
         """
@@ -885,7 +883,7 @@ class Monitor(object):
         dy1 = pt1[1] - pt0[1]
         dx2 = pt2[0] - pt0[0]
         dy2 = pt2[1] - pt0[1]
-        return (dx1*dx2 + dy1*dy2)/sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10)
+        return (dx1*dx2 + dy1*dy2)/np.sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10)
 
     def CaptureFromCAM(self, devnum=0, resolution=(640,480), options=None):
         """
@@ -964,7 +962,6 @@ class Monitor(object):
         
         if mask_file:
             self.loadROIS(mask_file)
-
         
     def getFrameTime(self):
         """
@@ -1024,7 +1021,6 @@ class Monitor(object):
             self.lasttime = ct
             self.arena.compactSeconds() #average the coordinates and transfer from buffer to array
                 
-
     def addROI(self, coords, n_flies=1):
         """
         Add the coords for a new ROI and the number of flies we want to track in that area
@@ -1080,6 +1076,7 @@ class Monitor(object):
         EXPERIMENTAL, FIX THIS
         This is experimental
         For now it works only with one kind of arena
+        Should be more flexible than this
         """
         rows = 16
         cols = 2
@@ -1341,6 +1338,3 @@ class Monitor(object):
             return self.temp2
         
         return frame
-
-
-
