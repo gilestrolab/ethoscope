@@ -1,9 +1,7 @@
 TODO
 ====
 
-Real support of not rectangular ROI
 Add support for polygons (more than 4 corners)
-Make EXEs 
 Found a way to close stream from camera capture in opencv
 
 
