@@ -383,11 +383,15 @@ class previewPanel(wx.Panel):
     def paintImg(self, img):
         """
         """
-
-        frame = cv.CreateMat(self.size[1], self.size[0], cv.CV_8UC3)
+        depth, channels = img.depth, img.nChannels
+        datatype = cv.CV_MAKETYPE(depth, channels)
+        
+        frame = cv.CreateMat(self.size[1], self.size[0], datatype)
         cv.Resize(img, frame)
 
         cv.CvtColor(frame, frame, cv.CV_BGR2RGB)
+        #cv.CvtColor(frame, frame, cv.CV_GRAY2RGB)
+        
         self.bmp.CopyFromBuffer(frame.tostring())
         self.Refresh()
 

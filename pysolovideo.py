@@ -466,8 +466,16 @@ class Arena():
         """
            Return the position of each ROI's midline
         """
-        (pt1, pt2) = self.__ROItoRect(coords)
-        return (pt2[0] - pt1[0])/2
+        (x1,y1), (x2,y2) = self.__ROItoRect(coords)
+
+        horizontal = abs(x2 - x1) > abs(y2 - y1)
+        
+        if horizontal:
+            xm = x1 + (x2 - x1)/2
+            return (xm, y1), (xm, y2) 
+        else:
+            ym = y1 + (y2 - y1)/2
+            return (x1, ym), (x2, ym)
     
     def addROI(self, coords, n_flies):
         """
@@ -558,20 +566,45 @@ class Arena():
         return newROIS
 
 
+
+    def point_in_poly(self, pt, poly):
+        """
+        Determine if a point is inside a given polygon or not
+        Polygon is a list of (x,y) pairs. This fuction
+        returns True or False.  The algorithm is called
+        "Ray Casting Method".
+        polygon = [(0,10),(10,10),(10,0),(0,0)]
+        http://pseentertainmentcorp.com/smf/index.php?topic=545.0
+        Alternatively:
+        http://opencv.itseez.com/doc/tutorials/imgproc/shapedescriptors/point_polygon_test/point_polygon_test.html
+        """
+        x, y = pt
+        
+        n = len(poly)
+        inside = False
+
+        p1x,p1y = poly[0]
+        for i in range(n+1):
+            p2x,p2y = poly[i % n]
+            if y > min(p1y,p2y):
+                if y <= max(p1y,p2y):
+                    if x <= max(p1x,p2x):
+                        if p1y != p2y:
+                            xinters = (y-p1y)*(p2x-p1x)/(p2y-p1y)+p1x
+                        if p1x == p2x or x <= xinters:
+                            inside = not inside
+            p1x,p1y = p2x,p2y
+
+        return inside
+
     def isPointInROI(self, pt):
         """
         Check if a given point falls whithin one of the ROI
         Returns the ROI number or else returns -1
         """
-        x, y = pt
         
         for ROI in self.ROIS:
-            (x1, y1), (x2, y2), (x3, y3), (x4, y4) = ROI
-            lx = min([x1,x2,x3,x4])
-            rx = max([x1,x2,x3,x4])
-            uy = min([y1,y2,y3,y4])
-            ly = max([y1,y2,y3,y4])
-            if (lx < x < rx) and ( uy < y < ly ):
+            if self.point_in_poly(pt, ROI):
                 return self.ROIS.index(ROI)
         
         return -1
@@ -640,15 +673,21 @@ class Arena():
         Write the activity to file
         Kind of motion depends on user settings
         """
+        #Here we build the header
         year, month, day, hh, mn, sec = time.localtime()[0:6]
         month = MONTHS[month-1]
+        
         date = '%02d %02d %s' % (day,month,str(year)[-2:])
         tt = '%02d:%02d:%02d' % (hh, mn, sec)
-        active = '1' # monitor is active
-        damscan = '0' # used for compatiblity reason - unused in fact
-        unused = '\t'.join([0,0,0,0]) #four unused zeros as for DAM user's manual
-        light = '?' #light is on or off 
-
+        # 2 monitor is active
+        active = '1'
+        # 3 used for compatiblity reason - unused in fact
+        damscan = '0'
+        #4 -7 four unused zeros as for DAM user's manual
+        unused = '\t'.join([self.trackType,0,0,0])
+        #is light on or off
+        light = '?'
+        
         activity = []
         row = ''
 
@@ -706,18 +745,26 @@ class Arena():
     def calculateVBM(self):
         """
         Motion is calculated as virtual beam crossing
+        Detects automatically beam orientation (vertical vs horizontal)
         """
 
         values = []
 
         for fd, md in zip(self.flyDataMin, self.beams):
+
+            (mx1, my1), (mx2, my2) = md
+            horizontal = (mx1 == mx2)
             
             fs = np.roll(fd, -1, 0)
             
-            x = fd[:,:1]
-            x1 = fs[:,:1]
+            x = fd[:,:1]; y = fd[:,1:]
+            x1 = fs[:,:1]; y1 = fs[:,1:]
         
-            crossed = (x < md ) * ( md < x1) + (x > md) * (md > x1)
+            if horizontal:
+                crossed = (x < mx1 ) * ( mx1 < x1) + (x > mx1) * (mx1 > x1)
+            else:
+                crossed = (y < my1 ) * ( my1 < y1) + (y > my1) * (my1 > y1)
+            
             values .append ( crossed.sum() )
         
         activity = '\t'.join( [str(v) for v in values] )
@@ -764,7 +811,18 @@ class Monitor(object):
         
         self.firstFrame = True
         self.tracking = True
-        
+    
+    def __drawBeam(self, img, bm, color=None):
+        """
+        Draw the Beam using given coordinates
+        """
+        if not color: color = (100,100,200)
+        width = 1
+        line_type = cv.CV_AA
+
+        cv.Line(img, bm[0], bm[1], color, width, line_type, 0)
+
+        return img
 
 
     def __drawROI(self, img, ROI, color=None):
@@ -778,11 +836,7 @@ class Monitor(object):
         width = 1
         line_type = cv.CV_AA
 
-
-        cv.Line(img, ROI[0], ROI[1], color, width, line_type, 0)
-        cv.Line(img, ROI[1], ROI[2], color, width, line_type, 0)
-        cv.Line(img, ROI[2], ROI[3], color, width, line_type, 0)
-        cv.Line(img, ROI[3], ROI[0], color, width, line_type, 0)
+        cv.PolyLine(img, [ROI], is_closed=1, color=color, thickness=1, lineType=line_type, shift=0)
 
         return img
 
@@ -1167,8 +1221,9 @@ class Monitor(object):
         if self.tracking: frame = self.doTrack(frame)
                 
         if drawROIs and self.arena.ROIS:
-            for ROI in self.arena.ROIS:
+            for ROI, beam in zip(self.arena.ROIS, self.arena.beams):
                 frame = self.__drawROI(frame, ROI)
+                frame = self.__drawBeam(frame, beam)
 
         if selection:
             frame = self.__drawROI(frame, selection, color=(0,0,255))
@@ -1181,81 +1236,109 @@ class Monitor(object):
         
         return frame
 
-    def doTrack(self, frame):
+    def doTrack(self, frame, show_raw_diff=False):
         """
-        Track flies in ROIS using findContour algorhytm or opencv
+        Track flies in ROIS using findContour algorithm in opencv
         Each frame is compared against the moving average
         """
-
-        grey_image = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
-        temp = cv.CloneImage(frame)
-        difference = cv.CloneImage(frame)
+        
+        track_one = True # Track only one fly per ROI
 
         # Smooth to get rid of false positives
         cv.Smooth(frame, frame, cv.CV_GAUSSIAN, 3, 0)
 
+        #
         if self.firstFrame:
+            self.grey_image = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
+            self.temp = cv.CloneImage(frame)
+            self.temp2 = cv.CloneImage(frame)
+            self.difference = cv.CloneImage(frame)
+            self.ROImsk = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
+            self.ROIwrk = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
+            
+            #create the moving average
             self.moving_average = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_32F, 3)
             cv.ConvertScale(frame, self.moving_average, 1.0, 0.0)
             self.firstFrame = False
+
         else:
-            cv.RunningAvg(frame, self.moving_average, 0.08, None) #0.040
-            
+            cv.Zero(self.grey_image)
+            cv.Zero(self.temp)
+            cv.Zero(self.temp2)
+            cv.Zero(self.difference)
+            cv.Zero(self.ROImsk)
+            cv.Zero(self.ROIwrk)
+
+            #update the moving average
+            cv.RunningAvg(frame, self.moving_average, 0.1, None) #0.04
             
         # Convert the scale of the moving average.
-        cv.ConvertScale(self.moving_average, temp, 1.0, 0.0)
+        cv.ConvertScale(self.moving_average, self.temp, 1.0, 0.0)
 
         # Minus the current frame from the moving average.
-        cv.AbsDiff(frame, temp, difference)
+        cv.AbsDiff(frame, self.temp, self.difference)
 
         # Convert the image to grayscale.
-        cv.CvtColor(difference, grey_image, cv.CV_RGB2GRAY)
+        cv.CvtColor(self.difference, self.grey_image, cv.CV_RGB2GRAY)
 
         # Convert the image to black and white.
-        cv.Threshold(grey_image, grey_image, 20, 255, cv.CV_THRESH_BINARY)
+        cv.Threshold(self.grey_image, self.grey_image, 20, 255, cv.CV_THRESH_BINARY)
 
         # Dilate and erode to get proper blobs
-        cv.Dilate(grey_image, grey_image, None, 2) #18
-        cv.Erode(grey_image, grey_image, None, 2) #10
+        cv.Dilate(self.grey_image, self.grey_image, None, 2) #18
+        cv.Erode(self.grey_image, self.grey_image, None, 2) #10
 
         storage = cv.CreateMemStorage(0)
         
-        for fly_number, ROI in enumerate(self.arena.ROIStoRect()):
+        #Build the mask. This allows for non rectangular ROIs
+        for ROI in self.arena.ROIS:
+            cv.FillPoly( self.ROImsk, [ROI], color=cv.CV_RGB(255, 255, 255) )
+        
+        #Apply the mask to the grey image where tracking happens
+        cv.Copy(self.grey_image, self.ROIwrk, self.ROImsk)
+        
+        #track each ROI
+        for fly_number, ROI in enumerate( self.arena.ROIStoRect() ):
+            
             (x1,y1), (x2,y2) = ROI
-            cv.SetImageROI(grey_image, (x1,y1,x2-x1,y2-y1))
+            cv.SetImageROI(self.ROIwrk, (x1,y1,x2-x1,y2-y1))
             cv.SetImageROI(frame, (x1,y1,x2-x1,y2-y1))
-            
-            # Calculate movements
-            
-            contour = cv.FindContours(grey_image, storage, cv.CV_RETR_CCOMP, cv.CV_CHAIN_APPROX_SIMPLE)
+            cv.SetImageROI(self.grey_image, (x1,y1,x2-x1,y2-y1))
+
+            contour = cv.FindContours(self.ROIwrk, storage, cv.CV_RETR_CCOMP, cv.CV_CHAIN_APPROX_SIMPLE)
 
             points = []
             fly_coords = None
+
             while contour:
                 # Draw rectangles
                 bound_rect = cv.BoundingRect(list(contour))
                 contour = contour.h_next()
-                if not contour: # this will make sure we are tracking only the biggest rectangle
+                if track_one and not contour: # this will make sure we are tracking only the biggest rectangle
                     pt1 = (bound_rect[0], bound_rect[1])
                     pt2 = (bound_rect[0] + bound_rect[2], bound_rect[1] + bound_rect[3])
-                    points.append(pt1)
-                    points.append(pt2)
+                    points.append(pt1); points.append(pt2)
                     cv.Rectangle(frame, pt1, pt2, cv.CV_RGB(255,0,0), 1)
                     
                     fly_coords = ( pt1[0]+(pt2[0]-pt1[0])/2, pt1[1]+(pt2[1]-pt1[1])/2 )
                     area = (pt2[0]-pt1[0])*(pt2[1]-pt1[1])
                     if area > 400: fly_coords = None
-                    #frame = self.__drawCross(frame, fly_coords)
 
             fly_coords = self.arena.addFlyCoords(fly_number, fly_coords) # for each frame adds fly coordinates to all ROIS
             self.__drawCross(frame, fly_coords)
             
-            cv.ResetImageROI(grey_image)
+            if show_raw_diff:
+                self.__drawCross(self.grey_image, fly_coords, color=(100,100,100))
+            
+            cv.ResetImageROI(self.ROIwrk)
+            cv.ResetImageROI(self.grey_image)
             cv.ResetImageROI(frame)
 
-            #cv.Rectangle(frame, ROI[0], ROI[1], cv.CV_RGB(0,255,0), 1)
-
         self.processFlyMovements()
+        
+        if show_raw_diff:
+            cv.CvtColor(self.grey_image, self.temp2, cv.CV_GRAY2RGB)#show the actual difference blob that will be tracked
+            return self.temp2
         
         return frame
 
