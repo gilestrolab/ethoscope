@@ -99,7 +99,10 @@ class Cam:
         img = self.getImage(timestamp, imgType)
         cv.SaveImage(filename, img) #with opencv
 
-
+    def close(self):
+        """
+        """
+        pass
 
         
 class realCam(Cam):
@@ -150,8 +153,11 @@ class realCam(Cam):
         timestamp   False   (Default) Does not add timestamp
                     True              Add timestamp to the image
                     
-        """        
-        frame = cv.QueryFrame(self.camera)
+        """
+        frame = None
+        
+        if self.camera:
+            frame = cv.QueryFrame(self.camera)
 
         if self.scale:
             newsize = cv.CreateImage(self.resolution , cv.IPL_DEPTH_8U, 3)
@@ -173,8 +179,11 @@ class realCam(Cam):
         Closes the connection 
         FIX THIS
         """
-        cv.ReleaseCapture(self.camera)
-
+        print "attempting to close stream"
+        #cv.ReleaseCapture(self.camera)
+        del(self.camera)
+        self.camera = None
+        
 class virtualCamMovie(Cam):
     """
     A Virtual cam to be used to pick images from a movie (avi, mov) rather than a real webcam
@@ -892,6 +901,12 @@ class Monitor(object):
         dy2 = pt2[1] - pt0[1]
         return (dx1*dx2 + dy1*dy2)/np.sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10)
 
+    def close(self):
+        """
+        Closes stream
+        """
+        self.cam.close()
+
     def CaptureFromCAM(self, devnum=0, resolution=(640,480), options=None):
         """
         """
@@ -940,7 +955,12 @@ class Monitor(object):
         """
         Set source intelligently
         """
-        if type(camera) == type(0): 
+        try:
+            camera = int(camera)
+        except:
+            pass
+            
+        if type(camera) == type(0):
             self.CaptureFromCAM(camera, resolution, options)
         elif os.path.isfile(camera):
             self.CaptureFromMovie(camera, resolution, options)
@@ -1222,21 +1242,23 @@ class Monitor(object):
         self.imageCount += 1
         frame = self.cam.getImage(timestamp)
 
-        if self.tracking: frame = self.doTrack(frame)
+        if frame:
+
+            if self.tracking: frame = self.doTrack(frame)
+                    
+            if drawROIs and self.arena.ROIS:
+                for ROI, beam in zip(self.arena.ROIS, self.arena.beams):
+                    frame = self.__drawROI(frame, ROI)
+                    frame = self.__drawBeam(frame, beam)
+
+            if selection:
+                frame = self.__drawROI(frame, selection, color=(0,0,255))
                 
-        if drawROIs and self.arena.ROIS:
-            for ROI, beam in zip(self.arena.ROIS, self.arena.beams):
-                frame = self.__drawROI(frame, ROI)
-                frame = self.__drawBeam(frame, beam)
+            if crosses:
+                for pt in crosses:
+                    frame = self.__drawCross (frame, pt, color=(0,0,255))
 
-        if selection:
-            frame = self.__drawROI(frame, selection, color=(0,0,255))
-            
-        if crosses:
-            for pt in crosses:
-                frame = self.__drawCross (frame, pt, color=(0,0,255))
-
-        if self.grabMovie: cv.WriteFrame(self.writer, frame)
+            if self.grabMovie: cv.WriteFrame(self.writer, frame)
         
         return frame
 
