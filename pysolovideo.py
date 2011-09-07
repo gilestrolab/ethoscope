@@ -167,6 +167,13 @@ class realCam(Cam):
         Added for compatibility with other cams
         """
         return False
+        
+    def close(self):
+        """
+        Closes the connection 
+        FIX THIS
+        """
+        cv.ReleaseCapture(self.camera)
 
 class virtualCamMovie(Cam):
     """
@@ -675,14 +682,14 @@ class Arena():
         year, month, day, hh, mn, sec = time.localtime()[0:6]
         month = MONTHS[month-1]
         
-        date = '%02d %02d %s' % (day,month,str(year)[-2:])
+        date = '%02d %s %s' % (day, month, str(year)[-2:])
         tt = '%02d:%02d:%02d' % (hh, mn, sec)
         # 2 monitor is active
         active = '1'
         # 3 used for compatiblity reason - unused in fact
         damscan = '0'
         #4 -7 four unused zeros as for DAM user's manual
-        unused = '\t'.join([self.trackType,0,0,0])
+        unused = '\t'.join(str(a) for a in [self.trackType,0,0,0])
         #is light on or off
         light = '?'
         
@@ -740,7 +747,7 @@ class Arena():
         return activity
             
             
-a    def calculateVBM(self):
+    def calculateVBM(self):
         """
         Motion is calculated as virtual beam crossing
         Detects automatically beam orientation (vertical vs horizontal)
