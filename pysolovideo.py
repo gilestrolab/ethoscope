@@ -476,7 +476,12 @@ class Arena():
         uy = min([y1,y2,y3,y4])
         ly = max([y1,y2,y3,y4])
         return ( (lx,uy), (rx, ly) )
-        
+
+    def __distance( self, (x1, y1), (x2, y2) ):
+        """
+        Calculate the distance between two cartesian points
+        """
+        return np.sqrt((x2-x1)**2 + (y2-y1)**2)        
     
     def __getMidline (self, coords):
         """
@@ -641,20 +646,19 @@ class Arena():
         count   int     the fly number in the arena 
         fly     (x,y)   the coordinates to add 
         """
-        max_distance=200
+
+        max_movement=200
+        min_movement=10
+        previous_position = self.flyDataBuffer[count][-1]
+        isFirstMovement = ( previous_position == (0,0) )
+        fly = fly or previous_position
         
-        if fly:
-            #calculate distance from previous point
-            pf = self.flyDataBuffer[count][-1]
-            d = np.sqrt ( (fly[0] - pf[0])**2 + (fly[1]-pf[1])**2 )
-            #exclude too wide movements unless it's the first movement the fly makes
-            if d > max_distance and pf != (0,0): fly = self.flyDataBuffer[count][-1]
-            
-            self.flyDataBuffer[count].append ( fly )
-        else:
-            
-            fly = self.flyDataBuffer[count][-1]
-            self.flyDataBuffer[count].append ( fly )
+        distance = self.__distance( previous_position, fly )
+       
+        if ( distance > max_movement and not isFirstMovement ) or ( distance < min_movement ):
+            fly = previous_position
+        
+        self.flyDataBuffer[count].append ( fly )
     
         return fly
         
@@ -884,12 +888,6 @@ class Monitor(object):
         channels = [None, None, None]
         cv.Split(img, channels[0], channels[1], channels[2], None)
         return channels[cn]
-
-    def __distance(self, x1, y1, x2, y2):
-        """
-        Calculate the distance between two cartesian points
-        """
-        return np.sqrt((x2-x1)**2 + (y2-y1)**2)
 
     def __angle(self, pt1, pt2, pt0):
         """
