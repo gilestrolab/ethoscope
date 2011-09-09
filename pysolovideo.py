@@ -712,8 +712,7 @@ class Arena():
 
         Called every second; flies treated at once
         """
-        
-        if self.count_seconds == self.period:
+        if self.count_seconds >= self.period:
             self.writeActivity()
             self.count_seconds = 0
             self.flyDataMin = self.flyDataMin * 0
@@ -1300,7 +1299,7 @@ class Monitor(object):
         
         ct = self.getFrameTime()
         
-        if ( ct - self.lasttime) > 1: # if one second has elapsed
+        if ( ct - self.lasttime) >= 1: # if one second has elapsed
             self.lasttime = ct
             self.arena.compactSeconds() #average the coordinates and transfer from buffer to array
 
