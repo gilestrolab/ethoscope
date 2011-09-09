@@ -460,6 +460,7 @@ class Arena():
 
         #(-1,-1)
         self.firstPosition = (0,0)
+        
         # shape ( self.period (x,y )
         self.__fa = np.zeros( (self.period, 2), dtype=np.int )
         
@@ -470,7 +471,6 @@ class Arena():
         self.flyDataMin = np.zeros( (1, self.period, 2), dtype=np.int ) 
         
         self.count_seconds = 0
-        
         self.outputFile = None
         
     def __ROItoRect(self, coords):
@@ -864,7 +864,7 @@ class Monitor(object):
 
         self.maxTick = 60
         
-        self.firstFrame = True
+        self.__firstFrame = True
         self.tracking = True
     
     def __drawBeam(self, img, bm, color=None):
@@ -1319,11 +1319,11 @@ class Monitor(object):
         ROImsk = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
         ROIwrk = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
 
-        if self.firstFrame:
+        if self.__firstFrame:
             #create the moving average
             self.moving_average = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_32F, 3)
             cv.ConvertScale(frame, self.moving_average, 1.0, 0.0)
-            self.firstFrame = False
+            self.__firstFrame = False
         else:
             #update the moving average
             cv.RunningAvg(frame, self.moving_average, 0.1, None) #0.04
@@ -1389,20 +1389,11 @@ class Monitor(object):
             cv.ResetImageROI(grey_image)
             cv.ResetImageROI(frame)
             
-            #release memory
-            del contour
-
         self.processFlyMovements()
         
         if show_raw_diff:
             temp2 = cv.CloneImage(grey_image)
             cv.CvtColor(grey_image, temp2, cv.CV_GRAY2RGB)#show the actual difference blob that will be tracked
             return temp2
-
-        del grey_image
-        del temp
-        del difference
-        del ROImsk
-        del ROIwrk
         
         return frame
