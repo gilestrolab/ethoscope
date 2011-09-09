@@ -453,15 +453,24 @@ class Arena():
         self.ROAS = [] #Regions of Action
         
         self.period = 60 #in seconds
+        self.ratio = 0
         self.rowline = 0
         
         self.points_to_track = []
-        self.flyDataBuffer = []
-        self.flyDataMin = []
+
+        #(-1,-1)
+        self.firstPosition = (0,0)
+        # shape ( self.period (x,y )
+        self.__fa = np.zeros( (self.period, 2), dtype=np.int )
+        
+        # shape ( flies, seconds, (x,y) ) Contains the coordinates of the last second (if fps > 1, average)
+        self.flyDataBuffer = np.zeros( (1, 2), dtype=np.int ) 
+        
+        # shape ( flies, self.period, (x,y) )
+        self.flyDataMin = np.zeros( (1, self.period, 2), dtype=np.int ) 
         
         self.count_seconds = 0
         
-        self.fa = np.zeros( (self.period, 2), np.float )
         self.outputFile = None
         
     def __ROItoRect(self, coords):
@@ -499,6 +508,29 @@ class Arena():
             ym = y1 + (y2 - y1)/2
             return (x1, ym), (x2, ym)
     
+    def calibrate(self, p1, p2, cm=1):
+        """
+        The distance between p1 and p2 will be set to be X cm
+        (default 1 cm)
+        """
+        cm = float(cm)
+        dpx = self.__distance(p1, p2)
+        
+        self.ratio = dpx / cm  
+        
+        return self.ratio
+
+    def pxToCm(self, distance_px):
+        """
+        Converts distance from pixels to cm
+        """
+        
+        if self.ratio:
+            return distance_px / self.ratio
+        else:
+            print "You need to calibrate the mask first!"
+            return distance_px
+            
     def addROI(self, coords, n_flies):
         """
         Add a new ROI to the arena
@@ -506,8 +538,10 @@ class Arena():
         self.ROIS.append( coords )
         self.beams.append ( self.__getMidline (coords)  ) 
         self.points_to_track.append(n_flies)
-        self.flyDataBuffer.append( [(0,0)] )
-        self.flyDataMin.append ( self.fa )
+        
+        #these increase by one on the fly axis
+        self.flyDataBuffer = np.append( self.flyDataBuffer, [self.firstPosition], axis=0) # ( flies, 1, (x,y) )
+        self.flyDataMin = np.append (self.flyDataMin, [self.__fa.copy()], axis=0) # ( flies, self.period, (x,y) )
 
     def getROI(self, n):
         """
@@ -527,8 +561,10 @@ class Arena():
         if n >= 0:
             self.ROIS.pop(n)
             self.points_to_track.pop(n)
-            self.flyDataBuffer.pop(n)
-            self.flyDataMin.pop(n)
+            
+            self.flyDataBuffer = np.delete( self.flyDataBuffer, n, axis=0)
+            self.flyDataMin = np.delete( self.flyDataMin, n, axis=0)
+        
         elif n < 0:
             self.ROIS = []
             
@@ -557,10 +593,12 @@ class Arena():
             self.ROIS = cPickle.load(cf)
             self.points_to_track = cPickle.load(cf)
             cf.close()
+            
+            f = len(self.ROIS)
+            self.flyDataBuffer = np.zeros( (f,2), dtype=np.int )
+            self.flyDataMin = np.zeros ( (f,self.period,2), dtype=np.int )
 
             for coords in self.ROIS:
-                self.flyDataBuffer.append( [(0,0)] )
-                self.flyDataMin.append ( self.fa.copy() )
                 self.beams.append ( self.__getMidline (coords)  ) 
                 
             return True
@@ -593,7 +631,7 @@ class Arena():
         Polygon is a list of (x,y) pairs. This fuction
         returns True or False.  The algorithm is called
         "Ray Casting Method".
-        polygon = [(0,10),(10,10),(10,0),(0,0)]
+        polygon = [(x,y),(x1,x2),...,(x10,y10)]
         http://pseentertainmentcorp.com/smf/index.php?topic=545.0
         Alternatively:
         http://opencv.itseez.com/doc/tutorials/imgproc/shapedescriptors/point_polygon_test/point_polygon_test.html
@@ -645,57 +683,60 @@ class Arena():
         Add the provided coordinates to the existing list
         count   int     the fly number in the arena 
         fly     (x,y)   the coordinates to add 
+        Called for every fly moving in every frame
         """
 
-        max_movement=200
-        min_movement=10
-        previous_position = self.flyDataBuffer[count][-1]
-        isFirstMovement = ( previous_position == (0,0) )
-        fly = fly or previous_position
+        fly_size = 15 #About 15 pixels at 640x480
+        max_movement= fly_size * 20
+        min_movement= fly_size / 3
+
+        previous_position = tuple(self.flyDataBuffer[count])
+
+        isFirstMovement = ( previous_position == self.firstPosition )
+        fly = fly or previous_position #Fly is None if no blob was detected
         
         distance = self.__distance( previous_position, fly )
        
         if ( distance > max_movement and not isFirstMovement ) or ( distance < min_movement ):
             fly = previous_position
         
-        self.flyDataBuffer[count].append ( fly )
+        self.flyDataBuffer[count] = np.append( self.flyDataBuffer[count], fly, axis=0 ).reshape(-1,2).mean(axis=0)
     
-        return fly
+        return fly, distance
         
     def compactSeconds(self):
         """
         Compact the frames collected in the last second
         by averaging the value of the coordinates
-        FIX THIS: this function is probably not needed
+
+        Called every second; flies treated at once
         """
         
         if self.count_seconds == self.period:
             self.writeActivity()
             self.count_seconds = 0
-            
-        for c, f in enumerate(self.flyDataBuffer):
-            a = np.array(f)
-            a = a[a.nonzero()[0]]
-            
-            m = a.mean(0); m = m[~np.isnan(m)]
-            if not m.size: m = [0,0]
-            
-            self.flyDataMin[c][self.count_seconds] = m
-
-            self.flyDataBuffer[c] = [self.flyDataBuffer[c][-1]]
+            self.flyDataMin = self.flyDataMin * 0
         
+        #growing continously; this is the correct thing to do but we would have problems adding new row with new ROIs
+        #self.flyDataMin = np.append(self.flyDataMin, self.flyDataBuffer, axis=1)
+        
+        self.flyDataMin[:,self.count_seconds] = self.flyDataBuffer
         self.count_seconds += 1
 
     def writeActivity(self, extend=True):
         """
         Write the activity to file
         Kind of motion depends on user settings
+        
+        Called every minute; flies treated at once
         """
         #Here we build the header
         year, month, day, hh, mn, sec = time.localtime()[0:6]
         month = MONTHS[month-1]
         
+        #0 date
         date = '%02d %s %s' % (day, month, str(year)[-2:])
+        # 1 time
         tt = '%02d:%02d:%02d' % (hh, mn, sec)
         # 2 monitor is active
         active = '1'
@@ -742,20 +783,18 @@ class Arena():
         Motion is calculated as distance in px per minutes
         """
         
-        values = []
-        for fd in self.flyDataMin:
-
-            fs = np.roll(fd, -1, 0)
-            
-            x = fd[:,:1]; y = fd[:,1:]
-            x1 = fs[:,:1]; y1 = fs[:,1:]
-            
-            d = np.sqrt ( (x1-x)**2 + (y1-y)**2 )
-
-            d = d[~np.isnan(d)]; d = d[~np.isinf(d)]
-            
-            values. append ( d[:-1].sum() )
-
+        fd = self.flyDataMin
+        
+        # shift by one second left flies, seconds, (x,y)
+        fs = np.roll(fd, -1, axis=1) 
+        
+        x = fd[:,:,:1]; y = fd[:,:,1:]
+        x1 = fs[:,:,:1]; y1 = fs[:,:,1:]
+        
+        d = np.sqrt ( (x1-x)**2 + (y1-y)**2 )
+        #we sum everything BUT the last bit of information otherwise we have data duplication
+        values = d[:,:-1,:].sum(axis=1).reshape(-1)
+        
         activity = '\t'.join( [str(v) for v in values] )
         return activity
             
@@ -797,9 +836,7 @@ class Arena():
         activity = []
         rois = self.getROInumber()
         
-        a = np.array( self.flyDataMin ) #( n_flies, interval, (x,y) )
-        a = a.transpose(1,0,2) # ( interval, n_flies, (x,y) )
-        
+        a = self.flyDataMin.transpose(1,0,2) # ( interval, n_flies, (x,y) )
         a = a.reshape(resolution, -1, rois, 2).mean(0)
         
         for fd in a:
@@ -841,7 +878,6 @@ class Monitor(object):
         cv.Line(img, bm[0], bm[1], color, width, line_type, 0)
 
         return img
-
 
     def __drawROI(self, img, ROI, color=None):
         """
@@ -1036,16 +1072,6 @@ class Monitor(object):
         else:
             return False
    
-    def processFlyMovements(self):
-        """
-        """
-        
-        ct = self.getFrameTime()
-        
-        if ( ct - self.lasttime) > 1: # if one second has elapsed
-            self.lasttime = ct
-            self.arena.compactSeconds() #average the coordinates and transfer from buffer to array
-                
     def addROI(self, coords, n_flies=1):
         """
         Add the coords for a new ROI and the number of flies we want to track in that area
@@ -1096,6 +1122,12 @@ class Monitor(object):
         """
         return self.arena.isPointInROI(pt)
 
+    def calibrate(self, pt1, pt2, cm=1):
+        """
+        Relays to arena calibrate
+        """
+        return self.arena.calibrate(pt1, pt2, cm)
+        
     def autoMask(self, pt1, pt2):
         """
         EXPERIMENTAL, FIX THIS
@@ -1260,6 +1292,16 @@ class Monitor(object):
         
         return frame
 
+    def processFlyMovements(self):
+        """
+        """
+        
+        ct = self.getFrameTime()
+        
+        if ( ct - self.lasttime) > 1: # if one second has elapsed
+            self.lasttime = ct
+            self.arena.compactSeconds() #average the coordinates and transfer from buffer to array
+
     def doTrack(self, frame, show_raw_diff=False):
         """
         Track flies in ROIS using findContour algorithm in opencv
@@ -1271,65 +1313,55 @@ class Monitor(object):
         # Smooth to get rid of false positives
         cv.Smooth(frame, frame, cv.CV_GAUSSIAN, 3, 0)
 
-        #
+        grey_image = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
+        temp = cv.CloneImage(frame)
+        difference = cv.CloneImage(frame)
+        ROImsk = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
+        ROIwrk = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
+
         if self.firstFrame:
-            self.grey_image = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
-            self.temp = cv.CloneImage(frame)
-            self.temp2 = cv.CloneImage(frame)
-            self.difference = cv.CloneImage(frame)
-            self.ROImsk = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
-            self.ROIwrk = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
-            
             #create the moving average
             self.moving_average = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_32F, 3)
             cv.ConvertScale(frame, self.moving_average, 1.0, 0.0)
             self.firstFrame = False
-
         else:
-            cv.Zero(self.grey_image)
-            cv.Zero(self.temp)
-            cv.Zero(self.temp2)
-            cv.Zero(self.difference)
-            cv.Zero(self.ROImsk)
-            cv.Zero(self.ROIwrk)
-
             #update the moving average
             cv.RunningAvg(frame, self.moving_average, 0.1, None) #0.04
             
         # Convert the scale of the moving average.
-        cv.ConvertScale(self.moving_average, self.temp, 1.0, 0.0)
+        cv.ConvertScale(self.moving_average, temp, 1.0, 0.0)
 
         # Minus the current frame from the moving average.
-        cv.AbsDiff(frame, self.temp, self.difference)
+        cv.AbsDiff(frame, temp, difference)
 
         # Convert the image to grayscale.
-        cv.CvtColor(self.difference, self.grey_image, cv.CV_RGB2GRAY)
+        cv.CvtColor(difference, grey_image, cv.CV_RGB2GRAY)
 
         # Convert the image to black and white.
-        cv.Threshold(self.grey_image, self.grey_image, 20, 255, cv.CV_THRESH_BINARY)
+        cv.Threshold(grey_image, grey_image, 20, 255, cv.CV_THRESH_BINARY)
 
         # Dilate and erode to get proper blobs
-        cv.Dilate(self.grey_image, self.grey_image, None, 2) #18
-        cv.Erode(self.grey_image, self.grey_image, None, 2) #10
+        cv.Dilate(grey_image, grey_image, None, 2) #18
+        cv.Erode(grey_image, grey_image, None, 2) #10
 
-        storage = cv.CreateMemStorage(0)
-        
         #Build the mask. This allows for non rectangular ROIs
         for ROI in self.arena.ROIS:
-            cv.FillPoly( self.ROImsk, [ROI], color=cv.CV_RGB(255, 255, 255) )
+            cv.FillPoly( ROImsk, [ROI], color=cv.CV_RGB(255, 255, 255) )
         
         #Apply the mask to the grey image where tracking happens
-        cv.Copy(self.grey_image, self.ROIwrk, self.ROImsk)
+        cv.Copy(grey_image, ROIwrk, ROImsk)
         
         #track each ROI
         for fly_number, ROI in enumerate( self.arena.ROIStoRect() ):
             
+            this_frame_flies = []
+            
             (x1,y1), (x2,y2) = ROI
-            cv.SetImageROI(self.ROIwrk, (x1,y1,x2-x1,y2-y1))
+            cv.SetImageROI(ROIwrk, (x1,y1,x2-x1,y2-y1))
             cv.SetImageROI(frame, (x1,y1,x2-x1,y2-y1))
-            cv.SetImageROI(self.grey_image, (x1,y1,x2-x1,y2-y1))
+            cv.SetImageROI(grey_image, (x1,y1,x2-x1,y2-y1))
 
-            contour = cv.FindContours(self.ROIwrk, storage, cv.CV_RETR_CCOMP, cv.CV_CHAIN_APPROX_SIMPLE)
+            contour = cv.FindContours(ROIwrk, cv.CreateMemStorage(0), cv.CV_RETR_CCOMP, cv.CV_CHAIN_APPROX_SIMPLE)
 
             points = []
             fly_coords = None
@@ -1348,20 +1380,29 @@ class Monitor(object):
                     area = (pt2[0]-pt1[0])*(pt2[1]-pt1[1])
                     if area > 400: fly_coords = None
 
-            fly_coords = self.arena.addFlyCoords(fly_number, fly_coords) # for each frame adds fly coordinates to all ROIS
+            # for each frame adds fly coordinates to all ROIS. Also do some filtering to remove false positives
+            fly_coords, distance = self.arena.addFlyCoords(fly_number, fly_coords)
             self.__drawCross(frame, fly_coords)
-            
-            if show_raw_diff:
-                self.__drawCross(self.grey_image, fly_coords, color=(100,100,100))
-            
-            cv.ResetImageROI(self.ROIwrk)
-            cv.ResetImageROI(self.grey_image)
+            if show_raw_diff: self.__drawCross(grey_image, fly_coords, color=(100,100,100))
+
+            cv.ResetImageROI(ROIwrk)
+            cv.ResetImageROI(grey_image)
             cv.ResetImageROI(frame)
+            
+            #release memory
+            del contour
 
         self.processFlyMovements()
         
         if show_raw_diff:
-            cv.CvtColor(self.grey_image, self.temp2, cv.CV_GRAY2RGB)#show the actual difference blob that will be tracked
-            return self.temp2
+            temp2 = cv.CloneImage(grey_image)
+            cv.CvtColor(grey_image, temp2, cv.CV_GRAY2RGB)#show the actual difference blob that will be tracked
+            return temp2
+
+        del grey_image
+        del temp
+        del difference
+        del ROImsk
+        del ROIwrk
         
         return frame
