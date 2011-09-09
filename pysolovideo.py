@@ -40,8 +40,9 @@ Algorithm for motion analysis:          PIL through kmeans (vector quantization)
 
 import cv
 import cPickle
-import os, sys, datetime, time
+import os, datetime, time
 import numpy as np
+
 
 pySoloVideoVersion ='dev'
 MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug','Sep', 'Oct', 'Nov', 'Dec']
@@ -783,15 +784,16 @@ class Arena():
         Motion is calculated as distance in px per minutes
         """
         
-        fd = self.flyDataMin
-        
         # shift by one second left flies, seconds, (x,y)
-        fs = np.roll(fd, -1, axis=1) 
+        fs = np.roll(self.flyDataMin, -1, axis=1) 
         
-        x = fd[:,:,:1]; y = fd[:,:,1:]
-        x1 = fs[:,:,:1]; y1 = fs[:,:,1:]
+        x = self.flyDataMin[:,:,:1]
+        y = self.flyDataMin[:,:,1:]
         
-        d = np.sqrt ( (x1-x)**2 + (y1-y)**2 )
+        x1 = fs[:,:,:1]
+        y1 = fs[:,:,1:]
+        
+        d = self.__distance((x,y),(x1,y1))
         #we sum everything BUT the last bit of information otherwise we have data duplication
         values = d[:,:-1,:].sum(axis=1).reshape(-1)
         
@@ -1351,6 +1353,8 @@ class Monitor(object):
         #Apply the mask to the grey image where tracking happens
         cv.Copy(grey_image, ROIwrk, ROImsk)
         
+        storage = cv.CreateMemStorage(0)
+        
         #track each ROI
         for fly_number, ROI in enumerate( self.arena.ROIStoRect() ):
             
@@ -1361,7 +1365,7 @@ class Monitor(object):
             cv.SetImageROI(frame, (x1,y1,x2-x1,y2-y1))
             cv.SetImageROI(grey_image, (x1,y1,x2-x1,y2-y1))
 
-            contour = cv.FindContours(ROIwrk, cv.CreateMemStorage(0), cv.CV_RETR_CCOMP, cv.CV_CHAIN_APPROX_SIMPLE)
+            contour = cv.FindContours(ROIwrk, storage, cv.CV_RETR_CCOMP, cv.CV_CHAIN_APPROX_SIMPLE)
 
             points = []
             fly_coords = None
