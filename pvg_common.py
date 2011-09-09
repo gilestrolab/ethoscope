@@ -224,9 +224,19 @@ class previewPanel(wx.Panel):
         self.polyPoints = []
         self.keymode = keymode
         
+        self.ACTIONS = {
+                        "a": [self.AutoMask, "Automatically create the mask"],
+                        "c": [self.ClearLast, "Clear last selected area of interest"],
+                        "t": [self.Calibrate, "Calibrate the mask after selecting two points distant 1cm from each other"],
+                        "x": [self.ClearAll, "Clear all marked region of interest"],
+                        "j": [self.SaveCurrentSelection, "Save last marked area of interest"],
+                        "s": [self.SaveMask, "Save mask to file"],
+                        "q": [self.Stop, "Close connection to camera"]
+                        }
+        
         self.Bind( wx.EVT_LEFT_DOWN, self.onLeftDown )
         self.Bind( wx.EVT_LEFT_UP, self.onLeftUp )
-        self.Bind( wx.EVT_LEFT_DCLICK, self.AddPoint )
+        self.Bind( wx.EVT_LEFT_DCLICK, self.onDoubleClick )
         self.Bind( wx.EVT_MOTION, self.onMotion )
         self.Bind( wx.EVT_RIGHT_DOWN, self.ClearLast )
         self.Bind( wx.EVT_MIDDLE_DOWN, self.SaveCurrentSelection )
@@ -263,7 +273,7 @@ class previewPanel(wx.Panel):
             self.selection = None
             self.polyPoints = []
         
-    def AddPoint(self, event=None):
+    def onDoubleClick(self, event=None):
         """
         Add point
         """
@@ -325,33 +335,41 @@ class previewPanel(wx.Panel):
                 x1, y1, x2, y2  = (xmin, ymin, xmax, ymax)
                 self.selection = (x1,y1), (x2,y1), (x2,y2), (x1, y2)
 
+    def prinKeyEventsHelp(self, event=None):
+        """
+        """
+        for key in self.ACTIONS:
+            print "%s\t%s" % (key, self.ACTIONS[key][1])
+
     def onKeyPressed(self, event):
         """
         Regulates key pressing responses:
-        a       create auto mask
-        c       clear last ROI selected
-        x       clear all
-        g       start or stop movie grabbing
-        j       add current selection
-        s       save current mask
         """
         key = chr(event.GetKeyCode())
         
-        if key == 'a': self.AutoMask()
-        if key == 'c': self.ClearLast()
-        if key == 'x': self.ClearAll()
-        if key == 'g' and self.mon.writer: self.mon.grabMovie = not self.mon.grabMovie
-        if key == 'j': self.SaveCurrentSelection()
-        if key == 's': self.SaveMask()
-        #if key == '': self.()
+        if key == "g" and self.mon.writer: self.mon.grabMovie = not self.mon.grabMovie
+
+        if self.ACTIONS.has_key(key):
+            self.ACTIONS[key][0]()
+    
+    def Calibrate(self, event=None):
+        """
+        """
+        if len(self.polyPoints) > 2:
+            print "You need only two points for calibration. I am going to use the first two"
             
+        pt1, pt2 = self.polyPoints[0], self.polyPoints[1]
+        r = self.mon.calibrate(pt1, pt2)
+        self.polyPoints = []  
+        
+        print "%spixels = 1cm" % r
 
     def AutoMask(self, event=None):
         """
         """
         pt1, pt2 = self.polyPoints[0], self.polyPoints[1]
         self.mon.autoMask(pt1, pt2)
-         
+        self.polyPoints = []
 
     def SaveMask(self, event=None):
         """
@@ -383,17 +401,17 @@ class previewPanel(wx.Panel):
     def paintImg(self, img):
         """
         """
-        depth, channels = img.depth, img.nChannels
-        datatype = cv.CV_MAKETYPE(depth, channels)
-        
-        frame = cv.CreateMat(self.size[1], self.size[0], datatype)
-        cv.Resize(img, frame)
+        if img:
+            depth, channels = img.depth, img.nChannels
+            datatype = cv.CV_MAKETYPE(depth, channels)
+            
+            frame = cv.CreateMat(self.size[1], self.size[0], datatype)
+            cv.Resize(img, frame)
 
-        cv.CvtColor(frame, frame, cv.CV_BGR2RGB)
-        #cv.CvtColor(frame, frame, cv.CV_GRAY2RGB)
-        
-        self.bmp.CopyFromBuffer(frame.tostring())
-        self.Refresh()
+            cv.CvtColor(frame, frame, cv.CV_BGR2RGB)
+            
+            self.bmp.CopyFromBuffer(frame.tostring())
+            self.Refresh()
 
     def onPaint(self, evt):
         """
@@ -426,6 +444,14 @@ class previewPanel(wx.Panel):
         """
         """
         self.Play(False)
+        self.mon.close()
+
+    def Release(self):
+        """
+        Releases panel from input source
+        Will have to be reinitialized using setMonitor
+        """
+        self.mon.close()
 
     def hasMonitor(self):
         """
