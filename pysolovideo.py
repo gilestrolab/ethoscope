@@ -445,6 +445,9 @@ class Arena():
     The arena define the space where the flies move
     Carries information about the ROI (coordinates defining each vial) and
     the number of flies in each vial
+    
+    The class monitor takes care of the camera
+    The class arena takes care of the flies
     """
     def __init__(self):
         
@@ -679,6 +682,12 @@ class Arena():
             
         return newROIS
 
+    def getLastSteps(self, fly, steps):
+        """
+        """
+        c = self.count_seconds
+        return [(x,y) for [x,y] in self.flyDataMin[fly][c-steps:c].tolist()] + [tuple(self.flyDataBuffer[fly].flatten())]
+
     def addFlyCoords(self, count, fly):
         """
         Add the provided coordinates to the existing list
@@ -715,7 +724,7 @@ class Arena():
         if self.count_seconds >= self.period:
             self.writeActivity()
             self.count_seconds = 0
-            self.flyDataMin = self.flyDataMin * 0
+            #self.flyDataMin = self.flyDataMin * 0
         
         #growing continously; this is the correct thing to do but we would have problems adding new row with new ROIs
         #self.flyDataMin = np.append(self.flyDataMin, self.flyDataBuffer, axis=1)
@@ -848,7 +857,10 @@ class Arena():
     
 class Monitor(object):
     """
-        The main monitor class
+    The main monitor class
+    
+    The class monitor takes care of the camera
+    The class arena takes care of the flies
     """
 
     def __init__(self):
@@ -858,6 +870,8 @@ class Monitor(object):
         Real CAMs are handled through opencv, frames through PIL.
         """
         self.grabMovie = False
+        self.writer = None
+
         self.arena = Arena()
         
         self.imageCount = 0
@@ -867,6 +881,9 @@ class Monitor(object):
         
         self.__firstFrame = True
         self.tracking = True
+        
+        self.__tempFPS = 0 
+        self.processingFPS = 0
     
     def __drawBeam(self, img, bm, color=None):
         """
@@ -913,6 +930,22 @@ class Monitor(object):
         cv.Line(img, c, d, color, width, line_type, 0)
         
         return img
+        
+    def __drawLastSteps(self, img, fly, steps=5, color=None):
+        """
+        Draw the last n (default 5) steps of the fly
+        """
+
+        if not color: color = (255,255,255)
+        width = 1
+        line_type = cv.CV_AA
+
+        points = self.arena.getLastSteps(fly, steps)
+
+        cv.PolyLine(img, [points], is_closed=0, color=color, thickness=1, lineType=line_type, shift=0)
+
+        return img
+        
         
 
     def __getChannel(self, img, channel='R'):
@@ -1253,7 +1286,7 @@ class Monitor(object):
          
         return squares    
          
-    def GetImage(self, drawROIs = False, selection=None, crosses=None, timestamp=False):
+    def GetImage(self, drawROIs = False, selection=None, crosses=None, drawPath=True, timestamp=False):
         """
         GetImage(self, drawROIs = False, selection=None, timestamp=0)
         
@@ -1275,7 +1308,7 @@ class Monitor(object):
 
         if frame:
 
-            if self.tracking: frame = self.doTrack(frame)
+            if self.tracking: frame = self.doTrack(frame, show_raw_diff=False, drawPath=True)
                     
             if drawROIs and self.arena.ROIS:
                 for ROI, beam in zip(self.arena.ROIS, self.arena.beams):
@@ -1298,12 +1331,14 @@ class Monitor(object):
         """
         
         ct = self.getFrameTime()
+        self.__tempFPS += 1
         
         if ( ct - self.lasttime) >= 1: # if one second has elapsed
             self.lasttime = ct
             self.arena.compactSeconds() #average the coordinates and transfer from buffer to array
-
-    def doTrack(self, frame, show_raw_diff=False):
+            self.processingFPS = self.__tempFPS; self.__tempFPS = 0
+            
+    def doTrack(self, frame, show_raw_diff=False, drawPath=True):
         """
         Track flies in ROIS using findContour algorithm in opencv
         Each frame is compared against the moving average
@@ -1385,8 +1420,10 @@ class Monitor(object):
 
             # for each frame adds fly coordinates to all ROIS. Also do some filtering to remove false positives
             fly_coords, distance = self.arena.addFlyCoords(fly_number, fly_coords)
-            self.__drawCross(frame, fly_coords)
-            if show_raw_diff: self.__drawCross(grey_image, fly_coords, color=(100,100,100))
+            
+            frame = self.__drawCross(frame, fly_coords)
+            if drawPath: frame = self.__drawLastSteps(frame, fly_number, steps=5)
+            if show_raw_diff: grey_image = self.__drawCross(grey_image, fly_coords, color=(100,100,100))
 
             cv.ResetImageROI(ROIwrk)
             cv.ResetImageROI(grey_image)
