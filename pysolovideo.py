@@ -21,7 +21,7 @@
 #       MA 02110-1301, USA.
 #       
 #     
-"""Version 1.2
+"""Version 1.0
 
 Interaction with webcam:                opencv      liveShow.py / imageAquisition.py
 Saving movies as stream:                opencv      realCam
@@ -111,11 +111,19 @@ class realCam(Cam):
     a realCam class will handle a webcam connected to the system
     camera is handled through opencv and images can be transformed to PIL
     """
-    def __init__(self, devnum=0, showVideoWindow=False, resolution=(640,480)):
-        self.scale = False
+    def __init__(self, devnum=0, resolution=(640,480)):
+
+        self.devnum=devnum
         self.resolution = resolution
-        self.camera = cv.CaptureFromCAM(devnum)
-        self.setResolution (*resolution)
+        self.scale = False
+        
+        self.__initCamera()
+        
+    def __initCamera(self):
+        """
+        """
+        self.camera = cv.CaptureFromCAM(self.devnum)
+        self.setResolution (self.resolution)
 
     def getFrameTime(self):
         """
@@ -127,7 +135,7 @@ class realCam(Cam):
         """
         return self.__addText__(img)
 
-    def setResolution(self, x, y):
+    def setResolution(self, (x, y)):
         """
         Set resolution of the camera we are acquiring from
         """
@@ -155,10 +163,12 @@ class realCam(Cam):
                     True              Add timestamp to the image
                     
         """
-        frame = None
+        #frame = None
         
-        if self.camera:
-            frame = cv.QueryFrame(self.camera)
+        if not self.camera:
+            self.__initCamera()
+        
+        frame = cv.QueryFrame(self.camera)
 
         if self.scale:
             newsize = cv.CreateImage(self.resolution , cv.IPL_DEPTH_8U, 3)
@@ -178,11 +188,10 @@ class realCam(Cam):
     def close(self):
         """
         Closes the connection 
-        FIX THIS
         """
         print "attempting to close stream"
-        #cv.ReleaseCapture(self.camera)
-        del(self.camera)
+
+        del(self.camera) #cv.ReleaseCapture(self.camera)
         self.camera = None
         
 class virtualCamMovie(Cam):
@@ -697,7 +706,7 @@ class Arena():
         """
 
         fly_size = 15 #About 15 pixels at 640x480
-        max_movement= fly_size * 20
+        max_movement= fly_size * 100
         min_movement= fly_size / 3
 
         previous_position = tuple(self.flyDataBuffer[count])
@@ -767,7 +776,6 @@ class Arena():
         
         elif self.trackType == 2:
             activity = self.calculatePosition()
-
 
         flies = len ( activity[0] )
         if extend and flies < 32:
@@ -871,7 +879,8 @@ class Monitor(object):
         """
         self.grabMovie = False
         self.writer = None
-
+        self.cam = None
+        
         self.arena = Arena()
         
         self.imageCount = 0
@@ -884,6 +893,8 @@ class Monitor(object):
         
         self.__tempFPS = 0 
         self.processingFPS = 0
+        
+        self.drawPath = False
     
     def __drawBeam(self, img, bm, color=None):
         """
@@ -896,6 +907,26 @@ class Monitor(object):
         cv.Line(img, bm[0], bm[1], color, width, line_type, 0)
 
         return img
+
+    def __drawFPS(self, frame):
+        """
+        """
+        
+        normalfont = cv.InitFont(cv.CV_FONT_HERSHEY_PLAIN, 1, 1, 0, 1, 8)
+        boldfont = cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, 1, 1, 0, 3, 8)
+        font = normalfont
+        textcolor = (255,255,255)
+        text = "FPS: %02d" % self.processingFPS
+
+        (x1, _), ymin = cv.GetTextSize(text, font)
+        width, height = frame.width, frame.height
+        x = (width/64)
+        y = height - ymin - 2
+
+        cv.PutText(frame, text, (x, y), font, textcolor)
+        
+        return frame
+        
 
     def __drawROI(self, img, ROI, color=None):
         """
@@ -983,7 +1014,7 @@ class Monitor(object):
 
         self.resolution = resolution
         self.cam = realCam(devnum=devnum)
-        self.cam.setResolution(*resolution)
+        self.cam.setResolution(resolution)
         self.resolution = self.cam.getResolution()
         self.numberOfFrames = 0
         
@@ -1019,6 +1050,11 @@ class Monitor(object):
         self.resolution = self.cam.getResolution()
         self.numberOfFrames = self.cam.getTotalFrames()
     
+    def hasSource(self):
+        """
+        """
+        return self.cam != None
+    
     def setSource(self, camera, resolution, options=None):
         """
         Set source intelligently
@@ -1034,7 +1070,7 @@ class Monitor(object):
             self.CaptureFromMovie(camera, resolution, options)
         elif os.path.isdir(camera):
             self.CaptureFromFrames(camera, resolution, options)
-
+        
     def setTracking(self, track, trackType=0, mask_file='', outputFile=''):
         """
         Set the tracking parameters
@@ -1286,7 +1322,7 @@ class Monitor(object):
          
         return squares    
          
-    def GetImage(self, drawROIs = False, selection=None, crosses=None, drawPath=True, timestamp=False):
+    def GetImage(self, drawROIs = False, selection=None, crosses=None, timestamp=False):
         """
         GetImage(self, drawROIs = False, selection=None, timestamp=0)
         
@@ -1305,10 +1341,11 @@ class Monitor(object):
 
         self.imageCount += 1
         frame = self.cam.getImage(timestamp)
+        if timestamp: frame = self.__drawFPS(frame)
 
         if frame:
 
-            if self.tracking: frame = self.doTrack(frame, show_raw_diff=False, drawPath=True)
+            if self.tracking: frame = self.doTrack(frame, show_raw_diff=False, drawPath=self.drawPath)
                     
             if drawROIs and self.arena.ROIS:
                 for ROI, beam in zip(self.arena.ROIS, self.arena.beams):
@@ -1343,7 +1380,6 @@ class Monitor(object):
         Track flies in ROIS using findContour algorithm in opencv
         Each frame is compared against the moving average
         """
-        
         track_one = True # Track only one fly per ROI
 
         # Smooth to get rid of false positives
@@ -1352,8 +1388,8 @@ class Monitor(object):
         grey_image = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
         temp = cv.CloneImage(frame)
         difference = cv.CloneImage(frame)
-        ROImsk = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
-        ROIwrk = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
+        ROImsk = cv.CloneImage(grey_image)
+        ROIwrk = cv.CloneImage(grey_image)
 
         if self.__firstFrame:
             #create the moving average
@@ -1362,8 +1398,8 @@ class Monitor(object):
             self.__firstFrame = False
         else:
             #update the moving average
-            cv.RunningAvg(frame, self.moving_average, 0.1, None) #0.04
-            
+            cv.RunningAvg(frame, self.moving_average, 0.2, None) #0.04
+
         # Convert the scale of the moving average.
         cv.ConvertScale(self.moving_average, temp, 1.0, 0.0)
 
@@ -1386,18 +1422,15 @@ class Monitor(object):
         
         #Apply the mask to the grey image where tracking happens
         cv.Copy(grey_image, ROIwrk, ROImsk)
-        
         storage = cv.CreateMemStorage(0)
-        
+
         #track each ROI
         for fly_number, ROI in enumerate( self.arena.ROIStoRect() ):
             
-            this_frame_flies = []
-            
             (x1,y1), (x2,y2) = ROI
-            cv.SetImageROI(ROIwrk, (x1,y1,x2-x1,y2-y1))
-            cv.SetImageROI(frame, (x1,y1,x2-x1,y2-y1))
-            cv.SetImageROI(grey_image, (x1,y1,x2-x1,y2-y1))
+            cv.SetImageROI(ROIwrk, (x1,y1,x2-x1,y2-y1) )
+            cv.SetImageROI(frame, (x1,y1,x2-x1,y2-y1) )
+            cv.SetImageROI(grey_image, (x1,y1,x2-x1,y2-y1) )
 
             contour = cv.FindContours(ROIwrk, storage, cv.CV_RETR_CCOMP, cv.CV_CHAIN_APPROX_SIMPLE)
 
@@ -1420,7 +1453,7 @@ class Monitor(object):
 
             # for each frame adds fly coordinates to all ROIS. Also do some filtering to remove false positives
             fly_coords, distance = self.arena.addFlyCoords(fly_number, fly_coords)
-            
+
             frame = self.__drawCross(frame, fly_coords)
             if drawPath: frame = self.__drawLastSteps(frame, fly_number, steps=5)
             if show_raw_diff: grey_image = self.__drawCross(grey_image, fly_coords, color=(100,100,100))
@@ -1435,5 +1468,5 @@ class Monitor(object):
             temp2 = cv.CloneImage(grey_image)
             cv.CvtColor(grey_image, temp2, cv.CV_GRAY2RGB)#show the actual difference blob that will be tracked
             return temp2
-        
+
         return frame
