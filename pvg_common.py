@@ -200,7 +200,7 @@ class previewPanel(wx.Panel):
 
         self.size = size
         self.SetMinSize(self.size)
-        fps = options.GetOption('FPS_preview') or 7
+        fps = options.GetOption('FPS_preview') or 25
         self.interval = 1000/fps # fps determines refresh interval in ms
 
         self.SetBackgroundColour('#A9A9A9')
@@ -211,6 +211,8 @@ class previewPanel(wx.Panel):
         self.track = False
         self.trackType = 1
         self.drawROI = True
+        self.camera = None
+        self.resolution = None
 
         self.recording = False
         self.isPlaying = False
@@ -236,7 +238,7 @@ class previewPanel(wx.Panel):
         
         self.Bind( wx.EVT_LEFT_DOWN, self.onLeftDown )
         self.Bind( wx.EVT_LEFT_UP, self.onLeftUp )
-        self.Bind( wx.EVT_LEFT_DCLICK, self.onDoubleClick )
+        self.Bind( wx.EVT_LEFT_DCLICK, self.AddPoint )
         self.Bind( wx.EVT_MOTION, self.onMotion )
         self.Bind( wx.EVT_RIGHT_DOWN, self.ClearLast )
         self.Bind( wx.EVT_MIDDLE_DOWN, self.SaveCurrentSelection )
@@ -273,7 +275,7 @@ class previewPanel(wx.Panel):
             self.selection = None
             self.polyPoints = []
         
-    def onDoubleClick(self, event=None):
+    def AddPoint(self, event=None):
         """
         Add point
         """
@@ -375,28 +377,24 @@ class previewPanel(wx.Panel):
         """
         """
         self.mon.saveROIS()
-
-    def setMonitor(self, camera, resolution):
+        
+    def setMonitor(self, camera, resolution=None):
         """
         """
         
+        if not resolution: resolution = self.size
+        
+        self.camera = camera
+        self.resolution = resolution
         self.mon = pv.Monitor()
-        self.mon.setSource(camera, resolution)
-        
-        #frame_big = self.mon.GetImage() 
-        
-        #resize
+
         frame = cv.CreateMat(self.size[1], self.size[0], cv.CV_8UC3)
-        #cv.Resize(frame_big, frame)
-        
-        #convert colors before transforming to RGB
-        #cv.CvtColor(frame, frame, cv.CV_BGR2RGB)
         self.bmp = wx.BitmapFromBuffer(self.size[0], self.size[1], frame.tostring())
 
         self.Bind(wx.EVT_PAINT, self.onPaint)
-
         self.playTimer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.onNextFrame)
+        
 
     def paintImg(self, img):
         """
@@ -409,6 +407,7 @@ class previewPanel(wx.Panel):
             cv.Resize(img, frame)
 
             cv.CvtColor(frame, frame, cv.CV_BGR2RGB)
+            #cv.CvtColor(frame, frame, cv.CV_GRAY2RGB)
             
             self.bmp.CopyFromBuffer(frame.tostring())
             self.Refresh()
@@ -432,25 +431,23 @@ class previewPanel(wx.Panel):
     def Play(self, status=True, showROIs=True):
         """
         """
-        self.drawROI = showROIs
-        self.isPlaying = status
-        
-        if status:
-            self.playTimer.Start(self.interval)
-        else:
-            self.playTimer.Stop()
+
+        if self.camera != None and self.resolution != None and not self.mon.hasSource():
+            self.mon.setSource(self.camera, self.resolution)
+
+        if self.mon:
+            self.drawROI = showROIs
+            self.isPlaying = status
+            
+            if status:
+                self.playTimer.Start(self.interval)
+            else:
+                self.playTimer.Stop()
             
     def Stop(self):
         """
         """
         self.Play(False)
-        self.mon.close()
-
-    def Release(self):
-        """
-        Releases panel from input source
-        Will have to be reinitialized using setMonitor
-        """
         self.mon.close()
 
     def hasMonitor(self):
