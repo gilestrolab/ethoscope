@@ -30,6 +30,8 @@ from pvg_options import optionsFrame
 from pvg_panel_one import panelOne
 from pvg_panel_two import panelLiveView
 from pvg_common import options
+
+from pysolovideo import pySoloVideoVersion
         
 class mainNotebook(wx.Notebook):
     """
@@ -46,7 +48,15 @@ class mainNotebook(wx.Notebook):
         self.panelTwo = panelLiveView(self)
         self.AddPage(self.panelTwo, "Live View")
         
+        self.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGING, self.OnPageChanging)
+        
         self.Layout()
+        
+    def OnPageChanging(self, event):
+        """
+        """
+        self.panelOne.StopPlaying()
+        self.panelTwo.StopPlaying()
         
 class mainFrame(wx.Frame):
     """
@@ -73,7 +83,7 @@ class mainFrame(wx.Frame):
     def __set_properties(self):
         # begin wxGlade: mainFrame.__set_properties
         self.SetTitle("pySoloVideo")
-        self.SetSize((1085,850))
+        self.SetSize((1200,850))
         
     def __menubar__(self):
         
@@ -117,6 +127,21 @@ class mainFrame(wx.Frame):
         #wx.EVT_MENU(self, ID_FILE_CLOSE, self.onFileClose)
         wx.EVT_MENU(self, ID_FILE_EXIT, self.onFileExit)
         wx.EVT_MENU(self, ID_OPTIONS_SET, self.onConfigure)
+        wx.EVT_MENU(self, ID_HELP_ABOUT, self.onAbout)
+        
+    def onAbout(self, event):
+        """
+        Shows the about dialog
+        """
+        about = 'pySolo-Video - v %s\n' % pySoloVideoVersion
+        about += 'by Giorgio F. Gilestro\n'
+        about += 'Visit http://www.pysolo.net for more information'
+        
+        dlg = wx.MessageDialog(self, about, 'About', wx.OK | wx.ICON_INFORMATION)
+        dlg.ShowModal()
+        dlg.Destroy()
+
+        
         
     def onFileSave(self, event):
         """
