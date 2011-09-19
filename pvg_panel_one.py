@@ -216,14 +216,36 @@ class panelConfigure(wx.Panel):
         self.SetSizer(lowerSizer)
         self.Bind(EVT_THUMBNAIL_CLICKED, self.onThumbnailClicked)
 
-    def onPlay (self, event):
+    def __getSource(self):
+        """
+        check which source is ticked and what is the associated value
+        """
+        
+        for (r, s), st in zip(self.controls,range(3)):
+            if r.GetValue():
+                source = s.GetValue()
+                sourceType = st
+                
+        return source, sourceType
+        
+    def __getTrackingType(self):
+        """
+        return which tracking we are chosing
+        """
+        if self.trackDistanceRadio.GetValue(): trackType = 0
+        elif self.trackVirtualBM.GetValue(): trackType = 1
+        elif self.trackPosition.GetValue(): trackType = 2
+        
+        return trackType
+
+    def onPlay (self, event=None):
         """
         """
         if self.thumbnail:
             self.thumbnail.Play()
             self.btnStop.Enable(True)
         
-    def onStop (self, event):
+    def onStop (self, event=None):
         """
         """
         if self.thumbnail:
@@ -263,7 +285,6 @@ class panelConfigure(wx.Panel):
         self.source = self.thumbnail.source = source
         self.sourceType = self.thumbnail.sourceType = sourceType
         self.thumbnail.track = track
-        
         
         #update first static box
         active = self.thumbnail.hasMonitor()
@@ -308,22 +329,16 @@ class panelConfigure(wx.Panel):
                 source.Enable(False)
         
         self.applyButton.Enable(True)
- 
+
+
     def onApplySource(self, event):
         """
         """
-        
-        for (r, s), st in zip(self.controls,range(3)):
-            if r.GetValue():
-                source = s.GetValue()
-                sourceType = st
-        
+
+        source, sourceType = self.__getSource()
         track = self.activateTracking.GetValue()
         self.mask_file = self.pickMaskBrowser.GetValue()
-        
-        if self.trackDistanceRadio.GetValue(): self.trackType = 0
-        elif self.trackVirtualBM.GetValue(): self.trackType = 1
-        elif self.trackPosition.GetValue(): self.trackType = 2
+        self.trackType = self.__getTrackingType()
         
         if self.thumbnail:
            
@@ -332,13 +347,15 @@ class panelConfigure(wx.Panel):
 
             self.thumbnail.source = camera
             self.thumbnail.sourceType = sourceType
-
+            
+            #Change the source text
             self.currentSource.SetValue( os.path.split(source)[1] )
             
-            ts = self.thumbnail.size
-            self.thumbnail.setMonitor(camera, ts )
+            #Set thumbnail's source
+            self.thumbnail.setMonitor(camera)
+
+            #Enable buttons
             self.btnPlay.Enable(True)
-            
             self.activateTracking.Enable(True)
             self.pickMaskBrowser.Enable(True)
         
@@ -388,6 +405,9 @@ class panelOne(wx.Panel):
         self.SetSizer(self.PanelOneSizer)  
 
         
- 
+    def StopPlaying(self):
+        """
+        """
+        self.lowerPanel.onStop()
         
 
