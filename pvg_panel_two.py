@@ -52,7 +52,10 @@ class panelLiveView(wx.Panel):
         self.thumbnailNumber = wx.ComboBox(self, -1, size=(-1,-1) , choices=self.MonitorList, style=wx.CB_DROPDOWN | wx.CB_READONLY | wx.CB_SORT)
         self.Bind(wx.EVT_COMBOBOX, self.onChangeMonitor, self.thumbnailNumber)
 
+        self.sourceTXTBOX =  wx.TextCtrl (self, -1, "No monitor selected", style=wx.TE_READONLY)
+
         sbSizer_1.Add ( self.thumbnailNumber, 0, wx.ALIGN_CENTRE|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
+        sbSizer_1.Add ( self.sourceTXTBOX, 0, wx.ALIGN_CENTRE|wx.LEFT|wx.RIGHT|wx.TOP|wx.EXPAND, 5 )
 
         #Static box2: mask parameters
         sb_2 = wx.StaticBox(self, -1, "Mask Editing")#, size=(250,-1))
@@ -101,10 +104,10 @@ class panelLiveView(wx.Panel):
         titleFont = wx.Font(10, wx.SWISS, wx.NORMAL, wx.BOLD)
         instr = [ ('Left mouse button - single click outside ROI', 'Start dragging ROI. ROI will be a perfect rectangle'),
                   ('Left mouse button - single click inside ROI', 'Select ROI. ROI turns red.'),
-                  ('Left mouse button - double click', 'Select corner of ROI. Will close ROI after fourth selection'),
+                  ('Left mouse button - double click', 'Select corner of ROI.\nWill close ROI after fourth selection'),
                   ('Middle mouse button - single click', 'Add currently selected ROI. ROI turns white.'),
                   ('Right mouse button - click', 'Remove selected currently selected ROI'),
-                  ('Auto Fill', 'Will fill 32 ROIS (16x2) to fit under the last two\nselected points. To use select first upper left corner,\n then the lower right corner, then hit the Auto Fill Button.')
+                  ('Auto Fill', 'Will fill 32 ROIS (16x2) to fit under the last two\nselected points. To use select first upper left corner,\n then the lower right corner, then use "Auto Fill".')
                   ]
                   
         for title, text in instr:
@@ -128,30 +131,44 @@ class panelLiveView(wx.Panel):
         
         self.SetSizer(sizer_1) 
 
+    def StopPlaying(self):
+        """
+        """
+        self.fsPanel.Stop()
+
+
     def onChangeMonitor(self, event):
         """
+        FIX THIS
+        this is a mess
         """
         
         if self.fsPanel.isPlaying: self.fsPanel.Stop()
         
-        sel = self.monitor_name = event.GetString()
-        m = self.monitor_number = self.MonitorList.index(sel)
+        self.monitor_name = event.GetString()
+        self.monitor_number = self.MonitorList.index( self.monitor_name )
         
         n_cams = options.GetOption("Webcams")
         WebcamsList = [ 'Webcam %s' % (int(w) +1) for w in range( n_cams ) ]
 
         if options.HasMonitor(self.monitor_number):
-            self.fsPanel.sourceType, self.fsPanel.source, self.fsPanel.track, self.mask_file, self.fsPanel.trackType = options.GetMonitor(self.monitor_number)
-        else:
-            self.fsPanel.sourceType, self.fsPanel.source, self.fsPanel.track, self.mask_file, self.fsPanel.trackType = [0, '', False, '', 1]
+            sourceType, source, track, mask_file, trackType = options.GetMonitor(self.monitor_number)
+            self.fsPanel.setMonitor( source )
+            self.fsPanel.Play()
 
-        self.fsPanel.setMonitor(self.fsPanel.source, self.fs_size)
-        if self.fsPanel.hasMonitor(): self.fsPanel.Play()
+            if mask_file:
+                self.fsPanel.mon.loadROIS(mask_file)
+                self.currentMaskTXT.SetValue(os.path.split(mask_file)[1] or '')
             
-        if self.mask_file:
-            self.fsPanel.mon.loadROIS(self.mask_file)
-        
-        self.currentMaskTXT.SetValue(os.path.split(self.mask_file)[1] or '')
+            if sourceType == 0:
+                self.sourceTXTBOX.SetValue( WebcamsList[source] )
+            else:
+                self.sourceTXTBOX.SetValue( os.path.split(source)[1] )
+
+        else:
+            sourceType, source, track, mask_file, trackType = [0, '', False, '', 1]
+            self.sourceTXTBOX.SetValue('No Source for this monitor')
+
 
     def onSaveMask(self, event):
         """
