@@ -134,7 +134,7 @@ class panelLiveView(wx.Panel):
     def StopPlaying(self):
         """
         """
-        self.fsPanel.Stop()
+        if self.fsPanel and self.fsPanel.isPlaying: self.fsPanel.Stop()
 
 
     def onChangeMonitor(self, event):

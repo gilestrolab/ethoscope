@@ -248,7 +248,7 @@ class panelConfigure(wx.Panel):
     def onStop (self, event=None):
         """
         """
-        if self.thumbnail:
+        if self.thumbnail and self.thumbnail.isPlaying:
             self.thumbnail.Stop()
             self.btnStop.Enable(False)
 
