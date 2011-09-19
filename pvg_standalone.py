@@ -9,7 +9,7 @@ from os.path import splitext
 ##
 
 class CvMovieFrame(wx.Frame):
-    def __init__(self, parent, source, resolution, track, track_type, mask_file, outputFile, showROIs, record, trackonly ):
+    def __init__(self, parent, source, resolution, track, track_type, mask_file, outputFile, showROIs, showpath, record, trackonly ):
         wx.Frame.__init__(self, parent)
         self.displayPanel = previewPanel(self, size=resolution, keymode=True)
         self.SetSize(resolution)
@@ -41,7 +41,8 @@ if __name__=="__main__":
     parser.add_option('-k', '--mask', dest='mask_file', metavar="MASKFILE", help="File mode | Specify a maskfile to be used with file.")
     parser.add_option('-t', '--tracktype', dest='track_type', metavar="TT", help="File mode | Specify track type: 0, distance; 1, trikinetics; 2, coordinates")
     parser.add_option('-o', '--output', dest='outputFile', metavar="OUTFILE", help="All modes | Specify an output file where to store tracking results. A Mask must be loaded")
-    parser.add_option('--showmask', action="store_true", default=True, dest='showROIs', help="Show the area limiting the ROIs")
+    parser.add_option('--showmask', action="store_true", default=False, dest='showROIs', help="Show the area limiting the ROIs")
+    parser.add_option('--showpath', action="store_true", default=False, dest='showpath', help="Show the last steps of each fly as white line")
     parser.add_option('--record', action="store_true", default=False, dest='record', help="Record the resulting video as avi file")
     parser.add_option('--trackonly', action="store_true", default=False, dest='trackonly', help="Does only the tracking, without showing the video")
     
@@ -72,5 +73,5 @@ if __name__=="__main__":
     if (options.configfile and options.monitor) or options.source:
 
         app = wx.App()
-        f = CvMovieFrame(None, source, resolution, track, track_type, mask_file, outputFile, options.showROIs, options.record, options.trackonly )
+        f = CvMovieFrame(None, source, resolution, track, track_type, mask_file, outputFile, options.showROIs, options.showpath, options.record, options.trackonly )
         app.MainLoop()    
