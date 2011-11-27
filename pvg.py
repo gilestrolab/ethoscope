@@ -151,7 +151,7 @@ class mainFrame(wx.Frame):
     def onFileSaveAs(self, event):
         """
         """
-        filename = 'config.cfg'
+        filename = DEFAULT_CONFIG
         wildcard = "pySolo Video config file (*.cfg)|*.cfg"
         
         dlg = wx.FileDialog(

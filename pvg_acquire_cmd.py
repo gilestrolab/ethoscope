@@ -25,39 +25,8 @@
 import os, time
 import optparse
 
-import pysolovideo as pv
 from pvg_common import pvg_config, acquireThread
 
-def getMonitorsData(configfile=None):
-    """
-    return a list containing the monitors that we need to track 
-    based on info found in configfile
-    """
-    monitors = {}
-    
-    options = pvg_config(configfile)
-    print ("Reading configuration from file %s" % configfile)
-      
-    ms = options.GetOption('Monitors')
-    resolution = options.GetOption('FullSize')
-    dataFolder = options.GetOption('Data_Folder')
-    
-    for mon in range(ms):
-        if options.HasMonitor(mon):
-            _,source,track,mask_file,track_type = options.GetMonitor(mon)
-            monitors[mon] = {}
-            monitors[mon]['source'] = source
-            monitors[mon]['resolution'] = resolution
-            monitors[mon]['mask_file'] = mask_file
-            monitors[mon]['track_type'] = track_type
-            monitors[mon]['dataFolder'] = dataFolder
-            monitors[mon]['track'] = track
-        
-    print ( "Found %s monitors." % len(monitors) )
-    print ( "%s: Acquisition started." % time.ctime() )
-    
-    return monitors
- 
 if __name__ == '__main__':
 
     parser = optparse.OptionParser(usage='%prog [options] [argument]', version='%prog version 1.0')
@@ -72,11 +41,14 @@ if __name__ == '__main__':
         parser.print_help()
         exit(-1)
     
-    if not os.path.isfile(configfile):
-        print ('%s does not exist or is not accessible' % configfile)
+    try:
+        option_file = pvg_config(configfile)
+    except:
+        print ('Problem with configuration file %s.' % configfile)
         exit(-1)
         
-    monitorsData = getMonitorsData(configfile)
+    monitorsData = option_file.getMonitorsData()
+    print ( "Found %s monitors." % len(monitorsData) )
         
     for mn in monitorsData:
         m = monitorsData[mn]
@@ -84,3 +56,4 @@ if __name__ == '__main__':
         at = acquireThread(mn, m['source'], m['resolution'], m['mask_file'], startTrack, m['track_type'], m['dataFolder'])
         at.keepGoing = True
         at.start()
+        print ( "%s: Acquisition for monitor %s started." % ( time.ctime(), mn ))

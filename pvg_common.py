@@ -24,6 +24,8 @@ import wx, cv, os
 import pysolovideo as pv
 import ConfigParser, threading
 
+DEFAULT_CONFIG = 'pysolo_video.cfg'
+
 class myConfig():
     """
     Handles program configuration
@@ -37,7 +39,7 @@ class myConfig():
         defaultOptions  a dict containing the defaultOptions
         """
         
-        filename = filename or 'config.cfg'
+        filename = filename or DEFAULT_CONFIG
         pDir = os.getcwd()
         if not os.access(pDir, os.W_OK): pDir = os.environ['HOME']
 
@@ -231,6 +233,31 @@ class pvg_config(myConfig):
         """
         mn = 'Monitor%s' % monitor
         return self.config.has_section(mn)
+
+    def getMonitorsData(self):
+        """
+        return a list containing the monitors that we need to track 
+        based on info found in configfile
+        """
+        monitors = {}
+        
+        ms = self.GetOption('Monitors')
+        resolution = self.GetOption('FullSize')
+        dataFolder = self.GetOption('Data_Folder')
+        
+        for mon in range(ms):
+            if self.HasMonitor(mon):
+                _,source,track,mask_file,track_type = self.GetMonitor(mon)
+                monitors[mon] = {}
+                monitors[mon]['source'] = source
+                monitors[mon]['resolution'] = resolution
+                monitors[mon]['mask_file'] = mask_file
+                monitors[mon]['track_type'] = track_type
+                monitors[mon]['dataFolder'] = dataFolder
+                monitors[mon]['track'] = track
+            
+        return monitors
+
 
         
 class previewPanel(wx.Panel):
@@ -503,4 +530,4 @@ class previewPanel(wx.Panel):
 
 #################
 
-options = pvg_config('config.cfg')
+options = pvg_config(DEFAULT_CONFIG)

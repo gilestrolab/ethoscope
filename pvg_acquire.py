@@ -28,14 +28,14 @@ __date__ = "$Date: 2011/08/16 21:57:19 $"
 __copyright__ = "Copyright (c) 2011 Giorgio Gilestro"
 __license__ = "Python"
 
-import os, wx
-import pysolovideo as pv
-from pvg_common import pvg_config, acquireThread
+import os, optparse
 
+from pvg_common import pvg_config, acquireThread, DEFAULT_CONFIG
+
+import wx
 from wx.lib.filebrowsebutton import FileBrowseButton
 import wx.grid as gridlib
 
-import optparse
 
 class customDataTable(gridlib.PyGridTableBase):
     def __init__(self, colLabels, dataTypes, useValueCleaner=True):
@@ -723,15 +723,18 @@ class pvg_AcquirePanel(wx.Panel):
     def loadFile(self, filename):
         """
         """
-        self.configfile = filename
+        self.options = pvg_config(filename)
         self.updateTable()
-        self.parent.sb.SetStatusText('Loaded file %s' % self.configfile)
+        self.parent.sb.SetStatusText('Loaded file %s' % filename)
+        
+        return True
         
     def updateTable(self):
         """
         """
+        monitorsData = self.options.getMonitorsData()
+        
         self.grid.Clear()
-        monitorsData = getMonitorsData(self.configfile)
         self.monitors = {}
         
         for mn in monitorsData:
@@ -797,42 +800,22 @@ class acquireFrame(wx.Frame):
 
         self.acq_panel =  pvg_AcquirePanel(self)
 
-    def loadConfig(self, filename):
+    def loadConfig(self, filename=None):
         """
         """
-        self.acq_panel.loadFile(configfile)
+        if filename is None:
+            pDir = os.environ['HOME']
+            filename = os.path.join (pDir, DEFAULT_CONFIG)
+            
+        self.acq_panel.loadFile(filename)
+        
+        return True
         
     def Start(self):
         """
         """
         self.acq_panel.onStart()
 
-
-def getMonitorsData(configfile=None):
-    """
-    return a list containing the monitors that we need to track 
-    based on info found in configfile
-    """
-    monitors = {}
-    
-    options = pvg_config(configfile)
-      
-    ms = options.GetOption('Monitors')
-    resolution = options.GetOption('FullSize')
-    dataFolder = options.GetOption('Data_Folder')
-    
-    for mon in range(ms):
-        if options.HasMonitor(mon):
-            _,source,track,mask_file,track_type = options.GetMonitor(mon)
-            monitors[mon] = {}
-            monitors[mon]['source'] = source
-            monitors[mon]['resolution'] = resolution
-            monitors[mon]['mask_file'] = mask_file
-            monitors[mon]['track_type'] = track_type
-            monitors[mon]['dataFolder'] = dataFolder
-            monitors[mon]['track'] = track
-        
-    return monitors
 
 
 if __name__ == '__main__':
@@ -844,18 +827,19 @@ if __name__ == '__main__':
 
     (options, args) = parser.parse_args()
 
-    configfile = options.config_file or None
     
     app=wx.PySimpleApp(0)
     frame_acq = acquireFrame(None, -1, '')
     app.SetTopWindow(frame_acq)
-    
     frame_acq.Show(options.showgui)
-    app.MainLoop()
-    
-    if configfile:
-        optionsframe_acq.loadConfig(configfile)
-    if configfile and options.acquire:
+
+    configfile = options.config_file or DEFAULT_CONFIG
+    cfgloaded = frame_acq.loadConfig(configfile)
+
+    if cfgloaded and options.acquire:
         frame_acq.Start()
+    
+    app.MainLoop()
+
 
     
