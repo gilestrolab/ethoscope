@@ -22,7 +22,7 @@
 #       
 #       
 
-import os
+import os, time
 import optparse
 
 import pysolovideo as pv
@@ -54,6 +54,7 @@ def getMonitorsData(configfile=None):
             monitors[mon]['track'] = track
         
     print ( "Found %s monitors." % len(monitors) )
+    print ( "%s: Acquisition started." % time.ctime() )
     
     return monitors
  
@@ -66,9 +67,14 @@ if __name__ == '__main__':
 
     configfile = options.config_file
     
-    if not options.config_file:
-        print ('You need to specify a config file')
-        exit()
+    if configfile is None:
+        print ('You need to specify the path to a config file')
+        parser.print_help()
+        exit(-1)
+    
+    if not os.path.isfile(configfile):
+        print ('%s does not exist or is not accessible' % configfile)
+        exit(-1)
         
     monitorsData = getMonitorsData(configfile)
         

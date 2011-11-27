@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# If pysolo_acquire crashes, will automatically restart the process
+# and log the error 
+#
+
+CFG=$1
+
+until ./pvg_acquire_cmd.py -c $CFG; do
+    echo "Acquisition program crashed with exit code $?.  Respawning.." >&2
+    sleep 1
+done
