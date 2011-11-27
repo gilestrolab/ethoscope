@@ -22,12 +22,20 @@
 #       
 #       
 
-import os, threading, wx
+__author__ = "Giorgio Gilestro <giorgio@gilest.ro>"
+__version__ = "$Revision: 1.0 $"
+__date__ = "$Date: 2011/08/16 21:57:19 $"
+__copyright__ = "Copyright (c) 2011 Giorgio Gilestro"
+__license__ = "Python"
+
+import os, wx
 import pysolovideo as pv
-from pvg_common import pvg_config
+from pvg_common import pvg_config, acquireThread
 
 from wx.lib.filebrowsebutton import FileBrowseButton
 import wx.grid as gridlib
+
+import optparse
 
 class customDataTable(gridlib.PyGridTableBase):
     def __init__(self, colLabels, dataTypes, useValueCleaner=True):
@@ -709,7 +717,13 @@ class pvg_AcquirePanel(wx.Panel):
     def configCallback(self, event):
         """
         """
-        self.configfile = self.FBconfig.GetValue()
+        self.loadFile( self.FBconfig.GetValue() )
+        
+        
+    def loadFile(self, filename):
+        """
+        """
+        self.configfile = filename
         self.updateTable()
         self.parent.sb.SetStatusText('Loaded file %s' % self.configfile)
         
@@ -746,7 +760,7 @@ class pvg_AcquirePanel(wx.Panel):
         for row in d:
             if monitor == row[0]: return row[-1]
     
-    def onStart(self, event):
+    def onStart(self, event=None):
         """
         """
         self.acquiring = True
@@ -781,8 +795,18 @@ class acquireFrame(wx.Frame):
         self.sb = wx.StatusBar(self, wx.ID_ANY)
         self.SetStatusBar(self.sb)
 
-        acq_panel =  pvg_AcquirePanel(self)
+        self.acq_panel =  pvg_AcquirePanel(self)
+
+    def loadConfig(self, filename):
+        """
+        """
+        self.acq_panel.loadFile(configfile)
         
+    def Start(self):
+        """
+        """
+        self.acq_panel.onStart()
+
 
 def getMonitorsData(configfile=None):
     """
@@ -809,46 +833,29 @@ def getMonitorsData(configfile=None):
             monitors[mon]['track'] = track
         
     return monitors
- 
-class acquireThread(threading.Thread):
-
-    def __init__(self, monitor, source, resolution, mask_file, track, track_type, dataFolder):
-        """
-        """
-        threading.Thread.__init__(self)
-        self.monitor = monitor
-        self.keepGoing = False
-        self.track = track
-        outputFile = os.path.join(dataFolder, 'MON%02d.txt' % monitor)
-        
-        self.mon = pv.Monitor()
-        self.mon.setSource(source, resolution)
-        self.mon.setTracking(True, track_type, mask_file, outputFile)
-        
-    def run(self):
-        """
-        """
-        while self.keepGoing:
-            self.mon.GetImage()
-                
-    def doTrack(self):
-        """
-        """
-        self.keepGoing = True
-        self.start()
-
-    def halt(self):
-        """
-        """
-        self.keepGoing = False
 
 
 if __name__ == '__main__':
 
-    configfile = None
+    parser = optparse.OptionParser(usage='%prog [options] [argument]', version='%prog version 1.0')
+    parser.add_option('-c', '--config', dest='config_file', metavar="CONFIG_FILE", help="The full path to the config file to open")
+    parser.add_option('--acquire', action="store_true", default=False, dest='acquire', help="Start acquisition when the program starts")
+    parser.add_option('--nogui', action="store_false", default=True, dest='showgui', help="Do not show the graphical interface")
+
+    (options, args) = parser.parse_args()
+
+    configfile = options.config_file or None
     
     app=wx.PySimpleApp(0)
     frame_acq = acquireFrame(None, -1, '')
     app.SetTopWindow(frame_acq)
-    frame_acq.Show()
+    
+    frame_acq.Show(options.showgui)
     app.MainLoop()
+    
+    if configfile:
+        optionsframe_acq.loadConfig(configfile)
+    if configfile and options.acquire:
+        frame_acq.Start()
+
+    

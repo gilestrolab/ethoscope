@@ -22,9 +22,11 @@
 #       
 #       
 
-import os, threading, wx
+import os
+import optparse
+
 import pysolovideo as pv
-from pvg_common import pvg_config
+from pvg_common import pvg_config, acquireThread
 
 def getMonitorsData(configfile=None):
     """
@@ -55,54 +57,24 @@ def getMonitorsData(configfile=None):
     
     return monitors
  
-class acquireThread(threading.Thread):
-
-    def __init__(self, monitor, source, resolution, mask_file, track, track_type, dataFolder):
-        """
-        """
-        threading.Thread.__init__(self)
-        self.monitor = monitor
-        self.keepGoing = True
-        self.track = track
-        outputFile = os.path.join(dataFolder, 'MON%02d.txt' % monitor)
-        
-        self.mon = pv.Monitor()
-        self.mon.setSource(source, resolution)
-        self.mon.setTracking(True, track_type, mask_file, outputFile)
-        
-        print outputFile
-        print ( "Setting monitor %s with source %s and mask %s. Output to %s " % (monitor, source, os.path.split(mask_file)[1], os.path.split(outputFile)[1] ) )
-        
-    def run(self):
-        """
-        """
-        while self.keepGoing:
-            try:
-                self.mon.GetImage()
-            except KeyboardInterrupt:
-                self.halt()
-        
-    def halt(self):
-        """
-        """
-        self.keepGoing = False
-        print ( "Stopping capture" )
-
-
 if __name__ == '__main__':
 
-    configfile = None
+    parser = optparse.OptionParser(usage='%prog [options] [argument]', version='%prog version 1.0')
+    parser.add_option('-c', '--config', dest='config_file', metavar="CONFIG_FILE", help="The full path to the config file to open")
+
+    (options, args) = parser.parse_args()
+
+    configfile = options.config_file
     
-    if len(os.sys.argv) > 1 and os.path.isfile(os.sys.argv[1]):
-        configfile = os.sys.argv[1]
-    else:
+    if not options.config_file:
         print ('You need to specify a config file')
         exit()
         
     monitorsData = getMonitorsData(configfile)
-    
-    
+        
     for mn in monitorsData:
         m = monitorsData[mn]
-        at = acquireThread(mn, m['source'], m['resolution'], m['mask_file'], m['track_type'], m['dataFolder'])
+        startTrack = True
+        at = acquireThread(mn, m['source'], m['resolution'], m['mask_file'], startTrack, m['track_type'], m['dataFolder'])
+        at.keepGoing = True
         at.start()

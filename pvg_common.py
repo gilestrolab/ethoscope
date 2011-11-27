@@ -22,7 +22,7 @@
 
 import wx, cv, os
 import pysolovideo as pv
-import ConfigParser
+import ConfigParser, threading
 
 class myConfig():
     """
@@ -142,6 +142,52 @@ class myConfig():
         """
         """
         return self.GetValue('Options', key)
+
+class acquireThread(threading.Thread):
+
+    def __init__(self, monitor, source, resolution, mask_file, track, track_type, dataFolder):
+        """
+        """
+        threading.Thread.__init__(self)
+        self.monitor = monitor
+        self.keepGoing = False
+        self.verbose = False
+        self.track = track
+        outputFile = os.path.join(dataFolder, 'MON%02d.txt' % monitor)
+        
+        self.mon = pv.Monitor()
+        self.mon.setSource(source, resolution)
+        self.mon.setTracking(True, track_type, mask_file, outputFile)
+        
+        if self.verbose: print ( "Setting monitor %s with source %s and mask %s. Output to %s " % (monitor, source, os.path.split(mask_file)[1], os.path.split(outputFile)[1] ) )
+
+    def run(self, kbdint=False):
+        """
+        """
+        
+        if kbdint:
+        
+            while self.keepGoing:
+                try:
+                    self.mon.GetImage()
+                except KeyboardInterrupt:
+                    self.halt()
+                    
+        else:
+            while self.keepGoing:
+                self.mon.GetImage()
+                
+    def doTrack(self):
+        """
+        """
+        self.keepGoing = True
+        self.start()
+
+    def halt(self):
+        """
+        """
+        self.keepGoing = False
+        if self.verbose: print ( "Stopping capture" )
 
 class pvg_config(myConfig):
     """
