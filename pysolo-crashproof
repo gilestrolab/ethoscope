@@ -4,6 +4,8 @@
 # and log the error 
 #
 
+cd /opt/pysolo-video
+
 CFG=$1
 
 until ./pvg_acquire_cmd.py -c $CFG; do
