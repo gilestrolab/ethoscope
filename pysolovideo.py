@@ -464,6 +464,7 @@ class Arena():
         self.beams = []
         self.trackType = 1
         self.ROAS = [] #Regions of Action
+        self.minuteFPS = []
         
         self.period = 60 #in seconds
         self.ratio = 0
@@ -723,16 +724,18 @@ class Arena():
     
         return fly, distance
         
-    def compactSeconds(self):
+    def compactSeconds(self, FPS):
         """
         Compact the frames collected in the last second
         by averaging the value of the coordinates
 
         Called every second; flies treated at once
         """
+        self.minuteFPS.append(FPS)
         if self.count_seconds >= self.period:
-            self.writeActivity()
-            self.count_seconds = 0
+            avg_fps = np.mean(self.minuteFPS)
+            self.writeActivity(fps=avg_fps)
+            self.count_seconds = 0; self.minuteFPS = []
             #self.flyDataMin = self.flyDataMin * 0
         
         #growing continously; this is the correct thing to do but we would have problems adding new row with new ROIs
@@ -741,12 +744,13 @@ class Arena():
         self.flyDataMin[:,self.count_seconds] = self.flyDataBuffer
         self.count_seconds += 1
 
-    def writeActivity(self, extend=True):
+    def writeActivity(self, fps=0, extend=True):
         """
         Write the activity to file
         Kind of motion depends on user settings
         
         Called every minute; flies treated at once
+        1	09 Dec 11	19:02:19	1	0	1	0	0	0	?		[actual_activity]
         """
         #Here we build the header
         year, month, day, hh, mn, sec = time.localtime()[0:6]
@@ -758,8 +762,8 @@ class Arena():
         tt = '%02d:%02d:%02d' % (hh, mn, sec)
         # 2 monitor is active
         active = '1'
-        # 3 used for compatiblity reason - unused in fact
-        damscan = '0'
+        # 3 average frames per seconds (FPS)
+        damscan = int(round(fps))
         #4 -7 four unused zeros as for DAM user's manual
         unused = '\t'.join(str(a) for a in [self.trackType,0,0,0])
         #is light on or off
@@ -1372,7 +1376,7 @@ class Monitor(object):
         
         if ( ct - self.lasttime) >= 1: # if one second has elapsed
             self.lasttime = ct
-            self.arena.compactSeconds() #average the coordinates and transfer from buffer to array
+            self.arena.compactSeconds(self.__tempFPS) #average the coordinates and transfer from buffer to array
             self.processingFPS = self.__tempFPS; self.__tempFPS = 0
             
     def doTrack(self, frame, show_raw_diff=False, drawPath=True):
