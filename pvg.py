@@ -29,7 +29,7 @@ import wx, os
 from pvg_options import optionsFrame
 from pvg_panel_one import panelOne
 from pvg_panel_two import panelLiveView
-from pvg_common import options
+from pvg_common import options, DEFAULT_CONFIG
 
 from pysolovideo import pySoloVideoVersion
         
@@ -98,7 +98,7 @@ class mainFrame(wx.Frame):
 
         filemenu =  wx.Menu()
         filemenu. Append(ID_FILE_OPEN, '&Open File', 'Open a file')
-        filemenu. Append(ID_FILE_SAVE, '&Save File', 'Save current file')
+        #filemenu. Append(ID_FILE_SAVE, '&Save File', 'Save current file')
         filemenu. Append(ID_FILE_SAVE_AS, '&Save as...', 'Save current data in a new file')
         #filemenu. Append(ID_FILE_CLOSE, '&Close File', 'Close')
         filemenu. AppendSeparator()
