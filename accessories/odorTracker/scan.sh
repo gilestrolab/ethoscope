@@ -4,7 +4,7 @@ SRC=$1
 PVGROOT="/home/gg/Dropbox/myCode/pySolo-Video/"
 
 PVG_S=$PVGROOT"pvg_standalone.py -t2 --trackonly -i"
-FILETYPE_S="*.avi"
+FILETYPE_S="*.ogv*"
 
 PVG_OT=$PVGROOT"accessories/odorTracker/odorTracker.py --distribution --path -i"
 FILETYPE_OT="*.txt"

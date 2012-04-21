@@ -145,6 +145,43 @@ class myConfig():
         """
         return self.GetValue('Options', key)
 
+class acquireObject():
+    def __init__(self, monitor, source, resolution, mask_file, track, track_type, dataFolder):
+        """
+        """
+        self.monitor = monitor
+        self.keepGoing = False
+        self.verbose = False
+        self.track = track
+        outputFile = os.path.join(dataFolder, 'Monitor%02d.txt' % monitor)
+        
+        self.mon = pv.Monitor()
+        self.mon.setSource(source, resolution)
+        self.mon.setTracking(True, track_type, mask_file, outputFile)
+        
+        if self.verbose: print ( "Setting monitor %s with source %s and mask %s. Output to %s " % (monitor, source, os.path.split(mask_file)[1], os.path.split(outputFile)[1] ) )
+
+    def run(self, kbdint=False):
+        """
+        """
+        while self.keepGoing:
+            self.mon.GetImage()
+                
+    def start(self):
+        """
+        """
+        self.keepGoing = True
+        self.run()
+
+    def halt(self):
+        """
+        """
+        self.keepGoing = False
+        if self.verbose: print ( "Stopping capture" )
+
+
+
+
 class acquireThread(threading.Thread):
 
     def __init__(self, monitor, source, resolution, mask_file, track, track_type, dataFolder):
@@ -155,7 +192,7 @@ class acquireThread(threading.Thread):
         self.keepGoing = False
         self.verbose = False
         self.track = track
-        outputFile = os.path.join(dataFolder, 'MON%02d.txt' % monitor)
+        outputFile = os.path.join(dataFolder, 'Monitor%02d.txt' % monitor)
         
         self.mon = pv.Monitor()
         self.mon.setSource(source, resolution)
@@ -207,7 +244,7 @@ class pvg_config(myConfig):
                             "Data_Folder" : ['', "Folder where the final data are saved"]
                            }
 
-        self.monitorProperties = ['sourceType', 'source', 'track', 'maskfile', 'trackType']
+        self.monitorProperties = ['sourceType', 'source', 'track', 'maskfile', 'trackType', 'isSDMonitor']
 
         myConfig.__init__(self, filename, temporary, defaultOptions)
 
@@ -245,9 +282,9 @@ class pvg_config(myConfig):
         resolution = self.GetOption('FullSize')
         dataFolder = self.GetOption('Data_Folder')
         
-        for mon in range(ms):
+        for mon in range(1,ms+1):
             if self.HasMonitor(mon):
-                _,source,track,mask_file,track_type = self.GetMonitor(mon)
+                _,source,track,mask_file,track_type,isSDMonitor = self.GetMonitor(mon)
                 monitors[mon] = {}
                 monitors[mon]['source'] = source
                 monitors[mon]['resolution'] = resolution
@@ -255,6 +292,7 @@ class pvg_config(myConfig):
                 monitors[mon]['track_type'] = track_type
                 monitors[mon]['dataFolder'] = dataFolder
                 monitors[mon]['track'] = track
+                monitors[mon]['isSDMonitor'] = isSDMonitor
             
         return monitors
 
@@ -282,8 +320,10 @@ class previewPanel(wx.Panel):
         self.source = ''
         self.mon = None
         self.track = False
+        self.isSDMonitor = False
         self.trackType = 1
         self.drawROI = True
+        self.timestamp = False
         self.camera = None
         self.resolution = None
 
@@ -468,6 +508,7 @@ class previewPanel(wx.Panel):
         self.playTimer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.onNextFrame)
         
+        self.mon.setSource(self.camera, self.resolution)
 
     def paintImg(self, img):
         """
@@ -498,7 +539,7 @@ class previewPanel(wx.Panel):
         """
         """
 
-        self.paintImg( self.mon.GetImage(drawROIs = self.drawROI, selection=self.selection, crosses=self.polyPoints, timestamp=False) )
+        self.paintImg( self.mon.GetImage(drawROIs = self.drawROI, selection=self.selection, crosses=self.polyPoints, timestamp=self.timestamp) )
         if evt: evt.Skip()
       
     def Play(self, status=True, showROIs=True):

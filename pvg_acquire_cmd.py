@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
 #       pvg_acquire.py
@@ -25,7 +25,7 @@
 import os, time
 import optparse
 
-from pvg_common import pvg_config, acquireThread
+from pvg_common import pvg_config, acquireThread, acquireObject
 
 if __name__ == '__main__':
 
@@ -52,8 +52,7 @@ if __name__ == '__main__':
         
     for mn in monitorsData:
         m = monitorsData[mn]
-        startTrack = True
-        at = acquireThread(mn, m['source'], m['resolution'], m['mask_file'], startTrack, m['track_type'], m['dataFolder'])
+        at = acquireObject(mn, m['source'], m['resolution'], m['mask_file'], m['track'], m['track_type'], m['dataFolder'])
         at.keepGoing = True
         at.start()
         print ( "%s: Acquisition for monitor %s started." % ( time.ctime(), mn ))

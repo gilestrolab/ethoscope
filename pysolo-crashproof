@@ -4,7 +4,7 @@
 # and log the error 
 #
 
-cd /opt/pysolo-video
+#cd /opt/pysolo-video
 
 CFG=$1
 

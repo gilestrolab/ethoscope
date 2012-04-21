@@ -45,7 +45,10 @@ class odorTracker():
             rawfile = fh.read().split('\n')
 
             for line in rawfile:
-                coords.append( line.split('\t')[8:] )
+                line = line.split('\t')[10:]
+                while '0' in line:
+                    line.remove('0')
+                coords.append( line )
 
             fh.close()
 
@@ -56,11 +59,12 @@ class odorTracker():
             frames = len (coords)
             
             self.a = np.zeros( (frames, flies, 2) )
-
+            
             for n, line in enumerate(coords):
                 cs = [ ( float (c.split(',')[0] ), float (c.split(',')[1]) ) for c in line  ]
                 self.a[n] = np.array(cs)
             
+           
         except IOError:
             print "Error opening the file"
 
@@ -133,7 +137,7 @@ class odorTracker():
         """
         flies = self.a.shape[1] 
         cols = 4
-        rows = flies / 4
+        rows = np.ceil( flies / 4.0 )
         self.__makeFigure()
 
         for fly in range( flies ):

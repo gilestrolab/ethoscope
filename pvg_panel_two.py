@@ -90,8 +90,12 @@ class panelLiveView(wx.Panel):
         self.Bind(wx.EVT_BUTTON, self.onLoadMask, self.btnLoad)
         self.btnSave = wx.Button( self, wx.ID_ANY, label="Save Mask")
         self.Bind(wx.EVT_BUTTON, self.onSaveMask, self.btnSave)
+        self.btnSaveApply = wx.Button( self, wx.ID_ANY, label="Save and Apply")
+        self.Bind(wx.EVT_BUTTON, self.onSaveApply, self.btnSaveApply)
+        
         btnSizer_1.Add(self.btnLoad)
         btnSizer_1.Add(self.btnSave)
+        btnSizer_1.Add(self.btnSaveApply)
 
         sbSizer_3.Add ( self.currentMaskTXT, 0, wx.ALIGN_CENTRE|wx.LEFT|wx.RIGHT|wx.TOP|wx.EXPAND, 5 )
         sbSizer_3.Add (btnSizer_1, 0, wx.ALIGN_CENTRE|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
@@ -146,13 +150,13 @@ class panelLiveView(wx.Panel):
         if self.fsPanel.isPlaying: self.fsPanel.Stop()
         
         self.monitor_name = event.GetString()
-        self.monitor_number = self.MonitorList.index( self.monitor_name )
+        self.monitor_number = self.MonitorList.index( self.monitor_name ) + 1
         
         n_cams = options.GetOption("Webcams")
         WebcamsList = [ 'Webcam %s' % (int(w) +1) for w in range( n_cams ) ]
 
         if options.HasMonitor(self.monitor_number):
-            sourceType, source, track, mask_file, trackType = options.GetMonitor(self.monitor_number)
+            sourceType, source, track, mask_file, trackType, isSDMonitor = options.GetMonitor(self.monitor_number)
             self.fsPanel.setMonitor( source )
             self.fsPanel.Play()
 
@@ -191,6 +195,16 @@ class panelLiveView(wx.Panel):
             self.currentMaskTXT.SetValue(os.path.split(path)[1])
         
         dlg.Destroy()
+        return path
+
+    def onSaveApply(self, event):
+        """
+        Save ROIs to file and apply to current monitor
+        """
+        path = self.onSaveMask(None)
+        mn = self.monitor_name.replace(' ','')
+        options.SetValue(mn, 'maskfile', path)
+        options.Save()
 
     def onLoadMask(self, event):
         """

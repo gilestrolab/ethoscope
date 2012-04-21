@@ -121,7 +121,7 @@ class panelConfigure(wx.Panel):
         
         lowerSizer = wx.BoxSizer(wx.HORIZONTAL)
         
-        #Static box1
+        #Static box1 (LEFT)
         sb_1 = wx.StaticBox(self, -1, "Select Monitor")#, size=(250,-1))
         sbSizer_1 = wx.StaticBoxSizer (sb_1, wx.VERTICAL)
         
@@ -138,7 +138,8 @@ class panelConfigure(wx.Panel):
         self.Bind(wx.EVT_BUTTON, self.onPlay, self.btnPlay)
         self.Bind(wx.EVT_BUTTON, self.onStop, self.btnStop)
         self.btnPlay.Enable(False); self.btnStop.Enable(False)
-        self.applyButton = wx.Button( self, wx.ID_APPLY  )
+        self.applyButton = wx.Button( self, wx.ID_APPLY )
+        self.applyButton.SetToolTip(wx.ToolTip("Apply and Save to file"))
         self.Bind(wx.EVT_BUTTON, self.onApplySource, self.applyButton)
 
 
@@ -153,7 +154,7 @@ class panelConfigure(wx.Panel):
        
         lowerSizer.Add (sbSizer_1, 0, wx.EXPAND|wx.ALL, 5)
         
-        #Static box2
+        #Static box2 (CENTER)
         sb_2 = wx.StaticBox(self, -1, "Select Video input" )
         sbSizer_2 = wx.StaticBoxSizer (sb_2, wx.VERTICAL)
         grid2 = wx.FlexGridSizer( 0, 2, 0, 0 )
@@ -189,29 +190,40 @@ class panelConfigure(wx.Panel):
         sbSizer_2.Add( grid2 )        
         lowerSizer.Add(sbSizer_2, 0, wx.EXPAND|wx.ALL, 5)
        
-        
+        #Static box3 (RIGHT)
         sb_3 = wx.StaticBox(self, -1, "Set Tracking Parameters")
         sbSizer_3 = wx.StaticBoxSizer (sb_3, wx.VERTICAL)
+        
+        sbSizer_31 = wx.BoxSizer (wx.HORIZONTAL) 
+        
         self.activateTracking = wx.CheckBox(self, -1, "Activate Tracking")
         self.activateTracking.SetValue(False)
-        self.Bind ( wx.EVT_CHECKBOX, self.onActivateTracking)
+        self.activateTracking.Bind ( wx.EVT_CHECKBOX, self.onActivateTracking)
+
+        self.isSDMonitor = wx.CheckBox(self, -1, "Sleep Deprivation Monitor")
+        self.isSDMonitor.SetValue(False)
+        self.isSDMonitor.Bind ( wx.EVT_CHECKBOX, self.onSDMonitor)
+        self.isSDMonitor.Enable(False)
+
+        sbSizer_31.Add (self.activateTracking, 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
+        sbSizer_31.Add (self.isSDMonitor, 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
         
         self.pickMaskBrowser = FileBrowseButton(self, -1, labelText='Mask File')
                 
-        sbSizer_3.Add ( self.activateTracking , 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
+        #sbSizer_3.Add ( self.activateTracking , 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
+        sbSizer_3.Add ( sbSizer_31 , 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
         sbSizer_3.Add ( self.pickMaskBrowser , 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP|wx.EXPAND, 5 )
 
         #trackingTypeSizer = wx.Sizer(wx.HORIZONTAL)
-        self.trackDistanceRadio = wx.RadioButton(self, -1, 'Activity as distance traveled', style=wx.RB_GROUP)
-        self.trackVirtualBM = wx.RadioButton(self, -1, 'Activity as midline crossings count')
-        self.trackPosition = wx.RadioButton(self, -1, 'Only position of flies')
+        self.trackDistanceRadio = wx.RadioButton(self, -1, "Activity as distance traveled", style=wx.RB_GROUP)
+        self.trackVirtualBM = wx.RadioButton(self, -1, "Activity as midline crossings count")
+        self.trackPosition = wx.RadioButton(self, -1, "Only position of flies")
         sbSizer_3.Add (wx.StaticText ( self, -1, "Calculate fly activity as..."), 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
         sbSizer_3.Add (self.trackDistanceRadio, 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 2 )
         sbSizer_3.Add (self.trackVirtualBM, 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 2 )
         sbSizer_3.Add (self.trackPosition, 0, wx.ALIGN_LEFT|wx.LEFT|wx.RIGHT|wx.TOP, 2 )
   
         lowerSizer.Add(sbSizer_3, -1, wx.EXPAND|wx.ALL, 5)
-
 
         self.SetSizer(lowerSizer)
         self.Bind(EVT_THUMBNAIL_CLICKED, self.onThumbnailClicked)
@@ -256,9 +268,9 @@ class panelConfigure(wx.Panel):
         """
         Picking thumbnail by clicking on it
         """
-        self.monitor_number = evt.number
+        self.monitor_number = evt.number + 1
         self.thumbnail = evt.thumbnail
-        self.thumbnailNumber.SetValue(self.MonitorList[self.monitor_number])
+        self.thumbnailNumber.SetValue(self.MonitorList[self.monitor_number -1 ])
         self.updateThumbnail()
 
     def onChangingMonitor(self, evt):
@@ -266,7 +278,7 @@ class panelConfigure(wx.Panel):
         Picking thumbnail by using the dropbox
         """
         sel = evt.GetString()
-        self.monitor_number = self.MonitorList.index(sel)
+        self.monitor_number = self.MonitorList.index(sel) + 1
         self.thumbnail = self.parent.scrollThumbnails.previewPanels[self.monitor_number]         #this is not very elegant
         self.updateThumbnail()
 
@@ -275,9 +287,9 @@ class panelConfigure(wx.Panel):
         Refreshing thumbnail data
         """
         if options.HasMonitor(self.monitor_number):
-            sourceType, source, track, mask_file, trackType = options.GetMonitor(self.monitor_number)
+            sourceType, source, track, mask_file, trackType, isSDMonitor = options.GetMonitor(self.monitor_number)
         else:
-            sourceType, source, track, mask_file, trackType = [0, '', False, '', 1]
+            sourceType, source, track, mask_file, trackType, isSDMonitor = [0, '', False, '', 1, False]
 
         if sourceType == 0 and source != '':
             source = self.WebcamsList[source]
@@ -285,6 +297,8 @@ class panelConfigure(wx.Panel):
         self.source = self.thumbnail.source = source
         self.sourceType = self.thumbnail.sourceType = sourceType
         self.thumbnail.track = track
+        if self.thumbnail.hasMonitor():
+                self.thumbnail.mon.isSDMonitor = isSDMonitor
         
         #update first static box
         active = self.thumbnail.hasMonitor()
@@ -305,6 +319,7 @@ class panelConfigure(wx.Panel):
 
         #update third static box
         self.activateTracking.SetValue(self.thumbnail.track)
+        self.isSDMonitor.SetValue(isSDMonitor)
         self.pickMaskBrowser.SetValue(mask_file or '')
         [self.trackDistanceRadio, self.trackVirtualBM, self.trackPosition][trackType].SetValue(True)
 
@@ -370,8 +385,10 @@ class panelConfigure(wx.Panel):
                            self.thumbnail.source,
                            self.thumbnail.track,
                            self.mask_file,
-                           self.trackType
+                           self.trackType,
+                           self.thumbnail.mon.isSDMonitor
                            )
+        options.Save()
 
 
     def onActivateTracking(self, event):
@@ -379,6 +396,13 @@ class panelConfigure(wx.Panel):
         """
         if self.thumbnail:
             self.thumbnail.track = event.IsChecked()
+            
+    def onSDMonitor(self, event):
+        """
+        """
+        if self.thumbnail:
+            self.thumbnail.mon.isSDMonitor = event.IsChecked()
+
         
 class panelOne(wx.Panel):
     """
