@@ -36,7 +36,7 @@ class odorTracker():
         self.filename = filename
         self.fromFile(self.filename)
         
-    def fromFile(self, filename):
+    def fromFile(self, filename, horizontal=True):
         """
         """
         coords = []
@@ -59,9 +59,16 @@ class odorTracker():
             frames = len (coords)
             
             self.a = np.zeros( (frames, flies, 2) )
+
+            #default orientation is with horizontal tubes
+            #if tubes are vertical, we need to invert the coordinates
             
             for n, line in enumerate(coords):
-                cs = [ ( float (c.split(',')[0] ), float (c.split(',')[1]) ) for c in line  ]
+                if horizontal:
+                    cs = [ ( float (c.split(',')[0] ), float (c.split(',')[1]) ) for c in line  ]
+                else:
+                    cs = [ ( float (c.split(',')[1] ), float (c.split(',')[0]) ) for c in line  ]
+                   
                 self.a[n] = np.array(cs)
             
            
