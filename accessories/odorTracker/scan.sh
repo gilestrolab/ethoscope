@@ -3,7 +3,7 @@
 PYT='python2'
 PVGROOT="`pwd`/../../"
 OTROOT="`pwd`/"
-MOVIE_FILETYPE="*.ogv*"
+MOVIE_FILETYPE="*.avi*"
 
 ACTIONS=$(zenity --list --checklist --title "What do you want to do." --text "Specify actions." --column "" --column "Choices" True "Draw the Mask" True "Write Coordinates" True "Draw Graphs")
 
@@ -65,7 +65,7 @@ else
 
     #DRAW GRAPHS
     if [ $GRAPHS = 1 ]; then
-        PVG_OT=$OTROOT"odorTracker.py --distribution --path -i"
+        PVG_OT=$OTROOT"odorTracker.py --distribution --path --steps -i"
         FILETYPE_COORD="*.txt"
 
         for file in `find ${SRC} -name "$FILETYPE_COORD" -type f`
