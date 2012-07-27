@@ -16,14 +16,13 @@ class CvMovieFrame(wx.Frame):
 
         self.displayPanel.setMonitor(source, resolution)
         self.displayPanel.mon.setTracking(track, track_type, mask_file, outputFile)
-        
-        self.displayPanel.prinKeyEventsHelp()
         self.displayPanel.timestamp = showtime
        
         if record:
             self.displayPanel.mon.saveMovie('video_output.avi', fps=14, startOnKey=True)
         
         if not trackonly:
+            self.displayPanel.prinKeyEventsHelp()
             self.displayPanel.Play(showROIs=showROIs)
             self.Show()
         else:
