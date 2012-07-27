@@ -38,6 +38,7 @@ Algorithm for motion analysis:          PIL through kmeans (vector quantization)
     http://stackoverflow.com/questions/3923906/kmeans-in-opencv-python-interface
 """
 
+#import cv2 as cv
 import cv
 import cPickle
 import os, datetime, time
@@ -1441,6 +1442,12 @@ class Monitor(object):
             self.lasttime = ct
             self.arena.compactSeconds(self.__tempFPS, delta) #average the coordinates and transfer from buffer to array
             self.processingFPS = self.__tempFPS; self.__tempFPS = 0
+
+    grey_image = None
+    temp = None
+    difference = None
+    ROImsk = None
+    ROIwrk = None
             
     def doTrack(self, frame, show_raw_diff=False, drawPath=True):
         """
@@ -1453,12 +1460,31 @@ class Monitor(object):
         # Smooth to get rid of false positives
         cv.Smooth(frame, frame, cv.CV_GAUSSIAN, 3, 0)
 
+
         # Create some empty containers to be used later on
-        grey_image = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
-        temp = cv.CloneImage(frame)
-        difference = cv.CloneImage(frame)
-        ROImsk = cv.CloneImage(grey_image)
-        ROIwrk = cv.CloneImage(grey_image)
+        # Memory leakage bug fixed by Alan Zucconi
+
+        if self.grey_image is None:
+            self.grey_image = cv.CreateImage( cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
+        if self.temp is None:
+            self.temp = cv.CreateImage( cv.GetSize(frame), frame.depth, frame.nChannels)
+        if self.difference is None:
+            self.difference = cv.CreateImage( cv.GetSize(frame), frame.depth, frame.nChannels)
+        if self.ROImsk is None:
+            self.ROImsk = cv.CreateImage( cv.GetSize(self.grey_image), cv.IPL_DEPTH_8U, 1)
+        if self.ROIwrk is None:
+            self.ROIwrk = cv.CreateImage( cv.GetSize(self.grey_image), cv.IPL_DEPTH_8U, 1)
+
+        cv.Copy(frame, self.temp)
+        cv.Copy(frame, self.difference)
+        cv.Copy(self.grey_image, self.ROImsk)
+        cv.Copy(self.grey_image, self.ROIwrk)
+
+        grey_image = self.grey_image
+        temp = self.temp
+        difference = self.difference
+        ROImsk = self.ROImsk
+        ROIwrk = self.ROIwrk
 
         if self.__firstFrame:
             #create the moving average
@@ -1510,15 +1536,15 @@ class Monitor(object):
                 # Draw rectangles
                 bound_rect = cv.BoundingRect(list(contour))
                 contour = contour.h_next()
-                if track_one and not contour: # this will make sure we are tracking only the biggest rectangle
-                    pt1 = (bound_rect[0], bound_rect[1])
-                    pt2 = (bound_rect[0] + bound_rect[2], bound_rect[1] + bound_rect[3])
-                    points.append(pt1); points.append(pt2)
-                    cv.Rectangle(frame, pt1, pt2, cv.CV_RGB(255,0,0), 1)
-                    
-                    fly_coords = ( pt1[0]+(pt2[0]-pt1[0])/2, pt1[1]+(pt2[1]-pt1[1])/2 )
-                    area = (pt2[0]-pt1[0])*(pt2[1]-pt1[1])
-                    if area > 400: fly_coords = None
+                #if track_one and not contour: # this will make sure we are tracking only the biggest rectangle
+                pt1 = (bound_rect[0], bound_rect[1])
+                pt2 = (bound_rect[0] + bound_rect[2], bound_rect[1] + bound_rect[3])
+                points.append(pt1); points.append(pt2)
+                cv.Rectangle(frame, pt1, pt2, cv.CV_RGB(255,0,0), 1)
+             
+                fly_coords = ( pt1[0]+(pt2[0]-pt1[0])/2, pt1[1]+(pt2[1]-pt1[1])/2 )
+                area = (pt2[0]-pt1[0])*(pt2[1]-pt1[1])
+                if area > 400: fly_coords = None
 
             # for each frame adds fly coordinates to all ROIS. Also do some filtering to remove false positives
             fly_coords, distance = self.arena.addFlyCoords(fly_number, fly_coords)
