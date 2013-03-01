@@ -5,12 +5,12 @@ PVGROOT="`pwd`/../../"
 OTROOT="`pwd`/"
 MOVIE_FILETYPE="*.AVI*"
 
-ACTIONS=$(zenity --height=300 --list --checklist --title "What do you want to do." --text "Specify actions." --column "" --column "Choices" True "Draw the Mask" True "Write Coordinates" True "Draw Graphs" True "Write Position Summary")
+ACTIONS=$(zenity --list --checklist --title "What do you want to do." --text "Specify actions." --column "" --column "Choices" True "Draw the Mask" True "Write Coordinates" True "Draw Graphs")
 
 MAKEMASK=0
 COORDS=0
 GRAPHS=0
-
+DIRECTORY=0
 
 if [[ $ACTIONS =~ .*Mask.* ]]
 then
@@ -27,13 +27,14 @@ then
   GRAPHS=1
 fi
 
-if [[ $ACTIONS =~ .*Position.* ]]
-then
-  POSITION=1
+
+
+if [ $DIRECTORY = 1 ]; then
+    SRC=$(zenity  --file-selection --title="Select Directory that contains the files you want to process" --directory --filename=.)
+else
+    SRC=$(zenity  --file-selection --title="Select the files to process" --filename=.)
 fi
-
-
-SRC=$(zenity  --file-selection --title="Select Directory that contains the files you want to process" --directory --filename=.)
+    
 
 if [ -z $SRC ]; then
 
@@ -41,9 +42,9 @@ if [ -z $SRC ]; then
    
 else
 
-    echo Processing
+    echo Scanning basename( $SRC )
     
-    cd $SRC
+    cd basename( $SRC )
 
     #MAKE MASK
     if [ $MAKEMASK = 1 ]; then
@@ -79,18 +80,5 @@ else
             $PYT ${PVG_OT} ${file}
         done
     fi
-
-    #WRITE POSITIONS
-    if [ $POSITION = 1 ]; then
-        PVG_OT=$OTROOT"odorTracker.py --ratio -i"
-        FILETYPE_COORD="*.txt"
-
-        for file in `find ${SRC} -name "$FILETYPE_COORD" -type f`
-        do
-            echo 'Now processing figures for' ${file}
-            $PYT ${PVG_OT} ${file}
-        done
-    fi
-
 
 fi
