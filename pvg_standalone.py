@@ -13,6 +13,8 @@ class CvMovieFrame(wx.Frame):
         wx.Frame.__init__(self, parent)
         self.displayPanel = previewPanel(self, size=resolution, keymode=True)
         self.SetSize(resolution)
+        
+        self.SetTitle(source)
 
         self.displayPanel.setMonitor(source, resolution)
         self.displayPanel.mon.setTracking(track, track_type, mask_file, outputFile)
