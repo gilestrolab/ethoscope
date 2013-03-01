@@ -366,6 +366,34 @@ class previewPanel(wx.Panel):
         """
         self.mon.delROI(-1)
 
+    def CloneLast(self, event=None):
+        """
+        Clone the last drawn ROI and place it so that its center will
+        be the point selected by the user
+        """
+        
+        if self.allowEditing and self.mon.hasROI():
+            self.selection = None
+            self.polyPoints = []
+
+            x = event.GetX()
+            y = event.GetY()
+            
+            (x1,y1),(x2,y2),(x3,y3),(x4,y4) = self.mon.getROI(-1)
+            
+            mx1 = min(x1,x2,x3,x4) + (max(x1,x2,x3,x4) - min(x1,x2,x3,x4))/2
+            my1 = min(y1,y2,y3,y4) + (max(y1,y2,y3,y4) - min(y1,y2,y3,y4))/2
+            
+            dx = x - mx1
+            dy = y - my1
+            
+            self.selection = (x1+dx,y1+dy),(x2+dx,y2+dy),(x3+dx,y3+dy),(x4+dx,y4+dy)
+
+            self.mon.addROI(self.selection, 1)
+            self.selection = None
+            self.polyPoints = []
+            
+            
     def ClearLast(self, event=None):
         """
         Cancel current drawing
@@ -383,10 +411,15 @@ class previewPanel(wx.Panel):
         """
         save current selection
         """
+        if self.allowEditing and not self.selection:
+            self.CloneLast(event)
+
         if self.allowEditing and self.selection:
             self.mon.addROI(self.selection, 1)
             self.selection = None
             self.polyPoints = []
+            
+           
         
     def AddPoint(self, event=None):
         """
