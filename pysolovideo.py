@@ -599,6 +599,7 @@ class Arena():
         """
         if n >= 0:
             self.ROIS.pop(n)
+            self.beams.pop(n)
             self.points_to_track.pop(n)
             
             self.flyDataBuffer = np.delete( self.flyDataBuffer, n, axis=0)
@@ -606,6 +607,13 @@ class Arena():
         
         elif n < 0:
             self.ROIS = []
+            self.beams = []
+            self.points_to_track = []
+            # shape ( flies, seconds, (x,y) ) Contains the coordinates of the last second (if fps > 1, average)
+            self.flyDataBuffer = np.zeros( (1, 2), dtype=np.int ) 
+            # shape ( flies, self.period, (x,y) ) Contains the coordinates of the last minute (or period)
+            self.flyDataMin = np.zeros( (1, self.period, 2), dtype=np.int ) 
+            
             
     def getROInumber(self):
         """
@@ -1213,6 +1221,12 @@ class Monitor(object):
         """
         
         self.arena.addROI(coords, n_flies)
+        
+    def hasROI(self):
+        '''
+        Return true if at least a single roi is detected
+        '''
+        return self.arena.getROInumber() > 0
 
     def getROI(self, n):
         """
