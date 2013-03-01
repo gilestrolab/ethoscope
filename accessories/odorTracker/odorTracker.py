@@ -31,7 +31,7 @@ COLORS = dict ({'Blue': '#0066cc', 'Brown': '#660000', 'Pink': '#ff99cc', 'Blue 
 class odorTracker():
     """
     """
-    def __init__(self, source, save, show):
+    def __init__(self, source, save, show, horizontal=True):
         """
         source      a full path to a single file or a dir containing multiple files
         save        save the output as jpg files
@@ -44,9 +44,8 @@ class odorTracker():
         self.save = save
         self.show = show
 
-
         if os.path.isfile(source):
-            self.a = self.__readFile(source)
+            self.a = self.__readFile(source, horizontal)
 
         if os.path.isdir(source):
             pass
@@ -182,7 +181,7 @@ class odorTracker():
         """
         plot paths in the currently open figure and save it to file
         """
-        flies = self.a.shape[1] 
+        flies = self.a.shape[1]
         cols = 4
         rows = np.ceil( flies / 4.0 )
         self.__makeFigure()
@@ -375,69 +374,58 @@ class odorTracker():
 
             self.output(append='steps-fly%02d' % (fly+1) )
 
-    def plotFlyPlaceRatio(self, source, onecolor=False, midline = 250):
+    def writeFlyPlaceRatio(self, midline = 250):
         """
         """
         
-        fileList = self.__listFiles(source)
-        n = len(fileList)
+        #all the flies belong to the same txt file, so the 3D array is ok
         
-               #for sake of simplicity we use a list of arrays instead of a 3D array 
-        a = [] #because number of frames are going to be different from one file to another
-        
-        for f in fileList:
-            a.append ( self.__readFile(f) )
+        flies = self.a.shape[1] #num of flies
 
-        #check that all array have the same number of flies
-        allSameSize = len(set([sa.shape[1] for sa in a])) == 1
-        assert allSameSize == True, "All files must contain the same number of flies in the mask"
-        flies = a[0].shape[1]
-        
-        cols = 4
-        rows = np.ceil( n / 4.0 )
+        filename, __ = os.path.splitext(self.filename)
+        filename = filename + '-position.csv'
+        fullpath = os.path.join(self.directory, filename)    
+        fh = open(fullpath, 'w')
 
-        self.__makeFigure()
-        
-        ar = np.zeros((flies, n))
 
         for fly in range( flies ):
+
+            x = np.ma.MaskedArray( self.a[:,fly,0] )
+            #coords = self.a[:,fly]
+
+            # this counts the number of points (and hence of seconds) past on each side of the midline
+            # return one value for each zone
+
+            t = x.shape[0]
+            a = int(t*1/3) 
+            b = int(t*2/3)
             
-            #lr = []
+            is_left_a = ( x[:a] < midline ).sum(); is_right_a = ( x[:a] >= midline ).sum()
+            is_left_b = ( x[a:b] < midline ).sum(); is_right_b = ( x[a:b] >= midline ).sum()
+            is_left_c = ( x[b:] < midline ).sum(); is_right_c = ( x[b:] >= midline ).sum()
+            is_left = ( x < midline ).sum(); is_right = ( x >= midline ).sum()
             
-            for fn in range( n ):
 
-                x = a[fn][:,fly,0] # only x coordinates
-                
-                is_left = ( x < midline ).sum()
-                is_right = ( x>= midline ).sum()
-                
-                #lr.append ( 1.0 * is_left / (is_left + is_right) )
-                ar[fly][fn] = ( 1.0 * is_left / (is_left + is_right) )
-                
-            
-            ax = self.fig.add_subplot(cols, rows, fly+1)
-            
-            ax.xaxis.set_visible(False)
-            ax.yaxis.set_visible(False)
-
-            ax.plot( ar[fly],  'o-', color=COLORS['Light Grey'])
-
-        
-        #ax = self.fig.add_subplot(cols, rows, flies+2)
-        #ax.errorbar(range(ar.shape[1]), ar.mean(axis=0),  yerr=ar.std(axis=0), fmt='-o', color=COLORS['Red'])
-
-
-        self.output(append='ratios' )
-
-
+            fh.write( "%02d,%02d,%02d,%02d,%02d,%02d,%02d,%02d,%02d\n" % (fly+1, 
+                                        is_left_a, is_right_a,
+                                        is_left_b, is_right_b,
+                                        is_left_c, is_right_c,
+                                        is_left, is_right)
+                                        
+                    )
+                                            
+        fh.close()
+                                        
 if __name__ == '__main__':
     
     ot = None
     parser = optparse.OptionParser(usage='%prog [options] [argument]', version='%prog version 0.1')
     parser.add_option('-i', '--input', dest='source', metavar="SOURCE", help="File to be processed")
+    parser.add_option('--vertical', action="store_false", default=True, dest='horizontal', help="Revert x & y. Use if mask is vertical instead of horizontal")
     parser.add_option('--distribution', action="store_true", default=False, dest='distribution', help="Show a histogram of distribution bins")
     parser.add_option('--path', action="store_true", default=False, dest='path', help="Show the path of all the flies")
     parser.add_option('--steps', action="store_true", default=False, dest='steps', help="Show a measure of the length of each step")
+    parser.add_option('--ratio', action="store_true", default=False, dest='ratio', help="Plot a measure of time spent on one side or the other")
     parser.add_option('--showOnly', action="store_true", default=False, dest='showOnly', help="Do not save figure, just show it")
 
     (options, args) = parser.parse_args()
@@ -445,8 +433,8 @@ if __name__ == '__main__':
     show = options.showOnly
     save = not show
 
-    if options.source and ( options.distribution or options.path ):
-        ot = odorTracker(options.source, save, show)
+    if options.source and ( options.distribution or options.path or options.steps or options.ratio ):
+        ot = odorTracker(options.source, save, show, options.horizontal)
 
     else:
         parser.print_help()    
@@ -459,4 +447,7 @@ if __name__ == '__main__':
 
     if ot and options.steps:
         ot.plotStepsLength()
+
+    if ot and options.ratio:
+        ot.writeFlyPlaceRatio()
 
