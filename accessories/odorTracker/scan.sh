@@ -5,7 +5,7 @@ PVGROOT="`pwd`/../../"
 OTROOT="`pwd`/"
 MOVIE_FILETYPE="*.AVI*"
 
-ACTIONS=$(zenity --height=300 --list --checklist --title "What do you want to do." --text "Specify actions." --column "" --column "Choices" True "Draw the Mask" True "Write Coordinates" True "Draw Graphs" True "Write Position Summary")
+ACTIONS=$(zenity --height=300 --list --checklist --title "What do you want to do." --text "Specify actions." --column "" --column "Choices" True "Draw the Mask" True "Write Coordinates" True "Draw Graphs" True "Write Position Summary" False "Vertical")
 
 MAKEMASK=0
 COORDS=0
@@ -30,6 +30,11 @@ fi
 if [[ $ACTIONS =~ .*Position.* ]]
 then
   POSITION=1
+fi
+
+if [[ $ACTIONS =~ .*Vertical.* ]]
+then
+  VERTICAL="--vertical"
 fi
 
 
@@ -70,7 +75,7 @@ else
 
     #DRAW GRAPHS
     if [ $GRAPHS = 1 ]; then
-        PVG_OT=$OTROOT"odorTracker.py --distribution --path --steps -i"
+        PVG_OT=$OTROOT"odorTracker.py $VERTICAL --distribution --path --steps -i"
         FILETYPE_COORD="*.txt"
 
         for file in `find ${SRC} -name "$FILETYPE_COORD" -type f`
@@ -82,7 +87,7 @@ else
 
     #WRITE POSITIONS
     if [ $POSITION = 1 ]; then
-        PVG_OT=$OTROOT"odorTracker.py --ratio -i"
+        PVG_OT=$OTROOT"odorTracker.py $VERTICAL --ratio -i"
         FILETYPE_COORD="*.txt"
 
         for file in `find ${SRC} -name "$FILETYPE_COORD" -type f`

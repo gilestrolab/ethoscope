@@ -11,7 +11,9 @@ from os.path import splitext
 class CvMovieFrame(wx.Frame):
     def __init__(self, parent, source, resolution, track, track_type, mask_file, outputFile, showROIs, showpath, showtime, record, trackonly ):
         wx.Frame.__init__(self, parent)
-        self.displayPanel = previewPanel(self, size=resolution, keymode=True)
+        
+       
+        self.displayPanel = previewPanel(self, size=resolution, keymode=True, singleFrameMode=True)
         self.SetSize(resolution)
         
         self.SetTitle(source)
