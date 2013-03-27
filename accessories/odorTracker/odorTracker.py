@@ -50,6 +50,8 @@ class odorTracker():
         if os.path.isdir(source):
             pass
         
+        self.midline = max(self.a[:,:,0].flatten())/2 # all x coordinates
+        
     def __readFile(self, filename, horizontal=True):
         """
         Read a single txt file with coordinates and return a bidimensional numpy array
@@ -177,7 +179,7 @@ class odorTracker():
         self.output(append='-fly%02d' % fly)
         
         
-    def plotAllpath(self, onecolor=False, midline=250):
+    def plotAllpath(self, onecolor=False):
         """
         plot paths in the currently open figure and save it to file
         """
@@ -199,16 +201,16 @@ class odorTracker():
             if onecolor:
                 ax.plot( x,np.arange(len(x)), 'o-', color=COLORS['Light Grey'])
             else:
-                x.mask = (x < midline)
+                x.mask = (x < self.midline)
                 ax.plot( x,np.arange(len(x)), 'o-', color=COLORS['Red'])
-                x.mask = (x > midline)
+                x.mask = (x > self.midline)
                 ax.plot( x,np.arange(len(x)), 'o-', color=COLORS['Light Blue'])
             
             ax.set_xlim((0, 500))
 
         self.output(append='-path')
 
-    def plotStepsLength(self, midline = 250):
+    def plotStepsLength(self):
         """
         plot the lenght of each step
         """
@@ -221,8 +223,8 @@ class odorTracker():
 
             x = self.a[:,fly,0] # only x coordinates
             
-            is_left = ( x < midline )
-            is_right = ( x>= midline )
+            is_left = ( x < self.midline )
+            is_right = ( x>= self.midline )
             
             x1 = np.roll(x, -1)
             d = np.ma.MaskedArray( ((x1 - x)[:-1]) )# all the distances, step by step
@@ -278,7 +280,7 @@ class odorTracker():
         return lf
 
 
-    def plotFlyPath(self, source, onecolor=False, midline = 250):
+    def plotFlyPath(self, source, onecolor=False):
         """
         """
         
@@ -316,16 +318,16 @@ class odorTracker():
                 if onecolor:
                     ax.plot( x,np.arange(len(x)), 'o-', color=COLORS['Light Grey'])
                 else:
-                    x.mask = (x < midline)
+                    x.mask = (x < self.midline)
                     ax.plot( x,np.arange(len(x)), 'o-', color=COLORS['Red'])
-                    x.mask = (x > midline)
+                    x.mask = (x > self.midline)
                     ax.plot( x,np.arange(len(x)), 'o-', color=COLORS['Light Blue'])
                 
                 ax.set_xlim((0, 500))
 
             self.output(append='path-fly%02d' % (fly+1) )
 
-    def plotFlySteps(self, source, onecolor=False, midline = 250):
+    def plotFlySteps(self, source, onecolor=False):
         """
         """
         
@@ -354,8 +356,8 @@ class odorTracker():
 
                 x = a[fn][:,fly,0] # only x coordinates
                 
-                is_left = ( x < midline )
-                is_right = ( x>= midline )
+                is_left = ( x < self.midline )
+                is_right = ( x>= self.midline )
                 
                 x1 = np.roll(x, -1)
                 d = np.ma.MaskedArray( ((x1 - x)[:-1]) )# all the distances, step by step
@@ -374,7 +376,7 @@ class odorTracker():
 
             self.output(append='steps-fly%02d' % (fly+1) )
 
-    def writeFlyPlaceRatio(self, midline = 250):
+    def writeFlyPlaceRatio(self):
         """
         """
         
@@ -393,17 +395,17 @@ class odorTracker():
             x = np.ma.MaskedArray( self.a[:,fly,0] )
             #coords = self.a[:,fly]
 
-            # this counts the number of points (and hence of seconds) past on each side of the midline
+            # this counts the number of points (and hence of seconds) past on each side of the self.midline
             # return one value for each zone
 
             t = x.shape[0]
             a = int(t*1/3) 
             b = int(t*2/3)
             
-            is_left_a = ( x[:a] < midline ).sum(); is_right_a = ( x[:a] >= midline ).sum()
-            is_left_b = ( x[a:b] < midline ).sum(); is_right_b = ( x[a:b] >= midline ).sum()
-            is_left_c = ( x[b:] < midline ).sum(); is_right_c = ( x[b:] >= midline ).sum()
-            is_left = ( x < midline ).sum(); is_right = ( x >= midline ).sum()
+            is_left_a = ( x[:a] < self.midline ).sum(); is_right_a = ( x[:a] >= self.midline ).sum()
+            is_left_b = ( x[a:b] < self.midline ).sum(); is_right_b = ( x[a:b] >= self.midline ).sum()
+            is_left_c = ( x[b:] < self.midline ).sum(); is_right_c = ( x[b:] >= self.midline ).sum()
+            is_left = ( x < self.midline ).sum(); is_right = ( x >= self.midline ).sum()
             
 
             fh.write( "%02d,%02d,%02d,%02d,%02d,%02d,%02d,%02d,%02d\n" % (fly+1, 
