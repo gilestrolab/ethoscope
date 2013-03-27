@@ -23,6 +23,7 @@
 import wx, cv, os
 import pysolovideo as pv
 import ConfigParser, threading
+import numpy as np
 
 DEFAULT_CONFIG = 'pysolo_video.cfg'
 
@@ -303,7 +304,7 @@ class previewPanel(wx.Panel):
     A panel showing the video images. 
     Used for thumbnails
     """
-    def __init__(self, parent, size, keymode=True):
+    def __init__(self, parent, size, keymode=True, singleFrameMode=False):
 
         wx.Panel.__init__(self, parent, wx.ID_ANY, style=wx.WANTS_CHARS)
         
@@ -338,9 +339,10 @@ class previewPanel(wx.Panel):
         self.selROI = -1
         self.polyPoints = []
         self.keymode = keymode
+        self.digitBuffer = ''
         
         self.ACTIONS = {
-                        "a": [self.AutoMask, "Automatically create the mask"],
+                        "a": [self.autoDivideMask, "Automatically create the mask"],
                         "c": [self.ClearLast, "Clear last selected area of interest"],
                         "t": [self.Calibrate, "Calibrate the mask after selecting two points distant 1cm from each other"],
                         "x": [self.ClearAll, "Clear all marked region of interest"],
@@ -348,6 +350,8 @@ class previewPanel(wx.Panel):
                         "s": [self.SaveMask, "Save mask to file"],
                         "q": [self.Stop, "Close connection to camera"]
                         }
+        
+        self.singleFrameMode = singleFrameMode
         
         self.Bind( wx.EVT_LEFT_DOWN, self.onLeftDown )
         self.Bind( wx.EVT_LEFT_UP, self.onLeftUp )
@@ -495,6 +499,9 @@ class previewPanel(wx.Panel):
         """
         key = chr(event.GetKeyCode())
         
+        if ( key >= '0' and key <= '9' ): #is digit
+            self.digitBuffer = self.digitBuffer + key
+        
         if key == "g" and self.mon.writer: self.mon.grabMovie = not self.mon.grabMovie
 
         if self.ACTIONS.has_key(key):
@@ -512,6 +519,63 @@ class previewPanel(wx.Panel):
         
         print "%spixels = 1cm" % r
 
+    def autoDivideMask(self, n=1):
+        """
+        Divide the currently selected ROI into n pieces
+        if n=0, add one piece
+        """
+
+        vertical = True
+
+        if self.digitBuffer: n = int(self.digitBuffer)
+        self.digitBuffer = ''
+
+        if self.allowEditing and self.selection:
+            
+            a = np.array(self.selection)
+            
+            #if vertical:
+            #    #find the lower points and upper points
+            #    ind=np.lexsort((a[:,0],a[:,1]))    
+            #else:
+            #    ind=np.lexsort((a[:,1],a[:,0]))    
+               
+            #a = a[ind]
+            
+            if not vertical and n>1:
+                lx = np.linspace(a[0][0],a[2][0],n+1) # new lower X values
+                ly = np.linspace(a[0][1],a[2][1],n+1) # new lower Y values
+                lv = np.append( lx.reshape(-1,1), ly.reshape(-1,1), 1).astype(np.int)
+                
+                ux = np.linspace(a[1][0],a[3][0],n+1) # new upper X values
+                uy = np.linspace(a[1][1],a[3][1],n+1) # new upper Y values
+                uv = np.append( ux.reshape(-1,1), uy.reshape(-1,1), 1).astype(np.int)
+            
+                for i in range(0,n):
+                    self.selection = [ tuple(lv[i].tolist()), tuple(lv[i+1].tolist()), tuple(uv[i+1].tolist()), tuple(uv[i].tolist()) ]
+                    self.mon.addROI( self.selection, 1)
+            
+                self.polyPoints = []
+                self.selection = []
+
+            if vertical and n>1:
+                lx = np.linspace(a[0][0],a[1][0],n+1) # new left X values
+                ly = np.linspace(a[0][1],a[1][1],n+1) # new left Y values
+                lv = np.append( lx.reshape(-1,1), ly.reshape(-1,1), 1).astype(np.int)
+                
+                ux = np.linspace(a[2][0],a[3][0],n+1) # new right X values
+                uy = np.linspace(a[2][1],a[3][1],n+1) # new right Y values
+                uv = np.append( ux.reshape(-1,1), uy.reshape(-1,1), 1).astype(np.int)
+            
+                for i in range(0,n):
+                    self.selection = [ tuple(lv[i].tolist()), tuple(lv[i+1].tolist()), tuple(uv[i+1].tolist()), tuple(uv[i].tolist()) ]
+                    self.mon.addROI( self.selection, 1)
+            
+                self.polyPoints = []
+                self.selection = []
+
+            
+    
     def AutoMask(self, event=None):
         """
         """
