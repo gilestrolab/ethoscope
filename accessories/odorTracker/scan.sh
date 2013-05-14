@@ -11,6 +11,7 @@ MAKEMASK=0
 COORDS=0
 GRAPHS=0
 
+FOLDER=$1
 
 if [[ $ACTIONS =~ .*Mask.* ]]
 then
@@ -37,8 +38,12 @@ then
   VERTICAL="--vertical"
 fi
 
-
-SRC=$(zenity  --file-selection --title="Select Directory that contains the files you want to process" --directory --filename=.)
+if [ -z $FOLDER ]; then
+  SRC=$(zenity  --file-selection --title="Select Directory that contains the files you want to process" --directory --filename=.)
+else
+  echo Using folder $FOLDER
+  SRC=$FOLDER
+fi
 
 if [ -z $SRC ]; then
 
