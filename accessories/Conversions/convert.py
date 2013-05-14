@@ -21,8 +21,12 @@
 #       MA 02110-1301, USA.
 
 import numpy as np
+import os
+import optparse
 
-HEADER_LENGTH=8
+
+HEADER_LENGTH=10 # 10 is the same as trikinetics files
+TAB = '\t'
 
 def CoordsFromFile(filename):
     """
@@ -30,6 +34,8 @@ def CoordsFromFile(filename):
     Returns a 3 dimensional array of shape ( frames, flies, (x,y) )
     """
     coords = []
+    empty_coord = ['0', '0']
+    
     try:
         fh = open(filename, 'r')
         rawfile = fh.read().split('\n')
@@ -37,8 +43,11 @@ def CoordsFromFile(filename):
 
         for line in rawfile:
             if line:
-                coords.append( [xy.split(',') for xy in line.split('\t')[HEADER_LENGTH:] ] )
-
+                data = [xy.split(',') if ',' in xy else empty_coord for xy in line.split(TAB)[HEADER_LENGTH:] ]
+                if len(data) == 32: # If the computer crashes during data collection sometimes a line is not saved properly
+                    coords.append( data )
+                    
+        
         a = np.array(coords, dtype=float)
         
         return a
@@ -46,7 +55,7 @@ def CoordsFromFile(filename):
     except IOError:
         print "Error opening the file"
         return False
-        
+       
         
 def CountsFromFile(filename):
     """
@@ -62,8 +71,7 @@ def CountsFromFile(filename):
 
         for line in rawfile:
             if line:
-                counts.append( line.split('\t')[HEADER_LENGTH:] )
-
+                counts.append( line.split(TAB)[HEADER_LENGTH:] )
 
         a = np.array(counts, dtype=int)
         
@@ -161,7 +169,7 @@ def getHeaders(filename):
 
         for line in rawfile:
             if line:
-                headers.append( line.split('\t')[:HEADER_LENGTH] )
+                headers.append( line.split(TAB)[:HEADER_LENGTH] )
 
         
     except IOError:
@@ -179,7 +187,7 @@ def detectFileType(filename):
     with open(filename, 'r') as inputfile:
         lastline = inputfile.read().split('\n')[-2]
 
-    trackType = lastline.split('\t')[position]
+    trackType = lastline.split(TAB)[position]
     
     return int(trackType)
     
@@ -196,7 +204,7 @@ def c2b(file_in, file_out, extend=True):
     flies = dist.shape[1]
     
     if extend and flies < 32:
-        extension = '\t' + '\t'.join(['0',] * (32-flies) )
+        extension = TAB + TAB.join(['0',] * (32-flies) )
     else:
         extension = ''
     
@@ -205,9 +213,9 @@ def c2b(file_in, file_out, extend=True):
 
         for h, c in zip ( headers[::60], dist):
             fh.write (
-                         '\t'.join(h) +
-                         '\t0\t0\t' +
-                         '\t'.join( [str(xy)[1:-1] for xy in c.tolist()] ) +
+                         TAB.join(h) +
+                         'TAB0TAB0TAB' +
+                         TAB.join( [str(xy)[1:-1] for xy in c.tolist()] ) +
                          extension +
                          '\n'
                        )
@@ -220,6 +228,7 @@ def c2b(file_in, file_out, extend=True):
    
 def c2d(file_in, file_out, extend=True):
     """
+    Converts coordinates to distance
     """
     data =  CoordsFromFile(file_in)
     dist = CoordsToDistance(data)
@@ -229,7 +238,7 @@ def c2d(file_in, file_out, extend=True):
     flies = dist.shape[1]
     
     if extend and flies < 32:
-        extension = '\t' + '\t'.join(['0',] * (32-flies) )
+        extension = TAB + TAB.join(['0',] * (32-flies) )
     else:
         extension = ''
     
@@ -238,9 +247,9 @@ def c2d(file_in, file_out, extend=True):
 
         for h, c in zip ( headers[::60], dist):
             fh.write (
-                         '\t'.join(h) +
-                         '\t0\t0\t' +
-                         '\t'.join( [str(xy)[1:-1] for xy in c.tolist()] ) +
+                         TAB.join(h) + TAB +
+                         #'0TAB * 2' + #This is not needed anymore
+                         TAB.join( [str(xy)[1:-1] for xy in c.tolist()] ) +
                          extension +
                          '\n'
                        )
@@ -251,10 +260,30 @@ def c2d(file_in, file_out, extend=True):
 
 if __name__ == '__main__':
     
+    parser = optparse.OptionParser(usage='%prog [options] [argument]', version='%prog version 0.1')
+    parser.add_option('-i', '--input', dest='source', metavar="SOURCE", help="Input file to be processed")
+    parser.add_option('-o', '--output', dest='output', metavar="OUTPUT", help="Output file")
+
+    parser.add_option('--c2d', action="store_true", default=False, dest='c2d', help="Coordinates to distance traveled")
+    parser.add_option('--c2b', action="store_true", default=False, dest='c2b', help="Coordinates to virtual beam splitting")
+    
+    (options, args) = parser.parse_args()
+
+    if not options.source and not (options.c2d or options.c2b):
+        parser.print_help()    
+        
+    input_file = options.source
+    
+    if not options.output:
+        path_filename, extension = os.path.splitext(input_file)
+        output_file = path_filename + '-converted' + extension
+    else:
+        output_file = options.output
  
-    ctrl = '/home/gg/Dropbox/Work/Projects/Sandflies/raw/11.08.25/Monitor001.txt'
-    caff = '/home/gg/Dropbox/Work/Projects/Sandflies/raw/11.08.25/Monitor002.txt'
-    
-    c2d (caff, '/home/gg/Dropbox/Work/Projects/Sandflies/converted/new/Monitor002.txt')
-    
+    if options.c2d:
+        c2d(input_file, output_file)
+
+    if options.c2b:
+        c2b(input_file, output_file)
+        
 
