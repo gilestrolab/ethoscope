@@ -38,8 +38,10 @@ Algorithm for motion analysis:          PIL through kmeans (vector quantization)
     http://stackoverflow.com/questions/3923906/kmeans-in-opencv-python-interface
 """
 
-#import cv2 as cv
-import cv
+import cv2.cv as cv
+#http://opencv-users.1802565.n2.nabble.com/Why-is-cvClearMemStorage-not-exposed-through-the-Python-interface-td7229752.html
+
+#import cv
 import cPickle
 import os, datetime, time
 import numpy as np
@@ -68,27 +70,6 @@ class Cam:
     Functions and properties inherited by all cams
     """
     
-    def __addText__(self, frame, text = None):
-        """
-        Add current time as stamp to the image
-        """
-
-        if not text: text = time.asctime(time.localtime(time.time()))
-
-        normalfont = cv.InitFont(cv.CV_FONT_HERSHEY_PLAIN, 1, 1, 0, 1, 8)
-        boldfont = cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, 1, 1, 0, 3, 8)
-        font = normalfont
-        textcolor = (255,255,255)
-
-        (x1, _), ymin = cv.GetTextSize(text, font)
-        width, height = frame.width, frame.height
-        x = width - x1 - (width/64)
-        y = height - ymin - 2
-
-        cv.PutText(frame, text, (x, y), font, textcolor)
-        
-        return frame
-
     def getResolution(self):
         """
         Returns frame resolution as tuple (w,h)
@@ -131,11 +112,6 @@ class realCam(Cam):
         """
         return time.time() #current time epoch in secs.ms
 
-    def addTimeStamp(self, img):
-        """
-        """
-        return self.__addText__(img)
-
     def setResolution(self, (x, y)):
         """
         Set resolution of the camera we are acquiring from
@@ -156,13 +132,9 @@ class realCam(Cam):
         return (int(x1), int(y1))
         
 
-    def getImage( self, timestamp=False):
+    def getImage( self ):
         """
-        Returns frame
-        
-        timestamp   False   (Default) Does not add timestamp
-                    True              Add timestamp to the image
-                    
+        Returns frame, timestamp
         """
         #frame = None
         
@@ -176,9 +148,7 @@ class realCam(Cam):
             cv.Resize(frame, newsize)
             frame = newsize
         
-        if timestamp: frame = self.__addText__(frame)
-        
-        return frame
+        return frame, 0
 
     def isLastFrame(self):
         """
@@ -259,20 +229,16 @@ class virtualCamMovie(Cam):
         else:
             return frameTime / 1000.0 #returning seconds compatibility reasons
     
-    def getImage(self, timestamp=False):
+    def getImage(self):
         """
-        Returns frame
-        
-        timestamp   False   (Default) Does not add timestamp
-                    True              Add timestamp to the image
-                    
+        Returns frame, timestamp
         """
 
         #cv.SetCaptureProperty(self.capture, cv.CV_CAP_PROP_POS_FRAMES, self.currentFrame)
         # this does not work properly. Image is very corrupted
-        im = cv.QueryFrame(self.capture)
+        frame = cv.QueryFrame(self.capture)
 
-        if not im: im = self.blackFrame
+        if not frame: frame = self.blackFrame
         
         self.currentFrame += self.step
             
@@ -280,14 +246,12 @@ class virtualCamMovie(Cam):
 
         if self.scale:
             newsize = cv.CreateImage(self.resolution , cv.IPL_DEPTH_8U, 3)
-            cv.Resize(im, newsize)
-            im = newsize
+            cv.Resize(frame, newsize)
+            frame = newsize
 
-        if timestamp:
-            text = self.getFrameTime(asString=True)
-            im = self.__addText__(im, text)
+        timestamp = self.getFrameTime(asString=True)
 
-        return im
+        return frame, timestamp
       
     def setResolution(self, w, h):
         """
@@ -373,12 +337,9 @@ class virtualCamFrames(Cam):
         return fileList[start:end:step]
 
 
-    def getImage(self, timestamp=False):
+    def getImage(self):
         """
-        Returns frame
-        
-        timestamp   False   (Default) Does not add timestamp
-                    True              Add timestamp to the image
+        Returns frame, timestamp
         """
         n = self.currentFrame
         fp = os.path.join(self.path, self.fileList[n])
@@ -386,7 +347,7 @@ class virtualCamFrames(Cam):
         self.currentFrame += 1
 
         try:
-            im = cv.LoadImage(fp) #using cv to open the file
+            frame = cv.LoadImage(fp) #using cv to open the file
             
         except:
             print ( 'error with image %s' % fp )
@@ -394,14 +355,11 @@ class virtualCamFrames(Cam):
 
         if self.scale:
             newsize = cv.CreateMat(self.resolution[0], self.resolution[1], cv.CV_8UC3)
-            cv.Resize(im, newsize)
+            cv.Resize(frame, newsize)
 
-        self.last_time = self.getFrameTime(asString=True)
+        timestamp = self.last_time = self.getFrameTime(asString=True)
     
-        if timestamp:
-            im = self.__addText__(im, self.last_time)
-        
-        return im
+        return frame, timestamp
     
     def getTotalFrames(self):
         """
@@ -462,6 +420,7 @@ class Arena():
     
     The class monitor takes care of the camera
     The class arena takes care of the flies
+    
     """
     def __init__(self, parent):
         
@@ -974,6 +933,7 @@ class Monitor(object):
 
     def __drawFPS(self, frame):
         """
+        Add information about current FPS processing speed
         """
         
         normalfont = cv.InitFont(cv.CV_FONT_HERSHEY_PLAIN, 1, 1, 0, 1, 8)
@@ -985,6 +945,27 @@ class Monitor(object):
         (x1, _), ymin = cv.GetTextSize(text, font)
         width, height = frame.width, frame.height
         x = (width/64)
+        y = height - ymin - 2
+
+        cv.PutText(frame, text, (x, y), font, textcolor)
+        
+        return frame
+
+    def __addText(self, frame, text = None):
+        """
+        Add current time as stamp to the image
+        """
+
+        if not text: text = time.asctime(time.localtime(time.time()))
+
+        normalfont = cv.InitFont(cv.CV_FONT_HERSHEY_PLAIN, 1, 1, 0, 1, 8)
+        boldfont = cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, 1, 1, 0, 3, 8)
+        font = normalfont
+        textcolor = (255,255,255)
+
+        (x1, _), ymin = cv.GetTextSize(text, font)
+        width, height = frame.width, frame.height
+        x = width - x1 - (width/64)
         y = height - ymin - 2
 
         cv.PutText(frame, text, (x, y), font, textcolor)
@@ -1033,7 +1014,7 @@ class Monitor(object):
         
         return img
         
-    def __drawLastSteps(self, img, fly, steps=5, color=None):
+    def __drawLastSteps(self, frame, fly, steps=5, color=None):
         """
         Draw the last n (default 5) steps of the fly
         """
@@ -1044,9 +1025,9 @@ class Monitor(object):
 
         points = self.arena.getLastSteps(fly, steps)
 
-        cv.PolyLine(img, [points], is_closed=0, color=color, thickness=1, lineType=line_type, shift=0)
+        cv.PolyLine(frame, [points], is_closed=0, color=color, thickness=1, lineType=line_type, shift=0)
 
-        return img
+        return frame
         
         
 
@@ -1060,16 +1041,6 @@ class Monitor(object):
         channels = [None, None, None]
         cv.Split(img, channels[0], channels[1], channels[2], None)
         return channels[cn]
-
-    def __angle(self, pt1, pt2, pt0):
-        """
-        Return the angle between three points
-        """
-        dx1 = pt1[0] - pt0[0]
-        dy1 = pt1[1] - pt0[1]
-        dx2 = pt2[0] - pt0[0]
-        dy2 = pt2[1] - pt0[1]
-        return (dx1*dx2 + dy1*dy2)/np.sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10)
 
     def close(self):
         """
@@ -1311,6 +1282,18 @@ class Monitor(object):
         EXPERIMENTAL
         Find the greater square 
         """
+        
+        def angle(pt1, pt2, pt0):
+            """
+            Return the angle between three points
+            """
+            dx1 = pt1[0] - pt0[0]
+            dy1 = pt1[1] - pt0[1]
+            dx2 = pt2[0] - pt0[0]
+            dy2 = pt2[1] - pt0[1]
+            return (dx1*dx2 + dy1*dy2)/np.sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10)
+        
+        
         N = 11
         sz = (img.width & -2, img.height & -2)
         storage = cv.CreateMemStorage(0)
@@ -1385,7 +1368,7 @@ class Monitor(object):
                             # find minimum angle between joint
                             # edges (maximum of cosine)
                             if(i >= 2):
-                                t = abs(self.__angle(result[i%4], result[i-2], result[i-1]))
+                                t = abs(angle(result[i%4], result[i-2], result[i-1]))
                                 if s<t:
                                     s=t
                         # if cosines of all angles are small
@@ -1417,9 +1400,8 @@ class Monitor(object):
         """
 
         self.imageCount += 1
-        frame = self.cam.getImage(timestamp)
-        if timestamp: frame = self.__drawFPS(frame)
-
+        frame, time = self.cam.getImage()
+        
         if frame:
 
             if self.tracking: frame = self.doTrack(frame, show_raw_diff=False, drawPath=self.drawPath)
@@ -1439,6 +1421,10 @@ class Monitor(object):
                     frame = self.__drawCross (frame, pt, color=(0,0,255))
 
             if self.grabMovie: cv.WriteFrame(self.writer, frame)
+
+            if timestamp: 
+                frame = self.__drawFPS(frame)
+                frame = self.__addText(frame, time)
         
         return frame
 
@@ -1457,56 +1443,42 @@ class Monitor(object):
             self.arena.compactSeconds(self.__tempFPS, delta) #average the coordinates and transfer from buffer to array
             self.processingFPS = self.__tempFPS; self.__tempFPS = 0
 
-    grey_image = None
-    temp = None
-    difference = None
-    ROImsk = None
-    ROIwrk = None
-            
     def doTrack(self, frame, show_raw_diff=False, drawPath=True):
         """
         Track flies in ROIs using findContour algorithm in opencv
         Each frame is compared against the moving average
         take an opencv frame as input and return a frame as output with path, flies and mask drawn on it
         """
+        
+        def createImage(frame,ch=1):
+            i = cv.CreateImage( cv.GetSize(frame), cv.IPL_DEPTH_8U, ch)
+            cv.Zero(i)
+            return i
+        
         track_one = True # Track only one fly per ROI
+
+        #grey_image = cv.CreateImage( cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
+        #temp = cv.CreateImage( cv.GetSize(frame), frame.depth, frame.nChannels)
+        #difference = cv.CreateImage( cv.GetSize(frame), frame.depth, frame.nChannels)
+        #ROImsk = cv.CreateImage( cv.GetSize(grey_image), cv.IPL_DEPTH_8U, 1)
+        #ROIwrk = cv.CreateImage( cv.GetSize(grey_image), cv.IPL_DEPTH_8U, 1)
+
+        grey_image = createImage(frame)
+        temp = createImage(frame,3)
+        difference = createImage(frame,3)
+        ROImsk = createImage(frame)
+        ROIwrk = createImage(frame)
 
         # Smooth to get rid of false positives
         cv.Smooth(frame, frame, cv.CV_GAUSSIAN, 3, 0)
 
-
-        # Create some empty containers to be used later on
-        # Memory leakage bug fixed by Alan Zucconi
-
-        if self.grey_image is None:
-            self.grey_image = cv.CreateImage( cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
-        if self.temp is None:
-            self.temp = cv.CreateImage( cv.GetSize(frame), frame.depth, frame.nChannels)
-        if self.difference is None:
-            self.difference = cv.CreateImage( cv.GetSize(frame), frame.depth, frame.nChannels)
-        if self.ROImsk is None:
-            self.ROImsk = cv.CreateImage( cv.GetSize(self.grey_image), cv.IPL_DEPTH_8U, 1)
-        if self.ROIwrk is None:
-            self.ROIwrk = cv.CreateImage( cv.GetSize(self.grey_image), cv.IPL_DEPTH_8U, 1)
-
-        cv.Copy(frame, self.temp)
-        cv.Copy(frame, self.difference)
-        cv.Copy(self.grey_image, self.ROImsk)
-        cv.Copy(self.grey_image, self.ROIwrk)
-
-        grey_image = self.grey_image
-        temp = self.temp
-        difference = self.difference
-        ROImsk = self.ROImsk
-        ROIwrk = self.ROIwrk
-
         if self.__firstFrame:
-            #create the moving average
+            # create the moving average
             self.moving_average = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_32F, 3)
             cv.ConvertScale(frame, self.moving_average, 1.0, 0.0)
             self.__firstFrame = False
         else:
-            #update the moving average
+            # update the moving average
             cv.RunningAvg(frame, self.moving_average, 0.2, None) #0.04
 
         # Convert the scale of the moving average.
@@ -1525,12 +1497,15 @@ class Monitor(object):
         cv.Dilate(grey_image, grey_image, None, 2) #18
         cv.Erode(grey_image, grey_image, None, 2) #10
 
-        #Build the mask. This allows for non rectangular ROIs
+        # Build the mask. This allows for non rectangular ROIs
+        # In theory we need to do this only when the ROI have changed
+        # But it's easier to recreate each time
+
         for ROI in self.arena.ROIS:
             cv.FillPoly( ROImsk, [ROI], color=cv.CV_RGB(255, 255, 255) )
-        
         #Apply the mask to the grey image where tracking happens
-        cv.Copy(grey_image, ROIwrk, ROImsk)
+        cv.Copy(grey_image, ROIwrk, ROImsk) #src,dst,msk
+
         storage = cv.CreateMemStorage(0)
 
         #track each ROI
@@ -1554,7 +1529,7 @@ class Monitor(object):
                 pt1 = (bound_rect[0], bound_rect[1])
                 pt2 = (bound_rect[0] + bound_rect[2], bound_rect[1] + bound_rect[3])
                 points.append(pt1); points.append(pt2)
-                cv.Rectangle(frame, pt1, pt2, cv.CV_RGB(255,0,0), 1)
+                cv.Rectangle(frame, pt1, pt2, cv.CV_RGB(255,0,0), 1) #red rectangle
              
                 fly_coords = ( pt1[0]+(pt2[0]-pt1[0])/2, pt1[1]+(pt2[1]-pt1[1])/2 )
                 area = (pt2[0]-pt1[0])*(pt2[1]-pt1[1])
@@ -1574,8 +1549,8 @@ class Monitor(object):
         self.processFlyMovements()
         
         if show_raw_diff:
-            temp2 = cv.CloneImage(grey_image)
+            temp2 = cv.CloneImage(frame)
             cv.CvtColor(grey_image, temp2, cv.CV_GRAY2RGB)#show the actual difference blob that will be tracked
             return temp2
-
+ 
         return frame
