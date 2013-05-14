@@ -21,7 +21,7 @@
 #       MA 02110-1301, USA.
 #       
 #     
-"""Version 1.0
+"""Version 1.2
 
 Interaction with webcam:                opencv      liveShow.py / imageAquisition.py
 Saving movies as stream:                opencv      realCam
@@ -38,7 +38,7 @@ Algorithm for motion analysis:          PIL through kmeans (vector quantization)
     http://stackoverflow.com/questions/3923906/kmeans-in-opencv-python-interface
 """
 
-import cv2.cv as cv
+import cv2
 #http://opencv-users.1802565.n2.nabble.com/Why-is-cvClearMemStorage-not-exposed-through-the-Python-interface-td7229752.html
 
 #import cv
@@ -49,6 +49,7 @@ import numpy as np
 
 pySoloVideoVersion ='dev'
 MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug','Sep', 'Oct', 'Nov', 'Dec']
+MAX_FLY_AREA = 300 
 
 def getCameraCount():
     """
@@ -59,7 +60,7 @@ def getCameraCount():
     
     while Cameras:
         try:
-            print ( cv.CaptureFromCAM(n) )
+            print ( cv2.CaptureFromCAM(n) )
             n += 1
         except:
             Cameras = False
@@ -80,7 +81,7 @@ class Cam:
         """
         """
         img = self.getImage(timestamp, imgType)
-        cv.SaveImage(filename, img) #with opencv
+        cv2.SaveImage(filename, img) #with opencv
 
     def close(self):
         """
@@ -104,7 +105,9 @@ class realCam(Cam):
     def __initCamera(self):
         """
         """
-        self.camera = cv.CaptureFromCAM(self.devnum)
+        #self.camera = cv2.CaptureFromCAM(self.devnum)
+        self.camera = cv2.VideoCapture(self.devnum)
+        
         self.setResolution (self.resolution)
 
     def getFrameTime(self):
@@ -118,8 +121,11 @@ class realCam(Cam):
         """
         x = int(x); y = int(y)
         self.resolution = (x, y)
-        cv.SetCaptureProperty(self.camera, cv.CV_CAP_PROP_FRAME_WIDTH, x)
-        cv.SetCaptureProperty(self.camera, cv.CV_CAP_PROP_FRAME_HEIGHT, y)
+
+        #http://stackoverflow.com/questions/11420748/setting-camera-parameters-in-opencv-python
+        self.camera.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, x)
+        self.camera.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, y)
+        
         x1, y1 = self.getResolution()
         self.scale = ( (x, y) != (x1, y1) ) # if the camera does not support resolution, we need to scale the image
         
@@ -127,8 +133,8 @@ class realCam(Cam):
         """
         Return real resolution
         """
-        x1 = cv.GetCaptureProperty(self.camera, cv.CV_CAP_PROP_FRAME_WIDTH)
-        y1 = cv.GetCaptureProperty(self.camera, cv.CV_CAP_PROP_FRAME_HEIGHT)
+        x1 = self.camera.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH)
+        y1 = self.camera.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)
         return (int(x1), int(y1))
         
 
@@ -141,11 +147,13 @@ class realCam(Cam):
         if not self.camera:
             self.__initCamera()
         
-        frame = cv.QueryFrame(self.camera)
+        #frame = cv2.QueryFrame(self.camera)       
+        __, frame = self.camera.read()
+        
 
         if self.scale:
-            newsize = cv.CreateImage(self.resolution , cv.IPL_DEPTH_8U, 3)
-            cv.Resize(frame, newsize)
+            newsize = cv2.CreateImage(self.resolution , cv2.IPL_DEPTH_8U, 3)
+            cv2.Resize(frame, newsize)
             frame = newsize
         
         return frame, 0
@@ -162,7 +170,7 @@ class realCam(Cam):
         """
         print "attempting to close stream"
 
-        del(self.camera) #cv.ReleaseCapture(self.camera)
+        del(self.camera) #cv2.ReleaseCapture(self.camera)
         self.camera = None
         
 class virtualCamMovie(Cam):
@@ -197,11 +205,12 @@ class virtualCamMovie(Cam):
         
         self.loop = loop
 
-        self.capture = cv.CaptureFromFile(self.path)
+        self.capture = cv2.VideoCapture(self.path)
 
         #finding the input resolution
-        w = cv.GetCaptureProperty(self.capture, cv.CV_CAP_PROP_FRAME_WIDTH)
-        h = cv.GetCaptureProperty(self.capture, cv.CV_CAP_PROP_FRAME_HEIGHT)
+        w = self.capture.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH)
+        h = self.capture.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)
+        
         self.in_resolution = (int(w), int(h))
         self.resolution = self.in_resolution
 
@@ -212,16 +221,14 @@ class virtualCamMovie(Cam):
         if end < 1 or end > self.totalFrames: end = self.totalFrames
         self.lastFrame = end
        
-        self.blackFrame = cv.CreateImage(self.resolution , cv.IPL_DEPTH_8U, 3)
-        cv.Zero(self.blackFrame)
+        self.blackFrame = np.zeros( (w, h, 3) )
         
     def getFrameTime(self, asString=None):
         """
         Return the time of the frame
         """
         
-        frameTime = cv.GetCaptureProperty(self.capture, cv.CV_CAP_PROP_POS_MSEC)
-
+        frameTime = self.capture.get(cv2.cv.CV_CAP_PROP_POS_MSEC)
         
         if asString:
             frameTime = str( datetime.timedelta(seconds=frameTime / 100.0) )
@@ -234,20 +241,18 @@ class virtualCamMovie(Cam):
         Returns frame, timestamp
         """
 
-        #cv.SetCaptureProperty(self.capture, cv.CV_CAP_PROP_POS_FRAMES, self.currentFrame)
+        #cv2.SetCaptureProperty(self.capture, cv2.CV_CAP_PROP_POS_FRAMES, self.currentFrame)
         # this does not work properly. Image is very corrupted
-        frame = cv.QueryFrame(self.capture)
+        __, frame = self.capture.read()
 
-        if not frame: frame = self.blackFrame
+        if not frame.any(): frame = self.blackFrame
         
         self.currentFrame += self.step
             
         #elif self.currentFrame > self.lastFrame and not self.loop: return False
 
         if self.scale:
-            newsize = cv.CreateImage(self.resolution , cv.IPL_DEPTH_8U, 3)
-            cv.Resize(frame, newsize)
-            frame = newsize
+            frame = cv2.resize(frame, self.resolution)
 
         timestamp = self.getFrameTime(asString=True)
 
@@ -266,7 +271,7 @@ class virtualCamMovie(Cam):
         Be aware of this bug
         https://code.ros.org/trac/opencv/ticket/851
         """
-        return cv.GetCaptureProperty( self.capture , cv.CV_CAP_PROP_FRAME_COUNT )
+        return self.capture.get( cv2.cv.CV_CAP_PROP_FRAME_COUNT )
 
     def isLastFrame(self):
         """
@@ -298,7 +303,9 @@ class virtualCamFrames(Cam):
 
         fp = os.path.join(self.path, self.fileList[0])
         
-        self.in_resolution = cv.GetSize(cv.LoadImage(fp))
+        frame = cv2.imread(fp,cv2.CV_LOAD_IMAGE_COLOR)
+        self.in_resolution = frame.shape
+        
         if not resolution: resolution = self.in_resolution
         self.resolution = resolution
         self.scale = (self.in_resolution != self.resolution)
@@ -347,15 +354,14 @@ class virtualCamFrames(Cam):
         self.currentFrame += 1
 
         try:
-            frame = cv.LoadImage(fp) #using cv to open the file
+            frame = cv2.imread(fp,cv2.CV_LOAD_IMAGE_COLOR)
             
         except:
             print ( 'error with image %s' % fp )
             raise
 
         if self.scale:
-            newsize = cv.CreateMat(self.resolution[0], self.resolution[1], cv.CV_8UC3)
-            cv.Resize(frame, newsize)
+            frame = cv2.resize(frame, self.resolution)
 
         timestamp = self.last_time = self.getFrameTime(asString=True)
     
@@ -640,7 +646,7 @@ class Arena():
         polygon = [(x,y),(x1,x2),...,(x10,y10)]
         http://pseentertainmentcorp.com/smf/index.php?topic=545.0
         Alternatively:
-        http://opencv.itseez.com/doc/tutorials/imgproc/shapedescriptors/point_polygon_test/point_polygon_test.html
+        http://opencv2.itseez.com/doc/tutorials/imgproc/shapedescriptors/point_polygon_test/point_polygon_test.html
         """
         x, y = pt
         
@@ -925,9 +931,9 @@ class Monitor(object):
         """
         if not color: color = (100,100,200)
         width = 1
-        line_type = cv.CV_AA
+        line_type = cv2.CV_AA
 
-        cv.Line(img, bm[0], bm[1], color, width, line_type, 0)
+        cv2.line(img, bm[0], bm[1], color, width, line_type, 0)
 
         return img
 
@@ -936,18 +942,15 @@ class Monitor(object):
         Add information about current FPS processing speed
         """
         
-        normalfont = cv.InitFont(cv.CV_FONT_HERSHEY_PLAIN, 1, 1, 0, 1, 8)
-        boldfont = cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, 1, 1, 0, 3, 8)
-        font = normalfont
         textcolor = (255,255,255)
         text = "FPS: %02d" % self.processingFPS
 
-        (x1, _), ymin = cv.GetTextSize(text, font)
-        width, height = frame.width, frame.height
+        (x1, _), ymin = cv2.getTextSize(text, cv2.FONT_HERSHEY_PLAIN, 1, 1)
+        height, width, _ = frame.shape
         x = (width/64)
         y = height - ymin - 2
 
-        cv.PutText(frame, text, (x, y), font, textcolor)
+        cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_PLAIN, 1, textcolor, 1)
         
         return frame
 
@@ -958,22 +961,20 @@ class Monitor(object):
 
         if not text: text = time.asctime(time.localtime(time.time()))
 
-        normalfont = cv.InitFont(cv.CV_FONT_HERSHEY_PLAIN, 1, 1, 0, 1, 8)
-        boldfont = cv.InitFont(cv.CV_FONT_HERSHEY_SIMPLEX, 1, 1, 0, 3, 8)
-        font = normalfont
         textcolor = (255,255,255)
 
-        (x1, _), ymin = cv.GetTextSize(text, font)
-        width, height = frame.width, frame.height
+        (x1, _), ymin = cv2.getTextSize(text, cv2.FONT_HERSHEY_PLAIN, 1, 1)
+
+        height, width, _ = frame.shape
         x = width - x1 - (width/64)
         y = height - ymin - 2
 
-        cv.PutText(frame, text, (x, y), font, textcolor)
+        cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_PLAIN, 1, textcolor, 1)
         
         return frame
         
 
-    def __drawROI(self, img, ROI, color=None, ROInum=None):
+    def __drawROI(self, frame, ROI, color=None, ROInum=None):
         """
         Draw ROI on img using given coordinates
         ROI is a tuple of 4 tuples ( (x1, y1), (x2, y2), (x3, y3), (x4, y4) )
@@ -982,18 +983,17 @@ class Monitor(object):
 
         if not color: color = (255,255,255)
         width = 1
-        line_type = cv.CV_AA
+        line_type = cv2.CV_AA
 
-        cv.PolyLine(img, [ROI], is_closed=1, color=color, thickness=1, lineType=line_type, shift=0)
+        cv2.polylines(frame, np.array([ROI]), isClosed=1, color=color, thickness=1, lineType=line_type, shift=0)
         
         if ROInum != None:
             x, y = ROI[0]
-            font = cv.InitFont(cv.CV_FONT_HERSHEY_PLAIN, 1, 1, 0, 1, 8)
             textcolor = (255,255,255)
             text = "%02d" % ROInum
-            cv.PutText(img, text, (x, y), font, textcolor)
+            cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_PLAIN, 1, textcolor, 1)
 
-        return img
+        return frame
 
     def __drawCross(self, img, pt, color=None):
         """
@@ -1001,7 +1001,7 @@ class Monitor(object):
         """
         if not color: color = (255,255,255)
         width = 1
-        line_type = cv.CV_AA
+        line_type = cv2.CV_AA
         
         x, y = pt
         a = (x, y-5)
@@ -1009,8 +1009,8 @@ class Monitor(object):
         c = (x-5, y)
         d = (x+5, y)
         
-        cv.Line(img, a, b, color, width, line_type, 0)
-        cv.Line(img, c, d, color, width, line_type, 0)
+        cv2.line(img, a, b, color, width, line_type, 0)
+        cv2.line(img, c, d, color, width, line_type, 0)
         
         return img
         
@@ -1021,11 +1021,11 @@ class Monitor(object):
 
         if not color: color = (255,255,255)
         width = 1
-        line_type = cv.CV_AA
+        line_type = cv2.CV_AA
 
         points = self.arena.getLastSteps(fly, steps)
 
-        cv.PolyLine(frame, [points], is_closed=0, color=color, thickness=1, lineType=line_type, shift=0)
+        cv2.PolyLine(frame, [points], is_closed=0, color=color, thickness=1, lineType=line_type, shift=0)
 
         return frame
         
@@ -1039,7 +1039,7 @@ class Monitor(object):
         cn = 'RGB'.find( channel.upper() )
         
         channels = [None, None, None]
-        cv.Split(img, channels[0], channels[1], channels[2], None)
+        cv2.Split(img, channels[0], channels[1], channels[2], None)
         return channels[cn]
 
     def close(self):
@@ -1160,9 +1160,9 @@ class Monitor(object):
         
         http://stackoverflow.com/questions/5426637/writing-video-with-opencv-python-mac
         """
-        fourcc = cv.CV_FOURCC(*[c for c in codec])
+        fourcc = cv2.CV_FOURCC(*[c for c in codec])
         
-        self.writer = cv.CreateVideoWriter(filename, fourcc, fps, self.resolution, 1)
+        self.writer = cv2.CreateVideoWriter(filename, fourcc, fps, self.resolution, 1)
         self.grabMovie = not startOnKey
 
 
@@ -1296,39 +1296,39 @@ class Monitor(object):
         
         N = 11
         sz = (img.width & -2, img.height & -2)
-        storage = cv.CreateMemStorage(0)
-        timg = cv.CloneImage(img)
-        gray = cv.CreateImage(sz, 8, 1)
-        pyr = cv.CreateImage((img.width/2, img.height/2), 8, 3)
+        storage = cv2.CreateMemStorage(0)
+        timg = cv2.CloneImage(img)
+        gray = cv2.CreateImage(sz, 8, 1)
+        pyr = cv2.CreateImage((img.width/2, img.height/2), 8, 3)
 
         squares =[]
         # select the maximum ROI in the image
         # with the width and height divisible by 2
-        subimage = cv.GetSubRect(timg, (0, 0, sz[0], sz[1]))
+        subimage = cv2.GetSubRect(timg, (0, 0, sz[0], sz[1]))
 
         # down-scale and upscale the image to filter out the noise
-        cv.PyrDown(subimage, pyr, 7)
-        cv.PyrUp(pyr, subimage, 7)
-        tgray = cv.CreateImage(sz, 8, 1)
+        cv2.PyrDown(subimage, pyr, 7)
+        cv2.PyrUp(pyr, subimage, 7)
+        tgray = cv2.CreateImage(sz, 8, 1)
         # find squares in every color plane of the image
         for c in range(3):
             # extract the c-th color plane
             channels = [None, None, None]
             channels[c] = tgray
-            cv.Split(subimage, channels[0], channels[1], channels[2], None) 
+            cv2.Split(subimage, channels[0], channels[1], channels[2], None) 
             for l in range(N):
                 # hack: use Canny instead of zero threshold level.
                 # Canny helps to catch squares with gradient shading
                 if(l == 0):
-                    cv.Canny(tgray, gray, 0, thresh, 5)
-                    cv.Dilate(gray, gray, None, 1)
+                    cv2.Canny(tgray, gray, 0, thresh, 5)
+                    cv2.Dilate(gray, gray, None, 1)
                 else:
                     # apply threshold if l!=0:
                     #     tgray(x, y) = gray(x, y) < (l+1)*255/N ? 255 : 0
-                    cv.Threshold(tgray, gray, (l+1)*255/N, 255, cv.CV_THRESH_BINARY)
+                    cv2.Threshold(tgray, gray, (l+1)*255/N, 255, cv2.CV_THRESH_BINARY)
 
                 # find contours and store them all as a list
-                contours = cv.FindContours(gray, storage, cv.CV_RETR_LIST, cv.CV_CHAIN_APPROX_SIMPLE)
+                contours = cv2.FindContours(gray, storage, cv2.CV_RETR_LIST, cv2.CV_CHAIN_APPROX_SIMPLE)
 
                 if not contours:
                     continue
@@ -1351,8 +1351,8 @@ class Monitor(object):
                     
                     # approximate contour with accuracy proportional
                     # to the contour perimeter
-                    result = cv.ApproxPoly(contour, storage,
-                        cv.CV_POLY_APPROX_DP, cv.ArcLength(contour) *0.02, 0)
+                    result = cv2.ApproxPoly(contour, storage,
+                        cv2.CV_POLY_APPROX_DP, cv2.ArcLength(contour) *0.02, 0)
 
                     # square contours should have 4 vertices after approximation
                     # relatively large area (to filter out noisy contours)
@@ -1361,8 +1361,8 @@ class Monitor(object):
                     # area may be positive or negative - in accordance with the
                     # contour orientation
                     if(len(result) == 4 and 
-                        abs(cv.ContourArea(result)) > 500 and 
-                        cv.CheckContourConvexity(result)):
+                        abs(cv2.ContourArea(result)) > 500 and 
+                        cv2.CheckContourConvexity(result)):
                         s = 0
                         for i in range(5):
                             # find minimum angle between joint
@@ -1402,7 +1402,7 @@ class Monitor(object):
         self.imageCount += 1
         frame, time = self.cam.getImage()
         
-        if frame:
+        if frame.any():
 
             if self.tracking: frame = self.doTrack(frame, show_raw_diff=False, drawPath=self.drawPath)
                     
@@ -1420,7 +1420,7 @@ class Monitor(object):
                 for pt in crosses:
                     frame = self.__drawCross (frame, pt, color=(0,0,255))
 
-            if self.grabMovie: cv.WriteFrame(self.writer, frame)
+            if self.grabMovie: cv2.WriteFrame(self.writer, frame)
 
             if timestamp: 
                 frame = self.__drawFPS(frame)
@@ -1450,90 +1450,74 @@ class Monitor(object):
         take an opencv frame as input and return a frame as output with path, flies and mask drawn on it
         """
         
-        def createImage(frame,ch=1):
-            i = cv.CreateImage( cv.GetSize(frame), cv.IPL_DEPTH_8U, ch)
-            cv.Zero(i)
-            return i
-        
         track_one = True # Track only one fly per ROI
 
-        #grey_image = cv.CreateImage( cv.GetSize(frame), cv.IPL_DEPTH_8U, 1)
-        #temp = cv.CreateImage( cv.GetSize(frame), frame.depth, frame.nChannels)
-        #difference = cv.CreateImage( cv.GetSize(frame), frame.depth, frame.nChannels)
-        #ROImsk = cv.CreateImage( cv.GetSize(grey_image), cv.IPL_DEPTH_8U, 1)
-        #ROIwrk = cv.CreateImage( cv.GetSize(grey_image), cv.IPL_DEPTH_8U, 1)
-
-        grey_image = createImage(frame)
-        temp = createImage(frame,3)
-        difference = createImage(frame,3)
-        ROImsk = createImage(frame)
-        ROIwrk = createImage(frame)
-
         # Smooth to get rid of false positives
-        cv.Smooth(frame, frame, cv.CV_GAUSSIAN, 3, 0)
+        # http://opencvpython.blogspot.in/2012/06/smoothing-techniques-in-opencv.html
+        # https://github.com/abidrahmank/OpenCV2-Python/blob/master/Official_Tutorial_Python_Codes/3_imgproc/smoothing.py
+        
+        frame = cv2.GaussianBlur(frame,(5,5) ,0)
+        #frame = cv2.blur(frame,(3,3))
 
         if self.__firstFrame:
             # create the moving average
-            self.moving_average = cv.CreateImage(cv.GetSize(frame), cv.IPL_DEPTH_32F, 3)
-            cv.ConvertScale(frame, self.moving_average, 1.0, 0.0)
+            self.moving_average = np.float32(frame)
             self.__firstFrame = False
+            avg = cv2.convertScaleAbs(self.moving_average)
+            
         else:
             # update the moving average
-            cv.RunningAvg(frame, self.moving_average, 0.2, None) #0.04
-
-        # Convert the scale of the moving average.
-        cv.ConvertScale(self.moving_average, temp, 1.0, 0.0)
+            cv2.accumulateWeighted(frame, self.moving_average, 0.1)
+            avg = cv2.convertScaleAbs(self.moving_average)
 
         # Minus the current frame from the moving average.
-        cv.AbsDiff(frame, temp, difference)
+        difference = cv2.subtract(avg, frame)
 
         # Convert the image to grayscale.
-        cv.CvtColor(difference, grey_image, cv.CV_RGB2GRAY)
+        grey_image = cv2.cvtColor(difference, cv2.COLOR_BGR2GRAY)
 
         # Convert the image to black and white.
-        cv.Threshold(grey_image, grey_image, 20, 255, cv.CV_THRESH_BINARY)
+        ret, thresh = cv2.threshold(grey_image, 20, 255, cv2.THRESH_BINARY)
 
         # Dilate and erode to get proper blobs
-        cv.Dilate(grey_image, grey_image, None, 2) #18
-        cv.Erode(grey_image, grey_image, None, 2) #10
+        thresh = cv2.Canny(thresh, 0, 50, apertureSize=5)
+        thresh = cv2.dilate(thresh, None)
 
         # Build the mask. This allows for non rectangular ROIs
         # In theory we need to do this only when the ROI have changed
         # But it's easier to recreate each time
-
-        for ROI in self.arena.ROIS:
-            cv.FillPoly( ROImsk, [ROI], color=cv.CV_RGB(255, 255, 255) )
+        y,x,_ = frame.shape
+        ROImsk = np.zeros( (y,x), np.uint8)
+        cv2.fillPoly( ROImsk, np.array(self.arena.ROIS), color=(255, 255, 255) )
+                       
         #Apply the mask to the grey image where tracking happens
-        cv.Copy(grey_image, ROIwrk, ROImsk) #src,dst,msk
-
-        storage = cv.CreateMemStorage(0)
+        ROIwrk = thresh & ROImsk
 
         #track each ROI
         for fly_number, ROI in enumerate( self.arena.ROIStoRect() ):
             
             (x1,y1), (x2,y2) = ROI
-            cv.SetImageROI(ROIwrk, (x1,y1,x2-x1,y2-y1) )
-            cv.SetImageROI(frame, (x1,y1,x2-x1,y2-y1) )
-            cv.SetImageROI(grey_image, (x1,y1,x2-x1,y2-y1) )
-
-            contour = cv.FindContours(ROIwrk, storage, cv.CV_RETR_CCOMP, cv.CV_CHAIN_APPROX_SIMPLE)
+            contours, hierarchy = cv2.findContours(ROIwrk[y1:y2, x1:x2] ,cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
             points = []
             fly_coords = None
+           
+            for nc, cnt in enumerate(contours[:1]): #take only one point per contours
+                cnt = contours[0]
 
-            while contour:
-                # Draw rectangles
-                bound_rect = cv.BoundingRect(list(contour))
-                contour = contour.h_next()
-                #if track_one and not contour: # this will make sure we are tracking only the biggest rectangle
-                pt1 = (bound_rect[0], bound_rect[1])
-                pt2 = (bound_rect[0] + bound_rect[2], bound_rect[1] + bound_rect[3])
-                points.append(pt1); points.append(pt2)
-                cv.Rectangle(frame, pt1, pt2, cv.CV_RGB(255,0,0), 1) #red rectangle
-             
-                fly_coords = ( pt1[0]+(pt2[0]-pt1[0])/2, pt1[1]+(pt2[1]-pt1[1])/2 )
-                area = (pt2[0]-pt1[0])*(pt2[1]-pt1[1])
-                if area > 400: fly_coords = None
+                area = cv2.contourArea(cnt)
+                
+                (x,y),radius = cv2.minEnclosingCircle(cnt + (x1,y1))
+                center = (int(x),int(y))
+                radius = int(radius)
+                
+                if area > MAX_FLY_AREA: 
+                    fly_coords = None
+                    cv2.circle(frame, center, radius, (0,255,0), 1)
+                
+                else:
+                    fly_coords = int(x), int(y)
+                    cv2.circle(frame, center, radius, (0,0,100), 1)
 
             # for each frame adds fly coordinates to all ROIS. Also do some filtering to remove false positives
             fly_coords, distance = self.arena.addFlyCoords(fly_number, fly_coords)
@@ -1542,15 +1526,11 @@ class Monitor(object):
             if drawPath: frame = self.__drawLastSteps(frame, fly_number, steps=5)
             if show_raw_diff: grey_image = self.__drawCross(grey_image, fly_coords, color=(100,100,100))
 
-            cv.ResetImageROI(ROIwrk)
-            cv.ResetImageROI(grey_image)
-            cv.ResetImageROI(frame)
-            
         self.processFlyMovements()
         
-        if show_raw_diff:
-            temp2 = cv.CloneImage(frame)
-            cv.CvtColor(grey_image, temp2, cv.CV_GRAY2RGB)#show the actual difference blob that will be tracked
-            return temp2
+        if show_raw_diff or 1:
+            #return cv2.cvtColor(grey_image, cv2.COLOR_GRAY2BGR)
+            return cv2.cvtColor(ROIwrk, cv2.COLOR_GRAY2BGR)
+            #return difference
  
         return frame

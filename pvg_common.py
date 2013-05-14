@@ -20,7 +20,9 @@
 #       MA 02110-1301, USA.
 
 
-import wx, cv, os
+import wx
+import os
+import cv2
 import pysolovideo as pv
 import ConfigParser, threading
 import numpy as np
@@ -596,31 +598,30 @@ class previewPanel(wx.Panel):
         
         self.camera = camera
         self.resolution = resolution
-        self.mon = pv.Monitor()
 
-        frame = cv.CreateMat(self.size[1], self.size[0], cv.CV_8UC3)
-        self.bmp = wx.BitmapFromBuffer(self.size[0], self.size[1], frame.tostring())
+        self.mon = pv.Monitor()
+        self.mon.setSource(self.camera, self.resolution)
+        frame = self.mon.GetImage(drawROIs = self.drawROI, selection=self.selection, crosses=self.polyPoints, timestamp=self.timestamp)
+
+        self.bmp = wx.BitmapFromBuffer(self.size[0], self.size[1], frame)
 
         self.Bind(wx.EVT_PAINT, self.onPaint)
         self.playTimer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.onNextFrame)
         
-        self.mon.setSource(self.camera, self.resolution)
 
-    def paintImg(self, img):
+    def paintImg(self, frame):
         """
         """
-        if img:
-            depth, channels = img.depth, img.nChannels
-            datatype = cv.CV_MAKETYPE(depth, channels)
+        if frame.any():
+            height, width, _ = frame.shape
             
-            frame = cv.CreateMat(self.size[1], self.size[0], datatype)
-            cv.Resize(img, frame)
+            #if resize:
+                #frame = cv2.resize(frame, size)
 
-            cv.CvtColor(frame, frame, cv.CV_BGR2RGB)
-            #cv.CvtColor(frame, frame, cv.CV_GRAY2RGB)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             
-            self.bmp.CopyFromBuffer(frame.tostring())
+            self.bmp.CopyFromBuffer(frame)
             self.Refresh()
 
     def onPaint(self, evt):
@@ -630,13 +631,16 @@ class previewPanel(wx.Panel):
             dc = wx.BufferedPaintDC(self)
             self.PrepareDC(dc)
             dc.DrawBitmap(self.bmp, 0, 0, True)
+            
+            
         evt.Skip()
 
     def onNextFrame(self, evt):
         """
         """
-
-        self.paintImg( self.mon.GetImage(drawROIs = self.drawROI, selection=self.selection, crosses=self.polyPoints, timestamp=self.timestamp) )
+        
+        frame = self.mon.GetImage(drawROIs = self.drawROI, selection=self.selection, crosses=self.polyPoints, timestamp=self.timestamp)
+        self.paintImg( frame )
         if evt: evt.Skip()
       
     def Play(self, status=True, showROIs=True):
