@@ -21,27 +21,31 @@
 #       MA 02110-1301, USA.
 #       
 #     
-"""Version 1.2
-
-Interaction with webcam:                opencv      liveShow.py / imageAquisition.py
-Saving movies as stream:                opencv      realCam
-Saving movies as single files:          ?           realCam
-Opening movies as avi:                  opencv      virtualCamMovie
-Opening movies as sequence of files:    PIL         virtualCamFrames
+"""Version 1.3
 
 Each Monitor has a camera that can be: realCam || VirtualCamMovies || VirtualCamFrames
-The class monitor is handling the motion detection and data processing while the CAM only handle
+The class Monitor is handling the motion detection and data processing while the class Cam only handles
 IO of image sources
 
-Algorithm for motion analysis:          PIL through kmeans (vector quantization)
+Algorithm for motion analysis:
+
+    Versions <1.0
+    PIL through kmeans (vector quantization)
     http://en.wikipedia.org/wiki/Vector_quantization
     http://stackoverflow.com/questions/3923906/kmeans-in-opencv-python-interface
+    
+    Version 1.0
+    Blob detection through CV
+    Annoying mem leak associated to CV
+    #http://opencv-users.1802565.n2.nabble.com/Why-is-cvClearMemStorage-not-exposed-through-the-Python-interface-td7229752.html
+    
+    Version 1.2
+    Contour detection through CV2
+    
 """
 
 import cv2
-#http://opencv-users.1802565.n2.nabble.com/Why-is-cvClearMemStorage-not-exposed-through-the-Python-interface-td7229752.html
 
-#import cv
 import cPickle
 import os, datetime, time
 import numpy as np
@@ -49,22 +53,49 @@ import numpy as np
 
 pySoloVideoVersion ='dev'
 MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug','Sep', 'Oct', 'Nov', 'Dec']
-MAX_FLY_AREA = 300 
 
-def getCameraCount():
+FIRST_POSITION = (-1,-1)
+FLY_NOT_DETECTED = None
+
+
+class runningAvgComparison():
     """
-    FIX THIS
-    """
-    n = 0
-    Cameras = True
+    This is a class that stores a running average
+    and a running STD
+    For each value that is used to update,
+    it returns also information on whether it is an outlier
     
-    while Cameras:
-        try:
-            print ( cv2.CaptureFromCAM(n) )
-            n += 1
-        except:
-            Cameras = False
-    return n
+    """
+    
+    def __init__(self):
+        """
+        """
+        self.__tot_sum = 0
+        self.__n = 0
+        self.__sq_diff = 0
+    
+        
+    def update(self, value, outlier=2):
+        """
+        Take a running value and returns:
+        mean        the running mean
+        std         the running standard deviation
+        distance    how distant is the value from the mean
+        outside     a boolean value of whether the value is outside 2 SD
+        """
+
+        self.__tot_sum += value
+        self.__n += 1
+        
+        mean = self.__tot_sum / self.__n
+        self.__sq_diff += np.square(value - mean)
+        
+        std = np.sqrt(self.__sq_diff / self.__n) or 1
+        distance = (value - mean) / std
+        outside = distance >= outlier
+        
+        return mean, std, distance, outside
+
 
 class Cam:
     """
@@ -156,7 +187,7 @@ class realCam(Cam):
             cv2.Resize(frame, newsize)
             frame = newsize
         
-        return frame, 0
+        return frame, self.getFrameTime()
 
     def isLastFrame(self):
         """
@@ -254,9 +285,7 @@ class virtualCamMovie(Cam):
         if self.scale:
             frame = cv2.resize(frame, self.resolution)
 
-        timestamp = self.getFrameTime(asString=True)
-
-        return frame, timestamp
+        return frame, self.getFrameTime()
       
     def setResolution(self, w, h):
         """
@@ -363,9 +392,9 @@ class virtualCamFrames(Cam):
         if self.scale:
             frame = cv2.resize(frame, self.resolution)
 
-        timestamp = self.last_time = self.getFrameTime(asString=True)
+        self.last_time = self.getFrameTime()
     
-        return frame, timestamp
+        return frame, self.last_time
     
     def getTotalFrames(self):
         """
@@ -418,48 +447,23 @@ class virtualCamFrames(Cam):
         else:
             return False
 
-class Arena():
+class ROImask():
     """
-    The arena define the space where the flies move
-    Carries information about the ROI (coordinates defining each vial) and
-    the number of flies in each vial
+    This is the Class handling the info about the ROI Mask
+    This classes adds and removes ROI, checks if a point is in ROI,
+    load and saves ROIS to file
     
-    The class monitor takes care of the camera
-    The class arena takes care of the flies
-    
+    No tracking here
+   
     """
     def __init__(self, parent):
-        
         self.monitor = parent
         
         self.ROIS = [] #Regions of interest
         self.beams = [] # beams: absolute coordinates
-        self.trackType = 1
         self.ROAS = [] #Regions of Action
-        self.minuteFPS = []
-        
-        self.period = 60 #in seconds
-        self.ratio = 0
-        self.rowline = 0
-        
         self.points_to_track = []
-
-        #(-1,-1)
-        self.firstPosition = (0,0)
         
-        # shape ( self.period (x,y )
-        self.__fa = np.zeros( (self.period, 2), dtype=np.int )
-        
-        # shape ( flies, seconds, (x,y) ) Contains the coordinates of the last second (if fps > 1, average)
-        self.flyDataBuffer = np.zeros( (1, 2), dtype=np.int ) 
-        
-        # shape ( flies, self.period, (x,y) ) Contains the coordinates of the last minute (or period)
-        self.flyDataMin = np.zeros( (1, self.period, 2), dtype=np.int ) 
-        
-        self.count_seconds = 0
-        self.__n = 0
-        self.outputFile = None
-
     def __relativeBeams(self):
         """
         Return the coordinates of the beam
@@ -477,13 +481,13 @@ class Arena():
                 
         return newbeams
 
-    def __ROItoRect(self, coords):
+    def __ROItoRect(self, ROIcoords):
         """
         Used internally
         Converts a ROI (a tuple of four points coordinates) into
         a Rect (a tuple of two points coordinates)
         """
-        (x1, y1), (x2, y2), (x3, y3), (x4, y4) = coords
+        (x1, y1), (x2, y2), (x3, y3), (x4, y4) = ROIcoords
         lx = min([x1,x2,x3,x4])
         rx = max([x1,x2,x3,x4])
         uy = min([y1,y2,y3,y4])
@@ -494,8 +498,8 @@ class Arena():
         """
         Calculate the distance between two cartesian points
         """
-        return np.sqrt((x2-x1)**2 + (y2-y1)**2)        
-    
+        return np.sqrt((x2-x1)**2 + (y2-y1)**2)
+        
     def __getMidline (self, coords):
         """
         Return the position of each ROI's midline
@@ -543,10 +547,6 @@ class Arena():
         self.beams.append ( self.__getMidline (coords)  ) 
         self.points_to_track.append(n_flies)
         
-        #these increase by one on the fly axis
-        self.flyDataBuffer = np.append( self.flyDataBuffer, [self.firstPosition], axis=0) # ( flies, 1, (x,y) )
-        self.flyDataMin = np.append (self.flyDataMin, [self.__fa.copy()], axis=0) # ( flies, self.period, (x,y) )
-
     def getROI(self, n):
         """
         Returns the coordinates of the nth crop area
@@ -566,19 +566,11 @@ class Arena():
             self.ROIS.pop(n)
             self.beams.pop(n)
             self.points_to_track.pop(n)
-            
-            self.flyDataBuffer = np.delete( self.flyDataBuffer, n, axis=0)
-            self.flyDataMin = np.delete( self.flyDataMin, n, axis=0)
-        
+
         elif n < 0:
             self.ROIS = []
             self.beams = []
             self.points_to_track = []
-            # shape ( flies, seconds, (x,y) ) Contains the coordinates of the last second (if fps > 1, average)
-            self.flyDataBuffer = np.zeros( (1, 2), dtype=np.int ) 
-            # shape ( flies, self.period, (x,y) ) Contains the coordinates of the last minute (or period)
-            self.flyDataMin = np.zeros( (1, self.period, 2), dtype=np.int ) 
-            
             
     def getROInumber(self):
         """
@@ -606,10 +598,6 @@ class Arena():
             self.points_to_track = cPickle.load(cf)
             cf.close()
             
-            f = len(self.ROIS)
-            self.flyDataBuffer = np.zeros( (f,2), dtype=np.int )
-            self.flyDataMin = np.zeros ( (f,self.period,2), dtype=np.int )
-
             for coords in self.ROIS:
                 self.beams.append ( self.__getMidline (coords)  ) 
                 
@@ -637,44 +625,45 @@ class Arena():
 
         return newROIS
 
-    def point_in_poly(self, pt, poly):
-        """
-        Determine if a point is inside a given polygon or not
-        Polygon is a list of (x,y) pairs. This fuction
-        returns True or False.  The algorithm is called
-        "Ray Casting Method".
-        polygon = [(x,y),(x1,x2),...,(x10,y10)]
-        http://pseentertainmentcorp.com/smf/index.php?topic=545.0
-        Alternatively:
-        http://opencv2.itseez.com/doc/tutorials/imgproc/shapedescriptors/point_polygon_test/point_polygon_test.html
-        """
-        x, y = pt
-        
-        n = len(poly)
-        inside = False
-
-        p1x,p1y = poly[0]
-        for i in range(n+1):
-            p2x,p2y = poly[i % n]
-            if y > min(p1y,p2y):
-                if y <= max(p1y,p2y):
-                    if x <= max(p1x,p2x):
-                        if p1y != p2y:
-                            xinters = (y-p1y)*(p2x-p1x)/(p2y-p1y)+p1x
-                        if p1x == p2x or x <= xinters:
-                            inside = not inside
-            p1x,p1y = p2x,p2y
-
-        return inside
-
     def isPointInROI(self, pt):
         """
         Check if a given point falls whithin one of the ROI
         Returns the ROI number or else returns -1
         """
+
+        def __point_in_poly(pt, poly):
+            """
+            Determine if a point is inside a given polygon or not
+            Polygon is a list of (x,y) pairs. This fuction
+            returns True or False.  The algorithm is called
+            "Ray Casting Method".
+            polygon = [(x,y),(x1,x2),...,(x10,y10)]
+            http://pseentertainmentcorp.com/smf/index.php?topic=545.0
+            Alternatively:
+            http://opencv2.itseez.com/doc/tutorials/imgproc/shapedescriptors/point_polygon_test/point_polygon_test.html
+            """
+            x, y = pt
+            
+            n = len(poly)
+            inside = False
+
+            p1x,p1y = poly[0]
+            for i in range(n+1):
+                p2x,p2y = poly[i % n]
+                if y > min(p1y,p2y):
+                    if y <= max(p1y,p2y):
+                        if x <= max(p1x,p2x):
+                            if p1y != p2y:
+                                xinters = (y-p1y)*(p2x-p1x)/(p2y-p1y)+p1x
+                            if p1x == p2x or x <= xinters:
+                                inside = not inside
+                p1x,p1y = p2x,p2y
+
+            return inside
+
         
         for ROI in self.ROIS:
-            if self.point_in_poly(pt, ROI):
+            if __point_in_poly(pt, ROI):
                 return self.ROIS.index(ROI)
         
         return -1
@@ -690,562 +679,6 @@ class Arena():
             
         return newROIS
 
-    def getLastSteps(self, fly, steps):
-        """
-        """
-        c = self.count_seconds
-        return [(x,y) for [x,y] in self.flyDataMin[fly][c-steps:c].tolist()] + [tuple(self.flyDataBuffer[fly].flatten())]
-
-    def addFlyCoords(self, count, fly):
-        """
-        Add the provided coordinates to the existing list
-        count   int     the fly number in the arena 
-        fly     (x,y)   the coordinates to add 
-        Called for every fly moving in every frame
-        """
-
-        fly_size = 15 #About 15 pixels at 640x480
-        max_movement= fly_size * 100
-        min_movement= fly_size / 3
-
-        previous_position = tuple(self.flyDataBuffer[count])
-
-        isFirstMovement = ( previous_position == self.firstPosition )
-        fly = fly or previous_position #Fly is None if no blob was detected
-        
-        distance = self.__distance( previous_position, fly )
-       
-        if ( distance > max_movement and not isFirstMovement ) or ( distance < min_movement ):
-            fly = previous_position
-        
-        #Does a running average for the coordinates of the fly at each frame to flyDataBuffer
-        #This way the shape of flyDataBuffer is always (n, (x,y)) and once a second we just have to add the (x,y)
-        #values to flyDataMin, whose shape is (n, 60, (x,y))
-        self.flyDataBuffer[count] = np.append( self.flyDataBuffer[count], fly, axis=0 ).reshape(-1,2).mean(axis=0)
-    
-        return fly, distance
-        
-    def compactSeconds(self, FPS, delta):
-        """
-        Compact the frames collected in the last second
-        by averaging the value of the coordinates
-
-        Called every second; flies treated at once
-        FPS         current rate of frame per seconds
-        delta       how much time has elapsed from the last "second"
-        """
-
-        self.minuteFPS.append(FPS)
-        self.flyDataMin[:,self.__n] = self.flyDataBuffer
-
-        if self.count_seconds + 1 >= self.period:
-            self.writeActivity( fps = np.mean(self.minuteFPS) )
-            self.count_seconds = 0
-            self.__n = 0 
-            self.minuteFPS = []
-
-            for i in range(0,self.period):
-                    self.flyDataMin[:,i] = self.flyDataBuffer
-            
-        #growing continously; this is the correct thing to do but we would have problems adding new row with new ROIs
-        #self.flyDataMin = np.append(self.flyDataMin, self.flyDataBuffer, axis=1)
-
-
-        self.count_seconds += delta
-        self.__n += 1
-
-    def writeActivity(self, fps=0, extend=True):
-        """
-        Write the activity to file
-        Kind of motion depends on user settings
-        
-        Called every minute; flies treated at once
-        1	09 Dec 11	19:02:19	1	0	1	0	0	0	?		[actual_activity]
-        """
-        #Here we build the header
-        #year, month, day, hh, mn, sec = time.localtime()[0:6]
-        dt = datetime.datetime.fromtimestamp( self.monitor.getFrameTime() )
-        year, month, day, hh, mn, sec = dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second
-        month = MONTHS[month-1]
-        
-        #0 rowline
-        
-        #1 date
-        date = '%02d %s %s' % (day, month, str(year)[-2:])
-        #2 time
-        tt = '%02d:%02d:%02d' % (hh, mn, sec)
-        #3 monitor is active
-        active = '1'
-        #4 average frames per seconds (FPS)
-        damscan = int(round(fps))
-        #5 tracktype
-        tracktype = self.trackType
-        #6 is a monitor with sleep deprivation capabilities?
-        sleepDep = self.monitor.isSDMonitor * 1
-        #7 monitor number, not yet implemented
-        monitor = '0'
-        #8 unused
-        unused = 0
-        #9 is light on or off
-        light = '?'
-        
-        #10 :
-        #activity
-        
-        activity = []
-        row = ''
-
-        if self.trackType == 0:
-            activity = [self.calculateDistances(),]
-        
-        elif self.trackType == 1:
-            activity = [self.calculateVBM(),]
-        
-        elif self.trackType == 2:
-            activity = self.calculatePosition()
-
-        # Expand the readings to 32 flies for compatibility reasons with trikinetics
-        flies = len ( activity[0].split('\t') )
-        if extend and flies < 32:
-            extension = '\t' + '\t'.join(['0',] * (32-flies) )
-        else:
-            extension = ''
-
-            
-        for line in activity:
-            self.rowline +=1 
-            row_header = '%s\t'*10 % (self.rowline, date, tt, active, damscan, tracktype, sleepDep, monitor, unused, light)
-            row += row_header + line + extension + '\n'
-
-        if self.outputFile:
-            fh = open(self.outputFile, 'a')
-            fh.write(row)
-            fh.close()
-            
-    
-    def calculateDistances(self):
-        """
-        Motion is calculated as distance in px per minutes
-        """
-        
-        # shift by one second left flies, seconds, (x,y)
-        fs = np.roll(self.flyDataMin, -1, axis=1) 
-        
-        x = self.flyDataMin[:,:,:1]
-        y = self.flyDataMin[:,:,1:]
-        
-        x1 = fs[:,:,:1]
-        y1 = fs[:,:,1:]
-        
-        d = self.__distance((x,y),(x1,y1))
-        #we sum everything BUT the last bit of information otherwise we have data duplication
-        values = d[:,:-1,:].sum(axis=1).reshape(-1)
-        
-        activity = '\t'.join( ['%s' % int(v) for v in values] )
-        return activity
-            
-            
-    def calculateVBM(self):
-        """
-        Motion is calculated as virtual beam crossing
-        Detects automatically beam orientation (vertical vs horizontal)
-        """
-
-        values = []
-
-        for fd, md in zip(self.flyDataMin, self.__relativeBeams()):
-
-            (mx1, my1), (mx2, my2) = md
-            horizontal = (mx1 == mx2)
-            
-            fs = np.roll(fd, -1, 0)
-            
-            x = fd[:,:1]; y = fd[:,1:] # THESE COORDINATES ARE RELATIVE TO THE ROI
-            x1 = fs[:,:1]; y1 = fs[:,1:]
-
-            if horizontal:
-                crossed = (x < mx1 ) * ( x1 > mx1 ) + ( x > mx1) * ( x1 < mx1 )
-            else:
-                crossed = (y < my1 ) * ( y1 > my1 ) + ( y > my1) * ( y1 < my1 )
-        
-            values .append ( crossed.sum() )
-        
-        activity = '\t'.join( [str(v) for v in values] )
-        return activity
-            
-    def calculatePosition(self, resolution=1):
-        """
-        Simply write out position of the fly at every time interval, as 
-        decided by "resolution" (seconds)
-        """
-        
-        activity = []
-        rois = self.getROInumber()
-        
-        a = self.flyDataMin.transpose(1,0,2) # ( interval, n_flies, (x,y) )
-        a = a.reshape(resolution, -1, rois, 2).mean(0)
-        
-        for fd in a:
-            onerow = '\t'.join( ['%s,%s' % (x,y) for (x,y) in fd] )
-            activity.append(onerow)
-        
-        return activity
-    
-class Monitor(object):
-    """
-    The main monitor class
-    
-    The class monitor takes care of the camera
-    The class arena takes care of the flies
-    """
-
-    def __init__(self):
-
-        """
-        A Monitor contains a cam, which can be either virtual or real.
-        Everything is handled through openCV
-        """
-        self.grabMovie = False
-        self.writer = None
-        self.cam = None
-        
-        self.arena = Arena(self)
-        
-        self.imageCount = 0
-        self.lasttime = 0
-
-        self.maxTick = 60
-        
-        self.__firstFrame = True
-        self.tracking = True
-        
-        self.__tempFPS = 0 
-        self.processingFPS = 0
-        
-        self.drawPath = False
-        self.isSDMonitor = False
-    
-    def __drawBeam(self, img, bm, color=None):
-        """
-        Draw the Beam using given coordinates
-        """
-        if not color: color = (100,100,200)
-        width = 1
-        line_type = cv2.CV_AA
-
-        cv2.line(img, bm[0], bm[1], color, width, line_type, 0)
-
-        return img
-
-    def __drawFPS(self, frame):
-        """
-        Add information about current FPS processing speed
-        """
-        
-        textcolor = (255,255,255)
-        text = "FPS: %02d" % self.processingFPS
-
-        (x1, _), ymin = cv2.getTextSize(text, cv2.FONT_HERSHEY_PLAIN, 1, 1)
-        height, width, _ = frame.shape
-        x = (width/64)
-        y = height - ymin - 2
-
-        cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_PLAIN, 1, textcolor, 1)
-        
-        return frame
-
-    def __addText(self, frame, text = None):
-        """
-        Add current time as stamp to the image
-        """
-
-        if not text: text = time.asctime(time.localtime(time.time()))
-
-        textcolor = (255,255,255)
-
-        (x1, _), ymin = cv2.getTextSize(text, cv2.FONT_HERSHEY_PLAIN, 1, 1)
-
-        height, width, _ = frame.shape
-        x = width - x1 - (width/64)
-        y = height - ymin - 2
-
-        cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_PLAIN, 1, textcolor, 1)
-        
-        return frame
-        
-
-    def __drawROI(self, frame, ROI, color=None, ROInum=None):
-        """
-        Draw ROI on img using given coordinates
-        ROI is a tuple of 4 tuples ( (x1, y1), (x2, y2), (x3, y3), (x4, y4) )
-        and does not have to be necessarily a rectangle
-        """
-
-        if not color: color = (255,255,255)
-        width = 1
-        line_type = cv2.CV_AA
-
-        cv2.polylines(frame, np.array([ROI]), isClosed=1, color=color, thickness=1, lineType=line_type, shift=0)
-        
-        if ROInum != None:
-            x, y = ROI[0]
-            textcolor = (255,255,255)
-            text = "%02d" % ROInum
-            cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_PLAIN, 1, textcolor, 1)
-
-        return frame
-
-    def __drawCross(self, img, pt, color=None):
-        """
-        Draw a cross around a point pt
-        """
-        if not color: color = (255,255,255)
-        width = 1
-        line_type = cv2.CV_AA
-        
-        x, y = pt
-        a = (x, y-5)
-        b = (x, y+5)
-        c = (x-5, y)
-        d = (x+5, y)
-        
-        cv2.line(img, a, b, color, width, line_type, 0)
-        cv2.line(img, c, d, color, width, line_type, 0)
-        
-        return img
-        
-    def __drawLastSteps(self, frame, fly, steps=5, color=None):
-        """
-        Draw the last n (default 5) steps of the fly
-        """
-
-        if not color: color = (255,255,255)
-        width = 1
-        line_type = cv2.CV_AA
-
-        points = self.arena.getLastSteps(fly, steps)
-
-        cv2.PolyLine(frame, [points], is_closed=0, color=color, thickness=1, lineType=line_type, shift=0)
-
-        return frame
-        
-        
-
-    def __getChannel(self, img, channel='R'):
-        """
-        Return only the asked channel R,G or B
-        """
-
-        cn = 'RGB'.find( channel.upper() )
-        
-        channels = [None, None, None]
-        cv2.Split(img, channels[0], channels[1], channels[2], None)
-        return channels[cn]
-
-    def close(self):
-        """
-        Closes stream
-        """
-        self.cam.close()
-
-    def CaptureFromCAM(self, devnum=0, resolution=(640,480), options=None):
-        """
-        """
-        self.isVirtualCam = False
-        self.source = devnum
-
-        self.resolution = resolution
-        self.cam = realCam(devnum=devnum)
-        self.cam.setResolution(resolution)
-        self.resolution = self.cam.getResolution()
-        self.numberOfFrames = 0
-        
-    def CaptureFromMovie(self, camera, resolution=None, options=None):
-        """
-        """
-        self.isVirtualCam = True
-        self.source = camera
-        
-        if options:
-            step = options['step']
-            start = options['start']
-            end = options['end']
-            loop = options['loop']
-
-        self.cam = virtualCamMovie(path=camera, resolution = resolution)
-        self.resolution = self.cam.getResolution()
-        self.numberOfFrames = self.cam.getTotalFrames()
-        
-    def CaptureFromFrames(self, camera, resolution=None, options=None):
-        """
-        """
-        self.isVirtualCam = True
-        self.source = camera
-        
-        if options:
-            step = options['step']
-            start = options['start']
-            end = options['end']
-            loop = options['loop'] 
-         
-        self.cam = virtualCamFrames(path = camera, resolution = resolution)
-        self.resolution = self.cam.getResolution()
-        self.numberOfFrames = self.cam.getTotalFrames()
-    
-    def hasSource(self):
-        """
-        """
-        return self.cam != None
-    
-    def setSource(self, camera, resolution, options=None):
-        """
-        Set source intelligently
-        """
-        try:
-            camera = int(camera)
-        except:
-            pass
-            
-        if type(camera) == type(0):
-            self.CaptureFromCAM(camera, resolution, options)
-        elif os.path.isfile(camera):
-            self.CaptureFromMovie(camera, resolution, options)
-        elif os.path.isdir(camera):
-            self.CaptureFromFrames(camera, resolution, options)
-        
-    def setTracking(self, track, trackType=0, mask_file='', outputFile=''):
-        """
-        Set the tracking parameters
-        
-        track       Boolean     Do we do tracking of flies?
-        trackType   0           tracking using the virtual beam method
-                    1 (Default) tracking calculating distance moved
-        mask_file   text        the file used to load and store masks
-        outputFile  text        the txt file where results will be saved
-        """
-
-        if trackType == None: trackType = 0
-        if mask_file == None: mask_file = ''
-        if outputFile == None: outputFile = ''
-
-        self.track = track
-        self.arena.trackType = int(trackType)
-        self.mask_file = mask_file
-        self.arena.outputFile = outputFile
-        
-        if mask_file:
-            self.loadROIS(mask_file)
-        
-    def getFrameTime(self):
-        """
-        """
-        return self.cam.getFrameTime()
-    
-    def isLastFrame(self):
-        """
-        Proxy to isLastFrame()
-        Handled by camera
-        """
-        return self.cam.isLastFrame()
-        
-
-    def saveMovie(self, filename, fps=24, codec='FMP4', startOnKey=False):
-        """
-        Determines whether all the frames grabbed through getImage will also 
-        be saved as movie.
-        
-        filename                           the full path to the file to be written
-        fps             24   (Default)     number of frames per second
-        codec           FMP4 (Default)     codec to be used
-        
-        http://stackoverflow.com/questions/5426637/writing-video-with-opencv-python-mac
-        """
-        fourcc = cv2.CV_FOURCC(*[c for c in codec])
-        
-        self.writer = cv2.CreateVideoWriter(filename, fourcc, fps, self.resolution, 1)
-        self.grabMovie = not startOnKey
-
-
-    def saveSnapshot(self, *args, **kwargs):
-        """
-        proxy to saveSnapshot
-        """
-        self.cam.saveSnapshot(*args, **kwargs)
-    
-    def SetLoop(self,loop):
-        """
-        Set Loop on or off.
-        Will work only in virtual cam mode and not realCam
-        Return current loopmode
-        """
-        if self.isVirtualCam:
-            self.cam.loop = loop
-            return self.cam.loop
-        else:
-            return False
-   
-    def addROI(self, coords, n_flies=1):
-        """
-        Add the coords for a new ROI and the number of flies we want to track in that area
-        selection       (pt1, pt2, pt3, pt4)    A four point selection
-        n_flies         1    (Default)      Number of flies to be tracked in that area
-        """
-        
-        self.arena.addROI(coords, n_flies)
-        
-    def hasROI(self):
-        '''
-        Return true if at least a single roi is detected
-        '''
-        return self.arena.getROInumber() > 0
-
-    def getROI(self, n):
-        """
-        Returns the coordinates of the nth crop area
-        """
-        return self.arena.getROI(n)
-
-    def delROI(self, n):
-        """
-        removes the nth crop area from the list
-        if n -1, remove all
-        """
-        self.arena.delROI(n)
-        
-    def saveROIS(self, filename=None):
-        """
-        Save the current crop data to a file
-        """
-        if not filename: filename = self.mask_file
-        self.arena.saveROIS(filename)
-        
-    def loadROIS(self, filename=None):
-        """
-        Load the crop data from a file
-        """
-        if not filename: filename = self.mask_file
-        return self.arena.loadROIS(filename)
-
-    def resizeROIS(self, origSize, newSize):
-        """
-        Resize the mask to new size so that it would properly fit
-        resized images
-        """
-        return self.arena.resizeROIS(origSize, newSize)
-
-    def isPointInROI(self, pt):
-        """
-        Check if a given point falls whithin one of the ROI
-        Returns the ROI number or else returns -1
-        """
-        return self.arena.isPointInROI(pt)
-
-    def calibrate(self, pt1, pt2, cm=1):
-        """
-        Relays to arena calibrate
-        """
-        return self.arena.calibrate(pt1, pt2, cm)
-        
     def autoMask(self, pt1, pt2):
         """
         EXPERIMENTAL, FIX THIS
@@ -1256,6 +689,7 @@ class Monitor(object):
         rows = 16
         cols = 2
         food = .10
+        
         vials = rows * cols
         ROI = [None,] * vials
         
@@ -1275,7 +709,9 @@ class Monitor(object):
         nROI = []
         for R in ROI:
             (x, y), (x1, y1) = R
-            self.arena.addROI( ( (x,y), (x,y1), (x1,y1), (x1,y) ), 1)
+            self.addROI( ( (x,y), (x,y1), (x1,y1), (x1,y) ), 1)
+            
+        return vials
     
     def findOuterFrame(self, img, thresh=50):
         """
@@ -1381,8 +817,702 @@ class Monitor(object):
                     contour = contour.h_next()
          
         return squares    
+
+
+    
+class Monitor(object):
+    """
+    The main monitor class
+        """
+
+    def __init__(self):
+
+        """
+        A Monitor contains a cam, which can be either virtual or real.
+        Everything is handled through openCV
+        """
+        self.grabMovie = False
+        self.writer = None
+        self.cam = None
+        self.drawing = True
+        
+        self.mask = ROImask(self)
+        
+        self.imageCount = 0
+        self.lasttime = 0
+
+        self.maxTick = 60
+        
+        self.__firstFrame = True
+        self.tracking = True
+        
+        self.__tempFPS = 0 
+        self.processingFPS = 0
+        
+        self.isSDMonitor = False
+        
+        #Stuff that used to be in class ARENA
+        
+        self.trackType = 1
+        self.minuteFPS = []
+        
+        self.period = 60 #in seconds
+        self.ratio = 0
+        self.rowline = 0
+
+        # Buffer arrays
+        # shape ( self.period (x,y )
+        self.__fa = np.zeros( (self.period, 2), dtype=np.int )
+        
+        # shape ( flies, seconds, (x,y) ) Contains the coordinates of the last second (if fps > 1, average)
+        self.fly_last_frame_buffer = np.zeros( (0, 2), dtype=np.int ) 
+        
+        # shape ( flies, self.period, (x,y) ) Contains the coordinates of the last minute (or period)
+        self.fly_one_minute_buffer = np.zeros( (0, self.period, 2), dtype=np.int ) 
+        
+        self.count_seconds = 0
+        self.__n = 0
+        self.outputFile = None
+      
+        self.fly_area = runningAvgComparison()
+        self.fly_movement = runningAvgComparison()
+
+        self.debug_info = {}
+
+    def __distance( self, (x1, y1), (x2, y2) ):
+        """
+        Calculate the distance between two cartesian points
+        """
+        return np.sqrt((x2-x1)**2 + (y2-y1)**2)
+      
+#######################################################        
+        
+        
+#### DRAWING FUNCTION OF MONITOR ######################        
+    
+    def __drawBeam(self, img, bm, color=None):
+        """
+        Draw the Beam using given coordinates
+        """
+        if not color: color = (100,100,200)
+        width = 1
+        line_type = cv2.CV_AA
+
+        cv2.line(img, bm[0], bm[1], color, width, line_type, 0)
+
+        return img
+
+    def __drawDebugInfo(self, frame):
+        """
+        Add Debug information
+        """
+
+        textcolor = (255,255,255)
+        x, y = 20,20
+        height, width, _ = frame.shape
+
+        for label, value in self.debug_info.iteritems():
+            text = "%s: %.1f" % (label, value)
+            (x1, y1), ymin = cv2.getTextSize(text, cv2.FONT_HERSHEY_PLAIN, 1, 1)
+            y = height - ymin - 2
+            cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_PLAIN, 1, textcolor, 1)
+            height = height - y1*2
+        
+        return frame
+
+    def __addTimeStamp(self, frame, timeStamp):
+        """
+        Add current time as stamp to the image
+        """
+        text = time.asctime( time.localtime(timeStamp) )
+
+        textcolor = (255,255,255)
+
+        (x1, _), ymin = cv2.getTextSize(text, cv2.FONT_HERSHEY_PLAIN, 1, 1)
+
+        height, width, _ = frame.shape
+        x = width - x1 - (width/64)
+        y = height - ymin - 2
+
+        cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_PLAIN, 1, textcolor, 1)
+        
+        return frame
+        
+    def __drawROI(self, frame, ROI, color=None, ROInum=None):
+        """
+        Draw ROI on img using given coordinates
+        ROI is a tuple of 4 tuples ( (x1, y1), (x2, y2), (x3, y3), (x4, y4) )
+        and does not have to be necessarily a rectangle
+        """
+
+        if not color: color = (255,255,255)
+        width = 1
+        line_type = cv2.CV_AA
+
+        cv2.polylines(frame, np.array([ROI]), isClosed=1, color=color, thickness=1, lineType=line_type, shift=0)
+        
+        if ROInum != None:
+            x, y = ROI[0]
+            textcolor = (255,255,255)
+            text = "%02d" % ROInum
+            cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_PLAIN, 1, textcolor, 1)
+
+        return frame
+
+    def __drawCross(self, frame, pt, color=None, text=None):
+        """
+        Draw a cross around a point pt
+        """
+        if pt != None:
+            if not color: color = (255,255,255)
+            width = 1
+            line_type = cv2.CV_AA
+            
+            x, y = pt
+            a = (x, y-5)
+            b = (x, y+5)
+            c = (x-5, y)
+            d = (x+5, y)
+            
+            cv2.line(frame, a, b, color, width, line_type, 0)
+            cv2.line(frame, c, d, color, width, line_type, 0)
+            
+            if text: cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_PLAIN, 1, (255,255,255), 1)
+        
+        return frame
+        
+    def __drawLastSteps(self, frame, fly, steps=5, color=None):
+        """
+        Draw the last n (default 5) steps of the fly
+        """
+
+        if not color: color = (255,255,255)
+        width = 1
+        line_type = cv2.CV_AA
+
+        points = self.getLastSteps(fly, steps)
+
+        cv2.PolyLine(frame, [points], is_closed=0, color=color, thickness=1, lineType=line_type, shift=0)
+
+        return frame
+        
+
+#######################################################        
+        
+        
+#### VARIOUS FUNCTIONS ###############################        
+        
+
+    def __getChannel(self, img, channel='R'):
+        """
+        Return only the asked channel R,G or B
+        """
+
+        cn = 'RGB'.find( channel.upper() )
+        
+        channels = [None, None, None]
+        cv2.Split(img, channels[0], channels[1], channels[2], None)
+        return channels[cn]
+
+#######################################################        
+        
+        
+#### CAM FUNCTION OF MONITOR ##########################       
+
+
+    def __captureFromCAM(self, devnum=0, resolution=(640,480), options=None):
+        """
+        """
+        self.isVirtualCam = False
+        self.source = devnum
+
+        self.resolution = resolution
+        self.cam = realCam(devnum=devnum)
+        self.cam.setResolution(resolution)
+        self.resolution = self.cam.getResolution()
+        self.numberOfFrames = 0
+        
+    def __captureFromMovie(self, camera, resolution=None, options=None):
+        """
+        """
+        self.isVirtualCam = True
+        self.source = camera
+        
+        if options:
+            step = options['step']
+            start = options['start']
+            end = options['end']
+            loop = options['loop']
+
+        self.cam = virtualCamMovie(path=camera, resolution = resolution)
+        self.resolution = self.cam.getResolution()
+        self.numberOfFrames = self.cam.getTotalFrames()
+        
+    def __captureFromFrames(self, camera, resolution=None, options=None):
+        """
+        """
+        self.isVirtualCam = True
+        self.source = camera
+        
+        if options:
+            step = options['step']
+            start = options['start']
+            end = options['end']
+            loop = options['loop'] 
          
-    def GetImage(self, drawROIs = False, selection=None, crosses=None, timestamp=False):
+        self.cam = virtualCamFrames(path = camera, resolution = resolution)
+        self.resolution = self.cam.getResolution()
+        self.numberOfFrames = self.cam.getTotalFrames()
+    
+    def hasSource(self):
+        """
+        """
+        return self.cam != None
+    
+    def setSource(self, camera, resolution, options=None):
+        """
+        Set source intelligently
+        """
+        try:
+            camera = int(camera)
+        except:
+            pass
+            
+        if type(camera) == type(0):
+            self.__captureFromCAM(camera, resolution, options)
+        elif os.path.isfile(camera):
+            self.__captureFromMovie(camera, resolution, options)
+        elif os.path.isdir(camera):
+            self.__captureFromFrames(camera, resolution, options)
+
+    def close(self):
+        """
+        Closes stream
+        """
+        self.cam.close()
+        
+    def setTracking(self, track, trackType=0, mask_file='', outputFile=''):
+        """
+        Set the tracking parameters
+        
+        track       Boolean     Do we do tracking of flies?
+        trackType   0           tracking using the virtual beam method
+                    1 (Default) tracking calculating distance moved
+        mask_file   text        the file used to load and store masks
+        outputFile  text        the txt file where results will be saved
+        """
+
+        if trackType == None: trackType = 0
+        if mask_file == None: mask_file = ''
+        if outputFile == None: outputFile = ''
+
+        self.track = track
+        self.trackType = int(trackType)
+        self.mask_file = mask_file
+        self.outputFile = outputFile
+        
+        if mask_file:
+            self.loadROIS(mask_file)
+        
+    def getFrameTime(self):
+        """
+        """
+        return self.cam.getFrameTime()
+    
+    def isLastFrame(self):
+        """
+        Proxy to isLastFrame()
+        Handled by camera
+        """
+        return self.cam.isLastFrame()
+        
+
+    def saveMovie(self, filename, fps=24, codec='FMP4', startOnKey=False):
+        """
+        Determines whether all the frames grabbed through getImage will also 
+        be saved as movie.
+        
+        filename                           the full path to the file to be written
+        fps             24   (Default)     number of frames per second
+        codec           FMP4 (Default)     codec to be used
+        
+        http://stackoverflow.com/questions/5426637/writing-video-with-opencv-python-mac
+        """
+        fourcc = cv2.CV_FOURCC(*[c for c in codec])
+        
+        self.writer = cv2.CreateVideoWriter(filename, fourcc, fps, self.resolution, 1)
+        self.grabMovie = not startOnKey
+
+
+    def saveSnapshot(self, *args, **kwargs):
+        """
+        proxy to saveSnapshot
+        """
+        self.cam.saveSnapshot(*args, **kwargs)
+    
+    def SetLoop(self,loop):
+        """
+        Set Loop on or off.
+        Will work only in virtual cam mode and not realCam
+        Return current loopmode
+        """
+        if self.isVirtualCam:
+            self.cam.loop = loop
+            return self.cam.loop
+        else:
+            return False
+
+
+#######################################################        
+        
+        
+#### ROI FUNCTION OF MONITOR - NOT NEEDED? ############    
+   
+    def updateFlyBuffers(self, n, new=False):
+        """
+        """
+        if not new:
+            
+            if n > 0:
+                #these increase by one on the fly axis
+
+                for i in range(n):
+                    self.fly_last_frame_buffer = np.append( self.fly_last_frame_buffer, [FIRST_POSITION], axis=0) # ( flies, (x,y) )
+                    self.fly_one_minute_buffer = np.append (self.fly_one_minute_buffer, [self.__fa.copy()], axis=0) # ( flies, self.period, (x,y) )
+            if n < 0:
+
+                for i in range(n):
+                    self.fly_last_frame_buffer = np.delete( self.fly_last_frame_buffer, n, axis=0)
+                    self.fly_one_minute_buffer = np.delete( self.fly_one_minute_buffer, n, axis=0)
+            
+            if n == 0:
+                self.fly_last_frame_buffer = np.zeros( (0, 2), dtype=np.int ) 
+                self.fly_one_minute_buffer = np.zeros( (0, self.period, 2), dtype=np.int )
+        
+        if new:
+            self.updateFlyBuffers(0) # delete first
+            self.updateFlyBuffers(n) # then repopulate
+            
+        self.debug_info["ROIs"] = self.mask.getROInumber()
+   
+    def addROI(self, coords, n_flies=1):
+        """
+        Add the coords for a new ROI and the number of flies we want to track in that area
+        selection       (pt1, pt2, pt3, pt4)    A four point selection
+        n_flies         1    (Default)      Number of flies to be tracked in that area
+        """
+        
+        self.mask.addROI(coords, n_flies)
+        n = self.mask.getROInumber() - self.fly_last_frame_buffer.shape[0]
+        self.updateFlyBuffers(n)
+        
+    def hasROI(self):
+        '''
+        Return true if at least a single roi is detected
+        '''
+        return self.mask.getROInumber() > 0
+
+    def getROI(self, n):
+        """
+        Returns the coordinates of the nth crop area
+        """
+        return self.mask.getROI(n)
+
+    def delROI(self, n):
+        """
+        removes the nth crop area from the list
+        if n -1, remove all
+        """
+        self.mask.delROI(n)
+
+        if n >= 0:
+            self.updateFlyBuffers(-n)
+        
+        elif n == -1:
+            self.updateFlyBuffers(0)
+
+        
+    def saveROIS(self, filename=None):
+        """
+        Save the current crop data to a file
+        """
+        if not filename: filename = self.mask_file
+        self.mask.saveROIS(filename)
+        
+    def loadROIS(self, filename=None):
+        """
+        Load the crop data from a file
+        """
+        if not filename: filename = self.mask_file
+        
+        if self.mask.loadROIS(filename):
+            nROI = self.mask.getROInumber()
+            self.updateFlyBuffers(nROI, new=True)
+            return True
+        else:
+            return False
+
+    def resizeROIS(self, origSize, newSize):
+        """
+        Resize the mask to new size so that it would properly fit
+        resized images
+        """
+        return self.mask.resizeROIS(origSize, newSize)
+
+    def isPointInROI(self, pt):
+        """
+        Check if a given point falls whithin one of the ROI
+        Returns the ROI number or else returns -1
+        """
+        return self.mask.isPointInROI(pt)
+
+    def calibrate(self, pt1, pt2, cm=1):
+        """
+        Relays to arena calibrate
+        """
+        return self.mask.calibrate(pt1, pt2, cm)
+        
+        
+    def autoMask(self, pt1, pt2):
+        """
+        """
+        n = self.mask.autoMask(pt1, pt2)
+        self.updateFlyBuffers(n)
+
+#######################################################        
+        
+        
+#### TRACKING FUNCTIONS OF MONITOR ####################
+
+    def getLastSteps(self, fly, steps):
+        """
+        """
+        c = self.count_seconds
+        return [(x,y) for [x,y] in self.fly_one_minute_buffer[fly][c-steps:c].tolist()] + [tuple(self.fly_last_frame_buffer[fly].flatten())]
+
+    def addFlyCoords(self, count, fly_coords):
+        """
+        Add the provided coordinates to the existing list
+        count   int     the fly number in the arena 
+        fly     (x,y)   the coordinates to add 
+        Called for every fly moving in every frame
+        """
+
+        previous_position = tuple(self.fly_last_frame_buffer[count])
+        if fly_coords == FLY_NOT_DETECTED: fly_coords = previous_position
+
+        is_first_movement = not ( fly_coords == FIRST_POSITION )
+        distance = self.__distance( previous_position, fly_coords )
+        
+        avg, std, _, is_outside = self.fly_movement.update(distance, outlier=1)
+        
+        self.debug_info['FLY_DISTANCE_AVG'] = avg
+        self.debug_info['FLY_DISTANCE_STD'] = std
+        
+        if is_outside and not is_first_movement:
+            fly = previous_position
+        
+        # Does a running average for the coordinates of the fly at each frame to fly_one_second_buffer
+        # This way the shape of fly_one_second_buffer is always (n, (x,y)) and once a second we just have to add the (x,y)
+        # values to flyDataMin, whose shape is (n, 60, (x,y))
+        # shape is (n+1, 2) where n is the number of ROIS.
+        
+        b = self.fly_last_frame_buffer[count]
+        self.fly_last_frame_buffer[count] = np.append( b[b!=-1], fly_coords, axis=0).reshape(-1,2).mean(axis=0)
+        
+        return fly_coords, distance
+        
+    def compactSeconds(self, FPS, delta):
+        """
+        Compact the frames collected in the last second
+        by averaging the value of the coordinates
+
+        Called every second; flies treated at once
+        FPS         current rate of frame per seconds
+        delta       how much time has elapsed from the last "second"
+        """
+
+        self.minuteFPS.append(FPS)
+        self.fly_one_minute_buffer[:,self.__n] = self.fly_last_frame_buffer
+
+        if self.count_seconds + 1 >= self.period:
+            self.writeActivity( fps = np.mean(self.minuteFPS) )
+            self.count_seconds = 0
+            self.__n = 0 
+            self.minuteFPS = []
+
+            for i in range(0,self.period):
+                    self.fly_one_minute_buffer[:,i] = self.fly_last_frame_buffer
+            
+        #growing continously; this is the correct thing to do but we would have problems adding new row with new ROIs
+        #self.fly_one_minute_buffer = np.append(self.fly_one_minute_buffer, self.fly_last_frame_buffer, axis=1)
+
+
+        self.count_seconds += delta
+        self.__n += 1
+
+    def writeActivity(self, fps=0, extend=True):
+        """
+        Write the activity to file
+        Kind of motion depends on user settings
+        
+        Called every minute; flies treated at once
+        1	09 Dec 11	19:02:19	1	0	1	0	0	0	?		[actual_activity]
+        """
+        #Here we build the header
+        #year, month, day, hh, mn, sec = time.localtime()[0:6]
+        
+        dt = datetime.datetime.fromtimestamp( self.getFrameTime() )
+        
+        year, month, day, hh, mn, sec = dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second
+        month = MONTHS[month-1]
+        
+        #0 rowline
+        
+        #1 date
+        date = '%02d %s %s' % (day, month, str(year)[-2:])
+        #2 time
+        tt = '%02d:%02d:%02d' % (hh, mn, sec)
+        #3 monitor is active
+        active = '1'
+        #4 average frames per seconds (FPS)
+        damscan = int(round(fps))
+        #5 tracktype
+        tracktype = self.trackType
+        #6 is a monitor with sleep deprivation capabilities?
+        sleepDep = self.isSDMonitor * 1
+        #7 monitor number, not yet implemented
+        monitor = '0'
+        #8 unused
+        unused = 0
+        #9 is light on or off
+        light = '?'
+        
+        #10 :
+        #activity
+        
+        activity = []
+        row = ''
+
+        if self.trackType == 0:
+            activity = [self.calculateDistances(),]
+        
+        elif self.trackType == 1:
+            activity = [self.calculateVBM(),]
+        
+        elif self.trackType == 2:
+            activity = self.calculatePosition()
+
+        # Expand the readings to 32 flies for compatibility reasons with trikinetics
+        flies = len ( activity[0].split('\t') )
+        if extend and flies < 32:
+            extension = '\t' + '\t'.join(['0',] * (32-flies) )
+        else:
+            extension = ''
+
+            
+        for line in activity:
+            self.rowline +=1 
+            row_header = '%s\t'*10 % (self.rowline, date, tt, active, damscan, tracktype, sleepDep, monitor, unused, light)
+            row += row_header + line + extension + '\n'
+
+        if self.outputFile:
+            fh = open(self.outputFile, 'a')
+            fh.write(row)
+            fh.close()
+            
+    
+    def calculateDistances(self):
+        """
+        Motion is calculated as distance in px per minutes
+        """
+        
+        # shift by one second left flies, seconds, (x,y)
+        fs = np.roll(self.fly_one_minute_buffer, -1, axis=1) 
+        
+        x = self.fly_one_minute_buffer[:,:,:1]
+        y = self.fly_one_minute_buffer[:,:,1:]
+        
+        x1 = fs[:,:,:1]
+        y1 = fs[:,:,1:]
+        
+        d = self.__distance((x,y),(x1,y1))
+        #we sum everything BUT the last bit of information otherwise we have data duplication
+        values = d[:,:-1,:].sum(axis=1).reshape(-1)
+        
+        activity = '\t'.join( ['%s' % int(v) for v in values] )
+        return activity
+            
+            
+    def calculateVBM(self):
+        """
+        Motion is calculated as virtual beam crossing
+        Detects automatically beam orientation (vertical vs horizontal)
+        """
+
+        values = []
+
+        for fd, md in zip(self.fly_one_minute_buffer, self.__relativeBeams()):
+
+            (mx1, my1), (mx2, my2) = md
+            horizontal = (mx1 == mx2)
+            
+            fs = np.roll(fd, -1, 0)
+            
+            x = fd[:,:1]; y = fd[:,1:] # THESE COORDINATES ARE RELATIVE TO THE ROI
+            x1 = fs[:,:1]; y1 = fs[:,1:]
+
+            if horizontal:
+                crossed = (x < mx1 ) * ( x1 > mx1 ) + ( x > mx1) * ( x1 < mx1 )
+            else:
+                crossed = (y < my1 ) * ( y1 > my1 ) + ( y > my1) * ( y1 < my1 )
+        
+            values .append ( crossed.sum() )
+        
+        activity = '\t'.join( [str(v) for v in values] )
+        return activity
+            
+    def calculatePosition(self, resolution=1):
+        """
+        Simply write out position of the fly at every time interval, as 
+        decided by "resolution" (seconds)
+        """
+        
+        activity = []
+        rois = self.mask.getROInumber()
+        
+        a = self.fly_one_minute_buffer.transpose(1,0,2) # ( interval, n_flies, (x,y) )
+        a = a.reshape(resolution, -1, rois, 2).mean(0)
+        
+        for fd in a:
+            onerow = '\t'.join( ['%s,%s' % (x,y) for (x,y) in fd] )
+            activity.append(onerow)
+        
+        return activity
+
+    def processFlyMovements(self, time):
+        """
+        Decides what to do with the data
+        Called every frame
+        
+        In the live stream we find the coordinates of the flies multiple time per second
+        but we don't need so much information. This function will calculate how much time
+        has elapsed from the last time we analysed a frame, calculate the FPS and store the 
+        data in buffer that will get processed and saved to file
+        """
+        
+        ct = time
+        self.__tempFPS += 1
+        delta = ( ct - self.lasttime)
+
+        if delta >= 1: # if one second has elapsed from last time we went down this IF
+            self.lasttime = ct
+            self.compactSeconds(self.__tempFPS, delta) #average the coordinates and transfer from buffer to array
+            self.processingFPS = self.__tempFPS; self.__tempFPS = 0
+
+            self.debug_info['FPS'] = self.processingFPS
+         
+    def GetImage(self, drawROIs = False, selection=None, crosses=None, timestamp=False, draw_path=False):
         """
         GetImage(self, drawROIs = False, selection=None, timestamp=0)
         
@@ -1391,10 +1521,13 @@ class Monitor(object):
         
         selection      (x1,y1,x2,y2)            A four point selection to be drawn
         
-        crosses        (x,y),(x1,y1)            A list of tuples containing single point coordinates
+        crosses        (x,y),(x1,y1),...        A list of tuples containing single point coordinates
         
         timestamp      True                     Will add a timestamp to the bottom right corner
                        False        (Default)   
+                       
+        draw_path      True         (Default)   Draw the last steps of each fly to a path
+                       False
         
         Returns the last collected image
         """
@@ -1404,60 +1537,71 @@ class Monitor(object):
         
         if frame.any():
 
-            if self.tracking: frame = self.doTrack(frame, show_raw_diff=False, drawPath=self.drawPath)
+            # TRACKING RELATED
+            if self.tracking: 
+                frame, positions = self.trackByContours(frame)
+                
+                # for each frame adds fly coordinates to all ROIS. Also do some filtering to remove false positives
+                for (fly_number, fly_coords) in positions:
                     
-            if drawROIs and self.arena.ROIS:
+                    fly_coords, distance = self.addFlyCoords(fly_number, fly_coords)
+                    
+                    if distance > 0:
+                        cross_color = (255,255,255)
+                    else:
+                        cross_color = (255,0,0)
+                    
+                    # draw position of the fly as cross with or without some verbose
+                    if fly_coords and self.drawing:
+                        frame = self.__drawCross(frame, fly_coords, color=cross_color)
+                        #frame = self.__drawCross(frame, fly_coords, text=str(fly_number+1)+str(fly_coords)) 
+                    
+                    if draw_path and self.drawing:
+                        frame = self.__drawLastSteps(frame, fly_number, steps=5) # draw path of the fly
+                
+                self.processFlyMovements(time)
+
+            
+            # NOT TRACKING RELATED
+            if self.drawing and drawROIs and self.mask.ROIS: # draw ROIs
                 ROInum = 0
-                for ROI, beam in zip(self.arena.ROIS, self.arena.beams):
+                for ROI, beam in zip(self.mask.ROIS, self.mask.beams):
                     ROInum += 1
                     frame = self.__drawROI(frame, ROI, ROInum=ROInum)
                     frame = self.__drawBeam(frame, beam)
 
-            if selection:
-                frame = self.__drawROI(frame, selection, color=(0,0,255))
+            if self.drawing and selection:
+                frame = self.__drawROI(frame, selection, color=(0,0,255)) # draw red selection
                 
-            if crosses:
+            if self.drawing and crosses:
                 for pt in crosses:
-                    frame = self.__drawCross (frame, pt, color=(0,0,255))
+                    frame = self.__drawCross (frame, pt, color=(0,0,255)) # draw red crosses
+
+            if self.drawing and timestamp: 
+                frame = self.__drawDebugInfo(frame)
+                frame = self.__addTimeStamp(frame, time)
 
             if self.grabMovie: cv2.WriteFrame(self.writer, frame)
-
-            if timestamp: 
-                frame = self.__drawFPS(frame)
-                frame = self.__addText(frame, time)
         
-        return frame
+            return frame
 
-    def processFlyMovements(self):
-        """
-        Decides what to do with the data
-        Called every frame
-        """
-        
-        ct = self.getFrameTime()
-        self.__tempFPS += 1
-        delta = ( ct - self.lasttime)
-
-        if delta >= 1: # if one second has elapsed
-            self.lasttime = ct
-            self.arena.compactSeconds(self.__tempFPS, delta) #average the coordinates and transfer from buffer to array
-            self.processingFPS = self.__tempFPS; self.__tempFPS = 0
-
-    def doTrack(self, frame, show_raw_diff=False, drawPath=True):
+    def trackByContours(self, frame, draw_path=True, fliesPerROI=1):
         """
         Track flies in ROIs using findContour algorithm in opencv
         Each frame is compared against the moving average
         take an opencv frame as input and return a frame as output with path, flies and mask drawn on it
-        """
         
-        track_one = True # Track only one fly per ROI
+        draw_path    True | False   draw_path of the fly
+        fliesPerROI 1              limit number of flies to be tracked per ROI - not implemented yet
+        """
 
+        positions = []
+        
         # Smooth to get rid of false positives
         # http://opencvpython.blogspot.in/2012/06/smoothing-techniques-in-opencv.html
         # https://github.com/abidrahmank/OpenCV2-Python/blob/master/Official_Tutorial_Python_Codes/3_imgproc/smoothing.py
-        
-        frame = cv2.GaussianBlur(frame,(5,5) ,0)
-        #frame = cv2.blur(frame,(3,3))
+        frame = cv2.blur(frame,(1,1))
+        #frame = cv2.GaussianBlur(frame,(5,5) ,0)
 
         if self.__firstFrame:
             # create the moving average
@@ -1467,70 +1611,83 @@ class Monitor(object):
             
         else:
             # update the moving average
-            cv2.accumulateWeighted(frame, self.moving_average, 0.1)
+            cv2.accumulateWeighted(frame, self.moving_average, 0.02)
             avg = cv2.convertScaleAbs(self.moving_average)
 
         # Minus the current frame from the moving average.
         difference = cv2.subtract(avg, frame)
 
         # Convert the image to grayscale.
-        grey_image = cv2.cvtColor(difference, cv2.COLOR_BGR2GRAY)
+        #grey_image = cv2.cvtColor(difference, cv2.COLOR_BGR2GRAY)
 
         # Convert the image to black and white.
-        ret, thresh = cv2.threshold(grey_image, 20, 255, cv2.THRESH_BINARY)
+        ret, thresh = cv2.threshold(difference, 20, 255, cv2.THRESH_BINARY)
 
         # Dilate and erode to get proper blobs
         thresh = cv2.Canny(thresh, 0, 50, apertureSize=5)
         thresh = cv2.dilate(thresh, None)
 
-        # Build the mask. This allows for non rectangular ROIs
-        # In theory we need to do this only when the ROI have changed
-        # But it's easier to recreate each time
         y,x,_ = frame.shape
         ROImsk = np.zeros( (y,x), np.uint8)
-        cv2.fillPoly( ROImsk, np.array(self.arena.ROIS), color=(255, 255, 255) )
-                       
-        #Apply the mask to the grey image where tracking happens
-        ROIwrk = thresh & ROImsk
+
+        # FOR DEBUGGING PURPOSES ONLY
+        #draw_frame = cv2.cvtColor(grey_image, cv2.COLOR_GRAY2BGR)
+        #draw_frame = difference
+        #draw_frame = avg
+        #draw_frame = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
+        draw_frame = frame
+
+        #ROImsk *= 0
+        #if self.mask.getROInumber() :
+        #    cv2.fillPoly( ROImsk, np.array(self.mask.ROIS), color=(255, 255, 255) )
+        #    ROIwrk = thresh & ROImsk
+        #    draw_frame = cv2.cvtColor(ROImsk, cv2.COLOR_GRAY2BGR)
+
 
         #track each ROI
-        for fly_number, ROI in enumerate( self.arena.ROIStoRect() ):
-            
-            (x1,y1), (x2,y2) = ROI
-            contours, hierarchy = cv2.findContours(ROIwrk[y1:y2, x1:x2] ,cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        for fly_number, ROIrect in enumerate( self.mask.ROIStoRect() ):
 
+            #Apply the mask to the grey image where tracking happens
+            ROImsk *= 0
+            realROI = self.mask.getROI(fly_number)
+            cv2.fillPoly( ROImsk, np.array([realROI]), color=(255, 255, 255) )
+            ROIwrk = thresh & ROImsk
+            
+            (x1,y1), (x2,y2) = ROIrect
+            
+            contours, hierarchy = cv2.findContours(ROIwrk[y1:y2, x1:x2] ,cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE, offset=(x1,y1))
+            
             points = []
-            fly_coords = None
+            fly_coords = FLY_NOT_DETECTED
            
-            for nc, cnt in enumerate(contours[:1]): #take only one point per contours
-                cnt = contours[0]
+            for nc, cnt in enumerate(contours[:fliesPerROI]): #limit to only n point per contours
 
                 area = cv2.contourArea(cnt)
+                avg, std, distance, is_outlier = self.fly_area.update(area)
                 
-                (x,y),radius = cv2.minEnclosingCircle(cnt + (x1,y1))
+                self.debug_info['FLY_AREA_AVG'] = avg
+                self.debug_info['FLY_AREA_STD'] = std
+                
+                (x,y),radius = cv2.minEnclosingCircle(cnt)
                 center = (int(x),int(y))
                 radius = int(radius)
                 
-                if area > MAX_FLY_AREA: 
-                    fly_coords = None
-                    cv2.circle(frame, center, radius, (0,255,0), 1)
+                # centroid
+                #moments = cv2.moments(cnt)
+                #if moments['m00'] != 0.0:
+                    #cx = moments['m10']/moments['m00']
+                    #cy = moments['m01']/moments['m00']
+                    #center = (cx,cy)
                 
-                else:
-                    fly_coords = int(x), int(y)
-                    cv2.circle(frame, center, radius, (0,0,100), 1)
+                if not is_outlier: 
+                    fly_coords = center
 
-            # for each frame adds fly coordinates to all ROIS. Also do some filtering to remove false positives
-            fly_coords, distance = self.arena.addFlyCoords(fly_number, fly_coords)
+                if self.drawing and is_outlier:
+                    cv2.circle(draw_frame, center, radius, (0,255,255), 1)
+                elif self.drawing and not is_outlier:
+                    cv2.circle(draw_frame, center, radius, (0,0,255), 1)
 
-            frame = self.__drawCross(frame, fly_coords)
-            if drawPath: frame = self.__drawLastSteps(frame, fly_number, steps=5)
-            if show_raw_diff: grey_image = self.__drawCross(grey_image, fly_coords, color=(100,100,100))
-
-        self.processFlyMovements()
+            #Store the positions of the flies in an array
+            positions.append( (fly_number, fly_coords) )
         
-        if show_raw_diff or 1:
-            #return cv2.cvtColor(grey_image, cv2.COLOR_GRAY2BGR)
-            return cv2.cvtColor(ROIwrk, cv2.COLOR_GRAY2BGR)
-            #return difference
- 
-        return frame
+        return draw_frame, positions
