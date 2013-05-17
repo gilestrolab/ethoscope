@@ -57,7 +57,7 @@ else
 
     #MAKE MASK
     if [ $MAKEMASK = 1 ]; then
-        PVG_MM=$PVGROOT"pvg_standalone.py -t2 --showmask -i"
+        PVG_MM=$PVGROOT"pvg_standalone.py -t2 --showmask --showtime -i"
 
         for file in `find ${SRC} -name "$MOVIE_FILETYPE" -type f`
         do
