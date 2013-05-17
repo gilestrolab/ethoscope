@@ -32,6 +32,7 @@ class CvMovieFrame(wx.Frame):
         else:
             print "file: %s" % source
             print "Processing the video without output. This may take sometime..."
+            self.displayPanel.mon.drawing = False
             while not self.displayPanel.mon.isLastFrame():
                 self.displayPanel.mon.GetImage(timestamp=showtime)
             self.Close()
