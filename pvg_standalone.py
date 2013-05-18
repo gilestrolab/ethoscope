@@ -44,6 +44,7 @@ if __name__=="__main__":
     parser.add_option('--record', action="store_true", default=False, dest='record', help="Record the resulting video as avi file")
     parser.add_option('--trackonly', action="store_true", default=False, dest='trackonly', help="Does only the tracking, without showing the video")
     parser.add_option('--useCV', action="store_true", default=False, dest='use_cv', help="Show a preview using a CV window - experimental")
+    parser.add_option('--snapshot', action="store_true", default=False, dest='snapshot', help="Save a snapshot to file")
     
     (options, args) = parser.parse_args()
 
@@ -67,7 +68,12 @@ if __name__=="__main__":
     else:
         parser.print_help()
 
-    if options.use_cv:
+    if options.snapshot:
+        at = acquireObject(None, source, resolution, mask_file, track, track_type, output_file=output_file)
+        at.snapshot()
+        
+    
+    elif options.use_cv:
         c = cvPanel (source, resolution, str(source), track_type, mask_file, output_file, options.showROIs, options.showpath, options.showtime, options.record )
         c.play()
 

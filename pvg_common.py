@@ -153,6 +153,7 @@ class acquireObject():
         """
         """
         self.monitor = monitor
+        self.source = source
         self.keepGoing = False
         self.verbose = False
         self.track = track
@@ -192,6 +193,12 @@ class acquireObject():
         """
         print self.mon.debug_info
 
+    def snapshot(self):
+        """
+        """
+        filename = "%s.jpg" % self.source
+        frame = self.mon.GetImage()
+        cv2.imwrite(filename, frame)
 
 class acquireThread(threading.Thread):
 
