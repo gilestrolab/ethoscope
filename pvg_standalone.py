@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-import wx, cv, optparse
+import wx, optparse
 import pysolovideo as pv
-from pvg_common import previewPanel, pvg_config
+from pvg_common import previewPanel, pvg_config, acquireObject, cvPanel
 from os.path import splitext
 
 ##
@@ -9,33 +9,25 @@ from os.path import splitext
 ##
 
 class CvMovieFrame(wx.Frame):
-    def __init__(self, parent, source, resolution, track, track_type, mask_file, outputFile, showROIs, showpath, showtime, record, trackonly ):
+    def __init__(self, parent, source, resolution, track, track_type, mask_file, output_file, showROIs, showpath, showtime, record ):
         wx.Frame.__init__(self, parent)
         
        
         self.displayPanel = previewPanel(self, size=resolution, keymode=True, singleFrameMode=True)
         self.SetSize(resolution)
-        
         self.SetTitle(source)
 
         self.displayPanel.setMonitor(source, resolution)
-        self.displayPanel.mon.setTracking(track, track_type, mask_file, outputFile)
+        self.displayPanel.mon.setTracking(track, track_type, mask_file, output_file)
         self.displayPanel.timestamp = showtime
        
         if record:
             self.displayPanel.mon.saveMovie('video_output.avi', fps=14, startOnKey=True)
         
-        if not trackonly:
-            self.displayPanel.prinKeyEventsHelp()
-            self.displayPanel.Play(showROIs=showROIs)
-            self.Show()
-        else:
-            print "file: %s" % source
-            print "Processing the video without output. This may take sometime..."
-            self.displayPanel.mon.drawing = False
-            while not self.displayPanel.mon.isLastFrame():
-                self.displayPanel.mon.GetImage(timestamp=showtime)
-            self.Close()
+        self.displayPanel.prinKeyEventsHelp()
+        self.displayPanel.Play(showROIs=showROIs)
+        self.Show()
+
 
 if __name__=="__main__":
 
@@ -45,12 +37,13 @@ if __name__=="__main__":
     parser.add_option('-i', '--input', dest='source', metavar="SOURCE", help="File mode | Specify a source (camera number, file or folder)")
     parser.add_option('-k', '--mask', dest='mask_file', metavar="MASKFILE", help="File mode | Specify a maskfile to be used with file.")
     parser.add_option('-t', '--tracktype', dest='track_type', metavar="TT", help="File mode | Specify track type: 0, distance; 1, trikinetics; 2, coordinates")
-    parser.add_option('-o', '--output', dest='outputFile', metavar="OUTFILE", help="All modes | Specify an output file where to store tracking results. A Mask must be loaded")
+    parser.add_option('-o', '--output', dest='output_file', metavar="OUTFILE", help="All modes | Specify an output file where to store tracking results. A Mask must be loaded")
     parser.add_option('--showmask', action="store_true", default=False, dest='showROIs', help="Show the area limiting the ROIs")
     parser.add_option('--showpath', action="store_true", default=False, dest='showpath', help="Show the last steps of each fly as white line")
     parser.add_option('--showtime', action="store_true", default=False, dest='showtime', help="Show the frame timestamp")
     parser.add_option('--record', action="store_true", default=False, dest='record', help="Record the resulting video as avi file")
     parser.add_option('--trackonly', action="store_true", default=False, dest='trackonly', help="Does only the tracking, without showing the video")
+    parser.add_option('--useCV', action="store_true", default=False, dest='use_cv', help="Show a preview using a CV window - experimental")
     
     (options, args) = parser.parse_args()
 
@@ -60,7 +53,7 @@ if __name__=="__main__":
         mon = int(options.monitor)
         _,source,track,mask_file,track_type,isSDMonitor = opts.GetMonitor(mon)
         resolution = opts.GetOption('FullSize')
-        outputFile = options.outputFile or ''
+        output_file = options.output_file or ''
         
     elif options.source:
         
@@ -69,14 +62,25 @@ if __name__=="__main__":
         track = options.mask_file and options.track_type
         mask_file = options.mask_file or splitext(options.source)[0]+'.msk'
         track_type = options.track_type
-        outputFile = options.outputFile or splitext(options.source)[0]+'.txt'
+        output_file = options.output_file or splitext(options.source)[0]+'.txt'
 
     else:
         parser.print_help()
 
+    if options.use_cv:
+        c = cvPanel (source, resolution, str(source), track_type, mask_file, output_file, options.showROIs, options.showpath, options.showtime, options.record )
+        c.play()
 
-    if (options.configfile and options.monitor) or options.source:
+    elif not options.trackonly and ((options.configfile and options.monitor) or options.source):
 
         app = wx.App()
-        f = CvMovieFrame(None, source, resolution, track, track_type, mask_file, outputFile, options.showROIs, options.showpath, options.showtime, options.record, options.trackonly )
-        app.MainLoop()    
+        f = CvMovieFrame(None, source, resolution, track, track_type, mask_file, output_file, options.showROIs, options.showpath, options.showtime, options.record )
+        app.MainLoop()
+        
+    elif options.trackonly and ((options.configfile and options.monitor) or options.source): #no X output needed
+        
+        at = acquireObject(None, source, resolution, mask_file, track, track_type, output_file=output_file)
+        print "Processing video %s without output. This may take sometime." % source
+        at.start()
+        at.debug()
+
