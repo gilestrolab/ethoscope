@@ -42,6 +42,9 @@ Algorithm for motion analysis:
     Version 1.2
     Contour detection through CV2
     
+    Version 1.3
+    Classes Arena and Monitor fuse. Class ROImask is born
+    
 """
 
 import cv2
@@ -54,8 +57,9 @@ import numpy as np
 pySoloVideoVersion ='dev'
 MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug','Sep', 'Oct', 'Nov', 'Dec']
 
-FIRST_POSITION = (-1,-1)
+FLY_FIRST_POSITION = (-1,-1)
 FLY_NOT_DETECTED = None
+PERIOD = 60 #in seconds
 
 
 class runningAvgComparison():
@@ -64,7 +68,6 @@ class runningAvgComparison():
     and a running STD
     For each value that is used to update,
     it returns also information on whether it is an outlier
-    
     """
     
     def __init__(self):
@@ -136,9 +139,7 @@ class realCam(Cam):
     def __initCamera(self):
         """
         """
-        #self.camera = cv2.CaptureFromCAM(self.devnum)
         self.camera = cv2.VideoCapture(self.devnum)
-        
         self.setResolution (self.resolution)
 
     def getFrameTime(self):
@@ -173,15 +174,13 @@ class realCam(Cam):
         """
         Returns frame, timestamp
         """
-        #frame = None
-        
+       
         if not self.camera:
             self.__initCamera()
         
-        #frame = cv2.QueryFrame(self.camera)       
+        #if self.camera.isOpened():
         __, frame = self.camera.read()
         
-
         if self.scale:
             newsize = cv2.CreateImage(self.resolution , cv2.IPL_DEPTH_8U, 3)
             cv2.Resize(frame, newsize)
@@ -201,7 +200,7 @@ class realCam(Cam):
         """
         print "attempting to close stream"
 
-        del(self.camera) #cv2.ReleaseCapture(self.camera)
+        cv2.VideoCapture.release(self.devnum) 
         self.camera = None
         
 class virtualCamMovie(Cam):
@@ -831,46 +830,36 @@ class Monitor(object):
         A Monitor contains a cam, which can be either virtual or real.
         Everything is handled through openCV
         """
+        
         self.grabMovie = False
         self.writer = None
         self.cam = None
         self.drawing = True
+        self.tracking = True
         
         self.mask = ROImask(self)
         
-        self.imageCount = 0
-        self.lasttime = 0
-
-        self.maxTick = 60
+        self.__last_time = 0
+        self.__temp_FPS = 0 
+        self.__processingFPS = 0
+        self.__rowline = 0
         
-        self.__firstFrame = True
-        self.tracking = True
-        
-        self.__tempFPS = 0 
-        self.processingFPS = 0
-        
-        self.isSDMonitor = False
-        
-        #Stuff that used to be in class ARENA
+        # TO DO: NOT IMPLEMENTED YET
+        self.isSDMonitor = False # 
+        self.ratio = 0 # used for mask calibration, px to cm
         
         self.trackType = 1
-        self.minuteFPS = []
+        self.minuteFPS = runningAvgComparison()
         
-        self.period = 60 #in seconds
-        self.ratio = 0
-        self.rowline = 0
-
         # Buffer arrays
-        # shape ( self.period (x,y )
-        self.__fa = np.zeros( (self.period, 2), dtype=np.int )
-        
-        # shape ( flies, seconds, (x,y) ) Contains the coordinates of the last second (if fps > 1, average)
+        # shape ( PERIOD (x,y )
+        self.__fa = np.zeros( (PERIOD, 2), dtype=np.int )
+        # shape ( flies, (x,y) ) Contains the coordinates of the last second (if fps > 1, average)
         self.fly_last_frame_buffer = np.zeros( (0, 2), dtype=np.int ) 
+        # shape ( flies, PERIOD, (x,y) ) Contains the coordinates of the last minute (or period)
+        self.fly_one_minute_buffer = np.zeros( (0, PERIOD, 2), dtype=np.int ) 
         
-        # shape ( flies, self.period, (x,y) ) Contains the coordinates of the last minute (or period)
-        self.fly_one_minute_buffer = np.zeros( (0, self.period, 2), dtype=np.int ) 
-        
-        self.count_seconds = 0
+        self.__count_seconds = 0
         self.__n = 0
         self.outputFile = None
       
@@ -879,17 +868,17 @@ class Monitor(object):
 
         self.debug_info = {}
 
-    def __distance( self, (x1, y1), (x2, y2) ):
-        """
-        Calculate the distance between two cartesian points
-        """
-        return np.sqrt((x2-x1)**2 + (y2-y1)**2)
-      
 #######################################################        
         
         
 #### DRAWING FUNCTION OF MONITOR ######################        
     
+    def __distance( self, (x1, y1), (x2, y2) ):
+        """
+        Calculate the distance between two cartesian points
+        """
+        return np.sqrt((x2-x1)**2 + (y2-y1)**2)
+
     def __drawBeam(self, img, bm, color=None):
         """
         Draw the Beam using given coordinates
@@ -1177,8 +1166,8 @@ class Monitor(object):
                 #these increase by one on the fly axis
 
                 for i in range(n):
-                    self.fly_last_frame_buffer = np.append( self.fly_last_frame_buffer, [FIRST_POSITION], axis=0) # ( flies, (x,y) )
-                    self.fly_one_minute_buffer = np.append (self.fly_one_minute_buffer, [self.__fa.copy()], axis=0) # ( flies, self.period, (x,y) )
+                    self.fly_last_frame_buffer = np.append( self.fly_last_frame_buffer, [FLY_FIRST_POSITION], axis=0) # ( flies, (x,y) )
+                    self.fly_one_minute_buffer = np.append (self.fly_one_minute_buffer, [self.__fa.copy()], axis=0) # ( flies, PERIOD, (x,y) )
             if n < 0:
 
                 for i in range(n):
@@ -1187,7 +1176,7 @@ class Monitor(object):
             
             if n == 0:
                 self.fly_last_frame_buffer = np.zeros( (0, 2), dtype=np.int ) 
-                self.fly_one_minute_buffer = np.zeros( (0, self.period, 2), dtype=np.int )
+                self.fly_one_minute_buffer = np.zeros( (0, PERIOD, 2), dtype=np.int )
         
         if new:
             self.updateFlyBuffers(0) # delete first
@@ -1287,7 +1276,7 @@ class Monitor(object):
     def getLastSteps(self, fly, steps):
         """
         """
-        c = self.count_seconds
+        c = self.__count_seconds
         return [(x,y) for [x,y] in self.fly_one_minute_buffer[fly][c-steps:c].tolist()] + [tuple(self.fly_last_frame_buffer[fly].flatten())]
 
     def addFlyCoords(self, count, fly_coords):
@@ -1301,7 +1290,7 @@ class Monitor(object):
         previous_position = tuple(self.fly_last_frame_buffer[count])
         if fly_coords == FLY_NOT_DETECTED: fly_coords = previous_position
 
-        is_first_movement = not ( fly_coords == FIRST_POSITION )
+        is_first_movement = not ( fly_coords == FLY_FIRST_POSITION )
         distance = self.__distance( previous_position, fly_coords )
         
         avg, std, _, is_outside = self.fly_movement.update(distance, outlier=1)
@@ -1332,23 +1321,22 @@ class Monitor(object):
         delta       how much time has elapsed from the last "second"
         """
 
-        self.minuteFPS.append(FPS)
+        avgFPS, _, _, _ = self.minuteFPS.update(FPS)
         self.fly_one_minute_buffer[:,self.__n] = self.fly_last_frame_buffer
 
-        if self.count_seconds + 1 >= self.period:
-            self.writeActivity( fps = np.mean(self.minuteFPS) )
-            self.count_seconds = 0
+        if self.__count_seconds + 1 >= PERIOD:
+            self.writeActivity( fps = avgFPS )
+            self.__count_seconds = 0
             self.__n = 0 
-            self.minuteFPS = []
 
-            for i in range(0,self.period):
+            for i in range(0,PERIOD):
                     self.fly_one_minute_buffer[:,i] = self.fly_last_frame_buffer
             
         #growing continously; this is the correct thing to do but we would have problems adding new row with new ROIs
         #self.fly_one_minute_buffer = np.append(self.fly_one_minute_buffer, self.fly_last_frame_buffer, axis=1)
 
 
-        self.count_seconds += delta
+        self.__count_seconds += delta
         self.__n += 1
 
     def writeActivity(self, fps=0, extend=True):
@@ -1412,8 +1400,8 @@ class Monitor(object):
 
             
         for line in activity:
-            self.rowline +=1 
-            row_header = '%s\t'*10 % (self.rowline, date, tt, active, damscan, tracktype, sleepDep, monitor, unused, light)
+            self.__rowline +=1
+            row_header = '%s\t'*10 % (self.__rowline, date, tt, active, damscan, tracktype, sleepDep, monitor, unused, light)
             row += row_header + line + extension + '\n'
 
         if self.outputFile:
@@ -1502,15 +1490,15 @@ class Monitor(object):
         """
         
         ct = time
-        self.__tempFPS += 1
-        delta = ( ct - self.lasttime)
+        self.__temp_FPS += 1
+        delta = ( ct - self.__last_time)
 
         if delta >= 1: # if one second has elapsed from last time we went down this IF
-            self.lasttime = ct
-            self.compactSeconds(self.__tempFPS, delta) #average the coordinates and transfer from buffer to array
-            self.processingFPS = self.__tempFPS; self.__tempFPS = 0
+            self.__last_time = ct
+            self.compactSeconds(self.__temp_FPS, delta) #average the coordinates and transfer from buffer to array
+            self.__processingFPS = self.__temp_FPS; self.__temp_FPS = 0
 
-            self.debug_info['FPS'] = self.processingFPS
+            self.debug_info['FPS'] = self.__processingFPS
          
     def GetImage(self, drawROIs = False, selection=None, crosses=None, timestamp=False, draw_path=False):
         """
@@ -1532,7 +1520,7 @@ class Monitor(object):
         Returns the last collected image
         """
 
-        self.imageCount += 1
+        ##self.imageCount += 1
         frame, time = self.cam.getImage()
         
         if frame.any():
@@ -1603,16 +1591,14 @@ class Monitor(object):
         frame = cv2.blur(frame,(1,1))
         #frame = cv2.GaussianBlur(frame,(5,5) ,0)
 
-        if self.__firstFrame:
-            # create the moving average
-            self.moving_average = np.float32(frame)
-            self.__firstFrame = False
-            avg = cv2.convertScaleAbs(self.moving_average)
-            
-        else:
+        try:
             # update the moving average
             cv2.accumulateWeighted(frame, self.moving_average, 0.02)
-            avg = cv2.convertScaleAbs(self.moving_average)
+        except:
+            # it's our first frame: create the moving average
+            self.moving_average = np.float32(frame)
+        
+        avg = cv2.convertScaleAbs(self.moving_average)
 
         # Minus the current frame from the moving average.
         difference = cv2.subtract(avg, frame)
