@@ -149,25 +149,30 @@ class myConfig():
         return self.GetValue('Options', key)
 
 class acquireObject():
-    def __init__(self, monitor, source, resolution, mask_file, track, track_type, dataFolder):
+    def __init__(self, monitor, source, resolution, mask_file, track, track_type, data_folder=None, output_file=None):
         """
         """
         self.monitor = monitor
         self.keepGoing = False
         self.verbose = False
         self.track = track
-        outputFile = os.path.join(dataFolder, 'Monitor%02d.txt' % monitor)
+        
+        if not data_folder:
+            data_folder = os.getcwd()
+        
+        if not output_file:
+            output_file = os.path.join(data_folder, 'Monitor%02d.txt' % monitor)
         
         self.mon = pv.Monitor()
         self.mon.setSource(source, resolution)
-        self.mon.setTracking(True, track_type, mask_file, outputFile)
+        self.mon.setTracking(True, track_type, mask_file, output_file)
         
-        if self.verbose: print ( "Setting monitor %s with source %s and mask %s. Output to %s " % (monitor, source, os.path.split(mask_file)[1], os.path.split(outputFile)[1] ) )
+        if self.verbose: print ( "Setting monitor %s with source %s and mask %s. Output to %s " % (monitor, source, os.path.split(mask_file)[1], os.path.split(output_file)[1] ) )
 
     def run(self, kbdint=False):
         """
         """
-        while self.keepGoing:
+        while self.keepGoing and not self.mon.isLastFrame():
             self.mon.GetImage()
                 
     def start(self):
@@ -181,8 +186,11 @@ class acquireObject():
         """
         self.keepGoing = False
         if self.verbose: print ( "Stopping capture" )
-
-
+        
+    def debug(self):
+        """
+        """
+        print self.mon.debug_info
 
 
 class acquireThread(threading.Thread):
@@ -299,7 +307,40 @@ class pvg_config(myConfig):
             
         return monitors
 
+class cvPanel():
+    """
+    A panel showing the video images. 
+    Fully based on CV and not WX
+    """
 
+    def __init__(self, source, resolution=None, window_title='video',track_type=None, mask_file=None, output_file=None, showROI=False,showpath=False, showtime=False, record=False):
+        """
+        """
+    
+        self.title = window_title
+        self.resolution = resolution
+        self.showROI = showROI
+        self.timestamp = showtime
+        self.showpath = showpath
+        track = ( track_type > -1 )
+
+        self.mon = pv.Monitor()
+        self.mon.setSource(source, resolution)
+        self.mon.setTracking(track, track_type, mask_file, output_file)
+        
+        cv2.namedWindow(self.title, cv2.CV_WINDOW_AUTOSIZE)
+
+    def play(self):
+        """
+        """
+        frame = self.mon.GetImage()    
+        while not self.mon.isLastFrame():
+            cv2.imshow( self.title, frame )
+            frame = self.mon.GetImage(drawROIs = self.showROI, selection=None, crosses=None, timestamp=self.timestamp, draw_path=self.showpath)
+
+            key = cv2.waitKey(20)
+            if key > 0: # exit on ESC
+                break
         
 class previewPanel(wx.Panel):
     """
@@ -365,6 +406,9 @@ class previewPanel(wx.Panel):
         if keymode: 
             self.Bind( wx.EVT_CHAR, self.onKeyPressed )
             self.SetFocus()
+
+
+####### FUNCTIONS LINKED TO THE DRAWING OF THE ROIS #######
 
     def ClearAll(self, event=None):
         """
@@ -535,15 +579,7 @@ class previewPanel(wx.Panel):
         if self.allowEditing and self.selection:
             
             a = np.array(self.selection)
-            
-            #if vertical:
-            #    #find the lower points and upper points
-            #    ind=np.lexsort((a[:,0],a[:,1]))    
-            #else:
-            #    ind=np.lexsort((a[:,1],a[:,0]))    
-               
-            #a = a[ind]
-            
+           
             if not vertical and n>1:
                 lx = np.linspace(a[0][0],a[2][0],n+1) # new lower X values
                 ly = np.linspace(a[0][1],a[2][1],n+1) # new lower Y values
@@ -589,6 +625,12 @@ class previewPanel(wx.Panel):
         """
         """
         self.mon.saveROIS()
+
+
+###########################################################
+
+######### REFRESH AND PAINTING OF THE PANEL ###############
+
         
     def setMonitor(self, camera, resolution=None):
         """
