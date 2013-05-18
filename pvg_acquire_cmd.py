@@ -22,7 +22,8 @@
 #       
 #       
 
-import os, time
+import os
+from time import ctime
 import optparse
 
 from pvg_common import pvg_config, acquireThread, acquireObject
@@ -53,6 +54,5 @@ if __name__ == '__main__':
     for mn in monitorsData:
         m = monitorsData[mn]
         at = acquireObject(mn, m['source'], m['resolution'], m['mask_file'], m['track'], m['track_type'], m['dataFolder'])
-        at.keepGoing = True
         at.start()
-        print ( "%s: Acquisition for monitor %s started." % ( time.ctime(), mn ))
+        print ( "%s: Acquisition for monitor %s started." % ( ctime(), mn ))
