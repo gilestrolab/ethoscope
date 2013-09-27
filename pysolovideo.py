@@ -40,22 +40,35 @@ Algorithm for motion analysis:
     #http://opencv-users.1802565.n2.nabble.com/Why-is-cvClearMemStorage-not-exposed-through-the-Python-interface-td7229752.html
     
     Version 1.2
-    Contour detection through CV2
+    Now all the video processing is handled through CV2, including contour detection
     
     Version 1.3
     Classes Arena and Monitor fuse. Class ROImask is born
     
+    
+Current Data format
+    #0 rowline
+    #1 date
+    #2 time
+    #3 monitor is active (1)
+    #4 average frames per seconds (FPS)
+    #5 tracktype (0,1,2)
+    #6 is a monitor with sleep deprivation capabilities? (n/a)
+    #7 monitor number, not yet implemented (n/a)
+    #8 unused 
+    #9 is light on or off (n/a)
+    #10 actual activity (normally 32 datapoints)
+    
 """
 
 import cv2
-
 import cPickle
+from calendar import month_abbr
 import os, datetime, time
 import numpy as np
 
 
-pySoloVideoVersion ='dev'
-MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug','Sep', 'Oct', 'Nov', 'Dec']
+pySoloVideoVersion ='dev' #will be 1.4
 
 FLY_FIRST_POSITION = (-1,-1)
 FLY_NOT_DETECTED = None
@@ -275,7 +288,7 @@ class virtualCamMovie(Cam):
         # this does not work properly. Image is very corrupted
         __, frame = self.capture.read()
 
-        if not frame.any(): frame = self.blackFrame
+        if frame == None: frame = self.blackFrame
         
         self.currentFrame += self.step
             
@@ -1102,7 +1115,7 @@ class Monitor(object):
         
         if mask_file:
             self.loadROIS(mask_file)
-        
+       
     def getFrameTime(self):
         """
         """
@@ -1127,11 +1140,12 @@ class Monitor(object):
         
         http://stackoverflow.com/questions/5426637/writing-video-with-opencv-python-mac
         """
-        fourcc = cv2.CV_FOURCC(*[c for c in codec])
         
-        self.writer = cv2.CreateVideoWriter(filename, fourcc, fps, self.resolution, 1)
+        fourcc = cv2.cv.CV_FOURCC(*[c for c in codec]) # or -1
+        self.writer = cv2.VideoWriter(filename, fourcc, fps ,self.resolution )
         self.grabMovie = not startOnKey
 
+        #self.writer.release()
 
     def saveSnapshot(self, *args, **kwargs):
         """
@@ -1183,6 +1197,14 @@ class Monitor(object):
             self.updateFlyBuffers(n) # then repopulate
             
         self.debug_info["ROIs"] = self.mask.getROInumber()
+        
+    def getFliesDetected(self):
+        """
+        Returns how many flies are we actually detecting
+        Ignores flies that never moved
+        """
+        c = (self.fly_last_frame_buffer != FLY_FIRST_POSITION)
+        return c.all(axis=1).sum()
    
     def addROI(self, coords, n_flies=1):
         """
@@ -1353,7 +1375,7 @@ class Monitor(object):
         dt = datetime.datetime.fromtimestamp( self.getFrameTime() )
         
         year, month, day, hh, mn, sec = dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second
-        month = MONTHS[month-1]
+        month = month_abbr[month]
         
         #0 rowline
         
@@ -1376,8 +1398,7 @@ class Monitor(object):
         #9 is light on or off
         light = '?'
         
-        #10 :
-        #activity
+        #10 actual activity (normally 32 datapoints)
         
         activity = []
         row = ''
@@ -1523,55 +1544,58 @@ class Monitor(object):
         ##self.imageCount += 1
         frame, time = self.cam.getImage()
         
-        if frame.any():
-
-            # TRACKING RELATED
-            if self.tracking: 
-                frame, positions = self.trackByContours(frame)
-                
-                # for each frame adds fly coordinates to all ROIS. Also do some filtering to remove false positives
-                for (fly_number, fly_coords) in positions:
-                    
-                    fly_coords, distance = self.addFlyCoords(fly_number, fly_coords)
-                    
-                    if distance > 0:
-                        cross_color = (255,255,255)
-                    else:
-                        cross_color = (255,0,0)
-                    
-                    # draw position of the fly as cross with or without some verbose
-                    if fly_coords and self.drawing:
-                        frame = self.__drawCross(frame, fly_coords, color=cross_color)
-                        #frame = self.__drawCross(frame, fly_coords, text=str(fly_number+1)+str(fly_coords)) 
-                    
-                    if draw_path and self.drawing:
-                        frame = self.__drawLastSteps(frame, fly_number, steps=5) # draw path of the fly
-                
-                self.processFlyMovements(time)
-
+        # TRACKING RELATED
+        if self.tracking: 
+            frame, positions = self.trackByContours(frame)
             
-            # NOT TRACKING RELATED
-            if self.drawing and drawROIs and self.mask.ROIS: # draw ROIs
-                ROInum = 0
-                for ROI, beam in zip(self.mask.ROIS, self.mask.beams):
-                    ROInum += 1
-                    frame = self.__drawROI(frame, ROI, ROInum=ROInum)
-                    frame = self.__drawBeam(frame, beam)
-
-            if self.drawing and selection:
-                frame = self.__drawROI(frame, selection, color=(0,0,255)) # draw red selection
+            # for each frame adds fly coordinates to all ROIS. Also do some filtering to remove false positives
+            for (fly_number, fly_coords) in positions:
                 
-            if self.drawing and crosses:
-                for pt in crosses:
-                    frame = self.__drawCross (frame, pt, color=(0,0,255)) # draw red crosses
+                fly_coords, distance = self.addFlyCoords(fly_number, fly_coords)
+                
+                if distance > 0:
+                    cross_color = (255,255,255)
+                else:
+                    cross_color = (255,0,0)
+                
+                # draw position of the fly as cross with or without some verbose
+                if fly_coords and self.drawing:
+                    frame = self.__drawCross(frame, fly_coords, color=cross_color)
+                    #frame = self.__drawCross(frame, fly_coords, text=str(fly_number+1)+str(fly_coords)) 
+                
+                if draw_path and self.drawing:
+                    frame = self.__drawLastSteps(frame, fly_number, steps=5) # draw path of the fly
+            
+            self.processFlyMovements(time)      
+            self.debug_info['DETECTED'] = self.getFliesDetected()
 
-            if self.drawing and timestamp: 
-                frame = self.__drawDebugInfo(frame)
-                frame = self.__addTimeStamp(frame, time)
-
-            if self.grabMovie: cv2.WriteFrame(self.writer, frame)
         
-            return frame
+        # NOT TRACKING RELATED
+        if self.drawing and drawROIs and self.mask.ROIS: # draw ROIs
+            ROInum = 0
+            for ROI, beam in zip(self.mask.ROIS, self.mask.beams):
+                ROInum += 1
+                frame = self.__drawROI(frame, ROI, ROInum=ROInum)
+                frame = self.__drawBeam(frame, beam)
+
+        if self.drawing and selection:
+            frame = self.__drawROI(frame, selection, color=(0,0,255)) # draw red selection
+            
+        if self.drawing and crosses:
+            for pt in crosses:
+                frame = self.__drawCross (frame, pt, color=(0,0,255)) # draw red crosses
+
+        if self.drawing and timestamp: 
+            frame = self.__drawDebugInfo(frame)
+            frame = self.__addTimeStamp(frame, time)
+
+        if self.grabMovie: 
+            self.writer.write(frame)
+            
+        if self.grabMovie and self.isLastFrame():
+            self.writer.release()
+    
+        return frame
 
     def trackByContours(self, frame, draw_path=True, fliesPerROI=1):
         """
