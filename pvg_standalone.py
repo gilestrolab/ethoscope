@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-import wx, optparse
+import wx
+import optparse
 import pysolovideo as pv
 from pvg_common import previewPanel, pvg_config, acquireObject, cvPanel
 from os.path import splitext
@@ -75,6 +76,7 @@ if __name__=="__main__":
     
     elif options.use_cv:
         c = cvPanel (source, resolution, str(source), track_type, mask_file, output_file, options.showROIs, options.showpath, options.showtime, options.record )
+        if options.record: c.mon.saveMovie('video_output.avi')
         c.play()
 
     elif not options.trackonly and ((options.configfile and options.monitor) or options.source):
@@ -86,6 +88,7 @@ if __name__=="__main__":
     elif options.trackonly and ((options.configfile and options.monitor) or options.source): #no X output needed
         
         at = acquireObject(None, source, resolution, mask_file, track, track_type, output_file=output_file)
+        if options.record: at.mon.saveMovie('video_output.avi')
         print "Processing video %s without output. This may take sometime." % source
         at.start()
         at.debug()
