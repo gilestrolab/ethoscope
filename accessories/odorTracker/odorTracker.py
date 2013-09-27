@@ -19,14 +19,48 @@
 #       along with this program; if not, write to the Free Software
 #       Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #       MA 02110-1301, USA.
+#
+#
+#
+#
+#       All this would problably more readable as collection of functions rather than
+#       as class
+
+
 
 import numpy as np
-import optparse, os
+import optparse
+import os
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
 
-COLORS = dict ({'Blue': '#0066cc', 'Brown': '#660000', 'Pink': '#ff99cc', 'Blue Marine': '#466086', 'Light Grey': '#999999', 'Purple': '#990099', 'Light Pink': '#ffcc99', 'Grey': '#666666', 'Yellow': '#ffcc00', 'Olive Green': '#989e67', 'Dark Orange': '#ff8040', 'Bright Yellow': '#ffff00', 'Green': '#33cc33', 'Light Yellow': '#ffff99', 'Light Green': '#ccff99', 'Dark Purple': '#663366', 'Light Blue': '#99ccff', 'Dark Grey': '#333333', 'Red': '#cc0033', 'Dark Green': '#336633'})
+COLORS = dict ({
+                'Blue': '#0066cc', 
+                'Brown': '#660000', 
+                'Pink': '#ff99cc', 
+                'Blue Marine': '#466086', 
+                'Light Grey': '#999999', 
+                'Purple': '#990099', 
+                'Light Pink': '#ffcc99', 
+                'Grey': '#666666', 
+                'Yellow': '#ffcc00', 
+                'Olive Green': '#989e67', 
+                'Dark Orange': '#ff8040', 
+                'Bright Yellow': '#ffff00', 
+                'Green': '#33cc33', 
+                'Light Yellow': '#ffff99', 
+                'Light Green': '#ccff99', 
+                'Dark Purple': '#663366', 
+                'Light Blue': '#99ccff', 
+                'Dark Grey': '#333333', 
+                'Red': '#cc0033', 
+                'Dark Green': '#336633'
+                    })
 
+COLS = 4
+GRAY_BAND = 0.2
+LEGEND="/mnt/nas/Videos/Lab_Members/Chin_Yee_Shim/legend.txt"
 
 class odorTracker():
     """
@@ -46,11 +80,41 @@ class odorTracker():
 
         if os.path.isfile(source):
             self.a = self.__readFile(source, horizontal)
+            self.description = self.__seekDescription(source)
+            self.input_file = source
 
         if os.path.isdir(source):
+            # TO DO IMPLEMENT DIR READING ?
             pass
         
         self.midline = max(self.a[:,:,0].flatten())/2 # all x coordinates
+        
+        self.midline_left = int(self.midline * (1. - GRAY_BAND/2))
+        self.midline_right = int(self.midline * (1. + GRAY_BAND/2))
+
+    def __seekDescription(self, filename):
+        """
+        """
+        info = {}
+        fn = os.path.split(filename)[1]
+        f = os.path.splitext(fn)[0].upper()
+        
+        try:
+            fh = open(LEGEND, 'r')
+            fc = fh.read()
+            rawfile = fc.split('\n')
+            for line in rawfile[:-1]:
+                if line:
+                    fn, desc = line.split('\t')
+                    info[fn.upper()] = desc.strip()
+        except: 
+            pass
+
+        if f in info:
+            return info[f]
+        else:
+            return ''
+            
         
     def __readFile(self, filename, horizontal=True):
         """
@@ -75,7 +139,7 @@ class odorTracker():
             flies = len (coords[0])
             frames = len (coords)
             
-            a = np.zeros( (frames, flies, 2) )
+            a = np.ma.MaskedArray(np.zeros( (frames, flies, 2) ))
 
             #default orientation is with horizontal tubes
             #if tubes are vertical, we need to invert the coordinates
@@ -88,6 +152,7 @@ class odorTracker():
                    
                 a[n] = np.array(cs)
                 
+            #return self.filterArtifacts( a ) # VERY primitive way of smoothing artifacts
             return a
             
            
@@ -97,9 +162,18 @@ class odorTracker():
     def __makeFigure(self, clean=True):
         """
         """
+        font = {'family' : 'serif',
+                'weight' : 'normal',
+                'size'   : 12}
+
+        mpl.rc('font', **font)
+        
         if not self.fig or clean:
             self.fig = plt.figure(figsize=(8,6), dpi=120)
+            title = "%s [ %s ]" % (self.filename, self.description)
+            self.fig.suptitle(title, fontsize=20)
             
+                      
     def __showFigure(self):
         """
         """
@@ -123,6 +197,22 @@ class odorTracker():
         self.fig.set_size_inches(18.5,10.5)
         plt.savefig(fullpath,dpi=100)
         
+
+    def __listFiles(self, directory, extension='.txt'):
+        """
+        Returns a sorted list of files in the given directory, 
+        filtered  by given extension
+        """
+        
+        allfiles = os.listdir(directory)
+        extension = extension.upper()
+        
+        lf = [os.path.join(directory,f) for f in allfiles if os.path.splitext(f)[1].upper() == extension]
+        lf.sort()
+        
+        return lf        
+
+
     def output(self, show=None, save=None, filename=None, append=None):
         """
         Show and or save the figure
@@ -159,54 +249,103 @@ class odorTracker():
 
         self.output(append='-dist')
 
-    def plotOneFlyPath(self, fly):
+    def plotOneFlyPath(self, fly, onecolor=False):
         """
         plot path of a single fly - must specify fly number
         """
         self.__makeFigure()
 
-
         x = self.a[:,fly,0]
-        #coords = self.a[:,fly]
 
         ax = self.fig.add_subplot(111)
         
         ax.xaxis.set_visible(False)
         ax.yaxis.set_visible(False)
 
-        ax.plot( x,np.arange(len(x)), 'o-', color='#736F6E')
+        if onecolor:
+            ax.plot( x,np.arange(len(x)), 'o-', color=COLORS['Light Grey'])
+        else:
+            xl = np.ma.array( x, mask=(x < self.midline_left) )
+            ax.plot( xl,np.arange(len(x)), 'o-', color=COLORS['Red'])
+            
+            #x.mask = (x > self.midline)
+            xr = np.ma.array( x, mask=(x >= self.midline_right) )
+            ax.plot( xr,np.arange(len(x)), 'o-', color=COLORS['Light Blue'])
+            
+        ax.set_xlim((0, self.midline*2))
 
         self.output(append='-fly%02d' % fly)
-        
-        
+
+
     def plotAllpath(self, onecolor=False):
         """
         plot paths in the currently open figure and save it to file
         """
         flies = self.a.shape[1]
-        cols = 4
         rows = np.ceil( flies / 4.0 )
         self.__makeFigure()
 
+        dc = self.totalDistanceMoved()
+
         for fly in range( flies ):
 
-            x = np.ma.MaskedArray( self.a[:,fly,0] )
-            #coords = self.a[:,fly]
+            x = self.a[:,fly,0]
+            y_max = x.shape[0]
 
-            ax = self.fig.add_subplot(cols, rows, fly+1)
+            ax = self.fig.add_subplot(COLS, rows, fly+1)
             
-            ax.xaxis.set_visible(False)
+            is_last_row = (flies - fly) < COLS
+            ax.xaxis.set_visible(is_last_row)
             ax.yaxis.set_visible(False)
 
             if onecolor:
                 ax.plot( x,np.arange(len(x)), 'o-', color=COLORS['Light Grey'])
             else:
-                x.mask = (x < self.midline)
-                ax.plot( x,np.arange(len(x)), 'o-', color=COLORS['Red'])
-                x.mask = (x > self.midline)
-                ax.plot( x,np.arange(len(x)), 'o-', color=COLORS['Light Blue'])
+                xl = np.ma.array( x, mask=(x < self.midline) )
+                ax.plot( xl ,np.arange(len(x)), 'o-', color=COLORS['Red'])
+                
+                xr = np.ma.array( x, mask=(x >= self.midline) )
+                ax.plot( xr, np.arange(len(x)), 'o-', color=COLORS['Light Blue'])
+                
             
-            ax.set_xlim((0, 500))
+            rect1 = mpl.patches.Rectangle((self.midline_left,0), (self.midline_right-self.midline_left), y_max, color=COLORS['Light Grey'])
+            ax.add_patch(rect1)
+            
+            # Info about distance traveled
+            #total distance on each side
+            d_left = dc[fly,0]
+            d_right = dc[fly,1] 
+            
+            #percentages
+            d_left_perc = d_left / (d_left + d_right) * 100
+            d_right_perc = d_right / (d_left + d_right) * 100
+            
+            #join into strings
+            text_1_left = "%.0f (%02d" % (d_left, d_left_perc) + "%)"
+            text_1_right = "%.0f (%02d" % (d_right, d_right_perc) + "%)"
+
+            #write to figure
+            ax.text(0.0, 1.05, text_1_left, ha='left', va='center', transform=ax.transAxes)
+            ax.text(1.0, 1.05, text_1_right, ha='right', va='center', transform=ax.transAxes)
+            
+            # Info about time spent
+            #total time on each side
+            t_left = ( x < self.midline_left ).sum()
+            t_right = ( x >= self.midline_right ).sum()
+            
+            #percentages
+            t_left_perc = t_left * 1.0 / (t_left + t_right) * 100
+            t_right_perc = t_right * 1.0 / (t_left + t_right) * 100
+            
+            #join into strings
+            text_2_left = "%.0f (%02d" % (t_left, t_left_perc) + "%)"
+            text_2_right = "%.0f (%02d" % (t_right, t_right_perc) + "%)"
+            
+            ax.text(0.0, 1.15, text_2_left, ha='left', va='center', transform=ax.transAxes)
+            ax.text(1.0, 1.15, text_2_right, ha='right', va='center', transform=ax.transAxes)
+            
+            ax.set_xlim((0, self.midline*2))
+            ax.set_ylim((0, y_max))
 
         self.output(append='-path')
 
@@ -215,7 +354,6 @@ class odorTracker():
         plot the lenght of each step
         """
         flies = self.a.shape[1] 
-        cols = 4
         rows = np.ceil( flies / 4.0 )
         self.__makeFigure()
 
@@ -223,13 +361,13 @@ class odorTracker():
 
             x = self.a[:,fly,0] # only x coordinates
             
-            is_left = ( x < self.midline )
-            is_right = ( x>= self.midline )
+            is_left = ( x < self.midline_left )
+            is_right = ( x>= self.midline_right )
             
             x1 = np.roll(x, -1)
-            d = np.ma.MaskedArray( ((x1 - x)[:-1]) )# all the distances, step by step
+            d = ((x1 - x)[:-1]) # all the distances, step by step
 
-            ax = self.fig.add_subplot(cols, rows, fly+1)
+            ax = self.fig.add_subplot(COLS, rows, fly+1)
             
             ax.xaxis.set_visible(False)
             ax.yaxis.set_visible(False)
@@ -259,122 +397,107 @@ class odorTracker():
         e = np.std(d)
         
         return m, e
-        
-    def filterArtifacts(self, fly):
-        """
-        """
-        pass
 
-
-
-    def __listFiles(self, directory):
-        """
-        Returns a sorted list of txt files in the given directory
-        """
-        
-        allfiles = os.listdir(directory)
-        
-        lf = [os.path.join(directory,f) for f in allfiles if os.path.splitext(f)[1] == '.txt']
-        lf.sort()
-        
-        return lf
-
-
-    def plotFlyPath(self, source, onecolor=False):
+    def writeSummary(self, filename=None):
         """
         """
         
-        fileList = self.__listFiles(source)
-        n = len(fileList)
+        src, _ = os.path.splitext(self.filename) 
+        tt, tt_perc = self.preferenceIndex()
+        lv = tt_perc[:,0]
         
-               #for sake of simplicity we use a list of arrays instead of a 3D array 
-        a = [] #because number of frames are going to be different from one file to another
+        values = ','.join(['%.1f' % v for v in lv if v > 0])
+        n = (tt_perc > 0).sum(0)[0]
+        avg = np.mean(lv[lv>0])
+        std = np.std(lv[lv>0])
         
-        for f in fileList:
-            a.append ( self.__readFile(f) )
+        string = '%s,%s,%.2f,%.2f,%s,%s\n' % (src.upper(), self.description, avg, std, n, values)
 
-        #check that all array have the same number of flies
-        allSameSize = len(set([sa.shape[1] for sa in a])) == 1
-        assert allSameSize == True, "All files must contain the same number of flies in the mask"
-        flies = a[0].shape[1]
+        if filename != None:
+            
+            fh = open(filename, "a")
+            fh.write(string)
+            fh.close()
+        else:
+            print string
+
+    def preferenceIndex(self, distance_thresh=2000):
+        """
+        """
+        tot_distance_moved = self.totalDistanceMoved().sum(axis=1)
+        #mask out those who did not move enough
+        m = tot_distance_moved < distance_thresh #1D mask
+        mm = np.vstack((m.T, m.T)).T #2D mask
         
-        cols = 4
-        rows = np.ceil( n / 4.0 )
-
-        for fly in range( flies ):
-
-            self.__makeFigure()
-
-            for fn in range( n ):
-
-                x = np.ma.MaskedArray( a[fn][:,fly,0] )
-                #coords = self.a[:,fly]
-
-                ax = self.fig.add_subplot(cols, rows, fn+1)
-                
-                ax.xaxis.set_visible(False)
-                ax.yaxis.set_visible(False)
-
-                if onecolor:
-                    ax.plot( x,np.arange(len(x)), 'o-', color=COLORS['Light Grey'])
-                else:
-                    x.mask = (x < self.midline)
-                    ax.plot( x,np.arange(len(x)), 'o-', color=COLORS['Red'])
-                    x.mask = (x > self.midline)
-                    ax.plot( x,np.arange(len(x)), 'o-', color=COLORS['Light Blue'])
-                
-                ax.set_xlim((0, 500))
-
-            self.output(append='path-fly%02d' % (fly+1) )
-
-    def plotFlySteps(self, source, onecolor=False):
+        tt = self.totalTimeOnSides()
+        tt.mask = mm
+        
+        tt_perc = np.vstack( ( (tt[:,0] * 100.0 / tt.sum(axis=1)).T, (tt[:,1] * 100.0 / tt.sum(axis=1)).T ) ).T
+        
+        return tt, tt_perc
+        
+        
+    
+    def totalTimeOnSides(self, t1=0, t2=1.0):
         """
         """
         
-        fileList = self.__listFiles(source)
-        n = len(fileList)
+        x = self.a[:,:,0]
+    
+        t = x.shape[0]
+        t1 = int(t*t1)
+        t2 = int(t*t2)
+       
+        is_left = ( x[t1:t2] < self.midline_left ).sum(axis=0); is_right = ( x[t1:t2] > self.midline_right ).sum(axis=0)        
+        tt = np.vstack(([is_left.T],[is_right.T])).T
+
+        return np.ma.array(tt)
         
-               #for sake of simplicity we use a list of arrays instead of a 3D array 
-        a = [] #because number of frames are going to be different from one file to another
+    
+    def totalDistanceMoved(self):
+        """
+        """
+        x = self.a[:,:,0]
+        x1 = np.roll(x, -1, axis=0)
         
-        for f in fileList:
-            a.append ( self.__readFile(f) )
-
-        #check that all array have the same number of flies
-        allSameSize = len(set([sa.shape[1] for sa in a])) == 1
-        assert allSameSize == True, "All files must contain the same number of flies in the mask"
-        flies = a[0].shape[1]
+        xl = np.ma.array( x, mask=(x < self.midline_left) )
+        xr = np.ma.array( x, mask=(x > self.midline_right) )
         
-        cols = 4
-        rows = np.ceil( n / 4.0 )
+        d = np.abs( (x1 - x) ) # all the distances, step by step
+        dl = np.ma.array( d, mask=(x < self.midline_left) )
+        dr = np.ma.array( d, mask=(x > self.midline_right) )
+        
+        m = np.mean(d[:-1], axis=0) # average distance
 
-        for fly in range( flies ):
+        sl = np.sum(dl[:-1], axis=0) # distances on left 
+        sr = np.sum(dr[:-1], axis=0) # distances on right
 
-            self.__makeFigure()
+        s = np.sum(d[:-1], axis=0) # all distances, same as sl+sr
+        
+        sc = np.vstack(([sr.T],[sl.T])).T #sl and sr into 2D
+        
+        return sc
+        
 
-            for fn in range( n ):
+ 
+    def filterArtifacts(self, a):
+        """
+        """
+        
+        x = a[:,:,0]
+        x1 = np.roll(x, -1, axis=0)
+        d = np.abs( (x1 - x) ) # all the distances, step by step
+        m = np.mean(d[:-1], axis=0)
+        e = np.std(d[:-1], axis=0)
+        
+        x_mask = ((d - m) > (2 * e)) # outlier if diff is greater than 2STD
+        
+        q,w=x_mask.shape
+        xy_mask = np.zeros((q,w,2))
+        xy_mask[:,:,0] = x_mask
+        xy_mask[:,:,1] = x_mask
+        return np.ma.array(a, mask = xy_mask)
 
-                x = a[fn][:,fly,0] # only x coordinates
-                
-                is_left = ( x < self.midline )
-                is_right = ( x>= self.midline )
-                
-                x1 = np.roll(x, -1)
-                d = np.ma.MaskedArray( ((x1 - x)[:-1]) )# all the distances, step by step
-
-                ax = self.fig.add_subplot(cols, rows, fn+1)
-                
-                ax.xaxis.set_visible(False)
-                ax.yaxis.set_visible(False)
-
-                d.mask = is_left
-                ax.plot( d, color=COLORS['Red'])
-
-                d.mask = is_right
-                ax.plot( d, color=COLORS['Light Blue'])
-
-
-            self.output(append='steps-fly%02d' % (fly+1) )
 
     def writeFlyPlaceRatio(self):
         """
@@ -389,32 +512,27 @@ class odorTracker():
         fullpath = os.path.join(self.directory, filename)    
         fh = open(fullpath, 'w')
 
+        #is_left_a + is_left_b + is_left_c = self.totalTimeOnSides()
+        times_1st_third = self.totalTimeOnSides(t1=0, t2=1/3)
+        times_2nd_third = self.totalTimeOnSides(t1=1/3, t2=2/3)
+        times_3rd_third = self.totalTimeOnSides(t1=2/3, t2=3/3)
+        total_times = self.totalTimeOnSides()
+        
 
         for fly in range( flies ):
 
-            x = np.ma.MaskedArray( self.a[:,fly,0] )
-            #coords = self.a[:,fly]
+            is_left_a, is_right_a = times_1st_third[fly]
+            is_left_b, is_right_b = times_2nd_third[fly]
+            is_left_c, is_right_c = times_3rd_third[fly]
+            is_left, is_right = total_times[fly]
 
-            # this counts the number of points (and hence of seconds) past on each side of the self.midline
-            # return one value for each zone
-
-            t = x.shape[0]
-            a = int(t*1/3) 
-            b = int(t*2/3)
-            
-            is_left_a = ( x[:a] < self.midline ).sum(); is_right_a = ( x[:a] >= self.midline ).sum()
-            is_left_b = ( x[a:b] < self.midline ).sum(); is_right_b = ( x[a:b] >= self.midline ).sum()
-            is_left_c = ( x[b:] < self.midline ).sum(); is_right_c = ( x[b:] >= self.midline ).sum()
-            is_left = ( x < self.midline ).sum(); is_right = ( x >= self.midline ).sum()
-            
-
-            fh.write( "%02d,%02d,%02d,%02d,%02d,%02d,%02d,%02d,%02d\n" % (fly+1, 
+            line = "%02d,%02d,%02d,%02d,%02d,%02d,%02d,%02d,%02d\n" % (fly+1, 
                                         is_left_a, is_right_a,
                                         is_left_b, is_right_b,
                                         is_left_c, is_right_c,
                                         is_left, is_right)
+            print line#fh.write(line)
                                         
-                    )
                                             
         fh.close()
                                         
