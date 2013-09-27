@@ -320,7 +320,7 @@ class cvPanel():
     Fully based on CV and not WX
     """
 
-    def __init__(self, source, resolution=None, window_title='video',track_type=None, mask_file=None, output_file=None, showROI=False,showpath=False, showtime=False, record=False):
+    def __init__(self, source, resolution=None, window_title='video',track_type=None, mask_file=None, output_file=None, showROI=False,showpath=False, showtime=False):
         """
         """
     
