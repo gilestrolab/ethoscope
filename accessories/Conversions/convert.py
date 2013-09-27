@@ -90,19 +90,54 @@ def DistanceFromFile(filename):
     """
     return CountsFromFile(filename)
 
-def getMidlines(filename=None, orientation=None):
+def plotFlyActivity(coords, fly):
     """
-    FIX THIS
     """
-    return np.array([130,]*10).reshape(10,1)
+    orientation, md = getMidlines(coords)
+    x = coords[:,:,:1]; y = coords[:,:,1:]
+    
+    if orientation == 'H':
+        activity = x[:,fly]
+    if orientation == 'V':
+        activity = y[:,fly]
+        
+    m = md[fly]
+    
+    up = np.ma.array(activity, mask=activity>=m)
+    down = np.ma.array(activity, mask=activity<=m)
+    pylab.plot(up, 'b-')
+    pylab.plot(down, 'g-')
+    
 
+def getMidlines(coords):
+    """
+    """
+    x = coords[:,:,:1]; y = coords[:,:,1:]
+    
+    
+    x_span = x.max(0) - x.min(0)
+    y_span = y.max(0) - y.min(0)
+    
+    if y_span.max() > x_span.max(): 
+        orientation = 'V'
+        md = y_span / 2
+        
+    if x_span.max() > y_span.max(): 
+        orientation = 'H'
+        md = x_span / 2
+    
+    return orientation, md
 
 def compressArray(a, resolution=60):
     """
     This is used to compress an array having data in seconds
     to an array summing each 60 seconds into one minute
     """
+    
     frames, flies, d = a.shape
+
+    resolution = np.round(frames / 1440.)
+
     bins = frames / resolution 
     rest = frames % resolution
 
@@ -117,7 +152,7 @@ def compressArray(a, resolution=60):
     return c
 
 
-def CoordsToBeamCrossings(coords, orientation='V'):
+def CoordsToBeamCrossings(coords):
     """
     Transform an array containing coordinates to a beam crossing count
     coords should be a numpy array of shape ( frames, flies, (x,y) )
@@ -126,7 +161,7 @@ def CoordsToBeamCrossings(coords, orientation='V'):
                     V   Vertical    use Y value to check crossing
     """
    
-    md = getMidlines(orientation)
+    orientation, md = getMidlines(coords)
     
     fs = np.roll(coords, -1, 0)
     
@@ -157,6 +192,7 @@ def CoordsToDistance(coords):
     #d = d.reshape((frames, flies))
 
     return compressArray(d)
+    #return d
 
 def getHeaders(filename):
     """
@@ -193,47 +229,56 @@ def detectFileType(filename):
     
 #Conversion front-ends  
 
-def c2b(file_in, file_out, extend=True):
+def c2b(file_in, file_out=None, extend=True):
     """
+    Converts Coordinate to virtual beam crossing
     """
-    data =  CoordsFromFile(file_in)
-    dist = CoordsToBeamCrossings(data)
-    
+
+    new_content = ''
+    data =  CoordsFromFile(file_in) #This contains only the actual coordinates
+    beams = CoordsToBeamCrossings(data)
     headers = getHeaders(file_in)
+    VALUES_PER_MINUTE = int(np.floor( len(data) / 1440. ))
     
-    flies = dist.shape[1]
+    flies = beams.shape[1]
     
     if extend and flies < 32:
         extension = TAB + TAB.join(['0',] * (32-flies) )
     else:
         extension = ''
     
-    try:
-        fh = open(file_out, 'w')
 
-        for h, c in zip ( headers[::60], dist):
-            fh.write (
-                         TAB.join(h) +
-                         'TAB0TAB0TAB' +
-                         TAB.join( [str(xy)[1:-1] for xy in c.tolist()] ) +
-                         extension +
-                         '\n'
-                       )
-        fh.close()
+    for h, c in zip ( headers[::VALUES_PER_MINUTE], beams):
+        new_content += (
+                             TAB.join(h) + TAB +
+                             #'0TAB * 2' + #This is not needed anymore
+                             TAB.join( [str(xy)[1:-1] for xy in c.tolist()] ) +
+                             extension +
+                             '\n'
+                           )
+                           
+    if file_out:
+        try:
+            fh = open(file_out, 'w')
+            fh.write ( new_content )
+            fh.close()
 
-    except IOError:
-        print "Error opening the output file"
+        except IOError:
+            print "Error opening the output file"
+            
+    return new_content
 
-    
    
-def c2d(file_in, file_out, extend=True):
+def c2d(file_in, file_out=None, extend=True):
     """
     Converts coordinates to distance
     """
-    data =  CoordsFromFile(file_in)
-    dist = CoordsToDistance(data)
     
+    new_content = ''
+    data =  CoordsFromFile(file_in) #This contains only the actual coordinates
+    dist = CoordsToDistance(data)
     headers = getHeaders(file_in)
+    VALUES_PER_MINUTE = int(np.floor( len(data) / 1440. ))
     
     flies = dist.shape[1]
     
@@ -242,21 +287,26 @@ def c2d(file_in, file_out, extend=True):
     else:
         extension = ''
     
-    try:
-        fh = open(file_out, 'w')
 
-        for h, c in zip ( headers[::60], dist):
-            fh.write (
-                         TAB.join(h) + TAB +
-                         #'0TAB * 2' + #This is not needed anymore
-                         TAB.join( [str(xy)[1:-1] for xy in c.tolist()] ) +
-                         extension +
-                         '\n'
-                       )
-        fh.close()
+    for h, c in zip ( headers[::VALUES_PER_MINUTE], dist):
+        new_content += (
+                             TAB.join(h) + TAB +
+                             #'0TAB * 2' + #This is not needed anymore
+                             TAB.join( [str(xy)[1:-1] for xy in c.tolist()] ) +
+                             extension +
+                             '\n'
+                           )
+                           
+    if file_out:
+        try:
+            fh = open(file_out, 'w')
+            fh.write ( new_content )
+            fh.close()
 
-    except IOError:
-        print "Error opening the output file"
+        except IOError:
+            print "Error opening the output file"
+            
+    return new_content
 
 if __name__ == '__main__':
     
@@ -274,16 +324,16 @@ if __name__ == '__main__':
         
     input_file = options.source
     
-    if not options.output:
+    if input_file and not options.output:
         path_filename, extension = os.path.splitext(input_file)
         output_file = path_filename + '-converted' + extension
     else:
         output_file = options.output
  
-    if options.c2d:
+    if input_file and options.c2d:
         c2d(input_file, output_file)
 
-    if options.c2b:
+    if input_file and options.c2b:
         c2b(input_file, output_file)
         
 
