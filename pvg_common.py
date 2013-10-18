@@ -354,7 +354,7 @@ class previewPanel(wx.Panel):
     A panel showing the video images. 
     Used for thumbnails
     """
-    def __init__(self, parent, size, keymode=True, singleFrameMode=False):
+    def __init__(self, parent, size, keymode=True, singleFrameMode=False, showtime=False):
 
         wx.Panel.__init__(self, parent, wx.ID_ANY, style=wx.WANTS_CHARS)
         
@@ -374,7 +374,7 @@ class previewPanel(wx.Panel):
         self.isSDMonitor = False
         self.trackType = 1
         self.drawROI = True
-        self.timestamp = False
+        self.timestamp = showtime
         self.camera = None
         self.resolution = None
 
@@ -576,6 +576,7 @@ class previewPanel(wx.Panel):
         """
         Divide the currently selected ROI into n pieces
         if n=0, add one piece
+        TODO: ADD CUSTOM FEATURES FOR MASK
         """
 
         vertical = True
