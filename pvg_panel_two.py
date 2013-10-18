@@ -38,7 +38,7 @@ class panelLiveView(wx.Panel):
         self.fs_size = options.GetOption("FullSize")
         self.monitor_name = ''
 
-        self.fsPanel = previewPanel(self, size=self.fs_size)
+        self.fsPanel = previewPanel(self, size=self.fs_size, showtime=True)
         
         sizer_1 = wx.BoxSizer(wx.VERTICAL)
         sizer_2 = wx.BoxSizer(wx.HORIZONTAL)
