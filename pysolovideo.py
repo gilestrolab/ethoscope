@@ -118,17 +118,11 @@ class Cam:
     Functions and properties inherited by all cams
     """
     
-    def getResolution(self):
-        """
-        Returns frame resolution as tuple (w,h)
-        """
-        return self.resolution      
-        
     def saveSnapshot(self, filename, quality=90, timestamp=False):
         """
         """
         img = self.getImage(timestamp, imgType)
-        cv2.SaveImage(filename, img) #with opencv
+        cv2.SaveImage(filename, img)
 
     def close(self):
         """
@@ -191,14 +185,11 @@ class realCam(Cam):
         if not self.camera:
             self.__initCamera()
         
-        #if self.camera.isOpened():
         __, frame = self.camera.read()
         
         if self.scale:
-            newsize = cv2.CreateImage(self.resolution , cv2.IPL_DEPTH_8U, 3)
-            cv2.Resize(frame, newsize)
-            frame = newsize
-        
+            frame = cv2.resize( frame, self.resolution )
+
         return frame, self.getFrameTime()
 
     def isLastFrame(self):
@@ -210,10 +201,11 @@ class realCam(Cam):
     def close(self):
         """
         Closes the connection 
+        http://stackoverflow.com/questions/15460706/opencv-cv2-in-python-videocapture-not-releasing-camera-after-deletion
         """
         print "attempting to close stream"
 
-        cv2.VideoCapture.release(self.devnum) 
+        self.camera.release
         self.camera = None
         
 class virtualCamMovie(Cam):
@@ -266,6 +258,16 @@ class virtualCamMovie(Cam):
        
         self.blackFrame = np.zeros( (w, h, 3) )
         
+    def getResolution(self):
+        """
+        Returns frame resolution as tuple (w,h)
+        """
+        x = self.capture.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH)
+        y = self.capture.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)
+
+        return (x,y)
+        
+
     def getFrameTime(self, asString=None):
         """
         Return the time of the frame
@@ -433,6 +435,14 @@ class virtualCamFrames(Cam):
         """
         self.resolution = (w, h)
         self.scale = (self.resolution != self.in_resolution)
+        
+        
+    def getResolution(self):
+        """
+        Return frame resolution
+        TODO: DOES THIS WORK?
+        """
+        return self.resolution
 
     def compressAllImages(self, compression=90, resolution=(960,720)):
         """
@@ -476,7 +486,7 @@ class ROImask():
         self.ROAS = [] #Regions of Action
         self.points_to_track = []
         
-    def __relativeBeams(self):
+    def relativeBeams(self):
         """
         Return the coordinates of the beam
         relative to the ROI to which they belong
@@ -555,9 +565,12 @@ class ROImask():
         """
         Add a new ROI to the arena
         """
-        self.ROIS.append( coords )
-        self.beams.append ( self.__getMidline (coords)  ) 
-        self.points_to_track.append(n_flies)
+        good_coords = (np.array(coords)>=0).all()
+        
+        if good_coords: 
+            self.ROIS.append( coords )
+            self.beams.append ( self.__getMidline (coords)  ) 
+            self.points_to_track.append(n_flies)
         
     def getROI(self, n):
         """
@@ -729,6 +742,7 @@ class ROImask():
         """
         EXPERIMENTAL
         Find the greater square 
+        THIS NEED TO BE TRANSLATED TO CV2 - AT THE MOMENT IS NOT USED
         """
         
         def angle(pt1, pt2, pt0):
@@ -914,7 +928,8 @@ class Monitor(object):
         height, width, _ = frame.shape
 
         for label, value in self.debug_info.iteritems():
-            text = "%s: %.1f" % (label, value)
+            text = "%s: %s" % (label, value)
+                
             (x1, y1), ymin = cv2.getTextSize(text, cv2.FONT_HERSHEY_PLAIN, 1, 1)
             y = height - ymin - 2
             cv2.putText(frame, text, (x, y), cv2.FONT_HERSHEY_PLAIN, 1, textcolor, 1)
@@ -1086,6 +1101,10 @@ class Monitor(object):
             self.__captureFromMovie(camera, resolution, options)
         elif os.path.isdir(camera):
             self.__captureFromFrames(camera, resolution, options)
+            
+        self.debug_info["source"] = ("cam","avi","jpg")[camera]
+        self.debug_info["res"] = "%s,%s" % (resolution)
+        
 
     def close(self):
         """
@@ -1317,8 +1336,8 @@ class Monitor(object):
         
         avg, std, _, is_outside = self.fly_movement.update(distance, outlier=1)
         
-        self.debug_info['FLY_DISTANCE_AVG'] = avg
-        self.debug_info['FLY_DISTANCE_STD'] = std
+        self.debug_info['FLY_DISTANCE_AVG'] = "%.1f" % avg
+        self.debug_info['FLY_DISTANCE_STD'] = "%.1f" % std
         
         if is_outside and not is_first_movement:
             fly = previous_position
@@ -1461,7 +1480,7 @@ class Monitor(object):
 
         values = []
 
-        for fd, md in zip(self.fly_one_minute_buffer, self.__relativeBeams()):
+        for fd, md in zip(self.fly_one_minute_buffer, self.mask.relativeBeams()):
 
             (mx1, my1), (mx2, my2) = md
             horizontal = (mx1 == mx2)
@@ -1479,6 +1498,7 @@ class Monitor(object):
             values .append ( crossed.sum() )
         
         activity = '\t'.join( [str(v) for v in values] )
+        
         return activity
             
     def calculatePosition(self, resolution=1):
@@ -1545,7 +1565,7 @@ class Monitor(object):
         frame, time = self.cam.getImage()
         
         # TRACKING RELATED
-        if self.tracking: 
+        if self.tracking and self.mask.ROIS: 
             frame, positions = self.trackByContours(frame)
             
             # for each frame adds fly coordinates to all ROIS. Also do some filtering to remove false positives
@@ -1675,8 +1695,8 @@ class Monitor(object):
                 area = cv2.contourArea(cnt)
                 avg, std, distance, is_outlier = self.fly_area.update(area)
                 
-                self.debug_info['FLY_AREA_AVG'] = avg
-                self.debug_info['FLY_AREA_STD'] = std
+                self.debug_info['FLY_AREA_AVG'] = "%.1f" % avg
+                self.debug_info['FLY_AREA_STD'] = "%.1f" % std
                 
                 (x,y),radius = cv2.minEnclosingCircle(cnt)
                 center = (int(x),int(y))
