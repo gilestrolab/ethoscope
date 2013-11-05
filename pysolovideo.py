@@ -220,6 +220,7 @@ class realCam(Cam):
         http://stackoverflow.com/questions/8110310/simple-way-to-query-connected-usb-devices-info-in-python
         http://askubuntu.com/questions/49910/how-to-distinguish-between-identical-usb-to-serial-adapters
         """
+        serial = 0
         plat = os.sys.platform # linux, linux2, darwin, win32
         if "linux" in plat:
             addr = "/dev/video%s" % self.devnum
