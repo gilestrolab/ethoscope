@@ -127,7 +127,12 @@ class Cam:
     def close(self):
         """
         """
-        pass
+        return 0
+        
+    def getSerialNumber(self):
+        """
+        """
+        return 0
 
         
 class realCam(Cam):
@@ -207,6 +212,23 @@ class realCam(Cam):
 
         self.camera.release
         self.camera = None
+        
+        
+    def getSerialNumber(self):
+        """
+        Uses pyUSB
+        http://stackoverflow.com/questions/8110310/simple-way-to-query-connected-usb-devices-info-in-python
+        http://askubuntu.com/questions/49910/how-to-distinguish-between-identical-usb-to-serial-adapters
+        """
+        plat = os.sys.platform # linux, linux2, darwin, win32
+        if "linux" in plat:
+            addr = "/dev/video%s" % self.devnum
+            o = os.popen ("udevadm info %s | grep ID_SERIAL_SHORT" % addr).read().strip()
+            _ , serial = o.split("=")
+            
+        return serial
+            
+            
         
 class virtualCamMovie(Cam):
     """
@@ -895,6 +917,7 @@ class Monitor(object):
 
         self.debug_info = {}
 
+
 #######################################################        
         
         
@@ -1104,6 +1127,7 @@ class Monitor(object):
             
         self.debug_info["source"] = ("cam","avi","jpg")[camera]
         self.debug_info["res"] = "%s,%s" % (resolution)
+        self.debug_info["serial"] = self.cam.getSerialNumber()
         
 
     def close(self):
