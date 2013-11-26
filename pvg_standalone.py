@@ -59,7 +59,7 @@ if __name__=="__main__":
         
     elif options.source:
         
-        resolution = (640, 480)
+        resolution = (800, 600)
         source = options.source # integer or filename or dirname
         track = options.mask_file and options.track_type
         mask_file = options.mask_file or splitext(options.source)[0]+'.msk'
