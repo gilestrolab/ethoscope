@@ -748,7 +748,8 @@ class pvg_AcquirePanel(wx.Panel):
             
             mf = os.path.split(m['mask_file'])[1]
             df = 'Monitor%02d.txt' % (mn)
-            row = [mn, s, mf, df, m['track_type'], m['track'] ]
+            tt = ['DISTANCE','VBS','XY_COORDS'][m['track_type']]
+            row = [mn, s, mf, df, tt, m['track'] ]
             self.grid.AddRow(row)
             
             
