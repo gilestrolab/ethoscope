@@ -140,7 +140,7 @@ class realCam(Cam):
     a realCam class will handle a webcam connected to the system
     camera is handled through opencv and images can be transformed to PIL
     """
-    def __init__(self, devnum=0, resolution=(640,480)):
+    def __init__(self, devnum=0, resolution=(800, 600)):
 
         self.devnum=devnum
         self.resolution = resolution
@@ -220,12 +220,15 @@ class realCam(Cam):
         http://stackoverflow.com/questions/8110310/simple-way-to-query-connected-usb-devices-info-in-python
         http://askubuntu.com/questions/49910/how-to-distinguish-between-identical-usb-to-serial-adapters
         """
-        serial = 0
+        serial = 'NO_SERIAL'
         plat = os.sys.platform # linux, linux2, darwin, win32
         if "linux" in plat:
-            addr = "/dev/video%s" % self.devnum
-            o = os.popen ("udevadm info %s | grep ID_SERIAL_SHORT" % addr).read().strip()
-            _ , serial = o.split("=")
+            try:
+                addr = "/dev/video%s" % self.devnum
+                o = os.popen ("udevadm info %s | grep ID_SERIAL_SHORT" % addr).read().strip()
+                _ , serial = o.split("=")
+            except:
+                pass
             
         return serial
             
@@ -508,6 +511,9 @@ class ROImask():
         self.beams = [] # beams: absolute coordinates
         self.ROAS = [] #Regions of Action
         self.points_to_track = []
+        self.referencePoints = ((),())
+        self.serial = None
+        
         
     def relativeBeams(self):
         """
@@ -626,14 +632,18 @@ class ROImask():
         """
         return len(self.ROIS)
         
-    def saveROIS(self, filename):
+    def saveROIS(self, filename, serial=None):
         """
         Save the current crop data to a file
         """
         cf = open(filename, 'w')
         cPickle.dump(self.ROIS, cf)
         cPickle.dump(self.points_to_track, cf)
+        cPickle.dump(self.referencePoints, cf)
 
+        self.serial = serial
+        cPickle.dump(serial, cf)
+        
         cf.close()
         
     def loadROIS(self, filename):
@@ -644,6 +654,8 @@ class ROImask():
             cf = open(filename, 'r')
             self.ROIS = cPickle.load(cf)
             self.points_to_track = cPickle.load(cf)
+            self.referencePoints = cPickle.load(cf)
+            self.serial = cPickle.load(cf)
             cf.close()
             
             for coords in self.ROIS:
@@ -886,9 +898,11 @@ class Monitor(object):
         self.cam = None
         self.drawing = True
         self.tracking = True
+
+        self.referencePoints = None
         
         self.mask = ROImask(self)
-        
+
         self.__last_time = 0
         self.__temp_FPS = 0 
         self.__processingFPS = 0
@@ -1119,17 +1133,17 @@ class Monitor(object):
         except:
             pass
             
-        if type(camera) == type(0):
+        if type(camera) == int:
             self.__captureFromCAM(camera, resolution, options)
         elif os.path.isfile(camera):
             self.__captureFromMovie(camera, resolution, options)
         elif os.path.isdir(camera):
             self.__captureFromFrames(camera, resolution, options)
             
-        self.debug_info["source"] = ("cam","avi","jpg")[camera]
+        self.debug_info["source"] = camera
         self.debug_info["res"] = "%s,%s" % (resolution)
         self.debug_info["serial"] = self.cam.getSerialNumber()
-        
+
 
     def close(self):
         """
@@ -1292,7 +1306,8 @@ class Monitor(object):
         Save the current crop data to a file
         """
         if not filename: filename = self.mask_file
-        self.mask.saveROIS(filename)
+        self.mask.referencePoints = self.referencePoints
+        self.mask.saveROIS( filename, self.cam.getSerialNumber() )
         
     def loadROIS(self, filename=None):
         """
@@ -1303,6 +1318,10 @@ class Monitor(object):
         if self.mask.loadROIS(filename):
             nROI = self.mask.getROInumber()
             self.updateFlyBuffers(nROI, new=True)
+
+            print self.mask.referencePoints
+            print self.referencePoints
+
             return True
         else:
             return False
@@ -1414,24 +1433,17 @@ class Monitor(object):
         1	09 Dec 11	19:02:19	1	0	1	0	0	0	?		[actual_activity]
         """
         #Here we build the header
-        #year, month, day, hh, mn, sec = time.localtime()[0:6]
-        
         dt = datetime.datetime.fromtimestamp( self.getFrameTime() )
-        
-        year, month, day, hh, mn, sec = dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second
-        month = month_abbr[month]
-        
-        #0 rowline
-        
+       
+        #0 rowline        # computed when writing to file
         #1 date
-        date = '%02d %s %s' % (day, month, str(year)[-2:])
-        #2 time
-        tt = '%02d:%02d:%02d' % (hh, mn, sec)
+        date = '%02d %s %s' % (dt.day, month_abbr[dt.month], dt.year-2000)
+        #2 time        # computed when writing to file
         #3 monitor is active
         active = '1'
         #4 average frames per seconds (FPS)
         damscan = int(round(fps))
-        #5 tracktype
+        #5 tracktype # ['DISTANCE','VBS','XY_COORDS']
         tracktype = self.trackType
         #6 is a monitor with sleep deprivation capabilities?
         sleepDep = self.isSDMonitor * 1
@@ -1465,6 +1477,9 @@ class Monitor(object):
 
             
         for line in activity:
+            tt = '%02d:%02d:%02d' % (dt.hour, dt.minute, dt.second)
+            dt = dt + datetime.timedelta(seconds=1)
+
             self.__rowline +=1
             row_header = '%s\t'*10 % (self.__rowline, date, tt, active, damscan, tracktype, sleepDep, monitor, unused, light)
             row += row_header + line + extension + '\n'
@@ -1616,6 +1631,10 @@ class Monitor(object):
 
         
         # NOT TRACKING RELATED
+        if self.referencePoints == None:
+            self.referencePoints = self.findReferenceCircles(frame)
+            self.debug_info['REF_POINTS'] = self.referencePoints
+
         if self.drawing and drawROIs and self.mask.ROIS: # draw ROIs
             ROInum = 0
             for ROI, beam in zip(self.mask.ROIS, self.mask.beams):
@@ -1623,12 +1642,25 @@ class Monitor(object):
                 frame = self.__drawROI(frame, ROI, ROInum=ROInum)
                 frame = self.__drawBeam(frame, beam)
 
+        if self.drawing and drawROIs and self.referencePoints != None:
+            for i in self.referencePoints[0,:]:
+                x, y, r = i
+                cv2.circle(frame,(i[0],i[1]),i[2],(255,255,255),2)
+                frame = self.__drawCross (frame, (x,y), color=(0,0,255))
+            
+            if self.mask.referencePoints != ((),()):
+                for i in self.mask.referencePoints[0,:]:
+                    cv2.circle(frame,(i[0],i[1]),i[2],(0,255,0),1)  # draw the outer circle
+                    cv2.circle(frame,(i[0],i[1]),2,(0,0,255),3)     # draw the center of the circle
+
+        
         if self.drawing and selection:
             frame = self.__drawROI(frame, selection, color=(0,0,255)) # draw red selection
             
         if self.drawing and crosses:
             for pt in crosses:
                 frame = self.__drawCross (frame, pt, color=(0,0,255)) # draw red crosses
+            
 
         if self.drawing and timestamp: 
             frame = self.__drawDebugInfo(frame)
@@ -1639,6 +1671,7 @@ class Monitor(object):
             
         if self.grabMovie and self.isLastFrame():
             self.writer.release()
+         
     
         return frame
 
@@ -1746,3 +1779,20 @@ class Monitor(object):
             positions.append( (fly_number, fly_coords) )
         
         return draw_frame, positions
+
+    def findReferenceCircles(self, frame):
+        """
+        Finds reference circles and return their coordinates as list of tuples
+        """
+        circles = None
+        
+        cframe = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        cframe = cv2.medianBlur(cframe,5)
+        circles = cv2.HoughCircles(cframe, cv2.cv.CV_HOUGH_GRADIENT, 1, 10, param1=100, param2=30, minRadius=5, maxRadius=20)
+        
+        if circles != None:
+            circles = np.uint16(np.around(circles))
+
+        return circles
+
+        
