@@ -24,123 +24,159 @@
 
 import wx, os
 from pvg_common import options
+import wx.lib.filebrowsebutton as filebrowse
 
-class pvg_OptionsPanel(wx.Panel):
-    def __init__(self, parent):
-        wx.Panel.__init__(self, parent, wx.ID_ANY)
-        self.parent = parent
-        
-        ########
-        mainSizer = wx.BoxSizer(wx.HORIZONTAL)
-        optionsList = [key for key in options.defaultOptions]
-        self.tb = wx.ListBox(self, wx.ID_ANY, choices=optionsList, style=wx.LB_SINGLE)
-        self.Bind(wx.EVT_LISTBOX, self.onSelect, self.tb)
-        #########
-        
-        #########
-        self.sp = wx.Panel(self, wx.ID_ANY)
-        sz1 = wx.BoxSizer(wx.VERTICAL)
-        
-        sz2 = wx.BoxSizer(wx.VERTICAL)
-        titleFont = wx.Font(10, wx.SWISS, wx.NORMAL, wx.BOLD)
-        items = []
-        self.input = []
 
-        all_keys = [k for k in options.defaultOptions]
-        key = all_keys[0]
-        default_value = str(options.defaultOptions[key][0])
-        text = options.defaultOptions[key][1]
-        all_values = [str(options.GetOption(key)) for key in all_keys]
-        self.values = dict( [ (key, value) for (key, value) in zip(all_keys, all_values)] )                           
+class partial: #AKA curry
+    '''
+    This functions allows calling another function upon event trigger and pass arguments to it
+    ex buttonA.Bind (wx.EVT_BUTTON, partial(self.Print, 'Hello World!'))
+    '''
 
-        self.Title = wx.StaticText(self.sp, wx.ID_ANY, '%s' % key)
-        self.Title.SetFont(titleFont)
-        self.Description = wx.StaticText(self.sp, -1,  '\n%s.\nDefault value = %s\n' % (text, default_value) )
-        self.Input = wx.TextCtrl(self.sp, -1, all_values[0] )
-        self.Bind(wx.EVT_TEXT, self.onChangeValues, self.Input)
+    def __init__(self, fun, *args, **kwargs):
+        self.fun = fun
+        self.pending = args[:]
+        self.kwargs = kwargs.copy()
 
-        sz2.Add(self.Title, 0, wx.LEFT|wx.ALL, 2)
-        sz2.Add(self.Description, 0, wx.LEFT|wx.ALL, 2)
-        sz2.Add(self.Input, 0, wx.LEFT|wx.ALL, 2)
-        sz2.Add ( (wx.StaticLine(self.sp)), 0, wx.EXPAND|wx.TOP|wx.BOTTOM, 5 )
-        
-        self.sp.SetSizer(sz2)
-        #########
+    def __call__(self, *args, **kwargs):
+        if kwargs and self.kwargs:
+            kw = self.kwargs.copy()
+            kw.update(kwargs)
+        else:
+            kw = kwargs or self.kwargs
 
-        #########
-        btnSz = wx.BoxSizer(wx.HORIZONTAL)
-        saveBtn = wx.Button(self, wx.ID_SAVE)
-        clearBtn = wx.Button(self, wx.ID_CANCEL)
-        self.Bind(wx.EVT_BUTTON, self.onCancel, clearBtn)
-        self.Bind(wx.EVT_BUTTON, self.onSave, saveBtn)
-        btnSz.Add (saveBtn, 0, wx.ALL, 5) 
-        btnSz.Add (clearBtn, 0, wx.ALL, 5) 
-        #########
-
-        sz1.Add (self.sp, 1, wx.EXPAND|wx.ALL, 10)
-        sz1.Add (btnSz, 0, wx.EXPAND, 0)
-        
-        mainSizer.Add(self.tb, 0, wx.EXPAND|wx.ALL,1)
-        mainSizer.Add(sz1, 0, wx.EXPAND|wx.ALL,1)
-        
-        self.SetSizer(mainSizer)
-
-    def onChangeValues(self, event):
-        """
-        """
-        key = self.Title.GetLabel()
-        self.values[key] = event.GetString()
-
-    def onSelect(self, event):
-        """
-        """
-        key = event.GetString()
-        self.updatePanel(key)
-
-    def updatePanel(self, key):
-        """
-        """
-        default_value = str(options.defaultOptions[key][0])
-        text = options.defaultOptions[key][1]
-        act_value = self.values[key]
-        
-        self.Title.SetLabel('%s' % key)
-        self.Description.SetLabel('\n%s.\nDefault value = %s' % (text, default_value))
-        self.Input.SetValue(act_value)        
-        
-    def onCancel(self, event):
-        """
-        """
-        self.parent.Destroy()
-        
-    def onSave(self, event):
-        """
-        """
-        keys = [key for key in options.defaultOptions]
-        
-        for k in keys:
-            v = self.values[k]
-            v = v.replace('(',''); v = v.replace(')','')
-            options.SetValue('Options', k, v)
-        
-        options.Save()
-        self.parent.Close()
+        return self.fun(*(self.pending + args), **kw)
 
 class optionsFrame(wx.Frame):
-    def __init__(self, *args, **kwargs):
-        kwargs["style"] = wx.SYSTEM_MENU | wx.CAPTION
-        kwargs["size"] = (600, 400)
-
-        wx.Frame.__init__(self, *args, **kwargs)
-        opt_panel =  pvg_OptionsPanel(self)
+    def __init__(self, parent, ID=-1, title='pySolo Video Options', pos=wx.DefaultPosition,
+        size=(640,480), style=wx.DEFAULT_FRAME_STYLE
+            ):
         
+        wx.Frame.__init__(self, parent, ID, title, pos, size, style)
+        
+        pp = wx.Panel(self, -1)
+        self.optpane = wx.Treebook(pp, -1, style= wx.BK_DEFAULT)
+
+        # Now make a bunch of panels for the list book
+        for section in options.getOptionsGroups():
+            # The first item of the list is the main Panel
+            tbPanel = self.makePanel(self.optpane, section)
+            self.optpane.AddPage(tbPanel, section)
+
+            #for option in options.getOptionsNames(section):
+            #    # All the following ones are children
+            #    tbPanel = self.makePanel(self.optpane, option)
+            #    self.optpane.AddSubPage(tbPanel, option)
+
+
+        btSave = wx.Button(pp, wx.ID_SAVE)
+        btCancel = wx.Button(pp, wx.ID_CANCEL)
+        btSave.Bind(wx.EVT_BUTTON, self.onSaveOptions)
+        btCancel.Bind(wx.EVT_BUTTON, self.onCancelOptions)
+        self.Bind(wx.EVT_CLOSE, self.onCancelOptions)
+
+
+        btSz = wx.BoxSizer(wx.HORIZONTAL)
+        btSz.Add (btCancel)
+        btSz.Add (btSave)
+
+        sz = wx.BoxSizer(wx.VERTICAL)
+        sz.Add (self.optpane, 1, wx.EXPAND)
+        sz.Add (btSz, 0, wx.ALIGN_RIGHT | wx.ALL, 10)
+
+        pp.SetSizer(sz)
+
+        # This is a workaround for a sizing bug on Mac...
+        wx.FutureCall(100, self.__adjustSize)
+
+
+        for i in range(0,len(self.optpane.Children)-1):
+            self.optpane.ExpandNode(i)
+
+    def __adjustSize(self):
+        '''
+        Apparently this is needed as workaround for a sizing bug on Mac.
+        '''
+        self.optpane.GetTreeCtrl().InvalidateBestSize()
+        self.optpane.SendSizeEvent()
+
+    def makePanel(self, parent, name):
+        """
+        """
+        tp = wx.Panel(parent, -1,  style = wx.TAB_TRAVERSAL)
+
+        self.virtualw = wx.ScrolledWindow(tp)
+        
+        sz1 = wx.BoxSizer(wx.VERTICAL)
+
+        titleFont = wx.Font(10, wx.SWISS, wx.NORMAL, wx.BOLD)
+        items = []
+
+        for option in options.getOptionsNames(name):
+            option_name = option
+            option_value= str(options.GetOption(option_name))
+            option_description = options.getOptionDescription(option_name)
+
+            items.append ( wx.StaticText(self.virtualw, -1, '\nSet value of the variable: %s' % option_name))
+            items[-1].SetFont(titleFont)
+            items.append (  wx.StaticText(self.virtualw, -1, option_description) )
+
+            if "FOLDER" in option_name.upper():
+                items.append ( filebrowse.DirBrowseButton(self.virtualw, -1, size=(400, -1), changeCallback = partial(self.__saveValue, option_name), startDirectory="."  ))
+                items.append ( (wx.StaticLine(self.virtualw), 0, wx.EXPAND|wx.TOP|wx.BOTTOM, 5 ))
+                
+            
+            else: #for boolean first choice is always True, second choice always False
+                
+                items.append ( wx.TextCtrl (self.virtualw, -1, value=option_value))
+                items[-1].Bind (wx.EVT_TEXT, partial (self.__saveValue, option_name) )
+                items.append ( (wx.StaticLine(self.virtualw), 0, wx.EXPAND|wx.TOP|wx.BOTTOM, 5 ))
+        
+        
+        
+        sz1.AddMany (items)
+        self.virtualw.SetSizer(sz1)
+        sz1.Fit(self.virtualw)
+        
+        self.virtualw.SetScrollRate(20,20)
+        TreeBookPanelSizer = wx.BoxSizer()
+        TreeBookPanelSizer.Add(self.virtualw,  1, wx.GROW | wx.EXPAND, 0)
+        tp.SetSizer(TreeBookPanelSizer)
+        return tp
+        
+    def __saveValue(self, key, event):
+        """
+        """
+        value = event.GetString()
+        options.SetOption( key, value )
+        
+        
+    def onCancelOptions(self, event):
+        """
+        """
+        self.Destroy()
+        
+    def onSaveOptions(self, event):
+        """
+        """
+        options.Save()
+        self.Close()
+
+
+
+class MyApp(wx.App):
+    def OnInit(self):
+        self.options_frame =  optionsFrame(None)
+        self.options_frame.Show(True)
+        return True
+
 
 if __name__ == '__main__':
 
-    # Run as standalone
-    app=wx.PySimpleApp(0)
-    frame_opt = optionsFrame(None, -1, '')
-    app.SetTopWindow(frame_opt)
-    frame_opt.Show()
+
+    # Run program
+    app=MyApp()
     app.MainLoop()
+
+
 

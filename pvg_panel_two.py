@@ -133,7 +133,10 @@ class panelLiveView(wx.Panel):
         sizer_1.Add(sizer_2, 0, wx.ALIGN_CENTRE|wx.LEFT|wx.RIGHT|wx.TOP, 5 )
 
         
-        self.SetSizer(sizer_1) 
+        self.SetSizer(sizer_1)
+        print wx.Window.FindFocus()
+        
+        self.Bind( wx.EVT_CHAR, self.fsPanel.onKeyPressed )
 
     def StopPlaying(self):
         """
@@ -183,7 +186,7 @@ class panelLiveView(wx.Panel):
         wildcard = "pySolo mask file (*.msk)|*.msk"
         
         dlg = wx.FileDialog(
-            self, message="Save file as ...", defaultDir=os.getcwd(), 
+            self, message="Save file as ...", defaultDir=options.GetOption("Mask_Folder"), 
             defaultFile=filename, wildcard=wildcard, style=wx.SAVE
             )
 
@@ -203,7 +206,7 @@ class panelLiveView(wx.Panel):
         """
         path = self.onSaveMask(None)
         mn = self.monitor_name.replace(' ','')
-        options.SetValue(mn, 'maskfile', path)
+        options.setValue(mn, 'maskfile', path)
         options.Save()
 
     def onLoadMask(self, event):
@@ -215,7 +218,7 @@ class panelLiveView(wx.Panel):
         
         dlg = wx.FileDialog(
             self, message="Choose a file",
-            defaultDir=os.getcwd(),
+            defaultDir=options.GetOption("Mask_Folder"),
             defaultFile="",
             wildcard=wildcard,
             style=wx.OPEN | wx.CHANGE_DIR

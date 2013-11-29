@@ -86,17 +86,23 @@ class myConfig():
                                
     def Save(self, temporary=False, newfile=False, filename=None):
         """
+        Save configuration to new file
         """
         
         if temporary and not filename: filename = self.filename_temp
         elif not temporary and not filename: filename = self.filename
        
+        groups = set()
+       
         if newfile:
             self.config = ConfigParser.RawConfigParser()
-            self.config.add_section('Options')
+            for group in self.getOptionsGroups():
+                self.config.add_section(group)
             
             for key in self.defaultOptions:
-                self.config.set('Options', key, self.defaultOptions[key][0])
+                group = self.defaultOptions[key][2]
+                value = self.defaultOptions[key][0]
+                self.config.set(group, key, value)
 
         with open(filename, 'wb') as configfile:
             self.config.write(configfile)
@@ -104,7 +110,7 @@ class myConfig():
         if not temporary: self.Save(temporary=True)
 
 
-    def SetValue(self, section, key, value):
+    def setValue(self, section, key, value):
         """
         """
         
@@ -113,7 +119,7 @@ class myConfig():
         
         self.config.set(section, key, value)
         
-    def GetValue(self, section, key):
+    def getValue(self, section, key):
         """
         get value from config file
         Does some sanity checking to return tuple, integer and strings 
@@ -146,8 +152,108 @@ class myConfig():
     def GetOption(self, key):
         """
         """
-        return self.GetValue('Options', key)
+        section = self.defaultOptions[key][2]
+        return self.getValue(section, key)
+        
+        
+    def SetOption(self, key, value):
+        """
+        """
+        section = self.defaultOptions[key][2]
+        self.setValue(section, key, value)
 
+    def getOptionDescription(self, key):
+        """
+        """
+        return self.defaultOptions[key][1]    
+
+    def getOptionsGroups(self):
+        """
+        """
+        groups = set()
+        for key in self.defaultOptions:
+            groups.add (self.defaultOptions[key][2])
+        return groups
+        
+    def getOptionsNames(self, section):
+        """
+        """
+        opts = []
+        for key in self.defaultOptions:
+            group = self.defaultOptions[key][2]
+            if group == section: opts.append(key)
+        return opts
+
+class pvg_config(myConfig):
+    """
+    Inheriting from myConfig
+    """
+    def __init__(self, filename=None, temporary=False):
+
+        #                   "VAR_Name" : [DEFAULT VALUE, "Description", "Group_name"]
+        defaultOptions = { "Monitors" : [1, "Select the number of monitors connected to this machine", "General"],
+                            "Webcams"  : [1, "Select the number of webcams connected to this machine", "General"],
+                            "ThumbnailSize" : ['320, 240', "Specify the size for the thumbnail previews", "Recording"], 
+                            "FullSize" : ['800, 600', "Specify the size for the actual acquisition from the webcams.\nMake sure your webcam supports this definition", "Recording"], 
+                            "FPS_preview" : [5, "Refresh frequency (FPS) of the thumbnails during preview.\nSelect a low rate for slow computers", "Recording"],  
+                            "FPS_recording" : [15, "Actual refresh rate (FPS) during acquisition and processing", "Recording"],
+                            "Data_Folder" : ['.', "Folder where the final data are saved", "Folders"],
+                            "Mask_Folder" : ['.', "Folder where the masks are found", "Folders"],
+                           }
+
+        self.monitorProperties = ['sourceType', 'source', 'track', 'maskfile', 'trackType', 'isSDMonitor']
+
+        myConfig.__init__(self, filename, temporary, defaultOptions)
+
+    def SetMonitor(self, monitor, *args):
+        """
+        """
+        mn = 'Monitor%s' % monitor
+        for v, vn in zip( args, self.monitorProperties ):
+            self.setValue(mn, vn, v)
+    
+    def GetMonitor(self, monitor):
+        """
+        """
+        mn = 'Monitor%s' % monitor
+        md = []
+        if self.config.has_section(mn):
+            for vn in self.monitorProperties:
+                md.append ( self.getValue(mn, vn) )
+        return md
+
+    def HasMonitor(self, monitor):
+        """
+        """
+        mn = 'Monitor%s' % monitor
+        return self.config.has_section(mn)
+
+    def getMonitorsData(self):
+        """
+        return a list containing the monitors that we need to track 
+        based on info found in configfile
+        """
+        monitors = {}
+        
+        ms = self.GetOption('Monitors')
+        resolution = self.GetOption('FullSize')
+        dataFolder = self.GetOption('Data_Folder')
+        
+        for mon in range(1,ms+1):
+            if self.HasMonitor(mon):
+                _,source,track,mask_file,track_type,isSDMonitor = self.GetMonitor(mon)
+                monitors[mon] = {}
+                monitors[mon]['source'] = source
+                monitors[mon]['resolution'] = resolution
+                monitors[mon]['mask_file'] = mask_file
+                monitors[mon]['track_type'] = track_type
+                monitors[mon]['dataFolder'] = dataFolder
+                monitors[mon]['track'] = track
+                monitors[mon]['isSDMonitor'] = isSDMonitor
+            
+        return monitors
+        
+        
 class acquireObject():
     def __init__(self, monitor, source, resolution, mask_file, track, track_type, data_folder=None, output_file=None):
         """
@@ -246,73 +352,7 @@ class acquireThread(threading.Thread):
         self.keepGoing = False
         if self.verbose: print ( "Stopping capture" )
 
-class pvg_config(myConfig):
-    """
-    Inheriting from myConfig
-    """
-    def __init__(self, filename=None, temporary=False):
 
-        
-        defaultOptions = { "Monitors" : [9, "Select the number of monitors connected to this machine"],
-                            "Webcams"  : [1, "Select the number of webcams connected to this machine"],
-                            "ThumbnailSize" : ['320, 240', "Specify the size for the thumbnail previews"], 
-                            "FullSize" : ['640, 480', "Specify the size for the actual acquisition from the webcams.\nMake sure your webcam supports this definition"], 
-                            "FPS_preview" : [5, "Refresh frequency (FPS) of the thumbnails during preview.\nSelect a low rate for slow computers"],  
-                            "FPS_recording" : [5, "Actual refresh rate (FPS) during acquisition and processing"],
-                            "Data_Folder" : ['', "Folder where the final data are saved"]
-                           }
-
-        self.monitorProperties = ['sourceType', 'source', 'track', 'maskfile', 'trackType', 'isSDMonitor']
-
-        myConfig.__init__(self, filename, temporary, defaultOptions)
-
-    def SetMonitor(self, monitor, *args):
-        """
-        """
-        mn = 'Monitor%s' % monitor
-        for v, vn in zip( args, self.monitorProperties ):
-            self.SetValue(mn, vn, v)
-    
-    def GetMonitor(self, monitor):
-        """
-        """
-        mn = 'Monitor%s' % monitor
-        md = []
-        if self.config.has_section(mn):
-            for vn in self.monitorProperties:
-                md.append ( self.GetValue(mn, vn) )
-        return md
-
-    def HasMonitor(self, monitor):
-        """
-        """
-        mn = 'Monitor%s' % monitor
-        return self.config.has_section(mn)
-
-    def getMonitorsData(self):
-        """
-        return a list containing the monitors that we need to track 
-        based on info found in configfile
-        """
-        monitors = {}
-        
-        ms = self.GetOption('Monitors')
-        resolution = self.GetOption('FullSize')
-        dataFolder = self.GetOption('Data_Folder')
-        
-        for mon in range(1,ms+1):
-            if self.HasMonitor(mon):
-                _,source,track,mask_file,track_type,isSDMonitor = self.GetMonitor(mon)
-                monitors[mon] = {}
-                monitors[mon]['source'] = source
-                monitors[mon]['resolution'] = resolution
-                monitors[mon]['mask_file'] = mask_file
-                monitors[mon]['track_type'] = track_type
-                monitors[mon]['dataFolder'] = dataFolder
-                monitors[mon]['track'] = track
-                monitors[mon]['isSDMonitor'] = isSDMonitor
-            
-        return monitors
 
 class cvPanel():
     """
@@ -410,9 +450,7 @@ class previewPanel(wx.Panel):
         self.Bind( wx.EVT_RIGHT_DOWN, self.ClearLast )
         self.Bind( wx.EVT_MIDDLE_DOWN, self.SaveCurrentSelection )
         
-        if keymode: 
-            self.Bind( wx.EVT_CHAR, self.onKeyPressed )
-            self.SetFocus()
+
 
 
 ####### FUNCTIONS LINKED TO THE DRAWING OF THE ROIS #######
@@ -658,6 +696,10 @@ class previewPanel(wx.Panel):
         self.Bind(wx.EVT_PAINT, self.onPaint)
         self.playTimer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.onNextFrame)
+
+        if self.keymode: 
+            self.Bind( wx.EVT_CHAR, self.onKeyPressed )
+            self.SetFocus()
         
 
     def paintImg(self, frame):
