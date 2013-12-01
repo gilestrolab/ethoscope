@@ -243,10 +243,11 @@ class panelConfigure(wx.Panel):
     def __getTrackingType(self):
         """
         return which tracking we are chosing
+        ['DISTANCE','VBS','XY_COORDS']
         """
-        if self.trackDistanceRadio.GetValue(): trackType = 0
-        elif self.trackVirtualBM.GetValue(): trackType = 1
-        elif self.trackPosition.GetValue(): trackType = 2
+        if self.trackDistanceRadio.GetValue(): trackType = "DISTANCE"
+        elif self.trackVirtualBM.GetValue(): trackType = "VBS"
+        elif self.trackPosition.GetValue(): trackType = "XY_COORDS"
         
         return trackType
 
@@ -382,7 +383,7 @@ class panelConfigure(wx.Panel):
         
         options.SetMonitor(self.monitor_number,
                            self.thumbnail.sourceType,
-                           self.thumbnail.source,
+                           self.thumbnail.source+1,
                            self.thumbnail.track,
                            self.mask_file,
                            self.trackType,

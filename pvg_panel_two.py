@@ -71,6 +71,7 @@ class panelLiveView(wx.Panel):
 
         self.btnAutoFill = wx.Button( self, wx.ID_ANY, label="Auto Fill")
         self.Bind(wx.EVT_BUTTON, self.fsPanel.AutoMask, self.btnAutoFill)
+        self.btnAutoFill.Enable(False)
 
         fgSizer_1.Add (self.btnClear)
         fgSizer_1.Add (self.btnClearLast)
@@ -156,11 +157,11 @@ class panelLiveView(wx.Panel):
         self.monitor_number = self.MonitorList.index( self.monitor_name ) + 1
         
         n_cams = options.GetOption("Webcams")
-        WebcamsList = [ 'Webcam %s' % (int(w) +1) for w in range( n_cams ) ]
+        WebcamsList = [ 'Camera %02d' % (int(w) +1) for w in range( n_cams ) ]
 
         if options.HasMonitor(self.monitor_number):
             sourceType, source, track, mask_file, trackType, isSDMonitor = options.GetMonitor(self.monitor_number)
-            self.fsPanel.setMonitor( source )
+            self.fsPanel.setMonitor( source - 1 )
             self.fsPanel.Play()
 
             if mask_file:
@@ -168,7 +169,7 @@ class panelLiveView(wx.Panel):
                 self.currentMaskTXT.SetValue(os.path.split(mask_file)[1] or '')
             
             if sourceType == 0:
-                self.sourceTXTBOX.SetValue( WebcamsList[source] )
+                self.sourceTXTBOX.SetValue( WebcamsList[source-1] )
             else:
                 self.sourceTXTBOX.SetValue( os.path.split(source)[1] )
 

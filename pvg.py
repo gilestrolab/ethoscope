@@ -27,7 +27,8 @@
 import wx, os
 
 from pvg_options import optionsFrame
-from pvg_panel_one import panelOne
+#from pvg_panel_one import panelOne
+from pvg_acquire import pvg_AcquirePanel as panelOne
 from pvg_panel_two import panelLiveView
 from pvg_common import options, DEFAULT_CONFIG
 
@@ -43,7 +44,7 @@ class mainNotebook(wx.Notebook):
         wx.Notebook.__init__(self, *args, **kwds)
         
         self.panelOne = panelOne(self)
-        self.AddPage(self.panelOne, "Thumbnails")
+        self.AddPage(self.panelOne, "Monitors sheet")
 
         self.panelTwo = panelLiveView(self)
         self.AddPage(self.panelTwo, "Live View")
@@ -55,7 +56,7 @@ class mainNotebook(wx.Notebook):
     def OnPageChanging(self, event):
         """
         """
-        self.panelOne.StopPlaying()
+        #self.panelOne.StopPlaying()
         self.panelTwo.StopPlaying()
         
 class mainFrame(wx.Frame):
@@ -83,7 +84,8 @@ class mainFrame(wx.Frame):
     def __set_properties(self):
         # begin wxGlade: mainFrame.__set_properties
         self.SetTitle("pySoloVideo")
-        self.SetSize((1200,850))
+        x,y = options.GetOption("FullSize")
+        self.SetSize((x*1.8,y*1.4))
         
     def __menubar__(self):
         

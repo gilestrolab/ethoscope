@@ -208,6 +208,9 @@ class pvg_config(myConfig):
     def SetMonitor(self, monitor, *args):
         """
         """
+        if not args:
+            args = ["", "", "", "", "", "", ""]
+            
         mn = 'Monitor%s' % monitor
         for v, vn in zip( args, self.monitorProperties ):
             self.setValue(mn, vn, v)
@@ -351,6 +354,7 @@ class acquireThread(threading.Thread):
         """
         self.keepGoing = False
         if self.verbose: print ( "Stopping capture" )
+        self.mon.close()
 
 
 
