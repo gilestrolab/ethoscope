@@ -227,10 +227,13 @@ class pvg_AcquirePanel(wx.Panel):
         for mn in monitorsData:
             m = monitorsData[mn]
             if m['track']:
-                m_tt = ['DISTANCE','VBS','XY_COORDS'].index(m['track_type'])
                 
-                self.monitors[mn] = ( acquireThread(mn, m['source'], m['resolution'], m['mask_file'], m['track'], m_tt , m['dataFolder']) )
+                m_tt = ['DISTANCE','VBS','XY_COORDS'].index(m['track_type'])
+                m_source = int(m['source']) - 1
+                
+                self.monitors[mn] = ( acquireThread(mn, m_source, m['resolution'], m['mask_file'], m['track'], m_tt , m['dataFolder']) )
                 self.monitors[mn].doTrack()
+
                 c+=1
             
         self.parent.sb.SetStatusText('Tracking %s Monitors' % c)
