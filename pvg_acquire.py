@@ -93,7 +93,7 @@ class comboFileBrowser(wx.ComboBox):
             dlg.Destroy()
             
         #event.SetValue(filename)
-        self.changeCallback(*args, event=event)
+        self.changeCallback(event=event)
         
             
 
@@ -227,7 +227,9 @@ class pvg_AcquirePanel(wx.Panel):
         for mn in monitorsData:
             m = monitorsData[mn]
             if m['track']:
-                self.monitors[mn] = ( acquireThread(mn, m['source'], m['resolution'], m['mask_file'], m['track'], m['track_type'], m['dataFolder']) )
+                m_tt = ['DISTANCE','VBS','XY_COORDS'].index(m['track_type'])
+                
+                self.monitors[mn] = ( acquireThread(mn, m['source'], m['resolution'], m['mask_file'], m['track'], m_tt , m['dataFolder']) )
                 self.monitors[mn].doTrack()
                 c+=1
             
