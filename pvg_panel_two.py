@@ -35,7 +35,7 @@ class panelLiveView(wx.Panel):
         wx.Panel.__init__(self, parent, wx.ID_ANY)
 
         self.monitor_number = options.GetOption("Monitors")
-        self.fs_size = options.GetOption("FullSize")
+        self.fs_size = options.GetOption("Resolution")
         self.monitor_name = ''
 
         self.fsPanel = previewPanel(self, size=self.fs_size, showtime=True)
@@ -151,31 +151,37 @@ class panelLiveView(wx.Panel):
         this is a mess
         """
         
-        if self.fsPanel.isPlaying: self.fsPanel.Stop()
-        
+        #Get info on the monitor we selected
         self.monitor_name = event.GetString()
         self.monitor_number = self.MonitorList.index( self.monitor_name ) + 1
+
+        #Updates dropdown box
+        WebcamsList = [ 'Camera %02d' % (int(w) +1) for w in range( options.GetOption("Webcams") ) ]
         
-        n_cams = options.GetOption("Webcams")
-        WebcamsList = [ 'Camera %02d' % (int(w) +1) for w in range( n_cams ) ]
-
         if options.HasMonitor(self.monitor_number):
-            sourceType, source, track, mask_file, trackType, isSDMonitor = options.GetMonitor(self.monitor_number)
-            self.fsPanel.setMonitor( source - 1 )
-            self.fsPanel.Play()
 
-            if mask_file:
-                self.fsPanel.mon.loadROIS(mask_file)
-                self.currentMaskTXT.SetValue(os.path.split(mask_file)[1] or '')
+            md = options.GetMonitor(self.monitor_number)
             
-            if sourceType == 0:
-                self.sourceTXTBOX.SetValue( WebcamsList[source-1] )
-            else:
-                self.sourceTXTBOX.SetValue( os.path.split(source)[1] )
+            if md['source']:
+                if self.fsPanel.isPlaying: self.fsPanel.Stop()
+                
+                if type(md['source']) == int:
+                    self.fsPanel.setMonitor( md['source'] - 1 )
+                    self.sourceTXTBOX.SetValue( WebcamsList[md['source']-1] )
 
-        else:
-            sourceType, source, track, mask_file, trackType = [0, '', False, '', 1]
-            self.sourceTXTBOX.SetValue('No Source for this monitor')
+                else:
+                    self.fsPanel.setMonitor( md['source'] )
+                    self.sourceTXTBOX.SetValue( os.path.split(md['source'])[1] )
+                    
+                self.fsPanel.Play()
+
+                if md['mask_file']:
+                    self.fsPanel.mon.loadROIS(md['mask_file'])
+                    self.currentMaskTXT.SetValue(os.path.split(md['mask_file'])[1] or '')
+                
+            else:
+                #sourceType, source, track, mask_file, trackType = [0, '', False, '', 1]
+                self.sourceTXTBOX.SetValue('No Source for this monitor')
 
 
     def onSaveMask(self, event):

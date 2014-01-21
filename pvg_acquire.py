@@ -29,8 +29,8 @@ __copyright__ = "Copyright (c) 2011 Giorgio Gilestro"
 __license__ = "Python"
 
 import os, optparse
-
-from pvg_common import pvg_config, acquireThread, DEFAULT_CONFIG, options
+from pvg_common import pvg_config, acquireThread, DEFAULT_CONFIG, options, NO_SERIAL_PORT
+from accessories.sleepdeprivator import sleepdeprivator
 
 import wx
 from wx.lib.filebrowsebutton import FileBrowseButton
@@ -104,7 +104,7 @@ class pvg_AcquirePanel(wx.Panel):
         self.parent = parent
 
       
-        colLabels = ['Monitor', 'Source', 'Mask', 'Output', 'Track type', 'Track']
+        colLabels = ['Monitor', 'Source', 'Mask', 'Output', 'Track type', 'Track', 'sleepDeprivator']
         tracktypes = ['DISTANCE','VBS','XY_COORDS']
         
         self.monitors = {}
@@ -132,40 +132,41 @@ class pvg_AcquirePanel(wx.Panel):
         #for mn in monitorsData:
         for mn in range(1, mon_num+1):
             
-            if options.HasMonitor(mn):
-                _,source,track,mask_file,track_type,isSDMonitor = options.GetMonitor(mn)
-            else:
-                options.SetMonitor(mn)
-                source,track,mask_file,track_type,isSDMonitor = "", "", "", "", ""
+            if not options.HasMonitor(mn): options.SetMonitor(mn)
+            md = options.GetMonitor(mn)
             
             try:
-                _, s = os.path.split( source )
+                _, source = os.path.split( md['source'] )
             except:
-                s = 'Camera %02d' % ( source )
+                source = 'Camera %02d' % ( md['source'] )
             
-            _, mf = os.path.split(mask_file)
+            _, mf = os.path.split(md['mask_file'])
             df = 'Monitor%02d.txt' % (mn)
-            track = ( track == True )
+            track = ( md['track'] == True )
             
             ls = wx.BoxSizer (wx.HORIZONTAL)
             gridSizer.Add(wx.StaticText(self, -1, "Monitor %s" % mn ), 0, wx.ALL|wx.ALIGN_CENTER, 5)
 
-            gridSizer.Add(comboFileBrowser(self, wx.ID_ANY, size=(-1,-1), dialogTitle = "Choose an Input video file", startDirectory = options.GetOption("Data_Folder"), value = s, choices=WebcamsList, fileMask = "Video File (*.*)|*.*", browsevalue="Browse for video...", changeCallback = partial(self.__onChangeValue, [mn, "source"])), 0, wx.ALL|wx.ALIGN_CENTER, 5 )
+            gridSizer.Add(comboFileBrowser(self, wx.ID_ANY, size=(-1,-1), dialogTitle = "Choose an Input video file", startDirectory = options.GetOption("Data_Folder"), value = source, choices=WebcamsList, fileMask = "Video File (*.*)|*.*", browsevalue="Browse for video...", changeCallback = partial(self.__onChangeValue, [mn, "source"])), 0, wx.ALL|wx.ALIGN_CENTER, 5 )
 
-            gridSizer.Add(comboFileBrowser(self, wx.ID_ANY, size=(-1,-1), dialogTitle = "Choose a Mask file", startDirectory = options.GetOption("Mask_Folder"), value = mf, fileMask = "pySolo mask file (*.msk)|*.msk", browsevalue="Browse for mask...", changeCallback = partial(self.__onChangeValue, [mn, "maskfile"])), 0, wx.ALL|wx.ALIGN_CENTER, 5 )
+            gridSizer.Add(comboFileBrowser(self, wx.ID_ANY, size=(-1,-1), dialogTitle = "Choose a Mask file", startDirectory = options.GetOption("Mask_Folder"), value = mf, fileMask = "pySolo mask file (*.msk)|*.msk", browsevalue="Browse for mask...", changeCallback = partial(self.__onChangeValue, [mn, "mask_file"])), 0, wx.ALL|wx.ALIGN_CENTER, 5 )
 
             gridSizer.Add(comboFileBrowser(self, wx.ID_ANY, size=(-1,-1), dialogTitle = "Choose the output file", startDirectory = options.GetOption("Data_Folder"), value = df, fileMask = "Output File (*.txt)|*.txt", browsevalue="Browse for output...", changeCallback = partial(self.__onChangeValue, [mn, "outputfile"])), 0, wx.ALL|wx.ALIGN_CENTER, 5 )
 
 
-            ttcb = wx.ComboBox(self, -1, size=(-1,-1), value=track_type, choices=tracktypes, style=wx.CB_DROPDOWN | wx.CB_READONLY | wx.CB_SORT)
-            ttcb.Bind (wx.EVT_COMBOBOX, partial(self.__onChangeValue, [mn, "tracktype"]))
+            ttcb = wx.ComboBox(self, -1, size=(-1,-1), value=md['track_type'], choices=tracktypes, style=wx.CB_DROPDOWN | wx.CB_READONLY | wx.CB_SORT)
+            ttcb.Bind (wx.EVT_COMBOBOX, partial(self.__onChangeValue, [mn, "track_type"]))
             gridSizer.Add(ttcb , 0, wx.ALL|wx.ALIGN_CENTER, 5)
 
             chk = wx.CheckBox(self, -1, '', (10, 10))
-            chk.SetValue(track)
+            chk.SetValue(md['track'])
             chk.Bind(wx.EVT_CHECKBOX, partial(self.__onChangeValue, [mn, "track"]))
             gridSizer.Add(chk, 0, wx.ALL|wx.ALIGN_CENTER, 5)
             
+            SERIAL_PORTS = sleepdeprivator.listSerialPorts()
+            serialSD = wx.ComboBox(self, -1, size=(-1,-1), value=md['serial_port'], choices=SERIAL_PORTS, style=wx.CB_DROPDOWN | wx.CB_READONLY | wx.CB_SORT)
+            serialSD.Bind (wx.EVT_COMBOBOX, partial(self.__onChangeValue, [mn, "serial_port"]))
+            gridSizer.Add(serialSD , 0, wx.ALL|wx.ALIGN_CENTER, 5)
         
         btnSizer = wx.BoxSizer(wx.HORIZONTAL)
         conf_btnSizer = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, 'Configuration'), wx.HORIZONTAL)
@@ -222,6 +223,8 @@ class pvg_AcquirePanel(wx.Panel):
         self.startBtn.Enable(not self.acquiring)
         c = 0
 
+        resolution = options.GetOption("Resolution")
+        data_folder = options.GetOption("Data_Folder")
         monitorsData = options.getMonitorsData()
         
         for mn in monitorsData:
@@ -229,14 +232,20 @@ class pvg_AcquirePanel(wx.Panel):
             if m['track']:
                 
                 m_tt = ['DISTANCE','VBS','XY_COORDS'].index(m['track_type'])
-                m_source = int(m['source']) - 1
+                if type(m['source']) == int:
+                    m_source = int(m['source']) - 1
+                else:
+                    m_source = m['source']
                 
-                self.monitors[mn] = ( acquireThread(mn, m_source, m['resolution'], m['mask_file'], m['track'], m_tt , m['dataFolder']) )
+                self.monitors[mn] = ( acquireThread(mn, m_source, resolution, m['mask_file'], m['track'], m_tt , data_folder) )
+                self.monitors[mn].SDserialPort = m['serial_port']
+                self.monitors[mn].inactivity_threshold = m['inactivity_threshold'] or None
+
                 self.monitors[mn].doTrack()
 
                 c+=1
             
-        self.parent.sb.SetStatusText('Tracking %s Monitors' % c)
+        #self.parent.sb.SetStatusText('Tracking %s Monitors' % c)
     
     def onStop(self, event):
         """

@@ -26,9 +26,11 @@ import cv2
 import pysolovideo as pv
 import ConfigParser, threading
 import numpy as np
+from pysolovideo import NO_SERIAL_PORT
+
+
 
 DEFAULT_CONFIG = 'pysolo_video.cfg'
-
 class myConfig():
     """
     Handles program configuration
@@ -193,15 +195,16 @@ class pvg_config(myConfig):
         #                   "VAR_Name" : [DEFAULT VALUE, "Description", "Group_name"]
         defaultOptions = { "Monitors" : [1, "Select the number of monitors connected to this machine", "General"],
                             "Webcams"  : [1, "Select the number of webcams connected to this machine", "General"],
-                            "ThumbnailSize" : ['320, 240', "Specify the size for the thumbnail previews", "Recording"], 
-                            "FullSize" : ['800, 600', "Specify the size for the actual acquisition from the webcams.\nMake sure your webcam supports this definition", "Recording"], 
+                            #"ThumbnailSize" : ['320, 240', "Specify the size for the thumbnail previews", "Recording"], 
+                            "Resolution" : ['800, 600', "Specify the size for the actual acquisition from the webcams.\nMake sure your webcam supports this definition", "Recording"], 
                             "FPS_preview" : [5, "Refresh frequency (FPS) of the thumbnails during preview.\nSelect a low rate for slow computers", "Recording"],  
                             "FPS_recording" : [15, "Actual refresh rate (FPS) during acquisition and processing", "Recording"],
                             "Data_Folder" : ['.', "Folder where the final data are saved", "Folders"],
                             "Mask_Folder" : ['.', "Folder where the masks are found", "Folders"],
                            }
 
-        self.monitorProperties = ['sourceType', 'source', 'track', 'maskfile', 'trackType', 'isSDMonitor']
+        self.monitorProperties = ['source', 'track', 'mask_file', 'track_type', 'serial_port', 'inactivity_threshold']
+        self.defaultmonitorPropertiesValues = ["",0,"","","",NO_SERIAL_PORT,7]
 
         myConfig.__init__(self, filename, temporary, defaultOptions)
 
@@ -209,7 +212,7 @@ class pvg_config(myConfig):
         """
         """
         if not args:
-            args = ["", "", "", "", "", "", ""]
+            args = self.defaultmonitorPropertiesValues
             
         mn = 'Monitor%s' % monitor
         for v, vn in zip( args, self.monitorProperties ):
@@ -217,12 +220,13 @@ class pvg_config(myConfig):
     
     def GetMonitor(self, monitor):
         """
+        Returns a dictionary containing all the monitor properties
         """
         mn = 'Monitor%s' % monitor
-        md = []
+        md = {}
         if self.config.has_section(mn):
             for vn in self.monitorProperties:
-                md.append ( self.getValue(mn, vn) )
+                md[vn] = self.getValue(mn, vn)
         return md
 
     def HasMonitor(self, monitor):
@@ -239,21 +243,13 @@ class pvg_config(myConfig):
         monitors = {}
         
         ms = self.GetOption('Monitors')
-        resolution = self.GetOption('FullSize')
+        resolution = self.GetOption('Resolution')
         dataFolder = self.GetOption('Data_Folder')
         
         for mon in range(1,ms+1):
             if self.HasMonitor(mon):
-                _,source,track,mask_file,track_type,isSDMonitor = self.GetMonitor(mon)
-                monitors[mon] = {}
-                monitors[mon]['source'] = source
-                monitors[mon]['resolution'] = resolution
-                monitors[mon]['mask_file'] = mask_file
-                monitors[mon]['track_type'] = track_type
-                monitors[mon]['dataFolder'] = dataFolder
-                monitors[mon]['track'] = track
-                monitors[mon]['isSDMonitor'] = isSDMonitor
-            
+                monitors[mon] = self.GetMonitor(mon)
+
         return monitors
         
         
@@ -415,7 +411,6 @@ class previewPanel(wx.Panel):
         self.source = ''
         self.mon = None
         self.track = False
-        self.isSDMonitor = False
         self.trackType = 1
         self.drawROI = True
         self.timestamp = showtime

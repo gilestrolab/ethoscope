@@ -84,7 +84,7 @@ class mainFrame(wx.Frame):
     def __set_properties(self):
         # begin wxGlade: mainFrame.__set_properties
         self.SetTitle("pySoloVideo")
-        x,y = options.GetOption("FullSize")
+        x,y = options.GetOption("Resolution")
         self.SetSize((x*1.8,y*1.4))
         
     def __menubar__(self):

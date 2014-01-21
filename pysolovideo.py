@@ -67,12 +67,16 @@ from calendar import month_abbr
 import os, datetime, time
 import numpy as np
 
+from accessories.sleepdeprivator import sleepdeprivator
+
 
 pySoloVideoVersion ='dev' #will be 1.4
 
 FLY_FIRST_POSITION = (-1,-1)
 FLY_NOT_DETECTED = None
 PERIOD = 60 #in seconds
+ACTIVITY_PERIOD = 1440 #buffer of activity, in minutes
+NO_SERIAL_PORT = "NO SD"
 
 
 class runningAvgComparison():
@@ -884,7 +888,7 @@ class ROImask():
 class Monitor(object):
     """
     The main monitor class
-        """
+    """
 
     def __init__(self):
 
@@ -909,11 +913,15 @@ class Monitor(object):
         self.__rowline = 0
         
         # TO DO: NOT IMPLEMENTED YET
-        self.isSDMonitor = False # 
         self.ratio = 0 # used for mask calibration, px to cm
         
         self.trackType = 1
         self.minuteFPS = runningAvgComparison()
+        
+        
+        self.SDserialPort = None
+        self.inactivity_threshold = 7
+        self.flyActivity = np.zeros ((0,ACTIVITY_PERIOD), dtype=np.int)
         
         # Buffer arrays
         # shape ( PERIOD (x,y )
@@ -923,6 +931,7 @@ class Monitor(object):
         # shape ( flies, PERIOD, (x,y) ) Contains the coordinates of the last minute (or period)
         self.fly_one_minute_buffer = np.zeros( (0, PERIOD, 2), dtype=np.int ) 
         
+       
         self.__count_seconds = 0
         self.__n = 0
         self.outputFile = None
@@ -1231,6 +1240,7 @@ class Monitor(object):
    
     def updateFlyBuffers(self, n, new=False):
         """
+        Every time we add a new ROI the array need to be ridimensioned
         """
         if not new:
             
@@ -1240,15 +1250,18 @@ class Monitor(object):
                 for i in range(n):
                     self.fly_last_frame_buffer = np.append( self.fly_last_frame_buffer, [FLY_FIRST_POSITION], axis=0) # ( flies, (x,y) )
                     self.fly_one_minute_buffer = np.append (self.fly_one_minute_buffer, [self.__fa.copy()], axis=0) # ( flies, PERIOD, (x,y) )
+                    self.flyActivity = np.append (self.flyActivity, np.zeros ((1,ACTIVITY_PERIOD), dtype=np.int) , axis=0)
             if n < 0:
 
                 for i in range(n):
                     self.fly_last_frame_buffer = np.delete( self.fly_last_frame_buffer, n, axis=0)
                     self.fly_one_minute_buffer = np.delete( self.fly_one_minute_buffer, n, axis=0)
+                    self.flyActivity = np.delete (self.flyActivity, n,axis=0)
             
             if n == 0:
                 self.fly_last_frame_buffer = np.zeros( (0, 2), dtype=np.int ) 
                 self.fly_one_minute_buffer = np.zeros( (0, PERIOD, 2), dtype=np.int )
+                self.flyActivity = np.zeros ((0,ACTIVITY_PERIOD), dtype=np.int)
         
         if new:
             self.updateFlyBuffers(0) # delete first
@@ -1424,6 +1437,18 @@ class Monitor(object):
         self.__count_seconds += delta
         self.__n += 1
 
+    def isSDMon(self):
+        """
+        Make sure the monitor has sleepdeprivation capabilities
+        """
+        
+        if (self.SDserialPort != NO_SERIAL_PORT):
+            #return sleepdeprivator.ping(use_serial=False, port=self.SDserialPort)
+            return True
+        else:
+            return False
+        
+
     def writeActivity(self, fps=0, extend=True):
         """
         Write the activity to file
@@ -1432,6 +1457,9 @@ class Monitor(object):
         Called every minute; flies treated at once
         1	09 Dec 11	19:02:19	1	0	1	0	0	0	?		[actual_activity]
         """
+        
+        
+        
         #Here we build the header
         dt = datetime.datetime.fromtimestamp( self.getFrameTime() )
        
@@ -1446,7 +1474,7 @@ class Monitor(object):
         #5 tracktype # ['DISTANCE','VBS','XY_COORDS']
         tracktype = self.trackType
         #6 is a monitor with sleep deprivation capabilities?
-        sleepDep = self.isSDMonitor * 1
+        sleepDep = int(self.isSDMon())
         #7 monitor number, not yet implemented
         monitor = '0'
         #8 unused
@@ -1459,7 +1487,7 @@ class Monitor(object):
         activity = []
         row = ''
 
-        if self.trackType == 0:
+        if self.trackType == 0: 
             activity = [self.calculateDistances(),]
         
         elif self.trackType == 1:
@@ -1467,6 +1495,11 @@ class Monitor(object):
         
         elif self.trackType == 2:
             activity = self.calculatePosition()
+            
+            
+        if self.isSDMon():
+            self.calculateImmobility()
+            self.sleepDeprive(interval=5)
 
         # Expand the readings to 32 flies for compatibility reasons with trikinetics
         flies = len ( activity[0].split('\t') )
@@ -1558,6 +1591,44 @@ class Monitor(object):
             activity.append(onerow)
         
         return activity
+
+    def calculateImmobility(self):
+        """
+        Check if the flies are asleep for longer than interval (minutes)
+        Immobility is based on distance and flies are considered immobile if they have not moved
+        for at least threshold (px) * interval during the last interval
+        """
+        
+        #First calculate distance
+        fs = np.roll(self.fly_one_minute_buffer, -1, axis=1) 
+        x = self.fly_one_minute_buffer[:,:,:1]
+        y = self.fly_one_minute_buffer[:,:,1:]
+        x1 = fs[:,:,:1]
+        y1 = fs[:,:,1:]
+        d = self.__distance((x,y),(x1,y1))
+        #we sum everything BUT the last bit of information otherwise we have data duplication
+        values = d[:,:-1,:].sum(axis=1).reshape(-1)
+
+        #Add the values for distance in the buffer array
+        self.flyActivity = np.roll (self.flyActivity, -1, axis=1)
+        self.flyActivity[:,-1] = values
+        
+    
+    def sleepDeprive(self, interval=None, threshold=None):
+        """
+        returns a list of ROIs where flies have not moved during the last interval
+        """
+        if interval == None:
+            interval =  self.inactivity_threshold
+
+        if threshold == None:
+            threshold = float (self.debug_info['FLY_AREA_AVG']) * interval
+            
+        asleep = self.flyActivity[:,interval:-1].sum(axis=1) < threshold
+        ROIstomove = np.where( (asleep==True))[0].tolist()
+        
+        sleepdeprivator.deprive(ROIstomove, use_serial=False, port=self.SDserialPort)
+
 
     def processFlyMovements(self, time):
         """
