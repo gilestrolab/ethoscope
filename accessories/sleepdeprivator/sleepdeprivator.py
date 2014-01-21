@@ -22,7 +22,7 @@
 #  
 #  
 
-from DAMrealtime import SDrealtime
+from damrealtime import SDrealtime
 from time import sleep
 from datetime import datetime as dt
 

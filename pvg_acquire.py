@@ -150,25 +150,25 @@ class pvg_AcquirePanel(wx.Panel):
             ls = wx.BoxSizer (wx.HORIZONTAL)
             gridSizer.Add(wx.StaticText(self, -1, "Monitor %s" % mn ), 0, wx.ALL|wx.ALIGN_CENTER, 5)
 
-            gridSizer.Add(comboFileBrowser(self, wx.ID_ANY, size=(-1,-1), dialogTitle = "Choose an Input video file", startDirectory = options.GetOption("Data_Folder"), value = source, choices=WebcamsList, fileMask = "Video File (*.*)|*.*", browsevalue="Browse for video...", changeCallback = partial(self.__onChangeValue, [mn, "source"])), 0, wx.ALL|wx.ALIGN_CENTER, 5 )
+            gridSizer.Add(comboFileBrowser(self, wx.ID_ANY, size=(-1,-1), dialogTitle = "Choose an Input video file", startDirectory = options.GetOption("Data_Folder"), value = source, choices=WebcamsList, fileMask = "Video File (*.*)|*.*", browsevalue="Browse for video...", changeCallback = partial(self.__onChangeDropDown, [mn, "source"])), 0, wx.ALL|wx.ALIGN_CENTER, 5 )
 
-            gridSizer.Add(comboFileBrowser(self, wx.ID_ANY, size=(-1,-1), dialogTitle = "Choose a Mask file", startDirectory = options.GetOption("Mask_Folder"), value = mf, fileMask = "pySolo mask file (*.msk)|*.msk", browsevalue="Browse for mask...", changeCallback = partial(self.__onChangeValue, [mn, "mask_file"])), 0, wx.ALL|wx.ALIGN_CENTER, 5 )
+            gridSizer.Add(comboFileBrowser(self, wx.ID_ANY, size=(-1,-1), dialogTitle = "Choose a Mask file", startDirectory = options.GetOption("Mask_Folder"), value = mf, fileMask = "pySolo mask file (*.msk)|*.msk", browsevalue="Browse for mask...", changeCallback = partial(self.__onChangeDropDown, [mn, "mask_file"])), 0, wx.ALL|wx.ALIGN_CENTER, 5 )
 
-            gridSizer.Add(comboFileBrowser(self, wx.ID_ANY, size=(-1,-1), dialogTitle = "Choose the output file", startDirectory = options.GetOption("Data_Folder"), value = df, fileMask = "Output File (*.txt)|*.txt", browsevalue="Browse for output...", changeCallback = partial(self.__onChangeValue, [mn, "outputfile"])), 0, wx.ALL|wx.ALIGN_CENTER, 5 )
+            gridSizer.Add(comboFileBrowser(self, wx.ID_ANY, size=(-1,-1), dialogTitle = "Choose the output file", startDirectory = options.GetOption("Data_Folder"), value = df, fileMask = "Output File (*.txt)|*.txt", browsevalue="Browse for output...", changeCallback = partial(self.__onChangeDropDown, [mn, "outputfile"])), 0, wx.ALL|wx.ALIGN_CENTER, 5 )
 
 
             ttcb = wx.ComboBox(self, -1, size=(-1,-1), value=md['track_type'], choices=tracktypes, style=wx.CB_DROPDOWN | wx.CB_READONLY | wx.CB_SORT)
-            ttcb.Bind (wx.EVT_COMBOBOX, partial(self.__onChangeValue, [mn, "track_type"]))
+            ttcb.Bind (wx.EVT_COMBOBOX, partial(self.__onChangeDropDown, [mn, "track_type"]))
             gridSizer.Add(ttcb , 0, wx.ALL|wx.ALIGN_CENTER, 5)
 
             chk = wx.CheckBox(self, -1, '', (10, 10))
             chk.SetValue(md['track'])
-            chk.Bind(wx.EVT_CHECKBOX, partial(self.__onChangeValue, [mn, "track"]))
+            chk.Bind(wx.EVT_CHECKBOX, partial(self.__onChangeCheckBox, [mn, "track"]))
             gridSizer.Add(chk, 0, wx.ALL|wx.ALIGN_CENTER, 5)
             
             SERIAL_PORTS = sleepdeprivator.listSerialPorts()
             serialSD = wx.ComboBox(self, -1, size=(-1,-1), value=md['serial_port'], choices=SERIAL_PORTS, style=wx.CB_DROPDOWN | wx.CB_READONLY | wx.CB_SORT)
-            serialSD.Bind (wx.EVT_COMBOBOX, partial(self.__onChangeValue, [mn, "serial_port"]))
+            serialSD.Bind (wx.EVT_COMBOBOX, partial(self.__onChangeDropDown, [mn, "serial_port"]))
             gridSizer.Add(serialSD , 0, wx.ALL|wx.ALIGN_CENTER, 5)
         
         btnSizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -198,20 +198,49 @@ class pvg_AcquirePanel(wx.Panel):
         mainSizer.Add(btnSizer, 0, wx.ALL, 5)
         self.SetSizer(mainSizer) 
 
+    def __onChangeCheckBox(self, target, event=None):
+        """
+        """
+        self.saveOptionsBtn.Enable(True)
+        self.startBtn.Enable(False)
+            
+        value = event.IsChecked()
+        section = "Monitor%s" % target[0]
+        keyname = target[1]
+        options.setValue(section, keyname, value)
+        
+    def __onChangeDropDown(self, target, event=None):
+        """
+        """
+        self.saveOptionsBtn.Enable(True)
+        self.startBtn.Enable(False)
+            
+        value = event.GetString()
+        if "Camera " in value:
+            value = int(value.split(" ")[1])
+        
+        section = "Monitor%s" % target[0]
+        keyname = target[1]
+        options.setValue(section, keyname, value)
+
+
     def __onChangeValue(self, target, event=None):
         """
         """
         self.saveOptionsBtn.Enable(True)
         self.startBtn.Enable(False)
         
-        et = event.GetEventType()
-        if et == 10020:
+            
+        if event.GetEventType() == wx.EVT_CHECKBOX.evtType:
+            value = event.IsChecked()
+            print value
+
+        #if event.GetEventType() == wx.EVT_COMBOBOX.evtType:
+        else:
             value = event.GetString()
             if "Camera " in value:
                 value = int(value.split(" ")[1])
-            
-        elif et == 10009:
-            value = event.IsChecked()
+
         
         section = "Monitor%s" % target[0]
         keyname = target[1]

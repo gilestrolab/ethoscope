@@ -137,6 +137,17 @@ class Cam:
         """
         """
         return 0
+        
+    def getBlackFrame(self):
+        """
+        """
+        w, h = 800, 600
+        blackframe = np.zeros( (w, h, 3), dtype = np.uint8)
+        #blackframe = cv2.cvtColor(blackframe, cv2.GRAY2COLOR_BGR)
+        cv2.putText(blackframe, "NO INPUT", (int(w/4), int(h/2)), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 1)
+        return blackframe
+    
+
 
         
 class realCam(Cam):
@@ -195,6 +206,11 @@ class realCam(Cam):
             self.__initCamera()
         
         __, frame = self.camera.read()
+        
+        try:
+            frame.shape > 0
+        except:
+            frame = self.getBlackFrame()
         
         if self.scale:
             frame = cv2.resize( frame, self.resolution )
@@ -286,8 +302,7 @@ class virtualCamMovie(Cam):
         if end < 1 or end > self.totalFrames: end = self.totalFrames
         self.lastFrame = end
        
-        self.blackFrame = np.zeros( (w, h, 3) )
-        
+       
     def getResolution(self):
         """
         Returns frame resolution as tuple (w,h)
@@ -320,7 +335,11 @@ class virtualCamMovie(Cam):
         # this does not work properly. Image is very corrupted
         __, frame = self.capture.read()
 
-        if frame == None: frame = self.blackFrame
+        try:
+            frame.shape > 0
+        except:
+            frame = self.getBlackFrame()
+            
         
         self.currentFrame += self.step
             
@@ -989,9 +1008,7 @@ class Monitor(object):
         Add current time as stamp to the image
         """
         text = time.asctime( time.localtime(timeStamp) )
-
         textcolor = (255,255,255)
-
         (x1, _), ymin = cv2.getTextSize(text, cv2.FONT_HERSHEY_PLAIN, 1, 1)
 
         height, width, _ = frame.shape
@@ -1854,7 +1871,7 @@ class Monitor(object):
         Finds reference circles and return their coordinates as list of tuples
         """
         circles = None
-        
+
         cframe = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         cframe = cv2.medianBlur(cframe,5)
         circles = cv2.HoughCircles(cframe, cv2.cv.CV_HOUGH_GRADIENT, 1, 10, param1=100, param2=30, minRadius=5, maxRadius=20)

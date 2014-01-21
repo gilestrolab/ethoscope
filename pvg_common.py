@@ -704,16 +704,15 @@ class previewPanel(wx.Panel):
     def paintImg(self, frame):
         """
         """
-        if frame.any():
-            height, width, _ = frame.shape
-            
-            #if resize:
-                #frame = cv2.resize(frame, size)
+        height, width, _ = frame.shape
+        
+        #if resize:
+            #frame = cv2.resize(frame, size)
 
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            
-            self.bmp.CopyFromBuffer(frame)
-            self.Refresh()
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        self.bmp.CopyFromBuffer(frame)
+        self.Refresh()
 
     def onPaint(self, evt):
         """
@@ -732,6 +731,7 @@ class previewPanel(wx.Panel):
         
         frame = self.mon.GetImage(drawROIs = self.drawROI, selection=self.selection, crosses=self.polyPoints, timestamp=self.timestamp)
         self.paintImg( frame )
+        
         if evt: evt.Skip()
       
     def Play(self, status=True, showROIs=True):
