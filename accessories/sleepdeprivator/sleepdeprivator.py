@@ -155,6 +155,10 @@ def deprive(channels, use_serial=True, port=DEFAULT_PORT, baud=BAUD):
         sleep(2)
     
     cmd = '\n'.join(['M %02d' % (c+1) for c in channels])
+
+    print "sent command to port %s" % port
+    print cmd
+
     
     if cmd and use_serial:
         ser.write(cmd)

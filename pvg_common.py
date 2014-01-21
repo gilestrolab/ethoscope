@@ -204,7 +204,7 @@ class pvg_config(myConfig):
                            }
 
         self.monitorProperties = ['source', 'track', 'mask_file', 'track_type', 'serial_port', 'inactivity_threshold']
-        self.defaultmonitorPropertiesValues = ["",0,"","","",NO_SERIAL_PORT,7]
+        self.defaultmonitorPropertiesValues = ["",0,"","",NO_SERIAL_PORT,7]
 
         myConfig.__init__(self, filename, temporary, defaultOptions)
 
@@ -720,7 +720,7 @@ class previewPanel(wx.Panel):
         """
         if self.bmp:
             dc = wx.BufferedPaintDC(self)
-            self.PrepareDC(dc)
+            #self.PrepareDC(dc)
             dc.DrawBitmap(self.bmp, 0, 0, True)
             
             

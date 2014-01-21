@@ -87,8 +87,11 @@ class comboFileBrowser(wx.ComboBox):
             if dlg.ShowModal() == wx.ID_OK:
                 path = dlg.GetPath()
                 __, filename = os.path.split(path)
+                self.Append(filename)
                 self.SetValue(filename)
                 event.SetString(path)
+                #self.Command(event)
+                
             
             dlg.Destroy()
             
@@ -118,7 +121,7 @@ class pvg_AcquirePanel(wx.Panel):
         monitorsData = options.getMonitorsData()
 
         mainSizer = wx.BoxSizer(wx.VERTICAL)
-        gridSizer = wx.FlexGridSizer (rows=mon_num, cols=len(colLabels), vgap=5, hgap=5)  #wx.BoxSizer(wx.VERTICAL)
+        gridSizer = wx.FlexGridSizer (cols=len(colLabels), vgap=5, hgap=5)  #wx.BoxSizer(wx.VERTICAL)
 
 
         font = wx.Font(12, wx.SWISS, wx.NORMAL, wx.BOLD)
@@ -202,12 +205,12 @@ class pvg_AcquirePanel(wx.Panel):
         self.startBtn.Enable(False)
         
         et = event.GetEventType()
-        if et == 10016:
+        if et == 10020:
             value = event.GetString()
             if "Camera " in value:
                 value = int(value.split(" ")[1])
-
-        elif et == 10005:
+            
+        elif et == 10009:
             value = event.IsChecked()
         
         section = "Monitor%s" % target[0]
@@ -238,8 +241,9 @@ class pvg_AcquirePanel(wx.Panel):
                     m_source = m['source']
                 
                 self.monitors[mn] = ( acquireThread(mn, m_source, resolution, m['mask_file'], m['track'], m_tt , data_folder) )
-                self.monitors[mn].SDserialPort = m['serial_port']
-                self.monitors[mn].inactivity_threshold = m['inactivity_threshold'] or None
+                
+                self.monitors[mn].mon.SDserialPort = m['serial_port']
+                self.monitors[mn].mon.inactivity_threshold = m['inactivity_threshold'] or None
 
                 self.monitors[mn].doTrack()
 

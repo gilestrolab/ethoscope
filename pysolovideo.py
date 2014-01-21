@@ -1332,9 +1332,6 @@ class Monitor(object):
             nROI = self.mask.getROInumber()
             self.updateFlyBuffers(nROI, new=True)
 
-            print self.mask.referencePoints
-            print self.referencePoints
-
             return True
         else:
             return False
@@ -1618,6 +1615,7 @@ class Monitor(object):
         """
         returns a list of ROIs where flies have not moved during the last interval
         """
+        
         if interval == None:
             interval =  self.inactivity_threshold
 
@@ -1627,7 +1625,7 @@ class Monitor(object):
         asleep = self.flyActivity[:,interval:-1].sum(axis=1) < threshold
         ROIstomove = np.where( (asleep==True))[0].tolist()
         
-        sleepdeprivator.deprive(ROIstomove, use_serial=False, port=self.SDserialPort)
+        sleepdeprivator.deprive(ROIstomove, use_serial=True, port=self.SDserialPort)
 
 
     def processFlyMovements(self, time):
