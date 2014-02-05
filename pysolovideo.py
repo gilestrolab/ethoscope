@@ -1456,7 +1456,7 @@ class Monitor(object):
         Make sure the monitor has sleepdeprivation capabilities
         """
         
-        if (self.SDserialPort != NO_SERIAL_PORT):
+        if (self.SDserialPort != NO_SERIAL_PORT) and self.SDserialPort:
             #return sleepdeprivator.ping(use_serial=False, port=self.SDserialPort)
             return True
         else:
@@ -1636,8 +1636,10 @@ class Monitor(object):
         if interval == None:
             interval =  self.inactivity_threshold
 
-        if threshold == None:
+        if threshold == None and 'FLY_AREA_AVG' in self.debug_info:
             threshold = float (self.debug_info['FLY_AREA_AVG']) * interval
+        else:
+            threshold = 20 * interval
             
         asleep = self.flyActivity[:,interval:-1].sum(axis=1) < threshold
         ROIstomove = np.where( (asleep==True))[0].tolist()
