@@ -648,6 +648,7 @@ class ROImask():
             self.ROIS = []
             self.beams = []
             self.points_to_track = []
+            self.referencePoints == ((),())
             
     def getROInumber(self):
         """
@@ -1693,7 +1694,7 @@ class Monitor(object):
         frame, time = self.cam.getImage()
         
         # TRACKING RELATED
-        if self.tracking and self.mask.ROIS: 
+        if self.tracking and self.mask.ROIS and frame.any(): 
             frame, positions = self.trackByContours(frame)
             
             # for each frame adds fly coordinates to all ROIS. Also do some filtering to remove false positives
@@ -1730,13 +1731,18 @@ class Monitor(object):
                 frame = self.__drawROI(frame, ROI, ROInum=ROInum)
                 frame = self.__drawBeam(frame, beam)
 
-        if self.drawing and drawROIs and self.referencePoints != None:
-            for i in self.referencePoints[0,:]:
-                x, y, r = i
-                cv2.circle(frame,(i[0],i[1]),i[2],(255,255,255),2)
-                frame = self.__drawCross (frame, (x,y), color=(0,0,255))
+        #Drawing the reference circles
+        if self.drawing and drawROIs:
             
-            if self.mask.referencePoints != ((),()):
+            if self.referencePoints != None :
+                #The currently detected circle
+                for i in self.referencePoints[0,:]:
+                    x, y, r = i
+                    cv2.circle(frame,(i[0],i[1]),i[2],(255,255,255),2)
+                    frame = self.__drawCross (frame, (x,y), color=(0,0,255))
+            
+            #The circle in the mask
+            if self.mask.referencePoints != ((),()) and self.mask.referencePoints != None:
                 for i in self.mask.referencePoints[0,:]:
                     cv2.circle(frame,(i[0],i[1]),i[2],(0,255,0),1)  # draw the outer circle
                     cv2.circle(frame,(i[0],i[1]),2,(0,0,255),3)     # draw the center of the circle

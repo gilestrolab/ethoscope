@@ -68,13 +68,15 @@ class panelLiveView(wx.Panel):
         self.btnClearLast = wx.Button( self, wx.ID_ANY, label="Clear selected")
         self.Bind(wx.EVT_BUTTON, self.fsPanel.ClearLast, self.btnClearLast)
 
-
+        
+        self.AFValue = wx.TextCtrl (self, -1, "32")
         self.btnAutoFill = wx.Button( self, wx.ID_ANY, label="Auto Fill")
-        self.Bind(wx.EVT_BUTTON, self.fsPanel.AutoMask, self.btnAutoFill)
-        self.btnAutoFill.Enable(False)
+        self.Bind(wx.EVT_BUTTON, self.onAutoMask, self.btnAutoFill)
+        #self.btnAutoFill.Enable(False)
 
         fgSizer_1.Add (self.btnClear)
         fgSizer_1.Add (self.btnClearLast)
+        fgSizer_1.Add (self.AFValue)
         fgSizer_1.Add (self.btnAutoFill)
         
         sbSizer_2.Add (fgSizer_1)
@@ -183,6 +185,13 @@ class panelLiveView(wx.Panel):
                 #sourceType, source, track, mask_file, trackType = [0, '', False, '', 1]
                 self.sourceTXTBOX.SetValue('No Source for this monitor')
 
+
+    def onAutoMask(self, event):
+        """
+        """
+        n_roi = int( self.AFValue.GetValue() )
+        self.fsPanel.autoDivideMask(n_roi)
+        
 
     def onSaveMask(self, event):
         """
