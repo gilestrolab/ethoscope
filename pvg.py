@@ -144,7 +144,6 @@ class mainFrame(wx.Frame):
         dlg.Destroy()
 
         
-        
     def onFileSave(self, event):
         """
         """

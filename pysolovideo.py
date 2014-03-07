@@ -64,7 +64,8 @@ Current Data format
 import cv2
 import cPickle
 from calendar import month_abbr
-import os, datetime, time
+
+import os, datetime, time, threading
 import numpy as np
 
 from accessories.sleepdeprivator import sleepdeprivator
@@ -921,7 +922,7 @@ class Monitor(object):
         self.writer = None
         self.cam = None
         self.drawing = True
-        self.tracking = True
+        self.isTracking = False
 
         self.referencePoints = None
         
@@ -937,7 +938,6 @@ class Monitor(object):
         
         self.trackType = 1
         self.minuteFPS = runningAvgComparison()
-        
         
         self.SDserialPort = None
         self.inactivity_threshold = 7
@@ -1081,7 +1081,6 @@ class Monitor(object):
 
 #######################################################        
         
-        
 #### VARIOUS FUNCTIONS ###############################        
         
 
@@ -1096,9 +1095,40 @@ class Monitor(object):
         cv2.Split(img, channels[0], channels[1], channels[2], None)
         return channels[cn]
 
-#######################################################        
+        
+    def getUptime(self):
+        """
+        """
+        delta = (datetime.datetime.now() - self.starttime)
+        
+        t = datetime.timedelta(seconds=delta.seconds)
+        r = self.__rowline
+        return t, r
+        
+
+    def trackingLoop(self, kbdint=False):
+        """
+        """
+        #cv2.namedWindow("preview")
+        
+        while self.isTracking:
+            frame = self.GetImage()
+            #cv2.imshow("preview", frame)
+           
+
+    def startTracking(self):
+        self.track_thread = threading.Thread(target=self.trackingLoop)
+        self.isTracking = True
+        self.starttime = datetime.datetime.now()
+
+        self.track_thread.start()
+        
+    def stopTracking(self):
+        self.isTracking = False
         
         
+#######################################################
+
 #### CAM FUNCTION OF MONITOR ##########################       
 
 
@@ -1177,6 +1207,7 @@ class Monitor(object):
         Closes stream
         """
         self.cam.close()
+        self.isTracking = False
         
     def setTracking(self, track, trackType=0, mask_file='', outputFile=''):
         """
@@ -1452,6 +1483,7 @@ class Monitor(object):
         self.__count_seconds += delta
         self.__n += 1
 
+
     def isSDMon(self):
         """
         Make sure the monitor has sleepdeprivation capabilities
@@ -1462,6 +1494,15 @@ class Monitor(object):
             return True
         else:
             return False
+
+    def isSD(self):
+        """
+        It's time for performing sleep deprivation
+        """
+        timetoSD = True
+        
+        #first check that the monitor is able to do SD
+        return self.isSDMon() and timetoSD
         
 
     def writeActivity(self, fps=0, extend=True):
@@ -1511,8 +1552,7 @@ class Monitor(object):
         elif self.trackType == 2:
             activity = self.calculatePosition()
             
-            
-        if self.isSDMon():
+        if self.isSD():
             self.calculateImmobility()
             self.sleepDeprive(interval=5)
 
@@ -1694,7 +1734,7 @@ class Monitor(object):
         frame, time = self.cam.getImage()
         
         # TRACKING RELATED
-        if self.tracking and self.mask.ROIS and frame.any(): 
+        if self.isTracking and self.mask.ROIS and frame.any(): 
             frame, positions = self.trackByContours(frame)
             
             # for each frame adds fly coordinates to all ROIS. Also do some filtering to remove false positives
@@ -1766,7 +1806,6 @@ class Monitor(object):
         if self.grabMovie and self.isLastFrame():
             self.writer.release()
          
-    
         return frame
 
     def trackByContours(self, frame, draw_path=True, fliesPerROI=1):

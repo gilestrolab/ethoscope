@@ -29,8 +29,9 @@ __copyright__ = "Copyright (c) 2011 Giorgio Gilestro"
 __license__ = "Python"
 
 import os, optparse
-from pvg_common import pvg_config, acquireThread, DEFAULT_CONFIG, options, NO_SERIAL_PORT
+from pvg_common import pvg_config, DEFAULT_CONFIG, options, NO_SERIAL_PORT
 from accessories.sleepdeprivator import sleepdeprivator
+import pysolovideo
 
 import wx
 from wx.lib.filebrowsebutton import FileBrowseButton
@@ -107,10 +108,15 @@ class pvg_AcquirePanel(wx.Panel):
         self.parent = parent
 
       
-        colLabels = ['Monitor', 'Source', 'Mask', 'Output', 'Track type', 'Track', 'sleepDeprivator']
+        colLabels = ['Monitor', 'Source', 'Mask', 'Output', 'Track type', 'Track', 'uptime']
         tracktypes = ['DISTANCE','VBS','XY_COORDS']
         
         self.monitors = {}
+        self.InitMonitors()
+        self.uptimes = []
+        
+        self.timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.updateTimes, self.timer)
         
         ###################################################
 
@@ -129,9 +135,11 @@ class pvg_AcquirePanel(wx.Panel):
             text = wx.StaticText(self, -1, key )
             text.SetFont(font)
             gridSizer.Add(text, 0, wx.ALL|wx.ALIGN_CENTER, 5)
-            
+    
+    
+        self.recordBTNS = []
+        self.uptimeTXT = []
 
-        
         #for mn in monitorsData:
         for mn in range(1, mon_num+1):
             
@@ -150,43 +158,55 @@ class pvg_AcquirePanel(wx.Panel):
             ls = wx.BoxSizer (wx.HORIZONTAL)
             gridSizer.Add(wx.StaticText(self, -1, "Monitor %s" % mn ), 0, wx.ALL|wx.ALIGN_CENTER, 5)
 
+            #INPUT SOURCE
             gridSizer.Add(comboFileBrowser(self, wx.ID_ANY, size=(-1,-1), dialogTitle = "Choose an Input video file", startDirectory = options.GetOption("Data_Folder"), value = source, choices=WebcamsList, fileMask = "Video File (*.*)|*.*", browsevalue="Browse for video...", changeCallback = partial(self.__onChangeDropDown, [mn, "source"])), 0, wx.ALL|wx.ALIGN_CENTER, 5 )
-
+            
+            #MASK FILE
             gridSizer.Add(comboFileBrowser(self, wx.ID_ANY, size=(-1,-1), dialogTitle = "Choose a Mask file", startDirectory = options.GetOption("Mask_Folder"), value = mf, fileMask = "pySolo mask file (*.msk)|*.msk", browsevalue="Browse for mask...", changeCallback = partial(self.__onChangeDropDown, [mn, "mask_file"])), 0, wx.ALL|wx.ALIGN_CENTER, 5 )
-
+            
+            #OUTPUT FILE
             gridSizer.Add(comboFileBrowser(self, wx.ID_ANY, size=(-1,-1), dialogTitle = "Choose the output file", startDirectory = options.GetOption("Data_Folder"), value = df, fileMask = "Output File (*.txt)|*.txt", browsevalue="Browse for output...", changeCallback = partial(self.__onChangeDropDown, [mn, "outputfile"])), 0, wx.ALL|wx.ALIGN_CENTER, 5 )
 
-
+            #TRACKTYPE
             ttcb = wx.ComboBox(self, -1, size=(-1,-1), value=md['track_type'], choices=tracktypes, style=wx.CB_DROPDOWN | wx.CB_READONLY | wx.CB_SORT)
             ttcb.Bind (wx.EVT_COMBOBOX, partial(self.__onChangeDropDown, [mn, "track_type"]))
             gridSizer.Add(ttcb , 0, wx.ALL|wx.ALIGN_CENTER, 5)
-
-            chk = wx.CheckBox(self, -1, '', (10, 10))
-            chk.SetValue(md['track'])
-            chk.Bind(wx.EVT_CHECKBOX, partial(self.__onChangeCheckBox, [mn, "track"]))
-            gridSizer.Add(chk, 0, wx.ALL|wx.ALIGN_CENTER, 5)
             
-            SERIAL_PORTS = sleepdeprivator.listSerialPorts()
-            serialSD = wx.ComboBox(self, -1, size=(-1,-1), value=md['serial_port'], choices=SERIAL_PORTS, style=wx.CB_DROPDOWN | wx.CB_READONLY | wx.CB_SORT)
-            serialSD.Bind (wx.EVT_COMBOBOX, partial(self.__onChangeDropDown, [mn, "serial_port"]))
-            gridSizer.Add(serialSD , 0, wx.ALL|wx.ALIGN_CENTER, 5)
-        
+            ##DO TRACK
+            #chk = wx.CheckBox(self, -1, '', (10, 10))
+            #chk.SetValue(md['track'])
+            #chk.Bind(wx.EVT_CHECKBOX, partial(self.__onChangeCheckBox, [mn, "track"]))
+            #gridSizer.Add(chk, 0, wx.ALL|wx.ALIGN_CENTER, 5)
+            
+            ##SERIALPORTS
+            #SERIAL_PORTS = sleepdeprivator.listSerialPorts()
+            #serialSD = wx.ComboBox(self, -1, size=(-1,-1), value=md['serial_port'], choices=SERIAL_PORTS, style=wx.CB_DROPDOWN | wx.CB_READONLY | wx.CB_SORT)
+            #serialSD.Bind (wx.EVT_COMBOBOX, partial(self.__onChangeDropDown, [mn, "serial_port"]))
+            #gridSizer.Add(serialSD , 0, wx.ALL|wx.ALIGN_CENTER, 5)
+            
+            self.recordBTNS.append ( wx.ToggleButton(self, wx.ID_ANY, 'Start') )
+            self.recordBTNS[-1].Bind (wx.EVT_TOGGLEBUTTON, partial( self.onToggleRecording, mn))
+            gridSizer.Add(self.recordBTNS[-1], 0, wx.ALL|wx.ALIGN_CENTER, 5)
+            
+            self.uptimeTXT.append(wx.TextCtrl(self, value="00:00:00", size=(140,-1)))
+            gridSizer.Add(self.uptimeTXT[-1], 0, wx.ALL|wx.ALIGN_CENTER, 5)
+
+                    
         btnSizer = wx.BoxSizer(wx.HORIZONTAL)
         conf_btnSizer = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, 'Configuration'), wx.HORIZONTAL)
         acq_btnSizer = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, 'Acquisition'), wx.HORIZONTAL)
-        
 
         self.saveOptionsBtn = wx.Button(self, wx.ID_ANY, 'Save')
         self.saveOptionsBtn.Enable(False)
         self.Bind(wx.EVT_BUTTON, self.onSave, self.saveOptionsBtn)
         conf_btnSizer.Add (self.saveOptionsBtn, 0, wx.ALL, 5) 
         
-        self.startBtn = wx.Button(self, wx.ID_ANY, 'Start')
-        self.stopBtn = wx.Button(self, wx.ID_ANY, 'Stop')
-        self.startBtn.Enable(True)
+        self.startBtn = wx.Button(self, wx.ID_ANY, 'Start All')
+        self.stopBtn = wx.Button(self, wx.ID_ANY, 'Stop All')
+        self.startBtn.Enable(False)
         self.stopBtn.Enable(False)
-        self.Bind(wx.EVT_BUTTON, self.onStop, self.stopBtn)
-        self.Bind(wx.EVT_BUTTON, self.onStart, self.startBtn)
+        self.Bind(wx.EVT_BUTTON, self.onStopAll, self.stopBtn)
+        self.Bind(wx.EVT_BUTTON, self.onStartAll, self.startBtn)
         acq_btnSizer.Add (self.startBtn, 0, wx.ALL, 5) 
         acq_btnSizer.Add (self.stopBtn, 0, wx.ALL, 5)
 
@@ -196,7 +216,7 @@ class pvg_AcquirePanel(wx.Panel):
         #mainSizer.Add(self.FBconfig, 0, wx.EXPAND|wx.ALL, 5) 
         mainSizer.Add(gridSizer, 1, wx.EXPAND, 0)
         mainSizer.Add(btnSizer, 0, wx.ALL, 5)
-        self.SetSizer(mainSizer) 
+        self.SetSizer(mainSizer)
 
     def __onChangeCheckBox(self, target, event=None):
         """
@@ -233,7 +253,6 @@ class pvg_AcquirePanel(wx.Panel):
             
         if event.GetEventType() == wx.EVT_CHECKBOX.evtType:
             value = event.IsChecked()
-            print value
 
         #if event.GetEventType() == wx.EVT_COMBOBOX.evtType:
         else:
@@ -247,13 +266,9 @@ class pvg_AcquirePanel(wx.Panel):
         options.setValue(section, keyname, value)
         
         
-    def onStart(self, event=None):
+    def InitMonitors(self):
         """
         """
-        self.acquiring = True
-        self.stopBtn.Enable(self.acquiring)
-        self.startBtn.Enable(not self.acquiring)
-        c = 0
 
         resolution = options.GetOption("Resolution")
         data_folder = options.GetOption("Data_Folder")
@@ -269,18 +284,30 @@ class pvg_AcquirePanel(wx.Panel):
                 else:
                     m_source = m['source']
                 
-                self.monitors[mn] = ( acquireThread(mn, m_source, resolution, m['mask_file'], m['track'], m_tt , data_folder) )
+                #self.monitors[mn] = ( acquireThread(mn, m_source, resolution, m['mask_file'], m['track'], m_tt , data_folder) )
                 
-                self.monitors[mn].mon.SDserialPort = m['serial_port']
-                self.monitors[mn].mon.inactivity_threshold = m['inactivity_threshold'] or None
+                outputFile = os.path.join(data_folder, 'Monitor%02d.txt' % mn)
+                self.monitors[mn] = pysolovideo.Monitor()
+                self.monitors[mn].setSource(m_source, resolution)
+                self.monitors[mn].setTracking(True, m_tt, m['mask_file'], outputFile)
 
-                self.monitors[mn].doTrack()
+                
+                self.monitors[mn].SDserialPort = m['serial_port']
+                self.monitors[mn].inactivity_threshold = m['inactivity_threshold'] or None
 
-                c+=1
-            
+                #self.monitors[mn].doTrack()
+
         #self.parent.sb.SetStatusText('Tracking %s Monitors' % c)
+        
+    def onStartAll(self, event=None):
+        """
+        """
+        self.acquiring = True
+        self.stopBtn.Enable(self.acquiring)
+        self.startBtn.Enable(not self.acquiring)
+
     
-    def onStop(self, event):
+    def onStopAll(self, event):
         """
         """
         self.acquiring = False
@@ -299,6 +326,31 @@ class pvg_AcquirePanel(wx.Panel):
         self.saveOptionsBtn.Enable(False)
         self.startBtn.Enable(True)
         
+    def onToggleRecording(self, monitor, event=None):
+        """
+        """
+
+        recording = self.recordBTNS[monitor-1].GetValue()
+
+        if recording: 
+            self.monitors[monitor].startTracking()
+            self.recordBTNS[monitor-1].SetLabelText('Stop')
+            self.timer.Start(1000)
+        else:
+            self.recordBTNS[monitor-1].SetLabelText('Start')
+            self.monitors[monitor].stopTracking()
+            self.timer.Stop()
+        
+        
+    def updateTimes(self, event):
+        """
+        """
+        for n in range (len(self.monitors)):
+            if self.monitors[n+1].isTracking:
+                t, r = self.monitors[n+1].getUptime()
+                self.uptimeTXT[n].SetValue("%s (%s)" % (t, r))
+            
+
 class acquireFrame(wx.Frame):
     def __init__(self, *args, **kwargs):
         kwargs["size"] = (980, 600)
@@ -310,11 +362,6 @@ class acquireFrame(wx.Frame):
 
         self.acq_panel =  pvg_AcquirePanel(self)
         
-    def Start(self):
-        """
-        """
-        self.acq_panel.onStart()
-
 
 
 if __name__ == '__main__':
