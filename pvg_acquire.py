@@ -111,7 +111,7 @@ class pvg_AcquirePanel(wx.Panel):
         colLabels = ['Monitor', 'Source', 'Mask', 'Output', 'Track type', 'Track', 'uptime']
         tracktypes = ['DISTANCE','VBS','XY_COORDS']
         
-        self.monitors = {}
+        self.active_monitors = {}
         self.InitMonitors()
         
         self.timer = wx.Timer(self)
@@ -171,18 +171,6 @@ class pvg_AcquirePanel(wx.Panel):
             ttcb.Bind (wx.EVT_COMBOBOX, partial(self.__onChangeDropDown, [mn, "track_type"]))
             gridSizer.Add(ttcb , 0, wx.ALL|wx.ALIGN_CENTER, 5)
             
-            ##DO TRACK
-            #chk = wx.CheckBox(self, -1, '', (10, 10))
-            #chk.SetValue(md['track'])
-            #chk.Bind(wx.EVT_CHECKBOX, partial(self.__onChangeCheckBox, [mn, "track"]))
-            #gridSizer.Add(chk, 0, wx.ALL|wx.ALIGN_CENTER, 5)
-            
-            ##SERIALPORTS
-            #SERIAL_PORTS = sleepdeprivator.listSerialPorts()
-            #serialSD = wx.ComboBox(self, -1, size=(-1,-1), value=md['serial_port'], choices=SERIAL_PORTS, style=wx.CB_DROPDOWN | wx.CB_READONLY | wx.CB_SORT)
-            #serialSD.Bind (wx.EVT_COMBOBOX, partial(self.__onChangeDropDown, [mn, "serial_port"]))
-            #gridSizer.Add(serialSD , 0, wx.ALL|wx.ALIGN_CENTER, 5)
-            
             self.recordBTNS.append ( wx.ToggleButton(self, wx.ID_ANY, 'Start') )
             self.recordBTNS[-1].Bind (wx.EVT_TOGGLEBUTTON, partial( self.onToggleRecording, mn))
             gridSizer.Add(self.recordBTNS[-1], 0, wx.ALL|wx.ALIGN_CENTER, 5)
@@ -202,7 +190,7 @@ class pvg_AcquirePanel(wx.Panel):
         
         self.startBtn = wx.Button(self, wx.ID_ANY, 'Start All')
         self.stopBtn = wx.Button(self, wx.ID_ANY, 'Stop All')
-        self.startBtn.Enable(False)
+        self.startBtn.Enable(True)
         self.stopBtn.Enable(False)
         self.Bind(wx.EVT_BUTTON, self.onStopAll, self.stopBtn)
         self.Bind(wx.EVT_BUTTON, self.onStartAll, self.startBtn)
@@ -285,33 +273,35 @@ class pvg_AcquirePanel(wx.Panel):
                        
             output_file = os.path.join(data_folder, 'Monitor%02d.txt' % mn)
             
-            self.monitors[mn] = pysolovideo.Monitor()
-            self.monitors[mn].setSource(source, resolution)
-            self.monitors[mn].setTracking(True, track_type, m['mask_file'], output_file)
+            self.active_monitors[mn] = pysolovideo.Monitor()
+            self.active_monitors[mn].setSource(source, resolution)
+            self.active_monitors[mn].setTracking(True, track_type, m['mask_file'], output_file)
 
-            
-            self.monitors[mn].SDserialPort = m['serial_port']
-            self.monitors[mn].inactivity_threshold = m['inactivity_threshold'] or None
+            self.active_monitors[mn].SDserialPort = m['serial_port']
+            self.active_monitors[mn].inactivity_threshold = m['inactivity_threshold'] or None
         
     def onStartAll(self, event=None):
         """
         """
-        self.acquiring = True
-        self.stopBtn.Enable(self.acquiring)
-        self.startBtn.Enable(not self.acquiring)
-
+        self.stopBtn.Enable(True)
+        self.startBtn.Enable(False)
+        
+        for num, btn in enumerate(self.recordBTNS):
+            recording = btn.GetValue()
+            if not recording:
+                self.onToggleRecording(num+1, force="start")
     
     def onStopAll(self, event):
         """
         """
-        self.acquiring = False
+
         self.stopBtn.Enable(False)
         self.startBtn.Enable(True)
         
-        for mon in self.monitors:
-            self.monitors[mon].halt()
-            
-        self.parent.sb.SetStatusText('All tracking is now stopped')
+        for num, btn in enumerate(self.recordBTNS):
+            recording = btn.GetValue()
+            if recording: self.onToggleRecording(num+1, force="stop")
+
         
     def onSave(self, event):
         """
@@ -320,28 +310,30 @@ class pvg_AcquirePanel(wx.Panel):
         self.saveOptionsBtn.Enable(False)
         self.startBtn.Enable(True)
         
-    def onToggleRecording(self, monitor, event=None):
+    def onToggleRecording(self, monitor, event=None, force=None):
         """
         """
+        if monitor in self.active_monitors:
+            recording = self.recordBTNS[monitor-1].GetValue()
 
-        recording = self.recordBTNS[monitor-1].GetValue()
-
-        if recording: 
-            self.monitors[monitor].startTracking()
-            self.recordBTNS[monitor-1].SetLabelText('Stop')
-            self.timer.Start(1000)
-        else:
-            self.recordBTNS[monitor-1].SetLabelText('Start')
-            self.monitors[monitor].stopTracking()
-            self.timer.Stop()
+            if force == "start" or recording: 
+                self.active_monitors[monitor].startTracking()
+                self.recordBTNS[monitor-1].SetLabelText('Stop')
+                self.recordBTNS[monitor-1].SetValue(True)
+                self.timer.Start(1000)
+            elif force == "stop" or not recording:
+                self.recordBTNS[monitor-1].SetLabelText('Start')
+                self.active_monitors[monitor].stopTracking()
+                self.recordBTNS[monitor-1].SetValue(False)
+                self.timer.Stop()
         
         
     def updateTimes(self, event):
         """
         """
-        for n in range (len(self.monitors)):
-            if self.monitors[n+1].isTracking:
-                t, r = self.monitors[n+1].getUptime()
+        for n in range (len(self.active_monitors)):
+            if self.active_monitors[n+1].isTracking:
+                t, r = self.active_monitors[n+1].getUptime()
                 self.uptimeTXT[n].SetValue("%s (%s)" % (t, r))
             
 
