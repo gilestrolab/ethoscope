@@ -113,7 +113,6 @@ class pvg_AcquirePanel(wx.Panel):
         
         self.monitors = {}
         self.InitMonitors()
-        self.uptimes = []
         
         self.timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.updateTimes, self.timer)
@@ -276,28 +275,23 @@ class pvg_AcquirePanel(wx.Panel):
         
         for mn in monitorsData:
             m = monitorsData[mn]
-            if m['track']:
-                
-                m_tt = ['DISTANCE','VBS','XY_COORDS'].index(m['track_type'])
-                if type(m['source']) == int:
-                    m_source = int(m['source']) - 1
-                else:
-                    m_source = m['source']
-                
-                #self.monitors[mn] = ( acquireThread(mn, m_source, resolution, m['mask_file'], m['track'], m_tt , data_folder) )
-                
-                outputFile = os.path.join(data_folder, 'Monitor%02d.txt' % mn)
-                self.monitors[mn] = pysolovideo.Monitor()
-                self.monitors[mn].setSource(m_source, resolution)
-                self.monitors[mn].setTracking(True, m_tt, m['mask_file'], outputFile)
+               
+            track_type = ['DISTANCE','VBS','XY_COORDS'].index(m['track_type'])
+            
+            if type(m['source']) == int:
+                source = int(m['source']) - 1
+            else:
+                source = m['source']
+                       
+            output_file = os.path.join(data_folder, 'Monitor%02d.txt' % mn)
+            
+            self.monitors[mn] = pysolovideo.Monitor()
+            self.monitors[mn].setSource(source, resolution)
+            self.monitors[mn].setTracking(True, track_type, m['mask_file'], output_file)
 
-                
-                self.monitors[mn].SDserialPort = m['serial_port']
-                self.monitors[mn].inactivity_threshold = m['inactivity_threshold'] or None
-
-                #self.monitors[mn].doTrack()
-
-        #self.parent.sb.SetStatusText('Tracking %s Monitors' % c)
+            
+            self.monitors[mn].SDserialPort = m['serial_port']
+            self.monitors[mn].inactivity_threshold = m['inactivity_threshold'] or None
         
     def onStartAll(self, event=None):
         """
