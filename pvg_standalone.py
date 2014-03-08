@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 import wx
 import optparse
-import pysolovideo as pv
-from pvg_common import previewPanel, pvg_config, acquireObject, cvPanel
+import pysolovideo
+from pvg_common import previewPanel, pvg_config, cvPanel
 from os.path import splitext
 
 ##
@@ -70,12 +70,13 @@ if __name__=="__main__":
         parser.print_help()
 
     if options.snapshot:
-        at = acquireObject(None, source, resolution, mask_file, track, track_type, output_file=output_file)
-        at.snapshot()
-        
+        m = pysolovideo.Monitor()
+        m.setSource(source, resolution)
+        filename = "%s.jpg" % source
+        m.saveSnapshot(filename)
     
     elif options.use_cv:
-        c = cvPanel (source, resolution, str(source), track_type, mask_file, output_file, options.showROIs, options.showpath, options.showtime, options.record )
+        c = cvPanel (source, resolution, str(source), track_type, mask_file, output_file, options.showROIs, options.showpath, options.showtime )
         if options.record: c.mon.saveMovie('video_output.avi')
         c.play()
 
@@ -87,9 +88,11 @@ if __name__=="__main__":
         
     elif options.trackonly and ((options.configfile and options.monitor) or options.source): #no X output needed
         
-        at = acquireObject(None, source, resolution, mask_file, track, track_type, output_file=output_file)
-        if options.record: at.mon.saveMovie('video_output.avi')
+        m = pysolovideo.Monitor()
+        m.setSource(source, resolution)
+        m.setTracking(True, track_type, mask_file, output_file)
+        if options.record: m.saveMovie('video_output.avi')
         print "Processing video %s without output. This may take sometime." % source
-        at.start()
-        at.debug()
+        m.startTracking()
+        print m.debug_info
 
