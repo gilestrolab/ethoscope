@@ -126,8 +126,9 @@ class Cam:
     def saveSnapshot(self, filename, quality=90, timestamp=False):
         """
         """
-        img = self.getImage(timestamp, imgType)
-        cv2.SaveImage(filename, img)
+        frame, _ = self.getImage()
+        cv2.imwrite(filename, frame)
+
 
     def close(self):
         """
