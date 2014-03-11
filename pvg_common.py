@@ -22,15 +22,17 @@
 
 import wx
 import os
-import cv2
-import pysolovideo as pv
-import ConfigParser, threading
-import numpy as np
-from pysolovideo import NO_SERIAL_PORT
+import ConfigParser
+import threading
 
+import numpy as np
+import cv2
+import pysolovideo
 
 
 DEFAULT_CONFIG = 'pysolo_video.cfg'
+
+
 class myConfig():
     """
     Handles program configuration
@@ -204,7 +206,7 @@ class pvg_config(myConfig):
                            }
 
         self.monitorProperties = ['source', 'track', 'mask_file', 'track_type', 'serial_port', 'inactivity_threshold']
-        self.defaultmonitorPropertiesValues = ["",0,"","",NO_SERIAL_PORT,7]
+        self.defaultmonitorPropertiesValues = ["" ,0 ,"" , "XY_COORDS", pysolovideo.NO_SERIAL_PORT, 7]
 
         myConfig.__init__(self, filename, temporary, defaultOptions)
 
@@ -271,7 +273,7 @@ class cvPanel():
         self.showpath = showpath
         track = ( track_type > -1 )
 
-        self.mon = pv.Monitor()
+        self.mon = pysolovideo.Monitor()
         self.mon.setSource(source, resolution)
         self.mon.setTracking(track, track_type, mask_file, output_file)
         
@@ -586,7 +588,7 @@ class previewPanel(wx.Panel):
         self.camera = camera
         self.resolution = resolution
 
-        self.mon = pv.Monitor()
+        self.mon = pysolovideo.Monitor()
         self.mon.setSource(self.camera, self.resolution)
         frame = self.mon.GetImage(drawROIs = self.drawROI, selection=self.selection, crosses=self.polyPoints, timestamp=self.timestamp)
 

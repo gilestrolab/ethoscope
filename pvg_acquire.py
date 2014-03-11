@@ -29,7 +29,7 @@ __copyright__ = "Copyright (c) 2011 Giorgio Gilestro"
 __license__ = "Python"
 
 import os, optparse
-from pvg_common import pvg_config, DEFAULT_CONFIG, options, NO_SERIAL_PORT
+from pvg_common import pvg_config, DEFAULT_CONFIG, options
 from accessories.sleepdeprivator import sleepdeprivator
 import pysolovideo
 

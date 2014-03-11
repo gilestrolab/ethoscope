@@ -171,6 +171,7 @@ class panelLiveView(wx.Panel):
                     self.fsPanel.setMonitor( md['source'] - 1 )
                     self.sourceTXTBOX.SetValue( WebcamsList[md['source']-1] )
 
+
                 else:
                     self.fsPanel.setMonitor( md['source'] )
                     self.sourceTXTBOX.SetValue( os.path.split(md['source'])[1] )

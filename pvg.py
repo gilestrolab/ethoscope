@@ -27,13 +27,14 @@
 import wx, os
 
 from pvg_options import optionsFrame
-#from pvg_panel_one import panelOne
+
 from pvg_acquire import pvg_AcquirePanel as panelOne
 from pvg_panel_two import panelLiveView
 from pvg_common import options, DEFAULT_CONFIG
 
 from pysolovideo import pySoloVideoVersion
-        
+
+
 class mainNotebook(wx.Notebook):
     """
     The main notebook containing all the panels for data displaying and analysis
