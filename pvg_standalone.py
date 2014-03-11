@@ -20,6 +20,7 @@ class CvMovieFrame(wx.Frame):
 
         self.displayPanel.setMonitor(source, resolution)
         self.displayPanel.mon.setTracking(track, track_type, mask_file, output_file)
+        self.displayPanel.mon.isTracking = True
         self.displayPanel.timestamp = showtime
        
         if record:
@@ -46,6 +47,7 @@ if __name__=="__main__":
     parser.add_option('--trackonly', action="store_true", default=False, dest='trackonly', help="Does only the tracking, without showing the video")
     parser.add_option('--useCV', action="store_true", default=False, dest='use_cv', help="Show a preview using a CV window - experimental")
     parser.add_option('--snapshot', action="store_true", default=False, dest='snapshot', help="Save a snapshot to file")
+    parser.add_option('--printinfo', action="store_true", default=False, dest='printinfo', help="Print some debug info about the camera")
     
     (options, args) = parser.parse_args()
 
@@ -68,6 +70,13 @@ if __name__=="__main__":
 
     else:
         parser.print_help()
+
+
+    if options.source and options.printinfo:
+        m = pysolovideo.Monitor()
+        m.setSource(source, resolution)
+        print m.debug_info
+        exit()
 
     if options.snapshot:
         m = pysolovideo.Monitor()
@@ -94,5 +103,4 @@ if __name__=="__main__":
         if options.record: m.saveMovie('video_output.avi')
         print "Processing video %s without output. This may take sometime." % source
         m.startTracking()
-        print m.debug_info
 
