@@ -79,6 +79,7 @@ PERIOD = 60 #in seconds
 ACTIVITY_PERIOD = 1440 #buffer of activity, in minutes
 NO_SERIAL_PORT = "NO SD"
 
+MONITORS = []
 
 class runningAvgComparison():
     """
@@ -1133,7 +1134,7 @@ class Monitor(object):
 #### CAM FUNCTION OF MONITOR ##########################       
 
 
-    def __captureFromCAM(self, devnum=0, resolution=(640,480), options=None):
+    def __captureFromCAM(self, devnum=1, resolution=(640,480), options=None):
         """
         """
         self.isVirtualCam = False
@@ -1144,6 +1145,8 @@ class Monitor(object):
         self.cam.setResolution(resolution)
         self.resolution = self.cam.getResolution()
         self.numberOfFrames = 0
+        
+        print "STARTING %s" % devnum
         
     def __captureFromMovie(self, camera, resolution=None, options=None):
         """

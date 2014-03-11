@@ -22,6 +22,7 @@
 
 import wx, os
 from pvg_common import previewPanel, options
+import pysolovideo
 
 class panelLiveView(wx.Panel):
     """
@@ -34,11 +35,8 @@ class panelLiveView(wx.Panel):
         
         wx.Panel.__init__(self, parent, wx.ID_ANY)
 
-        self.monitor_number = options.GetOption("Monitors")
-        self.fs_size = options.GetOption("Resolution")
         self.monitor_name = ''
-
-        self.fsPanel = previewPanel(self, size=self.fs_size, showtime=True)
+        self.fsPanel = previewPanel(self, size=options.GetOption("Resolution"), showtime=True)
         
         sizer_1 = wx.BoxSizer(wx.VERTICAL)
         sizer_2 = wx.BoxSizer(wx.HORIZONTAL)
@@ -48,7 +46,7 @@ class panelLiveView(wx.Panel):
         #Static box1: monitor input
         sb_1 = wx.StaticBox(self, -1, "Select Monitor")#, size=(250,-1))
         sbSizer_1 = wx.StaticBoxSizer (sb_1, wx.VERTICAL)
-        self.MonitorList = ['Monitor %s' % (int(m) + 1) for m in range(self.monitor_number)]
+        self.MonitorList = ['Monitor %s' % (int(m) + 1) for m in range(options.GetOption("Monitors"))]
         self.thumbnailNumber = wx.ComboBox(self, -1, size=(-1,-1) , choices=self.MonitorList, style=wx.CB_DROPDOWN | wx.CB_READONLY | wx.CB_SORT)
         self.Bind(wx.EVT_COMBOBOX, self.onChangeMonitor, self.thumbnailNumber)
 
@@ -152,29 +150,19 @@ class panelLiveView(wx.Panel):
         FIX THIS
         this is a mess
         """
-        
-        #Get info on the monitor we selected
-        self.monitor_name = event.GetString()
-        self.monitor_number = self.MonitorList.index( self.monitor_name ) + 1
 
-        #Updates dropdown box
-        WebcamsList = [ 'Camera %02d' % (int(w) +1) for w in range( options.GetOption("Webcams") ) ]
+        mn = event.GetSelection() + 1
         
-        if options.HasMonitor(self.monitor_number):
+        if options.HasMonitor(mn):
 
-            md = options.GetMonitor(self.monitor_number)
+            md = options.GetMonitor(mn)
             
             if md['source']:
                 if self.fsPanel.isPlaying: self.fsPanel.Stop()
-                
-                if type(md['source']) == int:
-                    self.fsPanel.setMonitor( md['source'] - 1 )
-                    self.sourceTXTBOX.SetValue( WebcamsList[md['source']-1] )
 
-
-                else:
-                    self.fsPanel.setMonitor( md['source'] )
-                    self.sourceTXTBOX.SetValue( os.path.split(md['source'])[1] )
+                    
+                self.fsPanel.setMonitor( pysolovideo.MONITORS[mn] )
+                self.sourceTXTBOX.SetValue( 'Source: %s' % md['source'] )
                     
                 self.fsPanel.Play()
 

@@ -9,7 +9,7 @@ from os.path import splitext
 ## find . -fname "*.avi" | xargs python2 pvg_standalone.py -i {}
 ##
 
-class CvMovieFrame(wx.Frame):
+class wxMovieFrame(wx.Frame):
     def __init__(self, parent, source, resolution, track, track_type, mask_file, output_file, showROIs, showpath, showtime, record ):
         wx.Frame.__init__(self, parent)
         
@@ -92,7 +92,7 @@ if __name__=="__main__":
     elif not options.trackonly and ((options.configfile and options.monitor) or options.source):
 
         app = wx.App()
-        f = CvMovieFrame(None, source, resolution, track, track_type, mask_file, output_file, options.showROIs, options.showpath, options.showtime, options.record )
+        f = wxMovieFrame(None, source, resolution, track, track_type, mask_file, output_file, options.showROIs, options.showpath, options.showtime, options.record )
         app.MainLoop()
         
     elif options.trackonly and ((options.configfile and options.monitor) or options.source): #no X output needed

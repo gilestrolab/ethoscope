@@ -31,7 +31,7 @@ import pysolovideo
 
 
 DEFAULT_CONFIG = 'pysolo_video.cfg'
-
+MONITORS = []
 
 class myConfig():
     """
@@ -205,8 +205,8 @@ class pvg_config(myConfig):
                             "Mask_Folder" : ['.', "Folder where the masks are found", "Folders"],
                            }
 
-        self.monitorProperties = ['source', 'track', 'mask_file', 'track_type', 'serial_port', 'inactivity_threshold']
-        self.defaultmonitorPropertiesValues = ["" ,0 ,"" , "XY_COORDS", pysolovideo.NO_SERIAL_PORT, 7]
+        self.monitorProperties = ['source', 'track', 'mask_file', 'track_type', 'serial_port', 'inactivity_threshold', 'outputfile']
+        self.defaultmonitorPropertiesValues = ["" ,0 ,"" , "XY_COORDS", pysolovideo.NO_SERIAL_PORT, 7, '']
 
         myConfig.__init__(self, filename, temporary, defaultOptions)
 
@@ -579,7 +579,7 @@ class previewPanel(wx.Panel):
 ######### REFRESH AND PAINTING OF THE PANEL ###############
 
         
-    def setMonitor(self, camera, resolution=None):
+    def setMonitor_old(self, camera, resolution=None):
         """
         """
         
@@ -588,8 +588,10 @@ class previewPanel(wx.Panel):
         self.camera = camera
         self.resolution = resolution
 
-        self.mon = pysolovideo.Monitor()
-        self.mon.setSource(self.camera, self.resolution)
+        if not self.mon:
+            self.mon = pysolovideo.Monitor()
+            self.mon.setSource(self.camera, self.resolution)
+
         frame = self.mon.GetImage(drawROIs = self.drawROI, selection=self.selection, crosses=self.polyPoints, timestamp=self.timestamp)
 
         self.bmp = wx.BitmapFromBuffer(self.size[0], self.size[1], frame)
@@ -601,6 +603,26 @@ class previewPanel(wx.Panel):
         if self.keymode: 
             self.Bind( wx.EVT_CHAR, self.onKeyPressed )
             self.SetFocus()
+
+    def setMonitor(self, pysolomonitor):
+        """
+        associates an existing monitor to this panel
+        """
+        
+        self.mon = pysolomonitor
+
+        frame = self.mon.GetImage(drawROIs = self.drawROI, selection=self.selection, crosses=self.polyPoints, timestamp=self.timestamp)
+
+        self.bmp = wx.BitmapFromBuffer(self.size[0], self.size[1], frame)
+
+        self.Bind(wx.EVT_PAINT, self.onPaint)
+        self.playTimer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.onNextFrame)
+
+        if self.keymode: 
+            self.Bind( wx.EVT_CHAR, self.onKeyPressed )
+            self.SetFocus()
+
         
 
     def paintImg(self, frame):

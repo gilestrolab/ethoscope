@@ -34,7 +34,6 @@ from pvg_common import options, DEFAULT_CONFIG
 
 from pysolovideo import pySoloVideoVersion
 
-
 class mainNotebook(wx.Notebook):
     """
     The main notebook containing all the panels for data displaying and analysis

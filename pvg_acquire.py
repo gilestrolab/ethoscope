@@ -119,8 +119,6 @@ class pvg_AcquirePanel(wx.Panel):
         
         ###################################################
 
-        #self.FBconfig = FileBrowseButton(self, -1, labelText='Pick file', size=(300,-1))
-        
         WebcamsList = [ 'Camera %02d' % (int(w) +1) for w in range( options.GetOption("Webcams") ) ]
         mon_num = options.GetOption("Monitors")
         monitorsData = options.getMonitorsData()
@@ -164,7 +162,7 @@ class pvg_AcquirePanel(wx.Panel):
             gridSizer.Add(comboFileBrowser(self, wx.ID_ANY, size=(-1,-1), dialogTitle = "Choose a Mask file", startDirectory = options.GetOption("Mask_Folder"), value = mf, fileMask = "pySolo mask file (*.msk)|*.msk", browsevalue="Browse for mask...", changeCallback = partial(self.__onChangeDropDown, [mn, "mask_file"])), 0, wx.ALL|wx.ALIGN_CENTER, 5 )
             
             #OUTPUT FILE
-            gridSizer.Add(comboFileBrowser(self, wx.ID_ANY, size=(-1,-1), dialogTitle = "Choose the output file", startDirectory = options.GetOption("Data_Folder"), value = df, fileMask = "Output File (*.txt)|*.txt", browsevalue="Browse for output...", changeCallback = partial(self.__onChangeDropDown, [mn, "outputfile"])), 0, wx.ALL|wx.ALIGN_CENTER, 5 )
+            gridSizer.Add(comboFileBrowser(self, wx.ID_ANY, size=(-1,-1), dialogTitle = "Choose the output file", startDirectory = options.GetOption("Data_Folder"), value = md['outputfile'], fileMask = "Output File (*.txt)|*.txt", browsevalue="Browse for output...", changeCallback = partial(self.__onChangeDropDown, [mn, "outputfile"])), 0, wx.ALL|wx.ALIGN_CENTER, 5 )
 
             #TRACKTYPE
             ttcb = wx.ComboBox(self, -1, size=(-1,-1), value=md['track_type'], choices=tracktypes, style=wx.CB_DROPDOWN | wx.CB_READONLY | wx.CB_SORT)
@@ -256,7 +254,7 @@ class pvg_AcquirePanel(wx.Panel):
     def InitMonitors(self):
         """
         """
-
+        
         resolution = options.GetOption("Resolution")
         data_folder = options.GetOption("Data_Folder")
         monitorsData = options.getMonitorsData()
@@ -271,7 +269,7 @@ class pvg_AcquirePanel(wx.Panel):
             else:
                 source = m['source']
                        
-            output_file = os.path.join(data_folder, 'Monitor%02d.txt' % mn)
+            output_file = m['outputfile'] or os.path.join(data_folder, 'Monitor%02d.txt' % mn)
             
             self.active_monitors[mn] = pysolovideo.Monitor()
             self.active_monitors[mn].setSource(source, resolution)
@@ -279,7 +277,10 @@ class pvg_AcquirePanel(wx.Panel):
 
             self.active_monitors[mn].SDserialPort = m['serial_port']
             self.active_monitors[mn].inactivity_threshold = m['inactivity_threshold'] or None
-        
+
+        pysolovideo.MONITORS = self.active_monitors
+
+
     def onStartAll(self, event=None):
         """
         """
