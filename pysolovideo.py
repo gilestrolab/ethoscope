@@ -61,12 +61,16 @@ Current Data format
     
 """
 
-import cv2
+
+import os, datetime, time
 import cPickle
 from calendar import month_abbr
 
-import os, datetime, time, threading
+import cv2
 import numpy as np
+
+import threading
+import Queue
 
 from accessories.sleepdeprivator import sleepdeprivator
 
@@ -934,6 +938,8 @@ class Monitor(object):
         self.__temp_FPS = 0 
         self.__processingFPS = 0
         self.__rowline = 0
+        #self.__image_queue = Queue
+        self.__image_queue = None # for one frame queue we don't need a real queue.
         
         # TO DO: NOT IMPLEMENTED YET
         self.ratio = 0 # used for mask calibration, px to cm
@@ -1035,7 +1041,7 @@ class Monitor(object):
 
         cv2.polylines(frame, np.array([ROI]), isClosed=1, color=color, thickness=1, lineType=line_type, shift=0)
         
-        if ROInum != None:
+        if ROInum is not None:
             x, y = ROI[0]
             textcolor = (255,255,255)
             text = "%02d" % ROInum
@@ -1047,7 +1053,7 @@ class Monitor(object):
         """
         Draw a cross around a point pt
         """
-        if pt != None:
+        if pt is not None:
             if not color: color = (255,255,255)
             width = 1
             line_type = cv2.CV_AA
@@ -1076,7 +1082,7 @@ class Monitor(object):
 
         points = self.getLastSteps(fly, steps)
 
-        cv2.PolyLine(frame, [points], is_closed=0, color=color, thickness=1, lineType=line_type, shift=0)
+        cv2.polylines(frame, [points], is_closed=0, color=color, thickness=1, lineType=line_type, shift=0)
 
         return frame
         
@@ -1094,7 +1100,7 @@ class Monitor(object):
         cn = 'RGB'.find( channel.upper() )
         
         channels = [None, None, None]
-        cv2.Split(img, channels[0], channels[1], channels[2], None)
+        cv2.split(img, channels[0], channels[1], channels[2], None)
         return channels[cn]
 
         
@@ -1736,6 +1742,7 @@ class Monitor(object):
 
         ##self.imageCount += 1
         frame, time = self.cam.getImage()
+        #print time
         
         # TRACKING RELATED
         if self.isTracking and self.mask.ROIS and frame.any(): 
@@ -1809,8 +1816,16 @@ class Monitor(object):
             
         if self.grabMovie and self.isLastFrame():
             self.writer.release()
-         
+        
+        #self.__image_queue.put(frame)
+        self.__image_queue = frame
         return frame
+
+    def getImageFromQueue(self):
+        """
+        """
+        return self.__image_queue
+        #return self.__image_queue.get()
 
     def trackByContours(self, frame, draw_path=True, fliesPerROI=1):
         """

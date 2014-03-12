@@ -15,10 +15,16 @@ class wxMovieFrame(wx.Frame):
         
        
         self.displayPanel = previewPanel(self, size=resolution, keymode=True, singleFrameMode=True)
-        self.SetSize(resolution)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add (self.displayPanel)
+        #self.setSizer(sizer)
+        
+        #self.SetSize((-1, -1))
         self.SetTitle(source)
-
-        self.displayPanel.setMonitor(source, resolution)
+        
+        monitor = pysolovideo.Monitor()
+        monitor.setSource(source, resolution)
+        self.displayPanel.setMonitor( monitor )
         self.displayPanel.mon.setTracking(track, track_type, mask_file, output_file)
         self.displayPanel.mon.isTracking = True
         self.displayPanel.timestamp = showtime
@@ -86,6 +92,7 @@ if __name__=="__main__":
     
     elif options.use_cv:
         c = cvPanel (source, resolution, str(source), track_type, mask_file, output_file, options.showROIs, options.showpath, options.showtime )
+        c.mon.isTracking = True
         if options.record: c.mon.saveMovie('video_output.avi')
         c.play()
 
