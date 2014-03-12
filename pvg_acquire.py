@@ -31,7 +31,12 @@ __license__ = "Python"
 import os, optparse
 from pvg_common import pvg_config, DEFAULT_CONFIG, options
 from accessories.sleepdeprivator import sleepdeprivator
+
 import pysolovideo
+import cv2
+
+import threading
+from time import sleep
 
 import wx
 from wx.lib.filebrowsebutton import FileBrowseButton
@@ -108,7 +113,7 @@ class pvg_AcquirePanel(wx.Panel):
         self.parent = parent
 
       
-        colLabels = ['Monitor', 'Source', 'Mask', 'Output', 'Track type', 'Track', 'uptime']
+        colLabels = ['Monitor', 'Source', 'Mask', 'Output', 'Track type', 'Track', 'uptime', 'preview']
         tracktypes = ['DISTANCE','VBS','XY_COORDS']
         
         self.active_monitors = {}
@@ -169,14 +174,20 @@ class pvg_AcquirePanel(wx.Panel):
             ttcb.Bind (wx.EVT_COMBOBOX, partial(self.__onChangeDropDown, [mn, "track_type"]))
             gridSizer.Add(ttcb , 0, wx.ALL|wx.ALIGN_CENTER, 5)
             
+            #RECORD BUTTON
             self.recordBTNS.append ( wx.ToggleButton(self, wx.ID_ANY, 'Start') )
             self.recordBTNS[-1].Bind (wx.EVT_TOGGLEBUTTON, partial( self.onToggleRecording, mn))
             gridSizer.Add(self.recordBTNS[-1], 0, wx.ALL|wx.ALIGN_CENTER, 5)
-            
+
+            #UPTIME
             self.uptimeTXT.append(wx.TextCtrl(self, value="00:00:00", size=(140,-1)))
             gridSizer.Add(self.uptimeTXT[-1], 0, wx.ALL|wx.ALIGN_CENTER, 5)
 
-                    
+            #VIEW BUTTON
+            vb = wx.Button(self, wx.ID_ANY, 'View')
+            vb.Bind(wx.EVT_BUTTON, partial( self.onViewMonitor, mn))
+            gridSizer.Add(vb, 0, wx.ALL|wx.ALIGN_CENTER, 5)
+
         btnSizer = wx.BoxSizer(wx.HORIZONTAL)
         conf_btnSizer = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, 'Configuration'), wx.HORIZONTAL)
         acq_btnSizer = wx.StaticBoxSizer(wx.StaticBox(self, wx.ID_ANY, 'Acquisition'), wx.HORIZONTAL)
@@ -327,7 +338,23 @@ class pvg_AcquirePanel(wx.Panel):
                 self.active_monitors[monitor].stopTracking()
                 self.recordBTNS[monitor-1].SetValue(False)
                 self.timer.Stop()
-        
+
+    def onViewMonitor(self, monitor, event=None):
+        """
+        """
+        self.dopreview = True
+        self.view_thread = threading.Thread(target=self.__displayImage(monitor))
+    
+    def __displayImage(self, monitor):
+        """
+        """
+        cv2.namedWindow("preview")
+
+        #while self.dopreview:
+        frame = self.active_monitors[monitor].getImageFromQueue()
+        if frame is not None:
+            cv2.imshow("preview", frame)
+
         
     def updateTimes(self, event):
         """
