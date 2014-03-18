@@ -1212,6 +1212,7 @@ class Monitor(object):
         """
         Set source intelligently
         """
+        success = False
         try:
             camera = int(camera)
         except:
