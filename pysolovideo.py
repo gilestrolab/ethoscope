@@ -70,7 +70,7 @@ import cv2
 import numpy as np
 
 import threading
-import Queue
+#import Queue
 
 from accessories.sleepdeprivator import sleepdeprivator
 
@@ -154,8 +154,6 @@ class Cam:
         cv2.putText(blackframe, "NO INPUT", (int(w/4), int(h/2)), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 1)
         return blackframe
     
-
-
         
 class realCam(Cam):
     """
@@ -1142,20 +1140,28 @@ class Monitor(object):
 
     def __captureFromCAM(self, devnum=1, resolution=(640,480), options=None):
         """
+        Capture from an actual hardware camera
         """
         self.isVirtualCam = False
-        self.source = devnum
+        
+        try:
+            self.cam = realCam(devnum=devnum)
 
-        self.resolution = resolution
-        self.cam = realCam(devnum=devnum)
-        self.cam.setResolution(resolution)
-        self.resolution = self.cam.getResolution()
-        self.numberOfFrames = 0
-        
-        print "STARTING %s" % devnum
-        
+            self.source = devnum
+            self.resolution = resolution
+            self.cam.setResolution(resolution)
+            self.resolution = self.cam.getResolution()
+            self.numberOfFrames = 0
+       
+        except:
+            pass
+
+        return self.cam is not None
+
+       
     def __captureFromMovie(self, camera, resolution=None, options=None):
         """
+        Capture from movie file
         """
         self.isVirtualCam = True
         self.source = camera
@@ -1165,10 +1171,15 @@ class Monitor(object):
             start = options['start']
             end = options['end']
             loop = options['loop']
+        try:
+            self.cam = virtualCamMovie(path=camera, resolution = resolution)
+            self.resolution = self.cam.getResolution()
+            self.numberOfFrames = self.cam.getTotalFrames()
+        except:
+            pass
 
-        self.cam = virtualCamMovie(path=camera, resolution = resolution)
-        self.resolution = self.cam.getResolution()
-        self.numberOfFrames = self.cam.getTotalFrames()
+        return self.cam is not None
+
         
     def __captureFromFrames(self, camera, resolution=None, options=None):
         """
@@ -1181,10 +1192,16 @@ class Monitor(object):
             start = options['start']
             end = options['end']
             loop = options['loop'] 
-         
-        self.cam = virtualCamFrames(path = camera, resolution = resolution)
-        self.resolution = self.cam.getResolution()
-        self.numberOfFrames = self.cam.getTotalFrames()
+
+        try:
+            self.cam = virtualCamFrames(path = camera, resolution = resolution)
+            self.resolution = self.cam.getResolution()
+            self.numberOfFrames = self.cam.getTotalFrames()
+        except:
+            pass
+
+        return self.cam is not None
+
     
     def hasSource(self):
         """
@@ -1201,16 +1218,18 @@ class Monitor(object):
             pass
             
         if type(camera) == int:
-            self.__captureFromCAM(camera, resolution, options)
+            success = self.__captureFromCAM(camera, resolution, options)
         elif os.path.isfile(camera):
-            self.__captureFromMovie(camera, resolution, options)
+            success = self.__captureFromMovie(camera, resolution, options)
         elif os.path.isdir(camera):
-            self.__captureFromFrames(camera, resolution, options)
+            success = self.__captureFromFrames(camera, resolution, options)
             
-        self.debug_info["source"] = camera
-        self.debug_info["res"] = "%s,%s" % (resolution)
-        self.debug_info["serial"] = self.cam.getSerialNumber()
-
+        if success:
+            self.debug_info["source"] = camera
+            self.debug_info["res"] = "%s,%s" % (resolution)
+            self.debug_info["serial"] = self.cam.getSerialNumber()
+        
+        return success
 
     def close(self):
         """

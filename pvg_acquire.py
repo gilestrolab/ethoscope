@@ -283,11 +283,14 @@ class pvg_AcquirePanel(wx.Panel):
             output_file = m['outputfile'] or os.path.join(data_folder, 'Monitor%02d.txt' % mn)
             
             self.active_monitors[mn] = pysolovideo.Monitor()
-            self.active_monitors[mn].setSource(source, resolution)
-            self.active_monitors[mn].setTracking(True, track_type, m['mask_file'], output_file)
-
-            self.active_monitors[mn].SDserialPort = m['serial_port']
-            self.active_monitors[mn].inactivity_threshold = m['inactivity_threshold'] or None
+            success = self.active_monitors[mn].setSource(source, resolution)
+            if success:
+                self.active_monitors[mn].setTracking(True, track_type, m['mask_file'], output_file)
+                self.active_monitors[mn].SDserialPort = m['serial_port']
+                self.active_monitors[mn].inactivity_threshold = m['inactivity_threshold'] or None
+            else:
+                pass
+                
 
         pysolovideo.MONITORS = self.active_monitors
 
