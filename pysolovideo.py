@@ -158,7 +158,7 @@ class Cam:
 class realCam(Cam):
     """
     a realCam class will handle a webcam connected to the system
-    camera is handled through opencv and images can be transformed to PIL
+    camera is handled through cv2
     """
     def __init__(self, devnum=0, resolution=(800, 600)):
 
@@ -257,8 +257,13 @@ class realCam(Cam):
             
         return serial
             
-            
-        
+    def hasSource(self):
+        """
+        Is the camera active?
+        Return boolean
+        """
+        return self.camera.isOpened()
+
 class virtualCamMovie(Cam):
     """
     A Virtual cam to be used to pick images from a movie (avi, mov) rather than a real webcam
@@ -383,6 +388,13 @@ class virtualCamMovie(Cam):
         else:
             return False
 
+
+    def hasSource(self):
+        """
+        Is the camera active?
+        Return boolean
+        """
+        return self.capture.isOpened()
 
 class virtualCamFrames(Cam):
     """
@@ -522,6 +534,14 @@ class virtualCamFrames(Cam):
 
         else:
             return False
+
+
+    def hasSource(self):
+        """
+        Is the camera active?
+        Return boolean
+        """
+        return self.fileList != []
 
 class ROImask():
     """
@@ -1156,6 +1176,7 @@ class Monitor(object):
         except:
             pass
 
+        print self.cam
         return self.cam is not None
 
        
@@ -1206,31 +1227,34 @@ class Monitor(object):
     def hasSource(self):
         """
         """
-        return self.cam != None
+        if self.cam is not None:
+            return self.cam.hasSource()
+        else:
+            return False
     
     def setSource(self, camera, resolution, options=None):
         """
         Set source intelligently
         """
-        success = False
+
         try:
             camera = int(camera)
         except:
             pass
             
         if type(camera) == int:
-            success = self.__captureFromCAM(camera, resolution, options)
+            self.__captureFromCAM(camera, resolution, options)
         elif os.path.isfile(camera):
-            success = self.__captureFromMovie(camera, resolution, options)
+            self.__captureFromMovie(camera, resolution, options)
         elif os.path.isdir(camera):
-            success = self.__captureFromFrames(camera, resolution, options)
-            
-        if success:
+            self.__captureFromFrames(camera, resolution, options)
+
+        if self.hasSource():
             self.debug_info["source"] = camera
             self.debug_info["res"] = "%s,%s" % (resolution)
             self.debug_info["serial"] = self.cam.getSerialNumber()
         
-        return success
+        return self.hasSource()
 
     def close(self):
         """
