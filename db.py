@@ -10,10 +10,10 @@ def save(data):
 def load():
     f= open('savedRois', 'rb')
     data = pickle.load(f)
+    f.close()
     return data
     
 def writeMask(data):
-
     ROIS = [] #List of tuples ((x,y),(x,y1),(x1,y),(x1,y1))
     referencePoints= "none" #list of pints [[[x,y,r]]] Ask Giorgio, what they mean.
     pointsToTrack = [] #list of numbers [1, 1, 1]
