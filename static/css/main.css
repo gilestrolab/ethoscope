@@ -1,0 +1,50 @@
+
+
+/* ==========================================================================
+   Author's custom styles
+   ========================================================================== */
+
+
+#ROI-input{
+    position:relative;
+    display: inline-block;
+    width: 500;
+    height: 300;
+    padding: 0 ; 
+    margin:0;
+
+}
+#drawingCanvas{
+    position: relative;
+    border: 2px black solid;
+    z-index: 2;
+}
+
+#ROIView{
+    position:absolute;
+    z-index: 1;
+    border: 2px black solid;    
+}
+
+#pickloaded{
+    margin: 1em 0 1em 0;
+   
+}
+#pickloaded ul{
+    width: 300px;
+    margin: 0 auto;
+}
+
+#pickloaded ul li input{
+    margin: 0 1em ;
+}
+
+
+
+
+
+
+
+
+
+
