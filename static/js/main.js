@@ -258,21 +258,25 @@ function ev_refreshBackground(){
     
 /// Start
 function ev_start(){
-    var data = JSON.stringify({trackingType:2,roi:RoiObj})
-    console.log(data)
+    var tracking = $('input[name=optionTrack]:checked').val();
+    var data = JSON.stringify({trackingType:tracking,roi:RoiObj});
+    console.log(data);
     var oReq = new XMLHttpRequest();
     oReq.open("put", "/started", false);
     oReq.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     oReq.send(data);
     console.log("start");
+    location.reload();
 }
 /// Stop
 function ev_stop(){
     var oReq = new XMLHttpRequest();
     oReq.open("put", "/started", false);
     oReq.send();
+    location.reload();
     console.log("stop");
 }
+
 
 /// Radio Buttons Handdle
 function ev_handlerRadio(){
