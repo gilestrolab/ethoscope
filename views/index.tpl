@@ -93,9 +93,9 @@
         </div>
 %if status == True:
           <div class="col-md-4">
-            <h2>Tracking started</h2>
-            <p>Starts tracking the flies in the arena</p>
-            <p><button type="button" id="start" class="btn btn-success" href="#" role="button" disabled>Start</button></p>
+            <h2>Tracking ongoing</h2>
+            <p>Tracking is already ongoing</p>
+              <p><button type="button" id="start" class=" btn btn-success" href="#" role="button" disabled>Start</button></p>
          </div>
         <div class="col-md-4">
           <h2>Stop Tracking</h2>
@@ -105,8 +105,25 @@
 %else:
         <div class="col-md-4">
           <h2>Start Tracking</h2>
-          <p>Starts tracking the flies in the arena</p>
-          <p><button type="button" id="start" class="btn btn-success" href="#" role="button">Start</button></p>
+          <p>Select tracking type</p>
+             <form class="">
+              <div class="track-select">
+                <div class="input-group"><label>
+                    <input type="radio" name="optionTrack" id="optionTrack0" value="0">
+                    Position</label>
+                    
+                </div>
+                <div class="input-group ">
+                    <input type="radio" name="optionTrack" id="optionTrack1" value="1">
+                    <label>Distance</label>
+                </div>
+                <div class="input-group">
+                    <input type="radio" name="optionTrack" id="optionTrack2" value="2">
+                    <label>XY Coordinates</label>
+                </div>
+              </div>
+            <p><button type="submit" id="start" class=" btn btn-success" href="#" role="button" >Start</button></p>
+              </form>
         </div>
         <div class="col-md-4">
               <h2>Stop Tracking</h2>
@@ -120,7 +137,7 @@
       <hr>
 
       <footer>
-        <p>&copy; Company 2014</p>
+        <p>&copy; Polygonal Tree 2014</p>
       </footer>
     </div> <!-- /container -->        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
         <script>window.jQuery || document.write('<script src="static/js/vendor/jquery-1.11.0.min.js"><\/script>')</script>
@@ -130,3 +147,4 @@
         <script src="static/js/main.js"></script>
     </body>
 </html>
+
