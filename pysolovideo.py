@@ -681,38 +681,44 @@ class ROImask():
         """
         return len(self.ROIS)
         
-    def saveROIS(self, filename, serial=None):
-        """
-        Save the current crop data to a file
-        """
-        cf = open(filename, 'w')
-        cPickle.dump(self.ROIS, cf)
-        cPickle.dump(self.points_to_track, cf)
-        cPickle.dump(self.referencePoints, cf)
+	def saveROIS(self, filename, serial=None):
+		"""
+		Save the current crop data to a file
+		"""
+		cf = open(filename, 'w')
+		self.serial = serial
+		jsonData = {'ROIS':self.ROIS, 'pointsToTrack':self.points_to_track,'referencePoints': self.referencePoints, 'serial':self.serial}
+		json.dumps({self.ROIS, self.points_to_track, self.referencePoints, self.serial},cf)
+		cf.close()
 
-        self.serial = serial
-        cPickle.dump(serial, cf)
-        
-        cf.close()
-        
-    def loadROIS(self, filename):
-        """
-        Load the crop data from a file
-        """
-        try:
-            cf = open(filename, 'r')
-            self.ROIS = cPickle.load(cf)
-            self.points_to_track = cPickle.load(cf)
-            self.referencePoints = cPickle.load(cf)
-            self.serial = cPickle.load(cf)
-            cf.close()
-            
-            for coords in self.ROIS:
-                self.beams.append ( self.__getMidline (coords)  ) 
-                
-            return True
-        except:
-            return False
+	def loadROIS(self, filename):
+		"""
+		Load the crop data from a file
+		"""
+		try:
+			cf = open(filename, 'r')
+			data = json.load(cf)
+			self.ROIS = []
+			tup=[]
+			for t in data['ROIS']:
+				for p in t:
+					p = tuple(p)
+					tup.append(p)
+				self.ROIS.append(tuple(tup))
+				tup=[]
+			self.points_to_track = data['pointsToTrack']
+			self.referencePoints = data['referencePoints']
+			if self.referencePoints == "none":
+				self.referencePoints = ((),())
+			self.serial = data['serial']
+			cf.close()
+			
+			for coords in self.ROIS:
+				self.beams.append ( self.__getMidline (coords)  ) 
+				
+			return True
+		except:
+			return False
 
     def resizeROIS(self, origSize, newSize):
         """
@@ -757,7 +763,7 @@ class ROImask():
             inside = False
 
             p1x,p1y = poly[0]
-            for i in range(n+1):
+            for i in xrange(n+1):
                 p2x,p2y = poly[i % n]
                 if y > min(p1y,p2y):
                     if y <= max(p1y,p2y):
@@ -809,7 +815,7 @@ class ROImask():
         l = (w / cols) - int(food/2*w)
         
         k = 0
-        for v in range(rows):
+        for v in xrange(rows):
             ROI[k] = (x, y), (x+l, y+d)
             ROI[k+1] = (x1-l, y) , (x1, y+d)
             k+=2
@@ -857,12 +863,12 @@ class ROImask():
         cv2.PyrUp(pyr, subimage, 7)
         tgray = cv2.CreateImage(sz, 8, 1)
         # find squares in every color plane of the image
-        for c in range(3):
+        for c in xrange(3):
             # extract the c-th color plane
             channels = [None, None, None]
             channels[c] = tgray
             cv2.Split(subimage, channels[0], channels[1], channels[2], None) 
-            for l in range(N):
+            for l in xrange(N):
                 # hack: use Canny instead of zero threshold level.
                 # Canny helps to catch squares with gradient shading
                 if(l == 0):
@@ -910,7 +916,7 @@ class ROImask():
                         abs(cv2.ContourArea(result)) > 500 and 
                         cv2.CheckContourConvexity(result)):
                         s = 0
-                        for i in range(5):
+                        for i in xrange(5):
                             # find minimum angle between joint
                             # edges (maximum of cosine)
                             if(i >= 2):
@@ -921,7 +927,7 @@ class ROImask():
                         # (all angles are ~90 degree) then write quandrange
                         # vertices to resultant sequence
                         if(s < 0.3):
-                            pt = [result[i] for i in range(4)]
+                            pt = [result[i] for i in xrange(4)]
                             squares.append(pt)
                             print ('current # of squares found %d' % len(squares))
                     contour = contour.h_next()
@@ -1350,13 +1356,13 @@ class Monitor(object):
             if n > 0:
                 #these increase by one on the fly axis
 
-                for i in range(n):
+                for i in xrange(n):
                     self.fly_last_frame_buffer = np.append( self.fly_last_frame_buffer, [FLY_FIRST_POSITION], axis=0) # ( flies, (x,y) )
                     self.fly_one_minute_buffer = np.append (self.fly_one_minute_buffer, [self.__fa.copy()], axis=0) # ( flies, PERIOD, (x,y) )
                     self.flyActivity = np.append (self.flyActivity, np.zeros ((1,ACTIVITY_PERIOD), dtype=np.int) , axis=0)
             if n < 0:
 
-                for i in range(n):
+                for i in xrange(n):
                     self.fly_last_frame_buffer = np.delete( self.fly_last_frame_buffer, n, axis=0)
                     self.fly_one_minute_buffer = np.delete( self.fly_one_minute_buffer, n, axis=0)
                     self.flyActivity = np.delete (self.flyActivity, n,axis=0)
@@ -1527,7 +1533,7 @@ class Monitor(object):
             self.__count_seconds = 0
             self.__n = 0 
 
-            for i in range(0,PERIOD):
+            for i in xrange(0,PERIOD):
                     self.fly_one_minute_buffer[:,i] = self.fly_last_frame_buffer
             
         #growing continously; this is the correct thing to do but we would have problems adding new row with new ROIs
