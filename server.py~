@@ -66,8 +66,8 @@ def starStop():
                         "-t", str(data['trackingType']),
                         "-o", "output.txt",
                         "--showmask",
-                        "--trackonly"], stdout=PIPE, stderr=PIPE)
-	print (pySolo.communicate())
+                        "--trackonly"])
+        
         #pySolo = Popen(["python2", "pvg.py"])# -c pysolo_video.cfg -i 0 -k mask.msk -t 0 -o output.txt", shell=True)
         
     

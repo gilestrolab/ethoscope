@@ -711,7 +711,10 @@ class ROImask():
             self.referencePoints = data['referencePoints']
             if self.referencePoints == "none":
                 self.referencePoints = ((),())
-            self.serial = data['serial']
+            if data['serial']=='NO_SERIAL':
+                self.serial = None
+            else:
+                self.serial = data['serial']
             cf.close()
             
             for coords in self.ROIS:
@@ -1944,7 +1947,7 @@ class Monitor(object):
             ROIwrk = thresh & ROImsk
             
             (x1,y1), (x2,y2) = ROIrect
-            
+
             contours, hierarchy = cv2.findContours(ROIwrk[y1:y2, x1:x2] ,cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE, offset=(x1,y1))
             
             points = []

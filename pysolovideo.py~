@@ -63,7 +63,7 @@ Current Data format
 
 
 import os, datetime, time
-import cPickle
+import cPickle, json, sys
 from calendar import month_abbr
 
 import cv2
@@ -681,44 +681,47 @@ class ROImask():
         """
         return len(self.ROIS)
         
-	def saveROIS(self, filename, serial=None):
-		"""
-		Save the current crop data to a file
-		"""
-		cf = open(filename, 'w')
-		self.serial = serial
-		jsonData = {'ROIS':self.ROIS, 'pointsToTrack':self.points_to_track,'referencePoints': self.referencePoints, 'serial':self.serial}
-		json.dumps({self.ROIS, self.points_to_track, self.referencePoints, self.serial},cf)
-		cf.close()
+    def saveROIS(self, filename, serial=None):
+        """
+        Save the current crop data to a file
+        """
+        cf = open(filename, 'w')
+        self.serial = serial
+        jsonData = {'ROIS':self.ROIS, 'pointsToTrack':self.points_to_track,'referencePoints': self.referencePoints, 'serial':self.serial}
+        json.dumps({self.ROIS, self.points_to_track, self.referencePoints, self.serial},cf)
+        cf.close()
 
-	def loadROIS(self, filename):
-		"""
-		Load the crop data from a file
-		"""
-		try:
-			cf = open(filename, 'r')
-			data = json.load(cf)
-			self.ROIS = []
-			tup=[]
-			for t in data['ROIS']:
-				for p in t:
-					p = tuple(p)
-					tup.append(p)
-				self.ROIS.append(tuple(tup))
-				tup=[]
-			self.points_to_track = data['pointsToTrack']
-			self.referencePoints = data['referencePoints']
-			if self.referencePoints == "none":
-				self.referencePoints = ((),())
-			self.serial = data['serial']
-			cf.close()
-			
-			for coords in self.ROIS:
-				self.beams.append ( self.__getMidline (coords)  ) 
-				
-			return True
-		except:
-			return False
+    def loadROIS(self, filename):
+        """
+        Load the crop data from a file
+        """
+        try:
+            cf = open(filename, 'r')
+            data = json.load(cf)
+            self.ROIS = []
+            tup=[]
+            for t in data['ROIS']:
+                for p in t:
+                    p = tuple(p)
+                    tup.append(p)
+                self.ROIS.append(tuple(tup))
+                tup=[]
+            
+            self.points_to_track = data['pointsToTrack']
+            self.referencePoints = data['referencePoints']
+            if self.referencePoints == "none":
+                self.referencePoints = ((),())
+            if data['serial']=='NO_SERIAL':
+                self.serial = None
+            else:
+                self.serial = data['serial']
+            cf.close()
+            
+            for coords in self.ROIS:
+                self.beams.append ( self.__getMidline (coords)  ) 
+            return True
+        except:
+            return False
 
     def resizeROIS(self, origSize, newSize):
         """
@@ -1571,10 +1574,10 @@ class Monitor(object):
         Kind of motion depends on user settings
         
         Called every minute; flies treated at once
-        1	09 Dec 11	19:02:19	1	0	1	0	0	0	?		[actual_activity]
+        1   09 Dec 11   19:02:19    1   0   1   0   0   0   ?       [actual_activity]
         """
         
-        
+        print "activity"
         
         #Here we build the header
         dt = datetime.datetime.fromtimestamp( self.getFrameTime() )
@@ -1886,7 +1889,7 @@ class Monitor(object):
         draw_path    True | False   draw_path of the fly
         fliesPerROI 1              limit number of flies to be tracked per ROI - not implemented yet
         """
-
+        
         positions = []
         
         # Smooth to get rid of false positives
@@ -1908,10 +1911,10 @@ class Monitor(object):
         difference = cv2.subtract(avg, frame)
 
         # Convert the image to grayscale.
-        #grey_image = cv2.cvtColor(difference, cv2.COLOR_BGR2GRAY)
+        grey_image = cv2.cvtColor(difference, cv2.COLOR_BGR2GRAY)
 
         # Convert the image to black and white.
-        ret, thresh = cv2.threshold(difference, 20, 255, cv2.THRESH_BINARY)
+        ret, thresh = cv2.threshold(grew_image, 20, 255, cv2.THRESH_BINARY)
 
         # Dilate and erode to get proper blobs
         thresh = cv2.Canny(thresh, 0, 50, apertureSize=5)
@@ -1944,7 +1947,7 @@ class Monitor(object):
             ROIwrk = thresh & ROImsk
             
             (x1,y1), (x2,y2) = ROIrect
-            
+
             contours, hierarchy = cv2.findContours(ROIwrk[y1:y2, x1:x2] ,cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE, offset=(x1,y1))
             
             points = []

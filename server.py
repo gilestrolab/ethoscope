@@ -22,14 +22,11 @@ def index():
 @post('/ROI')
 def new_roi():
     roiData = request.json
-#    roiData = {}
-#    roiData.name = data['name']
-#    roiData.rois = data['rois']
+    #load saved rois and then add the new one
+    roiList = db.load()
     roiList[len(roiList)]=roiData
-    
     db.save(roiList)
-    #pointsToTrack = request.json('pointsToTrack')
-    #referencePoints = request.json('referencePoints')
+
 
 @get('/ROI')
 def list_roi():
