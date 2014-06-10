@@ -2,7 +2,7 @@
 
 if(window.addEventListener) {
 window.addEventListener('load', function () {
-  var TempROI, context, ROI, contexto, RoiObj, RoiObjList;
+  var TempROI, context, ROI, contexto, RoiObj, RoiObjList, flydata="";
 //  var ROIObj = {
 //                ROI:[],
 //                pointsToTrack:1,
@@ -277,7 +277,6 @@ function ev_stop(){
     console.log("stop");
 }
 
-
 /// Radio Buttons Handdle
 function ev_handlerRadio(){
    selection = $('input[name=selectedRoi]:checked').val();
@@ -286,12 +285,42 @@ function ev_handlerRadio(){
    img_update();
    $('#pickloaded').empty();
 }
-    
+
+
+
   init();
   backgroundImage();
   
+
     
 }, false); }
+
+(function(){
+
+///// Angular
+var app = angular.module('fly', []);
+//var internalID = window.setInterval(last_data, 10000);  
+var flydata = "";
+
+app.config(function($interpolateProvider) {
+ $interpolateProvider.startSymbol('{!');
+  $interpolateProvider.endSymbol('!}');
+});
+
+app.controller('flyDataCtrl',['$http','$interval', function ($http, $interval){
+   var flydata = this;
+   flydata.data = "";
+    var i = 0;
+    function getData(){
+   $http.get("/websocket").success(function(data){
+      flydata.data = data;
+   })};
+    getData();
+   $interval(getData, 60000);
+
+}]);
+
+})(); 
 
 //function handleRadio(){
 //   selection = $('input[name=selectedRoi]:checked').val();

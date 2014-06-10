@@ -87,7 +87,7 @@ if __name__=="__main__":
     if options.snapshot:
         m = pysolovideo.Monitor()
         m.setSource(source, resolution)
-        filename = "%s.jpg" % source
+        filename = "static/img/%s.jpg" % source
         m.saveSnapshot(filename)
     
     elif options.use_cv:

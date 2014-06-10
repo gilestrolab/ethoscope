@@ -2,7 +2,7 @@
 
 if(window.addEventListener) {
 window.addEventListener('load', function () {
-  var TempROI, context, ROI, contexto, RoiObj, RoiObjList;
+  var TempROI, context, ROI, contexto, RoiObj, RoiObjList, flydata="";
 //  var ROIObj = {
 //                ROI:[],
 //                pointsToTrack:1,
@@ -258,19 +258,22 @@ function ev_refreshBackground(){
     
 /// Start
 function ev_start(){
-    var data = JSON.stringify({trackingType:2,roi:RoiObj})
-    console.log(data)
+    var tracking = $('input[name=optionTrack]:checked').val();
+    var data = JSON.stringify({trackingType:tracking,roi:RoiObj});
+    console.log(data);
     var oReq = new XMLHttpRequest();
     oReq.open("put", "/started", false);
     oReq.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     oReq.send(data);
     console.log("start");
+    location.reload();
 }
 /// Stop
 function ev_stop(){
     var oReq = new XMLHttpRequest();
     oReq.open("put", "/started", false);
     oReq.send();
+    location.reload();
     console.log("stop");
 }
 
@@ -282,12 +285,42 @@ function ev_handlerRadio(){
    img_update();
    $('#pickloaded').empty();
 }
-    
+
+
+
   init();
   backgroundImage();
   
+
     
 }, false); }
+
+(function(){
+
+///// Angular
+var app = angular.module('fly', []);
+//var internalID = window.setInterval(last_data, 10000);  
+var flydata = "";
+
+app.config(function($interpolateProvider) {
+ $interpolateProvider.startSymbol('{!');
+  $interpolateProvider.endSymbol('!}');
+});
+
+app.controller('flyDataCtrl',['$http','$interval', function ($http, $interval){
+   var flydata = this;
+   flydata.data = "";
+    var i = 0;
+    function getData(){
+   $http.get("/websocket").success(function(data){
+      flydata.data = data;
+   })};
+    getData();
+   $interval(getData, 10000);
+
+}]);
+
+})(); 
 
 //function handleRadio(){
 //   selection = $('input[name=selectedRoi]:checked').val();

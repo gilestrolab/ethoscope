@@ -1,4 +1,5 @@
-<!DOCTYPE html>
+<!DOCTYPE>
+<html  >
 <!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
 <!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
 <!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
@@ -21,6 +22,9 @@
         <link rel="stylesheet" href="static/css/main.css">
 
         <script src="static/js/vendor/modernizr-2.6.2-respond-1.1.0.min.js"></script>
+                <script type="text/javascript" src="static/js/vendor/angular.min.js"></script>
+        <script type="text/javascript"  src="static/js/main.js"></script>
+        
     </head>
     <body>
         <!--[if lt IE 7]>
@@ -132,8 +136,15 @@
          </div>
 %end
        </div>
+      <hr>       
+      <div class="row status" ng-app="fly" ng-controller="flyDataCtrl as flyData">
+      {!flyData.data!}
       </div>
+     
+     </div>
+      
 
+      
       <hr>
 
       <footer>
@@ -144,7 +155,6 @@
 
         <script src="static/js/vendor/bootstrap.min.js"></script>
 
-        <script src="static/js/main.js"></script>
     </body>
 </html>
 

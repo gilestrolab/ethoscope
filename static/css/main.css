@@ -8,10 +8,10 @@
 #ROI-input{
     position:relative;
     display: inline-block;
-    width: 500;
+
     height: 300;
     padding: 0 ; 
-    margin:0;
+    margin:1em;
 
 }
 #drawingCanvas{

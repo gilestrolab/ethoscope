@@ -1,7 +1,8 @@
 from bottle import *
 import db
 from subprocess import Popen, PIPE, call
-import os, signal
+import os, signal, time
+app = Bottle()
 
 class RoiData():
     def __init__(self):
@@ -9,26 +10,42 @@ class RoiData():
         rois = []
         trackingType = 0
         
-@route('/static/<filepath:path>')
+@app.route('/static/<filepath:path>')
 def server_static(filepath):
     print (filepath)
     return static_file(filepath, root='static')
 
-@route('/')
+@app.route('/')
 def index():
     _,status = checkPid()
     return template('index', machineId=mid, status=status)
 
-@post('/ROI')
+@app.route('/websocket')
+def handle_websocket():
+    try:
+        data = readData()
+        return(data)
+    except:
+        print("error")
+       
+
+
+@app.post('/ROI')
 def new_roi():
     roiData = request.json
     #load saved rois and then add the new one
-    roiList = db.load()
-    roiList[len(roiList)]=roiData
-    db.save(roiList)
+    try:
+        roiList = db.load()
+        roiList[len(roiList)]=roiData
+        db.save(roiList)
+    except:
+        """file does not exits yet"""
+        db.save(roiData)
+        
 
 
-@get('/ROI')
+
+@app.get('/ROI')
 def list_roi():
     response.content_type = 'application/json'
     roisSaved = db.load()
@@ -39,7 +56,7 @@ def list_roi():
     print (dataToSend['data'])
     return (dataToSend)
 
-@put('/started')
+@app.put('/started')
 def starStop():
     try:
         data = request.json
@@ -68,7 +85,7 @@ def starStop():
         #pySolo = Popen(["python2", "pvg.py"])# -c pysolo_video.cfg -i 0 -k mask.msk -t 0 -o output.txt", shell=True)
         
     
-@get('/refresh')
+@app.get('/refresh')
 def refresh():
     pid, isAlreadyRunning = checkPid()
     if isAlreadyRunning:
@@ -99,9 +116,21 @@ def checkPid():
 def checkMachineId():
     f = open('/etc/pt-machine-id','r')
     piId = f.read().rstrip()
+    f.close()
     return piId
-    
+ 
+def readData():
+    f = open('output.txt','r')
+    lines = f.readlines()
+    f.close()
+    return lines[-1]
     
 roiList={}
 mid= checkMachineId()
-run(host='0.0.0.0', port=8088, debug=True)
+run(app,host='0.0.0.0', port=8088, debug=True)
+
+#from gevent.pywsgi import WSGIServer
+#from geventwebsocket.handler import WebSocketHandler
+#server = WSGIServer(("0.0.0.0", 8088), app,
+#                    handler_class=WebSocketHandler)
+#server.serve_forever()
