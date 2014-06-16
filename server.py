@@ -1,7 +1,7 @@
 from bottle import *
 import db
 from subprocess import Popen, PIPE, call
-import os, signal, time
+import os, signal, time, json
 app = Bottle()
 
 class RoiData():
@@ -18,15 +18,20 @@ def server_static(filepath):
 @app.route('/')
 def index():
     _,status = checkPid()
-    return template('index', machineId=mid, status=status)
+    df = subprocess.Popen(["df", "./"], stdout=subprocess.PIPE)
+    output = df.communicate()[0]
+    print(output)
+    device, size, used, available, percent, mountpoint = \
+                                                   output.split(b"\n")[1].split()
+    return template('index', machineId=mid, status=status, freeSpace = percent)
 
 @app.route('/websocket')
 def handle_websocket():
-    try:
-        data = readData()
-        return(data)
-    except:
-        print("error")
+    #try:
+    data = readData()
+    return(data)
+    #except:
+        #print("error")
        
 
 
@@ -101,6 +106,17 @@ def refresh():
     #return template('index', machineId=mid, status=status)
 
 
+@app.route('/downloadData/<machineID>')
+def downloadData(machineID):
+    pid, isAlreadyRunning = checkPid()
+    #Add a "last downloaded" and "free space available"
+    return static_file('output.txt', root='')
+
+@app.get('/visualizeData')
+def visualizeData():
+    pid, isAlreadyRunning = checkPid()   
+    return static_file('output.txt', root='')
+
 def checkPid():
     proc = Popen(["pgrep", "-f", "python2 pvg_standalone.py"], stdout=PIPE)
     try:
@@ -123,7 +139,11 @@ def readData():
     f = open('output.txt','r')
     lines = f.readlines()
     f.close()
-    return lines[-1]
+    lastData = lines[-1]
+    splitedData = lastData.split('\t')
+    jsonData = json.dumps(splitedData)
+    print (jsonData)
+    return jsonData
     
 roiList={}
 mid= checkMachineId()

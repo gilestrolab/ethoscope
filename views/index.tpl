@@ -138,20 +138,68 @@
        </div>
       <hr>       
       <div class="row status" ng-app="fly" ng-controller="flyDataCtrl as flyData">
-      {!flyData.data!}
-      </div>
-     
-     </div>
-      
+      <h3>Last collected data:</h3>
+      <table class="table table-resposive table-striped small">
+      <tr>
+        <th>id</th>
+        <th>date</th>
+        <th>time</th>
+        <th>active?</th>
+        <th>fps</th>
+        <th>trackType</th>
+        <th>SD</th>
+        <th>N/A</th>
+        <th>N/A</th>
+        <th>light</th>
+      </tr>
+      <tr>
+            <td ng-repeat="n in [0,1,2,3,4,5,6,7,8,9]">
+                {!flyData.data[n]!}
+            </td>
+        </tr>
+        <tr>
+            <th ng-repeat="n in [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]">
+            {!n!}
+            </th>
+        </tr>
+        <tr>
+            <td ng-repeat="n in [10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25]">
+                {!flyData.data[n]!}
+            </td>
+        </tr>
+        <tr>
+            <th ng-repeat="n in [17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32]">
+            {!n!}
+            </th>
+        </tr>
+         <tr>
+            <td ng-repeat="n in [26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42]">
+                {!flyData.data[n]!}
+            </td>
+        </tr>
+      </table>
 
-      
+
+
       <hr>
+     <h4>Disk space available:</h4>
+      <div class="progress">
+         <div class="progress-bar" role="progressbar" aria-valuenow="{{freeSpace}}" aria-valuemin="0" aria-valuemax="100" style="width: {{freeSpace}};">
+            <span class="">{{freeSpace}}</span>
+        </div>
+       </div>
 
+      <div class="download">
+        <a  class="btn btn-warning" href="/downloadData/{{machineId}}" download >Dowload Data</a>
+      </div>
+   </div>
+      <hr>
+      
       <footer>
         <p>&copy; Polygonal Tree 2014</p>
       </footer>
-    </div> <!-- /container -->        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
-        <script>window.jQuery || document.write('<script src="static/js/vendor/jquery-1.11.0.min.js"><\/script>')</script>
+    </div> <!-- /container -->        
+        <script src="static/js/vendor/jquery-1.11.0.min.js"></script>
 
         <script src="static/js/vendor/bootstrap.min.js"></script>
 
