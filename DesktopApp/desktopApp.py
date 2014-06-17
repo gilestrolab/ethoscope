@@ -41,7 +41,7 @@ class ControlMainWindow(QtGui.QMainWindow):
                     nameList.append(message)
                     rpiList.append(url)
                     print ('[%s]' % ', '.join(map(str, rpiList)))
-                    self.ui.listWidget.addItem(message)
+                    
             except:
                 pass
                 #print("No this one")
