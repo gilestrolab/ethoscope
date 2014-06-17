@@ -182,7 +182,7 @@
 
 
       <hr>
-     <h4>Disk space available:</h4>
+     <h4>Disk space used:</h4>
       <div class="progress">
          <div class="progress-bar" role="progressbar" aria-valuenow="{{freeSpace}}" aria-valuemin="0" aria-valuemax="100" style="width: {{freeSpace}};">
             <span class="">{{freeSpace}}</span>

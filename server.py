@@ -33,7 +33,10 @@ def handle_websocket():
     #except:
         #print("error")
        
-
+@app.route('/pidiscover')
+def pidiscover():
+    name = checkMachineId()
+    return(name)
 
 @app.post('/ROI')
 def new_roi():
