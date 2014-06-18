@@ -97,7 +97,6 @@ function init () {
   }
 
   function img_update () {
-       
       contexto.clearRect(0, 0, TempROI.width, TempROI.height);
       var l = RoiObj.rois.length;
       var img = new Image(); 
@@ -318,6 +317,13 @@ app.controller('flyDataCtrl',['$http','$interval', function ($http, $interval){
     getData();
    $interval(getData, 60000);
 
+}]);
+
+app.controller('changeMachineIdCtrl',['$scope', '$http',function($scope,$http){
+        $scope.changeMachineId = function(){
+            var name = prompt("New name for this Sleep", "SM 01");
+            $http.post("/changeMachineId", JSON.stringify({"newName":name})); 
+        };
 }]);
 
 })(); 

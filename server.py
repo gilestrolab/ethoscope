@@ -17,10 +17,10 @@ def server_static(filepath):
 
 @app.route('/')
 def index():
+    mid= checkMachineId()
     _,status = checkPid()
     df = subprocess.Popen(["df", "./"], stdout=subprocess.PIPE)
     output = df.communicate()[0]
-    print(output)
     device, size, used, available, percent, mountpoint = \
                                                    output.split(b"\n")[1].split()
     return template('index', machineId=mid, status=status, freeSpace = percent)
@@ -50,8 +50,15 @@ def new_roi():
         """file does not exits yet"""
         db.save(roiData)
         
-
-
+@app.post('/changeMachineId')
+def changeMachineId():
+    try:
+        name = request.json
+        print (name)
+        changeMId(name['newName'])
+    except:
+        print ("no data")
+    redirect("/")            
 
 @app.get('/ROI')
 def list_roi():
@@ -132,8 +139,14 @@ def checkPid():
     print(pid)
     return pid, started
 
+def changeMId(name):
+    f = open('machineId','w')
+    piId = f.write(name)
+    f.close()
+    return True
+
 def checkMachineId():
-    f = open('/etc/pt-machine-id','r')
+    f = open('machineId','r')
     piId = f.read().rstrip()
     f.close()
     return piId
@@ -149,7 +162,7 @@ def readData():
     return jsonData
     
 roiList={}
-mid= checkMachineId()
+
 run(app,host='0.0.0.0', port=8088, debug=True)
 
 #from gevent.pywsgi import WSGIServer

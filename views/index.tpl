@@ -26,12 +26,12 @@
         <script type="text/javascript"  src="static/js/main.js"></script>
         
     </head>
-    <body>
+    <body ng-app="fly">
         <!--[if lt IE 7]>
             <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
         <![endif]-->
     <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
-      <div class="container">
+      <div class="container" ng-controller="changeMachineIdCtrl">
         <div class="navbar-header">
           <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
             <span class="sr-only">Toggle navigation</span>
@@ -39,7 +39,7 @@
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </button>
-          <a class="navbar-brand" href="#">PySolo ControlPanel:{{machineId}}</a>
+          <a class="navbar-brand" href="/"  ng-click="changeMachineId()">PySolo ControlPanel:{{machineId}}</a>
             
         </div>
         <div class="navbar-collapse collapse">
@@ -137,7 +137,7 @@
 %end
        </div>
       <hr>       
-      <div class="row status" ng-app="fly" ng-controller="flyDataCtrl as flyData">
+      <div class="row status"  ng-controller="flyDataCtrl as flyData">
       <h3>Last collected data:</h3>
       <table class="table table-resposive table-striped small">
       <tr>
