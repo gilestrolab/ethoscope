@@ -99,7 +99,11 @@ def starStop():
         
         #pySolo = Popen(["python2", "pvg.py"])# -c pysolo_video.cfg -i 0 -k mask.msk -t 0 -o output.txt", shell=True)
         
-    
+@app.get('/state')
+def state():
+    _, isRunning = checkPid()
+    return isRunning
+
 @app.get('/refresh')
 def refresh():
     pid, isAlreadyRunning = checkPid()

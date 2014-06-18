@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'view.ui'
 #
-# Created: Tue Jun 17 15:56:14 2014
+# Created: Wed Jun 18 14:11:06 2014
 #      by: pyside-uic 0.2.15 running on PySide 1.2.1
 #
 # WARNING! All changes made in this file will be lost!
@@ -12,7 +12,7 @@ from PySide import QtCore, QtGui
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(521, 392)
+        MainWindow.resize(523, 417)
         self.centralwidget = QtGui.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.loadButton = QtGui.QPushButton(self.centralwidget)
@@ -60,15 +60,18 @@ class Ui_MainWindow(object):
         self.label_5.setFont(font)
         self.label_5.setObjectName("label_5")
         self.listWidget = QtGui.QListWidget(self.centralwidget)
-        self.listWidget.setGeometry(QtCore.QRect(15, 91, 491, 261))
+        self.listWidget.setGeometry(QtCore.QRect(10, 110, 491, 261))
         self.listWidget.setObjectName("listWidget")
         self.progressBar = QtGui.QProgressBar(self.centralwidget)
         self.progressBar.setGeometry(QtCore.QRect(360, 40, 141, 21))
         self.progressBar.setProperty("value", 24)
         self.progressBar.setObjectName("progressBar")
+        self.downloadcheckBox = QtGui.QCheckBox(self.centralwidget)
+        self.downloadcheckBox.setGeometry(QtCore.QRect(20, 70, 271, 21))
+        self.downloadcheckBox.setObjectName("downloadcheckBox")
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtGui.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 521, 23))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 523, 23))
         self.menubar.setObjectName("menubar")
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QtGui.QStatusBar(MainWindow)
@@ -89,4 +92,5 @@ class Ui_MainWindow(object):
         self.label_3.setText(QtGui.QApplication.translate("MainWindow", "Direccion Red local ", None, QtGui.QApplication.UnicodeUTF8))
         self.label_4.setText(QtGui.QApplication.translate("MainWindow", "0", None, QtGui.QApplication.UnicodeUTF8))
         self.label_5.setText(QtGui.QApplication.translate("MainWindow", ".", None, QtGui.QApplication.UnicodeUTF8))
+        self.downloadcheckBox.setText(QtGui.QApplication.translate("MainWindow", "Save data in this computer automatically ", None, QtGui.QApplication.UnicodeUTF8))
 
