@@ -190,7 +190,7 @@
        </div>
 
       <div class="download">
-        <a  class="btn btn-warning" href="/downloadData/{{machineId}}" download >Dowload Data</a>
+        <a  class="btn btn-warning" href="/downloadData/{{machineId}}" download>Dowload Data</a>
       </div>
    </div>
       <hr>

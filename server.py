@@ -102,7 +102,7 @@ def starStop():
 @app.get('/state')
 def state():
     _, isRunning = checkPid()
-    return isRunning
+    return str(isRunning)
 
 @app.get('/refresh')
 def refresh():
