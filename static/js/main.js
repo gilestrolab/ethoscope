@@ -119,6 +119,11 @@ function init () {
   }
     
   function saveRoi (ev){
+      console.log(ev._x);
+      console.log(ev._y);
+      console.log(tool.x0);
+      console.log(tool.y0);
+      
       var x  = Math.min(ev._x,  tool.x0),
           y  = Math.min(ev._y,  tool.y0),
           w  = Math.abs(ev._x - tool.x0),
@@ -185,6 +190,34 @@ function init () {
     
 //// Auto Mask
     function ev_autoMask(ev){
+        //take the first rectangle from roiObj
+        var r = RoiObj.rois[0];
+        //Divide the recntangle in a table of 16 rows 2 columns
+        x = r.ROI[0];
+        y = r.ROI[1];
+        w = r.ROI[4];
+        h = r.ROI[5];
+        
+        var individualW = w/2.;
+        var individualH = h/16.;
+        
+        RoiObj.rois.pop();
+        for (var j=0; j<2; j++){
+            for(var i = 0; i < 16; i++){
+                 var d = {};
+                 dx = x + individualW*j;
+                 dx1 = dx + individualW;
+                 dy = y + individualH*i;
+                 dy1 = dy + individualH;
+
+                 d.ROI = [dx,dy, dx1,dy1,individualW,individualH];
+                console.log(d.ROI);
+                 d.pointsToTrack = 1;
+                 d.referencePoints = [];
+                 RoiObj.rois.push(d);
+            }
+        }
+        img_update();
         console.log("auto good");
     };
 ///// Background image paint    
@@ -198,6 +231,8 @@ function backgroundImage(){
     };
     
 }
+    
+
 /// Save ROI into SM for future trackings.
 function ev_saveRoiToSM(ev){
     var name = prompt("What is the name of this ROI", "Default");
