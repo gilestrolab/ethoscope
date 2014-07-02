@@ -198,17 +198,17 @@ function init () {
         w = r.ROI[4];
         h = r.ROI[5];
         
-        var individualW = w/2.;
-        var individualH = h/16.;
+        var individualW = w/2;
+        var individualH = h/16;
         
         RoiObj.rois.pop();
         for (var j=0; j<2; j++){
             for(var i = 0; i < 16; i++){
                  var d = {};
-                 dx = x + individualW*j;
-                 dx1 = dx + individualW;
-                 dy = y + individualH*i;
-                 dy1 = dy + individualH;
+                 dx = Math.round(x + individualW*j);
+                 dx1 = Math.round(dx + individualW);
+                 dy = Math.round(y + individualH*i);
+                 dy1 = Math.round(dy + individualH);
 
                  d.ROI = [dx,dy, dx1,dy1,individualW,individualH];
                 console.log(d.ROI);
@@ -358,6 +358,16 @@ app.controller('changeMachineIdCtrl',['$scope', '$http',function($scope,$http){
         $scope.changeMachineId = function(){
             var name = prompt("New name for this Sleep", "SM 01");
             $http.post("/changeMachineId", JSON.stringify({"newName":name})); 
+        };
+}]);
+    
+app.controller('deleteDataCtrl',['$scope', '$http',function($scope,$http){
+        $scope.deleteData = function(){
+            var c = confirm("Are You sure you want to delete all the data?");
+            if(c == true){
+                var mid = $("#machineid").text().split(": ")[0];
+                $http.delete("/deleteData/"+mid); 
+            }
         };
 }]);
 

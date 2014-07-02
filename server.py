@@ -4,6 +4,8 @@ from subprocess import Popen, PIPE, call
 import os, signal, time, json
 app = Bottle()
 
+outputfile = "output.txt"
+
 class RoiData():
     def __init__(self):
         name = ""
@@ -93,7 +95,7 @@ def starStop():
                         "-i","0",
                         "-k", "mask.msk",
                         "-t", str(data['trackingType']),
-                        "-o", "output.txt",
+                        "-o", outputfile,
                         "--showmask",
                         "--trackonly"])
         
@@ -124,12 +126,30 @@ def refresh():
 def downloadData(machineID):
     pid, isAlreadyRunning = checkPid()
     #Add a "last downloaded" and "free space available"
-    return static_file('output.txt', root='')
+    return static_file(outputfile, root='')
+
+@app.delete('/deleteData/<machineID>')
+def deleteData(machineID):
+    pid, isAlreadyRunning = checkPid()
+    if isAlreadyRunning:
+        #save the last 10 lines
+        f = open(outputfile, 'r')
+        f.seek(10, 2)
+        data = f.readlines()
+        f.close()
+        f = open(outputfile, 'w')
+        f.write(data)
+    else:
+        #erease everything.
+        f=open(outputfile, 'w')
+        f.close()
+    redirect("/")
+     
 
 @app.get('/visualizeData')
 def visualizeData():
     pid, isAlreadyRunning = checkPid()   
-    return static_file('output.txt', root='')
+    return static_file(outputfile, root='')
 
 def checkPid():
     proc = Popen(["pgrep", "-f", "python2 pvg_standalone.py"], stdout=PIPE)
@@ -156,13 +176,15 @@ def checkMachineId():
     return piId
  
 def readData():
-    f = open('output.txt','r')
+    f = open(outputfile,'r')
     lines = f.readlines()
     f.close()
-    lastData = lines[-1]
-    splitedData = lastData.split('\t')
-    jsonData = json.dumps(splitedData)
-    print (jsonData)
+    jsonData = 0
+    if len(lines)>0:
+        lastData = lines[-1]
+        splitedData = lastData.split('\t')
+        jsonData = json.dumps(splitedData)
+        print (jsonData)
     return jsonData
     
 roiList={}

@@ -39,7 +39,7 @@
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </button>
-          <a class="navbar-brand" href="/"  ng-click="changeMachineId()">PySolo ControlPanel:{{machineId}}</a>
+          <a id="machineid" class="navbar-brand" href="/"  ng-click="changeMachineId()">PySolo ControlPanel: {{machineId}}</a>
             
         </div>
         <div class="navbar-collapse collapse">
@@ -189,8 +189,11 @@
         </div>
        </div>
 
-      <div class="download">
+      <div class="download col-md-2">
         <a  class="btn btn-warning" href="/downloadData/{{machineId}}" download>Dowload Data</a>
+      </div>
+      <div class="delete col-md-offset-4 col-md-4" ng-controller="deleteDataCtrl">
+        <button  class="btn btn-danger"  ng-click="deleteData()">Delete Data</button>
       </div>
    </div>
       <hr>
