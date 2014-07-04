@@ -22,8 +22,7 @@
         <link rel="stylesheet" href="static/css/main.css">
 
         <script src="static/js/vendor/modernizr-2.6.2-respond-1.1.0.min.js"></script>
-                <script type="text/javascript" src="static/js/vendor/angular.min.js"></script>
-        <script type="text/javascript"  src="static/js/main.js"></script>
+
         
     </head>
     <body ng-app="fly">
@@ -31,15 +30,15 @@
             <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="http://browsehappy.com/">upgrade your browser</a> to improve your experience.</p>
         <![endif]-->
     <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
-      <div class="container" ng-controller="changeMachineIdCtrl">
-        <div class="navbar-header">
+      <div class="container" >
+        <div class="navbar-header" ng-controller="changeMachineIdCtrl">
           <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
             <span class="sr-only">Toggle navigation</span>
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </button>
-          <a id="machineid" class="navbar-brand" href="/"  ng-click="changeMachineId()">PySolo ControlPanel: {{machineId}}</a>
+          <span class="navbar-brand" >PySolo ControlPanel:</span><a id="machineid" class="navbar-brand" href=""  ng-click="changeName()" data-toggle="tooltip" data-placement="right" title="Click to edit">{{machineId}}</a>
             
         </div>
         <div class="navbar-collapse collapse">
@@ -70,7 +69,7 @@
                 <div class=" col-md-12">
                     <div class="btn-group">
                         <button type="button" id="removeLast" class="btn btn-default" href="#" role="button">Remove last</button>
-                        <button type="button" id="autoMask"class="btn btn-default" href="#" role="button">Auto mask</button>
+                        <button type="button" id="autoMask"class="btn btn-default" href="#" role="button" data-toggle="tooltip" data-placement="bottom" title="First you have to select the area of Interest. Then click here and it will be divided in 2x16 matrix">Auto mask</button>
                         </div>
                     <div class="btn-group">
                         <button type="button" id="saveRoi" class="btn btn-default" href="#" role="button">Save</button>
@@ -189,11 +188,17 @@
         </div>
        </div>
 
-      <div class="download col-md-2">
+      <div class="download col-md-4">
+          <p class="explanation">Download the generated data to save it to your computer.</p> 
         <a  class="btn btn-warning" href="/downloadData/{{machineId}}" download>Dowload Data</a>
       </div>
-      <div class="delete col-md-offset-4 col-md-4" ng-controller="deleteDataCtrl">
+      <div class="delete  col-md-4" ng-controller="deleteDataCtrl">
+        <p class="explanation">Deleting the old data you will free some space in the disk.</p>   
         <button  class="btn btn-danger"  ng-click="deleteData()">Delete Data</button>
+      </div>
+       <div class="delete  col-md-4" ng-controller="poweroffCtrl">
+        <p class="explanation">This will power off the sleep Monitor and the tracking system. To power on again, you will have to replug the power supply.</p>   
+        <button  class="btn btn-danger"  ng-click="poweroff()">Power Off</button>
       </div>
    </div>
       <hr>
@@ -203,9 +208,13 @@
       </footer>
     </div> <!-- /container -->        
         <script src="static/js/vendor/jquery-1.11.0.min.js"></script>
-
         <script src="static/js/vendor/bootstrap.min.js"></script>
-
+        <script type="text/javascript" src="static/js/vendor/angular.min.js"></script>
+        <script type="text/javascript"  src="static/js/main.js"></script>
+        <script>
+        $('#machineid').tooltip();
+            $('#autoMask').tooltip();
+        </script>
     </body>
 </html>
 

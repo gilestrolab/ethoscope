@@ -1,10 +1,16 @@
+import bottle
 from bottle import *
+
 import db
 from subprocess import Popen, PIPE, call
 import os, signal, time, json
+
+basedir=os.path.dirname(__file__)
+
 app = Bottle()
 
-outputfile = "output.txt"
+outputfile = os.path.join(basedir,"output.txt")
+
 
 class RoiData():
     def __init__(self):
@@ -14,18 +20,18 @@ class RoiData():
         
 @app.route('/static/<filepath:path>')
 def server_static(filepath):
-    print (filepath)
-    return static_file(filepath, root='static')
+    return static_file(filepath, root=os.path.join(basedir,"static"))
 
 @app.route('/')
 def index():
+    print(os.path.dirname(__file__))
     mid= checkMachineId()
     _,status = checkPid()
     df = subprocess.Popen(["df", "./"], stdout=subprocess.PIPE)
     output = df.communicate()[0]
     device, size, used, available, percent, mountpoint = \
                                                    output.split(b"\n")[1].split()
-    return template('index', machineId=mid, status=status, freeSpace = percent)
+    return template(os.path.join(basedir+"/views","index.tpl"), machineId=mid, status=status, freeSpace = percent)
 
 @app.route('/websocket')
 def handle_websocket():
@@ -51,16 +57,6 @@ def new_roi():
     except:
         """file does not exits yet"""
         db.save(roiData)
-        
-@app.post('/changeMachineId')
-def changeMachineId():
-    try:
-        name = request.json
-        print (name)
-        changeMId(name['newName'])
-    except:
-        print ("no data")
-    redirect("/")            
 
 @app.get('/ROI')
 def list_roi():
@@ -73,6 +69,19 @@ def list_roi():
     print (dataToSend['data'])
     return (dataToSend)
 
+@app.post('/changeMachineId')
+def changeMachineId():
+    try:
+        print("changing name")
+        name = request.json
+        print(name)
+        changeMId(name['newName'])
+        return(name['newName'])
+    except:
+        print ("no data")
+    #redirect("/")
+
+    
 @app.put('/started')
 def starStop():
     try:
@@ -81,16 +90,15 @@ def starStop():
     except:
         print ("no data")
     pid, isAlreadyRunning = checkPid()
-    print(pid, isAlreadyRunning)
+    
     if isAlreadyRunning:
         os.kill(pid,signal.SIGTERM)
-        print(pid)
     else:
         db.writeMask(data)
         #f = open('mask.msk','wb')
         #pickle.dump(data['roi'], f)
         #f.close()
-        pySolo = Popen(["python2","pvg_standalone.py", 
+        pySolo = Popen(["python2",os.path.join(basedir,"pvg_standalone.py"), 
                         "-c", "pysolo_video.cfg",
                         "-i","0",
                         "-k", "mask.msk",
@@ -113,7 +121,7 @@ def refresh():
         #add a call to a function to update snapshot
         pass 
     else:
-        pySolo = call(["python2","pvg_standalone.py", 
+        pySolo = call(["python2",os.path.join(basedir,"pvg_standalone.py"), 
                         "-c", "pysolo_video.cfg",
                         "-i","0",
                         "--snapshot",])
@@ -125,24 +133,31 @@ def refresh():
 @app.route('/downloadData/<machineID>')
 def downloadData(machineID):
     pid, isAlreadyRunning = checkPid()
-    #Add a "last downloaded" and "free space available"
-    return static_file(outputfile, root='')
-
+    mid = checkMachineId()
+    if mid == machineID:
+        #Add a "last downloaded" and "free space available"
+        return static_file(outputfile, root='')
+    else:
+        redirect("/")
+    
+    
 @app.delete('/deleteData/<machineID>')
 def deleteData(machineID):
     pid, isAlreadyRunning = checkPid()
-    if isAlreadyRunning:
-        #save the last 10 lines
-        f = open(outputfile, 'r')
-        f.seek(10, 2)
-        data = f.readlines()
-        f.close()
-        f = open(outputfile, 'w')
-        f.write(data)
-    else:
-        #erease everything.
-        f=open(outputfile, 'w')
-        f.close()
+    mid = checkMachineId()
+    if mid == machineID:
+        if isAlreadyRunning:
+            #save the last 10 lines
+            f = open(outputfile, 'r')
+            f.seek(10, 2)
+            data = f.readlines()
+            f.close()
+            f = open(outputfile, 'w')
+            f.write(data)
+        else:
+            #erease everything.
+            f=open(outputfile, 'w')
+            f.close()
     redirect("/")
      
 
@@ -151,8 +166,22 @@ def visualizeData():
     pid, isAlreadyRunning = checkPid()   
     return static_file(outputfile, root='')
 
+@app.put('/poweroff/<machineID>')
+def poweroff(machineID):
+    pid, isAlreadyRunning = checkPid()
+    mid = checkMachineId()
+    if mid == machineID:
+        print("powering off")
+        if isAlreadyRunning:
+            startStop()
+        off = call("poweroff")
+        
+"""helpers methods."""
+
 def checkPid():
-    proc = Popen(["pgrep", "-f", "python2 pvg_standalone.py"], stdout=PIPE)
+    proc = Popen(["pgrep", "-f", 
+                  "python2 "+os.path.join(basedir,"pvg_standalone.py")]
+                 , stdout=PIPE)
     try:
         pid=int(proc.stdout.readline())
         started=True
@@ -160,17 +189,16 @@ def checkPid():
         started=False
         pid = None
     proc.stdout.close()
-    print(pid)
     return pid, started
 
 def changeMId(name):
-    f = open('machineId','w')
+    f = open(os.path.join(basedir,'machineId'),'w')
     piId = f.write(name)
     f.close()
     return True
 
 def checkMachineId():
-    f = open('machineId','r')
+    f = open(os.path.join(basedir,'machineId'),'r')
     piId = f.read().rstrip()
     f.close()
     return piId
@@ -187,6 +215,7 @@ def readData():
         print (jsonData)
     return jsonData
     
+"""The main program"""    
 roiList={}
 
 run(app,host='0.0.0.0', port=8088, debug=True)

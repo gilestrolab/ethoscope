@@ -355,20 +355,31 @@ app.controller('flyDataCtrl',['$http','$interval', function ($http, $interval){
 }]);
 
 app.controller('changeMachineIdCtrl',['$scope', '$http',function($scope,$http){
-        $scope.changeMachineId = function(){
+        $scope.changeName = function(){
             var name = prompt("New name for this Sleep", "SM 01");
-            $http.post("/changeMachineId", JSON.stringify({"newName":name})); 
+            $http.post("/changeMachineId", JSON.stringify({"newName":name})).success(function(data){
+            $("#machineid").text(data);
+            }); 
         };
 }]);
     
 app.controller('deleteDataCtrl',['$scope', '$http',function($scope,$http){
         $scope.deleteData = function(){
-            var c = confirm("Are You sure you want to delete all the data?");
-            if(c == true){
-                var mid = $("#machineid").text().split(": ")[0];
+            var d = confirm("Are You sure you want to delete all the data?");
+            if(d == true){
+                var mid = $("#machineid").text().split(": ")[1];
                 $http.delete("/deleteData/"+mid); 
             }
         };
+}]);
+app.controller('poweroffCtrl',['$scope', '$http',function($scope,$http){
+    $scope.poweroff = function(){
+        var c = confirm("Are You sure you want to poweroff the sleep Monitor?");
+        if(c == true){
+            var mid = $("#machineid").text();
+            $http.put("/poweroff/"+mid); 
+        }
+    };
 }]);
 
 })(); 
