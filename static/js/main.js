@@ -242,6 +242,7 @@ function ev_saveRoiToSM(ev){
     oReq.open("post", "/ROI", false);
     oReq.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     oReq.send(data);
+    console.log(data);
     console.log(oReq.status);
 }
     
@@ -252,32 +253,36 @@ function ev_loadRoiFromSM(ev){
     oReq.send();
     
     RoiObjList=[];
+    console.log(oReq.response);
     res = JSON.parse(oReq.response);
+    console.log(res);
     
-    for (var d in res.data){
-       RoiObjList.push(res.data[d]);
+    if (res.name == 'Rois Saved in SM'){        
+        for (var d in res.data){
+           RoiObjList.push(res.data[d]);
+        }
+        console.log(RoiObjList);
+        var l = RoiObjList.length;
+        console.log(l);
+        $('#pickloaded').append(
+                "<ul class='list-group'></ul>"
+            );
+        for(var i=0; i<l; i++){
+            $('#pickloaded ul').append(
+                "<li class='list-group-item'><input type='radio' name='selectedRoi' id='selectedRoi"+i+"' value="+i+">"+RoiObjList[i].name+"</li>"
+            );
+        }
+
+        for(var i=0; i<l; i++){
+             //Radio Buttons
+             id = 'selectedRoi'+i;
+             console.log(id);
+             element = document.getElementById(id);
+             //radioButtonsArray.push(element);
+             element.addEventListener('click', ev_handlerRadio, false);
+        }
+        console.log("load");
     }
-    console.log(RoiObjList);
-    var l = RoiObjList.length;
-    console.log(l);
-    $('#pickloaded').append(
-            "<ul class='list-group'></ul>"
-        );
-    for(var i=0; i<l; i++){
-        $('#pickloaded ul').append(
-            "<li class='list-group-item'><input type='radio' name='selectedRoi' id='selectedRoi"+i+"' value="+i+">"+RoiObjList[i].name+"</li>"
-        );
-    }
-    
-    for(var i=0; i<l; i++){
-         //Radio Buttons
-         id = 'selectedRoi'+i;
-         console.log(id);
-         element = document.getElementById(id);
-         //radioButtonsArray.push(element);
-         element.addEventListener('click', ev_handlerRadio, false);
-    }
-    console.log("load");
 }    
 
 /// Refresh
@@ -293,14 +298,18 @@ function ev_refreshBackground(){
 /// Start
 function ev_start(){
     var tracking = $('input[name=optionTrack]:checked').val();
-    var data = JSON.stringify({trackingType:tracking,roi:RoiObj});
-    console.log(data);
+    var d = new Date();
+    var t = d.getTime();
+    var data = JSON.stringify({time:t,trackingType:tracking,roi:RoiObj}); 
     var oReq = new XMLHttpRequest();
     oReq.open("put", "/started", false);
     oReq.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
     oReq.send(data);
     console.log("start");
+    console.log(t);
+    console.log(data);
     location.reload();
+
 }
 /// Stop
 function ev_stop(){

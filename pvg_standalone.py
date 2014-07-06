@@ -3,7 +3,7 @@ import wx
 import optparse
 import pysolovideo
 from pvg_common import previewPanel, pvg_config, cvPanel
-from os.path import splitext
+from os.path import splitext, dirname, join
 
 ##
 ## find . -fname "*.avi" | xargs python2 pvg_standalone.py -i {}
@@ -87,7 +87,7 @@ if __name__=="__main__":
     if options.snapshot:
         m = pysolovideo.Monitor()
         m.setSource(source, resolution)
-        filename = "static/img/%s.jpg" % source
+        filename = join(dirname(__file__),"static/img/%s.jpg" % source)
         m.saveSnapshot(filename)
     
     elif options.use_cv:

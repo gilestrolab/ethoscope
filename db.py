@@ -1,16 +1,28 @@
 import pickle, json
+from os import path
+basedir=path.dirname(__file__)
 
 def save(data):
-    f = open('savedRois', 'wb')
-    pickle.dump(data, f)
+    try:
+        roiList = load()
+        roiList.append(data)
+    except:
+        """file does not exits yet, create firs entry"""
+        #roiList = [{"1":{data}}]
+        roiList=[]
+        roiList.append(data)
+    f = open(path.join(basedir,'savedRois'), 'wb')
+    pickle.dump(roiList, f)
     f.close()
     print("data saved")
 
 
 def load():
-    f= open('savedRois', 'rb')
+    f= open(path.join(basedir,'savedRois'), 'rb')
     data = pickle.load(f)
+    print(data)
     f.close()
+    #except:
     return data
     
 def writeMask(data):
@@ -18,9 +30,9 @@ def writeMask(data):
     referencePoints= "none" #list of pints [[[x,y,r]]] Ask Giorgio, what they mean.
     pointsToTrack = [] #list of numbers [1, 1, 1]
     serial = "NO_SERIAL"
-    #from data create ROIS, referencePoints and pointsToTrack
-    scalex = int(1280/500)
-    scaley = int(720/300)
+    #from data create ROIS, referencePoints and pointsToTrack CHECK THIS!
+    scalex = int(800/500)#int(1280/500)
+    scaley = int(600/300)#int(720/300)
     for key,roi in data.items():
         if key == 'roi':
             for element in roi['rois']:

@@ -49,14 +49,17 @@ def pidiscover():
 @app.post('/ROI')
 def new_roi():
     roiData = request.json
+    db.save(roiData)
     #load saved rois and then add the new one
-    try:
-        roiList = db.load()
-        roiList[len(roiList)]=roiData
-        db.save(roiList)
-    except:
-        """file does not exits yet"""
-        db.save(roiData)
+#    try:
+#        roiList = db.load()
+#        roiList[len(roiList)]=roiData
+#        db.save(roiList)
+#    except:
+#        """file does not exits yet"""
+#        roiList = [0]
+#        roiList[0]=roiData
+#        db.save(roiData)
 
 @app.get('/ROI')
 def list_roi():
@@ -65,9 +68,8 @@ def list_roi():
     dataToSend = {}
     dataToSend['name']="Rois Saved in SM"
     dataToSend['data'] = roisSaved
-    
-    print (dataToSend['data'])
-    return (dataToSend)
+    d = json.dumps(dataToSend)
+    return (d)
 
 @app.post('/changeMachineId')
 def changeMachineId():
@@ -86,7 +88,10 @@ def changeMachineId():
 def starStop():
     try:
         data = request.json
-        print (data)
+        t = data['time']
+        print(t)
+        #set time, given in miliseconds from javascript, used in seconds for date
+        setTime = call(['date', '-s', '@'+str(t)[:-3]])
     except:
         print ("no data")
     pid, isAlreadyRunning = checkPid()
@@ -99,7 +104,7 @@ def starStop():
         #pickle.dump(data['roi'], f)
         #f.close()
         pySolo = Popen(["python2",os.path.join(basedir,"pvg_standalone.py"), 
-                        "-c", "pysolo_video.cfg",
+                        "-c", os.path.join(basedir,"pysolo_video.cfg"),
                         "-i","0",
                         "-k", "mask.msk",
                         "-t", str(data['trackingType']),
@@ -122,7 +127,7 @@ def refresh():
         pass 
     else:
         pySolo = call(["python2",os.path.join(basedir,"pvg_standalone.py"), 
-                        "-c", "pysolo_video.cfg",
+                        "-c", os.path.join(basedir,"pysolo_video.cfg"),
                         "-i","0",
                         "--snapshot",])
     redirect("/")
