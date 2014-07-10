@@ -113,12 +113,12 @@
               <div class="track-select">
                 <div class="input-group"><label>
                     <input type="radio" name="optionTrack" id="optionTrack0" value="0">
-                    Position</label>
+                    Virtual Beam</label>
                     
                 </div>
                 <div class="input-group ">
                     <input type="radio" name="optionTrack" id="optionTrack1" value="1">
-                    <label>Distance</label>
+                    <label>Distance Walked</label>
                 </div>
                 <div class="input-group">
                     <input type="radio" name="optionTrack" id="optionTrack2" value="2">

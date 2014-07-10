@@ -1,15 +1,16 @@
-import bottle
 from bottle import *
 
 import db
 from subprocess import Popen, PIPE, call
-import os, signal, time, json
+from os import path, kill
+from signal import SIGTERM
+import json
 
-basedir=os.path.dirname(__file__)
+basedir=path.dirname(__file__)
 
 app = Bottle()
 
-outputfile = os.path.join(basedir,"output.txt")
+outputfile = path.join(basedir,"output.txt")
 
 
 class RoiData():
@@ -20,18 +21,17 @@ class RoiData():
         
 @app.route('/static/<filepath:path>')
 def server_static(filepath):
-    return static_file(filepath, root=os.path.join(basedir,"static"))
+    return static_file(filepath, root=path.join(basedir,"static"))
 
 @app.route('/')
 def index():
-    print(os.path.dirname(__file__))
     mid= checkMachineId()
     _,status = checkPid()
     df = subprocess.Popen(["df", "./"], stdout=subprocess.PIPE)
     output = df.communicate()[0]
     device, size, used, available, percent, mountpoint = \
                                                    output.split(b"\n")[1].split()
-    return template(os.path.join(basedir+"/views","index.tpl"), machineId=mid, status=status, freeSpace = percent)
+    return template(path.join(basedir+"/views","index.tpl"), machineId=mid, status=status, freeSpace = percent)
 
 @app.route('/websocket')
 def handle_websocket():
@@ -74,9 +74,7 @@ def list_roi():
 @app.post('/changeMachineId')
 def changeMachineId():
     try:
-        print("changing name")
         name = request.json
-        print(name)
         changeMId(name['newName'])
         return(name['newName'])
     except:
@@ -89,7 +87,6 @@ def starStop():
     try:
         data = request.json
         t = data['time']
-        print(t)
         #set time, given in miliseconds from javascript, used in seconds for date
         setTime = call(['date', '-s', '@'+str(t)[:-3]])
     except:
@@ -97,19 +94,19 @@ def starStop():
     pid, isAlreadyRunning = checkPid()
     
     if isAlreadyRunning:
-        os.kill(pid,signal.SIGTERM)
+        kill(pid,SIGTERM)
     else:
         db.writeMask(data)
         #f = open('mask.msk','wb')
         #pickle.dump(data['roi'], f)
         #f.close()
-        pySolo = Popen(["python2",os.path.join(basedir,"pvg_standalone.py"), 
-                        "-c", os.path.join(basedir,"pysolo_video.cfg"),
+        pySolo = Popen(["python2",path.join(basedir,"pvg_standalone.py"), 
+                        "-c", path.join(basedir,"pysolo_video.cfg"),
                         "-i","0",
                         "-k", "mask.msk",
                         "-t", str(data['trackingType']),
                         "-o", outputfile,
-                        "--showmask",
+                        "--showmask",#useful?
                         "--trackonly"])
         
         #pySolo = Popen(["python2", "pvg.py"])# -c pysolo_video.cfg -i 0 -k mask.msk -t 0 -o output.txt", shell=True)
@@ -123,11 +120,12 @@ def state():
 def refresh():
     pid, isAlreadyRunning = checkPid()
     if isAlreadyRunning:
-        #add a call to a function to update snapshot
+        #add a call to a function to update snapshot when trackingType
+        #for now, do nothing
         pass 
     else:
-        pySolo = call(["python2",os.path.join(basedir,"pvg_standalone.py"), 
-                        "-c", os.path.join(basedir,"pysolo_video.cfg"),
+        pySolo = call(["python2",path.join(basedir,"pvg_standalone.py"), 
+                        "-c", path.join(basedir,"pysolo_video.cfg"),
                         "-i","0",
                         "--snapshot",])
     redirect("/")
@@ -140,8 +138,8 @@ def downloadData(machineID):
     pid, isAlreadyRunning = checkPid()
     mid = checkMachineId()
     if mid == machineID:
-        #Add a "last downloaded" and "free space available"
-        return static_file(outputfile, root='')
+        #TODO:Add a "last downloaded"
+        return static_file(outputfile, root='/', download=outputfile)
     else:
         redirect("/")
     
@@ -185,7 +183,7 @@ def poweroff(machineID):
 
 def checkPid():
     proc = Popen(["pgrep", "-f", 
-                  "python2 "+os.path.join(basedir,"pvg_standalone.py")]
+                  "python2 "+path.join(basedir,"pvg_standalone.py")]
                  , stdout=PIPE)
     try:
         pid=int(proc.stdout.readline())
@@ -197,13 +195,13 @@ def checkPid():
     return pid, started
 
 def changeMId(name):
-    f = open(os.path.join(basedir,'machineId'),'w')
+    f = open(path.join(basedir,'machineId'),'w')
     piId = f.write(name)
     f.close()
     return True
 
 def checkMachineId():
-    f = open(os.path.join(basedir,'machineId'),'r')
+    f = open(path.join(basedir,'machineId'),'r')
     piId = f.read().rstrip()
     f.close()
     return piId
@@ -217,7 +215,7 @@ def readData():
         lastData = lines[-1]
         splitedData = lastData.split('\t')
         jsonData = json.dumps(splitedData)
-        print (jsonData)
+        #print (jsonData)
     return jsonData
     
 """The main program"""    

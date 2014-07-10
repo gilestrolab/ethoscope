@@ -1,6 +1,6 @@
 import urllib.request as urllib
 import urllib.parse as parse
-import sys, time, subprocess, paramiko
+import sys, time, subprocess
 import view, socket, webbrowser
 import threading
 from PySide import QtCore, QtGui
@@ -73,7 +73,7 @@ class ControlMainWindow(QtGui.QMainWindow):
     
     autosave = AutoSaveData()
     
-    def __init__(self, parent=None):
+    def __init__(self, localIp,parent=None):
         super(ControlMainWindow, self).__init__(parent)
         self.ui = view.Ui_MainWindow()
         self.ui.setupUi(self)
@@ -167,13 +167,17 @@ def askPiId(device, port):
     piId=f.read()
     return piId
     
-        
+    
+def main():
+    localIp = socket.gethostbyname(str(socket.gethostname())).split('.')
+    app = QtGui.QApplication(sys.argv)
+    mySW = ControlMainWindow(localIp)
+    mySW.show()
+    sys.exit(app.exec_())
 
             
    
 if __name__ == "__main__":
-    localIp = socket.gethostbyname(str(socket.gethostname())).split('.')
-    app = QtGui.QApplication(sys.argv)
-    mySW = ControlMainWindow()
-    mySW.show()
-    sys.exit(app.exec_())
+    main()
+
+

@@ -300,15 +300,21 @@ function ev_start(){
     var tracking = $('input[name=optionTrack]:checked').val();
     var d = new Date();
     var t = d.getTime();
-    var data = JSON.stringify({time:t,trackingType:tracking,roi:RoiObj}); 
-    var oReq = new XMLHttpRequest();
-    oReq.open("put", "/started", false);
-    oReq.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
-    oReq.send(data);
-    console.log("start");
-    console.log(t);
-    console.log(data);
-    location.reload();
+    if (RoiObj.rois.length<1){
+        alert("There is no ROI selected. You can't start tracking.");
+    }else if (typeof tracking == 'undefined'){
+        alert("There is no tracking type selected. You can't start tracking.");
+    }else{
+        var data = JSON.stringify({time:t,trackingType:tracking,roi:RoiObj}); 
+        var oReq = new XMLHttpRequest();
+        oReq.open("put", "/started", false);
+        oReq.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+        oReq.send(data);
+        console.log("start");
+        console.log(t);
+        console.log(data);
+        location.reload();
+    }
 
 }
 /// Stop
