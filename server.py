@@ -6,7 +6,7 @@ from os import path, kill
 from signal import SIGTERM
 import json
 
-basedir=path.dirname(__file__)
+basedir=path.dirname(os.path.realpath(__file__))
 
 app = Bottle()
 
@@ -139,7 +139,7 @@ def downloadData(machineID):
     mid = checkMachineId()
     if mid == machineID:
         #TODO:Add a "last downloaded"
-        return static_file(outputfile, root='/', download=outputfile)
+        return static_file(outputfile, root='/')
     else:
         redirect("/")
     
@@ -151,14 +151,17 @@ def deleteData(machineID):
     if mid == machineID:
         if isAlreadyRunning:
             #save the last 10 lines
-            f = open(outputfile, 'r')
-            f.seek(10, 2)
+            f = open(outputfile, 'rb')
+            f.seek(-1000,2)
             data = f.readlines()
             f.close()
             f = open(outputfile, 'w')
-            f.write(data)
+            for line in data[1:]:
+                l = line.decode('utf-8')
+                f.write(l)
         else:
             #erease everything.
+            print(outputfile)
             f=open(outputfile, 'w')
             f.close()
     redirect("/")
@@ -207,15 +210,18 @@ def checkMachineId():
     return piId
  
 def readData():
-    f = open(outputfile,'r')
-    lines = f.readlines()
+    f = open(outputfile,'rb')
+    try:
+        f.seek(-1000,2)
+        lines = f.readlines()
+        line = lines[-1].decode('utf8').split('\t')
+        jsonData = json.dumps(line)
+    except:
+        print("no data in outpufile")
+        
+        pass
     f.close()
-    jsonData = 0
-    if len(lines)>0:
-        lastData = lines[-1]
-        splitedData = lastData.split('\t')
-        jsonData = json.dumps(splitedData)
-        #print (jsonData)
+
     return jsonData
     
 """The main program"""    

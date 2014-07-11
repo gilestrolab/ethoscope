@@ -1577,8 +1577,6 @@ class Monitor(object):
         1   09 Dec 11   19:02:19    1   0   1   0   0   0   ?       [actual_activity]
         """
         
-        print "activity"
-        
         #Here we build the header
         dt = datetime.datetime.fromtimestamp( self.getFrameTime() )
        

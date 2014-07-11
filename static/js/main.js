@@ -382,7 +382,7 @@ app.controller('deleteDataCtrl',['$scope', '$http',function($scope,$http){
         $scope.deleteData = function(){
             var d = confirm("Are You sure you want to delete all the data?");
             if(d == true){
-                var mid = $("#machineid").text().split(": ")[1];
+                var mid = $("#machineid").text();
                 $http.delete("/deleteData/"+mid); 
             }
         };
