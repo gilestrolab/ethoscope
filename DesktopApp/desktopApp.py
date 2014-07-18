@@ -17,7 +17,7 @@ class AutoSaveData(QtCore.QThread):
         QtCore.QThread.__init__(self)
             
     def run(self):
-        interval = 60
+        interval = 86400
         lastSave = time.time()
         #print ("lastSave,{}".format(lastSave))
         while autoSaveIsRunning:
@@ -30,7 +30,7 @@ class AutoSaveData(QtCore.QThread):
                         #get data    
                         url = pi+':8088/downloadData/'+parse.quote(nameList[i])
                         
-                        downloadChunks(url,nameList[i])
+                        self.downloadChunks(url,nameList[i])
                         #print(url)
                         #try:
                         req = urllib.Request(url=url)
@@ -51,7 +51,7 @@ class AutoSaveData(QtCore.QThread):
                     i=i+1
                 lastSave = time.time()
              
-            time.sleep(interval)
+            time.sleep(2)
         print("Thread ended")
 
         
@@ -68,7 +68,7 @@ class AutoSaveData(QtCore.QThread):
         except:
             print("error getting state")
  
-    def downloadChunks(url,filename):
+    def downloadChunks(self,url,filename):
             """
             Helper to download large files
             the only arg is a url
@@ -84,9 +84,9 @@ class AutoSaveData(QtCore.QThread):
             #temp_path = "/tmp/"
             try:
                 #file = os.path.join(temp_path,baseFile)
-                file = "./dowloadedData"+filename
+                file = "./"+filename
                 req = urllib.urlopen(url)
-                total_size = int(req.info().getheader('Content-Length').strip())
+                total_size = int(req.info().get('Content-Length').strip())
                 downloaded = 0
                 CHUNK = 256 * 10240
                 with open(file, 'wb') as fp:
@@ -99,7 +99,7 @@ class AutoSaveData(QtCore.QThread):
             except error.HTTPError:
                 print ("HTTP Error:", url)
                 return False
-            except urllib.error.URLError:
+            except error.URLError:
                 print ("URL Error:", url)
                 return False
 
