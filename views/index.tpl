@@ -38,7 +38,7 @@
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </button>
-          <span class="navbar-brand" >PySolo ControlPanel:</span><a id="machineid" class="navbar-brand" href=""  ng-click="changeName()" data-toggle="tooltip" data-placement="right" title="Click to edit">{{machineId}}</a>
+          <span class="navbar-brand" > PySolo ControlPanel:</span><a id="machineid" class="navbar-brand" href=""  ng-click="changeName()" data-toggle="tooltip" data-placement="right" title="Click to edit">{{machineId}}</a>
             
         </div>
         <div class="navbar-collapse collapse">
@@ -50,18 +50,19 @@
               <input type="password" placeholder="Password" class="form-control">
             </div>
             <button type="submit" class="btn btn-success">Sign in</button>
+            <img src='static/img/logo.png' height=30>
           </form>
         </div><!--/.navbar-collapse -->
       </div>
     </div>
 
     <!-- Main jumbotron for a primary marketing message or call to action -->
-    <div class="jumbotron">
+    <div class="snapshot">
       <div class="container text-center">
         <div class="row">
-        <h2>PySolo-Video Browser editor</h2>
+        <h2>Camera Snapshot</h2>
           <div id="ROI-input" class="col-md-12">
-            <canvas id="ROIView" width="500" height="300"></canvas>
+            <canvas id="ROIView" width="500" height="375"></canvas>
               <!--<canvas id="drawingCanvas" width="500" height="300"></canvas>-->
          </div>
           </div>

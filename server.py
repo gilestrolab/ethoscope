@@ -19,6 +19,11 @@ class RoiData():
         rois = []
         trackingType = 0
         
+@get('/favicon.ico')
+def get_favicon():
+    return server_static(path.join(basedir,'static/img/favicon.ico'))
+
+        
 @app.route('/static/<filepath:path>')
 def server_static(filepath):
     return static_file(filepath, root=path.join(basedir,"static"))
@@ -107,7 +112,7 @@ def starStop():
                         "-t", str(data['trackingType']),
                         "-o", outputfile,
                         "--showmask",#useful?
-                        "--trackonly"])
+                        "--useCV"])
         
         #pySolo = Popen(["python2", "pvg.py"])# -c pysolo_video.cfg -i 0 -k mask.msk -t 0 -o output.txt", shell=True)
         

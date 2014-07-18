@@ -31,16 +31,16 @@ def writeMask(data):
     pointsToTrack = [] #list of numbers [1, 1, 1]
     serial = "NO_SERIAL"
     #from data create ROIS, referencePoints and pointsToTrack CHECK THIS!
-    scalex = int(800/500)#int(1280/500)
-    scaley = int(600/300)#int(720/300)
+    scalex = 800/500 #int(1280/500)
+    scaley = 600/375 #int(720/300)
     for key,roi in data.items():
         if key == 'roi':
             for element in roi['rois']:
                 p = element['ROI']
-                ROIS.append(((p[0]*scalex,p[1]*scaley),
-                             (p[0]*scalex,p[3]*scaley),
-                             (p[2]*scalex,p[3]*scaley), 
-                             (p[2]*scalex,p[1]*scaley)))
+                ROIS.append(((int(p[0]*scalex),int(p[1]*scaley)),
+                             (int(p[0]*scalex),int(p[3]*scaley)),
+                             (int(p[2]*scalex),int(p[3]*scaley)), 
+                             (int(p[2]*scalex),int(p[1]*scaley))))
                 #referencePoints.append(element['referencePoints'])
                 pointsToTrack.append(element['pointsToTrack'])
 

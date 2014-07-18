@@ -9,7 +9,7 @@
     position:relative;
     display: inline-block;
 
-    height: 300;
+    height: 375;
     padding: 0 ; 
     margin:1em;
 
@@ -39,7 +39,9 @@
     margin: 0 1em ;
 }
 
-
+.snapshot{
+    background-color:#eee;
+}
 
 
 

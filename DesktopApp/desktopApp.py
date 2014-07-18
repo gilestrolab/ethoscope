@@ -1,6 +1,7 @@
 import urllib.request as urllib
 import urllib.parse as parse
-import sys, time, subprocess
+import urllib.error as error
+import sys, time, subprocess, math, os
 import view, socket, webbrowser
 import threading
 from PySide import QtCore, QtGui
@@ -16,11 +17,11 @@ class AutoSaveData(QtCore.QThread):
         QtCore.QThread.__init__(self)
             
     def run(self):
-        interval = 3
+        interval = 60
         lastSave = time.time()
-        print ("lastSave,{}".format(lastSave))
+        #print ("lastSave,{}".format(lastSave))
         while autoSaveIsRunning:
-            print(time.time()-lastSave)
+            #print(time.time()-lastSave)
             if time.time() - lastSave > interval:
                 i=0
                 for pi in rpiList:
@@ -28,14 +29,15 @@ class AutoSaveData(QtCore.QThread):
                     if (self.isRecording(pi)):
                         #get data    
                         url = pi+':8088/downloadData/'+parse.quote(nameList[i])
-                        print(url)
+                        
+                        downloadChunks(url,nameList[i])
+                        #print(url)
                         #try:
                         req = urllib.Request(url=url)
-                        print(req)
                         data = urllib.urlopen(req)
-                        print ("data")
+                        
+                        ##Problema de memoria si el archivo es muy grande!
                         message = data.read()
-                        print(message)
                         try:
                             savedFile = open(nameList[i],'a')
                         except:
@@ -49,7 +51,7 @@ class AutoSaveData(QtCore.QThread):
                     i=i+1
                 lastSave = time.time()
              
-            time.sleep(2)
+            time.sleep(interval)
         print("Thread ended")
 
         
@@ -66,7 +68,42 @@ class AutoSaveData(QtCore.QThread):
         except:
             print("error getting state")
  
+    def downloadChunks(url,filename):
+            """
+            Helper to download large files
+            the only arg is a url
+            this file will go to a temp directory
+            the file will also be downloaded
+            in chunks and print out how much remains
+            """
 
+            baseFile = os.path.basename(url)
+
+            #move the file to a more uniq path
+            #os.umask(0002)
+            #temp_path = "/tmp/"
+            try:
+                #file = os.path.join(temp_path,baseFile)
+                file = "./dowloadedData"+filename
+                req = urllib.urlopen(url)
+                total_size = int(req.info().getheader('Content-Length').strip())
+                downloaded = 0
+                CHUNK = 256 * 10240
+                with open(file, 'wb') as fp:
+                    while True:
+                        chunk = req.read(CHUNK)
+                        downloaded += len(chunk)
+                        print (math.floor((downloaded / total_size) * 100 ))
+                        if not chunk: break
+                        fp.write(chunk)
+            except error.HTTPError:
+                print ("HTTP Error:", url)
+                return False
+            except urllib.error.URLError:
+                print ("URL Error:", url)
+                return False
+
+            return file
  
 class ControlMainWindow(QtGui.QMainWindow):
     
@@ -86,21 +123,22 @@ class ControlMainWindow(QtGui.QMainWindow):
         self.ui.downloadcheckBox.setCheckState(QtCore.Qt.Checked)
         self.ui.downloadcheckBox.stateChanged.connect(self.autoDownload)
         self.ui.progressBar.hide()
-
+        self.localIp = localIp
     
     @QtCore.Slot()
     def piDiscover(self):
         global rpiList 
         global nameList 
+        localIp = self.localIp
         self.ui.progressBar.show()
         port = 80
 
-        for i in range(1,20):
+        for i in range(1,255):
             url = "http://"+localIp[0]+"."+localIp[1]+"."+localIp[2]+"."+str(i)
             #print(url+port)
             try:
                 req = urllib.Request(url=url+':8088/pidiscover')
-                f = urllib.urlopen(req,timeout = 0.05)
+                f = urllib.urlopen(req,timeout = 0.051)
                 message = f.read()
                 print(message)
                # password = b'yes'
