@@ -201,7 +201,7 @@ function init () {
         var individualW = w/2;
         var individualH = h/16;
         
-        RoiObj.rois.pop();
+        RoiObj.rois=[];
         for (var j=0; j<2; j++){
             for(var i = 0; i < 16; i++){
                  var d = {};
