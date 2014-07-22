@@ -129,10 +129,13 @@ class ControlMainWindow(QtGui.QMainWindow):
     def piDiscover(self):
         global rpiList 
         global nameList 
-        localIp = self.localIp
+        localIp = [self.ui.ipEdit.text(),self.ui.ipEdit_2.text(),self.ui.ipEdit_3.text()]
         self.ui.progressBar.show()
-        port = 80
-
+        port = 8088
+        
+        rpiList = []
+        nameList = []
+        
         for i in range(1,255):
             url = "http://"+localIp[0]+"."+localIp[1]+"."+localIp[2]+"."+str(i)
             #print(url+port)
@@ -156,6 +159,7 @@ class ControlMainWindow(QtGui.QMainWindow):
             sys.stdout.write( "scaning..."+str(int(i/255*100)) + '%\r'),
             self.ui.progressBar.setValue(int(i/255*100))
         print("Ended  ")
+        self.ui.listWidget.clear()
         self.ui.listWidget.addItems(nameList)
         self.rpiList = rpiList
         self.ui.progressBar.hide()
