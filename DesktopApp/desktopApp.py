@@ -52,7 +52,7 @@ class AutoSaveData(QtCore.QThread):
                 lastSave = time.time()
              
             time.sleep(2)
-        print("Thread ended")
+        #print("Thread ended")
 
         
     def isRecording(self,pi):
@@ -66,8 +66,9 @@ class AutoSaveData(QtCore.QThread):
             else:
                 return False
         except:
-            print("error getting state")
- 
+            #print("error getting state")
+            pass
+            
     def downloadChunks(self,url,filename):
             """
             Helper to download large files
@@ -93,17 +94,43 @@ class AutoSaveData(QtCore.QThread):
                     while True:
                         chunk = req.read(CHUNK)
                         downloaded += len(chunk)
-                        print (math.floor((downloaded / total_size) * 100 ))
+                        #print (math.floor((downloaded / total_size) * 100 ))
                         if not chunk: break
                         fp.write(chunk)
             except error.HTTPError:
-                print ("HTTP Error:", url)
+                #print ("HTTP Error:", url)
                 return False
             except error.URLError:
-                print ("URL Error:", url)
+                #print ("URL Error:", url)
                 return False
 
             return file
+
+class Discover(threading.Thread):
+    
+    
+
+    def __init__(self, url, scanInterval):
+        threading.Thread.__init__(self)
+        self.url = url    
+        self.scanInterval = scanInterval
+        
+    def run(self):
+        global List
+        try:            
+            req = urllib.Request(url=self.url+':8088/pidiscover')
+            f = urllib.urlopen(req,timeout = self.scanInterval)
+            message = f.read()
+            if (message):
+                message = message.decode("utf-8")
+                data = {'m':message,'u':self.url}
+                List.append(data)
+            else:
+                pass
+        except:
+            pass
+                
+
  
 class ControlMainWindow(QtGui.QMainWindow):
     
@@ -122,6 +149,7 @@ class ControlMainWindow(QtGui.QMainWindow):
         self.ui.listWidget.itemDoubleClicked.connect(self.openPi)
         self.ui.downloadcheckBox.setCheckState(QtCore.Qt.Checked)
         self.ui.downloadcheckBox.stateChanged.connect(self.autoDownload)
+        self.ui.horizontalSlider.setSliderPosition(80)
         self.ui.progressBar.hide()
         self.localIp = localIp
     
@@ -129,46 +157,60 @@ class ControlMainWindow(QtGui.QMainWindow):
     def piDiscover(self):
         global rpiList 
         global nameList 
+        global List
+        
         localIp = [self.ui.ipEdit.text(),self.ui.ipEdit_2.text(),self.ui.ipEdit_3.text()]
+        self.ui.horizontalSlider.hide()
+        self.ui.label_6.hide()
+        self.ui.label_7.hide()
+        self.ui.label_8.hide()
         self.ui.progressBar.show()
+        
         port = 8088
+        
+        scanInterval = 4*(1 - (self.ui.horizontalSlider.value()/100))
         
         rpiList = []
         nameList = []
+        thread =[]
+        List = []
         
         for i in range(1,255):
             url = "http://"+localIp[0]+"."+localIp[1]+"."+localIp[2]+"."+str(i)
             #print(url+port)
-            try:
-                req = urllib.Request(url=url+':8088/pidiscover')
-                f = urllib.urlopen(req,timeout = 0.051)
-                message = f.read()
-                print(message)
-               # password = b'yes'
-                if (message):
-                    message = message.decode("utf-8")
-                    nameList.append(message)
-                    rpiList.append(url)
-                    print ('[%s]' % ', '.join(map(str, rpiList)))
-                    
-            except:
-                pass
-                #print("No this one")
-                
-            #print percentage complete
-            sys.stdout.write( "scaning..."+str(int(i/255*100)) + '%\r'),
+            #try:
+            t=Discover(url,scanInterval)
+            thread.append(t)
+            thread[i-1].start()
+            #message, url = thread[i-1].message, thread[i-1].url
+            #thread[i-1].join()
+            #except:
+            #    pass
             self.ui.progressBar.setValue(int(i/255*100))
-        print("Ended  ")
+
+  
+        for i in range(0,254):
+            thread[i].join()
+            
+        for e in List:
+            nameList.append(e['m'])
+            rpiList.append(e['u'])
+        
         self.ui.listWidget.clear()
         self.ui.listWidget.addItems(nameList)
         self.rpiList = rpiList
         self.ui.progressBar.hide()
+        self.ui.horizontalSlider.show()
+        self.ui.label_6.show()
+        self.ui.label_7.show()
+        self.ui.label_8.show()
         self.autoDownload()
+
         
     @QtCore.Slot()
     def openPi(self):
         itemId = str(self.ui.listWidget.currentRow())#indexFromItem(self.ui.listWidget.currentItem))
-        print (itemId)
+        #print (itemId)
         url = self.rpiList[int(itemId)]+":8088"
         webbrowser.open(url, new=2)
 
@@ -179,7 +221,7 @@ class ControlMainWindow(QtGui.QMainWindow):
         if self.ui.downloadcheckBox.checkState():
             if self.autosave.isRunning():
                 #restart
-                print("stopping")
+                #print("stopping")
                 autoSaveIsRunning = False
                 #self.autoSave.joint()
                 time.sleep(3)
@@ -188,13 +230,13 @@ class ControlMainWindow(QtGui.QMainWindow):
             else:
                 try:
                     self.autosave = AutoSaveData()
-                    print("newinstance")
+                    #print("newinstance")
                 except:
-                    print("oldinstance")
+                    #print("oldinstance")
                     pass
                 autoSaveIsRunning = True
                 self.autosave.start()
-                print("started")
+                #print("started")
         else:
             #stop the saving
             autoSaveIsRunning = False

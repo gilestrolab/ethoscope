@@ -48,7 +48,7 @@ def writeMask(data):
             print(pointsToTrack)
     data = {'ROIS':ROIS,'referencePoints':referencePoints,
             'pointsToTrack':pointsToTrack,'serial':str(serial)}
-    f = open('mask.msk', 'w')
+    f = open(path.join(basedir,'mask.msk'), 'w')
     json.dump(data,f)
     #pickle.dump(str(ROIS), f)
     #pickle.dump(str(referencePoints),f)

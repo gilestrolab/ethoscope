@@ -1167,7 +1167,7 @@ class Monitor(object):
 #### CAM FUNCTION OF MONITOR ##########################       
 
 
-    def __captureFromCAM(self, devnum=1, resolution=(640,480), options=None):
+    def __captureFromCAM(self, devnum=1, resolution=(800,600), options=None):
         """
         Capture from an actual hardware camera
         """

@@ -108,11 +108,12 @@ def starStop():
         pySolo = Popen(["python2",path.join(basedir,"pvg_standalone.py"), 
                         "-c", path.join(basedir,"pysolo_video.cfg"),
                         "-i","0",
-                        "-k", "mask.msk",
+                        "-k", path.join(basedir,"mask.msk"),
                         "-t", str(data['trackingType']),
                         "-o", outputfile,
-                        "--showmask",#useful?
-                        "--trackonly"])
+                        "--showmask"#useful?
+                        #"--trackonly"
+                        ])
         
         #pySolo = Popen(["python2", "pvg.py"])# -c pysolo_video.cfg -i 0 -k mask.msk -t 0 -o output.txt", shell=True)
         
