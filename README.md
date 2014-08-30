@@ -18,6 +18,6 @@ REQUIRES:
 ------
 
 * `python 2.x`
-* `wxphyton 2.8`
+* `wxpython 2.8`
 * `opencv`
 * `numpy`
