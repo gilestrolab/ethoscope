@@ -63,14 +63,19 @@ Current Data format
 
 
 import os, datetime, time
-import cPickle
+import cPickle, json, sys
 from calendar import month_abbr
 
 import cv2
 import numpy as np
 
+import io, socket, struct
+try:
+    import picamera
+except:
+    print "no support for picamera"
+
 import threading
-#import Queue
 
 from accessories.sleepdeprivator import sleepdeprivator
 
@@ -145,16 +150,180 @@ class Cam:
         """
         return 0
         
-    def getBlackFrame(self):
+    def getBlackFrame( self, resolution=(800,600) ):
         """
         """
-        w, h = 800, 600
+        w, h = resolution
         blackframe = np.zeros( (w, h, 3), dtype = np.uint8)
         #blackframe = cv2.cvtColor(blackframe, cv2.GRAY2COLOR_BGR)
         cv2.putText(blackframe, "NO INPUT", (int(w/4), int(h/2)), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 1)
         return blackframe
     
+
+class piCamera(Cam):
+    """
+    http://picamera.readthedocs.org/en/latest/api.html
+    http://www.raspberrypi.org/picamera-pure-python-interface-for-camera-module/
+
+    """
+    def __init__(self, devnum=0, resolution=(800, 600), use_network=True):
         
+        self.camera = 0
+        self.resolution = resolution
+        self.scale = False
+        self.image_queue = self.getBlackFrame(resolution)
+        
+        if use_network:
+            self.startNetworkStream()
+        else:
+            self.__initCamera()
+        
+    def __initCamera(self):
+        """
+        """
+        self.camera = picamera.PiCamera()
+        self.camera.resolution = self.resolution
+        
+    def startNetworkStream(self, port=8000):
+        """
+        """
+
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.bind(('', port))
+        print "Live stream socket listening on port {p}...".format(p=port)
+        self.pipe = None
+        
+        self.socket.listen(5)
+
+        self.socket_thread_1 = threading.Thread(target=self.socket_listen)
+        self.socket_thread_2 = threading.Thread(target=self.socket_stream)
+        self.keepSocket = True
+        
+        self.socket_thread_1.start()
+        self.socket_thread_2.start()
+        
+    def stopNetworkStream(self):
+        """
+        """
+        self.keepSocket = False    
+                
+        
+    def socket_listen(self):
+        """
+        """    
+
+        while self.keepSocket:
+            print "listening"
+            try:
+                self.remote, client_address = self.socket.accept()
+                self.pipe = self.remote.makefile('wb',0)
+                print "connected to client: " , client_address
+            except:
+                pass
+
+
+    def socket_stream(self):
+        """
+        """
+        
+        while self.keepSocket:
+            
+            try:
+
+                with picamera.PiCamera() as camera:
+                    camera.resolution = self.resolution
+                    # Start a preview and let the camera warm up for 2 seconds
+                    camera.start_preview()
+                    time.sleep(2)
+
+                    # Note the start time and construct a stream to hold image data
+                    # temporarily (we could write it directly to connection but in this
+                    # case we want to find out the size of each capture first to keep
+                    # our protocol simple)
+                    stream = io.BytesIO()
+                    for foo in camera.capture_continuous(stream, 'jpeg', use_video_port=True):
+
+                        data = np.fromstring(stream.getvalue(), dtype=np.uint8)
+                        # "Decode" the image from the array, preserving colour
+                        image = cv2.imdecode(data, 1)
+                        # Convert RGB to BGR
+                        self.image_queue = image[:, :, ::-1]
+                        
+                        if self.pipe:
+                            # Write the length of the capture to the stream and flush to
+                            # ensure it actually gets sent
+                            self.pipe.write(struct.pack('<L', stream.tell()))
+                            self.pipe.flush()
+
+                        # Rewind the stream
+                        stream.seek(0)
+
+                        if self.pipe:
+                            # send the image data over the pipe
+                            self.pipe.write(stream.read())
+
+                        # Reset the stream for the next capture
+                        stream.seek(0)
+                        stream.truncate()
+
+                # Write a length of zero to the pipe to signal we're done
+                if self.pipe:
+                    self.pipe.write(struct.pack('<L', 0))
+
+                #finally:
+                #    self.pipe.close()
+                #    self.socket.close()
+
+            except socket.error, e:
+                print "Got Socket error", e
+                self.remote.close()
+                self.pipe = None
+
+            except IOError, e:
+                print "Got IOError: ", e
+                self.pipe = None
+
+    def close(self):
+        """
+        """
+        if self.camera:
+            self.camera.stop_preview()
+            self.camera.close()
+
+    def getFrameTime(self):
+        """
+        """
+        return time.time() #current time epoch in secs.ms
+
+    def setResolution(self, (x, y)):
+        self.camera.resolution = (x, y)
+        
+    def getResolution(self):
+        return self.camera.resolution
+
+    def isLastFrame(self):
+        """
+        Added for compatibility with other cams
+        """
+        return False
+    
+    def hasSource(self):
+        """
+        Is the camera active?
+        Return boolean
+        """
+        return self.camera != None
+
+    def getImage(self):
+        """
+        """
+        frame = self.image_queue 
+        if self.scale:
+            frame = cv2.resize( frame, self.resolution )
+        
+        return frame, self.getFrameTime()
+    
 class realCam(Cam):
     """
     a realCam class will handle a webcam connected to the system
@@ -686,30 +855,39 @@ class ROImask():
         Save the current crop data to a file
         """
         cf = open(filename, 'w')
-        cPickle.dump(self.ROIS, cf)
-        cPickle.dump(self.points_to_track, cf)
-        cPickle.dump(self.referencePoints, cf)
-
         self.serial = serial
-        cPickle.dump(serial, cf)
-        
+        jsonData = {'ROIS':self.ROIS, 'pointsToTrack':self.points_to_track,'referencePoints': self.referencePoints, 'serial':self.serial}
+        json.dumps({self.ROIS, self.points_to_track, self.referencePoints, self.serial},cf)
         cf.close()
-        
+
     def loadROIS(self, filename):
         """
         Load the crop data from a file
         """
         try:
             cf = open(filename, 'r')
-            self.ROIS = cPickle.load(cf)
-            self.points_to_track = cPickle.load(cf)
-            self.referencePoints = cPickle.load(cf)
-            self.serial = cPickle.load(cf)
+            data = json.load(cf)
+            self.ROIS = []
+            tup=[]
+            for t in data['ROIS']:
+                for p in t:
+                    p = tuple(p)
+                    tup.append(p)
+                self.ROIS.append(tuple(tup))
+                tup=[]
+            
+            self.points_to_track = data['pointsToTrack']
+            self.referencePoints = data['referencePoints']
+            if self.referencePoints == "none":
+                self.referencePoints = ((),())
+            if data['serial']=='NO_SERIAL':
+                self.serial = None
+            else:
+                self.serial = data['serial']
             cf.close()
             
             for coords in self.ROIS:
                 self.beams.append ( self.__getMidline (coords)  ) 
-                
             return True
         except:
             return False
@@ -757,7 +935,7 @@ class ROImask():
             inside = False
 
             p1x,p1y = poly[0]
-            for i in range(n+1):
+            for i in xrange(n+1):
                 p2x,p2y = poly[i % n]
                 if y > min(p1y,p2y):
                     if y <= max(p1y,p2y):
@@ -809,7 +987,7 @@ class ROImask():
         l = (w / cols) - int(food/2*w)
         
         k = 0
-        for v in range(rows):
+        for v in xrange(rows):
             ROI[k] = (x, y), (x+l, y+d)
             ROI[k+1] = (x1-l, y) , (x1, y+d)
             k+=2
@@ -857,12 +1035,12 @@ class ROImask():
         cv2.PyrUp(pyr, subimage, 7)
         tgray = cv2.CreateImage(sz, 8, 1)
         # find squares in every color plane of the image
-        for c in range(3):
+        for c in xrange(3):
             # extract the c-th color plane
             channels = [None, None, None]
             channels[c] = tgray
             cv2.Split(subimage, channels[0], channels[1], channels[2], None) 
-            for l in range(N):
+            for l in xrange(N):
                 # hack: use Canny instead of zero threshold level.
                 # Canny helps to catch squares with gradient shading
                 if(l == 0):
@@ -910,7 +1088,7 @@ class ROImask():
                         abs(cv2.ContourArea(result)) > 500 and 
                         cv2.CheckContourConvexity(result)):
                         s = 0
-                        for i in range(5):
+                        for i in xrange(5):
                             # find minimum angle between joint
                             # edges (maximum of cosine)
                             if(i >= 2):
@@ -921,7 +1099,7 @@ class ROImask():
                         # (all angles are ~90 degree) then write quandrange
                         # vertices to resultant sequence
                         if(s < 0.3):
-                            pt = [result[i] for i in range(4)]
+                            pt = [result[i] for i in xrange(4)]
                             squares.append(pt)
                             print ('current # of squares found %d' % len(squares))
                     contour = contour.h_next()
@@ -1138,7 +1316,8 @@ class Monitor(object):
         #cv2.namedWindow("preview")
         
         while self.isTracking:
-            frame = self.GetImage()
+            #frame = self.GetImage(drawROIs = True, selection=None, crosses=None, timestamp=True, draw_path=False)
+            frame = self.GetImage(drawROIs = True, selection=None, crosses=None, timestamp=True, draw_path=False)
             #cv2.imshow("preview", frame)
            
 
@@ -1157,8 +1336,22 @@ class Monitor(object):
 
 #### CAM FUNCTION OF MONITOR ##########################       
 
+    def __captureFromPICAM(self, resolution=(800,600), options=None):
+        """
+        Capture from raspberryPI camera
+        """
+        self.isVirtualCam = False
+        
+        self.cam = piCamera(resolution)
 
-    def __captureFromCAM(self, devnum=1, resolution=(640,480), options=None):
+        self.source = 1000
+        self.resolution = resolution
+        self.numberOfFrames = 0
+       
+        return self.cam is not None
+        
+
+    def __captureFromCAM(self, devnum=0, resolution=(800,600), options=None):
         """
         Capture from an actual hardware camera
         """
@@ -1176,7 +1369,6 @@ class Monitor(object):
         except:
             pass
 
-        print self.cam
         return self.cam is not None
 
        
@@ -1242,7 +1434,9 @@ class Monitor(object):
         except:
             pass
             
-        if type(camera) == int:
+        if type(camera) == int and camera == 1000:
+            self.__captureFromPICAM(resolution, options)
+        elif type(camera) == int:
             self.__captureFromCAM(camera, resolution, options)
         elif os.path.isfile(camera):
             self.__captureFromMovie(camera, resolution, options)
@@ -1317,11 +1511,15 @@ class Monitor(object):
 
         #self.writer.release()
 
-    def saveSnapshot(self, *args, **kwargs):
+    def saveSnapshot(self, filename, quality=90, timestamp=False):
         """
         proxy to saveSnapshot
         """
-        self.cam.saveSnapshot(*args, **kwargs)
+        if self.__image_queue != None:
+            cv2.imwrite(filename, self.__image_queue)
+        else:
+            self.cam.saveSnapshot(filename, quality, timestamp)
+
     
     def SetLoop(self,loop):
         """
@@ -1350,13 +1548,13 @@ class Monitor(object):
             if n > 0:
                 #these increase by one on the fly axis
 
-                for i in range(n):
+                for i in xrange(n):
                     self.fly_last_frame_buffer = np.append( self.fly_last_frame_buffer, [FLY_FIRST_POSITION], axis=0) # ( flies, (x,y) )
                     self.fly_one_minute_buffer = np.append (self.fly_one_minute_buffer, [self.__fa.copy()], axis=0) # ( flies, PERIOD, (x,y) )
                     self.flyActivity = np.append (self.flyActivity, np.zeros ((1,ACTIVITY_PERIOD), dtype=np.int) , axis=0)
             if n < 0:
 
-                for i in range(n):
+                for i in xrange(n):
                     self.fly_last_frame_buffer = np.delete( self.fly_last_frame_buffer, n, axis=0)
                     self.fly_one_minute_buffer = np.delete( self.fly_one_minute_buffer, n, axis=0)
                     self.flyActivity = np.delete (self.flyActivity, n,axis=0)
@@ -1527,7 +1725,7 @@ class Monitor(object):
             self.__count_seconds = 0
             self.__n = 0 
 
-            for i in range(0,PERIOD):
+            for i in xrange(0,PERIOD):
                     self.fly_one_minute_buffer[:,i] = self.fly_last_frame_buffer
             
         #growing continously; this is the correct thing to do but we would have problems adding new row with new ROIs
@@ -1565,10 +1763,8 @@ class Monitor(object):
         Kind of motion depends on user settings
         
         Called every minute; flies treated at once
-        1	09 Dec 11	19:02:19	1	0	1	0	0	0	?		[actual_activity]
+        1   09 Dec 11   19:02:19    1   0   1   0   0   0   ?       [actual_activity]
         """
-        
-        
         
         #Here we build the header
         dt = datetime.datetime.fromtimestamp( self.getFrameTime() )
@@ -1880,7 +2076,7 @@ class Monitor(object):
         draw_path    True | False   draw_path of the fly
         fliesPerROI 1              limit number of flies to be tracked per ROI - not implemented yet
         """
-
+        
         positions = []
         
         # Smooth to get rid of false positives
@@ -1902,10 +2098,10 @@ class Monitor(object):
         difference = cv2.subtract(avg, frame)
 
         # Convert the image to grayscale.
-        #grey_image = cv2.cvtColor(difference, cv2.COLOR_BGR2GRAY)
+        grey_image = cv2.cvtColor(difference, cv2.COLOR_BGR2GRAY)
 
         # Convert the image to black and white.
-        ret, thresh = cv2.threshold(difference, 20, 255, cv2.THRESH_BINARY)
+        ret, thresh = cv2.threshold(grey_image, 20, 255, cv2.THRESH_BINARY)
 
         # Dilate and erode to get proper blobs
         thresh = cv2.Canny(thresh, 0, 50, apertureSize=5)
@@ -1938,7 +2134,7 @@ class Monitor(object):
             ROIwrk = thresh & ROImsk
             
             (x1,y1), (x2,y2) = ROIrect
-            
+
             contours, hierarchy = cv2.findContours(ROIwrk[y1:y2, x1:x2] ,cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE, offset=(x1,y1))
             
             points = []
