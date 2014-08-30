@@ -30,9 +30,9 @@ def index():
     status = isTracking()
     
     st = os.statvfs("./")
-    freespace = round(st.f_bfree * 1.0 / st.f_blocks)
+    fs = str(round(st.f_bfree * 100.0 / st.f_blocks)) + "%"
     
-    return template(path.join(basedir+"/views","index.tpl"), machineId=mid, status=status, freeSpace = freespace)
+    return template(path.join(basedir+"/views","index.tpl"), machineId=mid, status=status, freeSpace = fs)
 
 @app.route('/websocket')
 def handle_websocket():
