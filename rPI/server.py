@@ -194,7 +194,7 @@ if __name__ == '__main__':
     outputfile = path.join(basedir,"output.txt")
 
     #Start the acquisition thread
-    pysolo_headless = pvg_cli(1000, resolution=(640,480))
+    pysolo_headless = pvg_cli(1000, resolution=(800,600))
 
     run(app,host='0.0.0.0', port=8088, debug=True)
 
