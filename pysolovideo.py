@@ -21,7 +21,7 @@
 #       MA 02110-1301, USA.
 #       
 #     
-"""Version 1.3
+"""Version 1.4
 
 Each Monitor has a camera that can be: realCam || VirtualCamMovies || VirtualCamFrames
 The class Monitor is handling the motion detection and data processing while the class Cam only handles
@@ -69,8 +69,13 @@ from calendar import month_abbr
 import cv2
 import numpy as np
 
+import io, socket, struct
+try:
+    import picamera
+except:
+    print "no support for picamera"
+
 import threading
-#import Queue
 
 from accessories.sleepdeprivator import sleepdeprivator
 
@@ -145,16 +150,182 @@ class Cam:
         """
         return 0
         
-    def getBlackFrame(self):
+    def getBlackFrame( self, resolution=(800,600) ):
         """
         """
-        w, h = 800, 600
+        w, h = resolution
         blackframe = np.zeros( (w, h, 3), dtype = np.uint8)
         #blackframe = cv2.cvtColor(blackframe, cv2.GRAY2COLOR_BGR)
         cv2.putText(blackframe, "NO INPUT", (int(w/4), int(h/2)), cv2.FONT_HERSHEY_PLAIN, 2, (255,255,255), 1)
         return blackframe
     
+
+class piCamera(Cam):
+    """
+    http://picamera.readthedocs.org/en/latest/api.html
+    http://www.raspberrypi.org/picamera-pure-python-interface-for-camera-module/
+
+    """
+    def __init__(self, devnum=0, resolution=(800, 600), use_network=True):
         
+        self.camera = 0
+        self.resolution = resolution
+        self.scale = False
+        self.image_queue = self.getBlackFrame(resolution)
+        
+        if use_network:
+            self.startNetworkStream()
+        else:
+            self.__initCamera()
+        
+    def __initCamera(self):
+        """
+        """
+        self.camera = picamera.PiCamera()
+        self.camera.resolution = self.resolution
+        
+    def startNetworkStream(self, port=8000):
+        """
+        """
+
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.socket.bind(('', port))
+        print ("Live stream socket listening on port {p}...".format(p=port))
+        self.pipe = None
+        
+        self.socket.listen(5)
+
+        self.socket_thread_1 = threading.Thread(target=self.socket_listen)
+        self.socket_thread_1.daemon=True
+        self.socket_thread_2 = threading.Thread(target=self.socket_stream)
+        self.socket_thread_2.daemon=True
+        self.keepSocket = True
+        
+        self.socket_thread_1.start()
+        self.socket_thread_2.start()
+        
+    def stopNetworkStream(self):
+        """
+        """
+        self.keepSocket = False    
+                
+        
+    def socket_listen(self):
+        """
+        """    
+
+        while self.keepSocket:
+            print "listening"
+            try:
+                self.remote, client_address = self.socket.accept()
+                self.pipe = self.remote.makefile('wb',0)
+                print "connected to client: " , client_address
+            except:
+                pass
+
+
+    def socket_stream(self):
+        """
+        """
+        
+        while self.keepSocket:
+            
+            try:
+
+                with picamera.PiCamera() as camera:
+                    camera.resolution = self.resolution
+                    # Start a preview and let the camera warm up for 2 seconds
+                    camera.start_preview()
+                    time.sleep(2)
+
+                    # Note the start time and construct a stream to hold image data
+                    # temporarily (we could write it directly to connection but in this
+                    # case we want to find out the size of each capture first to keep
+                    # our protocol simple)
+                    stream = io.BytesIO()
+                    for foo in camera.capture_continuous(stream, 'jpeg', use_video_port=True):
+
+                        data = np.fromstring(stream.getvalue(), dtype=np.uint8)
+                        # "Decode" the image from the array, preserving colour
+                        image = cv2.imdecode(data, 1)
+                        # Convert RGB to BGR
+                        self.image_queue = image[:, :, ::-1]
+                        
+                        if self.pipe:
+                            # Write the length of the capture to the stream and flush to
+                            # ensure it actually gets sent
+                            self.pipe.write(struct.pack('<L', stream.tell()))
+                            self.pipe.flush()
+
+                        # Rewind the stream
+                        stream.seek(0)
+
+                        if self.pipe:
+                            # send the image data over the pipe
+                            self.pipe.write(stream.read())
+
+                        # Reset the stream for the next capture
+                        stream.seek(0)
+                        stream.truncate()
+
+                # Write a length of zero to the pipe to signal we're done
+                if self.pipe:
+                    self.pipe.write(struct.pack('<L', 0))
+
+                #finally:
+                #    self.pipe.close()
+                #    self.socket.close()
+
+            except socket.error, e:
+                print "Got Socket error", e
+                self.remote.close()
+                self.pipe = None
+
+            except IOError, e:
+                print "Got IOError: ", e
+                self.pipe = None
+
+    def close(self):
+        """
+        """
+        if self.camera:
+            self.camera.stop_preview()
+            self.camera.close()
+
+    def getFrameTime(self):
+        """
+        """
+        return time.time() #current time epoch in secs.ms
+
+    def setResolution(self, (x, y)):
+        self.camera.resolution = (x, y)
+        
+    def getResolution(self):
+        return self.camera.resolution
+
+    def isLastFrame(self):
+        """
+        Added for compatibility with other cams
+        """
+        return False
+    
+    def hasSource(self):
+        """
+        Is the camera active?
+        Return boolean
+        """
+        return self.camera != None
+
+    def getImage(self):
+        """
+        """
+        frame = self.image_queue 
+        if self.scale:
+            frame = cv2.resize( frame, self.resolution )
+        
+        return frame, self.getFrameTime()
+    
 class realCam(Cam):
     """
     a realCam class will handle a webcam connected to the system
@@ -1147,7 +1318,8 @@ class Monitor(object):
         #cv2.namedWindow("preview")
         
         while self.isTracking:
-            frame = self.GetImage()
+            #frame = self.GetImage(drawROIs = True, selection=None, crosses=None, timestamp=True, draw_path=False)
+            frame = self.GetImage(drawROIs = True, selection=None, crosses=None, timestamp=True, draw_path=False)
             #cv2.imshow("preview", frame)
            
 
@@ -1166,8 +1338,22 @@ class Monitor(object):
 
 #### CAM FUNCTION OF MONITOR ##########################       
 
+    def __captureFromPICAM(self, resolution=(800,600), options=None):
+        """
+        Capture from raspberryPI camera
+        """
+        self.isVirtualCam = False
+        
+        self.cam = piCamera(resolution)
 
-    def __captureFromCAM(self, devnum=1, resolution=(800,600), options=None):
+        self.source = 1000
+        self.resolution = resolution
+        self.numberOfFrames = 0
+       
+        return self.cam is not None
+        
+
+    def __captureFromCAM(self, devnum=0, resolution=(800,600), options=None):
         """
         Capture from an actual hardware camera
         """
@@ -1185,7 +1371,6 @@ class Monitor(object):
         except:
             pass
 
-        print self.cam
         return self.cam is not None
 
        
@@ -1251,7 +1436,9 @@ class Monitor(object):
         except:
             pass
             
-        if type(camera) == int:
+        if type(camera) == int and camera == 1000:
+            self.__captureFromPICAM(resolution, options)
+        elif type(camera) == int:
             self.__captureFromCAM(camera, resolution, options)
         elif os.path.isfile(camera):
             self.__captureFromMovie(camera, resolution, options)
@@ -1326,11 +1513,15 @@ class Monitor(object):
 
         #self.writer.release()
 
-    def saveSnapshot(self, *args, **kwargs):
+    def saveSnapshot(self, filename, quality=90, timestamp=False):
         """
         proxy to saveSnapshot
         """
-        self.cam.saveSnapshot(*args, **kwargs)
+        if self.__image_queue != None:
+            cv2.imwrite(filename, self.__image_queue)
+        else:
+            self.cam.saveSnapshot(filename, quality, timestamp)
+
     
     def SetLoop(self,loop):
         """

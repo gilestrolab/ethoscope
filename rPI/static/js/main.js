@@ -396,6 +396,26 @@ app.controller('poweroffCtrl',['$scope', '$http',function($scope,$http){
         }
     };
 }]);
+app.controller('uploadCtrl',['$scope', '$http',function($scope,$http){
+           $scope.upload = function(){  
+              var ext = $('#data').val().split('.').pop().toLowerCase();
+             
+              if (confirm("WARNING: updating the package will stop tracking. Do you wish to continue?")) {
+                    if($.inArray(ext, ['zip']) == -1) {
+                         alert('File must be in .zip format.');
+                         return false;
+                     } else {
+                         var form_data = new FormData($('#upload-file')[0]);
+                          console.log(form_data);
+                         $http.post("/update", form_data, { headers: {"Content-type"  : "application/x-www-form-urlencoded; charset=utf-8";}}).success(function(data) {
+                                 setTimeout(function() {alert("File uploaded successfully. Please restart tracking.")}, 5000);
+                             });
+                     }
+              } else {
+                 return false;
+              }
+          };
+}]);
 
 })(); 
 

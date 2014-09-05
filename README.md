@@ -4,8 +4,6 @@ README
 pySolo-Video is a standalone program that provides video tracking
 capabilities meant for studying sleep in Drosophila
 
-This version has  modifications and add-ons to make it work on a Raspberry PI. 
-
 Input can be:
 
 * usb camera handled through opencv
@@ -23,4 +21,3 @@ REQUIRES:
 * `wxpython 2.8`
 * `opencv`
 * `numpy`
-* `bootle`
