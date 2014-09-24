@@ -396,6 +396,7 @@ app.controller('poweroffCtrl',['$scope', '$http',function($scope,$http){
         }
     };
 }]);
+<<<<<<< HEAD
 app.controller('uploadCtrl',['$scope', '$http',function($scope,$http){
            $scope.upload = function(){  
               var ext = $('#data').val().split('.').pop().toLowerCase();
@@ -416,6 +417,8 @@ app.controller('uploadCtrl',['$scope', '$http',function($scope,$http){
               }
           };
 }]);
+=======
+>>>>>>> 2c18142d99048230a47ad507b4237c753bbd75ed
 
 })(); 
 
