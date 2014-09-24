@@ -36,7 +36,9 @@ def open_with_socket():
     # Connect a client socket to my_server:8000 (change my_server to the
     # hostname of your server)
     client_socket = socket.socket()
+
     client_socket.connect(('192.168.1.201', 8000))
+
     connection = client_socket.makefile('rb')
 
     try:

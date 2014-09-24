@@ -1,8 +1,19 @@
 import db
+<<<<<<< HEAD
+import zipfile
+import glob
+from subprocess import call
+=======
+>>>>>>> 2c18142d99048230a47ad507b4237c753bbd75ed
 from bottle import *
 
 from os import path
 import json
+<<<<<<< HEAD
+import zipfile
+import glob
+=======
+>>>>>>> 2c18142d99048230a47ad507b4237c753bbd75ed
 
 os.sys.path.append("..")
 from pvg_headless import pvg_cli
@@ -15,7 +26,11 @@ class RoiData():
         rois = []
         trackingType = 0
         
+<<<<<<< HEAD
+@app.get('/favicon.ico')
+=======
 @get('/favicon.ico')
+>>>>>>> 2c18142d99048230a47ad507b4237c753bbd75ed
 def get_favicon():
     return server_static(path.join(basedir,'static/img/favicon.ico'))
 
@@ -92,7 +107,11 @@ def starStop():
         db.writeMask(data)
         
         #start a python thread and begins tracking
+<<<<<<< HEAD
+        print ("tracking type", data['trackingType'])
+=======
         print "tracking type", data['trackingType']
+>>>>>>> 2c18142d99048230a47ad507b4237c753bbd75ed
         pysolo_headless.setTracking(track_type=data['trackingType'], mask_file="mask.msk", output_file=outputfile)
         pysolo_headless.startTracking()
         
@@ -150,7 +169,33 @@ def poweroff(machineID):
         if isTracking():
             startStop()
         off = call("poweroff")
+<<<<<<< HEAD
+		
+@app.post('/update')
+def do_update():
+    
+    if isTracking():
+        startStop()
+    #close sockets
+    pysolo_headless.mon.cam.stopNetworkStream()
+    
+    data = request.files.data
+    
+    if data and data.file:
+        filename = data.filename
+        with open(filename,'wb') as open_file:
+            open_file.write(data.file.read())
+        with zipfile.ZipFile(data.filename, "r") as z:
+            z.extractall()
+        for hgx in glob.glob(data.filename):
+            os.remove(hgx)
+    
+    #change this for a service restart:
+    return call(["python3 restartScript.py"],shell=True)
+
+=======
         
+>>>>>>> 2c18142d99048230a47ad507b4237c753bbd75ed
 """helpers methods."""
 
 def isTracking():

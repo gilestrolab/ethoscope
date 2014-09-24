@@ -21,7 +21,7 @@
 #       MA 02110-1301, USA.
 #       
 #     
-"""Version 1.3
+"""Version 1.4
 
 Each Monitor has a camera that can be: realCam || VirtualCamMovies || VirtualCamFrames
 The class Monitor is handling the motion detection and data processing while the class Cam only handles
@@ -191,13 +191,23 @@ class piCamera(Cam):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.socket.bind(('', port))
+<<<<<<< HEAD
+        print ("Live stream socket listening on port {p}...".format(p=port))
+=======
         print "Live stream socket listening on port {p}...".format(p=port)
+>>>>>>> 2c18142d99048230a47ad507b4237c753bbd75ed
         self.pipe = None
         
         self.socket.listen(5)
 
         self.socket_thread_1 = threading.Thread(target=self.socket_listen)
+<<<<<<< HEAD
+        self.socket_thread_1.daemon=True
         self.socket_thread_2 = threading.Thread(target=self.socket_stream)
+        self.socket_thread_2.daemon=True
+=======
+        self.socket_thread_2 = threading.Thread(target=self.socket_stream)
+>>>>>>> 2c18142d99048230a47ad507b4237c753bbd75ed
         self.keepSocket = True
         
         self.socket_thread_1.start()
