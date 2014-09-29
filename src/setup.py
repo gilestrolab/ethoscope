@@ -17,12 +17,13 @@ setup(
     # data e.g. classifiers can be added as part of the package
     # TODO
     # package_data={'pysolovideo': ['data/classifiers/*.pkl']},
-#    extras_require={
-#        'pipes': ['luigi>=1.0.13'],
-#    },
+    # extras_require={
+    #     'pipes': ['picamera>=1.8'],
+    # },
     install_requires=[
         "numpy>=1.6.1",
         "scipy>=0.10.1",
+        "picamera>=1.8",
 # TODO check opencv in installed
         # "opencv>=2.4.5",
     ],
