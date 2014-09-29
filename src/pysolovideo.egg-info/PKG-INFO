@@ -1,0 +1,15 @@
+Metadata-Version: 1.0
+Name: pysolovideo
+Version: trunk
+Summary: todo
+Home-page: https://github.com/gilestrolab/pySolo-Video
+Author: ['Quentin Geissmann', 'Giorgio Gilestro']
+Author-email: ['quentin.geissmann13@imperial.ac.uk', 'g.gilestro@imperial.ac.uk']
+License: GPL3
+Description: To install, run
+        `pip install -e .`
+        in the `src` directory.
+        
+        You do *not* need to reinstall the package everytime you make a change.
+        
+Platform: UNKNOWN

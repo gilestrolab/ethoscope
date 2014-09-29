@@ -1,0 +1,7 @@
+README
+pysolovideo/__init__.py
+pysolovideo.egg-info/PKG-INFO
+pysolovideo.egg-info/SOURCES.txt
+pysolovideo.egg-info/dependency_links.txt
+pysolovideo.egg-info/requires.txt
+pysolovideo.egg-info/top_level.txt
