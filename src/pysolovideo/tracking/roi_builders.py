@@ -39,7 +39,7 @@ class BaseROIBuilder(object):
 class DefaultROIBuilder(BaseROIBuilder):
 
     def _rois_from_img(self,img):
-        h, w = img.shape
+        h, w = img.shape[0],img.shape[1]
         return[
             ROI([
                 (   0,        0       ),
