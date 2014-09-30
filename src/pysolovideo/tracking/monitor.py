@@ -1,18 +1,42 @@
 __author__ = 'quentin'
 
+import roi_builders as rbs
+from tracking_unit import TrackingUnit
+import logging
 
 class Monitor(object):
 
-    def __init__(self, camera, roi_builder):
+    def __init__(self, camera, tracker_class, roi_builder = None, interactors=None):
+
         self._camera = camera
 
-        self._roi_trackers = roi_builder.build(camera)
+        if roi_builder is None:
+            roi_builder = rbs.DefaultROIBuilder()
 
-        # after calibration, we try to restart camera
+        # We build the roi, possibly from images and/or templates. By default all the image is the ROI
+        rois = roi_builder(camera)
         self._camera.restart()
+
+
+        if interactors is None:
+            self._unit_trackers = [TrackingUnit(tracker_class, r, None) for r in rois]
+
+        elif len(interactors) == len(rois):
+            self._unit_trackers = [TrackingUnit(tracker_class, r, inter) for r, inter in zip(rois, interactors)]
+        else:
+            raise ValueError("You should have one interactor per ROI")
+
+
 
     def run(self):
          for t, frame in self._camera:
-             for rt in self._roi_trackers:
-                 rt.track(frame)
+             for tracker in self._unit_trackers:
+                position = tracker(t, frame)
+                logging.warning(position)
+
+                 # if self._interactor_map:
+                 #     interactor = self._interactor_map[rt]
+                 #     interactor.interact()
+
+
 
