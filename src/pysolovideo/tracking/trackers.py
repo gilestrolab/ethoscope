@@ -30,6 +30,8 @@ class DummyTracker(BaseTracker):
         # random_walk
         x, y = np.random.uniform(size=2)
         point = np.complex64(x + y * 1j)
+        if len(self._positions) == 0:
+            return point
         return self._positions[-1] + point
 
 
