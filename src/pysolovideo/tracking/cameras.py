@@ -15,7 +15,7 @@ class BaseCamera(object):
         pass
 
     def __del__(self):
-        NotImplementedError
+        self._close()
 
     def __iter__(self):
 
@@ -25,10 +25,6 @@ class BaseCamera(object):
             self._frame_idx += 1
 
             yield self._time_stamp(), self._next_image()
-
-
-    def is_opened(self):
-        raise NotImplementedError
 
     @property
     def resolution(self):
@@ -48,20 +44,31 @@ class BaseCamera(object):
         raise NotImplementedError
     def _time_stamp(self):
         raise NotImplementedError
+    def is_opened(self):
+        raise NotImplementedError
+    def restart(self):
+        raise NotImplementedError
 
 class BasePhysicalCamera(BaseCamera):
     def is_last_frame(self):
         return False
 
 
+
 class BaseVirtualCamera(BaseCamera):
     _path=None
+
+    def __init__(self, path, *args, **kwargs):
+        self._frame_idx = 0
 
     @property
     def path(self):
         return self._path
     def is_opened(self):
         return True
+
+    def restart(self):
+        self.__init__(self._path)
 
 
 class MovieVirtualCamera(BaseVirtualCamera):
@@ -73,7 +80,9 @@ class MovieVirtualCamera(BaseVirtualCamera):
         h = self.capture.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)
         self._total_n_frames =self.capture.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT)
         self._resolution = (int(w),int(h))
-        super(MovieVirtualCamera, self).__init__(*args, **kwargs)
+
+        super(MovieVirtualCamera, self).__init__(path,*args, **kwargs)
+        print self._frame_idx
 
     def _next_image(self):
         _, frame = self.capture.read()
@@ -86,10 +95,11 @@ class MovieVirtualCamera(BaseVirtualCamera):
 
     def is_last_frame(self):
         if self._frame_idx >= self._total_n_frames:
+
             return True
 
         return False
-    def __del__(self):
+    def _close(self):
         self.capture.release()
 
 
