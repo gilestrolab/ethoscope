@@ -8,7 +8,7 @@ USER=psv
 #### Note we should let pip deal with the python packages dependency
 ### to setup a computer in the lab just after installing arch:
 pacman -Syu
-pacman -S base-devel packer git
+pacman -S base-devel packer git gcc-fortran
 ### Video capture related
 pacman -S opencv mplayer ffmpeg gstreamer gstreamer0.10-plugins mencoder
 # a desktop environment may be useful:
@@ -18,7 +18,8 @@ pacman -S ntp bash-completion
 
 pacman -S raspberrypi-firmware{,-tools,-bootloader,-example}
 
-pacman -S python2-pip
+# preinstalling dependencies will save compiling time 
+pacman -S python2-pip python2-numpy python2-scipy python2-pandas
 
 ######################################################################################
 
@@ -28,6 +29,7 @@ systemctl enable ntpd.service
 # setting up ssh server
 systemctl enable sshd.service
 systemctl start sshd.service
+
 
 #TODOs: locale/TIMEZONE/keyboard ...
 
