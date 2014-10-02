@@ -6,6 +6,7 @@ import numpy as np
 import time
 
 capture = cv2.VideoCapture(0)
+cv2.waitKey(2000)
 im = capture.read()
 
 NFRAMES = 1000
