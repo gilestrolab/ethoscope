@@ -18,6 +18,8 @@ pacman -S ntp bash-completion
 
 pacman -S raspberrypi-firmware{,-tools,-bootloader,-example}
 
+pacman -S python2-pip
+
 ######################################################################################
 
 # enable networktime protocol
