@@ -20,4 +20,4 @@ for _ in range(NFRAMES):
 t1= time.time()
 
 print t0,t1
-print t1-t0 / float(NFRAMES)
+print (t1-t0) / float(NFRAMES)
