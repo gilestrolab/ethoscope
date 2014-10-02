@@ -10,7 +10,7 @@ cv2.waitKey(2000)
 im = capture.read()
 
 NFRAMES = 1000
-print "ok"
+print "ok, frame shape=", im.shape
 
 t0 = time.time()
 for _ in range(NFRAMES):
