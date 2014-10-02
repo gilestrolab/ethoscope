@@ -7,7 +7,7 @@ import time
 
 capture = cv2.VideoCapture(0)
 cv2.waitKey(2000)
-im = capture.read()
+_,im = capture.read()
 
 NFRAMES = 1000
 print "ok, frame shape=", im.shape
