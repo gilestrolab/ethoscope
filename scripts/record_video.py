@@ -51,8 +51,8 @@ if __name__ == "__main__":
 
         video_writer.write(frame)
 
-        cv2.imshow("preview", frame)
-        k = cv2.waitKey(1)
+        # cv2.imshow("preview", frame)
+        # k = cv2.waitKey(1)
         if t > option_dict["duration"]:
              break
 
