@@ -7,7 +7,8 @@ import cv
 
 
 
-VIDEO_FOURCC = cv.CV_FOURCC('D', 'I', 'V', 'X')
+# VIDEO_FOURCC = cv.CV_FOURCC('D', 'I', 'V', 'X')
+VIDEO_FOURCC = cv.CV_FOURCC('I', 'Y', 'U', 'V')
 
 
 if __name__ == "__main__":
