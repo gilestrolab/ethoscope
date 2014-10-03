@@ -116,8 +116,12 @@ class V4L2Camera(BaseCamera):
         self._warm_up()
 
         w, h = target_resolution
-        self.capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, w)
-        self.capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, h)
+        if w <0 or h <0:
+            self.capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, 99999)
+            self.capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, 99999)
+        else:
+            self.capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, w)
+            self.capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, h)
         self.capture.set(cv2.cv.CV_CAP_PROP_FPS, target_fps)
 
         self._target_fps = float(target_fps)
@@ -128,7 +132,11 @@ class V4L2Camera(BaseCamera):
 
         self._resolution = (im.shape[1], im.shape[0])
         if self._resolution != target_resolution:
-            logging.warning('Target resolution "%s" could NOT be achieved. Effective resolution is "%s"' % (target_resolution, self._resolution ))
+            if w > 0 and h > 0:
+                logging.warning('Target resolution "%s" could NOT be achieved. Effective resolution is "%s"' % (target_resolution, self._resolution ))
+            else:
+                logging.info('Maximal effective resolution is "%s"' % str(self._resolution))
+
 
         super(V4L2Camera, self).__init__(*args, **kwargs)
         self._start_time = time.time()
