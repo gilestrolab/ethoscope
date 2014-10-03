@@ -2,7 +2,8 @@ __author__ = 'quentin'
 
 
 import cv2
-import cv
+import time
+import logging
 
 
 class BaseCamera(object):
@@ -19,12 +20,13 @@ class BaseCamera(object):
 
     def __iter__(self):
 
+        # We ensure timestamps and frame index are set to 0
+        self.restart()
+
         while True:
             if self.is_last_frame() or not self.is_opened():
                 break
-            self._frame_idx += 1
-
-            yield self._time_stamp(), self._next_image()
+            yield self.next_time_image()
 
     @property
     def resolution(self):
@@ -38,6 +40,14 @@ class BaseCamera(object):
     def height(self):
         return self._resolution[1]
 
+    def next_time_image(self):
+        im = self._next_image()
+        time = self._time_stamp()
+        self._frame_idx += 1
+        return time, im
+
+
+
     def is_last_frame(self):
         raise NotImplementedError
     def _next_image(self):
@@ -48,10 +58,6 @@ class BaseCamera(object):
         raise NotImplementedError
     def restart(self):
         raise NotImplementedError
-
-class BasePhysicalCamera(BaseCamera):
-    def is_last_frame(self):
-        return False
 
 
 
@@ -95,17 +101,81 @@ class MovieVirtualCamera(BaseVirtualCamera):
 
     def is_last_frame(self):
         if self._frame_idx >= self._total_n_frames:
-
             return True
-
         return False
+
     def _close(self):
         self.capture.release()
 
 
 
 
-class USBCamera(BasePhysicalCamera):
-    pass
+class V4L2Camera(BaseCamera):
+    def __init__(self,device, target_fps=5, target_resolution=(960,720), *args, **kwargs):
+        self.capture = cv2.VideoCapture(device)
+        self._warm_up()
+
+        w, h = target_resolution
+        self.capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, w)
+        self.capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, h)
+        self.capture.set(cv2.cv.CV_CAP_PROP_FPS, target_fps)
+
+        self._target_fps = float(target_fps)
+        _, im = self.capture.read()
+
+        #TODO better exception handling is needed here / what do we do if initial capture fails...
+        assert(len(im.shape) >1)
+
+        self._resolution = (im.shape[1], im.shape[0])
+        if self._resolution != target_resolution:
+            logging.warning('Target resolution "%s" could NOT be achieved. Effective resolution is "%s"' % (target_resolution, self._resolution ))
+
+        super(V4L2Camera, self).__init__(*args, **kwargs)
+        self._start_time = time.time()
+
+    def _warm_up(self):
+        logging.info("%s is warming up" % (str(self)))
+        time.sleep(2)
+
+    def restart(self):
+        self._frame_idx = 0
+        self._start_time = time.time()
+
+    def is_opened(self):
+        return self.capture.isOpened()
 
 
+    def is_last_frame(self):
+        return False
+
+    def _time_stamp(self):
+        now = time.time()
+        # relative time stamp
+        return now - self._start_time
+
+    def _close(self):
+        self.capture.release()
+
+
+    def _next_image(self):
+
+        if self._frame_idx >0 :
+            expected_time =  self._start_time + self._frame_idx / self._target_fps
+            now = time.time()
+
+            to_sleep = expected_time - now
+
+            # Warnings if the fps is so high that we cannot grab fast enough
+            if to_sleep < 0:
+                logging.warning("The target FPS could not be reached. Frame lagging by  %f seconds" % (-1 * to_sleep))
+                self.capture.grab()
+
+            # we simply drop frames until we go above expected time
+            while now < expected_time:
+                self.capture.grab()
+                now = time.time()
+        else:
+            self.capture.grab()
+
+        _, frame = self.capture.retrieve()
+        return frame
