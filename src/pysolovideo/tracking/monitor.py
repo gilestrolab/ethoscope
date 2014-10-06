@@ -30,9 +30,12 @@ class Monitor(object):
 
     def run(self):
          for t, frame in self._camera:
-             for tracker in self._unit_trackers:
-                position = tracker(t, frame)
-                logging.warning(position)
+             for track_u in self._unit_trackers:
+                position, angle = track_u(t, frame)
+                track_u.interactor()
+
+
+
 
                  # if self._interactor_map:
                  #     interactor = self._interactor_map[rt]

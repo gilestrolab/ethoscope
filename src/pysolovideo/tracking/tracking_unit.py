@@ -17,11 +17,19 @@ class TrackingUnit(object):
 
         self._interactor.bind_tracker(self._tracker)
 
+    @property
+    def interactor(self):
+        return self._interactor
+
+    @property
+    def roi(self):
+        return self._roi
+
     def __call__(self, t, img):
         img, mask = self._roi(img)
-        position = self._tracker(t,img, mask)
+        position_angle = self._tracker(t,img, mask)
         self._interactor()
-        return position
+        return position_angle
 
 
 
