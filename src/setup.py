@@ -24,6 +24,7 @@ setup(
         "numpy>=1.6.1",
         "pandas>=0.13.1",
         "scipy>=0.10.1",
+        "scikit-learn",
         "picamera>=1.8",
 # TODO check opencv in installed
         # "opencv>=2.4.5",
