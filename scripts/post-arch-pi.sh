@@ -1,3 +1,5 @@
+#!/bin/sh
+
 ######################################
 # To build the sd card, follow instructions @ http://archlinuxarm.org/platforms/armv6/raspberry-pi
 ######################################
@@ -7,19 +9,19 @@ USER=psv
 ############# PACKAGES #########################
 #### Note we should let pip deal with the python packages dependency
 ### to setup a computer in the lab just after installing arch:
-pacman -Syu
-pacman -S base-devel packer git gcc-fortran
+pacman -Syu --noconfirm
+pacman -S base-devel packer git gcc-fortran --noconfirm
 ### Video capture related
-pacman -S opencv mplayer ffmpeg gstreamer gstreamer0.10-plugins mencoder
+pacman -S opencv mplayer ffmpeg gstreamer gstreamer0.10-plugins mencoder --noconfirm
 # a desktop environment may be useful:
-pacman -S xorg-server xorg-utils xorg-server-utils xorg-xinit xf86-video-fbdev lxde slim
+pacman -S xorg-server xorg-utils xorg-server-utils xorg-xinit xf86-video-fbdev lxde slim --noconfirm
 # utilities
-pacman -S ntp bash-completion
+pacman -S ntp bash-completion --noconfirm
 
-pacman -S raspberrypi-firmware{,-tools,-bootloader,-example}
+pacman -S raspberrypi-firmware{,-tools,-bootloader,-example} --noconfirm
 
 # preinstalling dependencies will save compiling time 
-pacman -S python2-pip python2-numpy python2-scipy python2-pandas
+pacman -S python2-pip python2-numpy python2-scipy python2-pandas --noconfirm
 
 ######################################################################################
 
