@@ -7,6 +7,7 @@ import logging
 
 
 class BaseCamera(object):
+    #TODO catch exception eg, if initialise with a wrong file
 
     capture = None
     _resolution = None
@@ -88,7 +89,6 @@ class MovieVirtualCamera(BaseVirtualCamera):
         self._resolution = (int(w),int(h))
 
         super(MovieVirtualCamera, self).__init__(path,*args, **kwargs)
-        print self._frame_idx
 
     def _next_image(self):
         _, frame = self.capture.read()

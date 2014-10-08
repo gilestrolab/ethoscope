@@ -32,7 +32,6 @@ class BaseInteractor(object):
         if self._target is None:
             raise NotImplementedError("_target must ba a defined function")
 
-        print "biiiiiiiim", args, self._target
         self._subprocess = multiprocessing.Process(target=self._target, args = args)
 
         self._subprocess.start()
@@ -62,11 +61,10 @@ def beep(frequency):
 
 class SystemPlaySoundOnStop(BaseInteractor):
 
-
-    def __init__(self):
+    def __init__(self, freq):
         self._t0 = None
         self._target = beep
-        self._freq = 1000
+        self._freq = freq
 
     def _run(self):
         positions = self._tracker.positions
@@ -76,12 +74,12 @@ class SystemPlaySoundOnStop(BaseInteractor):
         if len(positions ) <2 :
             return False, (self._freq,)
 
-        if np.abs(positions[-1] - positions[-2]) < 5:
+        if np.abs(positions[-1] - positions[-2]) < 3:
             now = time[-1]
             if self._t0 is None:
                 self._t0 = now
             else:
-                if(now - self._t0) > 30: # 5s of inactivity
+                if(now - self._t0) > 60: # 5s of inactivity
                     return True, (self._freq,)
 
         else:

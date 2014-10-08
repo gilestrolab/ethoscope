@@ -98,7 +98,6 @@ class AdaptiveMOGTracker(BaseTracker):
 
             if n_clusters_ > 1:
                 self._learning_rate *= self._increment
-                print "ambiguous!"
             else:
                 hull = cv2.convexHull(yx)
 
@@ -117,8 +116,8 @@ class AdaptiveMOGTracker(BaseTracker):
             cv2.drawContours(img,[hull],0, (255,0,0),2)
         except:
             pass
-        cv2.imshow("result",img)
-        cv2.waitKey(30)
+        cv2.imshow(str(self),img)
+
 
         return pos, np.NaN
 

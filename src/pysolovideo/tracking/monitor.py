@@ -3,6 +3,7 @@ __author__ = 'quentin'
 import roi_builders as rbs
 from tracking_unit import TrackingUnit
 import logging
+import cv2
 
 class Monitor(object):
 
@@ -33,6 +34,7 @@ class Monitor(object):
              for track_u in self._unit_trackers:
                 position, angle = track_u(t, frame)
                 track_u.interactor()
+             #cv2.waitKey(30)
 
 
 
