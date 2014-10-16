@@ -4,7 +4,7 @@ __author__ = 'quentin'
 from pysolovideo.tracking.roi_builders import ImgMaskROIBuilder
 from pysolovideo.tracking.cameras import MovieVirtualCamera
 from pysolovideo.tracking.monitor import Monitor
-from pysolovideo.tracking.trackers import AdaptiveMOGTracker
+from pysolovideo.tracking.trackers import AdaptiveBGModel
 from pysolovideo.tracking.interactors import SystemPlaySoundOnStop
 
 import cv2
@@ -26,7 +26,7 @@ inters = [SystemPlaySoundOnStop(500 + i * 30) for i in range(13)]
 
 
 
-monit = Monitor(cam, AdaptiveMOGTracker, interactors= inters, roi_builder=rb)
+monit = Monitor(cam, AdaptiveBGModel, interactors= inters, roi_builder=rb)
 monit.run()
 
 #

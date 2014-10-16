@@ -14,6 +14,7 @@ class ROI(object):
         # TODO if we do not need polygon, we can drop it
         self._polygon = np.array(polygon)
         self._value = value
+        #print self._polygon
 
         x,y,w,h = cv2.boundingRect(self._polygon)
 
@@ -68,6 +69,7 @@ class DefaultROIBuilder(BaseROIBuilder):
 
     def _rois_from_img(self,img):
         h, w = img.shape[0],img.shape[1]
+
         return[
             ROI([
                 (   0,        0       ),

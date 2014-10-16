@@ -32,7 +32,7 @@ class Monitor(object):
     def run(self):
          for t, frame in self._camera:
              for track_u in self._unit_trackers:
-                position, angle = track_u(t, frame)
+                track_u(t, frame)
                 track_u.interactor()
              #cv2.waitKey(30)
 

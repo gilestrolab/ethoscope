@@ -26,10 +26,12 @@ class TrackingUnit(object):
         return self._roi
 
     def __call__(self, t, img):
-        img, mask = self._roi(img)
-        position_angle = self._tracker(t,img, mask)
+        sub_img, mask = self._roi(img)
+
+        position = self._tracker(t,sub_img, mask)
         self._interactor()
-        return position_angle
+        return 1
+        # return position
 
 
 

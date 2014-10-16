@@ -74,7 +74,7 @@ class SystemPlaySoundOnStop(BaseInteractor):
         if len(positions ) <2 :
             return False, (self._freq,)
 
-        if np.abs(positions[-1] - positions[-2]) < 3:
+        if np.abs(positions[-1][0] - positions[-2][0]) < 3:
             now = time[-1]
             if self._t0 is None:
                 self._t0 = now

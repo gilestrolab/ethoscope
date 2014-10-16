@@ -9,7 +9,7 @@ from pysolovideo.tracking.interactors import SystemPlaySoundOnStop
 # cam = MovieVirtualCamera("/home/quentin/Desktop/drosoAdult_short.avi")
 cam = MovieVirtualCamera("/stk/pysolo_video_samples/singleDamTube2_150min_night.avi")
 
-inter = SystemPlaySoundOnStop()
+inter = SystemPlaySoundOnStop(1000)
 monit = Monitor(cam, AdaptiveMOGTracker, interactors=[inter])
 monit.run()
 
