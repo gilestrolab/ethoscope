@@ -6,6 +6,7 @@ from subprocess import call
 
 class BaseInteractor(object):
     _tracker = None
+    # this is not v elegant
     _subprocess = multiprocessing.Process()
 
     _target = None
@@ -19,6 +20,7 @@ class BaseInteractor(object):
 
     def bind_tracker(self, tracker):
         self._tracker = tracker
+
 
     def _run(self):
         raise NotImplementedError

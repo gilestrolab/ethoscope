@@ -1,30 +1,38 @@
 __author__ = 'quentin'
 
 import numpy as np
-import cv
 import cv2
-from sklearn.cluster import MeanShift, estimate_bandwidth
 import itertools
+import roi_builders
+
 class NoPositionError(Exception):
     pass
 
 class BaseTracker(object):
     # a list of complex number representing x(real) and y(imaginary) coordinatesT
-    _positions = []
-    _time_stamps = []
-    _data=None
 
-    def __init__(self, data=None):
+
+    def __init__(self, roi,data=None):
+        self._positions = []
+        self._time_stamps = []
+
         self._data = data
+        self._roi = roi
 
-    def __call__(self, t, img, mask):
+
+    def __call__(self, t, img):
+        sub_img, mask = self._roi(img)
+
         try:
-            point = self._find_position(img,mask)
+            point = self._find_position(sub_img,mask)
+            point[0:2] = point[0:2] / self._roi.longest_axis
+
         except NoPositionError:
             if len(self._positions) == 0:
                 point = np.array([np.NaN] * 3)
             else:
                 point = self._positions[-1]
+
 
 
         self._positions.append(point)
@@ -56,87 +64,11 @@ class DummyTracker(BaseTracker):
             return point
         return self._positions[-1] + point
 #
-#
-class AdaptiveMOGTracker(BaseTracker):
-#     def __init__(self, data=None):
-#         self._mog = cv2.BackgroundSubtractorMOG(1000,2, 0.9, 1.0)
-#
-#         self._max_learning_rate = 1e-2
-#         self._learning_rate = self._max_learning_rate
-#         self._min_learning_rate = 1e-7
-#         self._increment = 1.2
-#         super(AdaptiveMOGTracker, self).__init__(data)
-#
-#     def _find_position(self, img, mask):
-#         # TODO preallocated buffers
-#         # TODO  slice me with mask
-#         #  TODO try exepect slice me with mask
-#
-#
-#
-#         tmp = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-#
-#         tmp = cv2.GaussianBlur(tmp,(3,3), 1.5)
-#
-#         tmp = self._mog.apply(tmp, None, self._learning_rate)
-#
-#
-#         if len(self._positions) > 0:
-#             pos = self._positions[-1]
-#         else:
-#             pos= np.NaN
-#
-#
-#
-#
-#         # TODO if  a large proportion of the image is True, we should abort here.
-#
-#         yx = np.where(tmp)
-#
-#         if len(yx[0]) < 10:
-#             self._learning_rate *= self._increment
-#         else:
-#             yx = np.column_stack((yx[1],yx[0]))
-#
-#             # FIXME magic number here
-#             ms = MeanShift(bandwidth=10, bin_seeding=True)
-#             ms.fit(yx)
-#             labels = ms.labels_
-#             labels_unique = np.unique(labels)
-#             n_clusters_ = len(labels_unique)
-#
-#
-#             if n_clusters_ > 1:
-#                 self._learning_rate *= self._increment
-#             else:
-#                 hull = cv2.convexHull(yx)
-#
-#                 self._learning_rate /= self._increment
-#                 moments = cv2.moments(hull)
-#                 pos = moments['m10']/moments['m00'] + 1j * moments['m01']/moments['m00']
-#
-#
-#         if self._learning_rate > self._max_learning_rate:
-#             self._learning_rate = self._max_learning_rate
-#
-#         if self._learning_rate < self._min_learning_rate:
-#             self._learning_rate = 0
-#
-#         try:
-#             cv2.drawContours(img,[hull],0, (255,0,0),2)
-#         except:
-#             pass
-#         # cv2.imshow(str(self),img)
-#
-#
-#         return pos, np.NaN
-#
-    pass
-
 
 
 class AdaptiveBGModel(BaseTracker):
-    def __init__(self, data=None):
+
+    def __init__(self, roi, data=None):
         self._max_learning_rate = 1e-1
         self._learning_rate = self._max_learning_rate
         self._min_learning_rate = 1e-3
@@ -146,7 +78,8 @@ class AdaptiveBGModel(BaseTracker):
         self._fg_features = None
         self._bg_sd = None
 
-        super(AdaptiveBGModel, self).__init__(data)
+        super(AdaptiveBGModel, self).__init__(roi, data)
+
 
 
     def _update_fg_blob_model(self, img, contour, lr = 1e-2):
@@ -201,7 +134,7 @@ class AdaptiveBGModel(BaseTracker):
             self._bg_mean = img
             self._bg_sd = img
 
-        learning_mat = np.ones_like(img) * self._learning_rate
+        learning_mat = np.ones_like(img,dtype = np.float32) * np.float32(self._learning_rate)
         if fgmask is not None:
             cv2.dilate(fgmask,None,fgmask)
             cv2.dilate(fgmask,None,fgmask)
@@ -261,7 +194,6 @@ class AdaptiveBGModel(BaseTracker):
 
     def _find_position(self, img, mask):
         # TODO preallocated buffers
-        # TODO  slice me with mask
         #  TODO try exepect slice me with mask
 
         # minor preprocessing
@@ -270,22 +202,25 @@ class AdaptiveBGModel(BaseTracker):
 
         if len(self._positions) == 0:
             self._update_bg_model(grey)
-            print "??????"
             raise NoPositionError
 
         # fixme this should NOT be needed !
-        if self._bg_mean is None:
+        elif self._bg_mean is None:
             self._update_bg_model(grey)
             print "fixme"
             raise NoPositionError
 
-        fg = np.abs(grey - self._bg_mean).astype(np.uint8)
+        # fixme use preallocated buffers next line
+        fg = grey - self._bg_mean
+        np.abs(fg, fg)
+        fg = fg.astype(np.uint8)
+
         cv2.dilate(fg,None,fg)
         cv2.erode(fg,None,fg)
         #cv2.imshow("f", fg*5)
 
-        #todo make thi objective
-        _, fg = cv2.threshold(fg,13,255,cv2.THRESH_BINARY)
+        #todo make this objective
+        cv2.threshold(fg,13,255,cv2.THRESH_BINARY, dst=fg)
 
         if mask is not None:
             #todo test me
@@ -319,15 +254,15 @@ class AdaptiveBGModel(BaseTracker):
 
         self._update_fg_blob_model(grey, hull)
 
-        fg_mask = np.zeros_like(grey)
+        fg.fill(0)
 
         (x,y) ,(w,h), angle  = cv2.minAreaRect(hull)
 
-        cv2.drawContours(fg_mask ,[hull],0, (255,0,0),-1)
+        cv2.drawContours(fg ,[hull],0, (255,0,0),-1)
 
-        cv2.imshow(str(self), fg_mask )
-        cv2.waitKey(1)
+        # cv2.imshow(str(self), fg )
+        # cv2.waitKey(1)
 
-        self._update_bg_model(grey, fg_mask)
+        self._update_bg_model(grey, fg)
 
-        return [x + 1j * y, w + 1j * h, angle]
+        return np.array([x + 1j * y, w + 1j * h, angle])

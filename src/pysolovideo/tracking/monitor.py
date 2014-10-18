@@ -4,7 +4,7 @@ import roi_builders as rbs
 from tracking_unit import TrackingUnit
 import logging
 import cv2
-
+import numpy as np
 class Monitor(object):
 
     def __init__(self, camera, tracker_class, roi_builder = None, interactors=None):
@@ -29,12 +29,34 @@ class Monitor(object):
 
 
 
+    def _draw_on_frame(self,t, frame):
+        for track_u in self._unit_trackers:
+
+            xy, wh, a = track_u.get_last_position(absolute=True)
+
+            if np.isnan(xy):
+                continue
+
+            x = int(np.round(np.real(xy)))
+            y = int(np.round(np.imag(xy)))
+
+            w = int(np.round(np.real(wh)))
+            h = int(np.round(np.imag(wh)))
+
+            a = int(np.round(np.real(a)))
+
+            cv2.ellipse(frame,((x,y), (w,h), a),(0,255,0),2)
+            cv2.drawContours(frame,[track_u.roi.polygon],-1, (255,0,0), 2)
+        cv2.imshow("el", frame)
+        cv2.waitKey(1)
+
     def run(self):
-         for t, frame in self._camera:
-             for track_u in self._unit_trackers:
+        for t, frame in self._camera:
+            for track_u in self._unit_trackers:
                 track_u(t, frame)
-                track_u.interactor()
-             #cv2.waitKey(30)
+                # track_u.interactor()
+            self._draw_on_frame(t,frame)
+
 
 
 

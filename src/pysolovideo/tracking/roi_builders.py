@@ -13,13 +13,17 @@ class ROI(object):
 
         # TODO if we do not need polygon, we can drop it
         self._polygon = np.array(polygon)
+        if len(self._polygon.shape) == 2:
+            self._polygon = self._polygon.reshape((self._polygon.shape[0],1,self._polygon.shape[1]))
+
+
         self._value = value
-        #print self._polygon
+
 
         x,y,w,h = cv2.boundingRect(self._polygon)
 
         self._mask = np.zeros((h,w), np.uint8)
-        cv2.drawContours(self._mask, [polygon], 0, 255,-1,offset=(-x,-y))
+        cv2.drawContours(self._mask, [self._polygon], 0, 255,-1,offset=(-x,-y))
 
         self._rectangle = x,y,w,h
 
@@ -31,6 +35,22 @@ class ROI(object):
 
         return
 
+    @property
+    def offset(self):
+        x,y,w,h = self._rectangle
+        return x + 1j*y
+
+    @property
+    def polygon(self):
+
+        return self._polygon
+
+
+    @property
+    def longest_axis(self):
+        x,y,w,h = self._rectangle
+        return float(max(w, h))
+
 
     @property
     def value(self):
@@ -39,6 +59,7 @@ class ROI(object):
     def __call__(self,img):
         x,y,w,h = self._rectangle
         out = img[y : y + h, x : x +w]
+
 
         assert(out.shape[0:2] == self._mask.shape)
 
@@ -69,13 +90,12 @@ class DefaultROIBuilder(BaseROIBuilder):
 
     def _rois_from_img(self,img):
         h, w = img.shape[0],img.shape[1]
-
         return[
             ROI([
                 (   0,        0       ),
-                (   0,        w -1    ),
-                (   h - 1,    w - 1   ),
-                (   h - 1,    0       )]
+                (   0,        h -1    ),
+                (   w - 1,    h - 1   ),
+                (   w - 1,    0       )]
         )]
 
 
