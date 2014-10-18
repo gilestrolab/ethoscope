@@ -21,6 +21,7 @@ rois = rb(cam)
 
 
 
+# inters = [SystemPlaySoundOnStop(500 + i * 30) for i in range(13)]
 inters = [SystemPlaySoundOnStop(500 + i * 30) for i in range(13)]
 
 
