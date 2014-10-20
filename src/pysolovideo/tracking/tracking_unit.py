@@ -34,14 +34,11 @@ class TrackingUnit(object):
 
         last_position = self._tracker.positions.tail(1)
 
-        print last_position
 
         if not absolute:
             return last_position
 
         out = last_position.copy()
-
-
 
 
         out.x *= self._roi.longest_axis
@@ -51,20 +48,19 @@ class TrackingUnit(object):
 
         ox, oy = self._roi.offset
 
-        print out
 
         out.x += ox
         out.y += oy
-
-        #print self._roi.offset
 
         return out
 
 
 
     def __call__(self, t, img):
-
-        return  self._tracker(t,img)
+        data_row = self._tracker(t,img)
+        if data_row is not None:
+            data_row["roi_value"] = self._roi.value
+        return data_row
 
 
 
