@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 import itertools
 import roi_builders
-
+import pandas as pd
 class NoPositionError(Exception):
     pass
 
@@ -13,8 +13,8 @@ class BaseTracker(object):
 
 
     def __init__(self, roi,data=None):
-        self._positions = []
-        self._time_stamps = []
+        self._positions = pd.DataFrame()
+
 
         self._data = data
         self._roi = roi
@@ -24,20 +24,32 @@ class BaseTracker(object):
         sub_img, mask = self._roi(img)
 
         try:
+
             point = self._find_position(sub_img,mask)
-            point[0:2] = point[0:2] / self._roi.longest_axis
+
+            point = pd.DataFrame(point,index=[t])
+            point = self.normalise_position(point)
 
         except NoPositionError:
             if len(self._positions) == 0:
-                point = np.array([np.NaN] * 3)
+                return None
             else:
-                point = self._positions[-1]
+
+                point = self._positions.tail(1)
 
 
 
-        self._positions.append(point)
-        self._time_stamps.append(t)
+        self._positions = self._positions.append(point)
+
         return point
+
+    def normalise_position(self,point):
+        point.x = point.x / self._roi.longest_axis
+        point.y = point.y / self._roi.longest_axis
+        point.w = point.w / self._roi.longest_axis
+        point.h = point.h / self._roi.longest_axis
+        return point
+
 
     @property
     def positions(self):
@@ -48,7 +60,7 @@ class BaseTracker(object):
 
     @property
     def times(self):
-        return self._time_stamps
+        return self._positions.index
 
     def _find_position(self,img, mask):
         raise NotImplementedError
@@ -69,7 +81,7 @@ class DummyTracker(BaseTracker):
 class AdaptiveBGModel(BaseTracker):
 
     def __init__(self, roi, data=None):
-        self._max_learning_rate = 1e-1
+        self._max_learning_rate = 5e-1
         self._learning_rate = self._max_learning_rate
         self._min_learning_rate = 1e-3
         self._increment = 1.2
@@ -103,7 +115,12 @@ class AdaptiveBGModel(BaseTracker):
 
 
         if len(self.positions) > 2:
-            instantaneous_speed = abs(self.xy_pos(-1) - self.xy_pos(-2))
+
+            last_two_pos = self._positions.tail(2)
+            xm, xmm = last_two_pos.x
+            ym, ymm = last_two_pos.y
+
+            instantaneous_speed = abs(xm + 1j*ym - xmm + 1j*ymm)
         else:
             instantaneous_speed = 0
         if np.isnan(instantaneous_speed):
@@ -200,24 +217,26 @@ class AdaptiveBGModel(BaseTracker):
         grey = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
         cv2.GaussianBlur(grey,(3,3), 1.5, grey)
 
-        if len(self._positions) == 0:
-            self._update_bg_model(grey)
-            raise NoPositionError
+        # if len(self._positions) == 0:
+        #
+        #     self._update_bg_model(grey)
+        #
+        #     raise NoPositionError
 
         # fixme this should NOT be needed !
-        elif self._bg_mean is None:
+        if self._bg_mean is None:
             self._update_bg_model(grey)
             print "fixme"
             raise NoPositionError
 
-        # fixme use preallocated buffers next line
+        # fixme use preallocated buffers next line ?
         fg = grey - self._bg_mean
         np.abs(fg, fg)
         fg = fg.astype(np.uint8)
 
         cv2.dilate(fg,None,fg)
         cv2.erode(fg,None,fg)
-        #cv2.imshow("f", fg*5)
+
 
         #todo make this objective
         cv2.threshold(fg,13,255,cv2.THRESH_BINARY, dst=fg)
@@ -260,9 +279,19 @@ class AdaptiveBGModel(BaseTracker):
 
         cv2.drawContours(fg ,[hull],0, (255,0,0),-1)
 
-        # cv2.imshow(str(self), fg )
-        # cv2.waitKey(1)
+
+
+
+
 
         self._update_bg_model(grey, fg)
+        # cv2.drawContours(grey ,[hull],0, (255,0,0),-1)
+        # cv2.imshow(str(self), grey)
 
-        return np.array([x + 1j * y, w + 1j * h, angle])
+        return {
+            'x':x,
+            'y':y,
+            'w':w,
+            'h':h,
+            'phi':angle
+        }

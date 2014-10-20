@@ -32,21 +32,13 @@ class Monitor(object):
     def _draw_on_frame(self,t, frame):
         for track_u in self._unit_trackers:
 
-            xy, wh, a = track_u.get_last_position(absolute=True)
 
-            if np.isnan(xy):
+            pos = track_u.get_last_position(absolute=True)
+            if pos is None:
                 continue
 
-            x = int(np.round(np.real(xy)))
-            y = int(np.round(np.imag(xy)))
-
-            w = int(np.round(np.real(wh)))
-            h = int(np.round(np.imag(wh)))
-
-            a = int(np.round(np.real(a)))
-
-            cv2.ellipse(frame,((x,y), (w,h), a),(0,255,0),2)
-            cv2.drawContours(frame,[track_u.roi.polygon],-1, (255,0,0), 2)
+            cv2.ellipse(frame,((pos.x,pos.y), (pos.w,pos.h), pos.phi),(0,255,0),1,cv2.CV_AA)
+            cv2.drawContours(frame,[track_u.roi.polygon],-1, (255,0,0), 1, cv2.CV_AA)
         cv2.imshow("el", frame)
         cv2.waitKey(1)
 
@@ -54,8 +46,14 @@ class Monitor(object):
         for t, frame in self._camera:
             for track_u in self._unit_trackers:
                 track_u(t, frame)
-                # track_u.interactor()
+
+                #track_u.get_last_position(True)
+
+
+                # # track_u.interactor()
             self._draw_on_frame(t,frame)
+
+
 
 
 

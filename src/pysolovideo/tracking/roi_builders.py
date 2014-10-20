@@ -38,7 +38,7 @@ class ROI(object):
     @property
     def offset(self):
         x,y,w,h = self._rectangle
-        return x + 1j*y
+        return x,y
 
     @property
     def polygon(self):
