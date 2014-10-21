@@ -72,10 +72,19 @@ echo 'cma_offline_start=' >>  /boot/config.txt
 modprobe bcm2835-v4l2
 echo "bcm2835-v4l2" > /etc/modules-load.d/picamera.conf
 
+
+
+#SEE https://wiki.archlinux.org/index.php/arduino#Configuration
+gpasswd -a $USER uucp
+gpasswd -a $USER lock
+gpasswd -a $USER tty
+
+
 echo "Please REBOOT"
+
+
 
 ###########################################################################################
 # here we should have a startup script set up to:
 # 1) set individual hostnames to each pi (eg pi-M_A_C_A_D_D_R), where  M_A_C_A_D_D_R is the eth0 mac address
 # 2) update our software stack if needed (from git master/AUR)
-
