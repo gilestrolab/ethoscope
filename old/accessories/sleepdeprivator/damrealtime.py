@@ -201,7 +201,7 @@ class SDrealtime(DAMrealtime):
     
     def deprive(self, fname, interval=5):
         '''
-        check which flies are asleep and send command to arduino
+        check which flies are asleep and send command to hardware_control
         connected on serial port
         '''
         

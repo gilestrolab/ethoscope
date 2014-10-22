@@ -16,24 +16,21 @@ class ROI(object):
         if len(self._polygon.shape) == 2:
             self._polygon = self._polygon.reshape((self._polygon.shape[0],1,self._polygon.shape[1]))
 
-
         self._value = value
-
-
         x,y,w,h = cv2.boundingRect(self._polygon)
 
         self._mask = np.zeros((h,w), np.uint8)
         cv2.drawContours(self._mask, [self._polygon], 0, 255,-1,offset=(-x,-y))
 
         self._rectangle = x,y,w,h
+        # todo NOW! sort rois by value. if no values, left to right/ top to bottom!
 
     def bounding_rect(self):
         raise NotImplementedError
 
 
     def mask(self):
-
-        return
+        return self._mask
 
     @property
     def offset(self):

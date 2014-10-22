@@ -66,9 +66,7 @@ class Monitor(object):
 
                 data_row = pd.concat([data_row, interactor_columns], axis=1)
                 out.append(data_row)
-
                 self._draw_on_frame(track_u, data_row, copy)
-
             cv2.imshow("el", copy)
-            cv2.waitKey(1)
+            cv2.waitKey(250)
 

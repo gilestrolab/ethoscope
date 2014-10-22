@@ -108,8 +108,6 @@ class MovieVirtualCamera(BaseVirtualCamera):
         self.capture.release()
 
 
-
-
 class V4L2Camera(BaseCamera):
     def __init__(self,device, target_fps=5, target_resolution=(960,720), *args, **kwargs):
         self.capture = cv2.VideoCapture(device)
@@ -126,6 +124,9 @@ class V4L2Camera(BaseCamera):
 
         self._target_fps = float(target_fps)
         _, im = self.capture.read()
+
+        # preallocate image buffer => faster
+        self._frame = im
 
         #TODO better exception handling is needed here / what do we do if initial capture fails...
         assert(len(im.shape) >1)
@@ -185,5 +186,5 @@ class V4L2Camera(BaseCamera):
         else:
             self.capture.grab()
 
-        _, frame = self.capture.retrieve()
-        return frame
+        self.capture.retrieve(self._frame)
+        return self._frame
