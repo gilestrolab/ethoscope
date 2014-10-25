@@ -22,12 +22,22 @@ class BaseCamera(object):
     def __iter__(self):
 
         # We ensure timestamps and frame index are set to 0
-        self.restart()
 
+        self.restart()
+        at_leat_one_frame = False
         while True:
+            print self.is_last_frame()
             if self.is_last_frame() or not self.is_opened():
+                if not at_leat_one_frame:
+                    raise Exception("Camera could not read the first frame")
                 break
-            yield self.next_time_image()
+            t,out = self.next_time_image()
+
+            if out is None:
+                break
+            yield t,out
+            at_leat_one_frame = True
+
 
     @property
     def resolution(self):
@@ -86,12 +96,18 @@ class MovieVirtualCamera(BaseVirtualCamera):
         w = self.capture.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH)
         h = self.capture.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)
         self._total_n_frames =self.capture.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT)
+        if self._total_n_frames == 0.:
+            self._has_end_of_file = False
+        else:
+            self._has_end_of_file = True
+
         self._resolution = (int(w),int(h))
 
         super(MovieVirtualCamera, self).__init__(path,*args, **kwargs)
 
     def _next_image(self):
         _, frame = self.capture.read()
+
         return frame
 
     def _time_stamp(self):
@@ -100,7 +116,7 @@ class MovieVirtualCamera(BaseVirtualCamera):
         return time_s
 
     def is_last_frame(self):
-        if self._frame_idx >= self._total_n_frames:
+        if self._has_end_of_file and self._frame_idx >= self._total_n_frames:
             return True
         return False
 

@@ -66,10 +66,15 @@ class ROI(object):
 class BaseROIBuilder(object):
 
     def __call__(self, camera):
+
+
         for _, frame in camera:
+
             rois = self._rois_from_img(frame)
             # TODO here, we should make an average of a few frames
+
             break
+
         rois = self._sort_rois(rois)
         return rois
 
@@ -96,20 +101,27 @@ class DefaultROIBuilder(BaseROIBuilder):
         )]
 
 
-#
-# def show(im):
-#     cv2.imshow("test", im)
-#     cv2.waitKey(-1)
-#
+
+def show(im):
+    cv2.imshow("test", im)
+    cv2.waitKey(-1)
+
 
 class SleepDepROIBuilder(BaseROIBuilder):
 
 
     def _rois_from_img(self,im):
-        caps, rot_mat = self._best_image_rotation(im)
-        rois = self._make_rois(caps, rot_mat)
+        rot_mat= self._best_image_rotation(im)
+
+        rois = self._make_rois(im, rot_mat)
+        return rois
 
 
+
+    # def _decimate(self, im, rate=0.8):
+    #     rand = np.random.uniform(0,1,im.shape[0] * im.shape[1]).reshape(im.shape)
+    #     decimated = im & (rand > rate)
+    #     return decimated
 
     def _best_image_rotation(self, im):
         hsv_im = cv2.cvtColor(im,cv2.COLOR_BGR2HSV)
@@ -129,35 +141,78 @@ class SleepDepROIBuilder(BaseROIBuilder):
 
         caps = cv2.bitwise_and(v_im,s_im)
         dst = cv2.distanceTransform(caps, cv2.cv.CV_DIST_L2, cv2.cv.CV_DIST_MASK_PRECISE)
-
+        return  self._find_best_angle(dst)
         # todo rotate and minimise entropy of dst
-        vert = np.mean(dst ,1)
+        # vert = np.mean(dst ,1)
         #    pl.plot(vert / np.sum(vert))
-        # pl.show()
-        rot_mat = None
-        return  caps, rot_mat
+
     ####################################################################
 
 
-    def _make_rois(self, caps, rot_mat):
+    def make_rotation_mat(self, theta):
+        return np.array([
+        [np.cos(theta), -np.sin(theta)],
+        [np.sin(theta), np.cos(theta)],
+        ])
+
+    def _find_best_angle(self, im, min_theta=-30, max_theta=+30, theta_incr=.5 ):
+
+        min_entr, best_rot_mat, out = -np.Inf , None, None
+        for theta in np.arange(min_theta, max_theta, theta_incr):
+            M= cv2.getRotationMatrix2D((im.shape[1]/2,im.shape[0]/2), theta,  1)
+            rotated_im = cv2.warpAffine(im,M, (im.shape[1],im.shape[0]))
+            row_means = np.mean(rotated_im,1)
+            row_means /= np.sum(row_means)
+
+            entr =  np.sum(np.log2(row_means+1e-10) * row_means)
+
+            if entr > min_entr:
+                min_entr = entr
+                best_rot_mat = M
+
+
+
+        return best_rot_mat
+
+    def _make_rois(self, im, rot_mat):
         #todo watershed/ morph snakes
+        print im.shape
+        rotated_im = cv2.warpAffine(im, rot_mat, (im.shape[1],im.shape[0]))
+        #show(rotated_im)
+        hsv_im = cv2.cvtColor(rotated_im,cv2.COLOR_BGR2HSV)
+        s_im = hsv_im[:,:,1]
+        v_im = 255 - hsv_im[:,:,2]
+        s_im = cv2.medianBlur(s_im,7)
+        v_im = cv2.medianBlur(v_im,7)
 
-        caps = cv2.erode(caps,None, iterations=5)
-        caps = cv2.dilate(caps,None, iterations=5)
+        med = cv2.medianBlur(s_im,51)
+        cv2.subtract(s_im,med,s_im)
+        med = cv2.medianBlur(v_im,51)
+        cv2.subtract(v_im,med,v_im)
 
+
+        cv2.threshold(s_im,-1,255,cv2.THRESH_OTSU | cv2.THRESH_BINARY,s_im)
+        cv2.threshold(v_im,-1,255,cv2.THRESH_OTSU | cv2.THRESH_BINARY,v_im)
+
+        caps = cv2.bitwise_and(v_im,s_im)
 
         contours, h = cv2.findContours(caps,cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
+
+
 
         centres, wh = [],[]
         for c in contours:
             moms = cv2.moments(c)
-            xy = moms["m10"]/moms["m00"] + 1j * moms["m01"]/moms["m00"]
+            xy = moms["m10"]/moms["m00"]+ 1j *  moms["m01"]/moms["m00"]
+
+
+
             centres.append(xy)
             x0,y0,w,h =  cv2.boundingRect(c)
             #print w -h) / float(max(w,h))
             if min(h,w) / float(max(w,h)) < 0.5:
                 continue
-            if w > im.shape[0] / 10. or h > im.shape[0] / 10.:
+            if w > caps.shape[0] / 10. or h > caps.shape[0] / 10.:
                 continue
 
             wh.append(w + 1j * h)
@@ -182,6 +237,9 @@ class SleepDepROIBuilder(BaseROIBuilder):
         aw, ah = np.real(average_wh), np.imag(average_wh)
 
         rois = []
+
+        mask = np.zeros_like(caps)
+
         for x,l in zip(np.real(centres),  labels):
 
             a = (x - aw/2.5, top_pos + ah)
@@ -192,24 +250,24 @@ class SleepDepROIBuilder(BaseROIBuilder):
             pol = np.array([a,b,c,d])
             #todo here: remap according to the invert rotation matrix ;)
 
-            pol = pol.astype(np.int)
+            pol = pol.astype(np.int).reshape(4,1,2)
+            cv2.drawContours(mask, [pol], 0,255,-1)
+        show(mask)
 
-            rois.append(ROI(pol))
+        i_rot_mat = cv2.invertAffineTransform(rot_mat)
+        mask= cv2.warpAffine(mask, i_rot_mat, (im.shape[1],im.shape[0]))
+        show(mask)
 
-        #
-        # cv2.drawContours(im, polygons, -1, (0,0,255), 1,cv2.CV_AA)
-        # show(im)
+        contours, hiera = cv2.findContours(np.copy(mask), cv.CV_RETR_EXTERNAL, cv.CV_CHAIN_APPROX_SIMPLE)
 
-    #
-    # IMAGE_FILE = "./23cm_upright.jpg"
-    # #IMAGE_FILE = "./23cm.png"
-    # im = cv2.imread(IMAGE_FILE,1)
-    #
-    # _, caps = best_image_rotation(im)
-    # make_rois(caps,None)
-    #
+        rois = []
+        for c in contours:
+            tmp_mask = np.zeros_like(mask)
+            cv2.drawContours(tmp_mask, [c],0, 1)
 
+            rois.append(ROI(c, None))
 
+        return rois
 
 class ImgMaskROIBuilder(BaseROIBuilder):
     """

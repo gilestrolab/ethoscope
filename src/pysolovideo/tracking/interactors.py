@@ -36,9 +36,8 @@ class BaseInteractorSync(object):
         raise NotImplementedError
 
 class SleepDepInteractor(BaseInteractorSync):
-    _sleep_dep_interface =  SleepDepriverInterface()
-
-    def __init__(self, channel):
+    def __init__(self, channel, sd_interface ):
+        self._sleep_dep_interface = sd_interface
         self._t0 = None
         self._channel = channel
 

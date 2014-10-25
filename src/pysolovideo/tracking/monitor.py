@@ -37,15 +37,19 @@ class Monitor(object):
 
 
         pos = track_u.get_last_position(absolute=True)
+
+        cv2.drawContours(frame,[track_u.roi.polygon],-1, (0,0,255), 1, cv2.CV_AA)
+
         if pos is None:
             return
-        if bool(row.interact.item()):
+
+        if "interact" in row and bool(row.interact.item()):
             colour = (0, 255, 0)
         else:
             colour = (255, 0, 0)
 
         cv2.ellipse(frame,((pos.x,pos.y), (pos.w,pos.h), pos.phi),colour,1,cv2.CV_AA)
-        cv2.drawContours(frame,[track_u.roi.polygon],-1, (0,0,255), 1, cv2.CV_AA)
+
 
 
 
@@ -58,15 +62,20 @@ class Monitor(object):
             for track_u in self._unit_trackers:
 
                 data_row = track_u(t, frame)
+
+                self._draw_on_frame(track_u, data_row, copy)
+
                 if data_row is None:
                     continue
 
-                interactor_columns = track_u.interactor()
-                interactor_columns.index=data_row.index
+                #fixme this should be handled by tracking units themeselves
 
-                data_row = pd.concat([data_row, interactor_columns], axis=1)
-                out.append(data_row)
-                self._draw_on_frame(track_u, data_row, copy)
+                # interactor_columns = track_u.interactor()
+                # interactor_columns.index=data_row.index
+                #
+                # data_row = pd.concat([data_row, interactor_columns], axis=1)
+                # out.append(data_row)
+
             cv2.imshow("el", copy)
-            cv2.waitKey(250)
+            cv2.waitKey(25)
 
