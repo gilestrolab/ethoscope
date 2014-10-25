@@ -60,6 +60,7 @@ class TrackingUnit(object):
         data_row = self._tracker(t,img)
         if data_row is not None:
             data_row["roi_value"] = self._roi.value
+        # TODO interactor here
         return data_row
 
 

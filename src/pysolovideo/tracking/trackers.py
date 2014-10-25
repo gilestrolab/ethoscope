@@ -244,7 +244,7 @@ class AdaptiveBGModel(BaseTracker):
         if mask is not None:
             #todo test me
             cv2.bitwise_and(fg, mask, fg)
-
+        # fixme magi numbers. use cv2.CONSTS instead !!
         contours,hierarchy = cv2.findContours(fg, 1, 2)
 
         if len(contours) == 0:
