@@ -60,3 +60,7 @@ coverage.xml
 docs/_build/
 
 *.hex
+# profiling results
+*.pstats
+*.pdf
+
