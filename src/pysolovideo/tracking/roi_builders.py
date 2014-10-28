@@ -67,13 +67,22 @@ class BaseROIBuilder(object):
 
     def __call__(self, camera):
 
+        accum = None
+        for i, (_, frame) in enumerate(camera):
+            if accum is None:
+                accum = np.zeros_like(frame,dtype=np.uint16)
+            accum += frame
+            if i  >= 10:
+                break
 
-        for _, frame in camera:
+        accum /= 10
+        accum = accum.astype(np.uint8)
 
-            rois = self._rois_from_img(frame)
-            # TODO here, we should make an average of a few frames
 
-            break
+
+
+        rois = self._rois_from_img(accum)
+
 
         rois = self._sort_rois(rois)
         return rois
@@ -118,11 +127,6 @@ class SleepDepROIBuilder(BaseROIBuilder):
 
 
 
-    # def _decimate(self, im, rate=0.8):
-    #     rand = np.random.uniform(0,1,im.shape[0] * im.shape[1]).reshape(im.shape)
-    #     decimated = im & (rand > rate)
-    #     return decimated
-
     def _best_image_rotation(self, im):
         hsv_im = cv2.cvtColor(im,cv2.COLOR_BGR2HSV)
         s_im = hsv_im[:,:,1]
@@ -141,19 +145,13 @@ class SleepDepROIBuilder(BaseROIBuilder):
 
         caps = cv2.bitwise_and(v_im,s_im)
         dst = cv2.distanceTransform(caps, cv2.cv.CV_DIST_L2, cv2.cv.CV_DIST_MASK_PRECISE)
+        show(hsv_im)
         return  self._find_best_angle(dst)
         # todo rotate and minimise entropy of dst
         # vert = np.mean(dst ,1)
         #    pl.plot(vert / np.sum(vert))
 
-    ####################################################################
 
-
-    def make_rotation_mat(self, theta):
-        return np.array([
-        [np.cos(theta), -np.sin(theta)],
-        [np.sin(theta), np.cos(theta)],
-        ])
 
     def _find_best_angle(self, im, min_theta=-30, max_theta=+30, theta_incr=.5 ):
 
@@ -169,6 +167,7 @@ class SleepDepROIBuilder(BaseROIBuilder):
             if entr > min_entr:
                 min_entr = entr
                 best_rot_mat = M
+                show(rotated_im)
 
 
 
@@ -242,10 +241,10 @@ class SleepDepROIBuilder(BaseROIBuilder):
 
         for x,l in zip(np.real(centres),  labels):
 
-            a = (x - aw/2.5, top_pos + ah)
-            b = (x + aw/2.5, top_pos + ah)
-            d = (x - aw/2.5, bottom_pos  - ah)
-            c = (x + aw/2.5, bottom_pos - ah)
+            a = (x - aw/2.9, top_pos + ah)
+            b = (x + aw/2.9, top_pos + ah)
+            d = (x - aw/2.9, bottom_pos  - ah)
+            c = (x + aw/2.9, bottom_pos - ah)
 
             pol = np.array([a,b,c,d])
             #todo here: remap according to the invert rotation matrix ;)
@@ -256,6 +255,7 @@ class SleepDepROIBuilder(BaseROIBuilder):
 
         i_rot_mat = cv2.invertAffineTransform(rot_mat)
         mask= cv2.warpAffine(mask, i_rot_mat, (im.shape[1],im.shape[0]))
+        cv2.threshold(mask,128,255,cv2.THRESH_BINARY,mask)
         show(mask)
 
         contours, hiera = cv2.findContours(np.copy(mask), cv.CV_RETR_EXTERNAL, cv.CV_CHAIN_APPROX_SIMPLE)
@@ -263,7 +263,7 @@ class SleepDepROIBuilder(BaseROIBuilder):
         rois = []
         for c in contours:
             tmp_mask = np.zeros_like(mask)
-            cv2.drawContours(tmp_mask, [c],0, 1)
+            cv2.drawContours(tmp_mask, [c],0, 255 )
 
             rois.append(ROI(c, None))
 

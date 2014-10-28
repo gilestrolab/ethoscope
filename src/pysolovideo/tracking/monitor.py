@@ -77,5 +77,6 @@ class Monitor(object):
                 # out.append(data_row)
 
             cv2.imshow("el", copy)
-            cv2.waitKey(25)
+            cv2.waitKey(1)
+            print t / 60.
 

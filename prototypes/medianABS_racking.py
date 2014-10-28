@@ -1,107 +1,41 @@
 __author__ = 'quentin'
 
-import numpy as np
 import cv2
+import numpy as np
 import itertools
-import roi_builders
-import pandas as pd
+from pysolovideo.tracking.cameras import MovieVirtualCamera
+from pysolovideo.tracking.trackers import BaseTracker, NoPositionError
+from pysolovideo.tracking.roi_builders import DefaultROIBuilder
+cam = MovieVirtualCamera("/stk/pysolo_video_samples/representative_tube_fast.avi")
+# cam = MovieVirtualCamera("/stk/pysolo_video_samples/representative_tube.avi ")
 
-
-
-
-class NoPositionError(Exception):
-    pass
-
-class BaseTracker(object):
-    # a list of complex number representing x(real) and y(imaginary) coordinatesT
-
-
-    def __init__(self, roi,data=None):
-        self._positions = pd.DataFrame()
-
-
-        self._data = data
-        self._roi = roi
-
-
-    def __call__(self, t, img):
-        sub_img, mask = self._roi(img)
-
-        try:
-
-            point = self._find_position(sub_img,mask,t)
-
-            point = pd.DataFrame(point,index=[t])
-            point = self.normalise_position(point)
-
-        except NoPositionError:
-            if len(self._positions) == 0:
-                return None
-            else:
-
-                point = self._positions.tail(1)
-
-
-
-        self._positions = self._positions.append(point)
-
-        return point
-
-    def normalise_position(self,point):
-        point.x = point.x / self._roi.longest_axis
-        point.y = point.y / self._roi.longest_axis
-        point.w = point.w / self._roi.longest_axis
-        point.h = point.h / self._roi.longest_axis
-        return point
-
-
-    @property
-    def positions(self):
-        return self._positions
-
-    def xy_pos(self, i):
-        return self._positions[i][0]
-
-    @property
-    def times(self):
-        return self._positions.index
-
-    def _find_position(self,img, mask):
-        raise NotImplementedError
-
-
-class DummyTracker(BaseTracker):
-
-    def _find_position(self,img, mask):
-        # random_walk
-        x, y = np.random.uniform(size=2)
-        point = np.complex64(x + y * 1j)
-        if len(self._positions) == 0:
-            return point
-        return self._positions[-1] + point
 #
+def show(im,t=-1):
+    cv2.imshow("test",im)
+    cv2.waitKey(t)
 
 
-class AdaptiveBGModel(BaseTracker):
+
+class AdvancedTracker(BaseTracker):
 
     def __init__(self, roi, data=None):
+        self._max_bg_learning_half_life = 30.0
+        self._min_bg_learning_half_life = 1.0
+        self._object_expected_size = 0.05 #relative to ROI dimension
+
         self._max_learning_rate = 0.1
-        # self._max_learning_rate = 5e-1
         self._learning_rate = self._max_learning_rate
         self._min_learning_rate = 1e-3
         self._increment = 1.5
         self._max_area = 0.05
-        self._object_expected_size = 0.05 # proportion of the roi main axis
+
         self._bg_mean = None
         self._fg_features = None
         self._bg_sd = None
 
-        super(AdaptiveBGModel, self).__init__(roi, data)
+        super(AdvancedTracker, self).__init__(roi, data)
 
 
-    def show(self,im,t=-1):
-        cv2.imshow(str(self),im)
-        cv2.waitKey(t)
 
     def _update_fg_blob_model(self, img, contour, lr = 1e-3):
         features = self._comput_blob_features(img, contour)
@@ -218,41 +152,24 @@ class AdaptiveBGModel(BaseTracker):
 
         return out_hulls
 
-
     def _pre_process_input(self, img, mask):
 
-        grey = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+        grey = cv2.cvtColor(f,cv2.COLOR_BGR2GRAY)
 
         blur_rad = int(self._object_expected_size * np.max(grey.shape) * 2.0)
+        print blur_rad
         if blur_rad % 2 == 0:
             blur_rad += 1
 
-        #buff = cv2.medianBlur(grey,blur_rad)
-        buff = cv2.blur(grey,(blur_rad,blur_rad))
+        buff = cv2.medianBlur(grey,blur_rad)
         cv2.medianBlur(grey,3, grey)
         cv2.absdiff(grey,buff,grey)
-        # fixme, convert before
-        if mask is not None:
-            m = mask.astype(np.bool)
-            np.bitwise_not(m,m)
-            grey[m] = 0
-
-
         return grey
 
     def _find_position(self, img, mask,t):
         # TODO preallocated buffers
         #  TODO try exepect slice me with mask
-
-        # minor preprocessing
-
-        grey = self._pre_process_input(img,mask)
-
-        # if len(self._positions) == 0:
-        #
-        #     self._update_bg_model(grey)
-        #
-        #     raise NoPositionError
+        grey  = self._pre_process_input(img, mask)
 
         # fixme this should NOT be needed !
         if self._bg_mean is None:
@@ -271,9 +188,17 @@ class AdaptiveBGModel(BaseTracker):
 
         #todo make this objective
 
-        #cv2.threshold(fg,25,255,cv2.THRESH_BINARY, dst=fg)
-        cv2.threshold(fg,20,255,cv2.THRESH_BINARY , dst=fg)
-        # cv2.threshold(fg,20,255,cv2.THRESH_BINARY | cv2.THRESH_OTSU , dst=fg)
+        cv2.threshold(fg,15,255,cv2.THRESH_BINARY, dst=fg)
+
+
+
+
+
+        if mask is not None:
+            #todo test me
+            #cv2.bitwise_and(fg, mask, fg)
+            pass
+        #cv2.imshow(str(self), fg)
 
 
         if np.count_nonzero(fg) / (1.0 * img.shape[0] * img.shape[1]) > self._max_area :
@@ -289,6 +214,7 @@ class AdaptiveBGModel(BaseTracker):
         if len(contours) == 0:
             self._learning_rate *= self._increment
             self._update_bg_model(grey)
+            print "npe", 0
 
             raise NoPositionError
 
@@ -297,7 +223,7 @@ class AdaptiveBGModel(BaseTracker):
             self._learning_rate *= self._increment
             self._update_bg_model(grey)
             if self._fg_features is None:
-                print "npe"
+                print "npe", ">1"
 
                 raise NoPositionError
 
@@ -326,6 +252,7 @@ class AdaptiveBGModel(BaseTracker):
         self._update_fg_blob_model(grey, hull)
         fg.fill(0)
         cv2.drawContours( fg ,[hull],0, 1,3)
+        show(fg*255,1)
         self._update_bg_model(grey, fg)
 
 
@@ -338,3 +265,42 @@ class AdaptiveBGModel(BaseTracker):
             'h':h,
             'phi':angle
         }
+
+
+roi =  DefaultROIBuilder()(cam)
+
+tra = AdvancedTracker(*roi)
+for t,f in cam:
+    tra(t,f)
+
+
+
+#     grey = cv2.cvtColor(f,cv2.COLOR_BGR2GRAY)
+#     grey  = grey[:,0:24]
+#     blur_rad = int(_expected_size * np.max(grey.shape) * 2.0)
+#     print blur_rad
+#     if blur_rad % 2 == 0:
+#         blur_rad += 1
+#
+#     buff = cv2.medianBlur(grey,blur_rad)
+#     cv2.medianBlur(grey,5, grey)
+#     cv2.absdiff(grey,buff,buff)
+#
+#     if _bg_model is None:
+#         _bg_model = buff
+#         continue
+#
+#
+#
+#     buff2 = cv2.absdiff(buff, _bg_model)
+#
+#
+#     cv2.threshold(buff2, 7, 255,cv2.THRESH_BINARY, buff2)
+#
+#     _bg_model = np.copy(buff)
+#
+#     show(buff2,1)
+#
+#
+#
+#

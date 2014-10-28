@@ -26,7 +26,6 @@ class BaseCamera(object):
         self.restart()
         at_leat_one_frame = False
         while True:
-            print self.is_last_frame()
             if self.is_last_frame() or not self.is_opened():
                 if not at_leat_one_frame:
                     raise Exception("Camera could not read the first frame")
