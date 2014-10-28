@@ -60,10 +60,9 @@ class TrackingUnit(object):
                 return
 
                 #fixme this should be handled by tracking units themeselves
-            # if self._interactor is not None:
-            #     interactor_columns = self._interactor()
-            #     interactor_columns.index=data_row.index
-            #         #
+            if self._interactor is not None:
+                interactor_columns = self._interactor()
+                data_row.update(interactor_columns)
             #     data_row = pd.concat([data_row, interactor_columns], axis=1)
 
             return data_row

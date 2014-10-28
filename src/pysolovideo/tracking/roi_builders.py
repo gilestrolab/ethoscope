@@ -25,6 +25,8 @@ class ROI(object):
         self._rectangle = x,y,w,h
         # todo NOW! sort rois by value. if no values, left to right/ top to bottom!
 
+        self.idx = None
+
     def bounding_rect(self):
         raise NotImplementedError
 
@@ -47,7 +49,9 @@ class ROI(object):
     def longest_axis(self):
         x,y,w,h = self._rectangle
         return float(max(w, h))
-
+    @property
+    def rectangle(self):
+        return self._rectangle
 
     @property
     def value(self):
@@ -84,17 +88,18 @@ class BaseROIBuilder(object):
         rois = self._rois_from_img(accum)
 
 
-        rois = self._sort_rois(rois)
+        rois = self._spatial_sorting(rois)
+        for i,r in enumerate(rois):
+            r.idx =i
         return rois
 
 
-    def _sort_rois(self, rois):
-        # TODO Implement the left to right/top to bottom sorting algo
-        return rois
 
     def _rois_from_img(self,img):
         raise NotImplementedError
 
+    def _spatial_sorting(self, rois):
+        return [sr for sr in sorted(rois, lambda  a,b: a.rectangle[0] - b.rectangle[0])]
 
 
 class DefaultROIBuilder(BaseROIBuilder):
@@ -148,11 +153,6 @@ class SleepDepROIBuilder(BaseROIBuilder):
         dst = cv2.distanceTransform(caps, cv2.cv.CV_DIST_L2, cv2.cv.CV_DIST_MASK_PRECISE)
         show(hsv_im)
         return  self._find_best_angle(dst)
-        # todo rotate and minimise entropy of dst
-        # vert = np.mean(dst ,1)
-        #    pl.plot(vert / np.sum(vert))
-
-
 
     def _find_best_angle(self, im, min_theta=-30, max_theta=+30, theta_incr=.5 ):
 

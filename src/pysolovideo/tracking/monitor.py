@@ -40,11 +40,12 @@ class Monitor(object):
         pos = track_u.get_last_position(absolute=True)
 
         cv2.drawContours(frame,[track_u.roi.polygon],-1, (0,0,255), 1, cv2.CV_AA)
+        cv2.putText(frame, str(track_u.roi.idx+1),track_u.roi.offset, cv2.FONT_HERSHEY_COMPLEX_SMALL,0.75,(255,255,0))
 
         if pos is None:
             return
 
-        if "interact" in row and bool(row.interact.item()):
+        if "interact" in row and bool(row["interact"]):
             colour = (0, 255, 0)
         else:
             colour = (255, 0, 0)

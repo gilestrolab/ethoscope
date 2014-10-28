@@ -3,7 +3,7 @@ __author__ = 'quentin'
 import numpy as np
 import multiprocessing
 from subprocess import call
-import pandas as pd
+
 from pysolovideo.hardware_control.arduino_api import SleepDepriverInterface
 
 class BaseInteractorSync(object):
@@ -16,13 +16,11 @@ class BaseInteractorSync(object):
 
         interact, result  = self._run()
         if interact:
-            print result
-
             self._interact(**result)
 
         result["interact"] = interact
 
-        return pd.DataFrame(result, index=[None])
+        return result
 
 
     def bind_tracker(self, tracker):
@@ -53,12 +51,12 @@ class SleepDepInteractor(BaseInteractorSync):
 
         if len(positions ) <2 :
             return False, {"channel":self._channel}
-        tail_m = positions.tail(1)
-        xy_m = complex(tail_m.x + 1j * tail_m.y)
+        tail_m = positions[-1]
+        xy_m = complex(tail_m["x"] + 1j * tail_m["y"])
 
-        tail_mm = positions.tail(2).head(1)
+        tail_mm = positions[-2]
 
-        xy_mm =complex(tail_mm.x + 1j * tail_mm.y)
+        xy_mm =complex(tail_mm["x"] + 1j * tail_mm["y"])
 
         if np.abs(xy_m - xy_mm) < self._distance_threshold:
 
@@ -97,7 +95,7 @@ class BaseInteractor(object):
 
         result["interact"] = interact
 
-        return pd.DataFrame(result, index=[None])
+        return result
 
 
     def bind_tracker(self, tracker):
@@ -123,8 +121,8 @@ class BaseInteractor(object):
 class DefaultInteractor(BaseInteractor):
 
     def _run(self):
-        # does NOTHING
-        pass
+       return False, {}
+
 
 def beep(freq):
     from scikits.audiolab import play

@@ -17,30 +17,21 @@ class BaseTracker(object):
 
     def __init__(self, roi,data=None):
         self._positions =[]
-
-
         self._data = data
         self._roi = roi
-
 
     def __call__(self, t, img):
         sub_img, mask = self._roi(img)
         try:
-
             point = self._find_position(sub_img,mask,t)
             point = self.normalise_position(point)
 
         except NoPositionError:
-
             if len(self._positions) == 0:
                 return None
             else:
                 point = self._positions[-1]
-
         self._positions.append(point)
-
-
-
         return point
 
     def normalise_position(self,point):
@@ -62,7 +53,7 @@ class BaseTracker(object):
     def times(self):
         return self._positions.index
 
-    def _find_position(self,img, mask):
+    def _find_position(self,img, mask,t):
         raise NotImplementedError
 
 
@@ -81,13 +72,16 @@ class DummyTracker(BaseTracker):
 class AdaptiveBGModel(BaseTracker):
 
     def __init__(self, roi, data=None):
-        self._max_learning_rate = 0.1
-        # self._max_learning_rate = 5e-1
+        # self._max_learning_rate = 0.1
+        self._max_learning_rate = 0.01
+
         self._learning_rate = self._max_learning_rate
-        self._min_learning_rate = 1e-3
+        self._min_learning_rate = 1e-5
+        # self._min_learning_rate = 1e-3
         self._increment = 1.5
-        self._max_area = 0.05
+
         self._object_expected_size = 0.05 # proportion of the roi main axis
+        self._max_area = 10 * self._object_expected_size ** 2
         self._bg_mean = None
         self._fg_features = None
         self._bg_sd = None
@@ -160,7 +154,6 @@ class AdaptiveBGModel(BaseTracker):
 
         if self._learning_mat_buff is None:
             self._learning_mat_buff = np.ones_like(img,dtype = np.float32)
-            print "PB"
 
         self._learning_mat_buff.fill(self._learning_rate)
 
@@ -252,35 +245,16 @@ class AdaptiveBGModel(BaseTracker):
         return grey
 
     def _find_position(self, img, mask,t):
-        # TODO preallocated buffers
-        #  TODO try exepect slice me with mask
-
-        # minor preprocessing
-
+        # TODO preallocated buffers ++
         grey = self._pre_process_input(img,mask)
 
-        # if len(self._positions) == 0:
-        #
-        #     self._update_bg_model(grey)
-        #
-        #     raise NoPositionError
-
-        # fixme this should NOT be needed !
         if self._bg_mean is None:
             self._update_bg_model(grey)
-            print "fixme"
             raise NoPositionError
 
-        # fixme use preallocated buffers next line ?
+        # fixme use preallocated buffers next line
         fg = cv2.absdiff(grey, self._bg_mean.astype(np.uint8))
 
-        #fg = fg.astype(np.uint8)
-        # fixeme median bluer instead ?
-        # cv2.dilate(fg,None,fg)
-        # cv2.erode(fg,None,fg)
-
-
-        #todo make this objective
 
         #cv2.threshold(fg,25,255,cv2.THRESH_BINARY, dst=fg)
         # fixme magic number
@@ -289,7 +263,6 @@ class AdaptiveBGModel(BaseTracker):
 
 
         if np.count_nonzero(fg) / (1.0 * img.shape[0] * img.shape[1]) > self._max_area :
-
             self._learning_rate *= self._increment
             self._update_bg_model(grey)
             raise NoPositionError
@@ -317,27 +290,17 @@ class AdaptiveBGModel(BaseTracker):
             good_clust = np.argmin([self._feature_distance(cf) for cf in cluster_features])
             hull = hulls[good_clust]
 
-
-
         else:
             self._learning_rate /= self._increment
             hull = cv2.convexHull(contours[0])
             self._update_fg_blob_model(grey, hull)
 
 
-
-
         (x,y) ,(w,h), angle  = cv2.minAreaRect(hull)
-
-
-
-
 
         fg.fill(0)
         cv2.drawContours( fg ,[hull],0, 1,3)
         self._update_bg_model(grey, fg)
-
-
 
 
         return {

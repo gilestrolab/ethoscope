@@ -25,14 +25,14 @@ rb = SleepDepROIBuilder()
 
 #
 #
-# sdi = SleepDepriverInterface()
-#
-# inters = [SleepDepInteractor(i, sdi) for i in range(13)]
-#
-#
+#sdi = SleepDepriverInterface()
+#inters = [SleepDepInteractor(i, sdi) for i in range(30)]
+inters = None
 #
 #
-monit = Monitor(cam, AdaptiveBGModel, interactors= None, roi_builder=rb)
+#
+#
+monit = Monitor(cam, AdaptiveBGModel, interactors= inters, roi_builder=rb)
 monit.run()
 #
 #
