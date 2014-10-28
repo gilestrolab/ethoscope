@@ -39,15 +39,16 @@ class SleepDepInteractor(BaseInteractorSync):
         self._t0 = None
         self._channel = channel
 
-        self._distance_threshold = 1e-3
-        self._inactivity_time_threshold = 20 # s
+        self._distance_threshold = 1e-4
+        self._inactivity_time_threshold = 10 # s
 
     def _interact(self, **kwargs):
+        print "c=",self._channel
         self._sleep_dep_interface.deprive(**kwargs)
 
     def _run(self):
         positions = self._tracker.positions
-        time = self._tracker.times
+        t = self._tracker.times
 
         if len(positions ) <2 :
             return False, {"channel":self._channel}
@@ -60,7 +61,7 @@ class SleepDepInteractor(BaseInteractorSync):
 
         if np.abs(xy_m - xy_mm) < self._distance_threshold:
 
-            now = time[-1]
+            now = t[-1]
             if self._t0 is None:
                 self._t0 = now
 

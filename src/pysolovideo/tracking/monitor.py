@@ -34,23 +34,28 @@ class Monitor(object):
 
 
     def _draw_on_frame(self,track_u, row, frame):
-        if row is None:
-            return
 
         pos = track_u.get_last_position(absolute=True)
 
-        cv2.drawContours(frame,[track_u.roi.polygon],-1, (0,0,255), 1, cv2.CV_AA)
+
         cv2.putText(frame, str(track_u.roi.idx+1),track_u.roi.offset, cv2.FONT_HERSHEY_COMPLEX_SMALL,0.75,(255,255,0))
 
         if pos is None:
             return
 
-        if "interact" in row and bool(row["interact"]):
-            colour = (0, 255, 0)
-        else:
-            colour = (255, 0, 0)
+        if row["interact"]:
 
-        cv2.ellipse(frame,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),colour,1,cv2.CV_AA)
+            colour = (0, 255, 255)
+
+
+
+        else:
+            colour = (0, 0, 255)
+        cv2.drawContours(frame,[track_u.roi.polygon],-1, colour, 1, cv2.CV_AA)
+
+        cv2.ellipse(frame,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),(255,0,0),1,cv2.CV_AA)
+
+
 
 
 
@@ -61,16 +66,22 @@ class Monitor(object):
 
         for t, frame in self._camera:
             copy = frame.copy()
-            for track_u in self._unit_trackers:
+            to_wait = 1
+            for i,track_u in enumerate(self._unit_trackers):
 
                 data_row = track_u(t, frame)
-                if data_row is not None:
-                    out.append(data_row)
+                if data_row is None:
+                    continue
+                out.append(data_row)
 
                 self._draw_on_frame(track_u, data_row, copy)
 
+                if "interact" in data_row and bool(data_row["interact"]):
+                    print i+1
+                    to_wait = -1
 
             cv2.imshow("el", copy)
-            cv2.waitKey(1)
+
+            cv2.waitKey(to_wait)
             print t / 60.
 

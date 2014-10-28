@@ -71,24 +71,19 @@ class BaseROIBuilder(object):
 
     def __call__(self, camera):
 
-        accum = None
+        accum = []
         for i, (_, frame) in enumerate(camera):
-            if accum is None:
-                accum = np.zeros_like(frame,dtype=np.uint16)
-            accum += frame
+            accum.append(frame)
             if i  >= 10:
                 break
 
-        accum /= 10
-        accum = accum.astype(np.uint8)
-
-
-
+        accum = np.median(np.array(accum),0).astype(np.uint8)
 
         rois = self._rois_from_img(accum)
 
 
         rois = self._spatial_sorting(rois)
+
         for i,r in enumerate(rois):
             r.idx =i
         return rois
@@ -116,14 +111,14 @@ class DefaultROIBuilder(BaseROIBuilder):
 
 
 
-def show(im):
-    return
+def show(im, t=-1):
+
     cv2.imshow("test", im)
-    cv2.waitKey(-1)
+    cv2.waitKey(t)
 
 
 class SleepDepROIBuilder(BaseROIBuilder):
-
+    _n_rois = 32
 
     def _rois_from_img(self,im):
         rot_mat= self._best_image_rotation(im)
@@ -136,13 +131,14 @@ class SleepDepROIBuilder(BaseROIBuilder):
     def _best_image_rotation(self, im):
         hsv_im = cv2.cvtColor(im,cv2.COLOR_BGR2HSV)
         s_im = hsv_im[:,:,1]
-        v_im = 255 - hsv_im[:,:,2]
-        s_im = cv2.medianBlur(s_im,7)
-        v_im = cv2.medianBlur(v_im,7)
 
-        med = cv2.medianBlur(s_im,51)
+        v_im = 255 - hsv_im[:,:,2]
+        s_im = cv2.medianBlur(s_im,5)
+        v_im = cv2.medianBlur(v_im,5)
+
+        med = cv2.medianBlur(s_im,101)
         cv2.subtract(s_im,med,s_im)
-        med = cv2.medianBlur(v_im,51)
+        med = cv2.medianBlur(v_im,101)
         cv2.subtract(v_im,med,v_im)
 
 
@@ -151,7 +147,7 @@ class SleepDepROIBuilder(BaseROIBuilder):
 
         caps = cv2.bitwise_and(v_im,s_im)
         dst = cv2.distanceTransform(caps, cv2.cv.CV_DIST_L2, cv2.cv.CV_DIST_MASK_PRECISE)
-        show(hsv_im)
+        show(hsv_im,1)
         return  self._find_best_angle(dst)
 
     def _find_best_angle(self, im, min_theta=-30, max_theta=+30, theta_incr=.5 ):
@@ -168,7 +164,7 @@ class SleepDepROIBuilder(BaseROIBuilder):
             if entr > min_entr:
                 min_entr = entr
                 best_rot_mat = M
-                show(rotated_im)
+                show(rotated_im,100)
 
 
 
@@ -182,12 +178,12 @@ class SleepDepROIBuilder(BaseROIBuilder):
         hsv_im = cv2.cvtColor(rotated_im,cv2.COLOR_BGR2HSV)
         s_im = hsv_im[:,:,1]
         v_im = 255 - hsv_im[:,:,2]
-        s_im = cv2.medianBlur(s_im,7)
-        v_im = cv2.medianBlur(v_im,7)
+        s_im = cv2.medianBlur(s_im,5)
+        v_im = cv2.medianBlur(v_im,5)
 
-        med = cv2.medianBlur(s_im,51)
+        med = cv2.medianBlur(s_im,101)
         cv2.subtract(s_im,med,s_im)
-        med = cv2.medianBlur(v_im,51)
+        med = cv2.medianBlur(v_im,101)
         cv2.subtract(v_im,med,v_im)
 
 
@@ -196,29 +192,35 @@ class SleepDepROIBuilder(BaseROIBuilder):
 
         caps = cv2.bitwise_and(v_im,s_im)
 
+
         contours, h = cv2.findContours(caps,cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
 
 
 
         centres, wh = [],[]
+
         for c in contours:
             moms = cv2.moments(c)
+            if moms["m00"] == 0:
+                continue
             xy = moms["m10"]/moms["m00"]+ 1j *  moms["m01"]/moms["m00"]
 
 
 
             centres.append(xy)
             x0,y0,w,h =  cv2.boundingRect(c)
-            #print w -h) / float(max(w,h))
-            if min(h,w) / float(max(w,h)) < 0.5:
+            if min(h,w) / float(max(w,h)) < 0.6:
                 continue
             if w > caps.shape[0] / 10. or h > caps.shape[0] / 10.:
                 continue
 
             wh.append(w + 1j * h)
 
+            cv2.drawContours(rotated_im, [c], 0,(255,0,0),-1)
+        show(rotated_im)
 
-        average_wh = np.mean(wh)
+
+        average_wh = np.median(wh)
         # pl.plot(np.real(centres),np.imag(centres),"o");pl.show()
 
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
@@ -231,35 +233,51 @@ class SleepDepROIBuilder(BaseROIBuilder):
 
         top_lab = np.argmin(centroids)
 
-        top_pos = np.min(centroids)
-        bottom_pos = np.max(centroids)
+        top_pos = int(np.median([tx for tx,l in zip(np.imag(centres),labels) if l == top_lab]))
+        bottom_pos = int(np.median([tx for tx,l in zip(np.imag(centres),labels) if l != top_lab]))
 
         aw, ah = np.real(average_wh), np.imag(average_wh)
 
-        rois = []
+
 
         mask = np.zeros_like(caps)
 
-        for x,l in zip(np.real(centres),  labels):
+        shrink = 3.5
+        print "z", len(centres)
 
-            a = (x - aw/2.9, top_pos + ah)
-            b = (x + aw/2.9, top_pos + ah)
-            d = (x - aw/2.9, bottom_pos  - ah)
-            c = (x + aw/2.9, bottom_pos - ah)
+        scores = []
+        polygs = []
+        for y, x in zip(np.imag(centres), np.real(centres)):
 
-            pol = np.array([a,b,c,d])
-            #todo here: remap according to the invert rotation matrix ;)
+            scores.append(min(abs(y - bottom_pos), abs(y - top_pos)))
 
+            a = (x - aw/shrink, top_pos + ah)
+            b = (x + aw/shrink, top_pos + ah)
+            d = (x - aw/shrink, bottom_pos  - ah)
+            c = (x + aw/shrink, bottom_pos - ah)
+
+            polygs.append(np.array([a,b,c,d]))
+
+        polygs = [polygs[i] for i in np.argsort(scores)][0:self._n_rois]
+
+
+        cv2.rectangle(rotated_im, (0, top_pos), (im.shape[1], bottom_pos),(0,0,255),3)
+
+        for pol,s   in zip(polygs,sorted(scores)):
             pol = pol.astype(np.int).reshape(4,1,2)
             cv2.drawContours(mask, [pol], 0,255,-1)
-        show(mask)
+            cv2.drawContours(rotated_im, [pol], 0,(0,0,255),-1)
+            print s
+            show(rotated_im)
 
         i_rot_mat = cv2.invertAffineTransform(rot_mat)
         mask= cv2.warpAffine(mask, i_rot_mat, (im.shape[1],im.shape[0]))
         cv2.threshold(mask,128,255,cv2.THRESH_BINARY,mask)
-        show(mask)
+
 
         contours, hiera = cv2.findContours(np.copy(mask), cv.CV_RETR_EXTERNAL, cv.CV_CHAIN_APPROX_SIMPLE)
+        cv2.drawContours(im,contours,-1,(255,0,0), 3)
+        show(im)
 
         rois = []
         for c in contours:
@@ -267,7 +285,8 @@ class SleepDepROIBuilder(BaseROIBuilder):
             cv2.drawContours(tmp_mask, [c],0, 255 )
 
             rois.append(ROI(c, None))
-
+        print len(rois)
+        assert(len(rois) == self._n_rois)
         return rois
 
 class ImgMaskROIBuilder(BaseROIBuilder):

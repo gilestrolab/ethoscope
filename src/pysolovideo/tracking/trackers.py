@@ -17,6 +17,7 @@ class BaseTracker(object):
 
     def __init__(self, roi,data=None):
         self._positions =[]
+        self._times =[]
         self._data = data
         self._roi = roi
 
@@ -32,6 +33,7 @@ class BaseTracker(object):
             else:
                 point = self._positions[-1]
         self._positions.append(point)
+        self._times.append(t)
         return point
 
     def normalise_position(self,point):
@@ -51,7 +53,7 @@ class BaseTracker(object):
 
     @property
     def times(self):
-        return self._positions.index
+        return self._times
 
     def _find_position(self,img, mask,t):
         raise NotImplementedError
