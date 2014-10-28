@@ -4,7 +4,6 @@ import numpy as np
 import cv2
 import itertools
 import roi_builders
-import pandas as pd
 
 
 
@@ -17,7 +16,7 @@ class BaseTracker(object):
 
 
     def __init__(self, roi,data=None):
-        self._positions = pd.DataFrame()
+        self._positions =[]
 
 
         self._data = data
@@ -26,32 +25,29 @@ class BaseTracker(object):
 
     def __call__(self, t, img):
         sub_img, mask = self._roi(img)
-
         try:
 
             point = self._find_position(sub_img,mask,t)
-
-            point = pd.DataFrame(point,index=[t])
             point = self.normalise_position(point)
 
         except NoPositionError:
+
             if len(self._positions) == 0:
                 return None
             else:
+                point = self._positions[-1]
 
-                point = self._positions.tail(1)
+        self._positions.append(point)
 
 
-
-        self._positions = self._positions.append(point)
 
         return point
 
     def normalise_position(self,point):
-        point.x = point.x / self._roi.longest_axis
-        point.y = point.y / self._roi.longest_axis
-        point.w = point.w / self._roi.longest_axis
-        point.h = point.h / self._roi.longest_axis
+        point["x"] /= self._roi.longest_axis
+        point["y"] /=  self._roi.longest_axis
+        point["w"] /=  self._roi.longest_axis
+        point["h"] /= self._roi.longest_axis
         return point
 
 
@@ -95,6 +91,7 @@ class AdaptiveBGModel(BaseTracker):
         self._bg_mean = None
         self._fg_features = None
         self._bg_sd = None
+        self._learning_mat_buff = None
 
         super(AdaptiveBGModel, self).__init__(roi, data)
 
@@ -118,16 +115,17 @@ class AdaptiveBGModel(BaseTracker):
 
         roi = img[y : y + h, x : x + w]
         mask = np.zeros_like(roi)
-        cv2.drawContours(mask,[hull],-1, 1,-1,offset=(-x,-y))
 
-        mean_col = cv2.mean(roi,mask)[0]
-
+        #
+        # cv2.drawContours(mask,[hull],-1, 1,-1,offset=(-x,-y))
+        # mean_col = cv2.mean(roi,mask)[0]
+        mean_col = 0
 
         if len(self.positions) > 2:
 
-            last_two_pos = self._positions.tail(2)
-            xm, xmm = last_two_pos.x
-            ym, ymm = last_two_pos.y
+            pm, pmm = self._positions[-1],self._positions[-2]
+            xm, xmm = pm["x"], pmm["x"]
+            ym, ymm = pm["y"], pmm["y"]
 
             instantaneous_speed = abs(xm + 1j*ym - xmm + 1j*ymm)
         else:
@@ -160,13 +158,25 @@ class AdaptiveBGModel(BaseTracker):
             self._bg_mean = np.copy(img)
             #self._bg_sd = img
 
-        learning_mat = np.ones_like(img,dtype = np.float32) * np.float32(self._learning_rate)
+        if self._learning_mat_buff is None:
+            self._learning_mat_buff = np.ones_like(img,dtype = np.float32)
+            print "PB"
+
+        self._learning_mat_buff.fill(self._learning_rate)
+
         if fgmask is not None:
             cv2.dilate(fgmask,None,fgmask)
             # cv2.dilate(fgmask,None,fgmask)
-            learning_mat[fgmask.astype(np.bool)] = 0
+            self._learning_mat_buff[fgmask.astype(np.bool)] = 0
 
-        self._bg_mean = learning_mat * img  + (1 - learning_mat) * self._bg_mean
+
+        buff = 1. - self._learning_mat_buff
+        np.multiply(buff, self._bg_mean,buff)
+
+        np.multiply(self._learning_mat_buff, img, self._learning_mat_buff)
+
+
+        self._bg_mean = self._learning_mat_buff  + buff
 
         # self._bg_sd = learning_mat * np.abs(self._bg_mean - img)  + (1 - learning_mat) * self._bg_sd
 
@@ -228,8 +238,9 @@ class AdaptiveBGModel(BaseTracker):
             blur_rad += 1
 
         #buff = cv2.medianBlur(grey,blur_rad)
-        buff = cv2.blur(grey,(blur_rad,blur_rad))
-        cv2.medianBlur(grey,3, grey)
+        buff = np.zeros_like(grey)
+        cv2.blur(grey,(blur_rad,blur_rad),buff)
+        cv2.GaussianBlur(grey,(5,5), 2.5,grey)
         cv2.absdiff(grey,buff,grey)
         # fixme, convert before
         if mask is not None:
@@ -272,6 +283,7 @@ class AdaptiveBGModel(BaseTracker):
         #todo make this objective
 
         #cv2.threshold(fg,25,255,cv2.THRESH_BINARY, dst=fg)
+        # fixme magic number
         cv2.threshold(fg,20,255,cv2.THRESH_BINARY , dst=fg)
         # cv2.threshold(fg,20,255,cv2.THRESH_BINARY | cv2.THRESH_OTSU , dst=fg)
 
@@ -289,7 +301,6 @@ class AdaptiveBGModel(BaseTracker):
         if len(contours) == 0:
             self._learning_rate *= self._increment
             self._update_bg_model(grey)
-
             raise NoPositionError
 
 
@@ -297,8 +308,6 @@ class AdaptiveBGModel(BaseTracker):
             self._learning_rate *= self._increment
             self._update_bg_model(grey)
             if self._fg_features is None:
-                print "npe"
-
                 raise NoPositionError
 
             hulls = [cv2.convexHull( c) for c in contours]
@@ -313,7 +322,7 @@ class AdaptiveBGModel(BaseTracker):
         else:
             self._learning_rate /= self._increment
             hull = cv2.convexHull(contours[0])
-
+            self._update_fg_blob_model(grey, hull)
 
 
 
@@ -323,7 +332,7 @@ class AdaptiveBGModel(BaseTracker):
 
 
 
-        self._update_fg_blob_model(grey, hull)
+
         fg.fill(0)
         cv2.drawContours( fg ,[hull],0, 1,3)
         self._update_bg_model(grey, fg)

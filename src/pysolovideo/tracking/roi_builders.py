@@ -112,6 +112,7 @@ class DefaultROIBuilder(BaseROIBuilder):
 
 
 def show(im):
+    return
     cv2.imshow("test", im)
     cv2.waitKey(-1)
 
