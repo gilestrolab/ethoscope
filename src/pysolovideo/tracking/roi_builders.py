@@ -119,35 +119,72 @@ def show(im, t=-1):
 
 class SleepDepROIBuilder(BaseROIBuilder):
     _n_rois = 32
-
+    _adaptive_med_rad = 0.075
+    _min_food_tip_area = 1e-4
+    _max_food_tip_area = 2e-3
+    _min_food_tip_circularity = 0.75
+    _tube_over_tip_ratio = 1/3.5
     def _rois_from_img(self,im):
+
         rot_mat= self._best_image_rotation(im)
 
         rois = self._make_rois(im, rot_mat)
         return rois
 
+    def _score_food_tip_blobs(self,contour, im):
+        h, w = im.shape[0:2]
 
+        area = cv2.contourArea(contour)
+        if area <0 :
+            return 0
+        perim = cv2.arcLength(contour,True)
+
+        area_ratio = area / (1.0*w*h)
+
+        if area_ratio < self._min_food_tip_area:
+            return 0
+        if area_ratio > self._max_food_tip_area:
+            return 0
+
+        circul =  4 * np.pi * area / perim **2
+        if circul < self._min_food_tip_circularity :
+            return 0
+        return 1
+
+    def _find_blobs(self, im, scoring_fun):
+        grey= cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
+        rad = int(self._adaptive_med_rad * im.shape[1])
+        if rad % 2 == 0:
+            rad += 1
+        # cv2.medianBlur(grey, 5,grey)
+        cv2.erode(grey, None,grey, iterations=2)
+        cv2.dilate(grey,None,grey, iterations=2)
+        med = cv2.medianBlur(grey, rad)
+        cv2.subtract(med, grey, dst = med)
+        show(med)
+        bin = grey
+        score_map = np.zeros_like(bin)
+        for t in range(0, 255,1):
+            cv2.threshold(med, t, 255,cv2.THRESH_BINARY,bin)
+            if np.count_nonzero(bin) < self._adaptive_med_rad**2  * im.shape[0] * im.shape[1]:
+                break
+            if np.count_nonzero(bin) > 0.3 * im.shape[0] * im.shape[1]:
+                continue
+            contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
+
+            bin.fill(0)
+            for c in contours:
+                score = scoring_fun(c, im)
+                if score >0:
+                    cv2.drawContours(bin,[c],0,score,-1)
+            cv2.add(bin, score_map,score_map)
+        return score_map
 
     def _best_image_rotation(self, im):
-        hsv_im = cv2.cvtColor(im,cv2.COLOR_BGR2HSV)
-        s_im = hsv_im[:,:,1]
+        score_map = self._find_blobs(im, self._score_food_tip_blobs)
+        cv2.threshold(score_map, -1,255,cv2.THRESH_OTSU | cv2.THRESH_BINARY, score_map)
 
-        v_im = 255 - hsv_im[:,:,2]
-        s_im = cv2.medianBlur(s_im,5)
-        v_im = cv2.medianBlur(v_im,5)
-
-        med = cv2.medianBlur(s_im,101)
-        cv2.subtract(s_im,med,s_im)
-        med = cv2.medianBlur(v_im,101)
-        cv2.subtract(v_im,med,v_im)
-
-
-        cv2.threshold(s_im,-1,255,cv2.THRESH_OTSU | cv2.THRESH_BINARY,s_im)
-        cv2.threshold(v_im,-1,255,cv2.THRESH_OTSU | cv2.THRESH_BINARY,v_im)
-
-        caps = cv2.bitwise_and(v_im,s_im)
-        dst = cv2.distanceTransform(caps, cv2.cv.CV_DIST_L2, cv2.cv.CV_DIST_MASK_PRECISE)
-        show(hsv_im,1)
+        dst = cv2.distanceTransform(score_map, cv2.cv.CV_DIST_L2, cv2.cv.CV_DIST_MASK_PRECISE)
         return  self._find_best_angle(dst)
 
     def _find_best_angle(self, im, min_theta=-30, max_theta=+30, theta_incr=.5 ):
@@ -164,129 +201,168 @@ class SleepDepROIBuilder(BaseROIBuilder):
             if entr > min_entr:
                 min_entr = entr
                 best_rot_mat = M
-                show(rotated_im,100)
-
-
-
+                show(rotated_im,10)
         return best_rot_mat
 
+
+
+    def _score_cotton_wool_blobs(self,contour, im, w_food_tip):
+
+        x,y,w,h = cv2.boundingRect(contour)
+        print w,h, w_food_tip
+
+        if w > w_food_tip:
+            return 0
+
+        if w < w_food_tip/2.0:
+            return 0
+        if h > w_food_tip *5.0:
+            return 0
+        if h < w_food_tip/5.0:
+            return 0
+
+        return 1
+
+    def _find_cotton_plugs(self, im, w_food_tip, top_pos, bottom_pos):
+
+        score_fun = lambda c, im: self._score_cotton_wool_blobs(c, im, w_food_tip)
+
+        score_mat = self._find_blobs(im,score_fun)
+
+        score_mat[0:top_pos+w_food_tip,:] = 0
+        score_mat[bottom_pos - w_food_tip:,:] = 0
+        return score_mat
+
+
     def _make_rois(self, im, rot_mat):
-        #todo watershed/ morph snakes
-        print im.shape
+
         rotated_im = cv2.warpAffine(im, rot_mat, (im.shape[1],im.shape[0]))
-        #show(rotated_im)
-        hsv_im = cv2.cvtColor(rotated_im,cv2.COLOR_BGR2HSV)
-        s_im = hsv_im[:,:,1]
-        v_im = 255 - hsv_im[:,:,2]
-        s_im = cv2.medianBlur(s_im,5)
-        v_im = cv2.medianBlur(v_im,5)
 
-        med = cv2.medianBlur(s_im,101)
-        cv2.subtract(s_im,med,s_im)
-        med = cv2.medianBlur(v_im,101)
-        cv2.subtract(v_im,med,v_im)
+        score_map = self._find_blobs(rotated_im,self._score_food_tip_blobs)
+        m = np.mean(score_map,1).astype(np.uint8)
 
-
-        cv2.threshold(s_im,-1,255,cv2.THRESH_OTSU | cv2.THRESH_BINARY,s_im)
-        cv2.threshold(v_im,-1,255,cv2.THRESH_OTSU | cv2.THRESH_BINARY,v_im)
-
-        caps = cv2.bitwise_and(v_im,s_im)
-
-
-        contours, h = cv2.findContours(caps,cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
-
-
+        mean_mat = np.zeros_like(score_map.T)
+        mean_mat = (mean_mat + m).T
+        cv2.threshold(mean_mat, 1.0,255,cv2.THRESH_BINARY, mean_mat)
+        cv2.threshold(score_map, 5,255,cv2.THRESH_BINARY, score_map)
+        cv2.bitwise_and(score_map, mean_mat, mean_mat)
+        contours, h = cv2.findContours(mean_mat,cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
 
         centres, wh = [],[]
 
         for c in contours:
+            if self._score_food_tip_blobs(c, mean_mat) <1:
+                continue
             moms = cv2.moments(c)
+
             if moms["m00"] == 0:
                 continue
+
             xy = moms["m10"]/moms["m00"]+ 1j *  moms["m01"]/moms["m00"]
-
-
-
             centres.append(xy)
             x0,y0,w,h =  cv2.boundingRect(c)
-            if min(h,w) / float(max(w,h)) < 0.6:
-                continue
-            if w > caps.shape[0] / 10. or h > caps.shape[0] / 10.:
-                continue
-
             wh.append(w + 1j * h)
 
-            cv2.drawContours(rotated_im, [c], 0,(255,0,0),-1)
-        show(rotated_im)
-
+        if len(contours) != self._n_rois:
+            raise Exception("Wrong number of ROIs")
 
         average_wh = np.median(wh)
-        # pl.plot(np.real(centres),np.imag(centres),"o");pl.show()
+
 
         criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-
-        # Set flags (Just to avoid line break in the code)
         flags = cv2.KMEANS_RANDOM_CENTERS
-
         compactness,labels,centroids = cv2.kmeans(np.imag(centres).astype(np.float32),2,criteria,attempts=3,flags=flags)
         centroids = centroids.flatten()
-
         top_lab = np.argmin(centroids)
-
         top_pos = int(np.median([tx for tx,l in zip(np.imag(centres),labels) if l == top_lab]))
         bottom_pos = int(np.median([tx for tx,l in zip(np.imag(centres),labels) if l != top_lab]))
 
         aw, ah = np.real(average_wh), np.imag(average_wh)
 
+        wool_plugs = self._find_cotton_plugs(rotated_im , aw, top_pos, bottom_pos)
+        cv2.threshold(wool_plugs, 5,255,cv2.THRESH_BINARY,wool_plugs)
+
+        half_w = int(aw*0.5)
+        mid_pos = (top_pos + bottom_pos) / 2
 
 
-        mask = np.zeros_like(caps)
+        all_tube_widths = []
+        all_tube_heights= []
+        wool_xs = []
+        for xfd, l in zip(np.real(centres), labels):
 
-        shrink = 3.5
-        print "z", len(centres)
+            if l == top_lab:
+                y_start = mid_pos
+                y_stop = bottom_pos - half_w * 2
 
-        scores = []
-        polygs = []
-        for y, x in zip(np.imag(centres), np.real(centres)):
+            else:
+                y_start = top_pos + half_w * 2
+                y_stop = mid_pos
 
-            scores.append(min(abs(y - bottom_pos), abs(y - top_pos)))
+            sub_img = wool_plugs[ y_start : y_stop, xfd-half_w : xfd + half_w ]
+            contours, hiera = cv2.findContours(np.copy(sub_img), cv.CV_RETR_EXTERNAL, cv.CV_CHAIN_APPROX_SIMPLE)
 
-            a = (x - aw/shrink, top_pos + ah)
-            b = (x + aw/shrink, top_pos + ah)
-            d = (x - aw/shrink, bottom_pos  - ah)
-            c = (x + aw/shrink, bottom_pos - ah)
+            if len(contours) < 1:
+                raise Exception("Cotton Wool plug not found")
 
-            polygs.append(np.array([a,b,c,d]))
+            areas = []
+            for c in contours:
+                if c.shape[0] < 3:
+                    areas.append(0)
+                else:
+                    areas.append(cv2.contourArea(c))
 
-        polygs = [polygs[i] for i in np.argsort(scores)][0:self._n_rois]
+            max_area_idx = np.argmax(areas)
+            ct = contours[max_area_idx]
+            (x,y), (w,h), phi = cv2.fitEllipse(ct)
+            wool_xs.append(xfd - half_w + x)
+            all_tube_widths.append(w)
+            th = y  + h/2
+
+            if l == top_lab:
+                th  = th + mid_pos - top_pos
+            else:
+                th  = sub_img.shape[0]-th + (bottom_pos - mid_pos)
+
+            all_tube_heights.append(th)
+
+        average_tube_half_w = np.median(all_tube_widths)/2.0
+        average_tube_h = np.median(all_tube_heights)
 
 
-        cv2.rectangle(rotated_im, (0, top_pos), (im.shape[1], bottom_pos),(0,0,255),3)
+        mask = np.zeros_like(mean_mat)
+        for xfd, xw, l in zip(np.real(centres), wool_xs, labels):
 
-        for pol,s   in zip(polygs,sorted(scores)):
-            pol = pol.astype(np.int).reshape(4,1,2)
+            if l == top_lab:
+                a = (xfd - average_tube_half_w , top_pos + average_tube_h)
+                b = (xfd + average_tube_half_w , top_pos + average_tube_h)
+                c = (xw + average_tube_half_w , top_pos + aw)
+                d = (xw - average_tube_half_w , top_pos + aw)
+
+            else:
+                a = (xw - average_tube_half_w , bottom_pos - average_tube_h)
+                b = (xw + average_tube_half_w , bottom_pos - average_tube_h)
+                c = (xfd + average_tube_half_w , bottom_pos - aw)
+                d = (xfd - average_tube_half_w , bottom_pos - aw)
+
+            pol = np.array([a,b,c,d]).astype(np.int)
+            pol = pol.reshape(4,1,2)
             cv2.drawContours(mask, [pol], 0,255,-1)
-            cv2.drawContours(rotated_im, [pol], 0,(0,0,255),-1)
-            print s
-            show(rotated_im)
 
         i_rot_mat = cv2.invertAffineTransform(rot_mat)
+
         mask= cv2.warpAffine(mask, i_rot_mat, (im.shape[1],im.shape[0]))
-        cv2.threshold(mask,128,255,cv2.THRESH_BINARY,mask)
-
-
+        cv2.threshold(mask,254,255,cv2.THRESH_BINARY,mask)
         contours, hiera = cv2.findContours(np.copy(mask), cv.CV_RETR_EXTERNAL, cv.CV_CHAIN_APPROX_SIMPLE)
-        cv2.drawContours(im,contours,-1,(255,0,0), 3)
-        show(im)
 
         rois = []
         for c in contours:
             tmp_mask = np.zeros_like(mask)
             cv2.drawContours(tmp_mask, [c],0, 255 )
-
             rois.append(ROI(c, None))
-        print len(rois)
-        assert(len(rois) == self._n_rois)
+
+        if len(rois) != self._n_rois:
+            raise Exception("Unknown error, the total number of ROIs is different from the target")
         return rois
 
 class ImgMaskROIBuilder(BaseROIBuilder):
