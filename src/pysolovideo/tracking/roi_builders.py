@@ -290,12 +290,12 @@ class SleepDepROIBuilder(BaseROIBuilder):
 
         cv2.threshold(score_map, 5,255,cv2.THRESH_BINARY, score_map)
 
-
+        # show(score_map / 2 + tube_row_mat/2)
         cv2.bitwise_and(score_map, tube_row_mat, tube_row_mat)
 
         contours, h = cv2.findContours(np.copy(tube_row_mat),cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
 
-        centres, wh = [],[]
+        areas, centres, wh = [], [], []
 
 
         for c in contours:
@@ -311,11 +311,16 @@ class SleepDepROIBuilder(BaseROIBuilder):
             centres.append(xy)
             x0,y0,w,h =  cv2.boundingRect(c)
             wh.append(w + 1j * h)
+            areas.append(moms["m00"])
 
 
-
-        if len(centres) != self._n_rois:
+        if len(centres) < self._n_rois:
             raise Exception("Wrong number of ROIs")
+        elif len(centres) > self._n_rois:
+            ranks = np.argsort(areas)[::-1]
+            ranks = ranks[0:self._n_rois]
+            centres = np.array(centres)[ranks]
+            wh = np.array(wh)[ranks]
 
         average_wh = np.median(wh)
 
