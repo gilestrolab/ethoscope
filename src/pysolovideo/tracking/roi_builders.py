@@ -121,10 +121,10 @@ def show(im, t=-1):
 
 class SleepDepROIBuilder(BaseROIBuilder):
     _n_rois = 32
-    _adaptive_med_rad = 0.075
+    _adaptive_med_rad = 0.070
     _min_food_tip_area = 1e-4
     _max_food_tip_area = 2e-3
-    _min_food_tip_circularity = 0.65
+    _min_food_tip_ar = 0.65
     _tube_over_tip_ratio = 1/3.5
     def _rois_from_img(self,im):
 
@@ -135,7 +135,6 @@ class SleepDepROIBuilder(BaseROIBuilder):
 
     def _score_food_tip_blobs(self,contour, im):
         h, w = im.shape[0:2]
-
         area = cv2.contourArea(contour)
         if area <0 :
             return 0
@@ -145,12 +144,17 @@ class SleepDepROIBuilder(BaseROIBuilder):
 
         if area_ratio < self._min_food_tip_area:
             return 0
+
         if area_ratio > self._max_food_tip_area:
             return 0
 
-        circul =  4 * np.pi * area / perim **2
-        if circul < self._min_food_tip_circularity :
-            return 0
+        x,y,w,h  = cv2.boundingRect(contour)
+
+
+        aspect_ratio = min(w,h) / float(max(w,h))
+        if aspect_ratio < self._min_food_tip_ar:
+             return 0
+
         return 1
 
     def _find_blobs(self, im, scoring_fun):
@@ -182,7 +186,6 @@ class SleepDepROIBuilder(BaseROIBuilder):
             cv2.add(bin, score_map,score_map)
         cv2.dilate(score_map,None,score_map, iterations=2)
         cv2.erode(score_map, None,score_map, iterations=2)
-        show(score_map * 10)
         return score_map
 
     def _best_image_rotation(self, im):
@@ -248,24 +251,56 @@ class SleepDepROIBuilder(BaseROIBuilder):
         rotated_im = cv2.warpAffine(im, rot_mat, (im.shape[1],im.shape[0]))
 
         score_map = self._find_blobs(rotated_im,self._score_food_tip_blobs)
-        m = np.mean(score_map,1).astype(np.uint8)
+        m = np.mean(score_map,1)
 
-        mean_mat = np.zeros_like(score_map.T)
-        mean_mat = (mean_mat + m).T
-        #fixme  rationale for 4. ?!
-        # use continuity assumption instead
 
-        cv2.threshold(mean_mat, 10.,255,cv2.THRESH_BINARY, mean_mat)
+        t = np.percentile(m, 100 * (1. - self._adaptive_med_rad * 2))
+
+        mm = np.zeros_like(m)
+        mm[m >= t] = 1
+
+
+        # find continuous regions in vector:
+        stop_start = []
+        area_under_curves = []
+        start = None
+
+        for i, v in enumerate(np.diff(mm)):
+            if v == 1:
+                start = i
+            elif v == -1 or i == m.size:
+                stop = i
+                if start is not None:
+                    stop_start.append((start,stop))
+                    area_under_curves.append(np.sum(m[start:stop]))
+                start = None
+
+        if len(stop_start) < 2:
+            raise Exception("At leat one row of tube tips could not be detected")
+
+        rank_auc = np.argsort(area_under_curves)
+        rank_auc = rank_auc[::-1]
+
+        tube_row_mat = np.zeros_like(score_map)
+
+        for r in rank_auc[0:2]:
+            start,stop = stop_start[r]
+            tube_row_mat[start:stop,:] = 255
+
+
         cv2.threshold(score_map, 5,255,cv2.THRESH_BINARY, score_map)
 
-        cv2.bitwise_and(score_map, mean_mat, mean_mat)
 
-        contours, h = cv2.findContours(np.copy(mean_mat),cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
+        cv2.bitwise_and(score_map, tube_row_mat, tube_row_mat)
+
+        contours, h = cv2.findContours(np.copy(tube_row_mat),cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
 
         centres, wh = [],[]
 
+
         for c in contours:
-            if self._score_food_tip_blobs(c, mean_mat) <1:
+            if self._score_food_tip_blobs(c, tube_row_mat) <1:
+                raise Exception("At least one row of tube tips could not be detected")
                 continue
             moms = cv2.moments(c)
 
@@ -279,7 +314,7 @@ class SleepDepROIBuilder(BaseROIBuilder):
 
 
 
-        if len(contours) != self._n_rois:
+        if len(centres) != self._n_rois:
             raise Exception("Wrong number of ROIs")
 
         average_wh = np.median(wh)
@@ -301,8 +336,6 @@ class SleepDepROIBuilder(BaseROIBuilder):
         wool_plugs[bottom_pos - aw:] = 0
 
         cv2.threshold(wool_plugs, 5,255,cv2.THRESH_BINARY,wool_plugs)
-        show(wool_plugs, -1 )
-
 
         mid_pos = (top_pos + bottom_pos) / 2
 
@@ -311,7 +344,7 @@ class SleepDepROIBuilder(BaseROIBuilder):
         all_tube_heights= []
         wool_xs = []
 
-        show(wool_plugs+mean_mat, -1)
+
         all_plugs_contours, hiera = cv2.findContours(np.copy(wool_plugs), cv.CV_RETR_EXTERNAL, cv.CV_CHAIN_APPROX_SIMPLE)
 
 
@@ -343,9 +376,10 @@ class SleepDepROIBuilder(BaseROIBuilder):
             max_area_idx = np.argmax(areas)
             ct = contours[max_area_idx]
 
-            # FIXME no fit ellipse here! enter of mass of the hull instead?
+            moms = cv2.moments(ct)
 
-            (x,y), (w,h), phi = cv2.fitEllipse(ct)
+            x, y = moms["m10"]/moms["m00"],   moms["m01"]/moms["m00"]
+
 
 
             dists = [cv2.pointPolygonTest(rc,(x + xfd-half_w,  y+y_start ), True) for rc in all_plugs_contours]
@@ -355,7 +389,12 @@ class SleepDepROIBuilder(BaseROIBuilder):
 
             cv2.drawContours(rotated_im, [real_contour],-1, (0,255,255),2)
             rotated_im[ y_start : y_stop, xfd-half_w : xfd + half_w,: ] /= 2
-            show(rotated_im)
+            # cv2.drawContours(rotated_im, [real_contour],-1, (0,255,255),2)
+
+            # rotated_im[ y_start : y_stop, xfd-half_w : xfd + half_w,: ] /= 2
+            # cv2.circle(rotated_im,(int(x + xfd-half_w), int(y+y_start)),3, (0,255,255),2)
+            # show(rotated_im)
+
             (x,y), (w,h), phi = cv2.fitEllipse(real_contour)
 
             x -= ( xfd-half_w)
@@ -377,8 +416,8 @@ class SleepDepROIBuilder(BaseROIBuilder):
         average_tube_h = np.median(all_tube_heights)
 
 
-        final_mask = np.zeros_like(mean_mat)
-        tmp_mask = np.zeros_like(mean_mat)
+        final_mask = np.zeros_like(tube_row_mat)
+        tmp_mask = np.zeros_like(tube_row_mat)
 
         for xfd, xw, l in zip(np.real(centres), wool_xs, labels):
 
@@ -401,9 +440,10 @@ class SleepDepROIBuilder(BaseROIBuilder):
 
             cv2.bitwise_xor(tmp_mask,final_mask, final_mask)
             cv2.drawContours(final_mask , [pol], 0,0,1)
-            show(final_mask, 10)
+            show(final_mask, 1)
 
-        show(final_mask/3  + wool_plugs/3, 500)
+        show(final_mask/3  + wool_plugs/3, 200)
+
 
         # fixme do not just draw! try to split rois appart, at least 5 px
         i_rot_mat = cv2.invertAffineTransform(rot_mat)
@@ -417,7 +457,7 @@ class SleepDepROIBuilder(BaseROIBuilder):
             rois.append(ROI(c, None))
 
         if len(rois) != self._n_rois:
-            show(final_mask)
+
             raise Exception("Unknown error, the total number of ROIs is different from the target")
         return rois
 
