@@ -110,7 +110,7 @@ class AdaptiveBGModel(BaseTracker):
         x,y,w,h = cv2.boundingRect(contour)
 
         roi = img[y : y + h, x : x + w]
-        mask = np.zeros_like(roi)
+        # mask = np.zeros_like(roi)
 
         #
         # cv2.drawContours(mask,[hull],-1, 1,-1,offset=(-x,-y))
@@ -260,7 +260,7 @@ class AdaptiveBGModel(BaseTracker):
 
         #cv2.threshold(fg,25,255,cv2.THRESH_BINARY, dst=fg)
         # fixme magic number
-        cv2.threshold(fg,20,255,cv2.THRESH_BINARY , dst=fg)
+        cv2.threshold(fg,10,255,cv2.THRESH_BINARY , dst=fg)
         # cv2.threshold(fg,20,255,cv2.THRESH_BINARY | cv2.THRESH_OTSU , dst=fg)
 
 
@@ -297,11 +297,17 @@ class AdaptiveBGModel(BaseTracker):
             hull = cv2.convexHull(contours[0])
             self._update_fg_blob_model(grey, hull)
 
+        # small hull ==> erroneous bounding rectangle
+        if hull.shape[0] < 3:
+            print hull.shape
+            raise NoPositionError
 
         (x,y) ,(w,h), angle  = cv2.minAreaRect(hull)
 
+
         fg.fill(0)
-        cv2.drawContours( fg ,[hull],0, 1,3)
+        cv2.drawContours( fg ,[hull],0, 1,-1)
+
         self._update_bg_model(grey, fg)
 
 

@@ -128,6 +128,7 @@ class SleepDepROIBuilder(BaseROIBuilder):
     _tube_over_tip_ratio = 1/3.5
     def _rois_from_img(self,im):
 
+
         rot_mat= self._best_image_rotation(im)
 
         rois = self._make_rois(im, rot_mat)
