@@ -2,8 +2,7 @@ __author__ = 'quentin'
 
 import numpy as np
 import cv2
-import itertools
-import roi_builders
+from pysolovideo.utils.img_proc import merge_blobs
 
 
 
@@ -12,9 +11,6 @@ class NoPositionError(Exception):
     pass
 
 class BaseTracker(object):
-    # a list of complex number representing x(real) and y(imaginary) coordinatesT
-
-
     def __init__(self, roi,data=None):
         self._positions =[]
         self._times =[]
@@ -59,18 +55,6 @@ class BaseTracker(object):
         raise NotImplementedError
 
 
-class DummyTracker(BaseTracker):
-
-    def _find_position(self,img, mask):
-        # random_walk
-        x, y = np.random.uniform(size=2)
-        point = np.complex64(x + y * 1j)
-        if len(self._positions) == 0:
-            return point
-        return self._positions[-1] + point
-#
-
-
 class AdaptiveBGModel(BaseTracker):
 
     def __init__(self, roi, data=None):
@@ -90,11 +74,6 @@ class AdaptiveBGModel(BaseTracker):
         self._learning_mat_buff = None
 
         super(AdaptiveBGModel, self).__init__(roi, data)
-
-
-    def show(self,im,t=-1):
-        cv2.imshow(str(self),im)
-        cv2.waitKey(t)
 
     def _update_fg_blob_model(self, img, contour, lr = 1e-3):
         features = self._comput_blob_features(img, contour)
@@ -175,55 +154,6 @@ class AdaptiveBGModel(BaseTracker):
 
         # self._bg_sd = learning_mat * np.abs(self._bg_mean - img)  + (1 - learning_mat) * self._bg_sd
 
-    def _join_blobs(self, hulls):
-        idx_pos_w = []
-        for i, c in enumerate(hulls):
-            (x,y) ,(w,h), angle  = cv2.minAreaRect(c)
-            w = max(w,h)
-            h = min(w,h)
-            idx_pos_w.append((i, x+1j*y,w + h))
-
-        pairs_to_group = []
-        for a,b in itertools.combinations(idx_pos_w,2):
-
-            d = abs(a[1] - b[1])
-            wm = max(a[2], b[2])
-            if d < wm:
-                pairs_to_group.append({a[0], b[0]})
-
-
-        if len(pairs_to_group) == 0:
-            return hulls
-
-        repeat = True
-        out_sets = pairs_to_group
-
-        while repeat:
-            comps = out_sets
-            out_sets = []
-            repeat=False
-            for s in comps:
-                connected = False
-                for i,o in enumerate(out_sets):
-                    if o & s:
-                        out_sets[i] = s | out_sets[i]
-                        connected = True
-                        repeat=True
-                if not connected:
-                    out_sets.append(s)
-
-        out_hulls = []
-        for c in comps:
-            out_hulls.append(np.concatenate([hulls[s] for s in c]))
-
-
-        out_hulls= [cv2.convexHull(o) for o in out_hulls]
-
-
-
-        return out_hulls
-
-
     def _pre_process_input(self, img, mask):
 
         grey = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
@@ -286,7 +216,7 @@ class AdaptiveBGModel(BaseTracker):
                 raise NoPositionError
 
             hulls = [cv2.convexHull( c) for c in contours]
-            hulls = self._join_blobs(hulls)
+            hulls = merge_blobs(hulls)
 
             cluster_features = [self._comput_blob_features(grey, h) for h in hulls]
             good_clust = np.argmin([self._feature_distance(cf) for cf in cluster_features])
