@@ -5,6 +5,7 @@ from pysolovideo.tracking.roi_builders import SleepDepROIBuilder
 from pysolovideo.tracking.cameras import MovieVirtualCamera
 from pysolovideo.tracking.monitor import Monitor
 from pysolovideo.tracking.trackers import AdaptiveBGModel
+from pysolovideo.tracking.trackers import AdaptiveBGModel2
 from pysolovideo.tracking.interactors import SystemPlaySoundOnStop
 
 
@@ -20,7 +21,7 @@ inters = None
 
 
 
-monit = Monitor(cam, AdaptiveBGModel, interactors= inters, roi_builder=roi_builder)
+monit = Monitor(cam, AdaptiveBGModel2, interactors= inters, roi_builder=roi_builder)
 monit.run()
 
 #

@@ -5,7 +5,7 @@ import cv2
 import numpy as np
 import itertools
 
-def merge_blobs(contours):
+def merge_blobs(contours, prop = .5):
     """
     Merge together contour according to their position and size.
     If the distance between two blobs is smaller than the longest axis of, at least, one of them,
@@ -27,7 +27,7 @@ def merge_blobs(contours):
     for a,b in itertools.combinations(idx_pos_w,2):
 
         d = abs(a[1] - b[1])
-        wm = max(a[2], b[2])
+        wm = max(a[2], b[2]) * prop
         if d < wm:
             pairs_to_group.append({a[0], b[0]})
 
@@ -54,7 +54,7 @@ def merge_blobs(contours):
 
     out_hulls = []
     for c in comps:
-        out_hulls.append(np.concatenate([hulls[s] for s in c]))
+        out_hulls.append(np.concatenate([contours[s] for s in c]))
 
     out_hulls= [cv2.convexHull(o) for o in out_hulls]
 
