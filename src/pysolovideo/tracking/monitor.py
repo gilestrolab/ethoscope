@@ -61,12 +61,15 @@ class Monitor(object):
     def run(self):
         out  = []
         vw = None
+        to_wait = 1
         for t, frame in self._camera:
             if vw is None:
                 vw = cv2.VideoWriter("/home/quentin/Desktop/new_tracker_show_off_speed=x60.avi", cv2.cv.CV_FOURCC(*'DIVX'), 50, (frame.shape[1], frame.shape[0]))
             copy = frame.copy()
-            to_wait = 1
+
             for i,track_u in enumerate(self._unit_trackers):
+                # if i != 31:
+                #     continue
 
                 data_row = track_u(t, frame)
                 if data_row is None:
@@ -83,5 +86,5 @@ class Monitor(object):
             cv2.waitKey(to_wait)
             # vw.write(copy)
 
-            print t / 60.
+            print t / 60./ 60.
         vw.release()

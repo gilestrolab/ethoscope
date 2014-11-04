@@ -36,7 +36,7 @@ class TrackingUnit(object):
         if not absolute:
             return last_position
 
-        out = last_position
+        out = last_position.copy()
 
 
         out["x"] *= self._roi.longest_axis

@@ -29,7 +29,9 @@ class BaseTracker(object):
             if len(self._positions) == 0:
                 return None
             else:
-                point = self._positions[-1]
+                point = self._positions[-1].copy()
+                point["is_inferred"] = True
+
         self._positions.append(point)
         self._times.append(t)
         return point
@@ -62,7 +64,7 @@ class BaseTracker(object):
 
 
 class BackgroundModel(object):
-    def __init__(self, max_half_life=100., min_half_life=1., increment = 1.5):
+    def __init__(self, max_half_life=100., min_half_life=5., increment = 1.5):
         # the maximal half life of a pixel from background, in seconds
         self._max_half_life = float(max_half_life)
         # the minimal one
@@ -71,7 +73,8 @@ class BackgroundModel(object):
         # starts with the fastest learning rate
         self._current_half_life = self._min_half_life
 
-        self._increment = 1.01
+        # fixme theoritically this should depend on time, not frame index
+        self._increment = 1.1
         # the mean background
         self._bg_mean = None
         self._bg_sd = None
@@ -110,7 +113,13 @@ class BackgroundModel(object):
 
         # the learning rate, alpha, is an exponential function of half life
         # it correspond to how much the present frame should account for the background
-        alpha = ( 2 ** (-self._current_half_life/2.0)) **  dt
+
+        lam =  np.log(2)/self._current_half_life
+        # how much the current frame should be accounted for
+        alpha = 1 - np.exp(-lam * dt)
+        print self._current_half_life, lam, alpha
+
+        # print dt , alpha, self._current_half_life
 
         # set-p a matrix of learning rate. it is 0 where foreground map is true
         self._buff_alpha_matrix.fill(alpha)
@@ -149,8 +158,6 @@ class AdaptiveBGModel2(BaseTracker):
         self._buff_grey_blurred = None
         self._buff_fg = None
 
-
-
     def _pre_process_input(self, img, mask):
         if self._buff_grey is None:
             self._buff_grey = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
@@ -163,11 +170,21 @@ class AdaptiveBGModel2(BaseTracker):
         if blur_rad % 2 == 0:
             blur_rad += 1
 
-        cv2.medianBlur(self._buff_grey,blur_rad, self._buff_grey_blurred)
+
+
+        # too slow?
+        # cv2.medianBlur(self._buff_grey,blur_rad, self._buff_grey_blurred)
+        scale = 128. / np.median(self._buff_grey)
+        print "scale", scale
+        # cv2.imshow("gray",self._buff_grey)
+        cv2.multiply(self._buff_grey, scale, dst = self._buff_grey)
+        # cv2.imshow("norm", self._buff_grey)
+
+        cv2.GaussianBlur(self._buff_grey,(blur_rad, blur_rad),5.0, self._buff_grey_blurred)
         cv2.GaussianBlur(self._buff_grey,(5,5), 2.5,self._buff_grey)
         cv2.absdiff(self._buff_grey, self._buff_grey_blurred, self._buff_grey)
 
-        # fixme, convert before
+
         if mask is not None:
             cv2.bitwise_and(self._buff_grey, self._buff_grey, self._buff_grey, mask=mask)
             return self._buff_grey
@@ -236,15 +253,19 @@ class AdaptiveBGModel2(BaseTracker):
         bg = self._bg_model.bg_img.astype(np.uint8)
 
 
+        # cv2.imshow("gr",grey* 10)
 
         cv2.subtract(grey, bg, self._buff_fg)
-        # cv2.subtract( bg, grey, self._buff_fg)
-        # cv2.imshow("fg",self._buff_fg * 10)
-        # cv2.imshow("bg",bg)
-        # cv2.imshow("gr",grey)
-        #show(self._buff_fg)
 
-        cv2.threshold(self._buff_fg,-1,255,cv2.THRESH_BINARY | cv2.THRESH_OTSU, dst=self._buff_fg)
+        # cv2.subtract( bg, grey, self._buff_fg)
+
+        # cv2.imshow("bg",bg * 10)
+        # cv2.imshow("fg",self._buff_fg * 10)
+
+
+        cv2.threshold(self._buff_fg,10,255,cv2.THRESH_BINARY, dst=self._buff_fg)
+        # cv2.threshold(self._buff_fg,-1,255,cv2.THRESH_BINARY | cv2.THRESH_OTSU, dst=self._buff_fg)
+
         # cv2.threshold(self._buff_fg,15,255,cv2.THRESH_BINARY , dst=self._buff_fg)
 
         n_fg_pix = np.count_nonzero(self._buff_fg)
@@ -287,11 +308,16 @@ class AdaptiveBGModel2(BaseTracker):
 
         self._buff_fg.fill(0)
         cv2.drawContours(self._buff_fg ,[hull],0, 1,-1)
+
+        if mask is not None:
+            cv2.bitwise_and(self._buff_fg, mask,  self._buff_fg)
+
         self._bg_model.update(grey, t, self._buff_fg)
         return {
             'x':x, 'y':y,
             'w':w, 'h':h,
-            'phi':angle
+            'phi':angle,
+            "is_inferred": False
         }
 
 
