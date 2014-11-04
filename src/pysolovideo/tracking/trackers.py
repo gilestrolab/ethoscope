@@ -116,7 +116,7 @@ class BackgroundModel(object):
         self._buff_alpha_matrix.fill(alpha)
         if fg_mask is not None:
             cv2.dilate(fg_mask,None,fg_mask)
-            self._buff_alpha_matrix[fg_mask.astype(np.bool)] = 0
+            cv2.subtract(self._buff_alpha_matrix, self._buff_alpha_matrix, self._buff_alpha_matrix, mask=fg_mask)
 
 
         if self._buff_invert_alpha_mat is None:
@@ -163,19 +163,14 @@ class AdaptiveBGModel2(BaseTracker):
         if blur_rad % 2 == 0:
             blur_rad += 1
 
-
-        # cv2.blur(self._buff_grey,(blur_rad,blur_rad),self._buff_grey_blurred)
         cv2.medianBlur(self._buff_grey,blur_rad, self._buff_grey_blurred)
         cv2.GaussianBlur(self._buff_grey,(5,5), 2.5,self._buff_grey)
         cv2.absdiff(self._buff_grey, self._buff_grey_blurred, self._buff_grey)
 
         # fixme, convert before
         if mask is not None:
-            m = mask.astype(np.bool)
-            np.bitwise_not(m,m)
-            self._buff_grey[m] = 0
-
-        return self._buff_grey
+            cv2.bitwise_and(self._buff_grey, self._buff_grey, self._buff_grey, mask=mask)
+            return self._buff_grey
 
     #todo human friendly time/alpha
     def _update_fg_blob_model(self, img, contour, lr = 1e-3):
@@ -250,10 +245,7 @@ class AdaptiveBGModel2(BaseTracker):
         #show(self._buff_fg)
 
         cv2.threshold(self._buff_fg,-1,255,cv2.THRESH_BINARY | cv2.THRESH_OTSU, dst=self._buff_fg)
-
-        #todo rationnal threshold/adaptive
         # cv2.threshold(self._buff_fg,15,255,cv2.THRESH_BINARY , dst=self._buff_fg)
-
 
         n_fg_pix = np.count_nonzero(self._buff_fg)
         prop_fg_pix  = n_fg_pix / (1.0 * grey.shape[0] * grey.shape[1])
@@ -262,7 +254,7 @@ class AdaptiveBGModel2(BaseTracker):
             raise NoPositionError
 
         # fixme magic num
-        contours,hierarchy = cv2.findContours(self._buff_fg, 1, 2)
+        contours,hierarchy = cv2.findContours(self._buff_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
 
         if len(contours) == 0:
@@ -293,16 +285,12 @@ class AdaptiveBGModel2(BaseTracker):
 
         (x,y) ,(w,h), angle  = cv2.minAreaRect(hull)
 
-
         self._buff_fg.fill(0)
         cv2.drawContours(self._buff_fg ,[hull],0, 1,-1)
-        # show(self._buff_fg * 255,10)
         self._bg_model.update(grey, t, self._buff_fg)
         return {
-            'x':x,
-            'y':y,
-            'w':w,
-            'h':h,
+            'x':x, 'y':y,
+            'w':w, 'h':h,
             'phi':angle
         }
 
