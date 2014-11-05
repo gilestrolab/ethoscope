@@ -141,8 +141,8 @@ class SystemPlaySoundOnStop(BaseInteractor):
         self._t0 = None
         self._target = beep
         self._freq = freq
-        self._distance_threshold = 1e-3
-        self._inactivity_time_threshold = 10 # s
+        self._distance_threshold = 1e-2
+        self._inactivity_time_threshold = 90 # s
     def _run(self):
         positions = self._tracker.positions
         time = self._tracker.times
@@ -150,12 +150,12 @@ class SystemPlaySoundOnStop(BaseInteractor):
         if len(positions ) <2 :
             return False, {"freq":self._freq}
 
-        tail_m = positions.tail(1)
-        xy_m = complex(tail_m.x + 1j * tail_m.y)
+        tail_m = positions[-1]
+        xy_m = complex(tail_m["x"] + 1j * tail_m["y"])
 
-        tail_mm = positions.tail(2).head(1)
+        tail_mm = positions[-2]
 
-        xy_mm =complex(tail_mm.x + 1j * tail_mm.y)
+        xy_mm =complex(tail_mm["x"] + 1j * tail_mm["y"])
 
         if np.abs(xy_m - xy_mm) < self._distance_threshold:
 

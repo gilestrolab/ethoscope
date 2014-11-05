@@ -11,15 +11,13 @@ import pandas as pd
 
 class Monitor(object):
 
-    def __init__(self, camera, tracker_class, roi_builder = None, interactors=None):
+    def __init__(self, camera, tracker_class, rois = None, interactors=None):
 
         self._camera = camera
 
-        if roi_builder is None:
-            roi_builder = rbs.DefaultROIBuilder()
+        if rois is None:
+            rois = rbs.DefaultROIBuilder(camera)()
 
-        # We build the roi, possibly from images and/or templates. By default all the image is the ROI
-        rois = roi_builder(camera)
         self._camera.restart()
 
 
