@@ -247,7 +247,7 @@ class BackgroundModel(object):
         self.last_t = t
 
 
-class AdaptiveBGModel2(BaseTracker):
+class AdaptiveBGModel(BaseTracker):
     fg_model = ObjectModel()
     def __init__(self, roi, data=None):
 
@@ -258,7 +258,7 @@ class AdaptiveBGModel2(BaseTracker):
         # self._bg_sd = None
         # self._learning_mat_buff = None
 
-        super(AdaptiveBGModel2, self).__init__(roi, data)
+        super(AdaptiveBGModel, self).__init__(roi, data)
         self._bg_model = BackgroundModel()
         self._max_m_log_lik = 7.5
         self._buff_grey = None

@@ -6,7 +6,7 @@ __author__ = 'quentin'
 
 
 from pysolovideo.tracking.cameras import *
-from pysolovideo.tracking.trackers import AdaptiveBGModel2
+from pysolovideo.tracking.trackers import AdaptiveBGModel
 import cv2
 from pysolovideo.tracking.roi_builders import DefaultROIBuilder
 
@@ -18,7 +18,7 @@ cam = MovieVirtualCamera("/stk/pysolo_video_samples/singleDamTube1_150min_night.
 for t,frame in cam:
     break
 rois = DefaultROIBuilder()(frame[:,0:24,:])
-amog = AdaptiveBGModel2(*rois)
+amog = AdaptiveBGModel(*rois)
 
 for t,frame in cam:
 

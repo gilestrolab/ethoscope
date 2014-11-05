@@ -48,11 +48,8 @@ class SleepDepriverInterface(object):
 
         try:
             # If we fail to ping the port, this is a wrong port
-            print "boo"
             self._serial.write("L\n")
-
             r = self._serial.readline()
-            print "bam"
             if not r:
                 raise WrongSleepDepPortError
             self.deprive(0)

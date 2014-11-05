@@ -5,7 +5,7 @@ from pysolovideo.tracking.roi_builders import SleepDepROIBuilder
 from pysolovideo.tracking.cameras import MovieVirtualCamera
 from pysolovideo.tracking.monitor import Monitor
 
-from pysolovideo.tracking.trackers import AdaptiveBGModel2
+from pysolovideo.tracking.trackers import AdaptiveBGModel
 from pysolovideo.tracking.interactors import SystemPlaySoundOnStop
 from pysolovideo.tracking.interactors import SleepDepInteractor
 from pysolovideo.hardware_control.arduino_api import SleepDepriverInterface
@@ -28,7 +28,7 @@ inters = [SystemPlaySoundOnStop(500 + i * 30) for i in range(len(rois))]
 
 
 
-monit = Monitor(cam, AdaptiveBGModel2, rois, interactors= inters)
+monit = Monitor(cam, AdaptiveBGModel, rois, interactors= inters)
 monit.run()
 
 #
