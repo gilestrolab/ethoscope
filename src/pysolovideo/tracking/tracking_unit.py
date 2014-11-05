@@ -59,25 +59,13 @@ class TrackingUnit(object):
             return
 
         data_row["roi_value"] = self._roi.value
+        data_row["t"] = t
 
 
-            #fixme this should be handled by tracking units themeselves
-        if self._interactor is not None:
-            interactor_columns = self._interactor()
-            data_row.update(interactor_columns)
-        #     data_row = pd.concat([data_row, interactor_columns], axis=1)
+        if self._interactor is None:
+            return data_row
+
+        interactor_columns = self._interactor()
+        data_row.update(interactor_columns)
 
         return data_row
-
-        # # TODO interactor here
-        # return data_row
-
-
-
-
-
-
-
-
-
-

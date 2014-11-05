@@ -48,8 +48,11 @@ class SleepDepriverInterface(object):
 
         try:
             # If we fail to ping the port, this is a wrong port
+            print "boo"
             self._serial.write("L\n")
+
             r = self._serial.readline()
+            print "bam"
             if not r:
                 raise WrongSleepDepPortError
             self.deprive(0)
@@ -59,6 +62,6 @@ class SleepDepriverInterface(object):
 
 
     def deprive(self, channel):
-        cmd = "M %i\n" % channel
+        cmd = "M %i\n" % (channel + 1)
         self._serial.write(cmd)
         logging.info("Sending command to SD: %s" % cmd)

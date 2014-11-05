@@ -53,6 +53,11 @@ class ROI(object):
     def rectangle(self):
         return self._rectangle
 
+
+
+    def set_value(self, new_val):
+        self._value = new_val
+
     @property
     def value(self):
         return self._value
@@ -96,7 +101,12 @@ class BaseROIBuilder(object):
         raise NotImplementedError
 
     def _spatial_sorting(self, rois):
-        return [sr for sr in sorted(rois, lambda  a,b: a.rectangle[0] - b.rectangle[0])]
+        out = []
+        for i, sr in enumerate(sorted(rois, lambda  a,b: a.rectangle[0] - b.rectangle[0])):
+            if sr.value is None:
+                sr.set_value(i)
+            out.append(sr)
+        return out
 
 
 class DefaultROIBuilder(BaseROIBuilder):
@@ -463,7 +473,6 @@ class SleepDepROIBuilder(BaseROIBuilder):
             rois.append(ROI(c, None))
 
         if len(rois) != self._n_rois:
-
             raise Exception("Unknown error, the total number of ROIs is different from the target")
         return rois
 

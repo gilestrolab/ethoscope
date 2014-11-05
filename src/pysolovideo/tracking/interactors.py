@@ -39,8 +39,8 @@ class SleepDepInteractor(BaseInteractorSync):
         self._t0 = None
         self._channel = channel
 
-        self._distance_threshold = 1e-4
-        self._inactivity_time_threshold = 10 # s
+        self._distance_threshold = 1e-2
+        self._inactivity_time_threshold = 90 # s
 
     def _interact(self, **kwargs):
         print "c=",self._channel

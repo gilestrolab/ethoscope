@@ -2,8 +2,11 @@ __author__ = 'quentin'
 
 from pysolovideo.hardware_control.arduino_api import SleepDepriverInterface
 
-sdi = SleepDepriverInterface(port='/dev/ttyACM0')
+sdi = SleepDepriverInterface()
 
 
-for i in range(3):
-    sdi.deprive(i)
+sdi.deprive(0)
+#sdi.deprive(0)
+
+# for i in range(12,32):
+#     sdi.deprive(i)

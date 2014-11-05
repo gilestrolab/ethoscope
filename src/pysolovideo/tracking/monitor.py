@@ -11,9 +11,12 @@ import pandas as pd
 
 class Monitor(object):
 
-    def __init__(self, camera, tracker_class, rois = None, interactors=None):
+    def __init__(self, camera, tracker_class, rois = None, interactors=None, out_file=None, draw_results=False, draw_every_n=1):
 
         self._camera = camera
+        self._out_file = out_file
+        self._draw_results = draw_results
+        self.draw_every_n = draw_every_n
 
         if rois is None:
             rois = rbs.DefaultROIBuilder(camera)()
@@ -31,66 +34,50 @@ class Monitor(object):
 
 
 
-    def _draw_on_frame(self,track_u, row, frame):
+    def _draw_on_frame(self, frame, wait = 1):
 
-        pos = track_u.get_last_position(absolute=True)
+        frame = frame.copy()
+        for track_u in self._unit_trackers:
+            pos = track_u.get_last_position(absolute=True)
+            cv2.putText(frame, str(track_u.roi.value + 1),track_u.roi.offset, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.75, (255,255,0))
+            if pos is None:
+                continue
+            if "interact" in pos.keys() and pos["interact"]:
+                colour = (0, 255, 255)
+            else:
+                colour = (0, 0, 255)
+            cv2.drawContours(frame,[track_u.roi.polygon],-1, colour, 1, cv2.CV_AA)
+            cv2.ellipse(frame,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),(255,0,0),1,cv2.CV_AA)
 
 
-        cv2.putText(frame, str(track_u.roi.idx+1),track_u.roi.offset, cv2.FONT_HERSHEY_COMPLEX_SMALL,0.75,(255,255,0))
-
-        if pos is None:
-            return
-
-        if row["interact"]:
-
-            colour = (0, 255, 255)
-        else:
-            colour = (0, 0, 255)
-
-        cv2.drawContours(frame,[track_u.roi.polygon],-1, colour, 1, cv2.CV_AA)
-        cv2.ellipse(frame,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),(255,0,0),1,cv2.CV_AA)
+        cv2.imshow("el", frame)
+        cv2.waitKey(wait)
 
 
     def run(self):
         out  = []
-
-        SHOW_N_FRAMES = 1
         try:
-            for k,(t, frame) in enumerate(self._camera):
+            for i,(t, frame) in enumerate(self._camera):
                 # if vw is None:
                     # vw = None
                     # vw = cv2.VideoWriter("/home/quentin/Desktop/new_tracker_show_off_speed=x60.avi", cv2.cv.CV_FOURCC(*'DIVX'), 50, (frame.shape[1], frame.shape[0]))
-                if k % SHOW_N_FRAMES == 0:
-                    copy = frame.copy()
 
-                for i,track_u in enumerate(self._unit_trackers):
-                    # if i != 22:
-                    #     continue
 
+                for track_u in self._unit_trackers:
                     data_row = track_u(t, frame)
                     if data_row is None:
                         continue
-                    data_row["roi_value"] = i
-                    out.append(data_row)
 
+                    if self._out_file is not None:
+                        out.append(data_row)
 
-                    # if i == 25:
-                    #     print data_row
-                    if k % SHOW_N_FRAMES == 0:
-                        self._draw_on_frame(track_u, data_row, copy)
+                if self._draw_results and i % self.draw_every_n == 0:
+                    self._draw_on_frame(frame)
 
-                    if "interact" in data_row and bool(data_row["interact"]):
-                        print i+1
-
-
-                if k % SHOW_N_FRAMES == 0:
-                    cv2.imshow("el", copy)
-                    cv2.waitKey(1)
                 # vw.write(copy)
 
-                print k, t / 60./ 60.
         except KeyboardInterrupt:
-            df = pd.DataFrame(out)
-            print df
-            df.to_csv("/tmp/test.csv")
-        # vw.release()
+            if self._out_file is not None:
+                df = pd.DataFrame(out)
+                df.to_csv(self._out_file)
+            #vw.release()
