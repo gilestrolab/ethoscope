@@ -4,6 +4,7 @@ import numpy as np
 import cv2
 from pysolovideo.utils.img_proc import merge_blobs
 from pysolovideo.utils.debug import show
+from scipy import stats
 
 
 
@@ -174,11 +175,12 @@ class AdaptiveBGModel2(BaseTracker):
 
         # too slow?
         # cv2.medianBlur(self._buff_grey,blur_rad, self._buff_grey_blurred)
-        scale = 128. / np.median(self._buff_grey)
-        # print "scale", scale
-        # cv2.imshow("gray",self._buff_grey)
+        hist = cv2.calcHist([self._buff_grey], [0], None, [256], [0,255]).ravel()
+        hist = np.convolve(hist, [1] * 5)
+        mode =  np.argmax(hist)
+        scale = 128. / mode #np.median(self._buff_grey)
+
         cv2.multiply(self._buff_grey, scale, dst = self._buff_grey)
-        # cv2.imshow("norm", self._buff_grey)
 
         cv2.GaussianBlur(self._buff_grey,(blur_rad, blur_rad),5.0, self._buff_grey_blurred)
         cv2.GaussianBlur(self._buff_grey,(5,5), 2.5,self._buff_grey)

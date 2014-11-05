@@ -49,13 +49,7 @@ class Monitor(object):
         else:
             colour = (0, 0, 255)
         cv2.drawContours(frame,[track_u.roi.polygon],-1, colour, 1, cv2.CV_AA)
-
         cv2.ellipse(frame,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),(255,0,0),1,cv2.CV_AA)
-
-
-
-
-
 
 
     def run(self):
