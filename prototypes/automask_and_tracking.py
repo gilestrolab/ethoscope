@@ -4,7 +4,7 @@ __author__ = 'quentin'
 from pysolovideo.tracking.roi_builders import SleepDepROIBuilder
 from pysolovideo.tracking.cameras import MovieVirtualCamera
 from pysolovideo.tracking.monitor import Monitor
-from pysolovideo.tracking.trackers import AdaptiveBGModel
+
 from pysolovideo.tracking.trackers import AdaptiveBGModel2
 from pysolovideo.tracking.interactors import SystemPlaySoundOnStop
 

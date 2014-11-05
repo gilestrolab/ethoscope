@@ -54,21 +54,23 @@ class TrackingUnit(object):
 
     def __call__(self, t, img):
         data_row = self._tracker(t,img)
-        if data_row is not None:
-            data_row["roi_value"] = self._roi.value
-            if data_row is None:
-                return
 
-                #fixme this should be handled by tracking units themeselves
-            if self._interactor is not None:
-                interactor_columns = self._interactor()
-                data_row.update(interactor_columns)
-            #     data_row = pd.concat([data_row, interactor_columns], axis=1)
+        if data_row is None:
+            return
 
-            return data_row
+        data_row["roi_value"] = self._roi.value
 
-        # TODO interactor here
+
+            #fixme this should be handled by tracking units themeselves
+        if self._interactor is not None:
+            interactor_columns = self._interactor()
+            data_row.update(interactor_columns)
+        #     data_row = pd.concat([data_row, interactor_columns], axis=1)
+
         return data_row
+
+        # # TODO interactor here
+        # return data_row
 
 
 

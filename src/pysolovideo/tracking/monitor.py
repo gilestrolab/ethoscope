@@ -48,6 +48,7 @@ class Monitor(object):
             colour = (0, 255, 255)
         else:
             colour = (0, 0, 255)
+
         cv2.drawContours(frame,[track_u.roi.polygon],-1, colour, 1, cv2.CV_AA)
         cv2.ellipse(frame,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),(255,0,0),1,cv2.CV_AA)
 
@@ -55,34 +56,43 @@ class Monitor(object):
     def run(self):
         out  = []
 
-        SHOW_N_FRAMES = 10
-
-        for k,(t, frame) in enumerate(self._camera):
-            # if vw is None:
-                # vw = None
-                # vw = cv2.VideoWriter("/home/quentin/Desktop/new_tracker_show_off_speed=x60.avi", cv2.cv.CV_FOURCC(*'DIVX'), 50, (frame.shape[1], frame.shape[0]))
-            if k % SHOW_N_FRAMES == 0:
-                copy = frame.copy()
-
-            for i,track_u in enumerate(self._unit_trackers):
-                # if i != 31:
-                #     continue
-
-                data_row = track_u(t, frame)
-                if data_row is None:
-                    continue
-                out.append(data_row)
+        SHOW_N_FRAMES = 1
+        try:
+            for k,(t, frame) in enumerate(self._camera):
+                # if vw is None:
+                    # vw = None
+                    # vw = cv2.VideoWriter("/home/quentin/Desktop/new_tracker_show_off_speed=x60.avi", cv2.cv.CV_FOURCC(*'DIVX'), 50, (frame.shape[1], frame.shape[0]))
                 if k % SHOW_N_FRAMES == 0:
-                    self._draw_on_frame(track_u, data_row, copy)
+                    copy = frame.copy()
 
-                if "interact" in data_row and bool(data_row["interact"]):
-                    print i+1
-                    to_wait = -1
+                for i,track_u in enumerate(self._unit_trackers):
+                    # if i != 22:
+                    #     continue
 
-            if k % SHOW_N_FRAMES == 0:
-                cv2.imshow("el", copy)
-                cv2.waitKey(1)
-            # vw.write(copy)
+                    data_row = track_u(t, frame)
+                    if data_row is None:
+                        continue
+                    data_row["roi_value"] = i
+                    out.append(data_row)
 
-            print k, t / 60./ 60.
+
+                    # if i == 25:
+                    #     print data_row
+                    if k % SHOW_N_FRAMES == 0:
+                        self._draw_on_frame(track_u, data_row, copy)
+
+                    if "interact" in data_row and bool(data_row["interact"]):
+                        print i+1
+
+
+                if k % SHOW_N_FRAMES == 0:
+                    cv2.imshow("el", copy)
+                    cv2.waitKey(1)
+                # vw.write(copy)
+
+                print k, t / 60./ 60.
+        except KeyboardInterrupt:
+            df = pd.DataFrame(out)
+            print df
+            df.to_csv("/tmp/test.csv")
         # vw.release()
