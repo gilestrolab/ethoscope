@@ -117,7 +117,7 @@ class BackgroundModel(object):
         lam =  np.log(2)/self._current_half_life
         # how much the current frame should be accounted for
         alpha = 1 - np.exp(-lam * dt)
-        print self._current_half_life, lam, alpha
+        # print self._current_half_life, lam, alpha
 
         # print dt , alpha, self._current_half_life
 
@@ -175,7 +175,7 @@ class AdaptiveBGModel2(BaseTracker):
         # too slow?
         # cv2.medianBlur(self._buff_grey,blur_rad, self._buff_grey_blurred)
         scale = 128. / np.median(self._buff_grey)
-        print "scale", scale
+        # print "scale", scale
         # cv2.imshow("gray",self._buff_grey)
         cv2.multiply(self._buff_grey, scale, dst = self._buff_grey)
         # cv2.imshow("norm", self._buff_grey)
