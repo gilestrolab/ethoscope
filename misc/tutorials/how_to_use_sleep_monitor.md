@@ -23,11 +23,11 @@ First, since there is no automask yet, you need to create a mask for the video.
 A mask is an image with a black (0,0,0) background where every region of interest is outlined in a different value of grey.
 Ideally, the values of grey are in a sensible order (e.g. matching spatial order).
 Here is an example:
-![alt text](./mask_model.png)
+![mask model](./mask_model.png)
 
 I generally make them in inkscape since it is really simple to align rectangles.
-Here is a template (you just need to delete the original image and export to PNG, keeping the same resolution):
-![alt text](./mask_model.svg)
+Here is a template (change the backgrounf to black):
+![svg template](./mask_model.svg)
 
 Then, if my mask is saved at `~/Desktop/mask_model.png`, and my video at `/stk/pysolo_video_samples/monitor_exple.avi`, I can run:
 
