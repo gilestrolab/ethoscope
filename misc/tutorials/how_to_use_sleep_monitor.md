@@ -27,7 +27,7 @@ Here is an example:
 
 I generally make them in inkscape since it is really simple to align rectangles.
 Here is a template (you just need to delete the original image and export to PNG, keeping the same resolution):
-
+![alt text](./mask_model.svg)
 
 Then, if my mask is saved at `~/Desktop/mask_model.png`, and my video at `/stk/pysolo_video_samples/monitor_exple.avi`, I can run:
 
