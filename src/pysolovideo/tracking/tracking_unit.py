@@ -59,6 +59,7 @@ class TrackingUnit(object):
             return
 
         data_row["roi_value"] = self._roi.value
+        data_row["roi_idx"] = self._roi.idx
         data_row["t"] = t
 
 

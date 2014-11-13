@@ -83,10 +83,10 @@ class ObjectModel(object):
     """
     def __init__(self, history_length=2000):
         self._features_header = [
-            "area",
-            "width",
-            "aspect_ratio",
-            "mean_grey"
+            "fg_model_area",
+            "fg_model_width",
+            "fg_model_aspect_ratio",
+            "fg_model_mean_grey"
         ]
 
         self._history_length = history_length
@@ -390,6 +390,7 @@ class AdaptiveBGModel(BaseTracker):
             "is_inferred": False,
             "m_log_lik": distance
         }
+
         feature_dic  = dict(zip(self.fg_model.features_header, features))
 
         return dict(out_dic.items() + feature_dic.items())

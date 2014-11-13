@@ -72,15 +72,15 @@ SerialCommand sCmd; // The SerialCommand object
 
 int SHAKE = 2; // number of times the servo rotates
 int ROTATION_DELAY = 600; // pause between each motor movement
-int GROUP_SIZE = 8; // the size of the group of motors rotating at once
+int GROUP_SIZE = 1; // the size of the group of motors rotating at once
 
 boolean USE_SERVO = true;
 boolean NEW_SERVO = true;
 boolean DEBUG_MODE = false;
 
-boolean AUTO_MODE = false; // set this to TRUE to use it without PC connected
+boolean AUTO_MODE = true; // set this to TRUE to use it without PC connected
 int rMIN = 1; // default minimal value for RANDOM rotations in AUTO mode
-int rMAX = 7; // default maximum value for RANDOM rotations in AUTO mode
+int rMAX = 2; // default maximum value for RANDOM rotations in AUTO mode
 
 int lap = 1; // used internally
 unsigned long pTime = 0; // used internally

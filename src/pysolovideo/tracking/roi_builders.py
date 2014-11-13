@@ -4,8 +4,6 @@ __author__ = 'quentin'
 import numpy as np
 import cv2
 import cv
-# from pysolovideo.utils.memoisation import memoised_property
-
 
 class ROI(object):
 
@@ -89,7 +87,12 @@ class BaseROIBuilder(object):
             accum = np.median(np.array(accum),0).astype(np.uint8)
 
         rois = self._rois_from_img(accum)
-        rois = self._spatial_sorting(rois)
+        rois_w_no_value = [r for r in rois if r.value is None]
+
+        if len(rois_w_no_value) > 0:
+            rois = self._spatial_sorting(rois)
+        else:
+            rois = self._value_sorting(rois)
 
         for i,r in enumerate(rois):
             r.idx =i
@@ -105,6 +108,12 @@ class BaseROIBuilder(object):
         for i, sr in enumerate(sorted(rois, lambda  a,b: a.rectangle[0] - b.rectangle[0])):
             if sr.value is None:
                 sr.set_value(i)
+            out.append(sr)
+        return out
+
+    def _value_sorting(self, rois):
+        out = []
+        for i, sr in enumerate(sorted(rois, lambda  a,b: a.value - b.value)):
             out.append(sr)
         return out
 
