@@ -64,7 +64,6 @@ class ROI(object):
         x,y,w,h = self._rectangle
         out = img[y : y + h, x : x +w]
 
-
         assert(out.shape[0:2] == self._mask.shape)
 
         return out, self._mask
@@ -501,8 +500,6 @@ class ImgMaskROIBuilder(BaseROIBuilder):
         if len(self._mask.shape) == 3:
             self._mask = cv2.cvtColor(self._mask, cv2.COLOR_BGR2GRAY)
 
-
-
         contours, hiera = cv2.findContours(np.copy(self._mask), cv.CV_RETR_EXTERNAL, cv.CV_CHAIN_APPROX_SIMPLE)
 
         rois = []
@@ -513,6 +510,7 @@ class ImgMaskROIBuilder(BaseROIBuilder):
             value = int(np.median(self._mask[tmp_mask > 0]))
 
             rois.append(ROI(c, value))
+
         return rois
 
 

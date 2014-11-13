@@ -42,7 +42,7 @@ class Monitor(object):
         frame = frame.copy()
         for track_u in self._unit_trackers:
             pos = track_u.get_last_position(absolute=True)
-            cv2.putText(frame, str(track_u.roi.value + 1),track_u.roi.offset, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.75, (255,255,0))
+            cv2.putText(frame, str(track_u.roi.idx + 1),track_u.roi.offset, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.75, (255,255,0))
             if pos is None:
                 continue
             # if "interact" in pos.keys() and pos["interact"]:
@@ -53,7 +53,7 @@ class Monitor(object):
             cv2.ellipse(frame,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),(255,0,0),1,cv2.CV_AA)
 
 
-        cv2.imshow("el", frame)
+        cv2.imshow("psv", frame)
         cv2.waitKey(wait)
         return frame
 
@@ -84,7 +84,7 @@ class Monitor(object):
 
                 if self._draw_results and i % self.draw_every_n == 0:
                     tmp = self._draw_on_frame(frame)
-                    cv2.imshow("psv", tmp)
+
                         # vw.write(tmp)
 
         except KeyboardInterrupt:
