@@ -63,9 +63,3 @@ if __name__ == "__main__":
     monit.run()
 
 
-#### in R one could simply do:
-
-df = read.csv("/tmp/test.csv")
-dfss = subset(df, roi_idx==0)
-plot(t ~ x  , dfss, type="l")
-
