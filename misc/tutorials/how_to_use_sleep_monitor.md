@@ -14,6 +14,9 @@ At the moment, the package is still under development, so you need to
 3. `cd src`
 4. use `pip` to install the package: `# pip2 install -e .`
 
+In principle, this should pull all the dependencies (numpy, pandas...).
+However, opencv is **not** on pip, so you need to install it independently (e.g. using your package manager)!
+
 Ensure you can install packages with pip and that you are using **`python2` (hence `pip2`)**
 
 Running the sleep monitoring script on pre-recorded video
@@ -29,7 +32,7 @@ one could draw the following mask:
 ![mask model](./mask_model.png)
 
 I generally make them in inkscape since it is really simple to align rectangles.
-Here is a template (change the backgrounf to black):
+Here is a template (change the background to black):
 ![svg template](./mask_model.svg)
 
 Then, if my mask is saved at `~/Desktop/mask_model.png`, and my video at `/stk/pysolo_video_samples/monitor_exple.avi`, I can run:
