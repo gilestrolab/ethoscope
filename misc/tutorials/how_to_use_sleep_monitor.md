@@ -22,7 +22,10 @@ Running the sleep monitoring script on pre-recorded video
 First, since there is no automask yet, you need to create a mask for the video.
 A mask is an image with a black (0,0,0) background where every region of interest is outlined in a different value of grey.
 Ideally, the values of grey are in a sensible order (e.g. matching spatial order).
-Here is an example:
+For example, for this raw image:
+![raw image](./original.png)
+
+one could draw the following mask:
 ![mask model](./mask_model.png)
 
 I generally make them in inkscape since it is really simple to align rectangles.
