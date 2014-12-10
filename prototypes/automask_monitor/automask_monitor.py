@@ -1,7 +1,8 @@
 __author__ = 'quentin'
 
 from pysolovideo.tracking.roi_builders import BaseROIBuilder
-from pysolovideo.utils.debug import show
+from pysolovideo.tracking.roi_builders import ROI
+
 
 import numpy as np
 import cv2
@@ -19,11 +20,6 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
             rad += 1
 
 
-        # med = cv2.medianBlur(grey, rad)
-        # cv2.subtract(med, grey, dst = med)
-        #
-
-        #
         bin = np.copy(grey)
         score_map = np.zeros_like(bin)
         for t in range(0, 255,1):
@@ -67,7 +63,6 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
                 raise Exception("There should be three targets. Only %i objects have been found" % (len(contours)))
             if len(contours) == 3:
                 break
-        #cv2.threshold(map, t, 255,cv2.THRESH_BINARY , map)
 
         target_diams = [cv2.boundingRect(c)[2] for c in contours]
 
@@ -86,7 +81,7 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
             src_points.append((x,y))
 
 
-        #############sort point as:
+        ############# sort/name points as:
 
         # B--------------------------C
         # |
@@ -124,9 +119,14 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
 
 
 
-        # todo sort src_points ? ABC
-        sorted_src_pts = np.array([sorted_a, sorted_b, sorted_c], dtype=np.float32)
 
+
+        sorted_src_pts = np.array([sorted_a, sorted_b, sorted_c], dtype=np.float32)
+        sorted_src_pts += [
+                            [-mean_diam/2.,-mean_diam], # IMPORTANT A is not touching the grove, so we add + one radius
+                            [-mean_diam/2.,mean_diam/2.],
+                            [mean_diam/2.,mean_diam/2.]
+                          ]
 
 
         dst_points = np.array([(0,1),
@@ -136,34 +136,49 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
 
         wrap_mat = cv2.getAffineTransform(dst_points, sorted_src_pts)
 
-        print wrap_mat
 
-        origin = np.array(sorted_b, dtype=np.float32)
-
-        lines_to_draw = []
-        for i in range(1+16):
-            y = float(i)/17.0
-            x = 0
-            pt1 = np.array([x,y,0], dtype=np.float32)
-            x=1
-            pt2 = np.array([x,y,0], dtype=np.float32)
-            print pt1, np.dot(wrap_mat, pt1)
-
-            pt1, pt2 = np.dot(wrap_mat, pt1),  np.dot(wrap_mat, pt2)
-            pt1 += origin
-            pt2 += origin
-            pt1 = pt1.astype(np.int)
-            pt2 = pt2.astype(np.int)
-
-            cv2.line(img, tuple(pt1), tuple(pt2), (255,255,0),3, cv2.CV_AA)
+        origin = np.array(sorted_src_pts[1], dtype=np.float32)
 
 
+        rois = []
+        val = 0
+        for left in (True,False):
+            for i in range(16):
+                y = float(i)/16.0
+
+                if left:
+                    x = 0.
+                else:
+                    x = 0.5
+                pt1 = np.array([x,y,0], dtype=np.float32)
+                pt2 = np.array([x,y + 1./16.,0], dtype=np.float32)
+
+                if left:
+                    x = 0.5
+                else:
+                    x = 1.0
+
+                pt4 = np.array([x,y,0], dtype=np.float32)
+                pt3 = np.array([x,y + 1./16.,0], dtype=np.float32)
 
 
+                pt1, pt2 = np.dot(wrap_mat, pt1),  np.dot(wrap_mat, pt2)
+                pt3, pt4 = np.dot(wrap_mat, pt3),  np.dot(wrap_mat, pt4)
+                pt1 += origin
+                pt2 += origin
+                pt3 += origin
+                pt4 += origin
+                pt1 = pt1.astype(np.int)
+                pt2 = pt2.astype(np.int)
+                pt3 = pt3.astype(np.int)
+                pt4 = pt4.astype(np.int)
 
 
-        show(img)
+                ct = np.array([pt1,pt2, pt3, pt4]).reshape((1,4,2))
+                rois.append(ROI(ct, value=val))
 
+                val += 1
+        return rois
 
     def _score_targets(self,contour, im):
 
@@ -179,8 +194,10 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
         return 1
 
 
-im = cv2.imread("./shot0004.png")
+im = cv2.imread("./shot0003.png")
 rbuilder = SleepMonitorWithTargetROIBuilder()
-rbuilder(im)
+rois = rbuilder(im)
+
+
 
 
