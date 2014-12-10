@@ -293,7 +293,7 @@ class AdaptiveBGModel(BaseTracker):
 
 
         if mask is not None:
-            cv2.bitwise_and(self._buff_grey, self._buff_grey, self._buff_grey, mask=mask)
+            cv2.bitwise_and(self._buff_grey, mask, self._buff_grey)
             return self._buff_grey
 
 
