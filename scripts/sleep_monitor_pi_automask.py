@@ -28,6 +28,10 @@ if __name__ == "__main__":
     parser.add_option("-v", "--video", dest="video", help="the path to an optional video file."
                                                                 "If not specified, the webcam will be used",
                                                                 type="str", default=None)
+    parser.add_option("-r", "--result-video", dest="result_video", help="the path to an optional annotated video file."
+                                                                "This is useful to show the result on a video.",
+                                                                type="str", default=None)
+
     parser.add_option("-d", "--duration",dest="duration", help="The maximal duration of the monitoring (seconds). "
                                                                "Keyboard interrupt can be use to stop before",
                                                                 default=60, type="int")
@@ -46,7 +50,7 @@ if __name__ == "__main__":
         # The camera will not try to go faster than 3 fps
         cam = V4L2Camera(0, target_fps=3)
 
-    roi_builder = SleepMonitorWithTargetROIBuilder
+    roi_builder = SleepMonitorWithTargetROIBuilder()
 
     rois = roi_builder(cam)
 
@@ -55,8 +59,9 @@ if __name__ == "__main__":
                     rois,
                     out_file=option_dict["out"], # save a csv out
                     max_duration=option_dict["duration"], # when to stop (in seconds)
+                    video_out=option_dict["result_video"], # when to stop (in seconds)
                     draw_results=True, # draw position on image
-                    draw_every_n=10) # only draw 1 every 10 frames to save time
+                    draw_every_n=1) # only draw 1 every 10 frames to save time
     monit.run()
 
 
