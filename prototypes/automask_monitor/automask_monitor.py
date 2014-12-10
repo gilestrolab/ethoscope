@@ -47,6 +47,10 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
 
 
 
+    def dist_pts(self, pt1, pt2):
+        x1 , y1  = pt1
+        x2 , y2  = pt2
+        return np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
     def _rois_from_img(self,img):
         map = self._find_blobs(img, self._score_targets)
@@ -81,30 +85,77 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
             x , y = moms["m10"]/moms["m00"],  moms["m01"]/moms["m00"]
             src_points.append((x,y))
 
+
+        #############sort point as:
+
+        # B--------------------------C
+        # |
+        # |
+        # |
+        # A
+
+        a ,b, c = src_points
+        pairs = [(a,b), (b,c), (a,c)]
+
+
+        dists = [ self.dist_pts(*p) for p in pairs]
+        hypo_vertices = pairs[np.argmax(dists)]
+
+
+        for sp in src_points:
+            if not sp in hypo_vertices:
+
+                break
+
+        sorted_b = sp
+
+
+        dist = 0
+        for sp in src_points:
+            if sorted_b is sp:
+                continue
+            if self.dist_pts(sp, sorted_b) > dist:
+                dist = self.dist_pts(sp, sorted_b)
+                sorted_c = sp
+
+        sorted_a = [sp for sp in src_points if not sp is sorted_b and not sp is sorted_c][0]
+
+
+
+
+
         # todo sort src_points ? ABC
-        src_points = np.array(src_points, dtype=np.float32)
+        sorted_src_pts = np.array([sorted_a, sorted_b, sorted_c], dtype=np.float32)
 
-        print src_points
 
-        # dst_points = np.array([(0,1),
-        #                        (0,0),
-        #                        (1,0)], dtype=np.float32)
 
         dst_points = np.array([(0,1),
-                               (1,0),
-                               (0,0)], dtype=np.float32)
+                               (0,0),
+                               (1,0)], dtype=np.float32)
 
-        wrap_mat = cv2.getAffineTransform(dst_points, src_points)
+
+        wrap_mat = cv2.getAffineTransform(dst_points, sorted_src_pts)
+
+        print wrap_mat
+
+        origin = np.array(sorted_b, dtype=np.float32)
 
         lines_to_draw = []
-        for i in range(16 + 1):
-            x = float(i)/17.0
-            y = 0
+        for i in range(1+16):
+            y = float(i)/17.0
+            x = 0
             pt1 = np.array([x,y,0], dtype=np.float32)
-            pt2 = np.array([x,y,1], dtype=np.float32)
-            a, b = np.dot(wrap_mat, pt1).astype(np.int), np.dot(wrap_mat, pt2).astype(np.int)
-            # print a,b
-            cv2.line(img, tuple(a), tuple(b), (255,255,0),3)
+            x=1
+            pt2 = np.array([x,y,0], dtype=np.float32)
+            print pt1, np.dot(wrap_mat, pt1)
+
+            pt1, pt2 = np.dot(wrap_mat, pt1),  np.dot(wrap_mat, pt2)
+            pt1 += origin
+            pt2 += origin
+            pt1 = pt1.astype(np.int)
+            pt2 = pt2.astype(np.int)
+
+            cv2.line(img, tuple(pt1), tuple(pt2), (255,255,0),3, cv2.CV_AA)
 
 
 
