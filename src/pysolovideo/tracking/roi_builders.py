@@ -632,7 +632,7 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
 
         sorted_src_pts = np.array([sorted_a, sorted_b, sorted_c], dtype=np.float32)
         sorted_src_pts += [
-                            [-mean_diam/2.,-mean_diam], # IMPORTANT A is not touching the grove, so we add + one radius
+                            [-mean_diam/2.,-mean_diam/2 -mean_diam/4], # IMPORTANT A is not touching the grove, so we add + one radius
                             [-mean_diam/2.,mean_diam/2.],
                             [mean_diam/2.,mean_diam/2.]
                           ]
