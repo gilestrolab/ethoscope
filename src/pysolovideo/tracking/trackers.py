@@ -15,11 +15,12 @@ class NoPositionError(Exception):
 
 class BaseTracker(object):
     def __init__(self, roi,data=None):
-        self._positions =[]
-        self._times =[]
+        self._positions = deque()
+        self._times =deque()
         self._data = data
         self._roi = roi
         self._last_non_inferred_time = 0
+        self._max_history_length = 60 * 10# in seconds
     def __call__(self, t, img):
         sub_img, mask = self._roi(img)
         try:
@@ -40,6 +41,12 @@ class BaseTracker(object):
 
         self._positions.append(point)
         self._times.append(t)
+
+
+        if len(self._times) > 2 and (self._times[-1] - self._times[0]) > self._max_history_length:
+            self._positions.popleft()
+            self._times.popleft()
+
         return point
 
     def _infer_position(self, t, max_time=60):

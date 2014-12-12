@@ -81,8 +81,8 @@ class Monitor(object):
                     if data_row is None:
                         continue
 
-                    if self._out_file is not None:
-                        out.append(data_row)
+                    # if self._out_file is not None:
+                    #     out.append(data_row)
 
 
                 if (self._draw_results and i % self.draw_every_n == 0) or not vw is None :

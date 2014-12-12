@@ -60,7 +60,7 @@ if __name__ == "__main__":
                     out_file=option_dict["out"], # save a csv out
                     max_duration=option_dict["duration"], # when to stop (in seconds)
                     video_out=option_dict["result_video"], # when to stop (in seconds)
-                    draw_results=False, # draw position on image
+                    draw_results=True, # draw position on image
                     draw_every_n=1) # only draw 1 every 10 frames to save time
     monit.run()
 
