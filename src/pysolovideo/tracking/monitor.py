@@ -2,11 +2,11 @@ __author__ = 'quentin'
 
 import roi_builders as rbs
 from tracking_unit import TrackingUnit
+import csv
 import logging
 import cv2
+from collections import deque
 
-
-import pandas as pd
 
 # todo make capable of recording result video in arbitrary location
 # todo write every row /chunk of data in stdout/file (use updatable pd.Dataframes?)
@@ -19,11 +19,22 @@ class Monitor(object):
                 max_duration=None):
 
         self._camera = camera
-        self._out_file = out_file
+
+
+        if out_file is None or isinstance(out_file, file):
+            self._out_file = out_file
+        else:
+             self._out_file = open(out_file, 'wb')
+        # todo ensure file has opened OK
+
+
         self._draw_results = draw_results
         self.draw_every_n = draw_every_n
         self._max_duration = max_duration
         self._video_out = video_out
+        self._data_history = deque()
+        self._max_history_length = 60 *1# in seconds
+
         if rois is None:
             rois = rbs.DefaultROIBuilder(camera)()
 
@@ -39,6 +50,9 @@ class Monitor(object):
             raise ValueError("You should have one interactor per ROI")
 
 
+    @property
+    def data_history(self):
+        return self._data_history
 
     def _draw_on_frame(self, frame):
 
@@ -59,18 +73,17 @@ class Monitor(object):
 
         return frame_cp
 
-    def _stop_monitor(self, out):
-        if self._out_file is not None:
-                df = pd.DataFrame(out)
-                df.to_csv(self._out_file)
 
     def run(self):
-        out  = []
+        if self._out_file is not None:
+            header = None
+
+            file_writer  = csv.writer(self._out_file , quoting=csv.QUOTE_NONNUMERIC)
+
         vw = None
         try:
             for i,(t, frame) in enumerate(self._camera):
                 if self._max_duration is not None and t > self._max_duration:
-                    self._stop_monitor(out)
                     break
 
                 if self._video_out is not None and vw is None:
@@ -81,8 +94,17 @@ class Monitor(object):
                     if data_row is None:
                         continue
 
-                    # if self._out_file is not None:
-                    #     out.append(data_row)
+                    self._data_history.append(data_row)
+
+                    # print (self._data_history[-1]["t"] - self._data_history[0]["t"]), len(self._data_history)
+                    if len(self._data_history) > 2 and (self._data_history[-1]["t"] - self._data_history[0]["t"]) > self._max_history_length:
+                        self._data_history.popleft()
+
+                    if self._out_file is not None:
+                        if header is None:
+                            header = sorted(data_row.keys())
+                            file_writer.writerow(header)
+                        file_writer.writerow([data_row[f] for f in header])
 
 
                 if (self._draw_results and i % self.draw_every_n == 0) or not vw is None :
@@ -96,6 +118,5 @@ class Monitor(object):
         except KeyboardInterrupt:
             pass
 
-        self._stop_monitor(out)
         if not vw is None:
             vw.release()

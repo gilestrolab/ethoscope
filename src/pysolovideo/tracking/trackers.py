@@ -20,7 +20,7 @@ class BaseTracker(object):
         self._data = data
         self._roi = roi
         self._last_non_inferred_time = 0
-        self._max_history_length = 60 * 10# in seconds
+        self._max_history_length = 60  # in seconds
     def __call__(self, t, img):
         sub_img, mask = self._roi(img)
         try:
