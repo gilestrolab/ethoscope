@@ -8,15 +8,29 @@ import cv2
 from collections import deque
 
 
-# todo make capable of recording result video in arbitrary location
-# todo write every row /chunk of data in stdout/file (use updatable pd.Dataframes?)
-
 class Monitor(object):
 
     def __init__(self, camera, tracker_class, rois = None, interactors=None, out_file=None,
                 draw_results=False, draw_every_n=1,
                 video_out = None,
                 max_duration=None):
+        """
+        Class to orchestrate the tracking of several object in seperate regions of interest (ROIs) and interacting
+
+        :param camera: a camera object responsible of acquiring frames and associated time stamps.
+        :type: class:`pysolovideo.tracking_unit.cameras.BaseCamera`
+        :param tracker_class: The class that will be used for tracking. It must inherit from ``
+        :param rois: A list of region of interest.
+        :param interactors: The class that will be used for analysing the position of the object and interacting with the system/hardware.
+        :param out_file: An optional output file (file or filename)
+        :param draw_results: whether to draw the results of the tracking on a window (OpenCV frontend). This is mainly for debugging purposes and will result in using more resources.
+        :param draw_every_n: When `draw_results` is `True`, only draw   every `draw_every_n` frames. this can help to save some CPU time.
+        :param video_out: An optional filename where to write the original frames annotated with the location of the ROIs and position of the objects.
+          Note that this will use quite a lot of resources since it requires 1) drawing on the frames and 2) encoding the video in real time.
+        :param max_duration: tracking stops when the elapsed time is greater
+        :type max_duration: float
+
+        """
 
         self._camera = camera
 
