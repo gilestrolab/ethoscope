@@ -48,7 +48,7 @@ if __name__ == "__main__":
     # Otherwise, webcam
     else:
         # The camera will not try to go faster than 3 fps
-        cam = V4L2Camera(0, target_fps=3)
+        cam = V4L2Camera(0, target_fps=3, target_resolution=(640, 480))
 
     roi_builder = SleepMonitorWithTargetROIBuilder()
 

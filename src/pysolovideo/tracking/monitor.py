@@ -15,7 +15,7 @@ class Monitor(object):
                 video_out = None,
                 max_duration=None):
         """
-        Class to orchestrate the tracking of several object in seperate regions of interest (ROIs) and interacting
+        Class to orchestrate the tracking of several object in separate regions of interest (ROIs) and interacting
 
         :param camera: a camera object responsible of acquiring frames and associated time stamps.
         :type: class:`pysolovideo.tracking_unit.cameras.BaseCamera`
