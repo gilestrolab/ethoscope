@@ -659,16 +659,16 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
                     x = 0.
                 else:
                     x = 0.5
-                pt1 = np.array([x,y,0], dtype=np.float32)
-                pt2 = np.array([x,y + 1./16.,0], dtype=np.float32)
+                pt1 = np.array([x,y + 0.2/16 ,0], dtype=np.float32)
+                pt2 = np.array([x,y + 1./16. - 0.2/16  ,0], dtype=np.float32)
 
                 if left:
                     x = 0.5
                 else:
                     x = 1.0
 
-                pt4 = np.array([x,y,0], dtype=np.float32)
-                pt3 = np.array([x,y + 1./16.,0], dtype=np.float32)
+                pt4 = np.array([x,y+ 0.2/16,0], dtype=np.float32)
+                pt3 = np.array([x,y + 1./16. - 0.2/16,0], dtype=np.float32)
 
 
                 pt1, pt2 = np.dot(wrap_mat, pt1),  np.dot(wrap_mat, pt2)

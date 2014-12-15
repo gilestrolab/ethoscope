@@ -97,13 +97,19 @@ class Monitor(object):
         vw = None
         try:
             for i,(t, frame) in enumerate(self._camera):
+                if i % 60 == 0:
+                    print t/60
+
+
                 if self._max_duration is not None and t > self._max_duration:
                     break
 
                 if self._video_out is not None and vw is None:
                     vw = cv2.VideoWriter(self._video_out, cv2.cv.CV_FOURCC(*'DIVX'), 50, (frame.shape[1], frame.shape[0])) # fixme the 50 is arbitrary
 
-                for track_u in self._unit_trackers:
+                for j,track_u in enumerate(self._unit_trackers):
+                    # if j != 5:
+                    #     continue
                     data_row = track_u(t, frame)
                     if data_row is None:
                         continue
@@ -125,7 +131,8 @@ class Monitor(object):
                     tmp = self._draw_on_frame(frame)
                     if (self._draw_results and i % self.draw_every_n == 0):
                         cv2.imshow("psv", tmp)
-                        cv2.waitKey(1)
+                        # cv2.waitKey(1)
+                        cv2.waitKey(10)
                     if not vw is None:
                         vw.write(tmp)
 

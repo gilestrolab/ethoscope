@@ -88,7 +88,8 @@ class ObjectModel(object):
     """
     A class to model, update and predict foreground object (i.e. tracked animal).
     """
-    def __init__(self, history_length=2000):
+    def __init__(self, history_length=1000):
+        #fixme this should be time, not number of points!
         self._features_header = [
             "fg_model_area",
             "fg_model_width",
@@ -97,7 +98,8 @@ class ObjectModel(object):
         ]
 
         self._history_length = history_length
-        self._ring_buff = np.empty((self._history_length, len(self._features_header)))
+        self._ring_buff = np.empty((self._history_length, len(self._features_header)), dtype=np.float32)
+        self._std_buff = np.empty((self._history_length, len(self._features_header)), dtype=np.float32)
         self._ring_buff_idx=0
         self._is_ready = False
 
@@ -125,7 +127,10 @@ class ObjectModel(object):
     def distance(self, features):
 
         means = np.mean(self._ring_buff, 0)
-        stds = np.std(self._ring_buff, 0)
+        np.subtract(self._ring_buff, means, self._ring_buff)
+        np.abs(self._std_buff, self._std_buff)
+        stds = np.mean(self._std_buff, 0)
+        # stds = np.std(self._ring_buff, 0)
 
         a = 1 / (stds* np.sqrt(2.0 * np.pi))
         b = np.exp(- (features - means) ** 2  / (2 * stds ** 2))
@@ -256,10 +261,14 @@ class BackgroundModel(object):
 
 class AdaptiveBGModel(BaseTracker):
     fg_model = ObjectModel()
+
     def __init__(self, roi, data=None):
 
-        self._object_expected_size = 0.05 # proportion of the roi main axis
+        self._object_expected_size = 0.10 # proportion of the roi main axis
         self._max_area = 10 * self._object_expected_size ** 2
+        self._smooth_mode = deque()
+        self._smooth_mode_tstamp = deque()
+        self._smooth_mode_window_dt = 30 #seconds
         # self._bg_mean = None
         # self._fg_features = None
         # self._bg_sd = None
@@ -271,46 +280,67 @@ class AdaptiveBGModel(BaseTracker):
         self._buff_grey = None
         self._buff_grey_blurred = None
         self._buff_fg = None
+        self._buff_convolved_mask = None
 
-    def _pre_process_input(self, img, mask):
-        if self._buff_grey is None:
-            self._buff_grey = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
-            self._buff_grey_blurred = np.empty_like(self._buff_grey)
-            # self._buff_grey_blurred = np.empty_like(self._buff_grey)
+    def _pre_process_input(self, img, mask, t):
 
-        cv2.cvtColor(img,cv2.COLOR_BGR2GRAY, self._buff_grey)
-
-        blur_rad = int(self._object_expected_size * np.max(self._buff_grey.shape) * 2.0)
+        blur_rad = int(self._object_expected_size * np.max(img.shape) * 2.0)
         if blur_rad % 2 == 0:
             blur_rad += 1
 
 
+        if self._buff_grey is None:
+            self._buff_grey = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+            self._buff_grey_blurred = np.empty_like(self._buff_grey)
+            # self._buff_grey_blurred = np.empty_like(self._buff_grey)
+            if mask is None:
+                mask = np.ones_like(self._buff_grey) * 255
 
+            mask_conv = cv2.blur(mask,(blur_rad, blur_rad))
+            self._buff_convolved_mask  = (1/255.0 *  mask_conv.astype(np.float32))
+
+        cv2.cvtColor(img,cv2.COLOR_BGR2GRAY, self._buff_grey)
 
         hist = cv2.calcHist([self._buff_grey], [0], None, [256], [0,255]).ravel()
-        hist = np.convolve(hist, [1] * 5)
+        hist = np.convolve(hist, [1] * 3)
         mode =  np.argmax(hist)
+
+        self._smooth_mode.append(mode)
+        self._smooth_mode_tstamp.append(t)
+
+        if len(self._smooth_mode_tstamp) >2 and self._smooth_mode_tstamp[-1] - self._smooth_mode_tstamp[0] > self._smooth_mode_window_dt:
+            self._smooth_mode.popleft()
+            self._smooth_mode_tstamp.popleft()
+
+
+        mode = np.mean(list(self._smooth_mode))
         scale = 128. / mode
+
 
         cv2.multiply(self._buff_grey, scale, dst = self._buff_grey)
 
-        cv2.GaussianBlur(self._buff_grey,(blur_rad, blur_rad),5.0, self._buff_grey_blurred)
-        cv2.GaussianBlur(self._buff_grey,(5,5), 2.5,self._buff_grey)
+        cv2.bitwise_and(self._buff_grey, mask, self._buff_grey)
+
+        cv2.blur(self._buff_grey,(blur_rad, blur_rad), self._buff_grey_blurred)
+        #fixme could be optimised
+        self._buff_grey_blurred = (self._buff_grey_blurred / self._buff_convolved_mask).astype(np.uint8)
+
+        cv2.GaussianBlur(self._buff_grey,(3,3), 1.5,self._buff_grey)
         cv2.absdiff(self._buff_grey, self._buff_grey_blurred, self._buff_grey)
-
-
+        # cv2.imshow("bg", self._buff_grey)
         if mask is not None:
             cv2.bitwise_and(self._buff_grey, mask, self._buff_grey)
             return self._buff_grey
 
 
     def _find_position(self, img, mask,t):
-        grey = self._pre_process_input(img, mask)
+        grey = self._pre_process_input(img, mask, t)
         try:
             return self._track(img, grey, mask, t)
         except NoPositionError:
             self._bg_model.update(grey, t)
             raise NoPositionError
+
 
     def _track(self, img,  grey, mask,t):
         if self._bg_model.bg_img is None:
@@ -322,7 +352,11 @@ class AdaptiveBGModel(BaseTracker):
 
         cv2.subtract(grey, bg, self._buff_fg)
 
+        # cv2.imshow("fg", self._buff_fg*4)
+
         cv2.threshold(self._buff_fg,10,255,cv2.THRESH_BINARY, dst=self._buff_fg)
+        # cv2.imshow("bin_fg", self._buff_fg)
+
 
         n_fg_pix = np.count_nonzero(self._buff_fg)
         prop_fg_pix  = n_fg_pix / (1.0 * grey.shape[0] * grey.shape[1])
