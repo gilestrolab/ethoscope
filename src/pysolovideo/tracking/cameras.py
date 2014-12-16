@@ -17,6 +17,7 @@ class BaseCamera(object):
         pass
 
     def __del__(self):
+        print "releasing camera!"
         self._close()
 
     def __iter__(self):

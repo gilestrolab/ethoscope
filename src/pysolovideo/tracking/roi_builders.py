@@ -84,8 +84,12 @@ class BaseROIBuilder(object):
                     break
 
             accum = np.median(np.array(accum),0).astype(np.uint8)
-
-        rois = self._rois_from_img(accum)
+        try:
+            rois = self._rois_from_img(accum)
+        except Exception as e:
+            if not isinstance(camera, np.ndarray):
+                del camera
+            raise e
         rois_w_no_value = [r for r in rois if r.value is None]
 
         if len(rois_w_no_value) > 0:
@@ -564,6 +568,9 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
         # as soon as we have three objects, we stop
 
         for t in range(0, 255,1):
+            cv2.imshow("img",img);cv2.waitKey(-1)
+            cv2.imshow("map", map*5);cv2.waitKey(-1)
+
             cv2.threshold(map, t, 255,cv2.THRESH_BINARY  ,bin)
 
             contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
