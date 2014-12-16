@@ -7,16 +7,18 @@ import cv2
 
 # cam = MovieVirtualCamera("/home/quentin/Desktop/drosoAdult_short.avi")
 #
-#
-# for t,frame in cam:
-#     cv2.imshow("Test", frame)
-#     cv2.waitKey(1)
-#
-#
-# for t,frame in cam:
-#     cv2.imshow("Test", frame)
-#     cv2.waitKey(1)
-#
+
+cam = V4L2Camera(0,target_fps=1)
+
+for t,frame in cam:
+    cv2.imshow("Test", frame)
+    cv2.waitKey(1)
+
+
+for t,frame in cam:
+    cv2.imshow("Test", frame)
+    cv2.waitKey(1)
+
 
 cam = V4L2Camera(0,target_fps=1)
 
