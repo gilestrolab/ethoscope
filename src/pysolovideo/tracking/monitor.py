@@ -116,7 +116,7 @@ class Monitor(object):
 
                     self._data_history.append(data_row)
 
-                    # print (self._data_history[-1]["t"] - self._data_history[0]["t"]), len(self._data_history)
+
                     if len(self._data_history) > 2 and (self._data_history[-1]["t"] - self._data_history[0]["t"]) > self._max_history_length:
                         self._data_history.popleft()
 
@@ -131,8 +131,8 @@ class Monitor(object):
                     tmp = self._draw_on_frame(frame)
                     if (self._draw_results and i % self.draw_every_n == 0):
                         cv2.imshow("psv", tmp)
-                        # cv2.waitKey(1)
-                        cv2.waitKey(10)
+                        cv2.waitKey(1)
+                        # cv2.waitKey(10)
                     if not vw is None:
                         vw.write(tmp)
 

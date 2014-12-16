@@ -299,6 +299,7 @@ class AdaptiveBGModel(BaseTracker):
             mask_conv = cv2.blur(mask,(blur_rad, blur_rad))
             self._buff_convolved_mask  = (1/255.0 *  mask_conv.astype(np.float32))
 
+
         cv2.cvtColor(img,cv2.COLOR_BGR2GRAY, self._buff_grey)
 
         hist = cv2.calcHist([self._buff_grey], [0], None, [256], [0,255]).ravel()
@@ -317,6 +318,8 @@ class AdaptiveBGModel(BaseTracker):
         scale = 128. / mode
 
 
+        cv2.GaussianBlur(self._buff_grey,(5,5), 2.5,self._buff_grey)
+
         cv2.multiply(self._buff_grey, scale, dst = self._buff_grey)
 
         cv2.bitwise_and(self._buff_grey, mask, self._buff_grey)
@@ -325,9 +328,9 @@ class AdaptiveBGModel(BaseTracker):
         #fixme could be optimised
         self._buff_grey_blurred = (self._buff_grey_blurred / self._buff_convolved_mask).astype(np.uint8)
 
-        cv2.GaussianBlur(self._buff_grey,(3,3), 1.5,self._buff_grey)
+
         cv2.absdiff(self._buff_grey, self._buff_grey_blurred, self._buff_grey)
-        # cv2.imshow("bg", self._buff_grey)
+
         if mask is not None:
             cv2.bitwise_and(self._buff_grey, mask, self._buff_grey)
             return self._buff_grey
@@ -353,6 +356,7 @@ class AdaptiveBGModel(BaseTracker):
         cv2.subtract(grey, bg, self._buff_fg)
 
         # cv2.imshow("fg", self._buff_fg*4)
+        # cv2.imshow("bg", bg)
 
         cv2.threshold(self._buff_fg,10,255,cv2.THRESH_BINARY, dst=self._buff_fg)
         # cv2.imshow("bin_fg", self._buff_fg)
