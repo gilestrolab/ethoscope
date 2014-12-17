@@ -139,6 +139,7 @@ class V4L2Camera(BaseCamera):
         self.capture.set(cv2.cv.CV_CAP_PROP_FPS, target_fps)
 
         self._target_fps = float(target_fps)
+        time.sleep(1)
         _, im = self.capture.read()
 
         # preallocate image buffer => faster
