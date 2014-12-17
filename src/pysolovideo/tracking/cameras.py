@@ -147,7 +147,7 @@ class V4L2Camera(BaseCamera):
         # preallocate image buffer => faster
         self._frame = im
 
-        cv2.imshow("im", self._frame ); cv2.waitKey(-1)
+        cv2.imshow("im", im ); cv2.waitKey(-1)
 
         #TODO better exception handling is needed here / what do we do if initial capture fails...
         assert(len(im.shape) >1)

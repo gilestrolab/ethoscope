@@ -64,30 +64,58 @@ _, im = capture.read()
 cv2.imshow("im", im); cv2.waitKey(-1)
 
 
-_start_time = time.time()
+capture.release()
 
-for i in range(300):
-    expected_time =  _start_time +i / 5.0
-    now = time.time()
+device=0
+target_fps=5
+target_resolution=(640,480)
+capture = cv2.VideoCapture(device)
+w, h = target_resolution
+if w <0 or h <0:
+    capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, 99999)
+    capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, 99999)
+else:
+    capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, w)
+    capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, h)
+capture.set(cv2.cv.CV_CAP_PROP_FPS, target_fps)
 
-    to_sleep = expected_time - now
+_target_fps = float(target_fps)
+time.sleep(1)
+_, im = capture.read()
 
-    # Warnings if the fps is so high that we cannot grab fast enough
-    if to_sleep < 0:
-        print "The target FPS could not be reached. Frame lagging by  %f seconds" % (-1 * to_sleep)
-        capture.grab()
+# preallocate image buffer => faster
+_frame = im
 
-    # we simply drop frames until we go above expected time
-    while now < expected_time:
-        capture.grab()
-        now = time.time()
-    else:
-        capture.grab()
+cv2.imshow("im", im ); cv2.waitKey(-1)
 
-    capture.retrieve(im)
-    cv2.imshow("im", im); cv2.waitKey(6)
+
 
 
 #
-# #TODO better exception handling is needed here / what do we do if initial capture fails...
-# assert(len(im.shape) >1)
+# _start_time = time.time()
+#
+# for i in range(300):
+#     expected_time =  _start_time +i / 5.0
+#     now = time.time()
+#
+#     to_sleep = expected_time - now
+#
+#     # Warnings if the fps is so high that we cannot grab fast enough
+#     if to_sleep < 0:
+#         print "The target FPS could not be reached. Frame lagging by  %f seconds" % (-1 * to_sleep)
+#         capture.grab()
+#
+#     # we simply drop frames until we go above expected time
+#     while now < expected_time:
+#         capture.grab()
+#         now = time.time()
+#     else:
+#         capture.grab()
+#
+#     capture.retrieve(im)
+#     cv2.imshow("im", im); cv2.waitKey(6)
+#
+#
+# #
+# # #TODO better exception handling is needed here / what do we do if initial capture fails...
+# # assert(len(im.shape) >1)
