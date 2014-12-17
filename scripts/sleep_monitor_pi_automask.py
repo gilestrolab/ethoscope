@@ -47,8 +47,8 @@ if __name__ == "__main__":
         cam = MovieVirtualCamera(option_dict["video"])
     # Otherwise, webcam
     else:
-        # The camera will not try to go faster than 3 fps
-        cam = V4L2Camera(0, target_fps=1, target_resolution=(560, 420))
+        
+        cam = V4L2Camera(0, target_fps=5, target_resolution=(560, 420))
 
     roi_builder = SleepMonitorWithTargetROIBuilder()
 
