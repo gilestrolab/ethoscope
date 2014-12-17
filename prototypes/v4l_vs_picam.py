@@ -67,7 +67,7 @@ cv2.imshow("im", im); cv2.waitKey(-1)
 capture.release()
 
 device=0
-target_fps=5
+target_fps=1
 target_resolution=(640,480)
 capture = cv2.VideoCapture(device)
 w, h = target_resolution

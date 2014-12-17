@@ -8,7 +8,7 @@ import cv2
 # cam = MovieVirtualCamera("/home/quentin/Desktop/drosoAdult_short.avi")
 #
 
-cam = V4L2Camera(0,target_fps=1)
+cam = V4L2Camera(0,target_fps=5)
 
 for t,frame in cam:
     cv2.imshow("Test", frame)
