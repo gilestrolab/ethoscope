@@ -134,7 +134,7 @@ class Monitor(object):
                                     pass
                                 row.append(dt)
 
-                        file_writer.writerow()
+                        file_writer.writerow(row)
 
 
                 if (self._draw_results and i % self.draw_every_n == 0) or not vw is None :
