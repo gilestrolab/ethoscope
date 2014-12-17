@@ -191,7 +191,8 @@ class V4L2Camera(BaseCamera):
 
             # Warnings if the fps is so high that we cannot grab fast enough
             if to_sleep < 0:
-                logging.warning("The target FPS could not be reached. Actual FPS is about %f" % ( self._frame_idx/self._start_time))
+                if self._frame_idx % 100 == 0:
+                    logging.warning("The target FPS could not be reached. Effective FPS is about %f" % ( self._frame_idx/(now - self._start_time)))
                 self.capture.grab()
 
             # we simply drop frames until we go above expected time
