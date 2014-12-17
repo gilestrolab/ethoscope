@@ -62,28 +62,28 @@ _, im = capture.read()
 cv2.imshow("im", im); cv2.waitKey(-1)
 
 
-for i in range(300):
-    expected_time =  _start_time +i / 5.0
-    now = time.time()
-
-    to_sleep = expected_time - now
-
-    # Warnings if the fps is so high that we cannot grab fast enough
-    if to_sleep < 0:
-        logging.warning("The target FPS could not be reached. Frame lagging by  %f seconds" % (-1 * to_sleep))
-        self.capture.grab()
-
-    # we simply drop frames until we go above expected time
-    while now < expected_time:
-        self.capture.grab()
-        now = time.time()
-    else:
-    self.capture.grab()
-
-    self.capture.retrieve(self._frame)
-
-# preallocate image buffer => faster
-self._frame = im
-
-#TODO better exception handling is needed here / what do we do if initial capture fails...
-assert(len(im.shape) >1)
+# for i in range(300):
+#     expected_time =  _start_time +i / 5.0
+#     now = time.time()
+#
+#     to_sleep = expected_time - now
+#
+#     # Warnings if the fps is so high that we cannot grab fast enough
+#     if to_sleep < 0:
+#         logging.warning("The target FPS could not be reached. Frame lagging by  %f seconds" % (-1 * to_sleep))
+#         self.capture.grab()
+#
+#     # we simply drop frames until we go above expected time
+#     while now < expected_time:
+#         self.capture.grab()
+#         now = time.time()
+#     else:
+#     self.capture.grab()
+#
+#     self.capture.retrieve(self._frame)
+#
+# # preallocate image buffer => faster
+# self._frame = im
+#
+# #TODO better exception handling is needed here / what do we do if initial capture fails...
+# assert(len(im.shape) >1)
