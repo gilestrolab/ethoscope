@@ -26,6 +26,8 @@ class BaseCamera(object):
 
         self.restart()
         at_leat_one_frame = False
+
+        #fixme should use `with` of `try/finally` idiom here
         while True:
             if self.is_last_frame() or not self.is_opened():
                 if not at_leat_one_frame:
