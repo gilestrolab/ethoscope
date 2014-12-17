@@ -125,14 +125,14 @@ class Monitor(object):
                             header = sorted(data_row.keys())
                             file_writer.writerow(header)
 
-                            row = []
-                            for f in header:
-                                dt = data_row[f]
-                                try:
-                                    dt = round(dt,4)
-                                except:
-                                    pass
-                                row.append(dt)
+                        row = []
+                        for f in header:
+                            dt = data_row[f]
+                            try:
+                                dt = round(dt,4)
+                            except:
+                                pass
+                            row.append(dt)
 
                         file_writer.writerow(row)
 
