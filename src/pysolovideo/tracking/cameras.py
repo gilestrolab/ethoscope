@@ -147,6 +147,8 @@ class V4L2Camera(BaseCamera):
         # preallocate image buffer => faster
         self._frame = im
 
+        cv2.imshow("im", self._frame ); cv2.waitKey(-1)
+
         #TODO better exception handling is needed here / what do we do if initial capture fails...
         assert(len(im.shape) >1)
 
@@ -192,6 +194,7 @@ class V4L2Camera(BaseCamera):
             now = time.time()
 
             to_sleep = expected_time - now
+            print expected_time, self._frame_idx
 
             # Warnings if the fps is so high that we cannot grab fast enough
             if to_sleep < 0:
@@ -200,10 +203,12 @@ class V4L2Camera(BaseCamera):
 
             # we simply drop frames until we go above expected time
             while now < expected_time:
+                print "dropping"
                 self.capture.grab()
                 now = time.time()
         else:
             self.capture.grab()
 
         self.capture.retrieve(self._frame)
+        cv2.imshow("im", self._frame ); cv2.waitKey(10)
         return self._frame
