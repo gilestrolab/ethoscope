@@ -124,14 +124,24 @@ class Monitor(object):
                         if header is None:
                             header = sorted(data_row.keys())
                             file_writer.writerow(header)
-                        file_writer.writerow([data_row[f] for f in header])
+
+                            row = []
+                            for f in header:
+                                dt = data_row[f]
+                                try:
+                                    dt = round(dt)
+                                except:
+                                    pass
+                                row.append(dt)
+
+                        file_writer.writerow()
 
 
                 if (self._draw_results and i % self.draw_every_n == 0) or not vw is None :
                     tmp = self._draw_on_frame(frame)
                     if (self._draw_results and i % self.draw_every_n == 0):
                         cv2.imshow("psv", tmp)
-                        cv2.waitKey(1)
+                        cv2.waitKey(10)
                         # cv2.waitKey(10)
                     if not vw is None:
                         vw.write(tmp)

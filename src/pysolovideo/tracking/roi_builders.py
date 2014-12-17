@@ -568,9 +568,6 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
         # as soon as we have three objects, we stop
 
         for t in range(0, 255,1):
-            cv2.imshow("img",img);cv2.waitKey(-1)
-            cv2.imshow("map", map*5);cv2.waitKey(-1)
-
             cv2.threshold(map, t, 255,cv2.THRESH_BINARY  ,bin)
 
             contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
