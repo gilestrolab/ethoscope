@@ -17,7 +17,6 @@ class BaseCamera(object):
         pass
 
     def __del__(self):
-        print "releasing camera!"
         self._close()
 
     def __iter__(self):
@@ -26,8 +25,6 @@ class BaseCamera(object):
 
         self.restart()
         at_leat_one_frame = False
-
-        #fixme should use `with` of `try/finally` idiom here
         while True:
             if self.is_last_frame() or not self.is_opened():
                 if not at_leat_one_frame:
@@ -141,13 +138,10 @@ class V4L2Camera(BaseCamera):
         self.capture.set(cv2.cv.CV_CAP_PROP_FPS, target_fps)
 
         self._target_fps = float(target_fps)
-        time.sleep(1)
         _, im = self.capture.read()
 
         # preallocate image buffer => faster
         self._frame = im
-
-        cv2.imshow("im", im ); cv2.waitKey(-1)
 
         #TODO better exception handling is needed here / what do we do if initial capture fails...
         assert(len(im.shape) >1)
@@ -194,21 +188,18 @@ class V4L2Camera(BaseCamera):
             now = time.time()
 
             to_sleep = expected_time - now
-            print expected_time, self._frame_idx
 
             # Warnings if the fps is so high that we cannot grab fast enough
             if to_sleep < 0:
-                logging.warning("The target FPS could not be reached. Frame lagging by  %f seconds" % (-1 * to_sleep))
+                logging.warning("The target FPS could not be reached. Actual FPS is about %f" % ( self._frame_idx/self._start_time))
                 self.capture.grab()
 
             # we simply drop frames until we go above expected time
             while now < expected_time:
-                print "dropping"
                 self.capture.grab()
                 now = time.time()
         else:
             self.capture.grab()
 
         self.capture.retrieve(self._frame)
-        cv2.imshow("im", self._frame ); cv2.waitKey(10)
         return self._frame
