@@ -97,9 +97,9 @@ class Monitor(object):
         vw = None
         try:
             for i,(t, frame) in enumerate(self._camera):
-                if i % 60 == 0:
-                    print t/60
-
+                # if i % 60 == 0:
+                #     print t/60
+                #
 
                 if self._max_duration is not None and t > self._max_duration:
                     break
@@ -129,7 +129,7 @@ class Monitor(object):
                             for f in header:
                                 dt = data_row[f]
                                 try:
-                                    dt = round(dt)
+                                    dt = round(dt,4)
                                 except:
                                     pass
                                 row.append(dt)

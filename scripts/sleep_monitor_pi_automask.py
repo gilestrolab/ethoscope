@@ -61,7 +61,7 @@ if __name__ == "__main__":
                     max_duration=option_dict["duration"], # when to stop (in seconds)
                     video_out=option_dict["result_video"], # when to stop (in seconds)
                     draw_results=True, # draw position on image
-                    draw_every_n=1) # only draw 1 every 10 frames to save time
+                    draw_every_n=10) # only draw 1 every 10 frames to save time
     monit.run()
 
 
