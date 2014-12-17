@@ -5,39 +5,85 @@ import cv2
 import numpy as np
 import time
 import time
+# capture = cv2.VideoCapture(0)
+# capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH,640)
+# capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, 480)
+#
+# capture.set(cv2.cv.CV_CAP_PROP_FPS, 5)
+#
+# time.sleep(0.5)
+# #cv2.waitKey(2000)
+# _,im = capture.read()
+#
+#
+# NFRAMES = 1000
+# print "ok, frame shape=", im.shape
+#
+# t0 = time.time()
+# try:
+#     for _ in range(NFRAMES):
+#
+#         capture.grab()
+#         capture.retrieve(im)
+#
+#         cv2.imshow("frame", im)
+#         cv2.waitKey(1)
+#
+#
+#
+#         #im = np.copy(im)
+#         assert(len(im.shape) == 3)
+#     t1= time.time()
+#
+#     print (t1-t0) / float(NFRAMES)
+# finally:
+#     print "voila"
+#     capture.release()
+#
+# print "test"
+
+
 capture = cv2.VideoCapture(0)
-capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH,640)
-capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, 480)
+time.sleep(2)
+
+w, h = (640, 480)
+if w <0 or h <0:
+    capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, 99999)
+    capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, 99999)
+else:
+    capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, w)
+    capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, h)
 
 capture.set(cv2.cv.CV_CAP_PROP_FPS, 5)
 
-time.sleep(0.5)
-#cv2.waitKey(2000)
-_,im = capture.read()
+
+time.sleep(1)
+_, im = capture.read()
+cv2.imshow("im", im); cv2.waitKey(-1)
 
 
-NFRAMES = 1000
-print "ok, frame shape=", im.shape
+for i in range(300):
+    expected_time =  _start_time +i / 5.0
+    now = time.time()
 
-t0 = time.time()
-try:
-    for _ in range(NFRAMES):
+    to_sleep = expected_time - now
 
-        capture.grab()
-        capture.retrieve(im)
+    # Warnings if the fps is so high that we cannot grab fast enough
+    if to_sleep < 0:
+        logging.warning("The target FPS could not be reached. Frame lagging by  %f seconds" % (-1 * to_sleep))
+        self.capture.grab()
 
-        cv2.imshow("frame", im)
-        cv2.waitKey(1)
+    # we simply drop frames until we go above expected time
+    while now < expected_time:
+        self.capture.grab()
+        now = time.time()
+    else:
+    self.capture.grab()
 
+    self.capture.retrieve(self._frame)
 
+# preallocate image buffer => faster
+self._frame = im
 
-        #im = np.copy(im)
-        assert(len(im.shape) == 3)
-    t1= time.time()
-
-    print (t1-t0) / float(NFRAMES)
-finally:
-    print "voila"
-    capture.release()
-
-print "test"
+#TODO better exception handling is needed here / what do we do if initial capture fails...
+assert(len(im.shape) >1)
