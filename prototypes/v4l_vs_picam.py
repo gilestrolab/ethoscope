@@ -83,7 +83,7 @@ for i in range(300):
         capture.grab()
 
     capture.retrieve(im)
-    cv2.imshow("im", im); cv2.waitKey(-1)
+    cv2.imshow("im", im); cv2.waitKey(6)
 
 
 #
