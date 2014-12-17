@@ -4,15 +4,15 @@ __author__ = 'quentin'
 import cv2
 import numpy as np
 import time
-
+import time
 capture = cv2.VideoCapture(0)
 capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH,640)
 capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, 480)
 
 capture.set(cv2.cv.CV_CAP_PROP_FPS, 5)
 
-
-cv2.waitKey(2000)
+time.sleep(0.5)
+#cv2.waitKey(2000)
 _,im = capture.read()
 
 
