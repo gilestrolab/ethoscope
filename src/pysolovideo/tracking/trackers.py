@@ -98,10 +98,12 @@ class ObjectModel(object):
         ]
 
         self._history_length = history_length
-        self._ring_buff = np.zeros((self._history_length, len(self._features_header)), dtype=np.float32)
-        self._std_buff = np.zeros((self._history_length, len(self._features_header)), dtype=np.float32)
+        self._ring_buff = np.zeros((self._history_length, len(self._features_header)), dtype=np.float32, order="F")
+        self._std_buff = np.zeros((self._history_length, len(self._features_header)), dtype=np.float32, order="F")
         self._ring_buff_idx=0
         self._is_ready = False
+        self._roi_img_buff = None
+        self._mask_img_buff = None
 
     @property
     def is_ready(self):
@@ -156,14 +158,19 @@ class ObjectModel(object):
     def compute_features(self, img, contour):
         x,y,w,h = cv2.boundingRect(contour)
 
-                # fixme this is potentially to be slow!
-
-        roi = cv2.cvtColor(img[y : y + h, x : x + w, :],cv2.COLOR_BGR2GRAY)
-        mask = np.zeros_like(roi)
+        # fixme this is potentially slow!
+        # at leat, we can preallocate arrays
 
 
-        cv2.drawContours(mask,[contour],-1, (1,1,1),-1,offset=(-x,-y))
-        mean_col = cv2.mean(roi,mask)[0]
+        if self._roi_img_buff is None:
+            self._roi_img_buff = cv2.cvtColor(img[y : y + h, x : x + w, :],cv2.COLOR_BGR2GRAY)
+            self._mask_img_buff = np.zeros_like(self._roi_img_buff)
+
+        cv2.cvtColor(img[y : y + h, x : x + w, :],cv2.COLOR_BGR2GRAY,self._roi_img_buff)
+        self._mask_img_buff.fill(0)
+
+        cv2.drawContours(self._mask_img_buff,[contour],-1, (1,1,1),-1,offset=(-x,-y))
+        mean_col = cv2.mean(self._roi_img_buff, self._mask_img_buff)[0]
 
 
         (_,_) ,(width,height), angle  = cv2.minAreaRect(contour)
@@ -309,6 +316,7 @@ class AdaptiveBGModel(BaseTracker):
                 mask = np.ones_like(self._buff_grey) * 255
 
             mask_conv = cv2.blur(mask,(blur_rad, blur_rad))
+
             self._buff_convolved_mask  = (1/255.0 *  mask_conv.astype(np.float32))
 
 

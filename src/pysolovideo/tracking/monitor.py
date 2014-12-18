@@ -100,6 +100,8 @@ class Monitor(object):
                 # if i % 60 == 0:
                 #     print t/60
                 #
+                if t > 60 * 10:
+                    raise KeyboardInterrupt
 
                 if self._max_duration is not None and t > self._max_duration:
                     break
