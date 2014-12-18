@@ -98,8 +98,8 @@ class ObjectModel(object):
         ]
 
         self._history_length = history_length
-        self._ring_buff = np.empty((self._history_length, len(self._features_header)), dtype=np.float32)
-        self._std_buff = np.empty((self._history_length, len(self._features_header)), dtype=np.float32)
+        self._ring_buff = np.zeros((self._history_length, len(self._features_header)), dtype=np.float32)
+        self._std_buff = np.zeros((self._history_length, len(self._features_header)), dtype=np.float32)
         self._ring_buff_idx=0
         self._is_ready = False
 
@@ -113,8 +113,8 @@ class ObjectModel(object):
 
     def update(self, img, contour):
 
-        features = self.compute_features(img,contour)
-        self._ring_buff[self._ring_buff_idx] = features
+        self._ring_buff[self._ring_buff_idx] = self.compute_features(img,contour)
+
         self._ring_buff_idx += 1
 
         if self._ring_buff_idx == self._history_length:
@@ -122,14 +122,25 @@ class ObjectModel(object):
             self._ring_buff_idx = 0
 
 
-        return features
+
+        return self._ring_buff[self._ring_buff_idx]
 
     def distance(self, features):
 
-        means = np.mean(self._ring_buff, 0)
-        np.subtract(self._ring_buff, means, self._ring_buff)
-        np.abs(self._std_buff, self._std_buff)
-        stds = np.mean(self._std_buff, 0)
+        if not self._is_ready:
+            last_row = self._ring_buff_idx
+        else:
+            last_row = self._history_length -1
+
+        means = np.mean(self._ring_buff[:last_row], 0)
+
+        np.subtract(self._ring_buff[:last_row], means, self._std_buff[:last_row])
+        np.abs(self._std_buff[:last_row], self._std_buff[:last_row])
+
+        stds = np.mean(self._std_buff[:last_row], 0)
+
+
+
         # stds = np.std(self._ring_buff, 0)
 
         a = 1 / (stds* np.sqrt(2.0 * np.pi))
@@ -137,6 +148,7 @@ class ObjectModel(object):
 
         likelihoods =  a * b
         logls = np.sum(np.log10(likelihoods))
+
 
         return -1.0 * logls
 
