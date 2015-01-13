@@ -99,9 +99,9 @@ class Monitor(object):
             for i,(t, frame) in enumerate(self._camera):
                 # if i % 60 == 0:
                 #     print t/60
-                #
-                if t > 60 * 10:
-                    raise KeyboardInterrupt
+                #TODO use max_duration
+                # if t > 60 * 10:
+                #     raise KeyboardInterrupt
 
                 if self._max_duration is not None and t > self._max_duration:
                     break

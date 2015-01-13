@@ -301,6 +301,21 @@ class AdaptiveBGModel(BaseTracker):
         self._buff_fg = None
         self._buff_convolved_mask = None
 
+    def _pre_process_input_minimal(self, img, mask, t, darker_fg=True):
+        if self._buff_grey is None:
+            self._buff_grey = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+            if mask is None:
+                mask = np.ones_like(self._buff_grey) * 255
+
+        cv2.cvtColor(img,cv2.COLOR_BGR2GRAY, self._buff_grey)
+        if darker_fg:
+            cv2.subtract(255, self._buff_grey, self._buff_grey)
+
+
+        if mask is not None:
+            cv2.bitwise_and(self._buff_grey, mask, self._buff_grey)
+            return self._buff_grey
+
     def _pre_process_input(self, img, mask, t):
 
         blur_rad = int(self._object_expected_size * np.max(img.shape) * 2.0)
@@ -322,6 +337,10 @@ class AdaptiveBGModel(BaseTracker):
 
         cv2.cvtColor(img,cv2.COLOR_BGR2GRAY, self._buff_grey)
 
+
+
+
+
         hist = cv2.calcHist([self._buff_grey], [0], None, [256], [0,255]).ravel()
         hist = np.convolve(hist, [1] * 3)
         mode =  np.argmax(hist)
@@ -338,9 +357,10 @@ class AdaptiveBGModel(BaseTracker):
         scale = 128. / mode
 
 
-        cv2.GaussianBlur(self._buff_grey,(5,5), 2.5,self._buff_grey)
+        # cv2.GaussianBlur(self._buff_grey,(5,5), 1.5,self._buff_grey)
 
         cv2.multiply(self._buff_grey, scale, dst = self._buff_grey)
+
 
         cv2.bitwise_and(self._buff_grey, mask, self._buff_grey)
 
@@ -357,7 +377,8 @@ class AdaptiveBGModel(BaseTracker):
 
 
     def _find_position(self, img, mask,t):
-        grey = self._pre_process_input(img, mask, t)
+        grey = self._pre_process_input_minimal(img, mask, t)
+        # grey = self._pre_process_input(img, mask, t)
         try:
             return self._track(img, grey, mask, t)
         except NoPositionError:
@@ -374,11 +395,13 @@ class AdaptiveBGModel(BaseTracker):
         bg = self._bg_model.bg_img.astype(np.uint8)
 
         cv2.subtract(grey, bg, self._buff_fg)
-
+        #
+        # cv2.imshow("grey", grey)
         # cv2.imshow("fg", self._buff_fg*4)
         # cv2.imshow("bg", bg)
 
         cv2.threshold(self._buff_fg,10,255,cv2.THRESH_BINARY, dst=self._buff_fg)
+
         # cv2.imshow("bin_fg", self._buff_fg)
 
 

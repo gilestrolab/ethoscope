@@ -569,7 +569,6 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
 
         for t in range(0, 255,1):
             cv2.threshold(map, t, 255,cv2.THRESH_BINARY  ,bin)
-
             contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
 
             if len(contours) <3:
@@ -582,7 +581,8 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
         mean_diam = np.mean(target_diams)
         mean_sd = np.std(target_diams)
 
-        if mean_sd/mean_diam > 0.05:
+        if mean_sd/mean_diam > 0.10:
+            print mean_sd/mean_diam
             raise Exception("Two much variation in the diameter of the targets. Something must be wrong since all target should have the same size")
 
 
