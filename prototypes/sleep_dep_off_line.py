@@ -1,12 +1,14 @@
 __author__ = 'quentin'
 
 
-# Interface to V4l
+
+
+
 from pysolovideo.tracking.cameras import V4L2Camera
 from pysolovideo.tracking.cameras import MovieVirtualCamera
 
 # Build ROIs from greyscale image
-from pysolovideo.tracking.roi_builders import SleepMonitorWithTargetROIBuilder
+from pysolovideo.tracking.roi_builders import SleepDepROIBuilder
 
 # the robust self learning tracker
 from pysolovideo.tracking.trackers import AdaptiveBGModel
@@ -24,7 +26,7 @@ import logging
 if __name__ == "__main__":
 
     parser = optparse.OptionParser()
-    parser.add_option("-o", "--output", dest="out", help="the output file (eg out.csv   )", type="str")
+    parser.add_option("-o", "--output", dest="out", help="the output file (eg out.avi)", type="str")
     parser.add_option("-v", "--video", dest="video", help="the path to an optional video file."
                                                                 "If not specified, the webcam will be used",
                                                                 type="str", default=None)
@@ -42,15 +44,11 @@ if __name__ == "__main__":
 
 
 
-    # use a video file instead of the camera if asked by the user (--video /path/to/video)
-    if option_dict["video"] is not None:
-        cam = MovieVirtualCamera(option_dict["video"])
-    # Otherwise, webcam
-    else:
 
-        cam = V4L2Camera(0, target_fps=5, target_resolution=(560, 420))
+    cam = MovieVirtualCamera("/run/media/quentin/data_part/pysolo_video_samples/motion_in_dark_one_tube_at_a_time.avi")
 
-    roi_builder = SleepMonitorWithTargetROIBuilder()
+    roi_builder = SleepDepROIBuilder()
+    # roi_builder = SleepMonitorWithTargetROIBuilder()
 
     rois = roi_builder(cam)
 
@@ -61,7 +59,7 @@ if __name__ == "__main__":
                     max_duration=option_dict["duration"], # when to stop (in seconds)
                     video_out=option_dict["result_video"], # when to stop (in seconds)
                     draw_results=True, # draw position on image
-                    draw_every_n=10) # only draw 1 every 10 frames to save time
+                    draw_every_n=1) # only draw 1 every 10 frames to save time
     monit.run()
 
 
