@@ -108,10 +108,11 @@ class Monitor(object):
 
                 if self._video_out is not None and vw is None:
                     vw = cv2.VideoWriter(self._video_out, cv2.cv.CV_FOURCC(*'DIVX'), 50, (frame.shape[1], frame.shape[0])) # fixme the 50 is arbitrary
-
+                print t, "================================================="
                 for j,track_u in enumerate(self._unit_trackers):
-                    # if j != 5:
+                    # if j != 20:
                     #     continue
+
                     data_row = track_u(t, frame)
                     if data_row is None:
                         continue

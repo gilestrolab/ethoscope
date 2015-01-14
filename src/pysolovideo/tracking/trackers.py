@@ -142,7 +142,9 @@ class ObjectModel(object):
         stds = np.mean(self._std_buff[:last_row], 0)
 
 
-
+        # print means
+        # print stds
+        # print features
         # stds = np.std(self._ring_buff, 0)
 
         a = 1 / (stds* np.sqrt(2.0 * np.pi))
@@ -171,7 +173,7 @@ class ObjectModel(object):
 
         cv2.drawContours(self._mask_img_buff,[contour],-1, (1,1,1),-1,offset=(-x,-y))
         mean_col = cv2.mean(self._roi_img_buff, self._mask_img_buff)[0]
-
+        # todo NOT use colour
 
         (_,_) ,(width,height), angle  = cv2.minAreaRect(contour)
         width, height= max(width,height), min(width,height)
@@ -195,6 +197,7 @@ class ObjectModel(object):
                             ar,
                             #instantaneous_speed +1.0,
                             mean_col +1
+                            # 1.0
                              ])
 
         return features
@@ -270,6 +273,8 @@ class BackgroundModel(object):
         else:
             np.subtract(1, self._buff_alpha_matrix, self._buff_invert_alpha_mat)
 
+        # cv2.imshow("imt", img_t)
+        # cv2.imshow("bgm", self._bg_mean.astype(np.uint8))
 
         np.multiply(self._buff_alpha_matrix, img_t, self._buff_alpha_matrix)
         np.multiply(self._buff_invert_alpha_mat, self._bg_mean, self._buff_invert_alpha_mat)
@@ -295,7 +300,7 @@ class AdaptiveBGModel(BaseTracker):
 
         super(AdaptiveBGModel, self).__init__(roi, data)
         self._bg_model = BackgroundModel()
-        self._max_m_log_lik = 7.5
+        self._max_m_log_lik = 15.
         self._buff_grey = None
         self._buff_grey_blurred = None
         self._buff_fg = None
@@ -387,6 +392,8 @@ class AdaptiveBGModel(BaseTracker):
 
 
     def _track(self, img,  grey, mask,t):
+
+
         if self._bg_model.bg_img is None:
             self._buff_fg = np.empty_like(grey)
             raise NoPositionError
@@ -395,18 +402,21 @@ class AdaptiveBGModel(BaseTracker):
         bg = self._bg_model.bg_img.astype(np.uint8)
 
         cv2.subtract(grey, bg, self._buff_fg)
-        #
+
         # cv2.imshow("grey", grey)
-        # cv2.imshow("fg", self._buff_fg*4)
+        # cv2.imshow("fg", self._buff_fg*3)
         # cv2.imshow("bg", bg)
 
-        cv2.threshold(self._buff_fg,10,255,cv2.THRESH_BINARY, dst=self._buff_fg)
+        #fixme magic number
+        cv2.threshold(self._buff_fg,15,255,cv2.THRESH_BINARY, dst=self._buff_fg)
 
         # cv2.imshow("bin_fg", self._buff_fg)
 
 
         n_fg_pix = np.count_nonzero(self._buff_fg)
         prop_fg_pix  = n_fg_pix / (1.0 * grey.shape[0] * grey.shape[1])
+
+        is_ambiguous = False
         if  prop_fg_pix > self._max_area:
             self._bg_model.increase_learning_rate()
             raise NoPositionError
@@ -421,14 +431,15 @@ class AdaptiveBGModel(BaseTracker):
 
 
         elif len(contours) > 1:
-            self._bg_model.increase_learning_rate()
+
             if not self.fg_model.is_ready:
                 raise NoPositionError
 
 
             hulls = [cv2.convexHull( c) for c in contours]
             hulls = merge_blobs(hulls)
-
+            if len(hulls) > 1:
+                is_ambiguous = True
             cluster_features = [self.fg_model.compute_features(img, h) for h in hulls]
             all_distances = [self.fg_model.distance(cf) for cf in cluster_features]
             good_clust = np.argmin(all_distances)
@@ -439,8 +450,6 @@ class AdaptiveBGModel(BaseTracker):
 
             if hull.shape[0] < 3:
                 raise NoPositionError
-
-
         else:
 
             hull = cv2.convexHull(contours[0])
@@ -448,13 +457,11 @@ class AdaptiveBGModel(BaseTracker):
                 self._bg_model.increase_learning_rate()
                 raise NoPositionError
 
-
-
             features = self.fg_model.compute_features(img, hull)
             distance = self.fg_model.distance(features)
+
         if distance > self._max_m_log_lik:
             self._bg_model.increase_learning_rate()
-            # return None
             raise NoPositionError
 
 
@@ -466,8 +473,14 @@ class AdaptiveBGModel(BaseTracker):
         if mask is not None:
             cv2.bitwise_and(self._buff_fg, mask,  self._buff_fg)
 
-        self._bg_model.decrease_learning_rate()
-        self._bg_model.update(grey, t, self._buff_fg)
+        if is_ambiguous:
+            self._bg_model.increase_learning_rate()
+            self._bg_model.update(grey, t)
+        else:
+            self._bg_model.decrease_learning_rate()
+            self._bg_model.update(grey, t, self._buff_fg)
+
+
         self.fg_model.update(img, hull)
 
 
