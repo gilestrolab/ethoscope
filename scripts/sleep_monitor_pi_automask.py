@@ -36,6 +36,8 @@ if __name__ == "__main__":
                                                                "Keyboard interrupt can be use to stop before",
                                                                 default=None, type="int")
 
+    parser.add_option("-f", "--drawing-frequency",dest="drawing_frequency", help="Draw only every N frames (to save processing power).",
+                                                                default=-1, type="int")
     (options, args) = parser.parse_args()
 
     option_dict = vars(options)
@@ -54,14 +56,20 @@ if __name__ == "__main__":
 
     rois = roi_builder(cam)
 
+    df = option_dict["drawing_frequency"]
+    if df <= 0:
+        draw = False
+    else:
+        draw = True
+
     monit = Monitor(cam,
                     AdaptiveBGModel,
                     rois,
                     out_file=option_dict["out"], # save a csv out
                     max_duration=option_dict["duration"], # when to stop (in seconds)
                     video_out=option_dict["result_video"], # when to stop (in seconds)
-                    draw_results=True, # draw position on image
-                    draw_every_n=1) # only draw 1 every 10 frames to save time
+                    draw_results=draw, # draw position on image
+                    draw_every_n=df) # only draw 1 every 10 frames to save time
     monit.run()
 
 
