@@ -207,7 +207,7 @@ class BackgroundModel(object):
     """
     A class to model background. It uses a dynamic running average and support arbitrary and heterogeneous frame rates
     """
-    def __init__(self, max_half_life=100., min_half_life=5., increment = 1.5):
+    def __init__(self, max_half_life=100., min_half_life=1., increment = 1.5):
         # the maximal half life of a pixel from background, in seconds
         self._max_half_life = float(max_half_life)
         # the minimal one
