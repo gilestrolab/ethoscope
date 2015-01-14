@@ -110,7 +110,7 @@ class Monitor(object):
                     vw = cv2.VideoWriter(self._video_out, cv2.cv.CV_FOURCC(*'DIVX'), 50, (frame.shape[1], frame.shape[0])) # fixme the 50 is arbitrary
                 print t, "================================================="
                 for j,track_u in enumerate(self._unit_trackers):
-                    # if j != 20:
+                    # if j > 20:
                     #     continue
 
                     data_row = track_u(t, frame)

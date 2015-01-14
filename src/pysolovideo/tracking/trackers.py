@@ -207,7 +207,7 @@ class BackgroundModel(object):
     """
     A class to model background. It uses a dynamic running average and support arbitrary and heterogeneous frame rates
     """
-    def __init__(self, max_half_life=100., min_half_life=1., increment = 1.5):
+    def __init__(self, max_half_life=10., min_half_life=1., increment = 1.2):
         # the maximal half life of a pixel from background, in seconds
         self._max_half_life = float(max_half_life)
         # the minimal one
@@ -217,7 +217,7 @@ class BackgroundModel(object):
         self._current_half_life = self._min_half_life
 
         # fixme theoritically this should depend on time, not frame index
-        self._increment = 1.1
+        self._increment = increment
         # the mean background
         self._bg_mean = None
         # self._bg_sd = None
@@ -300,7 +300,7 @@ class AdaptiveBGModel(BaseTracker):
 
         super(AdaptiveBGModel, self).__init__(roi, data)
         self._bg_model = BackgroundModel()
-        self._max_m_log_lik = 15.
+        self._max_m_log_lik = 99.
         self._buff_grey = None
         self._buff_grey_blurred = None
         self._buff_fg = None
@@ -461,6 +461,7 @@ class AdaptiveBGModel(BaseTracker):
             distance = self.fg_model.distance(features)
 
         if distance > self._max_m_log_lik:
+            print "rejected!"
             self._bg_model.increase_learning_rate()
             raise NoPositionError
 
