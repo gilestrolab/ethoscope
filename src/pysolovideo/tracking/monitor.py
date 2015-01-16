@@ -1,3 +1,25 @@
+r"""
+=====================
+Monitor
+=====================
+
+this module does ...
+
+
+--------------
+subsection 1
+--------------
+ewsf s
+gtfrdegbvtsd
+gds gvdr
+
+
+>>> test
+>>> voila
+
+
+"""
+
 __author__ = 'quentin'
 
 import roi_builders as rbs
@@ -14,11 +36,11 @@ class Monitor(object):
                 draw_results=False, draw_every_n=1,
                 video_out = None,
                 max_duration=None):
-        """
+        r"""
         Class to orchestrate the tracking of several object in separate regions of interest (ROIs) and interacting
 
         :param camera: a camera object responsible of acquiring frames and associated time stamps.
-        :type: class:`pysolovideo.tracking_unit.cameras.BaseCamera`
+        :type camera: class:`~pysolovideo.tracking_unit.cameras.BaseCamera`
         :param tracker_class: The class that will be used for tracking. It must inherit from ``
         :param rois: A list of region of interest.
         :param interactors: The class that will be used for analysing the position of the object and interacting with the system/hardware.
