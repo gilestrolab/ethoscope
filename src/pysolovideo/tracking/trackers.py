@@ -20,7 +20,7 @@ class BaseTracker(object):
         self._data = data
         self._roi = roi
         self._last_non_inferred_time = 0
-        self._max_history_length = 60  # in seconds
+        self._max_history_length = 300  # in seconds
     def __call__(self, t, img):
         sub_img, mask = self._roi(img)
 
@@ -82,8 +82,6 @@ class BaseTracker(object):
 
     def _find_position(self,img, mask,t):
         raise NotImplementedError
-
-
 
 
 class ObjectModel(object):
@@ -151,7 +149,6 @@ class ObjectModel(object):
 
         likelihoods =  a * b
         logls = np.sum(np.log10(likelihoods)) / len(likelihoods)
-
 
         return -1.0 * logls
 

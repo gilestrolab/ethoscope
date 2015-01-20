@@ -63,6 +63,7 @@ class TrackingUnit(object):
         data_row["t"] = t
 
 
+        # fixme this should be useless as interactor is set to 'Default', not None
         if self._interactor is None:
             return data_row
 

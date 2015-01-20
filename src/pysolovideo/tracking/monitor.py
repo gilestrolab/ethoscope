@@ -102,9 +102,14 @@ class Monitor(object):
         for track_u in self._unit_trackers:
 
             pos = track_u.get_last_position(absolute=True)
+
             cv2.putText(frame_cp, str(track_u.roi.idx + 1), track_u.roi.offset, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.75, (255,255,0))
             if pos is None:
                 continue
+
+            # if pos["roi_idx"] != 11:
+            #     continue
+
 
             if "interact" in pos.keys() and pos["interact"]:
                 roi_colour = (0, 255,0)
@@ -134,7 +139,7 @@ class Monitor(object):
         try:
 
             for i,(t, frame) in enumerate(self._camera):
-                # print "==================================="
+
                 self._frame_buffer = frame
                 # if i % 60 == 0:
                 #     print t/60
@@ -147,7 +152,7 @@ class Monitor(object):
 
                 if self._video_out is not None and vw is None:
                     vw = cv2.VideoWriter(self._video_out, cv2.cv.CV_FOURCC(*'DIVX'), 50, (frame.shape[1], frame.shape[0])) # fixme the 50 is arbitrary
-                # print t, "================================================="
+
                 for j,track_u in enumerate(self._unit_trackers):
                     # if j > 19:
                     #     continue
