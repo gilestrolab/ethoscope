@@ -1,3 +1,25 @@
+r"""
+=====================
+Monitor
+=====================
+
+this module does ...
+
+
+--------------
+subsection 1
+--------------
+ewsf s
+gtfrdegbvtsd
+gds gvdr
+
+
+>>> test
+>>> voila
+
+
+"""
+
 __author__ = 'quentin'
 
 import roi_builders as rbs
@@ -6,7 +28,7 @@ import csv
 import logging
 import cv2
 from collections import deque
-
+import numpy as np
 
 class Monitor(object):
 
@@ -14,11 +36,11 @@ class Monitor(object):
                 draw_results=False, draw_every_n=1,
                 video_out = None,
                 max_duration=None):
-        """
+        r"""
         Class to orchestrate the tracking of several object in separate regions of interest (ROIs) and interacting
 
         :param camera: a camera object responsible of acquiring frames and associated time stamps.
-        :type: class:`pysolovideo.tracking_unit.cameras.BaseCamera`
+        :type camera: :class:`~pysolovideo.tracking.cameras.BaseCamera`
         :param tracker_class: The class that will be used for tracking. It must inherit from ``
         :param rois: A list of region of interest.
         :param interactors: The class that will be used for analysing the position of the object and interacting with the system/hardware.
@@ -48,6 +70,7 @@ class Monitor(object):
         self._video_out = video_out
         self._data_history = deque()
         self._max_history_length = 60 *1# in seconds
+        self._frame_buffer = None
 
         if rois is None:
             rois = rbs.DefaultROIBuilder(camera)()
@@ -67,6 +90,11 @@ class Monitor(object):
     @property
     def data_history(self):
         return self._data_history
+
+    @property
+    def last_frame(self):
+        frame_copy = np.copy(self._frame_buffer)
+        return frame_copy
 
     def _draw_on_frame(self, frame):
 
@@ -97,6 +125,7 @@ class Monitor(object):
         vw = None
         try:
             for i,(t, frame) in enumerate(self._camera):
+                self._frame_buffer = frame
                 # if i % 60 == 0:
                 #     print t/60
                 #TODO use max_duration
@@ -108,7 +137,7 @@ class Monitor(object):
 
                 if self._video_out is not None and vw is None:
                     vw = cv2.VideoWriter(self._video_out, cv2.cv.CV_FOURCC(*'DIVX'), 50, (frame.shape[1], frame.shape[0])) # fixme the 50 is arbitrary
-                print t, "================================================="
+                # print t, "================================================="
                 for j,track_u in enumerate(self._unit_trackers):
                     # if j > 20:
                     #     continue
@@ -145,7 +174,7 @@ class Monitor(object):
                     if (self._draw_results and i % self.draw_every_n == 0):
                         cv2.imshow("psv", tmp)
                         cv2.waitKey(10)
-                        # cv2.waitKey(10)
+
                     if not vw is None:
                         vw.write(tmp)
 
