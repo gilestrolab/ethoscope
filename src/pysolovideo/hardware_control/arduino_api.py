@@ -34,6 +34,7 @@ class SleepDepriverInterface(object):
 
         for ap, _, _  in all_ports:
             try:
+                #here we use a recursive strategy to find the good port (ap).
                 SleepDepriverInterface(ap)
                 return ap
             except (WrongSleepDepPortError, serial.SerialException):

@@ -78,7 +78,7 @@ boolean USE_SERVO = true;
 boolean NEW_SERVO = true;
 boolean DEBUG_MODE = false;
 
-boolean AUTO_MODE = true; // set this to TRUE to use it without PC connected
+boolean AUTO_MODE = false; // set this to TRUE to use it without PC connected
 int rMIN = 1; // default minimal value for RANDOM rotations in AUTO mode
 int rMAX = 2; // default maximum value for RANDOM rotations in AUTO mode
 
