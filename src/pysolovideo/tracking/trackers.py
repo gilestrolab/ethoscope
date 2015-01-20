@@ -23,12 +23,14 @@ class BaseTracker(object):
         self._max_history_length = 60  # in seconds
     def __call__(self, t, img):
         sub_img, mask = self._roi(img)
+
         try:
             point = self._find_position(sub_img,mask,t)
             if point is None:
                 return None
             point = self.normalise_position(point)
             self._last_non_inferred_time = t
+            point["is_inferred"] = False
         except NoPositionError:
             if len(self._positions) == 0:
                 return None
@@ -104,6 +106,7 @@ class ObjectModel(object):
         self._is_ready = False
         self._roi_img_buff = None
         self._mask_img_buff = None
+        self._img_buff_shape = np.array([0,0])
 
     @property
     def is_ready(self):
@@ -124,7 +127,6 @@ class ObjectModel(object):
             self._ring_buff_idx = 0
 
 
-
         return self._ring_buff[self._ring_buff_idx]
 
     def distance(self, features):
@@ -136,22 +138,19 @@ class ObjectModel(object):
 
         means = np.mean(self._ring_buff[:last_row], 0)
 
+
+
         np.subtract(self._ring_buff[:last_row], means, self._std_buff[:last_row])
         np.abs(self._std_buff[:last_row], self._std_buff[:last_row])
 
         stds = np.mean(self._std_buff[:last_row], 0)
 
 
-        # print means
-        # print stds
-        # print features
-        # stds = np.std(self._ring_buff, 0)
-
         a = 1 / (stds* np.sqrt(2.0 * np.pi))
         b = np.exp(- (features - means) ** 2  / (2 * stds ** 2))
 
         likelihoods =  a * b
-        logls = np.sum(np.log10(likelihoods))
+        logls = np.sum(np.log10(likelihoods)) / len(likelihoods)
 
 
         return -1.0 * logls
@@ -160,20 +159,24 @@ class ObjectModel(object):
     def compute_features(self, img, contour):
         x,y,w,h = cv2.boundingRect(contour)
 
-        # fixme this is potentially slow!
-        # at leat, we can preallocate arrays
+        if self._roi_img_buff is None or np.any(self._roi_img_buff.shape < img.shape[0:2]) :
+            # dynamically reallocate buffer if needed
+            self._img_buff_shape[1] =  max(self._img_buff_shape[1],w)
+            self._img_buff_shape[0] =  max(self._img_buff_shape[0], h)
 
-
-        if self._roi_img_buff is None:
-            self._roi_img_buff = cv2.cvtColor(img[y : y + h, x : x + w, :],cv2.COLOR_BGR2GRAY)
+            self._roi_img_buff = np.zeros(self._img_buff_shape, np.uint8)
             self._mask_img_buff = np.zeros_like(self._roi_img_buff)
 
-        cv2.cvtColor(img[y : y + h, x : x + w, :],cv2.COLOR_BGR2GRAY,self._roi_img_buff)
-        self._mask_img_buff.fill(0)
+        sub_mask = self._mask_img_buff[0 : h, 0 : w]
 
-        cv2.drawContours(self._mask_img_buff,[contour],-1, (1,1,1),-1,offset=(-x,-y))
-        mean_col = cv2.mean(self._roi_img_buff, self._mask_img_buff)[0]
-        # todo NOT use colour
+        sub_grey = self._roi_img_buff[ 0 : h, 0: w]
+
+        cv2.cvtColor(img[y : y + h, x : x + w, :],cv2.COLOR_BGR2GRAY,sub_grey)
+        sub_mask.fill(0)
+
+        cv2.drawContours(sub_mask,[contour],-1, 255,-1,offset=(-x,-y))
+        mean_col = cv2.mean(sub_grey, sub_mask)[0]
+
 
         (_,_) ,(width,height), angle  = cv2.minAreaRect(contour)
         width, height= max(width,height), min(width,height)
@@ -300,7 +303,7 @@ class AdaptiveBGModel(BaseTracker):
 
         super(AdaptiveBGModel, self).__init__(roi, data)
         self._bg_model = BackgroundModel()
-        self._max_m_log_lik = 99.
+        self._max_m_log_lik = 2.
         self._buff_grey = None
         self._buff_grey_blurred = None
         self._buff_fg = None
@@ -403,7 +406,6 @@ class AdaptiveBGModel(BaseTracker):
 
         cv2.subtract(grey, bg, self._buff_fg)
 
-        # cv2.imshow("grey", grey)
         # cv2.imshow("fg", self._buff_fg*3)
         # cv2.imshow("bg", bg)
 
@@ -438,7 +440,13 @@ class AdaptiveBGModel(BaseTracker):
 
             hulls = [cv2.convexHull( c) for c in contours]
             hulls = merge_blobs(hulls)
-            if len(hulls) > 1:
+
+            hulls = [h for h in hulls if h.shape[0] >= 3]
+
+            if len(hulls) < 1:
+                raise NoPositionError
+
+            elif len(hulls) > 1:
                 is_ambiguous = True
             cluster_features = [self.fg_model.compute_features(img, h) for h in hulls]
             all_distances = [self.fg_model.distance(cf) for cf in cluster_features]
@@ -448,8 +456,7 @@ class AdaptiveBGModel(BaseTracker):
             distance = all_distances[good_clust]
             features = cluster_features[good_clust]
 
-            if hull.shape[0] < 3:
-                raise NoPositionError
+
         else:
 
             hull = cv2.convexHull(contours[0])
@@ -461,7 +468,6 @@ class AdaptiveBGModel(BaseTracker):
             distance = self.fg_model.distance(features)
 
         if distance > self._max_m_log_lik:
-            print "rejected!"
             self._bg_model.increase_learning_rate()
             raise NoPositionError
 
