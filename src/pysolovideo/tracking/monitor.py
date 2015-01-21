@@ -96,7 +96,7 @@ class Monitor(object):
         return frame_copy
 
     def stop(self):
-        pass
+        self._force_stop = True
     def _draw_on_frame(self, frame):
 
         frame_cp = frame.copy()
