@@ -51,7 +51,6 @@ class Monitor(object):
           Note that this will use quite a lot of resources since it requires 1) drawing on the frames and 2) encoding the video in real time.
         :param max_duration: tracking stops when the elapsed time is greater
         :type max_duration: float
-
         """
 
         self._camera = camera
@@ -71,7 +70,7 @@ class Monitor(object):
         self._data_history = deque()
         self._max_history_length = 60 *1# in seconds
         self._frame_buffer = None
-
+        self._force_stop = False
         if rois is None:
             rois = rbs.DefaultROIBuilder(camera)()
 
@@ -96,6 +95,8 @@ class Monitor(object):
         frame_copy = np.copy(self._frame_buffer)
         return frame_copy
 
+    def stop(self):
+        pass
     def _draw_on_frame(self, frame):
 
         frame_cp = frame.copy()
@@ -140,15 +141,18 @@ class Monitor(object):
 
             for i,(t, frame) in enumerate(self._camera):
 
+                if self._force_stop or self._max_duration is not None and t > self._max_duration:
+                    break
+
                 self._frame_buffer = frame
+
+
                 # if i % 60 == 0:
                 #     print t/60
-                #TODO use max_duration
                 # if t > 60 * 10:
                 #     raise KeyboardInterrupt
 
-                if self._max_duration is not None and t > self._max_duration:
-                    break
+
 
                 if self._video_out is not None and vw is None:
                     vw = cv2.VideoWriter(self._video_out, cv2.cv.CV_FOURCC(*'DIVX'), 50, (frame.shape[1], frame.shape[0])) # fixme the 50 is arbitrary
