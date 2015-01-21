@@ -143,7 +143,7 @@ class SystemPlaySoundOnStop(BaseInteractor):
         self._target = beep
         self._freq = freq
         self._distance_threshold = 0.2
-        self._inactivity_time_threshold = 30 * 4 # s
+        self._inactivity_time_threshold = 30# * 4 # s
         self._rest_time = 60 # how long should we wait before restimulating (s)
 
     def _cumulative_dist(self, times, positions):
@@ -172,6 +172,7 @@ class SystemPlaySoundOnStop(BaseInteractor):
             return False, {"freq":self._freq}
 
         cum_dist = self._cumulative_dist(times, positions)
+        print positions[-1]["roi_idx"], cum_dist
         if cum_dist > self._distance_threshold:
             return False, {"freq":self._freq}
 
