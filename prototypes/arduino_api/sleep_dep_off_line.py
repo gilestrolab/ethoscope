@@ -45,8 +45,8 @@ if __name__ == "__main__":
 
 
 
-    cam = MovieVirtualCamera("/data/pysolo_video_samples/motion_in_dark_one_tube_at_a_time.avi")
-
+    #cam = MovieVirtualCamera("/data/pysolo_video_samples/motion_in_dark_one_tube_at_a_time.avi")
+    cam = V4L2Camera(0, target_fps=5, target_resolution=(560, 420))
 
 
     roi_builder = SleepDepROIBuilder()
