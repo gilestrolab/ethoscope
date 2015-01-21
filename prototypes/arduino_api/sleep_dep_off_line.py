@@ -9,6 +9,7 @@ from pysolovideo.tracking.cameras import MovieVirtualCamera
 
 # Build ROIs from greyscale image
 from pysolovideo.tracking.roi_builders import SleepDepROIBuilder
+from pysolovideo.tracking.roi_builders import SleepMonitorWithTargetROIBuilder
 
 # the robust self learning tracker
 from pysolovideo.tracking.trackers import AdaptiveBGModel
@@ -45,11 +46,15 @@ if __name__ == "__main__":
 
 
 
-    cam = MovieVirtualCamera("/data/pysolo_video_samples/motion_in_dark_one_tube_at_a_time.avi")
+    # cam = MovieVirtualCamera("/data/pysolo_video_samples/motion_in_dark_one_tube_at_a_time.avi")
+    # roi_builder = SleepDepROIBuilder()
+
+
+    cam = MovieVirtualCamera("/data/pysolo_video_samples/sleepMonitor_5days.avi")
+    roi_builder = SleepMonitorWithTargetROIBuilder()
 
 
 
-    roi_builder = SleepDepROIBuilder()
     # roi_builder = SleepMonitorWithTargetROIBuilder()
 
     rois = roi_builder(cam)
