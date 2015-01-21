@@ -14,6 +14,7 @@ setup(
     license="GPL3",
     description='todo', #TODO
     long_description=open('README').read(),
+    scripts=['scripts/sleep_monitor_pi_automask.py'],
     # data e.g. classifiers can be added as part of the package
     # TODO
     # package_data={'pysolovideo': ['data/classifiers/*.pkl']},
@@ -22,12 +23,13 @@ setup(
     # },
     install_requires=[
         "numpy>=1.6.1",
-        # "pandas>=0.13.1",
-        "bottle>=0.12.8",
+        "pyserial>=2.7",
+        "bottle>=0.12.8"
         # "scipy>=0.10.1",
         # "scikit-learn",
         # "picamera>=1.8",
-        "pyserial>=2.7"
+        # "pandas>=0.13.1",
+
 # TODO check opencv in installed
         # "opencv>=2.4.5",
     ],
