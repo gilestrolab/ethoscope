@@ -8,11 +8,11 @@ setup(
     name='pysolovideo',
     version='trunk',
     author=['Quentin Geissmann', 'Giorgio Gilestro', 'Luis Garcia'],
-    author_email= ['quentin.geissmann13@imperial.ac.uk','g.gilestro@imperial.ac.uk', 'luis.garcia@polygonaltree.co.uk'],
+    author_email=['quentin.geissmann13@imperial.ac.uk', 'g.gilestro@imperial.ac.uk', 'luis.garcia@polygonaltree.co.uk'],
     packages=['pysolovideo'],
     url="https://github.com/gilestrolab/pySolo-Video",
     license="GPL3",
-    description='todo', #TODO
+    description='todo',  #TODO
     long_description=open('README').read(),
     # data e.g. classifiers can be added as part of the package
     # TODO

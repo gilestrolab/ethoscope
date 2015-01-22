@@ -1,0 +1,46 @@
+<!-- index.html -->
+    <!DOCTYPE html>
+    <html ng-app="flyApp">
+    <head>
+        <meta charset="utf-8">
+        <base href="/static">
+      <!-- SCROLLS -->
+      <!-- load bootstrap and fontawesome via CDN -->
+      <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" />
+      <link rel="stylesheet" href="//netdna.bootstrapcdn.com/font-awesome/4.0.0/css/font-awesome.css" />
+
+      <!-- SPELLS -->
+      <!-- load angular and angular route via CDN -->
+      <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.9/angular.min.js"></script>
+          <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.3.9/angular-route.js"></script>
+      <script src="static/js/script.js"></script>
+    </head>
+    <body ng-controller="mainController">
+
+        <!-- HEADER AND NAVBAR -->
+        <header>
+            <nav class="navbar navbar-default">
+            <div class="container">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="/">Fly Control Pannel</a>
+                </div>
+
+                <ul class="nav navbar-nav navbar-right">
+                    <li><a href="/"><i class="fa fa-home"></i> Home</a></li>
+                    <li><a href="sm"><i class="fa fa-shield"></i> Sleep Monitors</a></li>
+                    <li><a href="sd"><i class="fa fa-comment"></i> Sleep Deprivators</a></li>
+                </ul>
+            </div>
+            </nav>
+        </header>
+
+        <!-- MAIN CONTENT AND INJECTED VIEWS -->
+        <div id="main">
+            <div ng-view></div>
+
+        </div>
+
+    </body>
+    </html>
+
+
