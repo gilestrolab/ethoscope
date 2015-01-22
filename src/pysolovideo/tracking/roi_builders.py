@@ -135,13 +135,6 @@ class DefaultROIBuilder(BaseROIBuilder):
 
 
 
-def show(im, t=-1):
-
-    cv2.imshow("test", im)
-    cv2.waitKey(t)
-
-
-
 
 
 class SleepDepROIBuilder(BaseROIBuilder):
@@ -164,7 +157,7 @@ class SleepDepROIBuilder(BaseROIBuilder):
         area = cv2.contourArea(contour)
         if area <0 :
             return 0
-        perim = cv2.arcLength(contour,True)
+        # perim = cv2.arcLength(contour,True)
 
         area_ratio = area / (1.0*w*h)
 
@@ -286,6 +279,12 @@ class SleepDepROIBuilder(BaseROIBuilder):
         mm[m >= t] = 1
 
 
+
+        # pl.plot(np.diff(mm))
+        # pl.show()
+
+
+
         # find continuous regions in vector:
         stop_start = []
         area_under_curves = []
@@ -301,8 +300,10 @@ class SleepDepROIBuilder(BaseROIBuilder):
                     area_under_curves.append(np.sum(m[start:stop]))
                 start = None
 
+
+
         if len(stop_start) < 2:
-            raise Exception("At leat one row of tube tips could not be detected")
+            raise Exception("At least one row of tube tips could not be detected")
 
         rank_auc = np.argsort(area_under_curves)
         rank_auc = rank_auc[::-1]
@@ -324,9 +325,12 @@ class SleepDepROIBuilder(BaseROIBuilder):
         areas, centres, wh = [], [], []
 
 
+
         for c in contours:
-            if self._score_food_tip_blobs(c, tube_row_mat) <1:
-                raise Exception("At least one row of tube tips could not be detected")
+            s = self._score_food_tip_blobs(c, tube_row_mat)
+
+            if s <1:
+                #raise Exception("At least one row of tube tips could not be detected")
                 continue
             moms = cv2.moments(c)
 
@@ -471,9 +475,9 @@ class SleepDepROIBuilder(BaseROIBuilder):
 
             cv2.bitwise_xor(tmp_mask,final_mask, final_mask)
             cv2.drawContours(final_mask , [pol], 0,0,1)
-            show(final_mask, 1)
+            # show(final_mask, 1)
 
-        show(final_mask/3  + wool_plugs/3, 200)
+        
 
 
         # fixme do not just draw! try to split rois appart, at least 5 px

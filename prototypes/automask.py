@@ -10,7 +10,7 @@ import glob
 import cv2
 import os
 
-AUTO_ROI_DATA = "/stk/pysolo_video_samples/auto_rois/"
+AUTO_ROI_DATA = "/data/pysolo_video_samples/auto_rois/"
 OUT_IMG = "/home/quentin/Desktop/tmp/"
 shots = glob.glob(AUTO_ROI_DATA + "*.png")
 
@@ -18,7 +18,7 @@ shots = glob.glob(AUTO_ROI_DATA + "*.png")
 roi_builder = SleepDepROIBuilder()
 
 
-for scale in [0.5, 0.75, 1, 1.25, 1.5]:
+for scale in [1, 0.5, 0.75, 1.25, 1.5]:
     for i, s in enumerate(reversed(sorted(shots))):
         orig_im = cv2.imread(s)
         im = cv2.resize(orig_im, (0,0), fx=scale, fy=scale)
@@ -38,6 +38,8 @@ for scale in [0.5, 0.75, 1, 1.25, 1.5]:
             print "FAILED:", s, "i = ", i
             print e
             cv2.imwrite(OUT_IMG+ "FAILED_SCALE=" + str(100 * scale)+"_RESULT_"+ os.path.basename(s), im)
+            cv2.waitKey(-1)
+            # exit()
 
         cv2.imshow("auto", im)
         cv2.waitKey(500)
