@@ -1,14 +1,17 @@
 #!/bin/sh
 
+# This file can be downloaded at http://tinyurl.com/oyuh92j
 ######################################
 # To build the sd card, follow instructions @ http://archlinuxarm.org/platforms/armv6/raspberry-pi
+# Then run this script.
+# After boot, one can log a s `root` (password = `root`)
+# And run: `systemctl start slim` to start the window manager
 ######################################
 
-USER=psv
+USER_NAME=psv
+PASSWORD=psv
 
 ############# PACKAGES #########################
-#### Note we should let pip deal with the python packages dependency
-### to setup a computer in the lab just after installing arch:
 pacman -Syu --noconfirm
 pacman -S base-devel packer git gcc-fortran --noconfirm
 ### Video capture related
@@ -17,33 +20,32 @@ pacman -S opencv mplayer ffmpeg gstreamer gstreamer0.10-plugins mencoder --nocon
 pacman -S xorg-server xorg-utils xorg-server-utils xorg-xinit xf86-video-fbdev lxde slim --noconfirm
 # utilities
 pacman -S ntp bash-completion --noconfirm
-
 pacman -S raspberrypi-firmware{,-tools,-bootloader,-example} --noconfirm
 
-# preinstalling dependencies will save compiling time 
+# preinstalling dependencies will save compiling time on python packages
 pacman -S python2-pip python2-numpy python2-scipy python2-pandas --noconfirm
 
 ######################################################################################
 
-# enable networktime protocol
+# Enable networktime protocol
 systemctl start ntpd.service
 systemctl enable ntpd.service
-# setting up ssh server
+# Setting up ssh server
 systemctl enable sshd.service
 systemctl start sshd.service
-
 
 #TODOs: locale/TIMEZONE/keyboard ...
 
 ##########################################################################################
-sudo useradd -m -g users -G wheel -s /bin/bash $USER
-sudo passwd $USER
+# add password without stoping
+pass=$(perl -e 'print crypt($ARGV[0], "password")' $PASSWORD)
+useradd -m -g users -G wheel -s /bin/bash  -p $pass $USER_NAME
 
-echo 'exec startlxde' >> /home/$USER/.xinitrc
-chown $user /home/$USER/.xinitrc
 
-# to start one could just run:
-# systemctl start slim
+echo 'exec startlxde' >> /home/$USER_NAME/.xinitrc
+chown $USER_NAME /home/$USER_NAME/.xinitrc
+
+
 ############################################
 
 echo 'start_file=start_x.elf' > /boot/config.txt
@@ -57,7 +59,9 @@ echo 'arm_freq=1000' >> /boot/config.txt
 echo 'core_freq=500' >> /boot/config.txt
 echo 'sdram_freq=500' >> /boot/config.txt
 echo 'over_voltage=6' >> /boot/config.txt
-echo 'gpu_mem=256' >>  /boot/config.txt
+
+### TODO test, is that enough?
+echo 'gpu_mem=128' >>  /boot/config.txt
 echo 'cma_lwm=' >>  /boot/config.txt
 echo 'cma_hwm=' >>  /boot/config.txt
 echo 'cma_offline_start=' >>  /boot/config.txt
@@ -80,11 +84,10 @@ gpasswd -a $USER lock
 gpasswd -a $USER tty
 
 
-echo "Please REBOOT"
-
-
-
 ###########################################################################################
-# here we should have a startup script set up to:
-# 1) set individual hostnames to each pi (eg pi-M_A_C_A_D_D_R), where  M_A_C_A_D_D_R is the eth0 mac address
+# The hostname is derived from the **eth0** MAC address, NOT the wireless one
+mac_addr=$(ip link show  enp3s0  |  grep -ioh '[0-9A-F]\{2\}\(:[0-9A-F]\{2\}\)\{5\}' | head -1 | sed s/:/_/g)
+hostname=PI_$mac_addr
+hostnamectl set-hostname $hostname
+
 # 2) update our software stack if needed (from git master/AUR)
