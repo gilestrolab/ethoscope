@@ -12,6 +12,8 @@ USER_NAME=psv
 PASSWORD=psv
 
 ############# PACKAGES #########################
+
+pacman-key --init
 pacman -Syu --noconfirm
 pacman -S base-devel packer git gcc-fortran --noconfirm
 ### Video capture related
@@ -23,7 +25,7 @@ pacman -S ntp bash-completion --noconfirm
 pacman -S raspberrypi-firmware{,-tools,-bootloader,-example} --noconfirm
 
 # preinstalling dependencies will save compiling time on python packages
-pacman -S python2-pip python2-numpy python2-scipy python2-pandas --noconfirm
+pacman -S python2-pip python2-numpy python2-bottle python2-pyserial --noconfirm
 
 ######################################################################################
 
