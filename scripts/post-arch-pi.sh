@@ -15,17 +15,17 @@ PASSWORD=psv
 
 pacman-key --init
 pacman -Syu --noconfirm
-pacman -S base-devel packer git gcc-fortran --noconfirm
+pacman -S base-devel packer git gcc-fortran --noconfirm --needed
 ### Video capture related
-pacman -S opencv mplayer ffmpeg gstreamer gstreamer0.10-plugins mencoder --noconfirm
+pacman -S opencv mplayer ffmpeg gstreamer gstreamer0.10-plugins mencoder --noconfirm --needed
 # a desktop environment may be useful:
-pacman -S xorg-server xorg-utils xorg-server-utils xorg-xinit xf86-video-fbdev lxde slim --noconfirm
+pacman -S xorg-server xorg-utils xorg-server-utils xorg-xinit xf86-video-fbdev lxde slim --noconfirm --needed
 # utilities
-pacman -S ntp bash-completion --noconfirm
-pacman -S raspberrypi-firmware{,-tools,-bootloader,-example} --noconfirm
+pacman -S ntp bash-completion --noconfirm --needed
+pacman -S raspberrypi-firmware{,-tools,-bootloader,-example} --noconfirm --needed
 
 # preinstalling dependencies will save compiling time on python packages
-pacman -S python2-pip python2-numpy python2-bottle python2-pyserial --noconfirm
+pacman -S python2-pip python2-numpy python2-bottle python2-pyserial --noconfirm --needed
 
 ######################################################################################
 
