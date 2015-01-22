@@ -477,7 +477,7 @@ class SleepDepROIBuilder(BaseROIBuilder):
             cv2.drawContours(final_mask , [pol], 0,0,1)
             # show(final_mask, 1)
 
-        
+
 
 
         # fixme do not just draw! try to split rois appart, at least 5 px
