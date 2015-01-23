@@ -3,17 +3,17 @@
     <html ng-app="flyApp">
     <head>
         <meta charset="utf-8">
-        <base href="/static">
+        <base href="/">
       <!-- SCROLLS -->
       <!-- load bootstrap and fontawesome via CDN -->
       <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" />
-      <link rel="stylesheet" href="//netdna.bootstrapcdn.com/font-awesome/4.0.0/css/font-awesome.css" />
+      <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" />
 
       <!-- SPELLS -->
       <!-- load angular and angular route via CDN -->
       <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.9/angular.min.js"></script>
           <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.3.9/angular-route.js"></script>
-      <script src="static/js/script.js"></script>
+      <script src="/static/js/script.js"></script>
     </head>
     <body ng-controller="mainController">
 
@@ -35,7 +35,7 @@
         </header>
 
         <!-- MAIN CONTENT AND INJECTED VIEWS -->
-        <div id="main">
+        <div id="main" class="container">
             <div ng-view></div>
 
         </div>

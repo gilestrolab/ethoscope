@@ -1,7 +1,17 @@
 <!-- home.html -->
-    <div class="jumbotron text-center">
-        <h1>Home Page</h1>
+    <div class="jumbotron text-center" >
+        <h1>Device List</h1>
+        <div>Scan the network to autodectect connected devices</div>
 
-        <p>{{ message }}</p>
+        <button class="btn btn-default" ng-click="get_devices()">Scan Network for Devices</button>
+
     </div>
-
+    <div class="col-lg-4 alert alert-info" ng-repeat="device in devices">
+        <a href="{{device.type}}/{{device.id}}">
+            <h3 ng-if="device.type == 'sm'">Sleep Monitor</h3>
+            <h3 ng-if="device.type == 'sd'">Sleep Deprivator</h3>
+            <div><span class="fa fa-paw"></span> ID: {{device.id}}</div>
+            <div><span class="fa fa-genderless"></span> Name: {{device.name}}</div>
+            <div><span class="fa fa-laptop"></span> IP: {{device.ip}}</div>
+        </a>
+    </div>

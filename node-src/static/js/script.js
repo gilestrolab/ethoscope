@@ -1,8 +1,5 @@
-// script.js
-
-    // create the module and name it scotchApp
+(function(){
     var app = angular.module('flyApp', ['ngRoute']);
-
     // configure our routes
     app.config(function($routeProvider, $locationProvider) {
         $routeProvider
@@ -14,13 +11,13 @@
             })
 
             // route for the sleep monitor page
-            .when('/sm', {
+            .when('/sm/:device_id', {
                 templateUrl : '/static/pages/sm.html',
                 controller  : 'smController'
             })
 
             // route for the sleep deprivator page
-            .when('/sd', {
+            .when('/sd/:device_id', {
                 templateUrl : '/static/pages/sd.html',
                 controller  : 'sdController'
             });
@@ -29,28 +26,28 @@
     });
 
     // create the controller and inject Angular's $scope
-    app.controller('mainController', function($scope) {
+    app.controller('mainController', function($scope, $http) {
+        $http.get('/devices_list').success(function(data){
+            $scope.devices = data;
+        })
+        //Scan for SM or SD connected.
+        $scope.get_devices = function(){
+            $http.get('/devices').success(function(data){
+                $scope.devices = data;
+            })
+        }
+    });
 
-        // create a message to display in our view
-        $scope.message = 'Everyone come and see how good I look!';
-        //Scan for SM or SD connected, first try local connexion, if not possible try through PT-Node.
-        //1. Ask for the ip address of the PT-Node
-        /*http.get('/ipAddress').success(function(data){
-         IP_PT_Node = data;
+    app.controller('smController', function($scope, $http, $routeParams)  {
+        device_id = $routeParams.device_id;
+        $http.get('/device/device_id').success(function(){
+            $scope.device = data;
         });
-        for(var i=0; i<256; i++){
-            http.get('/piDiscover')
-        }*/
     });
 
-    app.controller('smController', function($scope) {
+    app.controller('sdController',  function($scope, $http,$routeParams)  {
 
         // create a message to display in our view
         $scope.message = 'Everyone come and see how good I look!';
     });
-
-    app.controller('sdController', function($scope) {
-
-        // create a message to display in our view
-        $scope.message = 'Everyone come and see how good I look!';
-    });
+})()
