@@ -81,9 +81,9 @@ echo "bcm2835-v4l2" > /etc/modules-load.d/picamera.conf
 
 
 #SEE https://wiki.archlinux.org/index.php/arduino#Configuration
-gpasswd -a $USER uucp
-gpasswd -a $USER lock
-gpasswd -a $USER tty
+gpasswd -a $USER_NAME uucp
+gpasswd -a $USER_NAME lock
+gpasswd -a $USER_NAME tty
 
 
 ###########################################################################################
