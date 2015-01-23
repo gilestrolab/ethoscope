@@ -88,8 +88,10 @@ gpasswd -a $USER tty
 
 ###########################################################################################
 # The hostname is derived from the **eth0** MAC address, NOT the wireless one
-mac_addr=$(ip link show  eth0  |  grep -ioh '[0-9A-F]\{2\}\(:[0-9A-F]\{2\}\)\{5\}' | head -1 | sed s/://g)
-hostname=PI_$mac_addr
+#mac_addr=$(ip link show  eth0  |  grep -ioh '[0-9A-F]\{2\}\(:[0-9A-F]\{2\}\)\{5\}' | head -1 | sed s/://g)
+The hostname is derived from the **machine-id**, located in /etc/machine-id
+device_id =$(cat /etc/machine-id)
+hostname=PI_$device_id
 hostnamectl set-hostname $hostname
 
 # our software.
