@@ -17,7 +17,7 @@ def name():
 @api.get('/controls/<id>/<action>')
 def controls(id, action):
     global control
-    
+
     if id == machine_id:
         if action == 'start':
             try:
@@ -50,12 +50,16 @@ def controls(id, action):
 @api.get('/data/<id>/<type_of_data>')
 def data(id, type_of_data):
     if id == machine_id:
-        if type_of_data == 'all':
-            return {"last_frame": control.last_frame, "data_history": control.data_history}
-        if type_of_data == 'last_frame':
-            return control.last_frame
-        if type_of_data == 'history':
-            return control.data_history
+        try:
+
+            if type_of_data == 'all':
+                return {"last_frame": control.last_frame, "data_history": control.data_history}
+            if type_of_data == 'last_frame':
+                return control.last_frame
+            if type_of_data == 'last_positions':
+                return control.last_positions
+        except Exception as e:
+            return {'error':str(e)}
     else:
         return "Error on machine ID"
 

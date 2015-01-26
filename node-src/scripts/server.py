@@ -58,7 +58,7 @@ def device(id):
     try:
         url = devices_list[id]['ip']
         print url
-        req = urllib2.Request(url=devices_list[id]['ip']+':9000/id')
+        req = urllib2.Request(url=devices_list[id]['ip']+':9000/data/'+id+'/last_positions')
         f = urllib2.urlopen(req)
         message = f.read()
         print message

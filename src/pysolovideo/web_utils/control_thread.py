@@ -26,6 +26,8 @@ class ControlThread(Thread):
                     AdaptiveBGModel,
                     rois,
                     out_file='out', # save a csv out
+                    draw_results = True,
+                    
                     )
 
         super(ControlThread, self).__init__()
@@ -35,7 +37,7 @@ class ControlThread(Thread):
 
     def stop(self):
         self._monit.stop()
-        
+
 
     @property
     def last_frame(self):
@@ -44,3 +46,7 @@ class ControlThread(Thread):
     @property
     def data_history(self):
         return self._monit.data_history
+
+    @property
+    def last_positions(self):
+        return self._monit.last_positions
