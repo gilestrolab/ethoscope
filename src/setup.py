@@ -9,7 +9,12 @@ setup(
     version='trunk',
     author=['Quentin Geissmann', 'Giorgio Gilestro', 'Luis Garcia'],
     author_email= ['quentin.geissmann13@imperial.ac.uk','g.gilestro@imperial.ac.uk', 'luis.garcia@polygonaltree.co.uk'],
-    packages=['pysolovideo'],
+    packages=['pysolovideo',
+               'pysolovideo.tracking.monitor',
+               'pysolovideo.utils',
+               'pysolovideo.web_utils',
+               'pysolovideo.hardware_control',
+              ],
     url="https://github.com/gilestrolab/pySolo-Video",
     license="GPL3",
     description='todo', #TODO

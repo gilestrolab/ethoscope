@@ -89,7 +89,7 @@ gpasswd -a $USER_NAME tty
 ###########################################################################################
 # The hostname is derived from the **eth0** MAC address, NOT the wireless one
 #mac_addr=$(ip link show  eth0  |  grep -ioh '[0-9A-F]\{2\}\(:[0-9A-F]\{2\}\)\{5\}' | head -1 | sed s/://g)
-The hostname is derived from the **machine-id**, located in /etc/machine-id
+# The hostname is derived from the **machine-id**, located in /etc/machine-id
 device_id =$(cat /etc/machine-id)
 hostname=PI_$device_id
 hostnamectl set-hostname $hostname
@@ -98,5 +98,5 @@ hostnamectl set-hostname $hostname
 # TODO use AUR!
 wget https://github.com/gilestrolab/pySolo-Video/archive/3.0.tar.gz -O psv.tar.gz
 tar -xvf psv.tar.gz
-cd pySolo-Video-psv_package/src
+cd pySolo-Video-*/src
 pip2 install .

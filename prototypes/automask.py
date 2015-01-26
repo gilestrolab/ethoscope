@@ -38,7 +38,7 @@ for scale in [1, 0.5, 0.75, 1.25, 1.5]:
             print "FAILED:", s, "i = ", i
             print e
             cv2.imwrite(OUT_IMG+ "FAILED_SCALE=" + str(100 * scale)+"_RESULT_"+ os.path.basename(s), im)
-            cv2.waitKey(-1)
+            # cv2.waitKey(-1)
             # exit()
 
         cv2.imshow("auto", im)
