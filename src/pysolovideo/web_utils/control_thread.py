@@ -15,7 +15,7 @@ class ControlThread(Thread):
 
     def __init__(self, *args, **kwargs):
 
-        cam = MovieVirtualCamera('../Projects/13_003_sleep depriation machine/sleepMonitor_5days.avi')
+        cam = MovieVirtualCamera('/Users/pepelisu/PolygonalTree/Repositories/rencoded_c.mov')
         #cam = V4L2Camera(0, target_fps=5, target_resolution=(560, 420))
 
         roi_builder = SleepMonitorWithTargetROIBuilder()
@@ -25,17 +25,17 @@ class ControlThread(Thread):
         self._monit = Monitor(cam,
                     AdaptiveBGModel,
                     rois,
-                    out_file=machine_id+'out', # save a csv out
+                    out_file='out', # save a csv out
                     )
 
         super(ControlThread, self).__init__()
 
     def run(self, **kwarg):
-
         self._monit.run()
 
     def stop(self):
         self._monit.stop()
+        
 
     @property
     def last_frame(self):

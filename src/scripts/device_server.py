@@ -16,6 +16,8 @@ def name():
 
 @api.get('/controls/<id>/<action>')
 def controls(id, action):
+    global control
+    
     if id == machine_id:
         if action == 'start':
             try:
@@ -24,16 +26,23 @@ def controls(id, action):
                 #t = data['time']
                 # set time, given in milliseconds from javascript, used in seconds for date
                 #set_time = call(['date', '-s', '@' + str(t)[:-3]])
-
+                control = ControlThread(machine_id)
                 control.start()
                 return {'status': 'Started'}
-            except:
-                logging.error("Impossible to start")
-                return {'status': 'Error'}
+            except Exception as e:
+                return {'error':str(e)}
+            #except:
+            #    logging.error("Impossible to start")
+            #    return {'status': 'Error'}
 
         if action == 'stop':
-            control.stop()
-            return {'status': 'Stopped'}
+            try:
+                control.stop()
+                control.join()
+                return {'status': 'Stopped'}
+            except Exception as e:
+                return {'error':str(e)}
+
     else:
         return "Error on machine ID"
 
@@ -55,7 +64,7 @@ if __name__ == '__main__':
 
     machine_id = get_machine_id()
     #create object
-    control = ControlThread(machine_id)
+    control = None #ControlThread(machine_id)
 
 
     run(api, host='0.0.0.0', port=9000, debug=True)

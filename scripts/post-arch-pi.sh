@@ -12,7 +12,7 @@ USER_NAME=psv
 PASSWORD=psv
 
 ############# PACKAGES #########################
-
+pacman-db-update
 pacman-key --init
 pacman -Syu --noconfirm
 pacman -S base-devel packer git gcc-fortran --noconfirm --needed

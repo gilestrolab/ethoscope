@@ -40,7 +40,8 @@
 
     app.controller('smController', function($scope, $http, $routeParams)  {
         device_id = $routeParams.device_id;
-        $http.get('/device/device_id').success(function(){
+        $http.get('/device/'+device_id).success(function(data){
+            console.log(data);
             $scope.device = data;
         });
     });
@@ -49,5 +50,8 @@
 
         // create a message to display in our view
         $scope.message = 'Everyone come and see how good I look!';
+        $http.get('/device/'+device_id).success(function(data){
+            $scope.device = data;
+        });
     });
 })()
