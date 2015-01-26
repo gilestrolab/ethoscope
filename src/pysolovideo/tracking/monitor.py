@@ -30,6 +30,7 @@ import cv2
 from collections import deque
 import numpy as np
 
+
 class Monitor(object):
 
     def __init__(self, camera, tracker_class, rois = None, interactors=None, out_file=None,
@@ -72,6 +73,7 @@ class Monitor(object):
         self._frame_buffer = None
         self._force_stop = False
         self._last_positions = {}
+        self._last_time_stamp = 0
 
         if rois is None:
             rois = rbs.DefaultROIBuilder(camera)()
@@ -97,9 +99,15 @@ class Monitor(object):
         return self._last_positions
 
     @property
-    def last_frame(self):
+    def last_time_frame(self):
         frame_copy = np.copy(self._frame_buffer)
-        return frame_copy
+
+        return self._last_time_stamp, frame_copy
+    @property
+    def last_drawn_frame(self):
+        return self._draw_on_frame(self._frame_buffer)
+
+
 
     def stop(self):
         self._force_stop = True
@@ -148,10 +156,13 @@ class Monitor(object):
 
             for i,(t, frame) in enumerate(self._camera):
 
+
+
                 if self._force_stop or (self._max_duration is not None and t > self._max_duration):
 
                     break
 
+                self._last_time_stamp = t
                 self._frame_buffer = frame
 
 

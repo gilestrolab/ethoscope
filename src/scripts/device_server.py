@@ -10,6 +10,11 @@ from pysolovideo.web_utils.helpers import get_machine_id
 
 api = Bottle()
 
+@api.route('/static/<filepath:path>')
+def server_static(filepath):
+    return static_file(filepath, root="/")
+
+
 @api.get('/id')
 def name():
     return {"id" : machine_id, "type": "sm"}
@@ -53,9 +58,9 @@ def data(id, type_of_data):
         try:
 
             if type_of_data == 'all':
-                return {"last_frame": control.last_frame, "data_history": control.data_history}
-            if type_of_data == 'last_frame':
-                return control.last_frame
+                return {"last_drawn_img": control.last_drawn_img, "data_history": control.last_positions}
+            if type_of_data == 'last_drawn_img':
+                return control.last_drawn_img
             if type_of_data == 'last_positions':
                 return control.last_positions
         except Exception as e:
@@ -70,5 +75,11 @@ if __name__ == '__main__':
     #create object
     control = None #ControlThread(machine_id)
 
-
+    # try:
+    # TODO
     run(api, host='0.0.0.0', port=9000, debug=True)
+    # except KeyboardInterrupt:
+    #     control.stop()
+    #     control.join()
+    #     del control
+    #

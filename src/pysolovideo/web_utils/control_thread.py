@@ -1,3 +1,6 @@
+import tempfile
+import os
+import cv2
 from threading import Thread
 from pysolovideo.tracking.monitor import Monitor
 
@@ -14,8 +17,9 @@ from pysolovideo.tracking.trackers import AdaptiveBGModel
 class ControlThread(Thread):
 
     def __init__(self, *args, **kwargs):
+        self._tmp_img_name = file_name = tempfile.mkstemp(suffix='.png')[1]
 
-        cam = MovieVirtualCamera('/Users/pepelisu/PolygonalTree/Repositories/rencoded_c.mov')
+        cam = MovieVirtualCamera('/data/pysolo_video_samples/sleepMonitor_5days.avi')
         #cam = V4L2Camera(0, target_fps=5, target_resolution=(560, 420))
 
         roi_builder = SleepMonitorWithTargetROIBuilder()
@@ -38,10 +42,19 @@ class ControlThread(Thread):
     def stop(self):
         self._monit.stop()
 
+    def __del__(self):
+        self.stop()
+        os.remove(self._tmp_img_name)
 
     @property
-    def last_frame(self):
-        return self._monit.last_frame
+    def last_time_frame(self):
+        return self._monit.last_time_frame
+
+    @property
+    def last_drawn_img(self):
+        img = self._monit.last_drawn_frame
+        cv2.imwrite(self._tmp_img_name,img)
+        return self._tmp_img_name
 
     @property
     def data_history(self):
