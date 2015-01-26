@@ -103,6 +103,7 @@ class Monitor(object):
 
     def stop(self):
         self._force_stop = True
+
     def _draw_on_frame(self, frame):
 
         frame_cp = frame.copy()
@@ -146,7 +147,9 @@ class Monitor(object):
         try:
 
             for i,(t, frame) in enumerate(self._camera):
-                if self._force_stop or self._max_duration is not None and t > self._max_duration:
+
+                if self._force_stop or (self._max_duration is not None and t > self._max_duration):
+
                     break
 
                 self._frame_buffer = frame

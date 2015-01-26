@@ -30,10 +30,10 @@ def index():
 def devices():
     global devices_list
     devices_list = {}
-    strs = subprocess.check_output(shlex.split('ip r l'))
-    host_ip = strs.split(b'src')[-1].split()[0]
-    host_ip = host_ip.decode('utf-8').split('.')
-
+    #strs = subprocess.check_output(shlex.split('ip r l'))
+    #host_ip = strs.split(b'src')[-1].split()[0]
+    #host_ip = host_ip.decode('utf-8').split('.')
+    host_ip = ['127','0','0','0']
     thread =[]
 
     for i in range(0,256):
@@ -56,16 +56,19 @@ def devices_list():
 @app.get('/device/<id>')
 def device(id):
     try:
-        req = urllib2.Request(url=devices_list[id][ip]+':9000/')
-        f = urllib2.urlopen(req,timeout = self.scanInterval)
+        url = devices_list[id]['ip']
+        print url
+        req = urllib2.Request(url=devices_list[id]['ip']+':9000/data/'+id+'/last_positions')
+        f = urllib2.urlopen(req)
         message = f.read()
+        print message
         if message:
             data = json.loads(message)
-            data['ip'] = self.url
-            devices_list[data['id']]= data
+            return data
 
-    except:
-        pass
+    except Exception as e:
+        return {'error':str(e)}
+        
 
 @app.get('/sm/<id>')
 def redirection_to_home(id):

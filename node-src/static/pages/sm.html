@@ -5,6 +5,21 @@
 
     </div>
     <div>
-        <p>{{ device }}</p>
+        <table class="table table-striped">
+            <thead>
+                <th>ROI</th>
+                <th>time</th>
+                <th>X</th>
+                <th>Y</th>
+            </thead>
+            <tr ng-repeat="roi in device | orderBy : 'roi_dx.toInteger()'">
+                <td>{{roi.roi_idx}}</td>
+                <td>{{roi.t}}</td>
+                <td>{{roi.x}}</td>
+                <td>{{roi.y}}</td>
+
+
+            </tr>
+        </table>
     </div>
 
