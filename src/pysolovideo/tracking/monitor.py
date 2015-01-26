@@ -71,6 +71,8 @@ class Monitor(object):
         self._max_history_length = 60 *1# in seconds
         self._frame_buffer = None
         self._force_stop = False
+        self._last_positions = {}
+
         if rois is None:
             rois = rbs.DefaultROIBuilder(camera)()
 
@@ -89,6 +91,10 @@ class Monitor(object):
     @property
     def data_history(self):
         return self._data_history
+
+    @property
+    def last_positions(self):
+        return self._last_positions
 
     @property
     def last_frame(self):
@@ -143,6 +149,7 @@ class Monitor(object):
             for i,(t, frame) in enumerate(self._camera):
 
                 if self._force_stop or (self._max_duration is not None and t > self._max_duration):
+
                     break
 
                 self._frame_buffer = frame
@@ -163,8 +170,13 @@ class Monitor(object):
                     #     continue
 
                     data_row = track_u(t, frame)
+
                     if data_row is None:
                         continue
+                    abs_pos = track_u.get_last_position(absolute=True)
+
+                    if abs_pos is not None:
+                        self._last_positions[abs_pos["roi_idx"]] = abs_pos
 
                     self._data_history.append(data_row)
 
@@ -177,6 +189,9 @@ class Monitor(object):
                             header = sorted(data_row.keys())
                             file_writer.writerow(header)
 
+
+
+
                         row = []
                         for f in header:
                             dt = data_row[f]
@@ -187,6 +202,7 @@ class Monitor(object):
                             row.append(dt)
 
                         file_writer.writerow(row)
+
 
 
                 if (self._draw_results and i % self.draw_every_n == 0) or not vw is None :

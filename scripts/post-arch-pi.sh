@@ -96,7 +96,7 @@ hostnamectl set-hostname $hostname
 
 # our software.
 # TODO use AUR!
-wget https://github.com/gilestrolab/pySolo-Video/archive/psv_package.tar.gz -O psv.tar.gz
+wget https://github.com/gilestrolab/pySolo-Video/archive/3.0.tar.gz -O psv.tar.gz
 tar -xvf psv.tar.gz
 cd pySolo-Video-psv_package/src
-pip2 install -e .
+pip2 install .
