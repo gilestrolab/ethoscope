@@ -99,4 +99,4 @@ hostnamectl set-hostname $hostname
 wget https://github.com/gilestrolab/pySolo-Video/archive/psv_package.tar.gz -O psv.tar.gz
 tar -xvf psv.tar.gz
 cd pySolo-Video-psv_package/src
-pip2 install -e .
+pip2 install .
