@@ -15,8 +15,8 @@ PASSWORD=psv
 
 
 ############# PACKAGES #########################
-pacman-db-update
-pacman-key --init
+# pacman-db-update
+# pacman-key --init
 pacman -Syu --noconfirm
 pacman -S base-devel git gcc-fortran --noconfirm --needed
 ### Video capture related
