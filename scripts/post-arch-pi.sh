@@ -25,7 +25,7 @@ pacman -S opencv mplayer ffmpeg gstreamer gstreamer0.10-plugins mencoder --nocon
 pacman -S xorg-server xorg-utils xorg-server-utils xorg-xinit xf86-video-fbdev lxde slim --noconfirm --needed
 # utilities
 pacman -S ntp bash-completion --noconfirm --needed
-pacman -S raspberrypi-firmware{,-tools,-bootloader,-example} --noconfirm --needed
+pacman -S raspberrypi-firmware{,-tools,-bootloader,-examples} --noconfirm --needed
 
 # preinstalling dependencies will save compiling time on python packages
 pacman -S python2-pip python2-numpy python2-bottle python2-pyserial --noconfirm --needed
@@ -42,7 +42,7 @@ systemctl start sshd.service
 #TODOs: locale/TIMEZONE/keyboard ...
 
 ##########################################################################################
-# add password without stoping
+# add password without stopping
 pass=$(perl -e 'print crypt($ARGV[0], "password")' $PASSWORD)
 useradd -m -g users -G wheel -s /bin/bash  -p $pass $USER_NAME
 
