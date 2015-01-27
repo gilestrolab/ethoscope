@@ -10,7 +10,7 @@ setup(
     author=['Quentin Geissmann', 'Giorgio Gilestro', 'Luis Garcia'],
     author_email= ['quentin.geissmann13@imperial.ac.uk','g.gilestro@imperial.ac.uk', 'luis.garcia@polygonaltree.co.uk'],
     packages=['pysolovideo',
-               'pysolovideo.tracking.monitor',
+               'pysolovideo.tracking',
                'pysolovideo.utils',
                'pysolovideo.web_utils',
                'pysolovideo.hardware_control',
@@ -30,12 +30,5 @@ setup(
         "numpy>=1.6.1",
         "pyserial>=2.7",
         "bottle>=0.12.8"
-        # "scipy>=0.10.1",
-        # "scikit-learn",
-        # "picamera>=1.8",
-        # "pandas>=0.13.1",
-
-# TODO check opencv in installed
-        # "opencv>=2.4.5",
     ],
 )

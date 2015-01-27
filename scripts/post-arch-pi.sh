@@ -8,14 +8,17 @@
 # And run: `systemctl start slim` to start the window manager
 ######################################
 
+set -e # stop if any error happens
+
 USER_NAME=psv
 PASSWORD=psv
+
 
 ############# PACKAGES #########################
 pacman-db-update
 pacman-key --init
 pacman -Syu --noconfirm
-pacman -S base-devel packer git gcc-fortran --noconfirm --needed
+pacman -S base-devel git gcc-fortran --noconfirm --needed
 ### Video capture related
 pacman -S opencv mplayer ffmpeg gstreamer gstreamer0.10-plugins mencoder --noconfirm --needed
 # a desktop environment may be useful:
@@ -96,7 +99,7 @@ hostnamectl set-hostname $hostname
 
 # our software.
 # TODO use AUR!
-wget https://github.com/gilestrolab/pySolo-Video/archive/3.0.tar.gz -O psv.tar.gz
+wget https://github.com/gilestrolab/pySolo-Video/archive/4.0.tar.gz -O psv.tar.gz
 tar -xvf psv.tar.gz
 cd pySolo-Video-*/src
 pip2 install .
