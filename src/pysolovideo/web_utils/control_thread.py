@@ -29,7 +29,9 @@ class ControlThread(Thread):
         logging.basicConfig(filename=self._tmp_files["log_file"], level=logging.INFO)
 
 
+
         logging.info("Starting camera")
+        # FIXME!!!!!!!!!!!!!!!!!
         cam = MovieVirtualCamera('/data/pysolo_video_samples/sleepMonitor_5days.avi')
         #cam = V4L2Camera(0, target_fps=5, target_resolution=(560, 420))
 

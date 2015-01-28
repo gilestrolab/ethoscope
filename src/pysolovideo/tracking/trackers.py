@@ -496,9 +496,11 @@ class AdaptiveBGModel(BaseTracker):
             "m_log_lik": distance
         }
 
-        feature_dic  = dict(zip(self.fg_model.features_header, features))
+        # We can do this for DEBUGGING purposes
+        # feature_dic  = dict(zip(self.fg_model.features_header, features))
+        # out_dic = dict(out_dic.items() + feature_dic.items())
 
-        return dict(out_dic.items() + feature_dic.items())
+        return out_dic
 
 
 

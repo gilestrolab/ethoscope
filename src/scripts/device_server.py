@@ -31,7 +31,10 @@ def controls(id, action):
                     # set time, given in milliseconds from javascript, used in seconds for date
                     #set_time = call(['date', '-s', '@' + str(t)[:-3]])
                     #FIXME should not draw unless for debug
+
                     control = ControlThread(machine_id, out_file=OUT_CSV_FILE, draw_results = True)
+
+
                     control.start()
                     return {'status': 'Started'}
                 if action == 'stop':
@@ -41,7 +44,10 @@ def controls(id, action):
                     return {'status': 'Stopped'}
 
             except Exception as e:
-                return control.format_psv_error(e)
+                try:
+                    return control.format_psv_error(e)
+                except:
+                    return e
 
     else:
         return "Error on machine ID"
@@ -71,7 +77,10 @@ if __name__ == '__main__':
     machine_id = get_machine_id()
 
     #FIXME
-    OUT_CSV_FILE = "/tmp/out.csv"
+
+    #OUT_CSV_FILE = zipfile.ZipFile("/tmp/out.zip","w",zipfile.ZIP_DEFLATED)
+    #OUT_CSV_FILE =
+    OUT_CSV_FILE ="/tmp/out.zip"
 
     #create object
     control = None #ControlThread(machine_id)

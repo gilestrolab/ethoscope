@@ -31,7 +31,7 @@ from collections import deque
 import numpy as np
 from pysolovideo.utils.debug import PSVException
 
-#TODO
+# TODO
 # def psv_exception_checker_decorator(*args, **kwargs):
 #
 
@@ -61,10 +61,14 @@ class Monitor(object):
         self._camera = camera
         self._exception = None
 
+
         if out_file is None or isinstance(out_file, file):
             self._out_file = out_file
         else:
              self._out_file = open(out_file, 'wb')
+
+        #self._out_file = out_file
+
         # todo ensure file has opened OK
 
 
@@ -80,10 +84,9 @@ class Monitor(object):
         self._last_time_stamp = 0
 
         if rois is None:
-            rois = rbs.DefaultROIBuilder(camera)()
+            rois = rbs.DefaultROIBuilder()(camera)
 
         self._camera.restart()
-
 
         if interactors is None:
             self._unit_trackers = [TrackingUnit(tracker_class, r, None) for r in rois]
@@ -98,7 +101,6 @@ class Monitor(object):
     def data_history(self):
         if self._exception is not None:
             raise self._exception
-
         return self._data_history
 
     @property
@@ -160,7 +162,7 @@ class Monitor(object):
         if self._out_file is not None:
             header = None
 
-            file_writer  = csv.writer(self._out_file , quoting=csv.QUOTE_NONNUMERIC)
+            file_writer  = csv.writer(self._out_file , quoting=csv.QUOTE_NONE)
 
         vw = None
         try:
@@ -211,10 +213,17 @@ class Monitor(object):
                         row = []
                         for f in header:
                             dt = data_row[f]
-                            try:
-                                dt = round(dt,4)
-                            except:
-                                pass
+                            if isinstance(dt,float):
+                                if dt == 0:
+                                    dt = 0
+                                elif dt < 1:
+                                    dt ="%.2e" % dt
+                                else:
+                                    dt ="%.2f" % dt
+
+                            elif isinstance(dt, bool):
+                                dt = int(dt)
+
                             row.append(dt)
 
                         file_writer.writerow(row)
@@ -232,12 +241,13 @@ class Monitor(object):
 
 
         except PSVException as e:
-            logging.error("A pysolo exception was detected by Monitor object")
+            logging.error("A PysoloVideo exception was detected by Monitor object")
             self._exception = e
             pass
 
-        except Exception:
+        except Exception as e:
             logging.error("An undefined exception was detected by Monitor object")
+            self._exception = e
             pass
 
         if not vw is None:
