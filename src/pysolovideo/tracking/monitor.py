@@ -29,7 +29,11 @@ import logging
 import cv2
 from collections import deque
 import numpy as np
+from pysolovideo.utils.debug import PSVException
 
+#TODO
+# def psv_exception_checker_decorator(*args, **kwargs):
+#
 
 class Monitor(object):
 
@@ -55,7 +59,7 @@ class Monitor(object):
         """
 
         self._camera = camera
-
+        self._exception = None
 
         if out_file is None or isinstance(out_file, file):
             self._out_file = out_file
@@ -92,24 +96,35 @@ class Monitor(object):
 
     @property
     def data_history(self):
+        if self._exception is not None:
+            raise self._exception
+
         return self._data_history
 
     @property
     def last_positions(self):
+        if self._exception is not None:
+            raise self._exception
         return self._last_positions
 
     @property
     def last_time_frame(self):
+        if self._exception is not None:
+            raise self._exception
         frame_copy = np.copy(self._frame_buffer)
 
         return self._last_time_stamp, frame_copy
     @property
     def last_drawn_frame(self):
+        if self._exception is not None:
+            raise self._exception
         return self._draw_on_frame(self._frame_buffer)
 
 
 
     def stop(self):
+        if self._exception is not None:
+            raise self._exception
         self._force_stop = True
 
     def _draw_on_frame(self, frame):
@@ -122,10 +137,6 @@ class Monitor(object):
             cv2.putText(frame_cp, str(track_u.roi.idx + 1), track_u.roi.offset, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.75, (255,255,0))
             if pos is None:
                 continue
-
-            # if pos["roi_idx"] != 11:
-            #     continue
-
 
             if "interact" in pos.keys() and pos["interact"]:
                 roi_colour = (0, 255,0)
@@ -155,11 +166,8 @@ class Monitor(object):
         try:
 
             for i,(t, frame) in enumerate(self._camera):
-
-
-
                 if self._force_stop or (self._max_duration is not None and t > self._max_duration):
-
+                    logging.info("Monitor object stopping itself")
                     break
 
                 self._last_time_stamp = t
@@ -168,9 +176,6 @@ class Monitor(object):
 
                 # if i % 60 == 0:
                 #     print t/60
-                # if t > 60 * 10:
-                #     raise KeyboardInterrupt
-
 
 
                 if self._video_out is not None and vw is None:
@@ -225,7 +230,14 @@ class Monitor(object):
                     if not vw is None:
                         vw.write(tmp)
 
-        except KeyboardInterrupt:
+
+        except PSVException as e:
+            logging.error("A pysolo exception was detected by Monitor object")
+            self._exception = e
+            pass
+
+        except Exception:
+            logging.error("An undefined exception was detected by Monitor object")
             pass
 
         if not vw is None:
