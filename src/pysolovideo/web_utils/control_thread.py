@@ -98,7 +98,7 @@ class ControlThread(Thread):
             cv2.imwrite(self._tmp_files["dbg_img"], e.img)
             out = {"PSV_ERROR":[str(e), self._tmp_files["dbg_img"]]}
         else:
-            out = {"GENERIC ERROR":str(e)}
+            out = {type(e):str(e)}
 
         out["log_file"] = self._tmp_files['log_file']
         return out
