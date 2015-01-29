@@ -4,7 +4,8 @@ __author__ = 'quentin'
 import cv2
 import time
 import logging
-
+import os
+from pysolovideo.utils.debug import PSVException
 
 class BaseCamera(object):
     #TODO catch exception eg, if initialise with a wrong file
@@ -28,7 +29,7 @@ class BaseCamera(object):
         while True:
             if self.is_last_frame() or not self.is_opened():
                 if not at_leat_one_frame:
-                    raise Exception("Camera could not read the first frame")
+                    raise PSVException("Camera could not read the first frame")
                 break
             t,out = self.next_time_image()
 
@@ -91,6 +92,9 @@ class MovieVirtualCamera(BaseVirtualCamera):
 
     def __init__(self, path, *args, **kwargs ):
         self._path = path
+
+        if not os.path.exists(path):
+            raise PSVException("'%s' does not exist. No such file" % path)
         self.capture = cv2.VideoCapture(path)
         w = self.capture.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH)
         h = self.capture.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)

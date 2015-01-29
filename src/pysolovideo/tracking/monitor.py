@@ -30,6 +30,7 @@ import cv2
 from collections import deque
 import numpy as np
 from pysolovideo.utils.debug import PSVException
+import gzip
 
 # TODO
 # def psv_exception_checker_decorator(*args, **kwargs):
@@ -62,10 +63,11 @@ class Monitor(object):
         self._exception = None
 
 
-        if out_file is None or isinstance(out_file, file):
+
+        if out_file is None or isinstance(out_file, file) or isinstance(out_file, gzip.GzipFile):
             self._out_file = out_file
         else:
-             self._out_file = open(out_file, 'wb')
+            self._out_file = open(out_file, 'wb')
 
         #self._out_file = out_file
 
@@ -161,7 +163,6 @@ class Monitor(object):
     def run(self):
         if self._out_file is not None:
             header = None
-
             file_writer  = csv.writer(self._out_file , quoting=csv.QUOTE_NONE)
 
         vw = None
@@ -252,3 +253,9 @@ class Monitor(object):
 
         if not vw is None:
             vw.release()
+        #fixme close result file!
+        if not self._out_file is None:
+            try:
+                self._out_file.close()
+            except:
+                pass

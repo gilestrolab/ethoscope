@@ -28,8 +28,6 @@ class ControlThread(Thread):
         self._machine_id = machine_id
         logging.basicConfig(filename=self._tmp_files["log_file"], level=logging.INFO)
 
-
-
         logging.info("Starting camera")
         # FIXME!!!!!!!!!!!!!!!!!
         #cam = MovieVirtualCamera('/data/pysolo_video_samples/sleepMonitor_5days.avi')
@@ -99,7 +97,7 @@ class ControlThread(Thread):
             cv2.imwrite(self._tmp_files["dbg_img"], e.img)
             out = {"PSV_ERROR":[str(e), self._tmp_files["dbg_img"]]}
         else:
-            out = {"GENERIC ERROR":str(e)}
+            out = {type(e).__name__:str(e)}
 
         out["log_file"] = self._tmp_files['log_file']
         return out
