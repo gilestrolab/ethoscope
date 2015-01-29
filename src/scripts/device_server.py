@@ -37,12 +37,13 @@ def controls(id, action):
                     control = ControlThread(machine_id, out_file=out_file, draw_results = True, max_duration=DURATION)
 
                     control.start()
-                    return {'status': 'Started'}
+                    return {'status': 'started'}
                 if action == 'stop':
 
                     control.stop()
                     control.join()
-                    return {'status': 'Stopped'}
+                    control = None
+                    return {'status': 'stopped'}
 
             except Exception as e:
                 try:
@@ -58,14 +59,19 @@ def controls(id, action):
 def data(id, type_of_data):
     if id == machine_id:
         try:
-
-            if type_of_data == 'all':
-                return {"last_drawn_img": control.last_drawn_img, "data_history": control.last_positions}
-            if type_of_data == 'last_drawn_img':
-                return control.last_drawn_img
-            if type_of_data == 'last_positions':
-                return control.last_position
-
+            if control != None:
+                if type_of_data == 'all':
+                    return {"status": "started", "last_drawn_img": control.last_drawn_img, "last_positions": control.last_positions}
+                if type_of_data == 'last_drawn_img':
+                    return {"last_drawn_img": control.last_drawn_img}
+                if type_of_data == 'last_positions':
+                    return {"last_positions": control.last_positions}
+                if type_of_data == 'log_file_path':
+                    return {"log_file_path": control.log_file_path}
+                if type_of_data == 'data_history':
+                    return {"data_history": control.data_history}
+            else:
+                return {"status": "stopped"}
 
         except Exception as e:
             return control.format_psv_error(e)

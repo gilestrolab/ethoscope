@@ -30,7 +30,8 @@ class ControlThread(Thread):
 
         logging.info("Starting camera")
         # FIXME!!!!!!!!!!!!!!!!!
-        cam = MovieVirtualCamera('/data/pysolo_video_samples/sleepMonitor_5days.avi')
+        #cam = MovieVirtualCamera('/data/pysolo_video_samples/sleepMonitor_5days.avi')
+        cam = MovieVirtualCamera('/data1/sleepMonitor_5days.avi')
         #cam = V4L2Camera(0, target_fps=5, target_resolution=(560, 420))
 
         logging.info("Building ROIs")
