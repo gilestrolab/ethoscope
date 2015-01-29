@@ -92,6 +92,26 @@ def redirection_to_home(id):
     else:
         return "no devices"
 
+@app.post('/device/<id>/log')
+def get_log(id):
+    try:
+        data = request.body.read()
+        data = json.loads(data)
+        file_path = data["file_path"]
+        print(file_path)
+        url = devices_list[id]['ip']
+        req = urllib2.Request(url=devices_list[id]['ip']+':9000/static/'+file_path)
+        f = urllib2.urlopen(req)
+        result = {}
+        i=0
+        for line in f:
+            result[i]=line
+            i=i+1
+        return result
+
+    except Exception as e:
+        return {'error':str(e)}
+
 #################
 # HELP METHODS
 #################

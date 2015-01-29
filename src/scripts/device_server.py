@@ -35,12 +35,14 @@ def controls(id, action):
                     out_file = gzip.open(OUT_ZIP_FILE,"w")
                     control = ControlThread(machine_id, video_file=INPUT_VIDEO, out_file=out_file, draw_results = DRAW_RESULTS, max_duration=DURATION)
                     control.start()
+                    logging.info("Starting monitor")
                     return {'status': 'started'}
                 if action == 'stop':
 
                     control.stop()
                     control.join()
                     control = None
+                    logging.info("Stopping monitor")
                     return {'status': 'stopped'}
 
             except Exception as e:

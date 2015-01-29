@@ -8,9 +8,14 @@
 
         <button class="btn btn-success btn-xl" ng-if="device.status == 'stopped'" ng-click="sm.start()">Start</button>
         <button class="btn btn-danger" ng-if="device.status == 'started'"  ng-click="sm.stop()">Stop</button>
-        <button class="btn btn-info" ng-click="sm.download()">Download Data</button>
+        <a href="{{device.ip}}:9000/static/tmp/out.csv.gz" class="btn btn-info" ng-click="sm.download()">Download Data</a>
         <button class="btn btn-info" ng-click="sm.log()">Log</button>
 
+    </div>
+
+    <div ng-if="showLog == true">
+        <pre>
+        <p class="log" ng-repeat="(key,entry) in device.log">{{key}}: {{entry}}</p></pre>
     </div>
 
     <div ng-if="device.status == 'started'">
@@ -37,4 +42,5 @@
             </tr>
         </table>
     </div>
+
 
