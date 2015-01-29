@@ -49,19 +49,17 @@ def devices():
     return devices_list
 
 @app.get('/devices_list')
-def devices_list():
+def get_devices_list():
     return devices_list
 
 #Get the information of one Sleep Monitor
-@app.get('/device/<id>')
-def device(id):
+@app.get('/device/<id>/data/<type_of_req>')
+def device(id, type_of_req):
     try:
         url = devices_list[id]['ip']
-        print url
-        req = urllib2.Request(url=devices_list[id]['ip']+':9000/data/'+id+'/last_positions')
+        req = urllib2.Request(url=devices_list[id]['ip']+':9000/data/'+id+'/'+type_of_req)
         f = urllib2.urlopen(req)
         message = f.read()
-        print message
         if message:
             data = json.loads(message)
             return data
@@ -69,11 +67,30 @@ def device(id):
     except Exception as e:
         return {'error':str(e)}
         
+@app.get('/device/<id>/controls/<type_of_req>')
+def device(id, type_of_req):
+    try:
+        url = devices_list[id]['ip']
+        req = urllib2.Request(url=devices_list[id]['ip']+':9000/controls/'+id+'/'+type_of_req)
+        f = urllib2.urlopen(req)
+        message = f.read()
+        if message:
+            data = json.loads(message)
+            return data
+
+    except Exception as e:
+        return {'error':str(e)}
 
 @app.get('/sm/<id>')
 def redirection_to_home(id):
-    return redirect('/')
+    return redirect('/#/sm/'+id)
 
+@app.get('/device/<id>/ip')
+def redirection_to_home(id):
+    if len(devices_list) > 0:
+        return devices_list[id]['ip']
+    else:
+        return "no devices"
 
 #################
 # HELP METHODS

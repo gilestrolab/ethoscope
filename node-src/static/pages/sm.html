@@ -1,22 +1,36 @@
 <!-- home.html -->
-    <div class="jumbotron text-center">
+    <div class="jumbotron text-center" ng-cloak>
         <h1>Sleep Monitor</h1>
         <p>Here you can perform actions and know the status of the device</p>
+        <div>
+        <img ng-if="device.status == 'started'"  ng-src="{{device.ip}}:9000/static{{device.last_drawn_img}}" alt=""></img>
+        </div>
+
+        <button class="btn btn-success btn-xl" ng-if="device.status == 'stopped'" ng-click="sm.start()">Start</button>
+        <button class="btn btn-danger" ng-if="device.status == 'started'"  ng-click="sm.stop()">Stop</button>
+        <button class="btn btn-info" ng-click="sm.download()">Download Data</button>
 
     </div>
-    <div>
+
+    <div ng-if="device.status == 'started'">
         <table class="table table-striped">
             <thead>
                 <th>ROI</th>
                 <th>time</th>
                 <th>X</th>
                 <th>Y</th>
+                <th>inferred</th>
+                <th>interact</th>
             </thead>
-            <tr ng-repeat="roi in device | orderBy : 'roi_dx.toInteger()'">
-                <td>{{roi.roi_idx}}</td>
+            <tr ng-repeat="roi in device.last_positions | toArray | orderBy:'roi_value'">
+                <td>{{roi.roi_value+1}}</td>
                 <td>{{roi.t}}</td>
-                <td>{{roi.x}}</td>
-                <td>{{roi.y}}</td>
+                <td>{{roi.x| number:0}}</td>
+                <td>{{roi.y| number:0}}</td>
+                <td ng-if="roi.is_inferred == true" style="background-color:#F2DEDE;">{{roi.is_inferred}}</td>
+                <td ng-if="roi.is_inferred == false" >{{roi.is_inferred}}</td>
+
+                <td>{{roi.interact}}</td>
 
 
             </tr>

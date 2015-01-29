@@ -1,6 +1,17 @@
 (function(){
     var app = angular.module('flyApp', ['ngRoute']);
+    app.filter("toArray", function(){
+        return function(obj) {
+            var result = [];
+            angular.forEach(obj, function(val, key) {
+                result.push(val);
+            });
+            return result;
+        };
+    });
+
     // configure our routes
+
     app.config(function($routeProvider, $locationProvider) {
         $routeProvider
 
@@ -38,19 +49,63 @@
         }
     });
 
-    app.controller('smController', function($scope, $http, $routeParams)  {
+    app.controller('smController', function($scope, $http, $routeParams, $interval)  {
         device_id = $routeParams.device_id;
-        $http.get('/device/'+device_id).success(function(data){
-            console.log(data);
+        $scope.sm = {}
+        var refresh_data = false;
+        $http.get('/device/'+device_id+'/data/all').success(function(data){
+
             $scope.device = data;
+
+            if ($scope.device.status == 'started'){
+                        refresh_data = $interval($scope.sm.refresh, 10000);
+                    }
         });
+        $http.get('/device/'+device_id+'/ip').success(function(data){
+                    $scope.device.ip = data;
+                });
+
+        $scope.sm.start = function(){
+            $http.get('/device/'+device_id+'/controls/start')
+                 .success(function(data){
+                    console.log(data);
+                    $scope.device.status = data.status;
+                    if (data.status == 'started'){
+                        refresh_data = $interval($scope.sm.refresh, 10000);
+                    }
+                });
+        };
+        $scope.sm.stop = function(){
+            $http.get('/device/'+device_id+'/controls/stop')
+                 .success(function(data){
+                    console.log(data);
+                    $scope.device.status = data.status;
+                    if (data.status == 'started'){
+                        $scope.sm.refresh();
+                        $interval.cancel(refresh_data);
+                    }
+                });
+        };
+        $scope.sm.refresh = function(){
+            $http.get('/device/'+device_id+'/data/last_drawn_img')
+                 .success(function(data){
+                    console.log(data);
+                    $scope.device.last_drawn_img = data.last_drawn_img+'?' + new Date().getTime();
+                });
+            $http.get('/device/'+device_id+'/data/last_positions')
+                 .success(function(data){
+                    console.log(data);
+                    $scope.device.last_positions = data.last_positions;
+                });
+        }
+
     });
 
     app.controller('sdController',  function($scope, $http,$routeParams)  {
 
         // create a message to display in our view
         $scope.message = 'Everyone come and see how good I look!';
-        $http.get('/device/'+device_id).success(function(data){
+        $http.get('/device/'+device_id+'/all').success(function(data){
             $scope.device = data;
         });
     });
