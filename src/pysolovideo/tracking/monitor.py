@@ -256,6 +256,9 @@ class Monitor(object):
         #fixme close result file!
         if not self._out_file is None:
             try:
+                logging.info("Closing result file")
                 self._out_file.close()
+                logging.info("Result file closed")
             except:
+                logging.error("Cannot close result file")
                 pass
