@@ -63,7 +63,6 @@ class Monitor(object):
         self._exception = None
 
 
-
         if out_file is None or isinstance(out_file, file) or isinstance(out_file, gzip.GzipFile):
             self._out_file = out_file
         else:

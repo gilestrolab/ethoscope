@@ -1,10 +1,11 @@
 __author__ = 'luis'
 
 import logging
+import gzip
+from optparse import OptionParser
 from bottle import *
 from pysolovideo.web_utils.control_thread import ControlThread
 from pysolovideo.web_utils.helpers import get_machine_id
-from pysolovideo.utils.debug import PSVException
 
 api = Bottle()
 
@@ -30,12 +31,9 @@ def controls(id, action):
                     #t = data['time']
                     # set time, given in milliseconds from javascript, used in seconds for date
                     #set_time = call(['date', '-s', '@' + str(t)[:-3]])
-                    #FIXME should not draw unless for debug
-                    import gzip
-                    import sys
-                    out_file = gzip.open(OUT_ZIP_FILE,"w")
-                    control = ControlThread(machine_id, out_file=out_file, draw_results = True, max_duration=DURATION)
 
+                    out_file = gzip.open(OUT_ZIP_FILE,"w")
+                    control = ControlThread(machine_id, video_file=INPUT_VIDEO, out_file=out_file, draw_results = DRAW_RESULTS, max_duration=DURATION)
                     control.start()
                     return {'status': 'started'}
                 if action == 'stop':
@@ -81,18 +79,31 @@ def data(id, type_of_data):
 
 if __name__ == '__main__':
 
+    parser = OptionParser()
+    parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
+    (options, args) = parser.parse_args()
+    option_dict = vars(options)
+    debug = option_dict["debug"]
+
     machine_id = get_machine_id()
+
+
+    if debug:
+        DURATION = 60*60*4
+        INPUT_VIDEO = '/data/pysolo_video_samples/sleepMonitor_5days.avi'
+        DRAW_RESULTS = True
+    else:
+        INPUT_VIDEO = None
+        DURATION = None
+        DRAW_RESULTS =False
+
     OUT_ZIP_FILE = "/tmp/out.csv.gz"
-    DURATION = 60*60*4
 
-    #create object
-    control = None #ControlThread(machine_id)
+    control = None
 
-    # try:
-    # TODO
     try:
-        run(api, host='0.0.0.0', port=9000, debug=True)
-
+        # @luis TODO => I am not quite sure about debug here.
+        run(api, host='0.0.0.0', port=9000, debug=debug)
     finally:
         control.stop()
         control.join()

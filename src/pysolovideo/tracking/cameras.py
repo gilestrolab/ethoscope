@@ -93,6 +93,8 @@ class MovieVirtualCamera(BaseVirtualCamera):
     def __init__(self, path, *args, **kwargs ):
         self._path = path
 
+        if not isinstance(path, str):
+            raise PSVException("path to video must be a string")
         if not os.path.exists(path):
             raise PSVException("'%s' does not exist. No such file" % path)
         self.capture = cv2.VideoCapture(path)
@@ -145,6 +147,9 @@ class V4L2Camera(BaseCamera):
         _, im = self.capture.read()
 
         # preallocate image buffer => faster
+        if im is None:
+            raise PSVException("Error whist retrieving video frame. Got None instead. Camera not plugged?")
+
         self._frame = im
 
         #TODO better exception handling is needed here / what do we do if initial capture fails...
@@ -207,4 +212,7 @@ class V4L2Camera(BaseCamera):
             self.capture.grab()
 
         self.capture.retrieve(self._frame)
+
+
+
         return self._frame

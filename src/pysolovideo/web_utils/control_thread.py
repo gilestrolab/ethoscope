@@ -19,7 +19,8 @@ import logging
 
 class ControlThread(Thread):
 
-    def __init__(self, machine_id,  *args, **kwargs):
+    def __init__(self, machine_id, video_file=None, *args, **kwargs):
+
         self._tmp_files = {
             "last_img": tempfile.mkstemp(suffix='.png')[1],
             "dbg_img": tempfile.mkstemp(suffix='.png')[1],
@@ -27,12 +28,14 @@ class ControlThread(Thread):
         }
         self._machine_id = machine_id
         logging.basicConfig(filename=self._tmp_files["log_file"], level=logging.INFO)
-
         logging.info("Starting camera")
-        # FIXME!!!!!!!!!!!!!!!!!
-        #cam = MovieVirtualCamera('/data/pysolo_video_samples/sleepMonitor_5days.avi')
-        cam = MovieVirtualCamera('/data1/sleepMonitor_5days.avi')
-        #cam = V4L2Camera(0, target_fps=5, target_resolution=(560, 420))
+
+
+        if video_file is None:
+            cam = V4L2Camera(0, target_fps=5, target_resolution=(560, 420))
+        else:
+            cam = MovieVirtualCamera(video_file)
+
 
         logging.info("Building ROIs")
         roi_builder = SleepMonitorWithTargetROIBuilder()
