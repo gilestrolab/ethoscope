@@ -71,6 +71,7 @@
                     console.log(data);
                     $scope.device.status = data.status;
                     if (data.status == 'started'){
+                        $scope.sm.refresh();
                         refresh_data = $interval($scope.sm.refresh, 10000);
                     }
                 });
@@ -81,11 +82,34 @@
                     console.log(data);
                     $scope.device.status = data.status;
                     if (data.status == 'started'){
-                        $scope.sm.refresh();
                         $interval.cancel(refresh_data);
                     }
                 });
         };
+
+        $scope.sm.download = function(){
+            $http.get($scope.device.ip+':9000/static/tmp/out.csv.gz');
+        };
+
+        $scope.sm.log = function(){
+            var log_file_path = ''
+            if ($scope.showLog == false){
+            $http.get('/device/'+device_id+'/data/log_file_path')
+                .success(function(data){
+                    log_file_path = data.log_file;
+                    console.log(log_file_path);
+                    $http.post('/device/'+device_id+'/log', data={"file_path":log_file_path})
+                        .success(function(data, status, headers, config){
+                            $scope.device.log = data;
+                            $scope.showLog = true;
+                        });
+            });
+            }else{
+                $scope.showLog = false;
+            }
+        };
+
+
         $scope.sm.refresh = function(){
             $http.get('/device/'+device_id+'/data/last_drawn_img')
                  .success(function(data){

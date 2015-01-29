@@ -34,12 +34,14 @@ def controls(id, action):
                     control = ControlThread(machine_id, out_file=OUT_CSV_FILE, draw_results = True, max_duration=60*60)
 
                     control.start()
+                    logging.info("Starting monitor")
                     return {'status': 'started'}
                 if action == 'stop':
 
                     control.stop()
                     control.join()
                     control = None
+                    logging.info("Stopping monitor")
                     return {'status': 'stopped'}
 
             except Exception as e:
