@@ -2,10 +2,12 @@ __author__ = 'luis'
 
 import logging
 import gzip
+import datetime
 from optparse import OptionParser
 from bottle import *
 from pysolovideo.web_utils.control_thread import ControlThread
 from pysolovideo.web_utils.helpers import get_machine_id
+from subprocess import call
 
 api = Bottle()
 
@@ -22,29 +24,27 @@ def name():
 
     return {"id": machine_id, "type": "sm", "name": "SM15-001", "status": status}
 
-@api.get('/controls/<id>/<action>')
+@api.post('/controls/<id>/<action>')
 def controls(id, action):
     global control
 
     if id == machine_id:
-
             try:
                 if action == 'start':
+
                     # Sync clocks with the node or master
-                    #data = request.json
-                    #t = data['time']
-                    # set time, given in milliseconds from javascript, used in seconds for date
+                    data = request.json
+                    t = data['time']
+                    #set time, given in seconds from javascript, used in seconds for date
                     #set_time = call(['date', '-s', '@' + str(t)[:-3]])
-
-                    date_time = "TODO" # todo @luis
-
+                    date = datetime.fromtimestamp(t)
+                    date_time = date.isoformat()
                     control = ControlThread(machine_id=machine_id, date_time=date_time, video_file=INPUT_VIDEO, psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
 
                     control.start()
                     logging.info("Starting monitor")
                     return {'status': 'started'}
                 if action == 'stop':
-
                     control.stop()
                     control.join()
                     control = None
@@ -52,11 +52,11 @@ def controls(id, action):
                     return {'status': 'stopped'}
 
             except Exception as e:
+                print e
                 try:
                     return control.format_psv_error(e)
                 except:
                     return {type(e).__name__:str(e)}
-
     else:
         return "Error on machine ID"
 
@@ -103,9 +103,10 @@ if __name__ == '__main__':
     if debug:
         import getpass
         DURATION = 60*60*4
-        INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
-        if getpass.getuser() == "quentin": ## @ luis ;)
+        if getpass.getuser() == "quentin":
             INPUT_VIDEO = '/data/pysolo_video_samples/sleepMonitor_5days.avi'
+        elif getpass.getuser() == "asterix":
+            INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
         DRAW_RESULTS = True
         PSV_DIR = '/tmp/psv'
     else:

@@ -73,7 +73,7 @@
         }
     });
 
-    app.controller('smController', function($scope, $http, $routeParams, $interval)  {
+    app.controller('smController', function($scope, $http, $routeParams, $interval, $timeout)  {
         device_id = $routeParams.device_id;
         $scope.sm = {}
         var refresh_data = false;
@@ -82,7 +82,7 @@
             $scope.device = data;
 
             if ($scope.device.status == 'started'){
-                        refresh_data = $interval($scope.sm.refresh, 10000);
+                        refresh_data = $interval(refresh, 10000);
                     }
         });
         $http.get('/device/'+device_id+'/ip').success(function(data){
@@ -90,18 +90,18 @@
                 });
 
         $scope.sm.start = function(){
-            $http.get('/device/'+device_id+'/controls/start')
+            $http.post('/device/'+device_id+'/controls/start', data={"time":Math.floor(Date.now() / 1000)})
                  .success(function(data){
                     $scope.device.status = data.status;
                     if (data.status == 'started'){
                         $http.post('/devices_list', data={"device_id":device_id,"status":"started"})
-                        setTimeout($scope.sm.refresh(),3000);
-                        refresh_data = $interval($scope.sm.refresh, 10000);
+                        $timeout(refresh,1000);
+                        refresh_data = $interval(refresh, 10000);
                     }
                 });
         };
         $scope.sm.stop = function(){
-            $http.get('/device/'+device_id+'/controls/stop')
+            $http.post('/device/'+device_id+'/controls/stop', data={})
                  .success(function(data){
                     $scope.device.status = data.status;
                     if (data.status == 'stopped'){
@@ -134,7 +134,7 @@
         };
 
 
-        $scope.sm.refresh = function(){
+       var refresh = function(){
             $http.get('/device/'+device_id+'/data/last_drawn_img')
                  .success(function(data){
                     console.log(data);
