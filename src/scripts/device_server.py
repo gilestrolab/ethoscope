@@ -101,8 +101,11 @@ if __name__ == '__main__':
 
 
     if debug:
+        import getpass
         DURATION = 60*60*4
         INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
+        if getpass.getuser() == "quentin": ## @ luis ;)
+            INPUT_VIDEO = '/data/pysolo_video_samples/sleepMonitor_5days.avi'
         DRAW_RESULTS = True
         PSV_DIR = '/tmp/psv'
     else:
