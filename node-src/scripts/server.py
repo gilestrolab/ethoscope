@@ -50,7 +50,20 @@ def devices():
 
 @app.get('/devices_list')
 def get_devices_list():
+    global devices_list
     return devices_list
+
+@app.post('/devices_list')
+def post_devices_list():
+    global devices_list
+    data = request.body.read()
+    data = json.loads(data)
+    device_id = data['device_id']
+    status = data['status']
+    print devices_list
+    devices_list[device_id]['status'] = status
+    print devices_list
+
 
 #Get the information of one Sleep Monitor
 @app.get('/device/<id>/data/<type_of_req>')
@@ -80,6 +93,10 @@ def device(id, type_of_req):
 
     except Exception as e:
         return {'error':str(e)}
+
+@app.get('/list/<type>')
+def redirection_to_home(type):
+    return redirect('/#/list/'+type)
 
 @app.get('/sm/<id>')
 def redirection_to_home(id):

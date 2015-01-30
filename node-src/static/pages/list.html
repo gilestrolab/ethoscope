@@ -1,0 +1,22 @@
+<!-- list.html -->
+    <div class="jumbotron text-center" >
+        <h1>{{device_type}}s</h1>
+        <div>Here you will see the list of connected: {{device_type}}</div>
+
+        <button class="btn btn-default" ng-click="get_devices()">Scan Network for {{device_type}}s</button>
+
+    </div>
+    <div class="col-lg-4 alert alert-info" ng-repeat="device in devices" ng-if="device.type == req_device_type">
+        <a  href="{{device.type}}/{{device.id}}">
+            <h3 ng-if="device_type == 'Sleep Monitor'">Sleep Monitor</h3>
+            <h3 ng-if="device_type == 'Sleep Deprivator'">Sleep Deprivator</h3>
+            <!--<div><span class="fa fa-paw"></span> ID: {{device.id}}</div>-->
+            <div><span class="fa fa-genderless"></span> Name: {{device.name}}</div>
+            <div><span ng-if="device.status == 'started'" class="fa fa-circle color-green"></span>
+            <span ng-if="device.status == 'stopped'" class="fa fa-circle color-red"></span> Status: {{device.status}}
+
+            </div>
+
+            <!--<div><span class="fa fa-laptop"></span> IP: {{device.ip}}</div>-->
+        </a>
+    </div>

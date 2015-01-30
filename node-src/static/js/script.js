@@ -20,6 +20,10 @@
                 templateUrl : '/static/pages/home.html',
                 controller  : 'mainController'
             })
+            .when('/list/:device_type', {
+                templateUrl : '/static/pages/list.html',
+                controller  : 'listController'
+            })
 
             // route for the sleep monitor page
             .when('/sm/:device_id', {
@@ -40,8 +44,28 @@
     app.controller('mainController', function($scope, $http) {
         $http.get('/devices_list').success(function(data){
             $scope.devices = data;
+            console.log(data);
         })
         //Scan for SM or SD connected.
+        $scope.get_devices = function(){
+            $http.get('/devices').success(function(data){
+                $scope.devices = data;
+            })
+        }
+    });
+
+
+    app.controller('listController', function($scope, $http, $routeParams, $interval)  {
+        $scope.req_device_type = $routeParams.device_type;
+        if ($scope.req_device_type == "sm"){
+            $scope.device_type = "Sleep Monitor";
+        }else if ($scope.req_device_type == 'sd'){
+            $scope.device_type = "Sleep Deprivator";
+        }
+        $http.get('/devices_list').success(function(data){
+            $scope.devices = data;
+        })
+
         $scope.get_devices = function(){
             $http.get('/devices').success(function(data){
                 $scope.devices = data;
@@ -68,10 +92,10 @@
         $scope.sm.start = function(){
             $http.get('/device/'+device_id+'/controls/start')
                  .success(function(data){
-                    console.log(data);
                     $scope.device.status = data.status;
                     if (data.status == 'started'){
-                        $scope.sm.refresh();
+                        $http.post('/devices_list', data={"device_id":device_id,"status":"started"})
+                        setTimeout($scope.sm.refresh(),3000);
                         refresh_data = $interval($scope.sm.refresh, 10000);
                     }
                 });
@@ -79,9 +103,9 @@
         $scope.sm.stop = function(){
             $http.get('/device/'+device_id+'/controls/stop')
                  .success(function(data){
-                    console.log(data);
                     $scope.device.status = data.status;
-                    if (data.status == 'started'){
+                    if (data.status == 'stopped'){
+                        $http.post('/devices_list', data={"device_id":device_id,"status":"stopped"})
                         $interval.cancel(refresh_data);
                     }
                 });

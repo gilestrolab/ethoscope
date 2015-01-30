@@ -16,7 +16,11 @@ def server_static(filepath):
 
 @api.get('/id')
 def name():
-    return {"id" : machine_id, "type": "sm"}
+    status = "stopped"
+    if control is not None:
+        status = "started"
+
+    return {"id": machine_id, "type": "sm", "name": "SM15-001", "status": status}
 
 @api.get('/controls/<id>/<action>')
 def controls(id, action):
@@ -59,7 +63,7 @@ def controls(id, action):
 def data(id, type_of_data):
     if id == machine_id:
         try:
-            if control != None:
+            if control is not None:
                 if type_of_data == 'all':
                     return {"status": "started", "last_drawn_img": control.last_drawn_img, "last_positions": control.last_positions}
                 if type_of_data == 'last_drawn_img':
@@ -92,7 +96,7 @@ if __name__ == '__main__':
 
     if debug:
         DURATION = 60*60*4
-        INPUT_VIDEO = '/data/pysolo_video_samples/sleepMonitor_5days.avi'
+        INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
         DRAW_RESULTS = True
     else:
         INPUT_VIDEO = None
