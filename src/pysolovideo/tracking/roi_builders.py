@@ -54,6 +54,18 @@ class ROI(object):
     def rectangle(self):
         return self._rectangle
 
+    def get_feature_dict(self):
+        x,y,w,h = self._rectangle
+        return {"x":x,
+                "y":y,
+                "w":w,
+                "h":h,
+                "value":self._value,
+                "idx":self.idx
+        }
+
+
+
 
 
     def set_value(self, new_val):
