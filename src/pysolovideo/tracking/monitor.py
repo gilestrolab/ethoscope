@@ -30,6 +30,8 @@ import cv2
 from collections import deque
 import numpy as np
 from pysolovideo.utils.debug import PSVException
+from pysolovideo.utils.io import ResultWriter
+
 import gzip
 
 # TODO
@@ -38,7 +40,7 @@ import gzip
 
 class Monitor(object):
 
-    def __init__(self, camera, tracker_class, rois = None, interactors=None, out_file=None,
+    def __init__(self, camera, tracker_class, rois = None, interactors=None, result_writer=None,
                 draw_results=False, draw_every_n=1,
                 video_out = None,
                 max_duration=None):
@@ -50,7 +52,7 @@ class Monitor(object):
         :param tracker_class: The class that will be used for tracking. It must inherit from ``
         :param rois: A list of region of interest.
         :param interactors: The class that will be used for analysing the position of the object and interacting with the system/hardware.
-        :param out_file: An optional output file (file or filename)
+        :param result_writer: An optional result writer (directory name or ResultWriter)
         :param draw_results: whether to draw the results of the tracking on a window (OpenCV frontend). This is mainly for debugging purposes and will result in using more resources.
         :param draw_every_n: When `draw_results` is `True`, only draw   every `draw_every_n` frames. this can help to save some CPU time.
         :param video_out: An optional filename where to write the original frames annotated with the location of the ROIs and position of the objects.
@@ -62,16 +64,13 @@ class Monitor(object):
         self._camera = camera
         self._exception = None
 
-
-        if out_file is None or isinstance(out_file, file) or isinstance(out_file, gzip.GzipFile):
-            self._out_file = out_file
+        if isinstance(result_writer, ResultWriter):
+            self._result_writer = result_writer
         else:
-            self._out_file = open(out_file, 'wb')
+            self._result_writer = ResultWriter(result_writer)
 
-        #self._out_file = out_file
 
         # todo ensure file has opened OK
-
 
         self._draw_results = draw_results
         self.draw_every_n = draw_every_n
@@ -123,8 +122,6 @@ class Monitor(object):
             raise self._exception
         return self._draw_on_frame(self._frame_buffer)
 
-
-
     def stop(self):
         if self._exception is not None:
             raise self._exception
@@ -160,9 +157,6 @@ class Monitor(object):
 
 
     def run(self):
-        if self._out_file is not None:
-            header = None
-            file_writer  = csv.writer(self._out_file , quoting=csv.QUOTE_NONE)
 
         vw = None
         try:
@@ -174,11 +168,6 @@ class Monitor(object):
 
                 self._last_time_stamp = t
                 self._frame_buffer = frame
-
-
-                # if i % 60 == 0:
-                #     print t/60
-
 
                 if self._video_out is not None and vw is None:
                     vw = cv2.VideoWriter(self._video_out, cv2.cv.CV_FOURCC(*'DIVX'), 50, (frame.shape[1], frame.shape[0])) # fixme the 50 is arbitrary
@@ -202,32 +191,13 @@ class Monitor(object):
                     if len(self._data_history) > 2 and (self._data_history[-1]["t"] - self._data_history[0]["t"]) > self._max_history_length:
                         self._data_history.popleft()
 
-                    if self._out_file is not None:
-                        if header is None:
-                            header = sorted(data_row.keys())
-                            file_writer.writerow(header)
+                    if self._result_writer is not None and self._result_writer.header is None:
+                        header = sorted(data_row.keys())
+                        self._result_writer.set_header(header)
+                        logging.info("Setting header %s" % str(header))
 
 
-
-
-                        row = []
-                        for f in header:
-                            dt = data_row[f]
-                            if isinstance(dt,float):
-                                if dt == 0:
-                                    dt = 0
-                                elif dt < 1:
-                                    dt ="%.2e" % dt
-                                else:
-                                    dt ="%.2f" % dt
-
-                            elif isinstance(dt, bool):
-                                dt = int(dt)
-
-                            row.append(dt)
-
-                        file_writer.writerow(row)
-
+                    self._result_writer.write_row(t,data_row)
 
 
                 if (self._draw_results and i % self.draw_every_n == 0) or not vw is None :
@@ -252,12 +222,3 @@ class Monitor(object):
 
         if not vw is None:
             vw.release()
-        #fixme close result file!
-        if not self._out_file is None:
-            try:
-                logging.info("Closing result file")
-                self._out_file.close()
-                logging.info("Result file closed")
-            except:
-                logging.error("Cannot close result file")
-                pass

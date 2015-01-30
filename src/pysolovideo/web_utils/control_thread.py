@@ -14,22 +14,34 @@ from pysolovideo.tracking.roi_builders import SleepMonitorWithTargetROIBuilder
 # the robust self learning tracker
 from pysolovideo.tracking.trackers import AdaptiveBGModel
 from pysolovideo.utils.debug import PSVException
-
+from pysolovideo.utils.io import ResultWriter
+import shutil
 import logging
 
 class ControlThread(Thread):
 
-    def __init__(self, machine_id, video_file=None, *args, **kwargs):
+    _result_dir = "results/"
+    _last_img_file = "last_img.png"
+    _dbg_img_file = "dbg_img.png"
+    _log_file = "psv.log"
+
+    def __init__(self, machine_id, date_time, psv_dir, video_file=None, *args, **kwargs):
+
+        # We wipe off previous data
+        shutil.rmtree(psv_dir, ignore_errors=True)
+        os.makedirs(psv_dir)
+
 
         self._tmp_files = {
-            "last_img": tempfile.mkstemp(suffix='.png')[1],
-            "dbg_img": tempfile.mkstemp(suffix='.png')[1],
-            "log_file": tempfile.mkstemp(suffix='.log')[1]
+            "last_img": os.path.join(psv_dir, self._last_img_file),
+            "dbg_img": os.path.join(psv_dir, self._dbg_img_file),
+            "log_file": os.path.join(psv_dir, self._log_file)
         }
+
         self._machine_id = machine_id
+
         logging.basicConfig(filename=self._tmp_files["log_file"], level=logging.INFO)
         logging.info("Starting camera")
-
 
         if video_file is None:
             cam = V4L2Camera(0, target_fps=5, target_resolution=(560, 420))
@@ -43,10 +55,16 @@ class ControlThread(Thread):
 
         logging.info("Initialising monitor")
 
+        metadata = {"machine_id": self._machine_id,
+                     "date_time": date_time
+                     }
+        result_dir = os.path.join(psv_dir, self._result_dir)
+        self._result_writer  = ResultWriter(dir_path=result_dir, metadata=metadata)
 
         self._monit = Monitor(cam,
                     AdaptiveBGModel,
                     rois,
+                    result_writer=self._result_writer,
                     *args,**kwargs
                     )
 
@@ -64,13 +82,15 @@ class ControlThread(Thread):
 
     def __del__(self):
         self.stop()
-        for k,i in self._tmp_files.items():
-            try:
-                os.remove(i)
-            except:
-                pass
 
+    def result_files(self, partial=False):
+        out = []
+        print self._result_writer.file_list
 
+        for d in self._result_writer.file_list:
+            if partial or d["end"] is not None:
+                out.append(d["path"])
+        return out
 
     @property
     def last_time_frame(self):

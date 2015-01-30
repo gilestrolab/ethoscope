@@ -32,8 +32,10 @@ def controls(id, action):
                     # set time, given in milliseconds from javascript, used in seconds for date
                     #set_time = call(['date', '-s', '@' + str(t)[:-3]])
 
-                    out_file = gzip.open(OUT_ZIP_FILE,"w")
-                    control = ControlThread(machine_id, video_file=INPUT_VIDEO, out_file=out_file, draw_results = DRAW_RESULTS, max_duration=DURATION)
+                    date_time = "TODO" # todo @luis
+
+                    control = ControlThread(machine_id=machine_id, date_time=date_time, video_file=INPUT_VIDEO, psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
+
                     control.start()
                     logging.info("Starting monitor")
                     return {'status': 'started'}
@@ -70,6 +72,8 @@ def data(id, type_of_data):
                     return {"log_file_path": control.log_file_path}
                 if type_of_data == 'data_history':
                     return {"data_history": control.data_history}
+                if type_of_data == 'result_files':
+                    return {"result_files": control.result_files()}
             else:
                 return {"status": "stopped"}
 
@@ -90,16 +94,21 @@ if __name__ == '__main__':
     machine_id = get_machine_id()
 
 
+
+
     if debug:
         DURATION = 60*60*4
         INPUT_VIDEO = '/data/pysolo_video_samples/sleepMonitor_5days.avi'
         DRAW_RESULTS = True
+        PSV_DIR = '/tmp/psv'
     else:
         INPUT_VIDEO = None
         DURATION = None
         DRAW_RESULTS =False
+        # fixme => we should have mounted /dev/sda/ onto a costum location instead @luis @ quentin
+        PSV_DIR = '/tmp/psv'
 
-    OUT_ZIP_FILE = "/tmp/out.csv.gz"
+
 
     control = None
 

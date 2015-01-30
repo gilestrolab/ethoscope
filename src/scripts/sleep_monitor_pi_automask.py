@@ -66,7 +66,7 @@ if __name__ == "__main__":
     monit = Monitor(cam,
                     AdaptiveBGModel,
                     rois,
-                    out_file=option_dict["out"], # save a csv out
+                    result_writer=option_dict["out"], # save a csv out
                     max_duration=option_dict["duration"], # when to stop (in seconds)
                     video_out=option_dict["result_video"], # when to stop (in seconds)
                     draw_results=draw, # draw position on image
