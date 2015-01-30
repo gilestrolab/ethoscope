@@ -40,13 +40,32 @@ class ControlThread(Thread):
 
         self._machine_id = machine_id
 
+
+
+        filename = self._tmp_files["log_file"]
+
         logging.basicConfig(filename=self._tmp_files["log_file"], level=logging.INFO)
+
+
+        logger = logging.getLogger()
+        logger.handlers[0].stream.close()
+        logger.removeHandler(logger.handlers[0])
+
+        file_handler = logging.FileHandler(filename)
+        file_handler.setLevel(logging.INFO)
+        formatter = logging.Formatter("%(asctime)s %(filename)s, %(lineno)d, %(funcName)s: %(message)s")
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
+
         logging.info("Starting camera")
+
 
         if video_file is None:
             cam = V4L2Camera(0, target_fps=5, target_resolution=(560, 420))
         else:
             cam = MovieVirtualCamera(video_file)
+
 
 
         logging.info("Building ROIs")
@@ -55,8 +74,12 @@ class ControlThread(Thread):
 
         logging.info("Initialising monitor")
 
+        roi_features = [r.get_feature_dict () for r in rois]
+
         metadata = {"machine_id": self._machine_id,
-                     "date_time": date_time
+                     "date_time": date_time,
+                     "rois": roi_features,
+                     "img":{"w":cam.width, "h":cam.height}
                      }
         result_dir = os.path.join(psv_dir, self._result_dir)
         self._result_writer  = ResultWriter(dir_path=result_dir, metadata=metadata)
@@ -85,7 +108,6 @@ class ControlThread(Thread):
 
     def result_files(self, partial=False):
         out = []
-        print self._result_writer.file_list
 
         for d in self._result_writer.file_list:
             if partial or d["end"] is not None:
