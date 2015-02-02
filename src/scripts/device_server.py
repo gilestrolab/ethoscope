@@ -34,7 +34,7 @@ def controls(id, action):
 
                     # Sync clocks with the node or master
                     data = request.json
-                    t = data['time']
+                    t = float(data['time'])
                     #set time, given in seconds from javascript, used in seconds for date
                     #set_time = call(['date', '-s', '@' + str(t)[:-3]])
                     date = datetime.fromtimestamp(t)
