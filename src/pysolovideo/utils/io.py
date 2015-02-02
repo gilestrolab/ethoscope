@@ -10,7 +10,7 @@ import logging
 
 #
 class ResultWriter(object):
-    def __init__(self, dir_path, use_compression=True, chunk_size= 60*30, metadata=None):
+    def __init__(self, dir_path, use_compression=True, chunk_size= -1, metadata=None):
 
 
         self.metadata = metadata
@@ -64,8 +64,10 @@ class ResultWriter(object):
     def _new_file(self, t):
         if self._current_file is not None:
             self._current_file.close()
-
-        basename = "chunk_%08d.csv.gz" % len(self._file_list)
+        if self._chunk_size > 0 : # negative chunck size means a single chunk
+            basename = "chunk_%08d.csv.gz" % len(self._file_list)
+        else:
+            basename = "result.csv.gz"
 
         path = os.path.join(self._dir_path,basename)
 
@@ -88,8 +90,9 @@ class ResultWriter(object):
         if self._header is None:
             raise PSVException("File writer headers have not been set")
 
-        if t - self._file_list[-1]["start"] >= self._chunk_size:
-            self._new_file(t)
+        if self._chunk_size > 0 : # negative chunck size means a single chunk
+            if t - self._file_list[-1]["start"] >= self._chunk_size:
+                self._new_file(t)
 
 
         row = []
