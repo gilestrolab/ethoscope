@@ -82,6 +82,7 @@ class Monitor(object):
         self._force_stop = False
         self._last_positions = {}
         self._last_time_stamp = 0
+        self._is_running = False
 
         if rois is None:
             rois = rbs.DefaultROIBuilder()(camera)
@@ -160,10 +161,13 @@ class Monitor(object):
 
         vw = None
         try:
-
+            self._is_running = True
             for i,(t, frame) in enumerate(self._camera):
-                if self._force_stop or (self._max_duration is not None and t > self._max_duration):
-                    logging.info("Monitor object stopping itself")
+                if self._force_stop:
+                    logging.info("Monitor object stopped from external request")
+                    break
+                elif (self._max_duration is not None and t > self._max_duration):
+                    logging.info("Monitor object stopped by timeout")
                     break
 
                 self._last_time_stamp = t
@@ -220,5 +224,7 @@ class Monitor(object):
             self._exception = e
             pass
 
-        if not vw is None:
-            vw.release()
+        finally:
+            if not vw is None:
+                vw.release()
+            self._is_running = False

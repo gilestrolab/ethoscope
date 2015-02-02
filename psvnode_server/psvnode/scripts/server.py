@@ -6,20 +6,24 @@ import urllib2
 import subprocess,json
 import threading
 
+from psvnode.utils.acquisition import Acquisition
+
 devices_list ={}
+
+STATIC_DIR = "../../static"
 
 @app.get('/favicon.ico')
 def get_favicon():
-    return server_static('../static/img/favicon.ico')
+    return server_static(STATIC_DIR+'/img/favicon.ico')
 
 @app.route('/static/<filepath:path>')
 def server_static(filepath):
-    return static_file(filepath, root="../static")
+    return static_file(filepath, root=STATIC_DIR)
 
 
 @app.route('/')
 def index():
-    return static_file('index.html', root='../static')
+    return static_file('index.html', root=STATIC_DIR)
 
 
 #################################
@@ -30,10 +34,10 @@ def index():
 def devices():
     global devices_list
     devices_list = {}
-    strs = subprocess.check_output(shlex.split('ip r l'))
-    host_ip = strs.split(b'src')[-1].split()[0]
-    host_ip = host_ip.decode('utf-8').split('.')
-    #host_ip = ['127','0','0','0']
+    #strs = subprocess.check_output(shlex.split('ip r l'))
+    #host_ip = strs.split(b'src')[-1].split()[0]
+    #host_ip = host_ip.decode('utf-8').split('.')
+    host_ip = ['129','31','135','0']
     thread =[]
 
     for i in range(0,256):
@@ -104,6 +108,13 @@ def device(id, type_of_req):
         message = f.read()
         if message:
             data = json.loads(message)
+            #start acquisition thread
+            if type_of_req == 'start' and data['status']=='started':
+                acquisition = Acquisition()
+                acquisition.start()
+            if type_of_req == 'stop' and data['status']=='stopped' and acquisition is not None:
+                acquisition.stop()
+                acquisition.join()
             return data
 
     except Exception as e:

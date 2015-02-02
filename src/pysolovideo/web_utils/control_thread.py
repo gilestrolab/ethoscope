@@ -95,7 +95,9 @@ class ControlThread(Thread):
 
     def run(self, **kwarg):
         logging.info("Starting monitor")
+
         self._monit.run()
+
 
 
     def stop(self):

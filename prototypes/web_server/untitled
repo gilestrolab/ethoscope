@@ -1,0 +1,18 @@
+from threading import Thread
+from pysolovideo.tracking.monitor import Monitor
+
+class Tracking(Thread):
+
+    def __init__(self, *args, **kwargs):
+        self.__monit = Monitor()
+        super(Tracking, self).__init__(*args, **kwargs)
+
+    def run(self, **kwarg):
+        self.__monit.run()
+
+    def stop(self):
+        self.__monit.stop()
+
+    @property
+    def dummy_variable(self):
+        return self.__monit._iteration
