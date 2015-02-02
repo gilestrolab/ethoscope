@@ -39,6 +39,7 @@ def controls(id, action):
                     #set_time = call(['date', '-s', '@' + str(t)[:-3]])
                     date = datetime.fromtimestamp(t)
                     date_time = date.isoformat()
+
                     control = ControlThread(machine_id=machine_id, date_time=date_time, video_file=INPUT_VIDEO, psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
 
                     control.start()
@@ -91,9 +92,11 @@ if __name__ == '__main__':
 
     parser = OptionParser()
     parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
+    parser.add_option("-p", "--port", dest="port", default=9000,help="port")
     (options, args) = parser.parse_args()
     option_dict = vars(options)
     debug = option_dict["debug"]
+    port = option_dict["port"]
 
     machine_id = get_machine_id()
 
@@ -108,23 +111,24 @@ if __name__ == '__main__':
         elif getpass.getuser() == "asterix":
             INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
         DRAW_RESULTS = True
-        PSV_DIR = '/tmp/psv'
+
     else:
         INPUT_VIDEO = None
         DURATION = None
         DRAW_RESULTS =False
-        # fixme => we should have mounted /dev/sda/ onto a costum location instead @luis @ quentin
-        PSV_DIR = '/tmp/psv'
+        # fixme => we should have mounted /dev/sda/ onto a custom location instead @luis @ quentin
 
 
+    PSV_DIR = "/tmp/" + "psv_" + str(port)
 
     control = None
 
     try:
-        # @luis TODO => I am not quite sure about debug here.
-        run(api, host='0.0.0.0', port=9000, debug=debug)
+        run(api, host='0.0.0.0', port=port, debug=debug)
     finally:
-        control.stop()
-        control.join()
+        if control is not None:
+            control.stop()
+            control.join()
+
 
 
