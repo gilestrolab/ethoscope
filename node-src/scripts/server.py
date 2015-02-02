@@ -30,10 +30,10 @@ def index():
 def devices():
     global devices_list
     devices_list = {}
-    #strs = subprocess.check_output(shlex.split('ip r l'))
-    #host_ip = strs.split(b'src')[-1].split()[0]
-    #host_ip = host_ip.decode('utf-8').split('.')
-    host_ip = ['127','0','0','0']
+    strs = subprocess.check_output(shlex.split('ip r l'))
+    host_ip = strs.split(b'src')[-1].split()[0]
+    host_ip = host_ip.decode('utf-8').split('.')
+    #host_ip = ['127','0','0','0']
     thread =[]
 
     for i in range(0,256):
@@ -60,9 +60,7 @@ def post_devices_list():
     data = json.loads(data)
     device_id = data['device_id']
     status = data['status']
-    print devices_list
     devices_list[device_id]['status'] = status
-    print devices_list
 
 
 #Get the information of one Sleep Monitor
@@ -85,6 +83,23 @@ def device(id, type_of_req):
     try:
         url = devices_list[id]['ip']
         req = urllib2.Request(url=devices_list[id]['ip']+':9000/controls/'+id+'/'+type_of_req)
+        f = urllib2.urlopen(req,{})
+        message = f.read()
+        if message:
+            data = json.loads(message)
+            return data
+
+    except Exception as e:
+        return {'error':str(e)}
+
+@app.post('/device/<id>/controls/<type_of_req>')
+def device(id, type_of_req):
+    try:
+        data = request.body.read()
+        url = devices_list[id]['ip']
+        req = urllib2.Request(url=devices_list[id]['ip']+':9000/controls/'+id+'/'+type_of_req,
+                              data=data,
+                              headers={'Content-Type': 'application/json'})
         f = urllib2.urlopen(req)
         message = f.read()
         if message:
