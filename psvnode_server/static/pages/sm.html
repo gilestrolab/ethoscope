@@ -1,6 +1,6 @@
 <!-- home.html -->
     <div class="jumbotron text-center" ng-cloak>
-        <h1>Sleep Monitor</h1>
+        <h1>Sleep Monitor {{device.name}}</h1>
         <p>Here you can perform actions and know the status of the device</p>
         <div>
         <img ng-if="device.status == 'started'"  ng-src="{{device.ip}}:9000/static{{device.last_drawn_img}}" alt=""></img>
@@ -10,6 +10,7 @@
         <button class="btn btn-danger" ng-if="device.status == 'started'"  ng-click="sm.stop()">Stop</button>
         <a href="{{device.ip}}:9000/static/tmp/out.csv.gz" class="btn btn-info" ng-click="sm.download()">Download Data</a>
         <button class="btn btn-info" ng-click="sm.log()">Log</button>
+        <button class="btn btn-danger" data-toggle="modal" data-target="#powerOffAlert">Power off Device</button>
 
     </div>
 
@@ -42,6 +43,41 @@
             </tr>
         </table>
     </div>
-<p>{{device}}</p>
+
+<div id="powerffAlert" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="powerOffAlertLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title">Warning!</h4>
+        </div>
+        <div class="modal-body">
+        <p>Do you want to power off the Device {{device.name}}? Any running acquisition will be ended.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">NO</button>
+        <button type="button" class="btn btn-primary" >YES</button>
+      </div>
+
+    </div>
+</div>
+<!-- Modal -->
+<div class="modal fade" id="powerOffAlert" tabindex="-1" role="dialog" aria-labelledby="powerOffAlertLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Modal title</h4>
+      </div>
+      <div class="modal-body">
+       <p>Do you want to power off the Device {{device.name}}? Any running acquisition will be ended.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">No</button>
+        <button type="button" class="btn btn-primary" ng-click="sm.poweroff()">Yes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 

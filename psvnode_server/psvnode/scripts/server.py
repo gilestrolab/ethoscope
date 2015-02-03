@@ -35,10 +35,10 @@ def index():
 def devices():
     global devices_list
     devices_list = {}
-    #strs = subprocess.check_output(shlex.split('ip r l'))
-    #host_ip = strs.split(b'src')[-1].split()[0]
-    #host_ip = host_ip.decode('utf-8').split('.')
-    host_ip = ['129','31','135','0']
+    strs = subprocess.check_output(shlex.split('ip r l'))
+    host_ip = strs.split(b'src')[-1].split()[0]
+    host_ip = host_ip.decode('utf-8').split('.')
+    #host_ip = ['129','31','135','0']
     thread =[]
 
     for i in range(0,256):
@@ -193,6 +193,9 @@ if __name__ == '__main__':
     try:
         # @luis TODO => I am not quite sure about debug here.
         run(app, host='0.0.0.0', port=8000, debug=debug)
+
+    except Exception as e:
+        print e
     finally:
         acquisition.stop()
         acquisition.join()

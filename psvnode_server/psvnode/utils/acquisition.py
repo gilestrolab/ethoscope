@@ -25,21 +25,8 @@ class Acquisition(Thread):
             t = time.time()
 
             if t - last_round > self.timeout:
-                req = urllib2.Request(url=self.url+':9000/data/'+self.id+'/result_files')
-                f = urllib2.urlopen(req)
-                message = f.read()
-                if message:
-                    data = json.loads(message)
-
-                if data['result_files'][0] is not None:
-                    command = 'rsync -avz -e ssh psv@'+self.url[7:]+':'+data['result_files'][0]+' /tmp/results/'
-
-                    ad=pexpect.spawn(command)
-                    ad.expect('password:')
-                    ad.sendline('psv')
-
-                    print command
-                    last_round = t
+                self.sync_data()
+                last_round = t
 
 
 
@@ -48,3 +35,18 @@ class Acquisition(Thread):
     def stop(self):
         self._force_stop = True
 
+
+    def sync_data(self):
+        req = urllib2.Request(url=self.url+':9000/data/'+self.id+'/result_files')
+        f = urllib2.urlopen(req)
+        message = f.read()
+        if message:
+            data = json.loads(message)
+
+            if data['result_files'][0] is not None:
+                # TODO change this route
+                command = 'rsync -avz -e ssh psv@'+self.url[7:]+':'+data['result_files'][0]+' /tmp/results/'+self.id
+
+                ad = pexpect.spawn(command)
+                ad.expect('password:')
+                ad.sendline('psv')

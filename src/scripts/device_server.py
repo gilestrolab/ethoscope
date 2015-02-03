@@ -36,7 +36,7 @@ def controls(id, action):
                     data = request.json
                     t = float(data['time'])
                     #set time, given in seconds from javascript, used in seconds for date
-                    #set_time = call(['date', '-s', '@' + str(t)[:-3]])
+                    #set_time = call(['date', '-s', '@' + str(t)])
                     date = datetime.fromtimestamp(t)
                     date_time = date.isoformat()
 
@@ -45,12 +45,20 @@ def controls(id, action):
                     control.start()
                     logging.info("Starting monitor")
                     return {'status': 'started'}
-                if action == 'stop':
+                elif action == 'stop':
                     control.stop()
                     control.join()
                     control = None
                     logging.info("Stopping monitor")
                     return {'status': 'stopped'}
+
+                elif action == 'poweroff':
+                    if control is not None:
+                        control.stop()
+                        control.join()
+                        logging.info("Stopping monitor due to poweroff request")
+                        logging.info("Powering off Device.")
+                    call('poweroff')
 
             except Exception as e:
                 print e
