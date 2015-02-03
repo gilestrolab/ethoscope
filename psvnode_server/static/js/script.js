@@ -75,6 +75,7 @@
 
     app.controller('smController', function($scope, $http, $routeParams, $interval, $timeout)  {
         device_id = $routeParams.device_id;
+
         $scope.sm = {}
         var refresh_data = false;
         $http.get('/device/'+device_id+'/data/all').success(function(data){
@@ -87,11 +88,13 @@
         });
         $http.get('/device/'+device_id+'/ip').success(function(data){
                     $scope.device.ip = data;
+                    $scope.device.name = $scope.devices[device_id].name;
                 });
 
         $scope.sm.start = function(){
-            $http.post('/device/'+device_id+'/controls/start', data={"time":Math.floor(Date.now() / 1000)})
+            $http.post('/device/'+device_id+'/controls/start', data={"time":Date.now() / 1000.})
                  .success(function(data){
+                    console.log(data);
                     $scope.device.status = data.status;
                     if (data.status == 'started'){
                         $http.post('/devices_list', data={"device_id":device_id,"status":"started"})
@@ -132,6 +135,13 @@
                 $scope.showLog = false;
             }
         };
+
+        $scope.sm.poweroff = function(){
+                $http.post('/device/'+device_id+'/controls/poweroff', data={})
+                .success(function(data){
+                    console.log(data);
+            })
+        }
 
 
        var refresh = function(){
