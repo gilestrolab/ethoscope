@@ -18,18 +18,23 @@ from pysolovideo.utils.io import ResultWriter
 import shutil
 import logging
 
+# http://localhost:9001/controls/3a92bcf229a34c4db2be733f6802094d/start
+# {"time": "372894738."}
+
 class ControlThread(Thread):
 
     _result_dir = "results/"
     _last_img_file = "last_img.png"
     _dbg_img_file = "dbg_img.png"
     _log_file = "psv.log"
+    _result_db_name = "result.db"
 
     def __init__(self, machine_id, date_time, psv_dir, video_file=None, *args, **kwargs):
 
         # We wipe off previous data
         shutil.rmtree(psv_dir, ignore_errors=True)
-        os.makedirs(psv_dir)
+        result_dir = os.path.join(psv_dir, self._result_dir, self._result_db_name)
+        os.makedirs(result_dir)
 
 
         self._tmp_files = {
@@ -81,8 +86,9 @@ class ControlThread(Thread):
                      "rois": roi_features,
                      "img":{"w":cam.width, "h":cam.height}
                      }
-        result_dir = os.path.join(psv_dir, self._result_dir)
-        self._result_writer  = ResultWriter(dir_path=result_dir, metadata=metadata)
+
+
+        self._result_writer  = ResultWriter(result_dir, metadata=metadata)
 
         self._monit = Monitor(cam,
                     AdaptiveBGModel,
@@ -95,7 +101,6 @@ class ControlThread(Thread):
 
     def run(self, **kwarg):
         logging.info("Starting monitor")
-
         self._monit.run()
 
 
@@ -108,13 +113,8 @@ class ControlThread(Thread):
     def __del__(self):
         self.stop()
 
-    def result_files(self, partial=True):
-        out = []
-
-        for d in self._result_writer.file_list:
-            if partial or d["end"] is not None:
-                out.append(d["path"])
-        return out
+    def result_files(self):
+        return [self._result_writer.path]
 
     @property
     def last_time_frame(self):
@@ -129,10 +129,6 @@ class ControlThread(Thread):
         img = self._monit.last_drawn_frame
         cv2.imwrite(self._tmp_files["last_img"],img)
         return self._tmp_files["last_img"]
-
-    @property
-    def data_history(self):
-        return self._monit.data_history
 
     @property
     def last_positions(self):
