@@ -3,6 +3,8 @@ __author__ = 'quentin'
 
 
 import interactors
+from pysolovideo.tracking.trackers import DataPointBase, RelativeVariableBase
+import copy
 
 class TrackingUnit(object):
     def __init__(self, tracking_algo_class, roi, interactor=None):
@@ -30,23 +32,19 @@ class TrackingUnit(object):
         if len(self._tracker.positions) < 1:
             return None
 
-        last_position = self._tracker.positions[-1]
+        last_position = copy.deepcopy(self._tracker.positions[-1])
 
 
         if not absolute:
             return last_position
 
-        out = last_position.copy()
 
-
-        out["x"] *= self._roi.longest_axis
-        out["y"] *= self._roi.longest_axis
-        out["h"] *= self._roi.longest_axis
-        out["w"] *= self._roi.longest_axis
-        ox, oy = self._roi.offset
-
-        out["x"] += ox
-        out["y"] += oy
+        out =[]
+        for k,i in last_position.data.items():
+            out.append(i)
+            if isinstance(i, RelativeVariableBase):
+                out[-1].to_absolute(self.roi)
+        out = DataPointBase(out)
 
         return out
 
@@ -57,17 +55,12 @@ class TrackingUnit(object):
 
         if data_row is None:
             return
+        # data_row["roi_value"] = self._roi.value
+        # data_row["roi_idx"] = self._roi.idx
+        # data_row["t"] = t
+        # print len(data_row.data)
+        interact, result = self._interactor()
 
-        data_row["roi_value"] = self._roi.value
-        data_row["roi_idx"] = self._roi.idx
-        data_row["t"] = t
-
-
-        # fixme this should be useless as interactor is set to 'Default', not None
-        if self._interactor is None:
-            return data_row
-
-        interactor_columns = self._interactor()
-        data_row.update(interactor_columns)
-
+        data_row.append(interact)
+        # print len(data_row.data)
         return data_row

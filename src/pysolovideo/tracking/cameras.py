@@ -35,7 +35,10 @@ class BaseCamera(object):
 
             if out is None:
                 break
-            yield t,out
+            t_ms = int(1000*t)
+
+            yield t_ms,out
+
             at_leat_one_frame = True
 
 

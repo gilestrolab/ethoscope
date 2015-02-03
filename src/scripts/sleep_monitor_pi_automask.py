@@ -14,6 +14,7 @@ from pysolovideo.tracking.trackers import AdaptiveBGModel
 
 # the standard monitor
 from pysolovideo.tracking.monitor import Monitor
+from pysolovideo.utils.io import ResultWriter
 
 import optparse
 import logging
@@ -46,31 +47,49 @@ if __name__ == "__main__":
 
 
     # use a video file instead of the camera if asked by the user (--video /path/to/video)
-    if option_dict["video"] is not None:
-        cam = MovieVirtualCamera(option_dict["video"])
-    # Otherwise, webcam
-    else:
-
-        cam = V4L2Camera(0, target_fps=5, target_resolution=(560, 420))
-
+    # if option_dict["video"] is not None:
+    #     cam = MovieVirtualCamera(option_dict["video"])
+    # # Otherwise, webcam
+    # else:
+    #     cam = V4L2Camera(0, target_fps=5, target_resolution=(560, 420))
+    cam = MovieVirtualCamera("/data/pysolo_video_samples/sleepMonitor_5days.avi")
+    df = 1
     roi_builder = SleepMonitorWithTargetROIBuilder()
+
 
     rois = roi_builder(cam)
 
-    df = option_dict["drawing_frequency"]
+    roi_features = [r.get_feature_dict () for r in rois]
+
+    metadata = {"machine_id": "0123456789",
+                 "date_time": "33321321",
+                 "rois": roi_features,
+                 "img":{"w":cam.width, "h":cam.height}
+                 }
+    import shutil
+    import os
+
+    psv_dir = "/tmp/testpsv/"
+    shutil.rmtree(psv_dir, ignore_errors=True)
+
+    result_writer  = ResultWriter(dir_path=psv_dir)
+
+
+    # df = option_dict["drawing_frequency"]
     if df <= 0:
         draw = False
     else:
         draw = True
 
+
+
     monit = Monitor(cam,
                     AdaptiveBGModel,
                     rois,
-                    result_writer=option_dict["out"], # save a csv out
+                    result_writer=result_writer, # save a csv out
                     max_duration=option_dict["duration"], # when to stop (in seconds)
                     video_out=option_dict["result_video"], # when to stop (in seconds)
                     draw_results=draw, # draw position on image
                     draw_every_n=df) # only draw 1 every 10 frames to save time
     monit.run()
-
-
+    f = monit.last_drawn_frame

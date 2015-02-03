@@ -12,10 +12,10 @@ subsection 1
 ewsf s
 gtfrdegbvtsd
 gds gvdr
-
-
->>> test
->>> voila
+#
+#
+# >>> test
+# >>> voila
 
 
 """
@@ -65,12 +65,16 @@ class Monitor(object):
         if isinstance(result_writer, ResultWriter):
             self._result_writer = result_writer
         else:
-            self._result_writer = ResultWriter(result_writer)
+            raise Exception("TODO")
+        # else:
+        #     self._result_writer = ResultWriter(result_writer)
+
 
 
         # todo ensure file has opened OK
 
         self._draw_results = draw_results
+
         if self._draw_results:
             import os
             self._window_name = "psv_" + str(os.getpgid(0))
@@ -133,15 +137,20 @@ class Monitor(object):
     def _draw_on_frame(self, frame):
 
         frame_cp = frame.copy()
+        positions = self._last_positions
         for track_u in self._unit_trackers:
 
-            pos = track_u.get_last_position(absolute=True)
+            # pos = track_u.get_last_position(absolute=True)
 
             cv2.putText(frame_cp, str(track_u.roi.idx + 1), track_u.roi.offset, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.75, (255,255,0))
-            if pos is None:
+
+            try:
+                pos = positions[track_u.roi.idx]
+            except KeyError:
                 continue
 
-            if "interact" in pos.keys() and pos["interact"]:
+
+            if pos["has_interacted"]:
                 roi_colour = (0, 255,0)
             else:
                 roi_colour = (255,0 , 255)
@@ -154,7 +163,10 @@ class Monitor(object):
 
             cv2.drawContours(frame_cp,[track_u.roi.polygon],-1, roi_colour, 1, cv2.CV_AA)
 
-            cv2.ellipse(frame_cp,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),colour,1,cv2.CV_AA)
+
+
+            cv2.ellipse(frame_cp,((pos["x"].value,pos["y"].value), (pos["w"].value,pos["h"].value), pos["phi"].value),colour,1,cv2.CV_AA)
+            # cv2.ellipse(frame_cp,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),colour,1,cv2.CV_AA)
 
         return frame_cp
 
@@ -165,6 +177,8 @@ class Monitor(object):
         try:
             self._is_running = True
             for i,(t, frame) in enumerate(self._camera):
+                if i % 1000 == 0:
+                    print t/1000. / 60./60.
                 if self._force_stop:
                     logging.info("Monitor object stopped from external request")
                     break
@@ -179,32 +193,33 @@ class Monitor(object):
                     vw = cv2.VideoWriter(self._video_out, cv2.cv.CV_FOURCC(*'DIVX'), 50, (frame.shape[1], frame.shape[0])) # fixme the 50 is arbitrary
 
                 for j,track_u in enumerate(self._unit_trackers):
-                    # if j > 19:
+                    # if j != 19:
                     #     continue
 
                     data_row = track_u(t, frame)
 
                     if data_row is None:
                         continue
+
                     abs_pos = track_u.get_last_position(absolute=True)
 
+
                     if abs_pos is not None:
-                        self._last_positions[abs_pos["roi_idx"]] = abs_pos
+                        self._last_positions[track_u.roi.idx] = abs_pos
 
-                    self._data_history.append(data_row)
+                    self._result_writer.write(t,track_u.roi, data_row)
 
+                #     if self._result_writer is not None and self._result_writer.header is None:
+                #         header = sorted(data_row.keys())
+                #         self._result_writer.set_header(header)
+                #         logging.info("Setting header %s" % str(header))
+                #
+                #
+                #     self._result_writer.write_row(t,data_row)
+                #
+                #
 
-                    if len(self._data_history) > 2 and (self._data_history[-1]["t"] - self._data_history[0]["t"]) > self._max_history_length:
-                        self._data_history.popleft()
-
-                    if self._result_writer is not None and self._result_writer.header is None:
-                        header = sorted(data_row.keys())
-                        self._result_writer.set_header(header)
-                        logging.info("Setting header %s" % str(header))
-
-
-                    self._result_writer.write_row(t,data_row)
-
+                self._result_writer.flush()
 
                 if (self._draw_results and i % self.draw_every_n == 0) or not vw is None :
                     tmp = self._draw_on_frame(frame)

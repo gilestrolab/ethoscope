@@ -7,6 +7,83 @@ from pysolovideo.utils.debug import show
 from collections import deque
 
 
+class VariableBase(object):
+    sql_data_type = None
+    header_name = None
+    def __init__(self, value):
+        self.value = value
+        if self.sql_data_type is None:
+            raise NotImplementedError("Variables must have an SQL data type such as INT")
+
+        if self.header_name is None:
+            raise NotImplementedError("Variables must have a header name")
+
+    def __repr__(self):
+        return str(self.value)
+    def __str__(self):
+        return str(self.value)
+
+
+class IsInferredVariable(VariableBase):
+    sql_data_type = "BOOLEAN"
+    header_name = "is_inferred"
+
+
+class RelativeVariableBase(VariableBase):
+    def to_absolute(self, roi):
+        self.value = self.get_absolute_value(roi)
+    def get_absolute_value(self, roi):
+        raise NotImplementedError("Relative variable must implement a `get_absolute_value()` method")
+
+
+class WidthVariable(VariableBase):
+    sql_data_type = "SMALLINT"
+    header_name = "w"
+
+class HeightVariable(VariableBase):
+    sql_data_type = "SMALLINT"
+    header_name = "h"
+
+class PhiVariable(VariableBase):
+    sql_data_type = "SMALLINT"
+    header_name = "phi"
+
+
+class XPosVariable(RelativeVariableBase):
+    sql_data_type = "SMALLINT"
+    header_name = "x"
+    def get_absolute_value(self, roi):
+        out = self.value
+        # out *= roi.longest_axis
+        ox, _ = roi.offset
+        out += ox
+        return int(out)
+
+class YPosVariable(RelativeVariableBase):
+    sql_data_type = "SMALLINT"
+    header_name = "y"
+    def get_absolute_value(self, roi):
+        out = self.value
+        # out *= roi.longest_axis
+        _, oy = roi.offset
+        out += oy
+        return int(out)
+#
+class DataPointBase(object):
+
+    def __init__(self, data):
+        self.data = {}
+        for i in data:
+            self.data[i.header_name] = i
+
+    def __getitem__(self, item):
+        return self.data[item]
+
+    def append(self, item):
+        self.data[item.header_name] =item
+
+# class DataPoint(DataPointBase):
+#     pass
 
 
 
@@ -14,6 +91,7 @@ class NoPositionError(Exception):
     pass
 
 class BaseTracker(object):
+    # data_point = None
     def __init__(self, roi,data=None):
         self._positions = deque()
         self._times =deque()
@@ -21,25 +99,30 @@ class BaseTracker(object):
         self._roi = roi
         self._last_non_inferred_time = 0
         self._max_history_length = 300  # in seconds
+        # if self.data_point is None:
+        #     raise NotImplementedError("Trackers must have a DataPoint object.")
+
     def __call__(self, t, img):
         sub_img, mask = self._roi(img)
-
         try:
             point = self._find_position(sub_img,mask,t)
             if point is None:
                 return None
-            point = self.normalise_position(point)
+            # point = self.normalise_position(point)
             self._last_non_inferred_time = t
-            point["is_inferred"] = False
+
+            point.append(IsInferredVariable(False))
+            # print 1, point.data
+
         except NoPositionError:
             if len(self._positions) == 0:
                 return None
             else:
+
                 point = self._infer_position(t)
                 if point is None:
                     return None
-                point["is_inferred"] = True
-
+                point.append(IsInferredVariable(True))
 
         self._positions.append(point)
         self._times.append(t)
@@ -48,6 +131,7 @@ class BaseTracker(object):
         if len(self._times) > 2 and (self._times[-1] - self._times[0]) > self._max_history_length:
             self._positions.popleft()
             self._times.popleft()
+
 
         return point
 
@@ -58,15 +142,6 @@ class BaseTracker(object):
             return None
 
         return self._positions[-1]
-
-
-
-    def normalise_position(self,point):
-        point["x"] /= self._roi.longest_axis
-        point["y"] /=  self._roi.longest_axis
-        point["w"] /=  self._roi.longest_axis
-        point["h"] /= self._roi.longest_axis
-        return point
 
 
     @property
@@ -293,18 +368,16 @@ class AdaptiveBGModel(BaseTracker):
         self._smooth_mode = deque()
         self._smooth_mode_tstamp = deque()
         self._smooth_mode_window_dt = 30 #seconds
-        # self._bg_mean = None
-        # self._fg_features = None
-        # self._bg_sd = None
-        # self._learning_mat_buff = None
 
-        super(AdaptiveBGModel, self).__init__(roi, data)
+
         self._bg_model = BackgroundModel()
         self._max_m_log_lik = 2.
         self._buff_grey = None
         self._buff_grey_blurred = None
         self._buff_fg = None
         self._buff_convolved_mask = None
+
+        super(AdaptiveBGModel, self).__init__(roi, data)
 
     def _pre_process_input_minimal(self, img, mask, t, darker_fg=True):
         if self._buff_grey is None:
@@ -403,13 +476,8 @@ class AdaptiveBGModel(BaseTracker):
 
         cv2.subtract(grey, bg, self._buff_fg)
 
-        # cv2.imshow("fg", self._buff_fg*3)
-        # cv2.imshow("bg", bg)
-
         #fixme magic number
         cv2.threshold(self._buff_fg,15,255,cv2.THRESH_BINARY, dst=self._buff_fg)
-
-        # cv2.imshow("bin_fg", self._buff_fg)
 
 
         n_fg_pix = np.count_nonzero(self._buff_fg)
@@ -420,7 +488,6 @@ class AdaptiveBGModel(BaseTracker):
             self._bg_model.increase_learning_rate()
             raise NoPositionError
 
-        # fixme magic num
         contours,hierarchy = cv2.findContours(self._buff_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
 
@@ -451,7 +518,7 @@ class AdaptiveBGModel(BaseTracker):
 
             hull = hulls[good_clust]
             distance = all_distances[good_clust]
-            features = cluster_features[good_clust]
+            #features = cluster_features[good_clust]
 
 
         else:
@@ -471,6 +538,12 @@ class AdaptiveBGModel(BaseTracker):
 
         (x,y) ,(w,h), angle  = cv2.minAreaRect(hull)
 
+        x_var = XPosVariable(int(x))
+        y_var = YPosVariable(int(y))
+        w_var = WidthVariable(int(w))
+        h_var = HeightVariable(int(h))
+        phi_var = PhiVariable(int(angle))
+
         self._buff_fg.fill(0)
         cv2.drawContours(self._buff_fg ,[hull],0, 1,-1)
 
@@ -488,19 +561,24 @@ class AdaptiveBGModel(BaseTracker):
         self.fg_model.update(img, hull)
 
 
-        out_dic = {
-            'x':x, 'y':y,
-            'w':w, 'h':h,
-            'phi':angle,
-            "is_inferred": False,
-            "m_log_lik": distance
-        }
+        out = DataPointBase([x_var, y_var, w_var, h_var, phi_var])
+        return out
+
+        # out = DataPoint([x_var, y_var])
+
+        # out_dic = {
+        #     'x':x_var, 'y':y,
+            # 'w':w, 'h':h,
+            # 'phi':angle,
+            # "is_inferred": False,
+            # "m_log_lik": distance
+        # }
 
         # We can do this for DEBUGGING purposes
         # feature_dic  = dict(zip(self.fg_model.features_header, features))
         # out_dic = dict(out_dic.items() + feature_dic.items())
 
-        return out_dic
+        # return out_dic
 
 
 

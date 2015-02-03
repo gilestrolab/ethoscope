@@ -19,9 +19,9 @@ class BaseInteractorSync(object):
         if interact:
             self._interact(**result)
 
-        result["interact"] = interact
 
-        return result
+
+        return interact, result
 
 
     def bind_tracker(self, tracker):
@@ -92,12 +92,10 @@ class BaseInteractor(object):
             raise ValueError("No tracker bound to this interactor. Use `bind_tracker()` methods")
 
         interact, result  = self._run()
-        if interact:
+        if interact.value:
             self._interact_async(result)
-
         result["interact"] = interact
-
-        return result
+        return interact, result
 
 
     def bind_tracker(self, tracker):
@@ -120,93 +118,102 @@ class BaseInteractor(object):
 
         self._subprocess.start()
 
+from pysolovideo.tracking.trackers import VariableBase
+
+
+class HasInteractedVariable(VariableBase):
+    sql_data_type = "BOOLEAN"
+    header_name = "has_interacted"
+
+
 class DefaultInteractor(BaseInteractor):
 
     def _run(self):
-       return False, {}
+        out = HasInteractedVariable(False), {}
+        return out
 
-
-def beep(freq):
-    from scikits.audiolab import play
-    length = 0.5
-    rate = 10000.
-    length = int(length * rate)
-    factor = float(freq) * (3.14 * 2) / rate
-    s = np.sin(np.arange(length) * factor)
-    s *= np.linspace(1,0.3,len(s))
-    play(s, 10000)
-
-class SystemPlaySoundOnStop(BaseInteractor):
-
-    def __init__(self, freq):
-        self._t0 = None
-        self._target = beep
-        self._freq = freq
-        self._distance_threshold = 0.2
-        self._inactivity_time_threshold = 30# * 4 # s
-        self._rest_time = 60 # how long should we wait before restimulating (s)
-
-    def _cumulative_dist(self, times, positions):
-        now = times[-1]
-        cum_dist = 0
-        px_lag = None
-        py_lag = None
-        for t, p in reversed(zip(times, positions)):
-            if px_lag is None:
-                px_lag, py_lag = p["x"],  p["y"]
-                continue
-            cum_dist += sqrt((px_lag - p["x"]) ** 2 + (py_lag - p["y"]) ** 2)
-
-            if (now - t) > self._inactivity_time_threshold:
-                break
-
-            px_lag, py_lag = p["x"],  p["y"]
-        return cum_dist
-
-    def _run(self):
-        positions = self._tracker.positions
-        times = self._tracker.times
-        now = times[-1]
-
-        if len(times) <2 or (now - times[0]) < self._inactivity_time_threshold :
-            return False, {"freq":self._freq}
-
-        cum_dist = self._cumulative_dist(times, positions)
-        print positions[-1]["roi_idx"], cum_dist
-        if cum_dist > self._distance_threshold:
-            return False, {"freq":self._freq}
-
-        if self._t0 is None:
-            self._t0 = now
-            return True, {"freq":self._freq}
-
-        if now - self._t0 < self._rest_time:
-            return False, {"freq":self._freq}
-
-        self._t0 = now
-        return True, {"freq":self._freq}
-
-        #
-        # tail_m = positions[-1]
-        # xy_m = complex(tail_m["x"] + 1j * tail_m["y"])
-        #
-        # tail_mm = positions[-2]
-        #
-        # xy_mm =complex(tail_mm["x"] + 1j * tail_mm["y"])
-        #
-        # if np.abs(xy_m - xy_mm) < self._distance_threshold:
-        #     now = time[-1]
-        #     if self._t0 is None:
-        #         self._t0 = now
-        #     else:
-        #         if(now - self._t0) > self._inactivity_time_threshold:
-        #             self._t0 = None
-        #             return True, {"freq":self._freq}
-        # else:
-        #     self._t0 = None
-        #
-        # return False, {"freq":self._freq}
-
-
-
-
+#
+# def beep(freq):
+#     from scikits.audiolab import play
+#     length = 0.5
+#     rate = 10000.
+#     length = int(length * rate)
+#     factor = float(freq) * (3.14 * 2) / rate
+#     s = np.sin(np.arange(length) * factor)
+#     s *= np.linspace(1,0.3,len(s))
+#     play(s, 10000)
+#
+# class SystemPlaySoundOnStop(BaseInteractor):
+#
+#     def __init__(self, freq):
+#         self._t0 = None
+#         self._target = beep
+#         self._freq = freq
+#         self._distance_threshold = 0.2
+#         self._inactivity_time_threshold = 30# * 4 # s
+#         self._rest_time = 60 # how long should we wait before restimulating (s)
+#
+#     def _cumulative_dist(self, times, positions):
+#         now = times[-1]
+#         cum_dist = 0
+#         px_lag = None
+#         py_lag = None
+#         for t, p in reversed(zip(times, positions)):
+#             if px_lag is None:
+#                 px_lag, py_lag = p["x"],  p["y"]
+#                 continue
+#             cum_dist += sqrt((px_lag - p["x"]) ** 2 + (py_lag - p["y"]) ** 2)
+#
+#             if (now - t) > self._inactivity_time_threshold:
+#                 break
+#
+#             px_lag, py_lag = p["x"],  p["y"]
+#         return cum_dist
+#
+#     def _run(self):
+#         positions = self._tracker.positions
+#         times = self._tracker.times
+#         now = times[-1]
+#
+#         if len(times) <2 or (now - times[0]) < self._inactivity_time_threshold :
+#             return False, {"freq":self._freq}
+#
+#         cum_dist = self._cumulative_dist(times, positions)
+#         print positions[-1]["roi_idx"], cum_dist
+#         if cum_dist > self._distance_threshold:
+#             return False, {"freq":self._freq}
+#
+#         if self._t0 is None:
+#             self._t0 = now
+#             return True, {"freq":self._freq}
+#
+#         if now - self._t0 < self._rest_time:
+#             return False, {"freq":self._freq}
+#
+#         self._t0 = now
+#         return True, {"freq":self._freq}
+#
+#         #
+#         # tail_m = positions[-1]
+#         # xy_m = complex(tail_m["x"] + 1j * tail_m["y"])
+#         #
+#         # tail_mm = positions[-2]
+#         #
+#         # xy_mm =complex(tail_mm["x"] + 1j * tail_mm["y"])
+#         #
+#         # if np.abs(xy_m - xy_mm) < self._distance_threshold:
+#         #     now = time[-1]
+#         #     if self._t0 is None:
+#         #         self._t0 = now
+#         #     else:
+#         #         if(now - self._t0) > self._inactivity_time_threshold:
+#         #             self._t0 = None
+#         #             return True, {"freq":self._freq}
+#         # else:
+#         #     self._t0 = None
+#         #
+#         # return False, {"freq":self._freq}
+#
+#
+#
+#
