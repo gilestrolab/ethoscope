@@ -13,30 +13,22 @@ import sqlite3
 class ResultWriter(object):
     db_name = "psv_result.db"
     def __init__(self, dir_path,  metadata=None):
-
-
         self.metadata = metadata
-
         self._dir_path = dir_path
-
         if self.metadata is None:
             self.metadata  = {}
-
         self._initialised = set()
         os.makedirs(self._dir_path)
         db_path = os.path.join(self._dir_path, self.db_name)
+
         try :
             os.remove(db_path)
         except:
             pass
-
         self._conn = sqlite3.connect(db_path)
-
         command = "CREATE TABLE ROI_MAP (roi_idx SMALLINT, roi_value SMALLINT, x SMALLINT,y SMALLINT,w SMALLINT,h SMALLINT)"
         c = self._conn.cursor()
         c.execute(command)
-
-
 
     def write(self, t, roi, data_row):
         if roi.idx not in self._initialised:
@@ -48,27 +40,25 @@ class ResultWriter(object):
     def _add(self,t, roi, data_row):
         # We make a new dir to store results
         fields = [t]
-        keys = data_row.data.keys()
-        # print sorted(keys)
-        for k in sorted(keys):
-            val = data_row.data[k].value
+
+
+        for dt in data_row.values():
+            val = dt
             if isinstance(val, bool):
                 val = int(val)
             fields.append(val)
+
         tp = tuple(fields)
-
         command = '''INSERT INTO ROI_%i VALUES %s''' % (roi.idx, tp)
-
         c = self._conn.cursor()
         c.execute(command)
 
 
     def _initialise(self, roi, data_row):
         # We make a new dir to store results
-        fields = ["time INT"]
-        keys = data_row.data.keys()
-        for k in sorted(keys):
-            dt = data_row.data[k]
+        fields = ["t INT"]
+
+        for dt in data_row.values():
             fields.append("%s %s" % (dt.header_name, dt.sql_data_type))
 
         fields = ", ".join(fields)

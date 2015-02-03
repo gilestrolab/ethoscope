@@ -7,6 +7,11 @@ from math import sqrt
 
 from pysolovideo.hardware_control.arduino_api import SleepDepriverInterface
 
+from pysolovideo.tracking.trackers import BoolVariableBase
+class HasInteractedVariable(BoolVariableBase):
+    header_name = "has_interacted"
+
+
 class BaseInteractorSync(object):
     _tracker = None
 
@@ -92,7 +97,7 @@ class BaseInteractor(object):
             raise ValueError("No tracker bound to this interactor. Use `bind_tracker()` methods")
 
         interact, result  = self._run()
-        if interact.value:
+        if interact:
             self._interact_async(result)
         result["interact"] = interact
         return interact, result
@@ -118,12 +123,6 @@ class BaseInteractor(object):
 
         self._subprocess.start()
 
-from pysolovideo.tracking.trackers import VariableBase
-
-
-class HasInteractedVariable(VariableBase):
-    sql_data_type = "BOOLEAN"
-    header_name = "has_interacted"
 
 
 class DefaultInteractor(BaseInteractor):

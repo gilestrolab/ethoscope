@@ -62,14 +62,10 @@ class Monitor(object):
         self._camera = camera
         self._exception = None
 
-        if isinstance(result_writer, ResultWriter):
+        if isinstance(result_writer, ResultWriter) or result_writer is None:
             self._result_writer = result_writer
         else:
             raise Exception("TODO")
-        # else:
-        #     self._result_writer = ResultWriter(result_writer)
-
-
 
         # todo ensure file has opened OK
 
@@ -77,13 +73,13 @@ class Monitor(object):
 
         if self._draw_results:
             import os
-            self._window_name = "psv_" + str(os.getpgid(0))
+            self._window_name = "psv_" + str(os.getpid())
 
         self.draw_every_n = draw_every_n
         self._max_duration = max_duration
         self._video_out = video_out
-        self._data_history = deque()
-        self._max_history_length = 60 *1# in seconds
+
+
         self._frame_buffer = None
         self._force_stop = False
         self._last_positions = {}
@@ -103,12 +99,6 @@ class Monitor(object):
         else:
             raise ValueError("You should have one interactor per ROI")
 
-
-    @property
-    def data_history(self):
-        if self._exception is not None:
-            raise self._exception
-        return self._data_history
 
     @property
     def last_positions(self):
@@ -149,36 +139,33 @@ class Monitor(object):
             except KeyError:
                 continue
 
-
             if pos["has_interacted"]:
                 roi_colour = (0, 255,0)
             else:
                 roi_colour = (255,0 , 255)
 
 
-            if pos["is_inferred"]:
+            if pos["is_inferred"]== True:
                 colour = (255,0,0)
             else:
                 colour = (0,255,255)
 
             cv2.drawContours(frame_cp,[track_u.roi.polygon],-1, roi_colour, 1, cv2.CV_AA)
 
+            cv2.ellipse(frame_cp,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),colour,1,cv2.CV_AA)
 
-
-            cv2.ellipse(frame_cp,((pos["x"].value,pos["y"].value), (pos["w"].value,pos["h"].value), pos["phi"].value),colour,1,cv2.CV_AA)
-            # cv2.ellipse(frame_cp,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),colour,1,cv2.CV_AA)
 
         return frame_cp
 
-
     def run(self):
-
         vw = None
         try:
             self._is_running = True
             for i,(t, frame) in enumerate(self._camera):
+
                 if i % 1000 == 0:
                     print t/1000. / 60./60.
+
                 if self._force_stop:
                     logging.info("Monitor object stopped from external request")
                     break
@@ -203,23 +190,13 @@ class Monitor(object):
 
                     abs_pos = track_u.get_last_position(absolute=True)
 
-
                     if abs_pos is not None:
                         self._last_positions[track_u.roi.idx] = abs_pos
+                    if not self._result_writer is None:
+                        self._result_writer.write(t,track_u.roi, data_row)
 
-                    self._result_writer.write(t,track_u.roi, data_row)
-
-                #     if self._result_writer is not None and self._result_writer.header is None:
-                #         header = sorted(data_row.keys())
-                #         self._result_writer.set_header(header)
-                #         logging.info("Setting header %s" % str(header))
-                #
-                #
-                #     self._result_writer.write_row(t,data_row)
-                #
-                #
-
-                self._result_writer.flush()
+                if not self._result_writer is None:
+                    self._result_writer.flush()
 
                 if (self._draw_results and i % self.draw_every_n == 0) or not vw is None :
                     tmp = self._draw_on_frame(frame)
@@ -242,7 +219,13 @@ class Monitor(object):
             pass
 
         finally:
+            self._is_running = False
+            try:
+                cv2.destroyAllWindows()
+            except:
+                pass
+
             if not vw is None:
                 vw.release()
-            self._is_running = False
+
             logging.info("Monitor closing")

@@ -6,84 +6,91 @@ from pysolovideo.utils.img_proc import merge_blobs
 from pysolovideo.utils.debug import show
 from collections import deque
 
+import collections
+import copy
 
-class VariableBase(object):
-    sql_data_type = None
+class IntVariableBase(int):
+    sql_data_type = "SMALLINT"
     header_name = None
-    def __init__(self, value):
-        self.value = value
-        if self.sql_data_type is None:
-            raise NotImplementedError("Variables must have an SQL data type such as INT")
+    def __new__(cls, value):
 
-        if self.header_name is None:
+        if cls.sql_data_type is None:
+            raise NotImplementedError("Variables must have an SQL data type such as INT")
+        if cls.header_name is None:
             raise NotImplementedError("Variables must have a header name")
 
-    def __repr__(self):
-        return str(self.value)
-    def __str__(self):
-        return str(self.value)
+        return  super(IntVariableBase, cls).__new__(cls, value)
 
 
-class IsInferredVariable(VariableBase):
+class BoolVariableBase(int):
     sql_data_type = "BOOLEAN"
+    header_name = None
+    def __new__(cls, value):
+        if cls.sql_data_type is None:
+            raise NotImplementedError("Variables must have an SQL data type such as INT")
+        if cls.header_name is None:
+            raise NotImplementedError("Variables must have a header name")
+
+        return  super(BoolVariableBase, cls).__new__(cls, value)
+
+
+class IsInferredVariable(BoolVariableBase):
     header_name = "is_inferred"
 
 
-class RelativeVariableBase(VariableBase):
-    def to_absolute(self, roi):
-        self.value = self.get_absolute_value(roi)
-    def get_absolute_value(self, roi):
-        raise NotImplementedError("Relative variable must implement a `get_absolute_value()` method")
-
-
-class WidthVariable(VariableBase):
-    sql_data_type = "SMALLINT"
+class WidthVariable(IntVariableBase):
     header_name = "w"
 
-class HeightVariable(VariableBase):
-    sql_data_type = "SMALLINT"
+class HeightVariable(IntVariableBase):
     header_name = "h"
 
-class PhiVariable(VariableBase):
-    sql_data_type = "SMALLINT"
+class PhiVariable(IntVariableBase):
     header_name = "phi"
 
 
+
+class RelativeVariableBase(IntVariableBase):
+    def to_absolute(self, roi):
+        return self.get_absolute_value(roi)
+    def get_absolute_value(self, roi):
+        raise NotImplementedError("Relative variable must implement a `get_absolute_value()` method")
+
 class XPosVariable(RelativeVariableBase):
-    sql_data_type = "SMALLINT"
     header_name = "x"
     def get_absolute_value(self, roi):
-        out = self.value
-        # out *= roi.longest_axis
+        out = int(self)
         ox, _ = roi.offset
         out += ox
-        return int(out)
+        return XPosVariable(out)
 
 class YPosVariable(RelativeVariableBase):
-    sql_data_type = "SMALLINT"
     header_name = "y"
     def get_absolute_value(self, roi):
-        out = self.value
-        # out *= roi.longest_axis
+        out = int(self)
         _, oy = roi.offset
         out += oy
-        return int(out)
+        return YPosVariable(out)
 #
-class DataPointBase(object):
+
+
+class DataPoint(collections.OrderedDict):
 
     def __init__(self, data):
-        self.data = {}
-        for i in data:
-            self.data[i.header_name] = i
 
-    def __getitem__(self, item):
-        return self.data[item]
+
+        collections.OrderedDict.__init__(self)
+
+        for i in data:
+            self.__setitem__(i.header_name, i)
+
+    def copy(self):
+        return DataPoint(copy.deepcopy(self.values()))
+
 
     def append(self, item):
-        self.data[item.header_name] =item
+        self.__setitem__(item.header_name, item)
 
-# class DataPoint(DataPointBase):
-#     pass
+
 
 
 
@@ -98,7 +105,8 @@ class BaseTracker(object):
         self._data = data
         self._roi = roi
         self._last_non_inferred_time = 0
-        self._max_history_length = 300  # in seconds
+        self._max_history_length = 250 * 1000  # in milliseconds
+        # self._max_history_length = 500   # in milliseconds
         # if self.data_point is None:
         #     raise NotImplementedError("Trackers must have a DataPoint object.")
 
@@ -112,7 +120,6 @@ class BaseTracker(object):
             self._last_non_inferred_time = t
 
             point.append(IsInferredVariable(False))
-            # print 1, point.data
 
         except NoPositionError:
             if len(self._positions) == 0:
@@ -120,8 +127,10 @@ class BaseTracker(object):
             else:
 
                 point = self._infer_position(t)
+
                 if point is None:
                     return None
+
                 point.append(IsInferredVariable(True))
 
         self._positions.append(point)
@@ -135,7 +144,7 @@ class BaseTracker(object):
 
         return point
 
-    def _infer_position(self, t, max_time=60):
+    def _infer_position(self, t, max_time=60 * 1000):
         if len(self._times) == 0:
             return None
         if t - self._last_non_inferred_time  > max_time:
@@ -282,7 +291,7 @@ class BackgroundModel(object):
     """
     A class to model background. It uses a dynamic running average and support arbitrary and heterogeneous frame rates
     """
-    def __init__(self, max_half_life=10., min_half_life=1., increment = 1.2):
+    def __init__(self, max_half_life=10. * 1000, min_half_life=1.* 1000, increment = 1.2):
         # the maximal half life of a pixel from background, in seconds
         self._max_half_life = float(max_half_life)
         # the minimal one
@@ -367,7 +376,7 @@ class AdaptiveBGModel(BaseTracker):
         self._max_area = 10 * self._object_expected_size ** 2
         self._smooth_mode = deque()
         self._smooth_mode_tstamp = deque()
-        self._smooth_mode_window_dt = 30 #seconds
+        self._smooth_mode_window_dt = 30 * 1000 #miliseconds
 
 
         self._bg_model = BackgroundModel()
@@ -561,7 +570,7 @@ class AdaptiveBGModel(BaseTracker):
         self.fg_model.update(img, hull)
 
 
-        out = DataPointBase([x_var, y_var, w_var, h_var, phi_var])
+        out = DataPoint([x_var, y_var, w_var, h_var, phi_var])
         return out
 
         # out = DataPoint([x_var, y_var])
