@@ -10,6 +10,7 @@ from psvnode.utils.acquisition import Acquisition
 
 devices_list ={}
 
+
 STATIC_DIR = "../../static"
 
 @app.get('/favicon.ico')
@@ -98,6 +99,8 @@ def device(id, type_of_req):
 
 @app.post('/device/<id>/controls/<type_of_req>')
 def device(id, type_of_req):
+    global acquisition
+
     try:
         data = request.body.read()
         url = devices_list[id]['ip']
@@ -109,12 +112,17 @@ def device(id, type_of_req):
         if message:
             data = json.loads(message)
             #start acquisition thread
-            if type_of_req == 'start' and data['status']=='started':
-                acquisition = Acquisition()
-                acquisition.start()
-            if type_of_req == 'stop' and data['status']=='stopped' and acquisition is not None:
-                acquisition.stop()
-                acquisition.join()
+            try:
+                if type_of_req == 'start' and data['status'] == 'started':
+                    acquisition = Acquisition(devices_list[id]['ip'],id)
+                    acquisition.start()
+                if type_of_req == 'stop' and data['status'] == 'stopped' and acquisition is not None:
+                    acquisition.stop()
+                    acquisition.join()
+            except Exception as e:
+                data['error'] = e
+                print e
+
             return data
 
     except Exception as e:
@@ -180,8 +188,13 @@ class Discover(threading.Thread):
 
 
 if __name__ == '__main__':
-    run(app, host='0.0.0.0', port=8000, debug=True)
 
-
+    acquisition = None
+    try:
+        # @luis TODO => I am not quite sure about debug here.
+        run(app, host='0.0.0.0', port=8000, debug=debug)
+    finally:
+        acquisition.stop()
+        acquisition.join()
 
 

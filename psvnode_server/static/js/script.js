@@ -90,8 +90,9 @@
                 });
 
         $scope.sm.start = function(){
-            $http.post('/device/'+device_id+'/controls/start', data={"time":Math.floor(Date.now() / 1000)})
+            $http.post('/device/'+device_id+'/controls/start', data={"time":Date.now() / 1000.})
                  .success(function(data){
+                    console.log(data);
                     $scope.device.status = data.status;
                     if (data.status == 'started'){
                         $http.post('/devices_list', data={"device_id":device_id,"status":"started"})
