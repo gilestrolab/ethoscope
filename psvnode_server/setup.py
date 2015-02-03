@@ -22,5 +22,6 @@ setup(
     # },
     install_requires=[
         "bottle>=0.12.8",
+        "pexpect>=3.3",
     ],
 )

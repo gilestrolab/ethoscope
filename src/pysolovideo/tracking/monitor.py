@@ -76,7 +76,7 @@ class Monitor(object):
             self._window_name = "psv_" + str(os.getpid())
 
         self.draw_every_n = draw_every_n
-        self._max_duration = max_duration
+        self._max_duration = max_duration * 1000 # in ms
         self._video_out = video_out
 
 
@@ -159,6 +159,9 @@ class Monitor(object):
 
     def run(self):
         vw = None
+        if self._draw_results:
+            cv2.namedWindow(self._window_name, cv2.CV_WINDOW_AUTOSIZE)
+            # cv2.startWindowThread()
         try:
             self._is_running = True
             for i,(t, frame) in enumerate(self._camera):
@@ -221,7 +224,9 @@ class Monitor(object):
         finally:
             self._is_running = False
             try:
+                cv2.waitKey(1)
                 cv2.destroyAllWindows()
+                cv2.waitKey(1)
             except:
                 pass
 

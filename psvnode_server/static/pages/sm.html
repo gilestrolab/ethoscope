@@ -23,21 +23,26 @@
         <table class="table table-striped">
             <thead>
                 <th>ROI</th>
-                <th>time</th>
+                <!--<th>time</th>-->
                 <th>X</th>
                 <th>Y</th>
                 <th>inferred</th>
                 <th>interact</th>
             </thead>
             <tr ng-repeat="roi in device.last_positions | toArray | orderBy:'roi_value'">
-                <td>{{roi.roi_value+1}}</td>
-                <td>{{roi.t}}</td>
+
+                <!--@luis do not add +1 pls-->
+                <td>{{roi.roi_idx}}</td>
+
+                <!--@luis We should give only one time-->
+
+                <!--<td>{{roi.t}}</td>-->
                 <td>{{roi.x| number:0}}</td>
                 <td>{{roi.y| number:0}}</td>
                 <td ng-if="roi.is_inferred == true" style="background-color:#F2DEDE;">{{roi.is_inferred}}</td>
                 <td ng-if="roi.is_inferred == false" >{{roi.is_inferred}}</td>
 
-                <td>{{roi.interact}}</td>
+                <td>{{roi.has_interacted}}</td>
 
 
             </tr>

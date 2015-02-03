@@ -25,9 +25,7 @@ class ResultWriter(object):
         except:
             pass
 
-
-        print path
-        self._conn = sqlite3.connect(path)
+        self._conn = sqlite3.connect(path, check_same_thread=False)
         command = "CREATE TABLE ROI_MAP (roi_idx SMALLINT, roi_value SMALLINT, x SMALLINT,y SMALLINT,w SMALLINT,h SMALLINT)"
         c = self._conn.cursor()
         c.execute(command)

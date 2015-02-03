@@ -1,7 +1,7 @@
 __author__ = 'luis'
 
 import logging
-import gzip
+
 import datetime
 from optparse import OptionParser
 from bottle import *
