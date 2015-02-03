@@ -24,15 +24,13 @@ __author__ = 'quentin'
 
 import roi_builders as rbs
 from tracking_unit import TrackingUnit
-import csv
+
 import logging
 import cv2
 from collections import deque
 import numpy as np
 from pysolovideo.utils.debug import PSVException
 from pysolovideo.utils.io import ResultWriter
-
-import gzip
 
 # TODO
 # def psv_exception_checker_decorator(*args, **kwargs):
@@ -73,6 +71,10 @@ class Monitor(object):
         # todo ensure file has opened OK
 
         self._draw_results = draw_results
+        if self._draw_results:
+            import os
+            self._window_name = "psv_" + str(os.getpgid(0))
+
         self.draw_every_n = draw_every_n
         self._max_duration = max_duration
         self._video_out = video_out
@@ -207,20 +209,20 @@ class Monitor(object):
                 if (self._draw_results and i % self.draw_every_n == 0) or not vw is None :
                     tmp = self._draw_on_frame(frame)
                     if (self._draw_results and i % self.draw_every_n == 0):
-                        cv2.imshow("psv", tmp)
-                        cv2.waitKey(10)
+                        cv2.imshow(self._window_name, tmp)
+                        cv2.waitKey(1)
 
                     if not vw is None:
                         vw.write(tmp)
 
 
         except PSVException as e:
-            logging.error("A PysoloVideo exception was detected by Monitor object")
+            logging.error("A PysoloVideo exception '%s' was detected by Monitor object"  % str(e))
             self._exception = e
             pass
 
         except Exception as e:
-            logging.error("An undefined exception was detected by Monitor object")
+            logging.error("An undefined exception '%s' was detected by Monitor object" % str(e))
             self._exception = e
             pass
 
@@ -228,3 +230,4 @@ class Monitor(object):
             if not vw is None:
                 vw.release()
             self._is_running = False
+            logging.info("Monitor closing")

@@ -114,7 +114,6 @@ class ControlThread(Thread):
         for d in self._result_writer.file_list:
             if partial or d["end"] is not None:
                 out.append(d["path"])
-        print out
         return out
 
     @property
