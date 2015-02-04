@@ -20,7 +20,7 @@ echo 'Installing and updating packages'
 # pacman-db-update
 # pacman-key --init
 pacman -Syu --noconfirm
-pacman -S base-devel git gcc-fortran --noconfirm --needed
+pacman -S base-devel git gcc-fortran rsync --noconfirm --needed
 ### Video capture related
 pacman -S opencv mplayer ffmpeg gstreamer gstreamer0.10-plugins mencoder --noconfirm --needed
 # a desktop environment may be useful:
