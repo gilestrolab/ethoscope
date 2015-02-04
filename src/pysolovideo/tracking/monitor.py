@@ -63,14 +63,6 @@ class Monitor(object):
         self._result_file = result_file
         self._metadata = metadata
         self._exception = None
-
-        # if isinstance(result_writer, ResultWriter) or result_writer is None:
-        #     self._result_writer = result_writer
-        # else:
-        #     raise Exception("TODO")
-
-        # todo ensure file has opened OK
-
         self._draw_results = draw_results
 
         if self._draw_results:
@@ -109,12 +101,14 @@ class Monitor(object):
         return self._last_positions
 
     @property
-    def last_time_frame(self):
+    def last_time_stamp(self):
         if self._exception is not None:
             raise self._exception
-        frame_copy = np.copy(self._frame_buffer)
+        # frame_copy = np.copy(self._frame_buffer)
+        time_from_start = self._last_time_stamp / 1e3
+        return time_from_start
 
-        return self._last_time_stamp, frame_copy
+
     @property
     def last_drawn_frame(self):
         if self._exception is not None:
@@ -137,7 +131,7 @@ class Monitor(object):
         frame_cp = frame.copy()
         positions = self._last_positions
         for track_u in self._unit_trackers:
-            cv2.putText(frame_cp, str(track_u.roi.idx + 1), track_u.roi.offset, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.75, (255,255,0))
+            cv2.putText(frame_cp, str(track_u.roi.idx), track_u.roi.offset, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.75, (255,255,0))
             try:
                 pos = positions[track_u.roi.idx]
             except KeyError:

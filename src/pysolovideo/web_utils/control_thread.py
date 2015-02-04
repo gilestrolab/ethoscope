@@ -114,8 +114,8 @@ class ControlThread(Thread):
         return self._monit.result_files
 
     @property
-    def last_time_frame(self):
-        return self._monit.last_time_frame
+    def last_time_stamp(self):
+        return self._monit.last_time_stamp
 
     @property
     def log_file_path(self):

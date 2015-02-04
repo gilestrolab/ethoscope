@@ -79,6 +79,8 @@ def data(id, type_of_data):
                     return {"status": "started", "last_drawn_img": control.last_drawn_img, "last_positions": control.last_positions}
                 if type_of_data == 'last_drawn_img':
                     return {"last_drawn_img": control.last_drawn_img}
+                if type_of_data == 'last_time_stamp':
+                    return {"last_time_stamp": control.last_time_stamp}
                 if type_of_data == 'last_positions':
                     return {"last_positions": control.last_positions}
                 if type_of_data == 'log_file_path':
