@@ -1,11 +1,7 @@
-# #import csv
-# __author__ = 'quentin'
-#
-from pysolovideo.utils.debug import PSVException
-import gzip
+__author__ = 'quentin'
+
+# from pysolovideo.utils.debug import PSVException
 import os
-import json
-import csv
 import logging
 import sqlite3
 
@@ -15,17 +11,16 @@ class ResultWriter(object):
     def __init__(self, path,  metadata=None):
         self._path = path
         self.metadata = metadata
-
         if self.metadata is None:
             self.metadata  = {}
         self._initialised = set()
-
         try :
             os.remove(path)
         except:
             pass
-
+        logging.info("Connecting to local database")
         self._conn = sqlite3.connect(path, check_same_thread=False)
+        logging.info("Creating master table 'ROI_MAP'")
         command = "CREATE TABLE ROI_MAP (roi_idx SMALLINT, roi_value SMALLINT, x SMALLINT,y SMALLINT,w SMALLINT,h SMALLINT)"
         c = self._conn.cursor()
         c.execute(command)
@@ -70,11 +65,8 @@ class ResultWriter(object):
         command = "CREATE TABLE ROI_%i (%s)" % (roi.idx, fields)
         c = self._conn.cursor()
         c.execute(command)
-
         fd = roi.get_feature_dict()
-
         command = "INSERT INTO ROI_MAP VALUES %s" % str((fd["idx"], fd["value"], fd["x"], fd["y"], fd["w"], fd["h"]))
-
         c = self._conn.cursor()
         c.execute(command)
 

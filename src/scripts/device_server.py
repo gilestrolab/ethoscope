@@ -113,7 +113,7 @@ if __name__ == '__main__':
 
     if debug:
         import getpass
-        DURATION = 60*10
+        DURATION = 60*60 * 1
         if getpass.getuser() == "quentin":
             INPUT_VIDEO = '/data/pysolo_video_samples/sleepMonitor_5days.avi'
         elif getpass.getuser() == "asterix":
