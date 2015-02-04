@@ -49,8 +49,6 @@ class ControlThread(Thread):
 
         self._machine_id = machine_id
 
-
-
         filename = self._tmp_files["log_file"]
 
         logging.basicConfig(filename=self._tmp_files["log_file"], level=logging.INFO)
@@ -68,7 +66,6 @@ class ControlThread(Thread):
 
 
         logging.info("Starting camera")
-
 
         if video_file is None:
             cam = V4L2Camera(0, target_fps=5, target_resolution=(560, 420))
@@ -91,13 +88,11 @@ class ControlThread(Thread):
                      "img":{"w":cam.width, "h":cam.height}
                      }
 
-
-        self._result_writer  = ResultWriter(result_file, metadata=metadata)
-
         self._monit = Monitor(cam,
                     AdaptiveBGModel,
                     rois,
-                    result_writer=self._result_writer,
+                    result_file=result_file,
+                    metadata=metadata,
                     *args,**kwargs
                     )
 
@@ -106,8 +101,6 @@ class ControlThread(Thread):
     def run(self, **kwarg):
         logging.info("Starting monitor")
         self._monit.run()
-
-
 
     def stop(self):
         logging.info("Stopping monitor")
@@ -118,7 +111,7 @@ class ControlThread(Thread):
         self.stop()
 
     def result_files(self):
-        return [self._result_writer.path]
+        return self._monit.result_files
 
     @property
     def last_time_frame(self):
@@ -152,5 +145,4 @@ class ControlThread(Thread):
 
         out["log_file"] = self._tmp_files['log_file']
         return out
-
 

@@ -37,6 +37,7 @@ class ResultWriter(object):
         if roi.idx not in self._initialised:
             self._initialise(roi, data_row)
         self._add(t, roi, data_row)
+
     def flush(self):
         self._conn.commit()
 

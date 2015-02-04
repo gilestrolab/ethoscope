@@ -38,10 +38,10 @@ from pysolovideo.utils.io import ResultWriter
 
 class Monitor(object):
 
-    def __init__(self, camera, tracker_class, rois = None, interactors=None, result_writer=None,
+    def __init__(self, camera, tracker_class, rois = None, interactors=None, result_file=None,
                 draw_results=False, draw_every_n=1,
                 video_out = None,
-                max_duration=None):
+                max_duration=None, metadata=None):
         r"""
         Class to orchestrate the tracking of several object in separate regions of interest (ROIs) and interacting
 
@@ -60,12 +60,14 @@ class Monitor(object):
         """
 
         self._camera = camera
+        self._result_file = result_file
+        self._metadata = metadata
         self._exception = None
 
-        if isinstance(result_writer, ResultWriter) or result_writer is None:
-            self._result_writer = result_writer
-        else:
-            raise Exception("TODO")
+        # if isinstance(result_writer, ResultWriter) or result_writer is None:
+        #     self._result_writer = result_writer
+        # else:
+        #     raise Exception("TODO")
 
         # todo ensure file has opened OK
 
@@ -119,6 +121,12 @@ class Monitor(object):
             raise self._exception
         return self._draw_on_frame(self._frame_buffer)
 
+    @property
+    def result_files(self):
+        if self._exception is not None:
+            raise self._exception
+        return [self._result_file]
+
     def stop(self):
         if self._exception is not None:
             raise self._exception
@@ -129,11 +137,7 @@ class Monitor(object):
         frame_cp = frame.copy()
         positions = self._last_positions
         for track_u in self._unit_trackers:
-
-            # pos = track_u.get_last_position(absolute=True)
-
             cv2.putText(frame_cp, str(track_u.roi.idx + 1), track_u.roi.offset, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.75, (255,255,0))
-
             try:
                 pos = positions[track_u.roi.idx]
             except KeyError:
@@ -159,15 +163,16 @@ class Monitor(object):
 
     def run(self):
         vw = None
-        if self._draw_results:
-            cv2.namedWindow(self._window_name, cv2.CV_WINDOW_AUTOSIZE)
-            # cv2.startWindowThread()
+        result_writer = None
         try:
+            if self._draw_results:
+                cv2.namedWindow(self._window_name, cv2.CV_WINDOW_AUTOSIZE)
+
+            if not self._result_file is None:
+                result_writer  = ResultWriter(self._result_file, metadata=self._metadata)
+
             self._is_running = True
             for i,(t, frame) in enumerate(self._camera):
-
-                if i % 1000 == 0:
-                    print t/1000. / 60./60.
 
                 if self._force_stop:
                     logging.info("Monitor object stopped from external request")
@@ -195,11 +200,11 @@ class Monitor(object):
 
                     if abs_pos is not None:
                         self._last_positions[track_u.roi.idx] = abs_pos
-                    if not self._result_writer is None:
-                        self._result_writer.write(t,track_u.roi, data_row)
+                    if not result_writer is None:
+                        result_writer.write(t,track_u.roi, data_row)
 
-                if not self._result_writer is None:
-                    self._result_writer.flush()
+                if not result_writer is None:
+                    result_writer.flush()
 
                 if (self._draw_results and i % self.draw_every_n == 0) or not vw is None :
                     tmp = self._draw_on_frame(frame)
@@ -224,6 +229,7 @@ class Monitor(object):
         finally:
             self._is_running = False
             try:
+                #Fixme not working
                 cv2.waitKey(1)
                 cv2.destroyAllWindows()
                 cv2.waitKey(1)
