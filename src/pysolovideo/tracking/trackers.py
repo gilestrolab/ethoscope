@@ -13,30 +13,18 @@ class IntVariableBase(int):
     sql_data_type = "SMALLINT"
     header_name = None
     def __new__(cls, value):
-
         if cls.sql_data_type is None:
             raise NotImplementedError("Variables must have an SQL data type such as INT")
         if cls.header_name is None:
             raise NotImplementedError("Variables must have a header name")
-
         return  super(IntVariableBase, cls).__new__(cls, value)
 
 
-class BoolVariableBase(int):
+class BoolVariableBase(IntVariableBase):
     sql_data_type = "BOOLEAN"
-    header_name = None
-    def __new__(cls, value):
-        if cls.sql_data_type is None:
-            raise NotImplementedError("Variables must have an SQL data type such as INT")
-        if cls.header_name is None:
-            raise NotImplementedError("Variables must have a header name")
-
-        return  super(BoolVariableBase, cls).__new__(cls, value)
-
 
 class IsInferredVariable(BoolVariableBase):
     header_name = "is_inferred"
-
 
 class WidthVariable(IntVariableBase):
     header_name = "w"
@@ -76,20 +64,14 @@ class YPosVariable(RelativeVariableBase):
 class DataPoint(collections.OrderedDict):
 
     def __init__(self, data):
-
-
         collections.OrderedDict.__init__(self)
-
         for i in data:
             self.__setitem__(i.header_name, i)
-
     def copy(self):
         return DataPoint(copy.deepcopy(self.values()))
 
-
     def append(self, item):
         self.__setitem__(item.header_name, item)
-
 
 
 

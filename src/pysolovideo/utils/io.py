@@ -37,17 +37,7 @@ class ResultWriter(object):
         self._conn.commit()
 
     def _add(self,t, roi, data_row):
-        # We make a new dir to store results
-        fields = [t]
-
-
-        for dt in data_row.values():
-            val = dt
-            if isinstance(val, bool):
-                val = int(val)
-            fields.append(val)
-
-        tp = tuple(fields)
+        tp = (t,) + tuple(data_row.values())
         command = '''INSERT INTO ROI_%i VALUES %s''' % (roi.idx, tp)
         c = self._conn.cursor()
         c.execute(command)
@@ -55,14 +45,17 @@ class ResultWriter(object):
 
     def _initialise(self, roi, data_row):
         # We make a new dir to store results
-        fields = ["t INT"]
+        fields = ["t INT PRIMARY KEY"]
 
         for dt in data_row.values():
             fields.append("%s %s" % (dt.header_name, dt.sql_data_type))
 
         fields = ", ".join(fields)
+
         self._initialised |= {roi.idx}
+
         command = "CREATE TABLE ROI_%i (%s)" % (roi.idx, fields)
+
         c = self._conn.cursor()
         c.execute(command)
         fd = roi.get_feature_dict()
@@ -71,4 +64,5 @@ class ResultWriter(object):
         c.execute(command)
 
     def __del__(self):
+        self.flush()
         self._conn.close()
