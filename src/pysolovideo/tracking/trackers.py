@@ -95,9 +95,12 @@ class BaseTracker(object):
     def __call__(self, t, img):
         sub_img, mask = self._roi(img)
         try:
+
             point = self._find_position(sub_img,mask,t)
+
             if point is None:
                 return None
+
             # point = self.normalise_position(point)
             self._last_non_inferred_time = t
 
@@ -154,6 +157,7 @@ class ObjectModel(object):
     """
     A class to model, update and predict foreground object (i.e. tracked animal).
     """
+    _sqrt_2_pi = np.sqrt(2.0 * np.pi)
     def __init__(self, history_length=1000):
         #fixme this should be time, not number of points!
         self._features_header = [
@@ -194,23 +198,21 @@ class ObjectModel(object):
         return self._ring_buff[self._ring_buff_idx]
 
     def distance(self, features):
-
         if not self._is_ready:
-            last_row = self._ring_buff_idx
+            last_row = self._ring_buff_idx + 1
         else:
-            last_row = self._history_length -1
+            last_row = self._history_length
 
-        means = np.mean(self._ring_buff[:last_row], 0)
-
-
+        means = np.mean(self._ring_buff[:last_row ], 0)
 
         np.subtract(self._ring_buff[:last_row], means, self._std_buff[:last_row])
         np.abs(self._std_buff[:last_row], self._std_buff[:last_row])
 
         stds = np.mean(self._std_buff[:last_row], 0)
+        if (stds == 0).any():
+            return 0
 
-
-        a = 1 / (stds* np.sqrt(2.0 * np.pi))
+        a = 1 / (stds* self._sqrt_2_pi)
         b = np.exp(- (features - means) ** 2  / (2 * stds ** 2))
 
         likelihoods =  a * b
@@ -446,6 +448,7 @@ class AdaptiveBGModel(BaseTracker):
 
 
     def _find_position(self, img, mask,t):
+
         grey = self._pre_process_input_minimal(img, mask, t)
         # grey = self._pre_process_input(img, mask, t)
         try:
@@ -457,23 +460,18 @@ class AdaptiveBGModel(BaseTracker):
 
     def _track(self, img,  grey, mask,t):
 
-
         if self._bg_model.bg_img is None:
             self._buff_fg = np.empty_like(grey)
             raise NoPositionError
 
-
         bg = self._bg_model.bg_img.astype(np.uint8)
-
         cv2.subtract(grey, bg, self._buff_fg)
 
         #fixme magic number
         cv2.threshold(self._buff_fg,15,255,cv2.THRESH_BINARY, dst=self._buff_fg)
 
-
         n_fg_pix = np.count_nonzero(self._buff_fg)
         prop_fg_pix  = n_fg_pix / (1.0 * grey.shape[0] * grey.shape[1])
-
         is_ambiguous = False
         if  prop_fg_pix > self._max_area:
             self._bg_model.increase_learning_rate()
@@ -481,14 +479,12 @@ class AdaptiveBGModel(BaseTracker):
 
         contours,hierarchy = cv2.findContours(self._buff_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-
         if len(contours) == 0:
             self._bg_model.increase_learning_rate()
             raise NoPositionError
 
 
         elif len(contours) > 1:
-
             if not self.fg_model.is_ready:
                 raise NoPositionError
 
@@ -513,19 +509,17 @@ class AdaptiveBGModel(BaseTracker):
 
 
         else:
-
             hull = cv2.convexHull(contours[0])
             if hull.shape[0] < 3:
                 self._bg_model.increase_learning_rate()
-                raise NoPositionError
 
+                raise NoPositionError
             features = self.fg_model.compute_features(img, hull)
             distance = self.fg_model.distance(features)
 
         if distance > self._max_m_log_lik:
             self._bg_model.increase_learning_rate()
             raise NoPositionError
-
 
         (x,y) ,(w,h), angle  = cv2.minAreaRect(hull)
 
@@ -536,6 +530,7 @@ class AdaptiveBGModel(BaseTracker):
         phi_var = PhiVariable(int(angle))
 
         self._buff_fg.fill(0)
+
         cv2.drawContours(self._buff_fg ,[hull],0, 1,-1)
 
         if mask is not None:
@@ -547,11 +542,7 @@ class AdaptiveBGModel(BaseTracker):
         else:
             self._bg_model.decrease_learning_rate()
             self._bg_model.update(grey, t, self._buff_fg)
-
-
         self.fg_model.update(img, hull)
-
-
         out = DataPoint([x_var, y_var, w_var, h_var, phi_var])
         return out
 
