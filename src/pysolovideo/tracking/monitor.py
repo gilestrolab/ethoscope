@@ -16,8 +16,6 @@ gds gvdr
 #
 # >>> test
 # >>> voila
-
-
 """
 
 __author__ = 'quentin'
@@ -62,7 +60,6 @@ class Monitor(object):
         self._camera = camera
         self._result_file = result_file
         self._metadata = metadata
-        self._exception = None
         self._draw_results = draw_results
 
         if self._draw_results:
@@ -93,41 +90,29 @@ class Monitor(object):
         else:
             raise ValueError("You should have one interactor per ROI")
 
-
     @property
     def last_positions(self):
-        if self._exception is not None:
-            raise self._exception
         return self._last_positions
 
     @property
     def last_time_stamp(self):
-        if self._exception is not None:
-            raise self._exception
-        # frame_copy = np.copy(self._frame_buffer)
         time_from_start = self._last_time_stamp / 1e3
         return time_from_start
 
-
     @property
     def last_drawn_frame(self):
-        if self._exception is not None:
-            raise self._exception
         return self._draw_on_frame(self._frame_buffer)
 
     @property
-    def result_files(self):
-        if self._exception is not None:
-            raise self._exception
-        return [self._result_file]
+    def result_file(self):
+        return self._result_file
 
     def stop(self):
-        if self._exception is not None:
-            raise self._exception
         self._force_stop = True
 
     def _draw_on_frame(self, frame):
-
+        if frame is None:
+            return
         frame_cp = frame.copy()
         positions = self._last_positions
         for track_u in self._unit_trackers:
@@ -149,9 +134,7 @@ class Monitor(object):
                 colour = (0,255,255)
 
             cv2.drawContours(frame_cp,[track_u.roi.polygon],-1, roi_colour, 1, cv2.CV_AA)
-
             cv2.ellipse(frame_cp,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),colour,1,cv2.CV_AA)
-
 
         return frame_cp
 
@@ -167,7 +150,8 @@ class Monitor(object):
 
             self._is_running = True
             for i,(t, frame) in enumerate(self._camera):
-
+                # if t > 10 * 1000:
+                #     raise PSVException("TESTTTTTTTT")
                 if self._force_stop:
                     logging.info("Monitor object stopped from external request")
                     break
@@ -209,16 +193,8 @@ class Monitor(object):
                     if not vw is None:
                         vw.write(tmp)
 
-
-        except PSVException as e:
-            logging.error("A PysoloVideo exception '%s' was detected by Monitor object"  % str(e))
-            self._exception = e
-            pass
-
         except Exception as e:
-            logging.error("An undefined exception '%s' was detected by Monitor object" % str(e))
-            self._exception = e
-            pass
+            raise e
 
         finally:
             self._is_running = False
@@ -232,5 +208,5 @@ class Monitor(object):
 
             if not vw is None:
                 vw.release()
-
             logging.info("Monitor closing")
+

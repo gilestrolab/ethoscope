@@ -36,32 +36,26 @@ def controls(id, action):
                     data = request.json
                     t = float(data['time'])
                     #set time, given in seconds from javascript, used in seconds for date
+                    # FIXME This is needed on PI
                     #set_time = call(['date', '-s', '@' + str(t)])
                     date = datetime.fromtimestamp(t)
-                    date_time = date.isoformat()
-
-                    control = ControlThread(machine_id=machine_id, date_time=date_time, video_file=INPUT_VIDEO, psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
-
+                    # date_time = date.isoformat()
                     control.start()
-                    logging.info("Starting monitor")
+
                     return {'status': 'started'}
-                elif action == 'stop':
+                elif action == 'stop' or action == 'poweroff':
                     control.stop()
                     control.join()
-                    control = None
                     logging.info("Stopping monitor")
-                    return {'status': 'stopped'}
-
-                elif action == 'poweroff':
-                    if control is not None:
-                        control.stop()
-                        control.join()
+                    if action == 'poweroff':
                         logging.info("Stopping monitor due to poweroff request")
                         logging.info("Powering off Device.")
-                    call('poweroff')
+                        # fixme, this is non blocking, is it ? maybe we should do something else
+                        call('poweroff')
+                    return {'status': 'stopped'}
+
 
             except Exception as e:
-                print e
                 try:
                     return control.format_psv_error(e)
                 except:
@@ -85,15 +79,14 @@ def data(id, type_of_data):
                     return {"last_positions": control.last_positions}
                 if type_of_data == 'log_file_path':
                     return {"log_file_path": control.log_file_path}
-                if type_of_data == 'data_history':
-                    return {"data_history": control.data_history}
                 if type_of_data == 'result_files':
                     return {"result_files": control.result_files()}
             else:
                 return {"status": "stopped"}
 
         except Exception as e:
-            return control.format_psv_error(e)
+            out = control.format_psv_error(e)
+            return out
     else:
         return "Error on machine ID"
 
@@ -110,16 +103,16 @@ if __name__ == '__main__':
 
     machine_id = get_machine_id()
 
-
-
-
     if debug:
         import getpass
-        DURATION = 60*60 * 1
+        DURATION = 60*60 * 100
         if getpass.getuser() == "quentin":
             INPUT_VIDEO = '/data/pysolo_video_samples/sleepMonitor_5days.avi'
         elif getpass.getuser() == "asterix":
             INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
+        else:
+            raise Exception("where is youre debuging video?")
+
         DRAW_RESULTS = True
 
     else:
@@ -131,7 +124,9 @@ if __name__ == '__main__':
 
     PSV_DIR = "/tmp/" + "psv_" + str(port)
 
-    control = None
+
+    control = ControlThread(machine_id=machine_id, video_file=INPUT_VIDEO,
+                            psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
 
     try:
         run(api, host='0.0.0.0', port=port, debug=debug)
