@@ -2,24 +2,29 @@
     <div class="jumbotron text-center" ng-cloak>
         <h1>Sleep Monitor {{device.name}}</h1>
         <p>Here you can perform actions and know the status of the device</p>
-        <div>
-        <img ng-if="device.status == 'started'"  ng-src="{{device.ip}}:9000/static{{device.last_drawn_img}}" alt=""></img>
+        <div class= "last_drawn_img">
+        <img ng-if="device.status == 'running'"  ng-src="{{device.img}}" alt=""></img>
         </div>
-
+        <div ng-if="device.status == 'running'">
+            <p><span class="fa fa-clock-o"></span> Total Duration: {{sm.elapsedtime(device.monitor_info.last_time_stamp)}}</p>
+        </div>
         <button class="btn btn-success btn-xl" ng-if="device.status == 'stopped'" ng-click="sm.start()">Start</button>
-        <button class="btn btn-danger" ng-if="device.status == 'started'"  ng-click="sm.stop()">Stop</button>
-        <a href="{{device.ip}}:9000/static/tmp/out.csv.gz" class="btn btn-info" ng-click="sm.download()">Download Data</a>
+        <button class="btn btn-danger" ng-if="device.status == 'running'"  ng-click="sm.stop()">Stop</button>
+        <a href="{{device.ip}}:9000/static{{device.result_file}}" class="btn btn-info" ng-click="sm.download()">Download Data</a>
         <button class="btn btn-info" ng-click="sm.log()">Log</button>
         <button class="btn btn-danger" data-toggle="modal" data-target="#powerOffAlert">Power off Device</button>
 
     </div>
+    <div id = "error" class="alert alert-danger" ng-if="device.error != null">
+        <p>Sorry there has been an error: {{device.error}}</p>
 
+    </div>
     <div ng-if="showLog == true">
         <pre>
         <p class="log" ng-repeat="(key,entry) in device.log">{{key}}: {{entry}}</p></pre>
     </div>
 
-    <div ng-if="device.status == 'started'">
+    <div ng-if="device.status == 'running'">
         <table class="table table-striped">
             <thead>
                 <th>ROI</th>
@@ -29,7 +34,7 @@
                 <th>inferred</th>
                 <th>interact</th>
             </thead>
-            <tr ng-repeat="roi in device.last_positions | toArray | orderBy:'roi_value'">
+            <tr ng-repeat="roi in device.monitor_info.last_positions | toArray | orderBy:'roi_value'">
 
                 <!--@luis do not add +1 pls-->
                 <td>{{roi.roi_idx}}</td>
@@ -83,6 +88,4 @@
     </div>
   </div>
 </div>
-
-
 
