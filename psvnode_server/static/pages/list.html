@@ -12,7 +12,7 @@
             <h3 ng-if="device_type == 'Sleep Deprivator'">Sleep Deprivator</h3>
             <!--<div><span class="fa fa-paw"></span> ID: {{device.machine_id}}</div>-->
             <div><span class="fa fa-genderless"></span> Name: {{device.name}}</div>
-            <div><span ng-if="device.status == 'started'" class="fa fa-circle color-green"></span>
+            <div><span ng-if="device.status == 'running'" class="fa fa-circle color-green"></span>
             <span ng-if="device.status == 'stopped'" class="fa fa-circle color-red"></span> Status: {{device.status}}
 
             </div>

@@ -102,7 +102,7 @@ class ControlThread(Thread):
             pos[k]["roi_idx"] = k
 
         if not t is None and not r is None and not p is None:
-            self._info["monitor_infos"] = {
+            self._info["monitor_info"] = {
                             "last_positions":pos,
                             "last_time_stamp":t,
                             "result_file":r
