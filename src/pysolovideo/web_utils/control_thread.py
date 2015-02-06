@@ -18,8 +18,11 @@ from pysolovideo.utils.io import ResultWriter
 import shutil
 import logging
 import time
+
+
 # http://localhost:9001/controls/3a92bcf229a34c4db2be733f6802094d/start
 # {"time": "372894738."}
+
 
 class ControlThread(Thread):
 
@@ -101,7 +104,8 @@ class ControlThread(Thread):
             self.stop()
 
         except PSVException as e:
-            cv2.imwrite(self._info["dbg_img"], e.img)
+            if e.img is not  None:
+                cv2.imwrite(self._info["dbg_img"], e.img)
             self.stop(str(e))
         except Exception as e:
             self.stop(str(e))
@@ -219,8 +223,3 @@ class ControlThread(Thread):
 #     finally:
 #         control.stop()
 #         control.join()
-#     #
-#     # # print control.info
-#     # finally:
-#     #     control.stop()
-#     #
