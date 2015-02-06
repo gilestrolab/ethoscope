@@ -27,6 +27,8 @@ Assuming you have a data file named `result.db` in your path:
 $ R
 R> library(risonno)
 # load ROIs 1,3 and 5 from the result file
-R> loadROIsFromFile("result.db", rois=c(1,3,5))
+R> rois <- loadROIsFromFile("result.db", rois=c(1,3,5))
+R> head(rois[[1]])
+R> hist(rois[[1]]$x, nclass=50)
 ```
 
