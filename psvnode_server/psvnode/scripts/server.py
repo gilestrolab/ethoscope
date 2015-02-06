@@ -69,11 +69,11 @@ def post_devices_list():
 
 
 #Get the information of one Sleep Monitor
-@app.get('/device/<id>/data/<type_of_req>')
-def device(id, type_of_req):
+@app.get('/device/<id>/data')
+def device(id):
     try:
         url = devices_list[id]['ip']
-        req = urllib2.Request(url=devices_list[id]['ip']+':9000/data/'+id+'/'+type_of_req)
+        req = urllib2.Request(url=devices_list[id]['ip']+':9000/data/'+id)
         f = urllib2.urlopen(req)
         message = f.read()
         if message:
@@ -181,10 +181,10 @@ class Discover(threading.Thread):
             if message:
                 data = json.loads(message)
                 data['ip'] = self.url
-                devices_list[data['id']]=data
+                devices_list[data['machine_id']]=data
+        except Exception as e:
+            print e
 
-        except:
-            pass
 
 
 if __name__ == '__main__':

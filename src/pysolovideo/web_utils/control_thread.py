@@ -37,7 +37,7 @@ class ControlThread(Thread):
                             "result_file": None
                             }
 
-    def __init__(self, machine_id, psv_dir, video_file=None, *args, **kwargs):
+    def __init__(self, machine_id, name, psv_dir, video_file=None, *args, **kwargs):
         self._monit_args = args
         self._monit_kwargs = kwargs
 
@@ -50,6 +50,13 @@ class ControlThread(Thread):
         self._result_file = os.path.join(result_dir, self._result_db_name)
         self._video_file = video_file
 
+        if name.find('SM')==0:
+            type_of_device = 'sm'
+        elif name.find('SD')==0:
+            type_of_device = 'sd'
+        else:
+            type_of_device = 'Unknown'
+
         self._info = {  "status": "stopped",
                         "time": time.time(),
                         "error": None,
@@ -57,6 +64,8 @@ class ControlThread(Thread):
                         "dbg_img": os.path.join(psv_dir, self._dbg_img_file),
                         "last_drawn_img": os.path.join(psv_dir, self._last_img_file),
                         "machine_id": machine_id,
+                        "name": name,
+                        "type": type_of_device,
                         "monitor_info": self._default_monitor_info,
                         }
 

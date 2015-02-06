@@ -19,11 +19,11 @@ def server_static(filepath):
 #fixme all this info should be in control.info
 @api.get('/id')
 def name():
-    status = "stopped"
-    if control is not None:
-        status = "started"
-
-    return {"id": machine_id, "type": "sm", "name": "SM15-001", "status": status}
+    global control
+    try:
+        return control.info
+    except Exception as e:
+        return {'error':e}
 
 @api.post('/controls/<id>/<action>')
 def controls(id, action):
@@ -60,18 +60,18 @@ def controls(id, action):
 
 
             except Exception as e:
-                return {"Error setting up control thread": str(e)}
+                return {'error': "Error setting up control thread"+str(e)}
 
     else:
-        return {"Error on machine ID"}
+        return {'error': "Error on machine ID"}
 
 
-@api.get('/data/<id>/<type_of_data>')
-def data(id, type_of_data):
+@api.get('/data/<id>')
+def data(id):
     if id == machine_id:
         return control.info
     else:
-        return {"Error on machine ID"}
+        return {'error': "Error on machine ID"}
 
 
 if __name__ == '__main__':
@@ -107,7 +107,8 @@ if __name__ == '__main__':
 
     PSV_DIR = "/tmp/" + "psv_" + str(port)
 
-    control = ControlThread(machine_id=machine_id, video_file=INPUT_VIDEO,
+    # fixme => the name should be hardcoded in a encrypted file? file.
+    control = ControlThread(machine_id=machine_id, name='SM15-001', video_file=INPUT_VIDEO,
                             psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
 
     try:

@@ -50,6 +50,7 @@
         $scope.get_devices = function(){
             $http.get('/devices').success(function(data){
                 $scope.devices = data;
+                console.log(data);
             })
         }
     });
@@ -78,7 +79,7 @@
 
         $scope.sm = {}
         var refresh_data = false;
-        $http.get('/device/'+device_id+'/data/all').success(function(data){
+        $http.get('/device/'+device_id+'/data').success(function(data){
 
             $scope.device = data;
 
@@ -121,16 +122,18 @@
         $scope.sm.log = function(){
             var log_file_path = ''
             if ($scope.showLog == false){
-            $http.get('/device/'+device_id+'/data/log_file_path')
-                .success(function(data){
-                    log_file_path = data.log_file;
-                    console.log(log_file_path);
+            //$http.get('/device/'+device_id+'/data/log_file_path')
+            //    .success(function(data){
+                    //log_file_path = data.log_file;
+                    log_file_path = $scope.device.log_file;
+
+                    console.log($scope.device.log_file);
                     $http.post('/device/'+device_id+'/log', data={"file_path":log_file_path})
                         .success(function(data, status, headers, config){
                             $scope.device.log = data;
                             $scope.showLog = true;
                         });
-            });
+            //});
             }else{
                 $scope.showLog = false;
             }
@@ -145,15 +148,11 @@
 
 
        var refresh = function(){
-            $http.get('/device/'+device_id+'/data/last_drawn_img')
+            $http.get('/device/'+device_id+'/data')
                  .success(function(data){
                     console.log(data);
-                    $scope.device.last_drawn_img = data.last_drawn_img+'?' + new Date().getTime();
-                });
-            $http.get('/device/'+device_id+'/data/last_positions')
-                 .success(function(data){
-                    console.log(data);
-                    $scope.device.last_positions = data.last_positions;
+                    $scope.device.last_drawn_img = data.monitor_info.last_drawn_img +'?' + new Date().getTime();
+                    $scope.device.last_positions = data.monitor_info.last_positions;
                 });
         }
 
