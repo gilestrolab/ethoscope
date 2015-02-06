@@ -69,6 +69,18 @@ class ControlThread(Thread):
                         "monitor_info": self._default_monitor_info,
                         }
 
+        logging.basicConfig(filename=self._info["log_file"], level=logging.INFO)
+
+        logger = logging.getLogger()
+        logger.handlers[0].stream.close()
+        logger.removeHandler(logger.handlers[0])
+
+        file_handler = logging.FileHandler(self._info["log_file"])
+        file_handler.setLevel(logging.INFO)
+        formatter = logging.Formatter("%(asctime)s %(filename)s, %(lineno)d, %(funcName)s: %(message)s")
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
         self._monit = None
         super(ControlThread, self).__init__()
 
@@ -120,18 +132,6 @@ class ControlThread(Thread):
             self.stop(str(e))
 
     def thread_init(self):
-        logging.basicConfig(filename=self._info["log_file"], level=logging.INFO)
-
-        logger = logging.getLogger()
-        logger.handlers[0].stream.close()
-        logger.removeHandler(logger.handlers[0])
-
-        file_handler = logging.FileHandler(self._info["log_file"])
-        file_handler.setLevel(logging.INFO)
-        formatter = logging.Formatter("%(asctime)s %(filename)s, %(lineno)d, %(funcName)s: %(message)s")
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
-
         logging.info("Starting camera")
 
         if self._video_file is None:
@@ -183,7 +183,7 @@ class ControlThread(Thread):
     def __del__(self):
         self.stop()
 
-#
+# #
 # if __name__ == '__main__':
 #
 #
