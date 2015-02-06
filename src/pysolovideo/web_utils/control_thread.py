@@ -55,8 +55,8 @@ class ControlThread(Thread):
                         "last_drawn_img": os.path.join(psv_dir, self._last_img_file),
                         "machine_id": machine_id,
                         "monitor_info": self._default_monitor_info,
-
                         }
+
         self._monit = None
         super(ControlThread, self).__init__()
 
@@ -169,73 +169,58 @@ class ControlThread(Thread):
 
     def __del__(self):
         self.stop()
-    #
-    #
-    # @property
-    # def last_drawn_img(self):
-    #     return self._tmp_files["last_img"]
-    #
-    # def _last_positions(self):
-    #     out = {}
-    #     for k,v in self._monit.last_positions.items():
-    #         out[k] = v
-    #         out[k]["roi_idx"] = k
-    #     return out
 
-    # def format_psv_error(self, e):
-    #
-    #     if isinstance(e, PSVException):
-    #         cv2.imwrite(self._tmp_files["dbg_img"], e.img)
-    #         out = {"PSV_ERROR":[str(e), self._tmp_files["dbg_img"]]}
-    #     else:
-    #         out = {type(e).__name__:str(e)}
-    #
-    #     out["log_file"] = self._tmp_files['log_file']
-    #     return out
-
-
-if __name__ == '__main__':
-
-
-    debug = True
-    port = 9000
-
-    machine_id = "njfhrkesngvuiodxjng"
-
-    if debug:
-        import getpass
-        DURATION = 60*60 * 100
-        if getpass.getuser() == "quentin":
-            INPUT_VIDEO = '/data/pysolo_video_samples/sleepMonitor_5days.avi'
-        elif getpass.getuser() == "asterix":
-            INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
-        else:
-            raise Exception("where is your debugging video?")
-
-        DRAW_RESULTS = True
-
-    else:
-        INPUT_VIDEO = None
-        DURATION = None
-        DRAW_RESULTS =False
-        # fixme => we should have mounted /dev/sda/ onto a custom location instead @luis @ quentin
-
-
-    PSV_DIR = "/tmp/" + "psv_" + str(port)
-
-    control = ControlThread(machine_id=machine_id, video_file=INPUT_VIDEO,
-                            psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
-    control.start()
-
-    try:
-        while True:
-            time.sleep(1)
-            print control.info
-    finally:
-        control.stop()
-        control.join()
-
-    print control.info
-    # finally:
-    #     control.stop()
-    #
+#
+# if __name__ == '__main__':
+#
+#
+#     debug = True
+#     port = 9000
+#
+#     machine_id = "njfhrkesngvuiodxjng"
+#
+#     if debug:
+#         import getpass
+#         DURATION = 60*60 * 100
+#         if getpass.getuser() == "quentin":
+#             INPUT_VIDEO = '/data/pysolo_video_samples/sleepMonitor_5days.avi'
+#         elif getpass.getuser() == "asterix":
+#             INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
+#         else:
+#             raise Exception("where is your debugging video?")
+#
+#         DRAW_RESULTS = True
+#
+#     else:
+#         INPUT_VIDEO = None
+#         DURATION = None
+#         DRAW_RESULTS =False
+#         # fixme => we should have mounted /dev/sda/ onto a custom location instead @luis @ quentin
+#
+#
+#     PSV_DIR = "/tmp/" + "psv_" + str(port)
+#
+#     control = ControlThread(machine_id=machine_id, video_file=INPUT_VIDEO,
+#                             psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
+#     control.start()
+#     try:
+#         i = 0
+#         while True:
+#             i +=1
+#             time.sleep(1)
+#             print i, control.info["error"], control.info["status"]
+#             if i == 5:
+#                 control.stop()
+#             if i == 6:
+#                 control = ControlThread(machine_id=machine_id, video_file=INPUT_VIDEO,
+#                             psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
+#                 control.start()
+#
+#     finally:
+#         control.stop()
+#         control.join()
+#     #
+#     # # print control.info
+#     # finally:
+#     #     control.stop()
+#     #

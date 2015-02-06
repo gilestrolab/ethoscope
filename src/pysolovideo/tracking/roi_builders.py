@@ -604,9 +604,6 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
             raise PSVException("Too much variation in the diameter of the targets. Something must be wrong since all target should have the same size", img)
 
 
-        #TEST
-        # raise PSVException("Too much variation in the diameter of the targets. Something must be wrong since all target should have the same size", img)
-
 
         src_points = []
         for c in contours:

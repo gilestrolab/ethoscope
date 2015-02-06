@@ -16,6 +16,7 @@ def server_static(filepath):
     return static_file(filepath, root="/")
 
 
+#fixme all this info should be in control.info
 @api.get('/id')
 def name():
     status = "stopped"
@@ -27,7 +28,6 @@ def name():
 @api.post('/controls/<id>/<action>')
 def controls(id, action):
     global control
-
     if id == machine_id:
             try:
                 if action == 'start':
@@ -40,13 +40,17 @@ def controls(id, action):
                     #set_time = call(['date', '-s', '@' + str(t)])
                     date = datetime.fromtimestamp(t)
                     # date_time = date.isoformat()
-                    control.start()
 
+                    control = ControlThread(machine_id=machine_id, video_file=INPUT_VIDEO,
+                            psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
+                    control.start()
                     return {'status': 'started'}
+
                 elif action == 'stop' or action == 'poweroff':
                     control.stop()
                     control.join()
                     logging.info("Stopping monitor")
+
                     if action == 'poweroff':
                         logging.info("Stopping monitor due to poweroff request")
                         logging.info("Powering off Device.")
@@ -56,39 +60,18 @@ def controls(id, action):
 
 
             except Exception as e:
-                try:
-                    return control.format_psv_error(e)
-                except:
-                    return {type(e).__name__:str(e)}
+                return {"Error setting up control thread": str(e)}
+
     else:
-        return "Error on machine ID"
+        return {"Error on machine ID"}
 
 
 @api.get('/data/<id>/<type_of_data>')
 def data(id, type_of_data):
     if id == machine_id:
-        try:
-            if control is not None:
-                if type_of_data == 'all':
-                    return {"status": "started", "last_drawn_img": control.last_drawn_img, "last_positions": control.last_positions}
-                if type_of_data == 'last_drawn_img':
-                    return {"last_drawn_img": control.last_drawn_img}
-                if type_of_data == 'last_time_stamp':
-                    return {"last_time_stamp": control.last_time_stamp}
-                if type_of_data == 'last_positions':
-                    return {"last_positions": control.last_positions}
-                if type_of_data == 'log_file_path':
-                    return {"log_file_path": control.log_file_path}
-                if type_of_data == 'result_files':
-                    return {"result_files": control.result_files()}
-            else:
-                return {"status": "stopped"}
-
-        except Exception as e:
-            out = control.format_psv_error(e)
-            return out
+        return control.info
     else:
-        return "Error on machine ID"
+        return {"Error on machine ID"}
 
 
 if __name__ == '__main__':
@@ -123,7 +106,6 @@ if __name__ == '__main__':
 
 
     PSV_DIR = "/tmp/" + "psv_" + str(port)
-
 
     control = ControlThread(machine_id=machine_id, video_file=INPUT_VIDEO,
                             psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
