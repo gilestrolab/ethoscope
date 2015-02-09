@@ -48,8 +48,14 @@
         })
         //Scan for SM or SD connected.
         $scope.get_devices = function(){
+            var spinner= new Spinner(opts).spin();
+            var loadingContainer = document.getElementById('loading_devices');
+            loadingContainer.appendChild(spinner.el);
+            $scope.loading_devices = true;
             $http.get('/devices').success(function(data){
                 $scope.devices = data;
+                spinner.stop();
+                $scope.loading_devices = false;
 
             })
         }
@@ -68,8 +74,15 @@
         })
 
         $scope.get_devices = function(){
+            var spinner= new Spinner(opts).spin();
+            var loadingContainer = document.getElementById('loading_devices');
+            loadingContainer.appendChild(spinner.el);
+            $scope.loading_devices = true;
             $http.get('/devices').success(function(data){
                 $scope.devices = data;
+                spinner.stop();
+                $scope.loading_devices = false;
+
             })
         }
     });
@@ -170,7 +183,6 @@
             $http.get('/device/'+device_id+'/data')
                  .success(function(data){
                     $scope.device= data;
-
                     $scope.device.img = device_ip+':9000/static'+$scope.device.last_drawn_img + '?' + new Date().getTime();
                 });
         }
