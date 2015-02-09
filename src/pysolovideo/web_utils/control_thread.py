@@ -150,12 +150,12 @@ class ControlThread(Thread):
 
         roi_features = [r.get_feature_dict () for r in rois]
 
-        metadata = {}
-                    # "machine_id": self._status["machine_id"]
-                    #  "date_time": date_time,
-                    #  "rois": roi_features,
-                    #  "img":{"w":cam.width, "h":cam.height}
-                    #  }
+        metadata = {
+                     "machine_id": self._info["machine_id"],
+                     "date_time": self._info["time"],
+                     "frame_width":cam.width,
+                     "frame_height":cam.height,
+                      }
 
         self._monit = Monitor(cam,
                     AdaptiveBGModel,

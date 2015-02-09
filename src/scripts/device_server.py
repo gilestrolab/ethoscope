@@ -94,7 +94,7 @@ if __name__ == '__main__':
         elif getpass.getuser() == "asterix":
             INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
         else:
-            raise Exception("where is youre debuging video?")
+            raise Exception("where is your debuging video?")
 
         DRAW_RESULTS = True
 

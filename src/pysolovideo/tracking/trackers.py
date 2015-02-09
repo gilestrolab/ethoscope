@@ -12,7 +12,10 @@ import copy
 class IntVariableBase(int):
     sql_data_type = "SMALLINT"
     header_name = None
+    functional_type = None # {distance, angle, bool, confidence,...}
     def __new__(cls, value):
+        if cls.functional_type is None:
+            raise NotImplementedError("Variables must have a functional data type such as 'distance', 'angle', 'bool', 'confidence'")
         if cls.sql_data_type is None:
             raise NotImplementedError("Variables must have an SQL data type such as INT")
         if cls.header_name is None:
@@ -21,23 +24,30 @@ class IntVariableBase(int):
 
 
 class BoolVariableBase(IntVariableBase):
+    functional_type = "bool"
     sql_data_type = "BOOLEAN"
 
 class IsInferredVariable(BoolVariableBase):
     header_name = "is_inferred"
 
-class WidthVariable(IntVariableBase):
-    header_name = "w"
-
-class HeightVariable(IntVariableBase):
-    header_name = "h"
-
 class PhiVariable(IntVariableBase):
     header_name = "phi"
+    functional_type = "angle"
 
+class DistanceIntVarBase(IntVariableBase):
+    functional_type = "distance"
 
+class WidthVariable(DistanceIntVarBase):
+    header_name = "w"
 
-class RelativeVariableBase(IntVariableBase):
+class HeightVariable(DistanceIntVarBase):
+    header_name = "h"
+
+class RelativeVariableBase(DistanceIntVarBase):
+    """
+    Variables that are expressed relatively to an origin can be converted to absolute using information form the ROI
+
+    """
     def to_absolute(self, roi):
         return self.get_absolute_value(roi)
     def get_absolute_value(self, roi):
@@ -58,7 +68,6 @@ class YPosVariable(RelativeVariableBase):
         _, oy = roi.offset
         out += oy
         return YPosVariable(out)
-#
 
 
 class DataPoint(collections.OrderedDict):

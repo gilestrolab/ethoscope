@@ -14,21 +14,36 @@ class ResultWriter(object):
         if self.metadata is None:
             self.metadata  = {}
         self._initialised = set()
+        self._var_map_initialised = False
         try :
             os.remove(path)
         except:
             pass
         logging.info("Connecting to local database")
         self._conn = sqlite3.connect(path, check_same_thread=False)
+        c = self._conn.cursor()
         logging.info("Creating master table 'ROI_MAP'")
         command = "CREATE TABLE ROI_MAP (roi_idx SMALLINT, roi_value SMALLINT, x SMALLINT,y SMALLINT,w SMALLINT,h SMALLINT)"
-        c = self._conn.cursor()
         c.execute(command)
+
+        logging.info("Creating variable map table 'VAR_MAP'")
+        command = "CREATE TABLE VAR_MAP (var_name CHAR(100), sql_type CHAR(100), functional_type CHAR(100))"
+        c.execute(command)
+
+        logging.info("Creating 'METADATA' table")
+        command = "CREATE TABLE METADATA (field CHAR(100), value CHAR(200))"
+        c.execute(command)
+        for k,v in metadata.items():
+            command = "INSERT INTO METADATA VALUES %s" % str((k, v))
+            c.execute(command)
+        logging.info("Result writer initialised")
     @property
     def path(self):
         return self._path
 
     def write(self, t, roi, data_row):
+        if not self._var_map_initialised:
+            self._initialise_var_map(data_row)
         if roi.idx not in self._initialised:
             self._initialise(roi, data_row)
         self._add(t, roi, data_row)
@@ -41,6 +56,15 @@ class ResultWriter(object):
         command = '''INSERT INTO ROI_%i VALUES %s''' % (roi.idx, tp)
         c = self._conn.cursor()
         c.execute(command)
+
+
+    def _initialise_var_map(self,  data_row):
+        logging.info("Filling 'VAR_MAP' with values")
+        c = self._conn.cursor()
+        for dt in data_row.values():
+            command = "INSERT INTO VAR_MAP VALUES %s"% str((dt.header_name, dt.sql_data_type, dt.functional_type))
+            c.execute(command)
+        self._var_map_initialised = True
 
 
     def _initialise(self, roi, data_row):

@@ -194,6 +194,7 @@ class Monitor(object):
                         vw.write(tmp)
 
         except Exception as e:
+            logging.info("Monitor closing with an exception: '%s'" % str(e))
             raise e
 
         finally:
