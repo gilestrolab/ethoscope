@@ -8,8 +8,9 @@ from pysolovideo.utils.debug import PSVException
 
 # TODO use PSVException on sdep
 
-class ROI(object):
 
+class ROI(object):
+    __global_idx = 1
     def __init__(self, polygon, value=None, orientation = None, regions=None):
 
         # TODO if we do not need polygon, we can drop it
@@ -26,8 +27,12 @@ class ROI(object):
         self._rectangle = x,y,w,h
         # todo NOW! sort rois by value. if no values, left to right/ top to bottom!
 
-        self.idx = None
+        self._idx = self.__global_idx
+        ROI.__global_idx +=1
 
+    @property
+    def idx(self):
+        return self._idx
     def bounding_rect(self):
         raise NotImplementedError
 
@@ -42,7 +47,6 @@ class ROI(object):
 
     @property
     def polygon(self):
-
         return self._polygon
 
 
@@ -112,8 +116,6 @@ class BaseROIBuilder(object):
         else:
             rois = self._value_sorting(rois)
 
-        for i,r in enumerate(rois):
-            r.idx =i
         return rois
 
 
@@ -673,7 +675,7 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
 
 
         rois = []
-        val = 0
+        val = 1
         for left in (True,False):
             for i in range(16):
                 y = float(i)/16.0

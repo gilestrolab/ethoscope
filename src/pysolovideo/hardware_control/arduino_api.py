@@ -60,6 +60,6 @@ class SleepDepriverInterface(object):
 
 
     def deprive(self, channel):
-        cmd = "M %i\n" % (channel + 1)
+        cmd = "M %i\n" % (channel)
         self._serial.write(cmd)
         logging.info("Sending command to SD: %s" % cmd)
