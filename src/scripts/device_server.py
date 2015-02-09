@@ -90,12 +90,11 @@ if __name__ == '__main__':
         import getpass
         DURATION = 60*60 * 100
         if getpass.getuser() == "quentin":
-            INPUT_VIDEO = '/data/pysolo_video_samples/sleepMonitor_5days.avi'
+            INPUT_VIDEO = '/data/pysolo_video_samples/sleep_monitor_100h_no_heat.avi'
         elif getpass.getuser() == "asterix":
             INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
         else:
-            raise Exception("where is your debuging video?")
-
+            raise Exception("where is your debugging video?")
         DRAW_RESULTS = True
 
     else:
