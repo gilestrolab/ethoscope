@@ -5,6 +5,8 @@
 
         <button class="btn btn-default" ng-click="get_devices()">Scan Network for Devices</button>
 
+        <div  id="loading_devices" class="spinner"></div>
+
     </div>
     <div class="col-lg-4 alert alert-info" ng-repeat="device in devices">
         <a href="{{device.type}}/{{device.machine_id}}">

@@ -4,6 +4,7 @@
         <div>Here you will see the list of connected: {{device_type}}</div>
 
         <button class="btn btn-default" ng-click="get_devices()">Scan Network for {{device_type}}s</button>
+        <div  id="loading_devices" class="spinner"></div>
 
     </div>
     <div class="col-lg-4 alert alert-info" ng-repeat="device in devices" ng-if="device.type == req_device_type">
