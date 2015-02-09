@@ -105,6 +105,7 @@
                     }
                 });
         };
+
         $scope.sm.stop = function(){
             $http.post('/device/'+device_id+'/controls/stop', data={})
                  .success(function(data){
@@ -125,11 +126,9 @@
             var log_file_path = ''
             if ($scope.showLog == false){
                     log_file_path = $scope.device.log_file;
-
-
                     $http.post('/device/'+device_id+'/log', data={"file_path":log_file_path})
                         .success(function(data, status, headers, config){
-                            $scope.device.log = data;
+                            $scope.log = data;
                             $scope.showLog = true;
                         });
             }else{
