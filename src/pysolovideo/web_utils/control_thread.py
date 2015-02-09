@@ -14,11 +14,11 @@ from pysolovideo.tracking.roi_builders import SleepMonitorWithTargetROIBuilder
 # the robust self learning tracker
 from pysolovideo.tracking.trackers import AdaptiveBGModel
 from pysolovideo.utils.debug import PSVException
-from pysolovideo.utils.io import ResultWriter
 import shutil
 import logging
 import time
-
+# to add pkg version in metadata
+import pkg_resources
 
 # http://localhost:9001/controls/3a92bcf229a34c4db2be733f6802094d/start
 # {"time": "372894738."}
@@ -155,6 +155,7 @@ class ControlThread(Thread):
                      "date_time": self._info["time"],
                      "frame_width":cam.width,
                      "frame_height":cam.height,
+                      "psv_version": pkg_resources.get_distribution("pysolovideo").version
                       }
 
         self._monit = Monitor(cam,
