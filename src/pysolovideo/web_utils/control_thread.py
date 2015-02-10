@@ -19,6 +19,7 @@ import logging
 import time
 # to add pkg version in metadata
 import pkg_resources
+import glob
 
 # http://localhost:9001/controls/3a92bcf229a34c4db2be733f6802094d/start
 # {"time": "372894738."}
@@ -30,11 +31,11 @@ class ControlThread(Thread):
     _last_img_file = "last_img.png"
     _dbg_img_file = "dbg_img.png"
     _log_file = "psv.log"
-    _result_db_name = "result.db"
+
     _default_monitor_info =  {
                             "last_positions":None,
                             "last_time_stamp":0,
-                            "result_file": None
+                            "result_files": []
                             }
 
     def __init__(self, machine_id, name, psv_dir, video_file=None, *args, **kwargs):
@@ -94,7 +95,9 @@ class ControlThread(Thread):
             return
         t = self._monit.last_time_stamp
         p = self._monit.last_positions
-        r = self._monit.result_file
+        r = glob.glob(os.path.join(self._monit.result_dir, "*"))
+
+
 
         pos = {}
         for k,v in p.items():
@@ -105,8 +108,10 @@ class ControlThread(Thread):
             self._info["monitor_info"] = {
                             "last_positions":pos,
                             "last_time_stamp":t,
-                            "result_file":r
+                            "result_files":r
                             }
+        # print "=================================="
+        # print r
         f = self._monit.last_drawn_frame
         if not f is None:
             cv2.imwrite(self._info["last_drawn_img"], f)
@@ -148,8 +153,6 @@ class ControlThread(Thread):
         logging.info("Initialising monitor")
 
 
-        roi_features = [r.get_feature_dict () for r in rois]
-
         metadata = {
                      "machine_id": self._info["machine_id"],
                      "date_time": self._info["time"],
@@ -161,7 +164,7 @@ class ControlThread(Thread):
         self._monit = Monitor(cam,
                     AdaptiveBGModel,
                     rois,
-                    result_file=self._result_file,
+                    result_dir=self._result_dir,
                     metadata=metadata,
                     *self._monit_args,
                     **self._monit_kwargs
@@ -183,53 +186,3 @@ class ControlThread(Thread):
 
     def __del__(self):
         self.stop()
-
-# #
-# if __name__ == '__main__':
-#
-#
-#     debug = True
-#     port = 9000
-#
-#     machine_id = "njfhrkesngvuiodxjng"
-#
-#     if debug:
-#         import getpass
-#         DURATION = 60*60 * 100
-#         if getpass.getuser() == "quentin":
-#             INPUT_VIDEO = '/data/pysolo_video_samples/sleepMonitor_5days.avi'
-#         elif getpass.getuser() == "asterix":
-#             INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
-#         else:
-#             raise Exception("where is your debugging video?")
-#
-#         DRAW_RESULTS = True
-#
-#     else:
-#         INPUT_VIDEO = None
-#         DURATION = None
-#         DRAW_RESULTS =False
-#         # fixme => we should have mounted /dev/sda/ onto a custom location instead @luis @ quentin
-#
-#
-#     PSV_DIR = "/tmp/" + "psv_" + str(port)
-#
-#     control = ControlThread(machine_id=machine_id, video_file=INPUT_VIDEO,
-#                             psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
-#     control.start()
-#     try:
-#         i = 0
-#         while True:
-#             i +=1
-#             time.sleep(1)
-#             print i, control.info["error"], control.info["status"]
-#             if i == 5:
-#                 control.stop()
-#             if i == 6:
-#                 control = ControlThread(machine_id=machine_id, video_file=INPUT_VIDEO,
-#                             psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
-#                 control.start()
-#
-#     finally:
-#         control.stop()
-#         control.join()

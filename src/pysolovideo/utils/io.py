@@ -7,16 +7,19 @@ import sqlite3
 
 #
 class ResultWriter(object):
+    _sqlite_basename = "psv_result.db"
 
-    def __init__(self, path,  metadata=None):
-        self._path = path
+    def __init__(self, dir_path,  metadata=None):
+
+        self._path = os.path.join(dir_path, self._sqlite_basename)
+
         self.metadata = metadata
         if self.metadata is None:
             self.metadata  = {}
         self._initialised = set()
         self._var_map_initialised = False
         try :
-            os.remove(path)
+            os.remove(self._path )
         except:
             pass
         logging.info("Connecting to local database")

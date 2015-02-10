@@ -104,7 +104,7 @@ if __name__ == '__main__':
         # fixme => we should have mounted /dev/sda/ onto a custom location instead @luis @ quentin
 
 
-    PSV_DIR = "/tmp/" + "psv_" + str(port)
+    PSV_DIR = "/psv_data"
 
     # fixme => the name should be hardcoded in a encrypted file? file.
     control = ControlThread(machine_id=machine_id, name='SM15-001', video_file=INPUT_VIDEO,

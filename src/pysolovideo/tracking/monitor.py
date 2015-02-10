@@ -36,7 +36,7 @@ from pysolovideo.utils.io import ResultWriter
 
 class Monitor(object):
 
-    def __init__(self, camera, tracker_class, rois = None, interactors=None, result_file=None,
+    def __init__(self, camera, tracker_class, rois = None, interactors=None, result_dir=None,
                 draw_results=False, draw_every_n=1,
                 video_out = None,
                 max_duration=None, metadata=None):
@@ -58,7 +58,7 @@ class Monitor(object):
         """
 
         self._camera = camera
-        self._result_file = result_file
+        self._result_dir = result_dir
         self._metadata = metadata
         self._draw_results = draw_results
 
@@ -67,7 +67,11 @@ class Monitor(object):
             self._window_name = "psv_" + str(os.getpid())
 
         self.draw_every_n = draw_every_n
-        self._max_duration = max_duration * 1000 # in ms
+        if not max_duration is None:
+            self._max_duration = max_duration * 1000 # in ms
+        else:
+            self._max_duration = None
+
         self._video_out = video_out
 
 
@@ -104,8 +108,8 @@ class Monitor(object):
         return self._draw_on_frame(self._frame_buffer)
 
     @property
-    def result_file(self):
-        return self._result_file
+    def result_dir(self):
+        return self._result_dir
 
     def stop(self):
         self._force_stop = True
@@ -145,8 +149,8 @@ class Monitor(object):
             if self._draw_results:
                 cv2.namedWindow(self._window_name, cv2.CV_WINDOW_AUTOSIZE)
 
-            if not self._result_file is None:
-                result_writer  = ResultWriter(self._result_file, metadata=self._metadata)
+            if not self._result_dir is None:
+                result_writer  = ResultWriter(self._result_dir, metadata=self._metadata)
 
             self._is_running = True
             for i,(t, frame) in enumerate(self._camera):
