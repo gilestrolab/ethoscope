@@ -12,7 +12,7 @@ set -e # stop if any error happens
 
 USER_NAME=psv
 PASSWORD=psv
-
+PSV_DATA_DIR=/psv_data
 
 ############# PACKAGES #########################
 echo 'Installing and updating packages'
@@ -99,6 +99,11 @@ device_id=$(cat /etc/machine-id)
 hostname=PI_$device_id
 echo "Hostname is $hostname"
 hostnamectl set-hostname $hostname
+
+
+mkdir $PSV_DATA_DIR
+chmod 777 $PSV_DATA_DIR -R
+
 
 # our software.
 # TODO use AUR!
