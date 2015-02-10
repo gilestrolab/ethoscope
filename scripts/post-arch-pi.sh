@@ -63,14 +63,15 @@ echo 'disable_camera_led=1' >> /boot/config.txt
 #gpu_mem_512=64
 #gpu_mem_256=64
 
-##Turbo
-echo 'arm_freq=1000' >> /boot/config.txt
-echo 'core_freq=500' >> /boot/config.txt
-echo 'sdram_freq=500' >> /boot/config.txt
-echo 'over_voltage=6' >> /boot/config.txt
+
+###Turbo #FIXME NOT needed for piv2.0
+#echo 'arm_freq=1000' >> /boot/config.txt
+#echo 'core_freq=500' >> /boot/config.txt
+#echo 'sdram_freq=500' >> /boot/config.txt
+#echo 'over_voltage=6' >> /boot/config.txt
 
 ### TODO test, is that enough?
-echo 'gpu_mem=128' >>  /boot/config.txt
+echo 'gpu_mem=256' >>  /boot/config.txt
 echo 'cma_lwm=' >>  /boot/config.txt
 echo 'cma_hwm=' >>  /boot/config.txt
 echo 'cma_offline_start=' >>  /boot/config.txt
