@@ -144,6 +144,13 @@ class V4L2Camera(BaseCamera):
         else:
             self.capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, w)
             self.capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, h)
+
+        if not isinstance(target_fps, int):
+            raise PSVException("FPS must be an integer number")
+
+        if target_fps < 2:
+            raise PSVException("FPS must be at least 2")
+        
         self.capture.set(cv2.cv.CV_CAP_PROP_FPS, target_fps)
 
         self._target_fps = float(target_fps)
