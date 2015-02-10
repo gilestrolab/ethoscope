@@ -38,3 +38,19 @@ lapply(names(roi_dfs), function(n) {
 	return(NULL)
 	})
 dev.off()
+
+pdf("test.pdf", w=16,h=9)
+lapply(names(roi_dfs), function(n) {
+	
+	d <- roi_dfs[[n]]
+	tt <- d$t/3600;
+	
+	y <- filter(d$activity, rep(1,61)) # on min
+
+ 	hist(log10(y), nclass=100, xlab="log10(Activity) (lenght of tube/min)",freq=F,xlim=c(0,1), ylim=c(0,1), main=n)
+	#plot(density(na.omit(y)), xlab="Activity (lenght of tube/min)",freq=F,xlim=c(0,10), log="y")
+
+	abline(v = .1, col="blue", lwd=3, lty=2)
+	return(NULL)
+	})
+dev.off()
