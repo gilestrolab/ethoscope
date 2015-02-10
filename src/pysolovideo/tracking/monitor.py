@@ -71,7 +71,7 @@ class Monitor(object):
             self._max_duration = max_duration * 1000 # in ms
         else:
             self._max_duration = None
-
+        
         self._video_out = video_out
 
 

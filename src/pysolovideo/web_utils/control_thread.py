@@ -20,6 +20,7 @@ import time
 # to add pkg version in metadata
 import pkg_resources
 import glob
+import traceback
 
 # http://localhost:9001/controls/3a92bcf229a34c4db2be733f6802094d/start
 # {"time": "372894738."}
@@ -96,8 +97,9 @@ class ControlThread(Thread):
             return
         t = self._monit.last_time_stamp
         p = self._monit.last_positions
-        r = glob.glob(os.path.join(self._monit.result_dir, "*"))
 
+        r = glob.glob(os.path.join(self._monit.result_dir, "*"))
+        r = [ s for s in r if not s.endswith("-journal")]
 
 
         pos = {}
@@ -111,8 +113,7 @@ class ControlThread(Thread):
                             "last_time_stamp":t,
                             "result_files":r
                             }
-        # print "=================================="
-        # print r
+
         f = self._monit.last_drawn_frame
         if not f is None:
             cv2.imwrite(self._info["last_drawn_img"], f)
@@ -133,9 +134,9 @@ class ControlThread(Thread):
         except PSVException as e:
             if e.img is not  None:
                 cv2.imwrite(self._info["dbg_img"], e.img)
-            self.stop(str(e))
+            self.stop(traceback.format_exc(e))
         except Exception as e:
-            self.stop(str(e))
+            self.stop(traceback.format_exc(e))
 
     def thread_init(self):
         logging.info("Starting camera")
@@ -146,13 +147,11 @@ class ControlThread(Thread):
             cam = MovieVirtualCamera(self._video_file)
 
 
-
         logging.info("Building ROIs")
         roi_builder = SleepMonitorWithTargetROIBuilder()
         rois = roi_builder(cam)
 
         logging.info("Initialising monitor")
-
 
         metadata = {
                      "machine_id": self._info["machine_id"],
@@ -178,12 +177,16 @@ class ControlThread(Thread):
             self._monit.stop()
             self._monit = None
 
+
         self._info["status"] = "stopped"
         self._info["time"] = time.time()
         self._info["error"] = error
         self._info["monitor_infos"] = self._default_monitor_info
-
-        logging.info("Monitor closed all right")
+        if error is not None:
+            logging.error("Monitor closed with an error:")
+            logging.error(error)
+        else:
+            logging.info("Monitor closed all right")
 
     def __del__(self):
         self.stop()
