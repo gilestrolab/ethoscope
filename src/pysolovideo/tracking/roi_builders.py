@@ -663,9 +663,9 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
         #                   ]
 
         sorted_src_pts += [
-                            [-mean_diam, -mean_diam ],
-                            [-mean_diam, mean_diam],
-                            [mean_diam, mean_diam]
+                            [-mean_diam * .5 , -mean_diam * .5],
+                            [-mean_diam* .5, mean_diam* .5],
+                            [mean_diam* .5, mean_diam* .5]
                           ]
 
         dst_points = np.array([(0,1),
