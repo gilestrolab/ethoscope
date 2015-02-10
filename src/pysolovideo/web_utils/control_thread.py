@@ -27,7 +27,7 @@ import glob
 
 class ControlThread(Thread):
 
-    _result_dir = "results/"
+    _result_dir_basename= "results/"
     _last_img_file = "last_img.png"
     _dbg_img_file = "dbg_img.png"
     _log_file = "psv.log"
@@ -45,10 +45,11 @@ class ControlThread(Thread):
         # We wipe off previous data
         shutil.rmtree(psv_dir, ignore_errors=True)
 
-        result_dir = os.path.join(psv_dir, self._result_dir)
-        os.makedirs(result_dir)
 
-        self._result_file = os.path.join(result_dir, self._result_db_name)
+        self._result_dir = os.path.join(psv_dir, self._result_dir_basename)
+        os.makedirs(self._result_dir )
+
+        #self._result_file = os.path.join(result_dir, self._result_db_name)
         self._video_file = video_file
 
         if name.find('SM')==0:

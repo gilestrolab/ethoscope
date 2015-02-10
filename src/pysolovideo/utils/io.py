@@ -22,8 +22,9 @@ class ResultWriter(object):
             os.remove(self._path )
         except:
             pass
-        logging.info("Connecting to local database")
-        self._conn = sqlite3.connect(path, check_same_thread=False)
+        logging.info("Connecting to local database:")
+        logging.info(self._path)
+        self._conn = sqlite3.connect(self._path, check_same_thread=False)
         c = self._conn.cursor()
         logging.info("Creating master table 'ROI_MAP'")
         command = "CREATE TABLE ROI_MAP (roi_idx SMALLINT, roi_value SMALLINT, x SMALLINT,y SMALLINT,w SMALLINT,h SMALLINT)"
