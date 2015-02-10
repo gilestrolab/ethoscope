@@ -15,10 +15,12 @@
         <button class="btn btn-danger" data-toggle="modal" data-target="#powerOffAlert">Power off Device</button>
 
     </div>
-    <div id = "error" class="alert alert-danger" ng-if="device.error">
+    <div id = "error" class="alert alert-danger text-center" ng-if="device.error">
         <p>Sorry there has been an error: {{device.error}}</p>
 
+         <img  ng-src="{{device.ip}}:9000/static{{device.dbg_img}}" alt="debug image" ng-if="device.dbg_img != null">
     </div>
+
     <div ng-if="showLog == true">
         <pre>
         <p class="log" ng-repeat="(key,entry) in log">{{key}}: {{entry}}</p></pre>
