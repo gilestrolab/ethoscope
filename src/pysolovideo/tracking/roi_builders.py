@@ -655,13 +655,18 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
 
 
         sorted_src_pts = np.array([sorted_a, sorted_b, sorted_c], dtype=np.float32)
-        sorted_src_pts += [
-            # IMPORTANT B and C are not touching the grove, so we add + one radius
-                            [-mean_diam/2.,-mean_diam/2 ],
-                            [-mean_diam/2.,mean_diam/2. + mean_diam/4],
-                            [mean_diam/2.,mean_diam/2. + mean_diam/4]
-                          ]
+        # sorted_src_pts += [
+        #     # IMPORTANT B and C are not touching the grove, so we add + one radius
+        #                     [-mean_diam/2.,-mean_diam/2 ],
+        #                     [-mean_diam/2.,mean_diam/2. + mean_diam/4],
+        #                     [mean_diam/2.,mean_diam/2. + mean_diam/4]
+        #                   ]
 
+        sorted_src_pts += [
+                            [-mean_diam, -mean_diam ],
+                            [-mean_diam, mean_diam],
+                            [mean_diam, mean_diam]
+                          ]
 
         dst_points = np.array([(0,1),
                                (0,0),
