@@ -29,7 +29,7 @@ import traceback
 class ControlThread(Thread):
 
     _result_dir_basename= "results/"
-    _last_img_file = "last_img.png"
+    _last_img_file = "last_img.jpg"
     _dbg_img_file = "dbg_img.png"
     _log_file = "psv.log"
 
