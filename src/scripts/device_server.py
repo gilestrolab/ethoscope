@@ -93,6 +93,8 @@ if __name__ == '__main__':
             INPUT_VIDEO = '/data/pysolo_video_samples/sleep_monitor_100h_no_heat.avi'
         elif getpass.getuser() == "asterix":
             INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
+        elif getpass.getuser() == "psv":
+            INPUT_VIDEO = None
         else:
             raise Exception("where is your debugging video?")
         DRAW_RESULTS = True
