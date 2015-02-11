@@ -96,9 +96,10 @@ if __name__ == '__main__':
         if getpass.getuser() == "quentin":
             INPUT_VIDEO = '/data/pysolo_video_samples/sleep_monitor_100h_no_heat.avi'
         elif getpass.getuser() == "asterix":
-            INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
             PSV_DIR = "/tmp/psv_data"
-
+            INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
+        elif getpass.getuser() == "psv":
+            INPUT_VIDEO = None
         else:
             raise Exception("where is your debugging video?")
         DRAW_RESULTS = True
@@ -108,8 +109,6 @@ if __name__ == '__main__':
         DURATION = None
         DRAW_RESULTS =False
         # fixme => we should have mounted /dev/sda/ onto a custom location instead @luis @ quentin
-
-
         PSV_DIR = "/psv_data"
 
     # fixme => the name should be hardcoded in a encrypted file? file.

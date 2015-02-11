@@ -154,6 +154,7 @@ class Monitor(object):
 
             self._is_running = True
             for i,(t, frame) in enumerate(self._camera):
+                print "=====>", i, t
                 # if t > 10 * 1000:
                 #     raise PSVException("TESTTTTTTTT")
                 if self._force_stop:

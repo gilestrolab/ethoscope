@@ -11,6 +11,8 @@ class ResultWriter(object):
 
     def __init__(self, dir_path,  metadata=None):
 
+        self._last_t, self._last_flush_t = 0, 0
+
         self._path = os.path.join(dir_path, self._sqlite_basename)
 
         self.metadata = metadata
@@ -46,6 +48,7 @@ class ResultWriter(object):
         return self._path
 
     def write(self, t, roi, data_row):
+        self._last_t = t
         if not self._var_map_initialised:
             self._initialise_var_map(data_row)
         if roi.idx not in self._initialised:
@@ -53,7 +56,11 @@ class ResultWriter(object):
         self._add(t, roi, data_row)
 
     def flush(self):
+        if (self._last_t - self._last_flush_t) < 10 * 1000:
+            return
         self._conn.commit()
+        self._last_flush_t =  self._last_t
+
 
     def _add(self,t, roi, data_row):
         tp = (t,) + tuple(data_row.values())

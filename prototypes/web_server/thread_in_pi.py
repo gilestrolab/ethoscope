@@ -190,3 +190,19 @@ class ControlThread(Thread):
 
     def __del__(self):
         self.stop()
+
+
+
+
+
+i=0
+PSV_DIR = "/psv_data"
+control = ControlThread(machine_id="na", name='SM15-001', video_file=None,
+                            psv_dir=PSV_DIR, draw_results = True, max_duration=None)
+control.start()
+while True:
+
+
+    time.sleep(1)
+    print "main thread looping", i
+    i +=1
