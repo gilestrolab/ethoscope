@@ -62,8 +62,8 @@ if __name__ == "__main__":
     logging.info("Initialising monitor")
 
     metadata = {
-                 "machine_id": self._info["machine_id"],
-                 "date_time": self._info["time"],
+                 "machine_id": "NA",
+                 "date_time": "NA",
                  "frame_width":cam.width,
                  "frame_height":cam.height,
                   "psv_version": pkg_resources.get_distribution("pysolovideo").version
