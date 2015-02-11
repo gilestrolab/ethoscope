@@ -58,9 +58,8 @@ class ResultWriter(object):
     def flush(self):
         if (self._last_t - self._last_flush_t) < 10 * 1000:
             return
-        print "flushing"
         self._conn.commit()
-        self.last_flush_t =  self._last_t
+        self._last_flush_t =  self._last_t
 
 
     def _add(self,t, roi, data_row):

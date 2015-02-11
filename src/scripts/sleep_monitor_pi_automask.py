@@ -51,8 +51,9 @@ if __name__ == "__main__":
 
 
 
-    cam = V4L2Camera(0, target_fps=5, target_resolution=(640, 480))
-
+    #cam = V4L2Camera(0, target_fps=5, target_resolution=(640, 480))
+    INPUT_VIDEO = '/data/pysolo_video_samples/sleep_monitor_100h_no_heat.avi'
+    cam = MovieVirtualCamera(INPUT_VIDEO)
 
 
     logging.info("Building ROIs")
