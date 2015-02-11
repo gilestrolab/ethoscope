@@ -8,7 +8,7 @@ import sqlite3
 #
 class ResultWriter(object):
     _sqlite_basename = "psv_result.db"
-
+    _flush_every_ns = 10 # flush every 10s of data
     def __init__(self, dir_path,  metadata=None):
 
         self._last_t, self._last_flush_t = 0, 0
@@ -28,9 +28,21 @@ class ResultWriter(object):
         logging.info(self._path)
         self._conn = sqlite3.connect(self._path, check_same_thread=False)
         c = self._conn.cursor()
+
+        logging.info("Setting DB parameters'")
+        command = "PRAGMA temp_store = MEMORY"
+        c.execute(command)
+        command = "PRAGMA synchronous = OFF"
+        c.execute(command)
+        command = "PRAGMA journal_mode = OFF"
+        c.execute(command)
+        command = "PRAGMA locking_mode = EXCLUSIVE"
+        c.execute(command)
+
         logging.info("Creating master table 'ROI_MAP'")
         command = "CREATE TABLE ROI_MAP (roi_idx SMALLINT, roi_value SMALLINT, x SMALLINT,y SMALLINT,w SMALLINT,h SMALLINT)"
         c.execute(command)
+
 
         logging.info("Creating variable map table 'VAR_MAP'")
         command = "CREATE TABLE VAR_MAP (var_name CHAR(100), sql_type CHAR(100), functional_type CHAR(100))"
@@ -56,7 +68,7 @@ class ResultWriter(object):
         self._add(t, roi, data_row)
 
     def flush(self):
-        if (self._last_t - self._last_flush_t) < 10 * 1000:
+        if (self._last_t - self._last_flush_t) < self._flush_every_ns * 1000:
             return
         self._conn.commit()
         self._last_flush_t =  self._last_t
