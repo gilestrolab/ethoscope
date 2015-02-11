@@ -16,80 +16,66 @@ from pysolovideo.tracking.trackers import AdaptiveBGModel
 from pysolovideo.tracking.monitor import Monitor
 from pysolovideo.utils.io import ResultWriter
 
+import pkg_resources
 import optparse
 import logging
 
 
 
 
+_result_dir = "/tmp/psv/results/"
+_last_img_file = "/tmp/psv/last_img.jpg"
+_dbg_img_file = "/tmp/psv/dbg_img.png"
+_log_file = "/tmp/psv/psv.log"
 
 if __name__ == "__main__":
 
-    parser = optparse.OptionParser()
-    parser.add_option("-o", "--output", dest="out", help="the output file (eg out.csv   )", type="str")
-    parser.add_option("-v", "--video", dest="video", help="the path to an optional video file."
-                                                                "If not specified, the webcam will be used",
-                                                                type="str", default=None)
-    parser.add_option("-r", "--result-video", dest="result_video", help="the path to an optional annotated video file."
-                                                                "This is useful to show the result on a video.",
-                                                                type="str", default=None)
+    # parser = optparse.OptionParser()
+    # parser.add_option("-o", "--output", dest="out", help="the output file (eg out.csv   )", type="str")
+    #
+    # parser.add_option("-r", "--result-video", dest="result_video", help="the path to an optional annotated video file."
+    #                                                             "This is useful to show the result on a video.",
+    #                                                             type="str", default=None)
+    #
+    # parser.add_option("-d", "--duration",dest="duration", help="The maximal duration of the monitoring (seconds). "
+    #                                                            "Keyboard interrupt can be use to stop before",
+    #                                                             default=None, type="int")
+    #
+    # parser.add_option("-f", "--drawing-frequency",dest="drawing_frequency", help="Draw only every N frames (to save processing power).",
+    #                                                             default=-1, type="int")
+    # (options, args) = parser.parse_args()
 
-    parser.add_option("-d", "--duration",dest="duration", help="The maximal duration of the monitoring (seconds). "
-                                                               "Keyboard interrupt can be use to stop before",
-                                                                default=None, type="int")
+    logging.basicConfig(filename=_log_file, level=logging.INFO)
 
-    parser.add_option("-f", "--drawing-frequency",dest="drawing_frequency", help="Draw only every N frames (to save processing power).",
-                                                                default=-1, type="int")
-    (options, args) = parser.parse_args()
-
-    option_dict = vars(options)
+    # option_dict = vars(options)
 
 
 
-    # use a video file instead of the camera if asked by the user (--video /path/to/video)
-    # if option_dict["video"] is not None:
-    #     cam = MovieVirtualCamera(option_dict["video"])
-    # # Otherwise, webcam
-    # else:
-    #     cam = V4L2Camera(0, target_fps=5, target_resolution=(560, 420))
-    cam = MovieVirtualCamera("/data/pysolo_video_samples/sleepMonitor_5days.avi")
-    df = 1
+    cam = V4L2Camera(0, target_fps=5, target_resolution=(560, 420))
+
+
+
+    logging.info("Building ROIs")
     roi_builder = SleepMonitorWithTargetROIBuilder()
-
-
     rois = roi_builder(cam)
 
-    roi_features = [r.get_feature_dict () for r in rois]
+    logging.info("Initialising monitor")
 
-    metadata = {"machine_id": "0123456789",
-                 "date_time": "33321321",
-                 "rois": roi_features,
-                 "img":{"w":cam.width, "h":cam.height}
-                 }
-    import shutil
-    import os
-
-    psv_dir = "/tmp/testpsv/"
-    shutil.rmtree(psv_dir, ignore_errors=True)
-
-    result_writer  = ResultWriter(dir_path=psv_dir)
-
-
-    # df = option_dict["drawing_frequency"]
-    if df <= 0:
-        draw = False
-    else:
-        draw = True
-
-
+    metadata = {
+                 "machine_id": self._info["machine_id"],
+                 "date_time": self._info["time"],
+                 "frame_width":cam.width,
+                 "frame_height":cam.height,
+                  "psv_version": pkg_resources.get_distribution("pysolovideo").version
+                  }
 
     monit = Monitor(cam,
-                    AdaptiveBGModel,
-                    rois,
-                    result_writer=result_writer, # save a csv out
-                    max_duration=option_dict["duration"], # when to stop (in seconds)
-                    video_out=option_dict["result_video"], # when to stop (in seconds)
-                    draw_results=draw, # draw position on image
-                    draw_every_n=df) # only draw 1 every 10 frames to save time
+                AdaptiveBGModel,
+                rois,
+                result_dir=_result_dir,
+                metadata=metadata,
+                )
+
+
     monit.run()
-    f = monit.last_drawn_frame
+
