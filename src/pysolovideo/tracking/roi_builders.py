@@ -104,11 +104,13 @@ class BaseROIBuilder(object):
 
             accum = np.median(np.array(accum),0).astype(np.uint8)
         try:
+
             rois = self._rois_from_img(accum)
         except Exception as e:
             if not isinstance(camera, np.ndarray):
                 del camera
             raise e
+
         rois_w_no_value = [r for r in rois if r.value is None]
 
         if len(rois_w_no_value) > 0:
@@ -583,6 +585,8 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
         return np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
     def _rois_from_img(self,img):
+
+
         map = self._find_blobs(img, self._score_targets)
         bin = np.zeros_like(map)
 
@@ -616,23 +620,24 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
 
         ############# sort/name points as:
 
-        # B--------------------------C
-        # |
-        # |
-        # |
-        # A
+
+        #                            A
+        #                            |
+        #                            |
+        #                            |
+        # C------------------------- B
 
         a ,b, c = src_points
         pairs = [(a,b), (b,c), (a,c)]
 
 
-        dists = [ self.dist_pts(*p) for p in pairs]
+        dists = [self.dist_pts(*p) for p in pairs]
+        # that is the AC pair
         hypo_vertices = pairs[np.argmax(dists)]
 
-
+        # this is B : the only point not in (a,c)
         for sp in src_points:
             if not sp in hypo_vertices:
-
                 break
 
         sorted_b = sp
@@ -642,17 +647,12 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
         for sp in src_points:
             if sorted_b is sp:
                 continue
+            # b-c is the largest distance, so we can infer what point is c
             if self.dist_pts(sp, sorted_b) > dist:
                 dist = self.dist_pts(sp, sorted_b)
                 sorted_c = sp
-
+        # the remaining point is a
         sorted_a = [sp for sp in src_points if not sp is sorted_b and not sp is sorted_c][0]
-
-
-
-
-
-
 
         sorted_src_pts = np.array([sorted_a, sorted_b, sorted_c], dtype=np.float32)
         # sorted_src_pts += [
@@ -662,22 +662,25 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
         #                     [mean_diam/2.,mean_diam/2. + mean_diam/4]
         #                   ]
 
+        for sp in sorted_src_pts:
+            cv2.circle(img, tuple(sp),5, (0,255,255),-1)
+
+
+
         sorted_src_pts += [
-                            [-mean_diam * .5 , -mean_diam * .5],
-                            [-mean_diam* .5, mean_diam* .5],
-                            [mean_diam* .5, mean_diam* .5]
+                            [+mean_diam * .75 , +mean_diam * 1.],
+                            [+mean_diam*  .75, -mean_diam* 1.],
+                            [-mean_diam* .75, -mean_diam* 1.]
                           ]
 
-        dst_points = np.array([(0,1),
-                               (0,0),
-                               (1,0)], dtype=np.float32)
+        dst_points = np.array([(1,0),
+                               (1,1),
+                               (0,1)], dtype=np.float32)
 
 
         wrap_mat = cv2.getAffineTransform(dst_points, sorted_src_pts)
 
-
-        origin = np.array(sorted_src_pts[1], dtype=np.float32)
-
+        origin = np.array((sorted_src_pts[2][0],sorted_src_pts[0][1]), dtype=np.float32)
 
         rois = []
         val = 1
@@ -717,6 +720,7 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
                 rois.append(ROI(ct, value=val))
 
                 val += 1
+
         return rois
 
     def _score_targets(self,contour, im):
