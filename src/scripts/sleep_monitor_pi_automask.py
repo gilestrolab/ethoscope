@@ -74,6 +74,8 @@ if __name__ == "__main__":
                 rois,
                 result_dir=_result_dir,
                 metadata=metadata,
+                draw_every_n=1,
+                draw_results=True
                 )
 
 
