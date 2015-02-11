@@ -132,7 +132,7 @@
         };
 
         $scope.sm.download = function(){
-            $http.get($scope.device.ip+':9000/static'+$scope.result_file);
+            $http.get($scope.device.ip+':9000/static'+$scope.result_files);
         };
 
         $scope.sm.log = function(){
@@ -184,6 +184,7 @@
                  .success(function(data){
                     $scope.device= data;
                     $scope.device.img = device_ip+':9000/static'+$scope.device.last_drawn_img + '?' + new Date().getTime();
+                    $scope.device.ip = device_ip;
                 });
         }
 

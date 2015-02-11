@@ -15,6 +15,10 @@ api = Bottle()
 def server_static(filepath):
     return static_file(filepath, root="/")
 
+@api.route('/download/<filepath:path>')
+def server_static(filepath):
+    return static_file(filepath, root="/", download=filepath)
+
 
 #fixme all this info should be in control.info
 @api.get('/id')
@@ -92,6 +96,7 @@ if __name__ == '__main__':
         if getpass.getuser() == "quentin":
             INPUT_VIDEO = '/data/pysolo_video_samples/sleep_monitor_100h_no_heat.avi'
         elif getpass.getuser() == "asterix":
+            PSV_DIR = "/tmp/psv_data"
             INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
         elif getpass.getuser() == "psv":
             INPUT_VIDEO = None
@@ -104,9 +109,7 @@ if __name__ == '__main__':
         DURATION = None
         DRAW_RESULTS =False
         # fixme => we should have mounted /dev/sda/ onto a custom location instead @luis @ quentin
-
-
-    PSV_DIR = "/psv_data"
+        PSV_DIR = "/psv_data"
 
     # fixme => the name should be hardcoded in a encrypted file? file.
     control = ControlThread(machine_id=machine_id, name='SM15-001', video_file=INPUT_VIDEO,
