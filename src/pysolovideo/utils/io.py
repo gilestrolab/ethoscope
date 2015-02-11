@@ -80,7 +80,7 @@ class ResultWriter(object):
 
     def _initialise(self, roi, data_row):
         # We make a new dir to store results
-        fields = ["t INT PRIMARY KEY"]
+        fields = ["t INT"]
 
         for dt in data_row.values():
             fields.append("%s %s" % (dt.header_name, dt.sql_data_type))
