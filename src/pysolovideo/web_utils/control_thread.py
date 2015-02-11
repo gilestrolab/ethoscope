@@ -142,7 +142,7 @@ class ControlThread(Thread):
         logging.info("Starting camera")
 
         if self._video_file is None:
-            cam = V4L2Camera(0, target_fps=9999, target_resolution=(560, 420))
+            cam = V4L2Camera(0, target_fps=10, target_resolution=(560, 420))
         else:
             cam = MovieVirtualCamera(self._video_file)
 
