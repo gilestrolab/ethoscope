@@ -2,9 +2,10 @@ import urllib2
 import json
 import time
 import pexpect
+import logging
+import subprocess
 
 from threading import Thread
-
 
 class Acquisition(Thread):
 
@@ -13,6 +14,19 @@ class Acquisition(Thread):
         self.id = id
         self._force_stop = False
         self.timeout = 10
+        self._info={"log_file":"/tmp/node.log"}
+
+        logging.basicConfig(filename=self._info['log_file'], level=logging.INFO)
+
+        logger = logging.getLogger()
+        logger.handlers[0].stream.close()
+        logger.removeHandler(logger.handlers[0])
+
+        file_handler = logging.FileHandler(self._info["log_file"])
+        file_handler.setLevel(logging.INFO)
+        formatter = logging.Formatter("%(asctime)s %(filename)s, %(lineno)d, %(funcName)s: %(message)s")
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
 
         super(Acquisition, self).__init__()
 
@@ -25,11 +39,9 @@ class Acquisition(Thread):
             t = time.time()
 
             if t - last_round > self.timeout:
+                logging.info("Recovering data from device "+self.url+" : "+self.id)
                 self.sync_data()
                 last_round = t
-
-
-
 
 
     def stop(self):
@@ -37,16 +49,20 @@ class Acquisition(Thread):
 
 
     def sync_data(self):
-        req = urllib2.Request(url=self.url+':9000/data/'+self.id+'/result_files')
+        req = urllib2.Request(url=self.url+':9000/data/'+self.id)
         f = urllib2.urlopen(req)
         message = f.read()
         if message:
             data = json.loads(message)
+            result_files = data['monitor_info']['result_files']
+            if result_files is not None:
+                for result_file in result_files:
+                    try:
+                        # FIXME change /tmp route for something like data/+self.id+'/'+datetime.datetime()+'/'
+                        command = ['rsync', '-avze','ssh','asterix@'+self.url[7:]+':'+result_file, '/tmp/results']
 
-            if data['result_files'][0] is not None:
-                # TODO change this route
-                command = 'rsync -avz -e ssh psv@'+self.url[7:]+':'+data['result_files'][0]+' /tmp/results/'+self.id
+                        ssh_sync = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE)
 
-                ad = pexpect.spawn(command)
-                ad.expect('password:')
-                ad.sendline('psv')
+                    except Exception as e:
+                        logging.error("Can't syncronize "+result_file+":")
+                        logging.error(e)
