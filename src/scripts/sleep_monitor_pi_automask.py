@@ -51,7 +51,7 @@ if __name__ == "__main__":
 
 
 
-    cam = V4L2Camera(0, target_fps=5, target_resolution=(560, 420))
+    cam = V4L2Camera(0, target_fps=5, target_resolution=(640, 480))
 
 
 
