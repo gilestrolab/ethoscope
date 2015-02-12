@@ -94,8 +94,7 @@
         var refresh_data = false;
 
         $http.get('/device/'+device_id+'/data').success(function(data){
-            $scope.device = data;
-            if ($scope.device.status == 'running'){
+            $scope.device elavice.status == 'running'){
                         refresh();
                         refresh_data = $interval(refresh, 3000);
                     }

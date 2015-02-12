@@ -36,7 +36,8 @@ class ControlThread(Thread):
     _default_monitor_info =  {
                             "last_positions":None,
                             "last_time_stamp":0,
-                            "result_files": []
+                            "result_files": [],
+                            "fps":0
                             }
 
     def __init__(self, machine_id, name, psv_dir, video_file=None, *args, **kwargs):
@@ -70,7 +71,7 @@ class ControlThread(Thread):
                         "machine_id": machine_id,
                         "name": name,
                         "type": type_of_device,
-                        "monitor_info": self._default_monitor_info,
+                        "monitor_info": self._default_monitor_info
                         }
 
         logging.basicConfig(filename=self._info["log_file"], level=logging.INFO)
@@ -98,10 +99,10 @@ class ControlThread(Thread):
             return
         t = self._monit.last_time_stamp
         p = self._monit.last_positions
+        f = self._monit.fps
 
         r = glob.glob(os.path.join(self._monit.result_dir, "*"))
-        r = [ s for s in r if not s.endswith("-journal")]
-
+        # r = [ s for s in r if not s.endswith("-journal")]
 
         pos = {}
         for k,v in p.items():
@@ -113,6 +114,7 @@ class ControlThread(Thread):
                             "last_positions":pos,
                             "last_time_stamp":t,
                             "result_files":r
+                            "fps": f
                             }
 
         f = self._monit.last_drawn_frame

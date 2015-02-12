@@ -164,9 +164,8 @@ class Monitor(object):
             for i,(t, frame) in enumerate(self._camera):
                 self._time_diffs.append(t - self._last_t)
                 if len(self._time_diffs) >10:
-                    self._fps = sum(self._time_diffs) / 1e4
+                    self._fps = 1e4 / float(sum(self._time_diffs))
                     self._time_diffs = []
-                print self.fps
                 # if t > 10 * 1000:
                 #     raise PSVException("TESTTTTTTTT")
                 if self._force_stop:

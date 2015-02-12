@@ -7,7 +7,12 @@
         </div>
         <div ng-if="device.status == 'running'">
             <p><span class="fa fa-clock-o"></span> Total Duration: {{sm.elapsedtime(device.monitor_info.last_time_stamp)}}</p>
+            <!--<p><span class="fa"></span> FPS: {{device.monitor_info.fps}}</p>-->
         </div>
+
+
+
+        <!--<p><span></span> FPS: </p>-->
         <button class="btn btn-success btn-xl" ng-if="device.status == 'stopped'" ng-click="sm.start()">Start</button>
         <button class="btn btn-danger" ng-if="device.status == 'running'"  ng-click="sm.stop()">Stop</button>
         <button class="btn btn-info" data-toggle="modal" data-target="#downloadModal">Download Data</button>
