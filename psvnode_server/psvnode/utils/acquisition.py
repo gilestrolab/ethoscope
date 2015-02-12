@@ -59,7 +59,7 @@ class Acquisition(Thread):
                 for result_file in result_files:
                     try:
                         # FIXME change /tmp route for something like data/+self.id+'/'+datetime.datetime()+'/'
-                        command = ['rsync', '-avze','ssh','asterix@'+self.url[7:]+':'+result_file, '/tmp/results']
+                        command = ['rsync', '-avze','ssh','psv@'+self.url[7:]+':'+result_file, '/tmp/results']
 
                         ssh_sync = subprocess.Popen(command, shell=False, stdout=subprocess.PIPE)
 

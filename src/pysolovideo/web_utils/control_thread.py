@@ -29,7 +29,7 @@ import traceback
 class ControlThread(Thread):
 
     _result_dir_basename= "results/"
-    _last_img_file = "last_img.jpg"
+    _tmp_last_img_file = "last_img.jpg"
     _dbg_img_file = "dbg_img.png"
     _log_file = "psv.log"
 
@@ -60,12 +60,13 @@ class ControlThread(Thread):
         else:
             type_of_device = 'Unknown'
 
+        self._tmp_dir = tempfile.mkdtemp(prefix="psv_")
         self._info = {  "status": "stopped",
                         "time": time.time(),
                         "error": None,
                         "log_file": os.path.join(psv_dir, self._log_file),
                         "dbg_img": os.path.join(psv_dir, self._dbg_img_file),
-                        "last_drawn_img": os.path.join(psv_dir, self._last_img_file),
+                        "last_drawn_img": os.path.join(self._tmp_dir, self._tmp_last_img_file),
                         "machine_id": machine_id,
                         "name": name,
                         "type": type_of_device,
@@ -190,3 +191,4 @@ class ControlThread(Thread):
 
     def __del__(self):
         self.stop()
+        shutil.rmtree(self._tmp_dir, ignore_errors=True)
