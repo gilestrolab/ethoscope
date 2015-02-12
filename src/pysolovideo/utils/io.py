@@ -31,8 +31,7 @@ class ResultWriter(object):
 
         logging.info("Setting DB parameters'")
         command = "PRAGMA temp_store = MEMORY"
-        c.execute(command)
-        command = "PRAGMA synchronous = OFF"
+
         c.execute(command)
         command = "PRAGMA journal_mode = OFF"
         c.execute(command)

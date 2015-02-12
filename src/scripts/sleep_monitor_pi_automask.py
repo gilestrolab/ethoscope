@@ -23,7 +23,7 @@ import logging
 
 
 
-_result_dir = "/tmp/psv/results/"
+_result_dir = "/psv_data/results/"
 _last_img_file = "/tmp/psv/last_img.jpg"
 _dbg_img_file = "/tmp/psv/dbg_img.png"
 _log_file = "/tmp/psv/psv.log"
