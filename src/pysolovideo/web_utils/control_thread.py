@@ -113,7 +113,7 @@ class ControlThread(Thread):
             self._info["monitor_info"] = {
                             "last_positions":pos,
                             "last_time_stamp":t,
-                            "result_files":r
+                            "result_files":r,
                             "fps": f
                             }
 
