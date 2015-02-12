@@ -105,7 +105,8 @@
         <h4 class="modal-title" id="myModalLabel">Modal title</h4>
       </div>
       <div class="modal-body">
-       <a ng-repeat="file in device.monitor_info.result_files" href="{{device.ip}}:9000/download{{file}}" target="_blank">{{file}}</a>
+       <a ng-repeat="file in device.monitor_info.result_files" href="{{device.ip}}:9000/download{{file}}" target="_blank">Device: {{file}}</a>
+          <a ng-repeat="file in device.monitor_info.result_files" href="/download{{file}}" target="_blank">Node: {{file}}</a>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
