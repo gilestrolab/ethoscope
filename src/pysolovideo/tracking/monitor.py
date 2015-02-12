@@ -81,6 +81,11 @@ class Monitor(object):
         self._last_time_stamp = 0
         self._is_running = False
 
+        # effective fps computation
+        self._last_t = 0
+        self._fps = 0
+        self._time_diffs = []
+
         if rois is None:
             rois = rbs.DefaultROIBuilder()(camera)
 
@@ -97,6 +102,9 @@ class Monitor(object):
     @property
     def last_positions(self):
         return self._last_positions
+    @property
+    def fps(self):
+        return self._fps
 
     @property
     def last_time_stamp(self):
@@ -154,7 +162,11 @@ class Monitor(object):
 
             self._is_running = True
             for i,(t, frame) in enumerate(self._camera):
-                print "=====>", i, t
+                self._time_diffs.append(t - self._last_t)
+                if len(self._time_diffs) >10:
+                    self._fps = sum(self._time_diffs) / 1e4
+                    self._time_diffs = []
+                print self.fps
                 # if t > 10 * 1000:
                 #     raise PSVException("TESTTTTTTTT")
                 if self._force_stop:
@@ -197,6 +209,8 @@ class Monitor(object):
 
                     if not vw is None:
                         vw.write(tmp)
+
+                self._last_t = t
 
         except Exception as e:
             logging.info("Monitor closing with an exception: '%s'" % str(e))
