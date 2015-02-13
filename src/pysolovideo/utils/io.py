@@ -125,16 +125,19 @@ class ResultWriter(ResultDBWriterBase):
                       db=self._db_name)
 
     def _clean_up(self):
+        logging.info("connecting to mysql db")
         cn = MySQLdb.connect(host="localhost",
                      user="root",
                       passwd="")
-
+        logging.info("Settign up cursor")
         c = cn.cursor()
         command = "DROP DATABASE IF EXISTS %s" % self._db_name
-        c.execute(command)
-        command = "CREATE DATABASE %s" % self._db_name
+        logging.info("Resetring DB")
         c.execute(command)
 
+        command = "CREATE DATABASE %s" % self._db_name
+        c.execute(command)
+        logging.info("Cleaned up")
 
 
 class SQLiteResultWriter(ResultDBWriterBase):
