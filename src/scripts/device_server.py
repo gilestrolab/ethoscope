@@ -94,7 +94,7 @@ if __name__ == '__main__':
         import getpass
         DURATION = 60*60 * 100
         if getpass.getuser() == "quentin":
-            INPUT_VIDEO = '/data/pysolo_video_samples/sleep_monitor_100h_no_heat.avi'
+            INPUT_VIDEO = '/data/pysolo_video_samples/monitor_new_targets_long.avi'
             PSV_DIR = "/psv_data"
         elif getpass.getuser() == "asterix":
             PSV_DIR = "/tmp/psv_data"

@@ -11,6 +11,8 @@ from pysolovideo.utils.debug import PSVException
 
 class ROI(object):
     __global_idx = 1
+    #FIXME THIS IS BAD WHEN STOPING/RESTARTING interpreter!!!!
+
     def __init__(self, polygon, value=None, orientation = None, regions=None):
 
         # TODO if we do not need polygon, we can drop it

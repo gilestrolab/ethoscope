@@ -21,6 +21,7 @@ import time
 import pkg_resources
 import glob
 import traceback
+from pysolovideo.utils.io import ResultWriter
 
 # http://localhost:9001/controls/3a92bcf229a34c4db2be733f6802094d/start
 # {"time": "372894738."}
@@ -32,24 +33,23 @@ class ControlThread(Thread):
     _tmp_last_img_file = "last_img.jpg"
     _dbg_img_file = "dbg_img.png"
     _log_file = "psv.log"
-
+    _mysql_db_name = "psv_db"
     _default_monitor_info =  {
                             "last_positions":None,
                             "last_time_stamp":0,
-                            "result_files": [],
                             "fps":0
                             }
 
     def __init__(self, machine_id, name, psv_dir, video_file=None, *args, **kwargs):
         self._monit_args = args
         self._monit_kwargs = kwargs
-
+        self._metadata = None
         # We wipe off previous data
         shutil.rmtree(psv_dir, ignore_errors=True)
 
 
         self._result_dir = os.path.join(psv_dir, self._result_dir_basename)
-        os.makedirs(self._result_dir )
+        os.makedirs(self._result_dir)
 
         #self._result_file = os.path.join(result_dir, self._result_db_name)
         self._video_file = video_file
@@ -71,6 +71,7 @@ class ControlThread(Thread):
                         "machine_id": machine_id,
                         "name": name,
                         "type": type_of_device,
+                        "db_name":self._mysql_db_name,
                         "monitor_info": self._default_monitor_info
                         }
 
@@ -101,19 +102,15 @@ class ControlThread(Thread):
         p = self._monit.last_positions
         f = self._monit.fps
 
-        r = glob.glob(os.path.join(self._monit.result_dir, "*"))
-        # r = [ s for s in r if not s.endswith("-journal")]
-
         pos = {}
         for k,v in p.items():
             pos[k] = dict(v)
             pos[k]["roi_idx"] = k
 
-        if not t is None and not r is None and not p is None:
+        if t is not None and p is not None:
             self._info["monitor_info"] = {
                             "last_positions":pos,
                             "last_time_stamp":t,
-                            "result_files":r,
                             "fps": f
                             }
 
@@ -130,7 +127,9 @@ class ControlThread(Thread):
             self._info["time"] = time.time()
             self.thread_init()
             logging.info("Starting monitor")
-            self._monit.run()
+
+            result_writer = ResultWriter(self._mysql_db_name ,self._metadata)
+            self._monit.run(result_writer)
             logging.info("Stopping Monitor thread")
             self.stop()
 
@@ -156,7 +155,9 @@ class ControlThread(Thread):
 
         logging.info("Initialising monitor")
 
-        metadata = {
+
+
+        self._metadata = {
                      "machine_id": self._info["machine_id"],
                      "date_time": self._info["time"],
                      "frame_width":cam.width,
@@ -164,11 +165,10 @@ class ControlThread(Thread):
                       "psv_version": pkg_resources.get_distribution("pysolovideo").version
                       }
 
+
         self._monit = Monitor(cam,
                     AdaptiveBGModel,
                     rois,
-                    result_dir=self._result_dir,
-                    metadata=metadata,
                     *self._monit_args,
                     **self._monit_kwargs
                     )

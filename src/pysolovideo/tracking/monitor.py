@@ -28,7 +28,7 @@ import cv2
 from collections import deque
 import numpy as np
 from pysolovideo.utils.debug import PSVException
-from pysolovideo.utils.io import ResultWriter
+
 
 # TODO
 # def psv_exception_checker_decorator(*args, **kwargs):
@@ -36,10 +36,10 @@ from pysolovideo.utils.io import ResultWriter
 
 class Monitor(object):
 
-    def __init__(self, camera, tracker_class, rois = None, interactors=None, result_dir=None,
+    def __init__(self, camera, tracker_class, rois = None, interactors=None,
                 draw_results=False, draw_every_n=1,
                 video_out = None,
-                max_duration=None, metadata=None):
+                max_duration=None):
         r"""
         Class to orchestrate the tracking of several object in separate regions of interest (ROIs) and interacting
 
@@ -58,9 +58,9 @@ class Monitor(object):
         """
 
         self._camera = camera
-        self._result_dir = result_dir
-        self._metadata = metadata
+
         self._draw_results = draw_results
+        # self._result_writer = result_writer
 
         if self._draw_results:
             import os
@@ -104,6 +104,7 @@ class Monitor(object):
         return self._last_positions
     @property
     def fps(self):
+        #FIXME this is wrong/not updating
         return self._fps
 
     @property
@@ -114,10 +115,6 @@ class Monitor(object):
     @property
     def last_drawn_frame(self):
         return self._draw_on_frame(self._frame_buffer)
-
-    @property
-    def result_dir(self):
-        return self._result_dir
 
     def stop(self):
         self._force_stop = True
@@ -150,25 +147,26 @@ class Monitor(object):
 
         return frame_cp
 
-    def run(self):
+    def run(self, result_writer = None):
         vw = None
-        result_writer = None
         try:
+
             if self._draw_results:
                 cv2.namedWindow(self._window_name, cv2.CV_WINDOW_AUTOSIZE)
 
-            if not self._result_dir is None:
-                result_writer  = ResultWriter(self._result_dir, metadata=self._metadata)
 
+
+            logging.info("Monitor starting a run")
             self._is_running = True
             for i,(t, frame) in enumerate(self._camera):
                 self._time_diffs.append(t - self._last_t)
                 if len(self._time_diffs) >10:
+
                     self._fps = 1e4 / float(sum(self._time_diffs))
                     self._fps = round(self._fps,3)
                     self._time_diffs = []
-                # if t > 10 * 1000:
-                #     raise PSVException("TESTTTTTTTT")
+                    print self._fps
+
                 if self._force_stop:
                     logging.info("Monitor object stopped from external request")
                     break
@@ -183,9 +181,6 @@ class Monitor(object):
                     vw = cv2.VideoWriter(self._video_out, cv2.cv.CV_FOURCC(*'DIVX'), 50, (frame.shape[1], frame.shape[0])) # fixme the 50 is arbitrary
 
                 for j,track_u in enumerate(self._unit_trackers):
-                    # if j != 19:
-                    #     continue
-
                     data_row = track_u(t, frame)
 
                     if data_row is None:
@@ -229,4 +224,5 @@ class Monitor(object):
             if not vw is None:
                 vw.release()
             logging.info("Monitor closing")
+            result_writer.close()
 
