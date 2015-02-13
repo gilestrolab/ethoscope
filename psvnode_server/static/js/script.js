@@ -92,6 +92,9 @@
         var device_ip;
         $scope.sm = {}
         var refresh_data = false;
+        var spStart= new Spinner(opts).spin();
+        var starting_tracking= document.getElementById('starting');
+
 
         $http.get('/device/'+device_id+'/data').success(function(data){
             $scope.device = data;
@@ -107,6 +110,9 @@
                 });
 
         $scope.sm.start = function(){
+            $scope.starting = true;
+            starting_tracking.appendChild(spStart.el);
+
             $http.post('/device/'+device_id+'/controls/start', data={"time":Date.now() / 1000.})
                  .success(function(data){
 
@@ -115,6 +121,7 @@
                         $http.post('/devices_list', data={"device_id":device_id,"status":"running"})
                         $timeout(refresh,1000);
                         refresh_data = $interval(refresh, 3000);
+
                     }
                 });
         };
@@ -185,6 +192,10 @@
                     $scope.device= data;
                     $scope.device.img = device_ip+':9000/static'+$scope.device.last_drawn_img + '?' + new Date().getTime();
                     $scope.device.ip = device_ip;
+                if ($scope.starting == true && $scope.device.status == 'running'){
+                    $scope.starting= false;
+                    spStart.stop();
+                }
                 });
         }
 
