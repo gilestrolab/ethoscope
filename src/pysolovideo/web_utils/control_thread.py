@@ -22,6 +22,7 @@ import pkg_resources
 import glob
 import traceback
 from pysolovideo.utils.io import ResultWriter
+from pysolovideo.utils.io import SQLiteResultWriter
 
 # http://localhost:9001/controls/3a92bcf229a34c4db2be733f6802094d/start
 # {"time": "372894738."}
@@ -29,7 +30,7 @@ from pysolovideo.utils.io import ResultWriter
 
 class ControlThread(Thread):
 
-    _result_dir_basename= "results/"
+
     _tmp_last_img_file = "last_img.jpg"
     _dbg_img_file = "dbg_img.png"
     _log_file = "psv.log"
@@ -48,8 +49,8 @@ class ControlThread(Thread):
         shutil.rmtree(psv_dir, ignore_errors=True)
 
 
-        self._result_dir = os.path.join(psv_dir, self._result_dir_basename)
-        os.makedirs(self._result_dir)
+        # self._result_dir = os.path.join(psv_dir, self._result_dir_basename)
+        # os.makedirs(self._result_dir)
 
         #self._result_file = os.path.join(result_dir, self._result_db_name)
         self._video_file = video_file
@@ -129,6 +130,8 @@ class ControlThread(Thread):
             logging.info("Starting monitor")
 
             result_writer = ResultWriter(self._mysql_db_name ,self._metadata)
+
+
             self._monit.run(result_writer)
             logging.info("Stopping Monitor thread")
             self.stop()
