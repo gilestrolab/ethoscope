@@ -114,11 +114,11 @@ def device(id, type_of_req):
             #start acquisition thread
             try:
                 if type_of_req == 'start' and data['status'] == 'started':
-                    acquisition = Acquisition(devices_list[id]['ip'],id)
-                    acquisition.start()
+                    acquisition[id] = Acquisition(devices_list[id]['ip'],id)
+                    acquisition[id].start()
                 if type_of_req == 'stop' and data['status'] == 'stopped' and acquisition is not None:
-                    acquisition.stop()
-                    acquisition.join()
+                    acquisition[id].stop()
+                    acquisition[id].join()
             except Exception as e:
                 data['error'] = e
                 print e
@@ -189,15 +189,23 @@ class Discover(threading.Thread):
 
 if __name__ == '__main__':
 
-    acquisition = None
+    acquisition = {}
+    devices_list = devices()
+    for k,device in devices_list.iteritems():
+        if device['status'] == 'running':
+            acquisition[k]= Acquisition(device['ip'],k)
+            acquisition[k].start()
     try:
+        #get the connected devices that are doing tracking and start acquisitions threads.
+
         # @luis TODO => I am not quite sure about debug here.
         run(app, host='0.0.0.0', port=8000, debug=debug)
 
     except Exception as e:
         print e
     finally:
-        acquisition.stop()
-        acquisition.join()
+        for a in acquisition:
+            a.stop()
+            a.join()
 
 
