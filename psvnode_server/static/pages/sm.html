@@ -36,7 +36,7 @@
         <p class="log" ng-repeat="(key,entry) in log">{{key}}: {{entry}}</p></pre>
     </div>
 
-    <div ng-if="device.status == 'running'">
+    <div ng-if="device.status == false">
         <table class="table table-striped">
             <thead>
                 <th>ROI</th>
