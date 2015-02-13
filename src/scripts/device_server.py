@@ -95,11 +95,13 @@ if __name__ == '__main__':
         DURATION = 60*60 * 100
         if getpass.getuser() == "quentin":
             INPUT_VIDEO = '/data/pysolo_video_samples/sleep_monitor_100h_no_heat.avi'
+            PSV_DIR = "/psv_data"
         elif getpass.getuser() == "asterix":
             PSV_DIR = "/tmp/psv_data"
             INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
         elif getpass.getuser() == "psv":
             INPUT_VIDEO = None
+            PSV_DIR = "/psv_data"
         else:
             raise Exception("where is your debugging video?")
         DRAW_RESULTS = True

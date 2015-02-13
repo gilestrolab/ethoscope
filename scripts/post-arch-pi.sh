@@ -13,6 +13,7 @@ set -e # stop if any error happens
 USER_NAME=psv
 PASSWORD=psv
 PSV_DATA_DIR=/psv_data
+PSV_DB_NAME=psv_db
 
 ############# PACKAGES #########################
 echo 'Installing and updating packages'
@@ -31,6 +32,9 @@ pacman -S raspberrypi-firmware{,-tools,-bootloader,-examples} --noconfirm --need
 
 # preinstalling dependencies will save compiling time on python packages
 pacman -S python2-pip python2-numpy python2-bottle python2-pyserial --noconfirm --needed
+
+# mariadb
+pacman -S mariadb --noconfirm --needed
 
 ######################################################################################
 echo 'Enabling startuup deamons'
@@ -104,6 +108,10 @@ hostnamectl set-hostname $hostname
 mkdir $PSV_DATA_DIR
 chmod 777 $PSV_DATA_DIR -R
 
+systemctl enable mysqld.service
+systemctl start mysqld.service
+
+mysql -u root -e "create database $PSV_DB_NAME";
 
 # our software.
 # TODO use AUR!
