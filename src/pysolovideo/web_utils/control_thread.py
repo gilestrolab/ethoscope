@@ -132,12 +132,10 @@ class ControlThread(Thread):
             self.thread_init()
             logging.info("Starting monitor")
 
-            result_writer = ResultWriter(self._mysql_db_name ,self._metadata)
-
-
-            self._monit.run(result_writer)
-            logging.info("Stopping Monitor thread")
-            self.stop()
+            with ResultWriter(self._mysql_db_name ,self._metadata) as rw:
+                self._monit.run(rw)
+                logging.info("Stopping Monitor thread")
+                self.stop()
 
         except PSVException as e:
             if e.img is not  None:

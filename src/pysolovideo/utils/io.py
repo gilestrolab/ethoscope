@@ -100,7 +100,8 @@ class ResultDBWriterBase(object):
 
         c.execute(command)
 
-
+    def __del__(self):
+        self.close()
     def close(self):
         self.flush()
         self._conn.commit()
@@ -132,12 +133,14 @@ class ResultWriter(ResultDBWriterBase):
         logging.info("Settign up cursor")
         c = cn.cursor()
         command = "DROP DATABASE IF EXISTS %s" % self._db_name
-        logging.info("Resetring DB")
+        logging.info("Resetting DB")
         c.execute(command)
 
         command = "CREATE DATABASE %s" % self._db_name
         c.execute(command)
         logging.info("Cleaned up")
+        cn.close()
+
 
 
 class SQLiteResultWriter(ResultDBWriterBase):
