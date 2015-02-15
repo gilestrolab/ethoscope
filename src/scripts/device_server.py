@@ -95,13 +95,13 @@ if __name__ == '__main__':
         DURATION = 60*60 * 100
         if getpass.getuser() == "quentin":
             INPUT_VIDEO = '/data/pysolo_video_samples/monitor_new_targets_long.avi'
-            PSV_DIR = "/psv_data"
+            PSV_DIR = "/psv_data/results/"
         elif getpass.getuser() == "asterix":
             PSV_DIR = "/tmp/psv_data"
             INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
         elif getpass.getuser() == "psv" or getpass.getuser() == "root":
             INPUT_VIDEO = "/data/monitor_new_targets_short.avi"
-            PSV_DIR = "/psv_data"
+            PSV_DIR = "/psv_data/results"
         else:
             raise Exception("where is your debugging video?")
         DRAW_RESULTS = True
@@ -110,15 +110,19 @@ if __name__ == '__main__':
         INPUT_VIDEO = None
         DURATION = None
         DRAW_RESULTS =False
-        # fixme => we should have mounted /dev/sda/ onto a custom location instead @luis @ quentin
-        PSV_DIR = "/psv_data"
+        # fixme => we should have mounted /dev/sda/ onto a custom location instead @luis @quentin
+        PSV_DIR = "/psv_data/results"
 
     # fixme => the name should be hardcoded in a encrypted file? file.
     control = ControlThread(machine_id=machine_id, name='SM15-001', video_file=INPUT_VIDEO,
                             psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
 
+
     try:
         run(api, host='0.0.0.0', port=port, debug=debug)
+    except Exception as e:
+
+        logging.error(e)
     finally:
         if control is not None:
             control.stop()

@@ -50,7 +50,10 @@ class ControlThread(Thread):
 
 
         # self._result_dir = os.path.join(psv_dir, self._result_dir_basename)
-        # os.makedirs(self._result_dir)
+        try:
+            os.makedirs(psv_dir)
+        except OSError:
+            pass
 
         #self._result_file = os.path.join(result_dir, self._result_db_name)
         self._video_file = video_file
