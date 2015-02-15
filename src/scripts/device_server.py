@@ -99,8 +99,8 @@ if __name__ == '__main__':
         elif getpass.getuser() == "asterix":
             PSV_DIR = "/tmp/psv_data"
             INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
-        elif getpass.getuser() == "psv":
-            INPUT_VIDEO = None
+        elif getpass.getuser() == "psv" or getpass.getuser() == "root":
+            INPUT_VIDEO = "/data/monitor_new_targets_short.avi"
             PSV_DIR = "/psv_data"
         else:
             raise Exception("where is your debugging video?")
