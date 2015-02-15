@@ -126,16 +126,17 @@ class ControlThread(Thread):
     def run(self):
         try:
             logging.info("Starting Monitor thread")
-            self._info["status"] = "running"
+
             self._info["error"] = None
             self._info["time"] = time.time()
             self.thread_init()
             logging.info("Starting monitor")
 
-            with ResultWriter(self._mysql_db_name ,self._metadata) as rw:
-                self._monit.run(rw)
-                logging.info("Stopping Monitor thread")
-                self.stop()
+            rw = ResultWriter(self._mysql_db_name ,self._metadata)
+            self._info["status"] = "running"
+            self._monit.run(rw)
+            logging.info("Stopping Monitor thread")
+            self.stop()
 
         except PSVException as e:
             if e.img is not  None:
