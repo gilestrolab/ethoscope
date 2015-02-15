@@ -29,6 +29,7 @@ setup(
     install_requires=[
         "numpy>=1.6.1",
         "pyserial>=2.7",
-        "bottle>=0.12.8"
+        "bottle>=0.12.8",
+        "MySQL-python >= 1.2.5",
     ],
 )
