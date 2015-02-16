@@ -29,8 +29,6 @@ from pysolovideo.utils.io import SQLiteResultWriter
 
 
 class ControlThread(Thread):
-
-
     _tmp_last_img_file = "last_img.jpg"
     _dbg_img_file = "dbg_img.png"
     _log_file = "psv.log"
