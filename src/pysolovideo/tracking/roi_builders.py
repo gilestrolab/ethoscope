@@ -11,7 +11,7 @@ from pysolovideo.utils.debug import PSVException
 
 class ROI(object):
     __global_idx = 1
-    #FIXME THIS IS BAD WHEN STOPING/RESTARTING interpreter!!!!
+    #FIXME THIS IS BAD WHEN STOPPING/RESTARTING interpreter!!!!
 
     def __init__(self, polygon, value=None, orientation = None, regions=None):
 
@@ -20,7 +20,7 @@ class ROI(object):
         if len(self._polygon.shape) == 2:
             self._polygon = self._polygon.reshape((self._polygon.shape[0],1,self._polygon.shape[1]))
 
-        self._value = value
+
         x,y,w,h = cv2.boundingRect(self._polygon)
 
         self._mask = np.zeros((h,w), np.uint8)
@@ -30,6 +30,8 @@ class ROI(object):
         # todo NOW! sort rois by value. if no values, left to right/ top to bottom!
 
         self._idx = self.__global_idx
+        if value is None:
+            self._value = self._idx
         ROI.__global_idx +=1
 
     @property

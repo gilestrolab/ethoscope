@@ -76,6 +76,7 @@ class DataPoint(collections.OrderedDict):
         collections.OrderedDict.__init__(self)
         for i in data:
             self.__setitem__(i.header_name, i)
+
     def copy(self):
         return DataPoint(copy.deepcopy(self.values()))
 

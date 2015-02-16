@@ -224,5 +224,5 @@ class Monitor(object):
             if not vw is None:
                 vw.release()
             logging.info("Monitor closing")
-            result_writer.close()
+
 

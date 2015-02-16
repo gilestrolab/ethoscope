@@ -8,9 +8,12 @@ import MySQLdb
 
 
 #
-
+#TODO add HIGH_PRIORITY to inserts!
 class ResultDBWriterBase(object):
     _flush_every_ns = 10 # flush every 10s of data
+
+    def _create_table(self, cursor, name, fields):
+        raise NotImplementedError()
 
     def __init__(self,  metadata=None, *args, **kwargs):
         self._last_t, self._last_flush_t = 0, 0
@@ -26,18 +29,15 @@ class ResultDBWriterBase(object):
         self._var_map_initialised = False
 
         logging.info("Creating master table 'ROI_MAP'")
-
-        command = "CREATE TABLE ROI_MAP (roi_idx SMALLINT, roi_value SMALLINT, x SMALLINT,y SMALLINT,w SMALLINT,h SMALLINT)"
-        c.execute(command)
-
+        self._create_table(c, "ROI_MAP", "roi_idx SMALLINT, roi_value SMALLINT, x SMALLINT,y SMALLINT,w SMALLINT,h SMALLINT")
 
         logging.info("Creating variable map table 'VAR_MAP'")
-        command = "CREATE TABLE VAR_MAP (var_name CHAR(100), sql_type CHAR(100), functional_type CHAR(100))"
-        c.execute(command)
+        self._create_table(c, "VAR_MAP", "var_name CHAR(100), sql_type CHAR(100), functional_type CHAR(100)")
+
 
         logging.info("Creating 'METADATA' table")
-        command = "CREATE TABLE METADATA (field CHAR(100), value CHAR(200))"
-        c.execute(command)
+        self._create_table(c,"METADATA", "field CHAR(100), value CHAR(200)")
+
         for k,v in self.metadata.items():
             command = "INSERT INTO METADATA VALUES %s" % str((k, v))
             c.execute(command)
@@ -91,21 +91,21 @@ class ResultDBWriterBase(object):
 
         self._initialised |= {roi.idx}
 
-        command = "CREATE TABLE ROI_%i (%s)" % (roi.idx, fields)
-
         c = self._conn.cursor()
-        c.execute(command)
+
+        table_name = "ROI_%i" % roi.idx
+        self._create_table(c, table_name, fields)
+
         fd = roi.get_feature_dict()
         command = "INSERT INTO ROI_MAP VALUES %s" % str((fd["idx"], fd["value"], fd["x"], fd["y"], fd["w"], fd["h"]))
-
         c.execute(command)
 
     def __del__(self):
-        self.close()
-    def close(self):
         self.flush()
-        self._conn.commit()
         self._conn.close()
+    def close(self):
+        pass
+
 
 
 class ResultWriter(ResultDBWriterBase):
@@ -115,8 +115,6 @@ class ResultWriter(ResultDBWriterBase):
     def __init__(self, db_name, *args, **kwargs):
         self._db_name = db_name
         super(ResultWriter, self).__init__(*args, **kwargs)
-
-
 
     def _get_connection(self):
 
@@ -130,17 +128,19 @@ class ResultWriter(ResultDBWriterBase):
         cn = MySQLdb.connect(host="localhost",
                      user="root",
                       passwd="")
-        logging.info("Settign up cursor")
+        logging.info("Setting up cursor")
         c = cn.cursor()
         command = "DROP DATABASE IF EXISTS %s" % self._db_name
+
         logging.info("Resetting DB")
         c.execute(command)
-
         command = "CREATE DATABASE %s" % self._db_name
         c.execute(command)
         logging.info("Cleaned up")
         cn.close()
-
+    def _create_table(self, cursor, name, fields, engine="MyISAM"):
+        command = "CREATE TABLE %s (%s) ENGINE %s" % (name, fields, engine)
+        cursor.execute(command)
 
 
 class SQLiteResultWriter(ResultDBWriterBase):
@@ -169,6 +169,9 @@ class SQLiteResultWriter(ResultDBWriterBase):
     def _get_connection(self):
         conn = sqlite3.connect(self._path, check_same_thread=False)
         return conn
+    def _create_table(self, cursor, name, fields):
+        command = "CREATE TABLE %s (%s)" % (name, fields)
+        cursor.execute(command)
 
 
 
