@@ -1,6 +1,7 @@
 __author__ = 'quentin'
 
 
+
 import MySQLdb
 import sqlite3
 import os
@@ -8,18 +9,23 @@ import logging
 
 
 
-import time
+"""
+#
+# import time
+#
+# # cloning = MySQLdbToSQlite("/psv_data/test/boom.db", "psv_db", remote_host="localhost", overwrite=False)
+# cloning = MySQLdbToSQlite("/psv_data/test/boome.db", "psv_db", remote_host="129.31.135.153",remote_pass="psv", remote_user="psv")
+#
+# try:
+#     while True:
+#         cloning.update_roi_tables()
+#         time.sleep(5)
+# except Exception as e:
+#     logging.info(e)
+#
+#
 
 """
-cloning = MySQLdbToSQlite("/psv_data/test/boom.db", "psv_db", overwrite=False)
-try:
-    while True:
-        cloning.update_roi_tables()
-        time.sleep(5)
-except Exception as e:
-    print e
-"""
-
 
 class MySQLdbToSQlite(object):
     def __init__(self, dst_path, remote_db_name="psv_db", remote_host="localhost", remote_user="root", remote_pass="", overwrite=True):
@@ -37,27 +43,40 @@ class MySQLdbToSQlite(object):
 
 
         """
-        self._mysql_db = MySQLdb.connect(host=remote_host,user=remote_user,
-                                         passwd=remote_pass,db=remote_db_name)
+
+        self._remote_host = remote_host
+        self._remote_user = remote_user
+        self._remote_pass = remote_pass
+        self._remote_db_name = remote_db_name
+
+        src = MySQLdb.connect(host=self._remote_host, user=self._remote_user,
+                                         passwd=self._remote_pass, db=self._remote_db_name)
+
         self._dst_path=dst_path
         logging.info("Initializing local database static tables at %s" % dst_path)
         # we remove file and create dir, if needed
+
         try:
             if overwrite:
+                logging.info("Trying to remove old database")
                 os.remove(self._dst_path)
-        except OSError:
+                logging.info("Success")
+        except OSError as e:
+            logging.warning(e)
             pass
         try:
+            logging.info("Making parent directories")
             os.makedirs(os.path.dirname(self._dst_path))
-        except OSError:
+            logging.info("Success")
+        except OSError as e:
+            logging.warning(e)
             pass
 
         with sqlite3.connect(self._dst_path, check_same_thread=False) as conn:
-            self._copy_table("VAR_MAP", self._mysql_db, conn)
-            self._copy_table("METADATA", self._mysql_db, conn)
+            self._copy_table("VAR_MAP", src, conn)
+            self._copy_table("METADATA", src, conn)
+            #TODO checksum of ordered metadata ?
             logging.info("Database mirroring initialised")
-    def __del__(self):
-        self._mysql_db.close()
 
     def update_roi_tables(self):
         """
@@ -65,7 +84,8 @@ class MySQLdbToSQlite(object):
 
         :return:
         """
-        src = self._mysql_db
+        src = MySQLdb.connect(host=self._remote_host, user=self._remote_user,
+                                         passwd=self._remote_pass, db=self._remote_db_name)
 
         with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
 
@@ -119,15 +139,12 @@ class MySQLdbToSQlite(object):
         last_t_in_dst = 0
         for c in dst_cur:
             last_t_in_dst = c[0]
-
-
         src_command = "SELECT * FROM %s WHERE t > %d" % (table_name, last_t_in_dst)
-
         src_cur.execute(src_command)
-
         for sc in src_cur:
             tp = tuple([str(v) for v in sc ])
             dst_command = "INSERT INTO %s VALUES %s" % (table_name, tp)
             dst_cur.execute(dst_command)
 
         dst.commit()
+

@@ -2,7 +2,6 @@ from bottle import *
 app = Bottle()
 import shlex
 import urllib2
-
 import subprocess,json
 import threading
 
@@ -41,6 +40,7 @@ def devices():
     #host_ip = ['129','31','135','0']
     thread =[]
 
+
     for i in range(0,256):
             ip = "http://"+host_ip[0]+'.'+host_ip[1]+'.' \
             +host_ip[2]+'.'+str(i)
@@ -65,6 +65,10 @@ def post_devices_list():
     data = json.loads(data)
     device_id = data['device_id']
     status = data['status']
+    # fixme get device human friendly name here as well. we may need it to save data in human readable dirs
+    # fixme get the metadata time stamp (+ format it e.g. 2014-12-18_18:21:43) so we can format out dir.
+    # alternatively, I can get all of these from the database metadata table,
+    # but would be better if `Aquisition` knew where to save the data at start ;)
     devices_list[device_id]['status'] = status
 
 
@@ -103,6 +107,7 @@ def device(id, type_of_req):
 
     try:
         data = request.body.read()
+        #fixme use this var
         url = devices_list[id]['ip']
         req = urllib2.Request(url=devices_list[id]['ip']+':9000/controls/'+id+'/'+type_of_req,
                               data=data,
@@ -166,6 +171,7 @@ def get_log(id):
 #################
 # HELP METHODS
 #################
+# @luis consider using multiprocessing maps for simplicity
 class Discover(threading.Thread):
     def __init__(self, scanInterval, url):
         threading.Thread.__init__(self)
@@ -182,8 +188,11 @@ class Discover(threading.Thread):
                 data = json.loads(message)
                 data['ip'] = self.url
                 devices_list[data['machine_id']]=data
-        except Exception as e:
-            print e
+        # we skipp this error as it is expected
+        # however we actually raise an exception otherwise
+        except urllib2.URLError:
+            pass
+
 
 
 
