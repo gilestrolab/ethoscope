@@ -204,7 +204,7 @@ if __name__ == '__main__':
     except Exception as e:
         print e
     finally:
-        for a in acquisition:
+        for a in acquisition.values():
             a.stop()
             a.join()
 
