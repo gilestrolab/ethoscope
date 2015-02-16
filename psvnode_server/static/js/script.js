@@ -175,12 +175,16 @@
             var secs = Math.floor((t - (days * 86400 ) - (hours *3600 ) - (minutes*60)))
 
             if (days>0){
-            var x =  days + " Days " + hours + " Hours " + minutes + " Minutes and " + secs + " Secondes ";
+            var x =  days + " days " + hours + " hours " + minutes + " minutes and " + secs + " seconds ";
             }else if ( days==0 && hours>0){
-            var x =   hours + " Hours " + minutes + " Minutes and " + secs + " Secondes ";
+            var x =   hours + " hours " + minutes + " minutes and " + secs + " seconds ";
             }else if(days==0 && hours==0 && minutes>0){
-            var x =  minutes + " Minutes and " + secs + " Secondes ";
+            var x =  minutes + " minutes and " + secs + " seconds ";
+            }else if(days==0 && hours==0 && minutes==0 && secs > 0){
+            var x =  secs + " seconds ";
             }
+
+
 
             return x;
 
