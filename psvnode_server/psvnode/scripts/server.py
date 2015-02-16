@@ -82,6 +82,7 @@ def device(id):
         message = f.read()
         if message:
             data = json.loads(message)
+
             return data
 
     except Exception as e:
@@ -119,6 +120,7 @@ def device(id, type_of_req):
             #start acquisition thread
             try:
                 if type_of_req == 'start' and data['status'] == 'started':
+                    # @quentin devices_list[id] points to -> ControlTread.info
                     acquisition[id] = Acquisition(devices_list[id]['ip'],id)
                     acquisition[id].start()
                 if type_of_req == 'stop' and data['status'] == 'stopped' and acquisition is not None:
@@ -126,7 +128,8 @@ def device(id, type_of_req):
                     acquisition[id].join()
             except Exception as e:
                 data['error'] = e
-                print e
+                # fixme use log
+                # print e
 
             return data
 

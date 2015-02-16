@@ -175,19 +175,25 @@
             var secs = Math.floor((t - (days * 86400 ) - (hours *3600 ) - (minutes*60)))
 
             if (days>0){
-            var x =  days + " days " + hours + " hours " + minutes + " minutes and " + secs + " seconds ";
+            var x =  days + " days, " + hours + "h, " + minutes + "min,  " + secs + "s ";
             }else if ( days==0 && hours>0){
-            var x =   hours + " hours " + minutes + " minutes and " + secs + " seconds ";
+            var x =   hours + "h, " + minutes + "min,  " + secs + "s ";
             }else if(days==0 && hours==0 && minutes>0){
-            var x =  minutes + " minutes and " + secs + " seconds ";
+            var x =  minutes + "min,  " + secs + "s ";
             }else if(days==0 && hours==0 && minutes==0 && secs > 0){
-            var x =  secs + " seconds ";
+            var x =  secs + " s ";
             }
 
 
 
             return x;
 
+        };
+         $scope.sm.start_date_time = function(unix_timestamp){
+
+            var date = new Date(unix_timestamp*1000);
+
+            return date.toUTCString();
         };
 
        var refresh = function(){
