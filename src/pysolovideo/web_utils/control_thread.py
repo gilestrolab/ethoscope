@@ -43,6 +43,10 @@ class ControlThread(Thread):
         self._monit_args = args
         self._monit_kwargs = kwargs
         self._metadata = None
+
+        self._last_info_t_stamp = 0
+        self._last_info_frame_idx = 0
+
         # We wipe off previous data
         shutil.rmtree(psv_dir, ignore_errors=True)
 
@@ -98,11 +102,26 @@ class ControlThread(Thread):
         return self._info
 
     def _update_info(self):
+
         if self._monit is None:
             return
         t = self._monit.last_time_stamp
+        frame_idx = self._monit.last_frame_idx
+
+        wall_time = time.time()
+
+        dt = wall_time - self._last_info_t_stamp
+        df = float(frame_idx - self._last_info_frame_idx)
+
+        print dt, df
+        if self._last_info_t_stamp == 0 or dt > 0:
+            f = round(df/dt, 2)
+        else:
+            f="NaN"
+
+
         p = self._monit.last_positions
-        f = self._monit.fps
+
 
         pos = {}
         for k,v in p.items():
@@ -120,11 +139,15 @@ class ControlThread(Thread):
         if not f is None:
             cv2.imwrite(self._info["last_drawn_img"], f)
 
+        self._last_info_t_stamp = wall_time
+        self._last_info_frame_idx = frame_idx
 
     def run(self):
         try:
-            logging.info("Starting Monitor thread")
+            self._info["status"] = "initialising"
+            self._info["status"] = "stopping"
 
+            logging.info("Starting Monitor thread")
             self._info["error"] = None
             self._info["time"] = time.time()
             self.thread_init()
@@ -145,6 +168,9 @@ class ControlThread(Thread):
 
     def thread_init(self):
         logging.info("Starting camera")
+
+        self._last_info_t_stamp = 0
+        self._last_info_frame_idx = 0
 
         if self._video_file is None:
             cam = V4L2Camera(0, target_fps=10, target_resolution=(1280, 920))
@@ -177,7 +203,7 @@ class ControlThread(Thread):
                     )
 
     def stop(self, error=None):
-
+        self._info["status"] = "stopping"
         logging.info("Stopping monitor")
         if not self._monit is None:
             self._monit.stop()

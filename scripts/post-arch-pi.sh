@@ -116,7 +116,14 @@ chmod 777 $PSV_DATA_DIR -R
 systemctl enable mysqld.service
 systemctl start mysqld.service
 
-mysql -u root -e "create database $PSV_DB_NAME";
+## not even useful:
+#mysql -u root -e "create database $PSV_DB_NAME";
+
+mysql -u root -e "CREATE USER \"$USER_NAME\"@'localhost' IDENTIFIED BY \"$PASSWORD\""
+mysql -u root -e "CREATE USER \"$USER_NAME\"@'%' IDENTIFIED BY \"$PASSWORD\""
+mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO \"$USER_NAME\"@'localhost' WITH GRANT OPTION";
+mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO \"$USER_NAME\"@'%' WITH GRANT OPTION";
+
 
 # our software.
 # TODO use AUR!

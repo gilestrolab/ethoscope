@@ -119,15 +119,15 @@ class ResultWriter(ResultDBWriterBase):
     def _get_connection(self):
 
         return  MySQLdb.connect(host="localhost",
-                     user="root",
-                      passwd="",
+                     user="psv",
+                      passwd="psv",
                       db=self._db_name)
 
     def _clean_up(self):
         logging.info("connecting to mysql db")
         cn = MySQLdb.connect(host="localhost",
-                     user="root",
-                      passwd="")
+                     user="psv",
+                      passwd="psv")
         logging.info("Setting up cursor")
         c = cn.cursor()
         command = "DROP DATABASE IF EXISTS %s" % self._db_name

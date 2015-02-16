@@ -82,9 +82,9 @@ class Monitor(object):
         self._is_running = False
 
         # effective fps computation
-        self._last_t = 0
-        self._fps = 0
-        self._time_diffs = []
+        # self._last_t = 0
+        # self._fps = 0
+        # self._time_diffs = []
 
         if rois is None:
             rois = rbs.DefaultROIBuilder()(camera)
@@ -102,16 +102,20 @@ class Monitor(object):
     @property
     def last_positions(self):
         return self._last_positions
-    @property
-    def fps(self):
-        #FIXME this is wrong/not updating
-        return self._fps
+
+    # @property
+    # def fps(self):
+    #
+    #     return (self._last_frame_idx +1.0) / self._last_time_stamp
 
     @property
     def last_time_stamp(self):
         time_from_start = self._last_time_stamp / 1e3
         return time_from_start
 
+    @property
+    def last_frame_idx(self):
+        return self._last_frame_idx
     @property
     def last_drawn_frame(self):
         return self._draw_on_frame(self._frame_buffer)
@@ -159,13 +163,8 @@ class Monitor(object):
             logging.info("Monitor starting a run")
             self._is_running = True
             for i,(t, frame) in enumerate(self._camera):
-                self._time_diffs.append(t - self._last_t)
-                if len(self._time_diffs) >10:
 
-                    self._fps = 1e4 / float(sum(self._time_diffs))
-                    self._fps = round(self._fps,3)
-                    self._time_diffs = []
-                    print self._fps
+
 
                 if self._force_stop:
                     logging.info("Monitor object stopped from external request")
@@ -173,7 +172,7 @@ class Monitor(object):
                 elif (self._max_duration is not None and t > self._max_duration):
                     logging.info("Monitor object stopped by timeout")
                     break
-
+                self._last_frame_idx = i
                 self._last_time_stamp = t
                 self._frame_buffer = frame
 

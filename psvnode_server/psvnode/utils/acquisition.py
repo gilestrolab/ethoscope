@@ -40,7 +40,7 @@ class Acquisition(Thread):
 
             if t - last_round > self.timeout:
                 logging.info("Recovering data from device "+self.url+" : "+self.id)
-                self.sync_data()
+                #self.sync_data()
                 last_round = t
 
 

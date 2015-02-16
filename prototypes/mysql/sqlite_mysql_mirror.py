@@ -47,7 +47,7 @@ class MySQLdbToSQlite(object):
             logging.info("Making parent directories")
             os.makedirs(os.path.dirname(self._dst_path))
             logging.info("Success")
-        except OSError:
+        except OSError as e:
             logging.warning(e)
             pass
 
