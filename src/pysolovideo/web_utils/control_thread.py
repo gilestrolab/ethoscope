@@ -44,14 +44,12 @@ class ControlThread(Thread):
         self._monit_kwargs = kwargs
         self._metadata = None
 
+        # for FPS computation
         self._last_info_t_stamp = 0
         self._last_info_frame_idx = 0
 
         # We wipe off previous data
         shutil.rmtree(psv_dir, ignore_errors=True)
-
-
-        # self._result_dir = os.path.join(psv_dir, self._result_dir_basename)
         try:
             os.makedirs(psv_dir)
         except OSError:
@@ -106,20 +104,16 @@ class ControlThread(Thread):
         if self._monit is None:
             return
         t = self._monit.last_time_stamp
+
         frame_idx = self._monit.last_frame_idx
-
         wall_time = time.time()
-
         dt = wall_time - self._last_info_t_stamp
         df = float(frame_idx - self._last_info_frame_idx)
 
-        print dt, df
         if self._last_info_t_stamp == 0 or dt > 0:
             f = round(df/dt, 2)
         else:
             f="NaN"
-
-
         p = self._monit.last_positions
 
 
@@ -145,16 +139,16 @@ class ControlThread(Thread):
     def run(self):
         try:
             self._info["status"] = "initialising"
-            self._info["status"] = "stopping"
-
             logging.info("Starting Monitor thread")
+
             self._info["error"] = None
-            self._info["time"] = time.time()
-            self.thread_init()
+            self._thread_init()
             logging.info("Starting monitor")
 
             rw = ResultWriter(self._mysql_db_name ,self._metadata)
             self._info["status"] = "running"
+
+
             self._monit.run(rw)
             logging.info("Stopping Monitor thread")
             self.stop()
@@ -166,7 +160,7 @@ class ControlThread(Thread):
         except Exception as e:
             self.stop(traceback.format_exc(e))
 
-    def thread_init(self):
+    def _thread_init(self):
         logging.info("Starting camera")
 
         self._last_info_t_stamp = 0
@@ -175,8 +169,7 @@ class ControlThread(Thread):
         if self._video_file is None:
             cam = V4L2Camera(0, target_fps=10, target_resolution=(1280, 920))
         else:
-            cam = MovieVirtualCamera(self._video_file)
-
+            cam = MovieVirtualCamera(self._video_file, use_wall_clock=True)
 
         logging.info("Building ROIs")
         roi_builder = SleepMonitorWithTargetROIBuilder()
@@ -184,36 +177,32 @@ class ControlThread(Thread):
 
         logging.info("Initialising monitor")
 
-
-
         self._metadata = {
                      "machine_id": self._info["machine_id"],
-                     "date_time": self._info["time"],
+                     "date_time": cam.start_time, #the camera start time is the reference 0
                      "frame_width":cam.width,
                      "frame_height":cam.height,
                       "psv_version": pkg_resources.get_distribution("pysolovideo").version
                       }
-
-
-        self._monit = Monitor(cam,
-                    AdaptiveBGModel,
-                    rois,
-                    *self._monit_args,
-                    **self._monit_kwargs
-                    )
+        #the camera start time is the reference 0
+        self._info["time"] = cam.start_time
+        self._monit = Monitor(cam, AdaptiveBGModel, rois,
+                    *self._monit_args, **self._monit_kwargs)
 
     def stop(self, error=None):
         self._info["status"] = "stopping"
+        self._info["time"] = time.time()
+
         logging.info("Stopping monitor")
         if not self._monit is None:
             self._monit.stop()
             self._monit = None
 
-
         self._info["status"] = "stopped"
         self._info["time"] = time.time()
         self._info["error"] = error
         self._info["monitor_infos"] = self._default_monitor_info
+
         if error is not None:
             logging.error("Monitor closed with an error:")
             logging.error(error)

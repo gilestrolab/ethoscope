@@ -75,31 +75,19 @@ class BaseCamera(object):
 
 
 
-class BaseVirtualCamera(BaseCamera):
-    _path=None
+class MovieVirtualCamera(BaseCamera):
 
-    def __init__(self, path, *args, **kwargs):
+
+    def __init__(self, path, use_wall_clock = False,  *args, **kwargs ):
         self._frame_idx = 0
-
-    @property
-    def path(self):
-        return self._path
-    def is_opened(self):
-        return True
-
-    def restart(self):
-        self.__init__(self._path)
-
-
-class MovieVirtualCamera(BaseVirtualCamera):
-
-    def __init__(self, path, *args, **kwargs ):
         self._path = path
+        self._use_wall_clock = use_wall_clock
 
         if not isinstance(path, str):
             raise PSVException("path to video must be a string")
         if not os.path.exists(path):
             raise PSVException("'%s' does not exist. No such file" % path)
+
         self.capture = cv2.VideoCapture(path)
         w = self.capture.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH)
         h = self.capture.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)
@@ -111,16 +99,39 @@ class MovieVirtualCamera(BaseVirtualCamera):
 
         self._resolution = (int(w),int(h))
 
-        super(MovieVirtualCamera, self).__init__(path,*args, **kwargs)
+        super(MovieVirtualCamera, self).__init__(path, *args, **kwargs)
+
+        # emulates v4l2 (real time camera) from video file
+        if self._use_wall_clock:
+            self._start_time = time.time()
+        else:
+            self._start_time = 0
+
+    @property
+    def start_time(self):
+        return self._start_time
+
+    @property
+    def path(self):
+        return self._path
+
+    def is_opened(self):
+        return True
+
+    def restart(self):
+        self.__init__(self._path, self._use_wall_clock)
+
 
     def _next_image(self):
         _, frame = self.capture.read()
-
         return frame
 
     def _time_stamp(self):
-        time_s = self.capture.get(cv2.cv.CV_CAP_PROP_POS_MSEC) / 1e3
+        if self._use_wall_clock:
+            now = time.time()
+            return now - self._start_time
 
+        time_s = self.capture.get(cv2.cv.CV_CAP_PROP_POS_MSEC) / 1e3
         return time_s
 
     def is_last_frame(self):
@@ -195,6 +206,9 @@ class V4L2Camera(BaseCamera):
         now = time.time()
         # relative time stamp
         return now - self._start_time
+    @property
+    def start_time(self):
+        return self._start_time
 
     def _close(self):
         self.capture.release()
