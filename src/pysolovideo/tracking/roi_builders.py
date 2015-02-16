@@ -32,7 +32,12 @@ class ROI(object):
         self._idx = self.__global_idx
         if value is None:
             self._value = self._idx
+        else:
+            self._value = value
+
         ROI.__global_idx +=1
+    def __del__(self):
+        ROI.__global_idx -=1
 
     @property
     def idx(self):
