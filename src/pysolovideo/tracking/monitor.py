@@ -61,7 +61,7 @@ class Monitor(object):
 
         self._draw_results = draw_results
         # self._result_writer = result_writer
-
+        self._last_frame_idx =0
         if self._draw_results:
             import os
             self._window_name = "psv_" + str(os.getpid())

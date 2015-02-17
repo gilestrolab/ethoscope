@@ -116,7 +116,6 @@ class ControlThread(Thread):
             f="NaN"
         p = self._monit.last_positions
 
-
         pos = {}
         for k,v in p.items():
             pos[k] = dict(v)
@@ -146,9 +145,8 @@ class ControlThread(Thread):
             logging.info("Starting monitor")
 
             rw = ResultWriter(self._mysql_db_name ,self._metadata)
+
             self._info["status"] = "running"
-
-
             self._monit.run(rw)
             logging.info("Stopping Monitor thread")
             self.stop()
