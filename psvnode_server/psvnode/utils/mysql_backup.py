@@ -28,7 +28,7 @@ import logging
 """
 
 class MySQLdbToSQlite(object):
-    def __init__(self, dst_path, remote_db_name="psv_db", remote_host="localhost", remote_user="root", remote_pass="", overwrite=True):
+    def     __init__(self, dst_path, remote_db_name="psv_db", remote_host="localhost", remote_user="root", remote_pass="", overwrite=True):
         """
         A class to backup remote psv MySQL data base into a local sqlite3 one.
         The name of the static (not updated during run) and the dynamic tables is hardcoded.
