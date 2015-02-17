@@ -31,7 +31,7 @@
                 controller  : 'smController'
             })
 
-            // route for the sleep deprivator page
+            // route for the sleep depriver page
             .when('/sd/:device_id', {
                 templateUrl : '/static/pages/sd.html',
                 controller  : 'sdController'
@@ -162,6 +162,10 @@
 
             })
         }
+
+        $scope.sm.alert= function(message){
+                alert(message);
+            }
 
         $scope.sm.elapsedtime = function(t){
 

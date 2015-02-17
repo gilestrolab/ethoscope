@@ -109,17 +109,14 @@ def get_devices_list():
 
 @app.post('/devices_list')
 def post_devices_list():
+    # @Luis I don't get this, is is meant to update device status on request?
+    # When is that used?  I presume it should be updated at every refresh right?
     global devices_map
     data = request.body.read()
     data = json.loads(data)
     device_id = data['device_id']
     status = data['status']
-    # fixme get device human friendly name here as well. we may need it to save data in human readable dirs
-    # fixme get the metadata time stamp (+ format it e.g. 2014-12-18_18:21:43) so we can format out dir.
-    # alternatively, I can get all of these from the database metadata table,
-    # but would be better if `Acquisition` knew where to save the data at start ;)
     devices_map[device_id]['status'] = status
-
 
 #Get the information of one Sleep Monitor
 @app.get('/device/<id>/data')
