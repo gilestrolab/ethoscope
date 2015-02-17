@@ -226,6 +226,10 @@ class ObjectModel(object):
         b = np.exp(- (features - means) ** 2  / (2 * stds ** 2))
 
         likelihoods =  a * b
+
+        if np.any(likelihoods==0):
+            return 0
+
         logls = np.sum(np.log10(likelihoods)) / len(likelihoods)
 
         return -1.0 * logls
