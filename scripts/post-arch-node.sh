@@ -10,10 +10,10 @@
 
 set -e # stop if any error happens
 
-USER_NAME=psv
-PASSWORD=psv
-PSV_DATA_DIR=/psv_data
-PSV_DB_NAME=psv_db
+USER_NAME=node
+PASSWORD=node
+PSV_DATA_DIR=/node_data
+PSV_DB_NAME=node_db
 
 ############# PACKAGES #########################
 echo 'Installing and updating packages'
@@ -22,8 +22,9 @@ echo 'Installing and updating packages'
 # pacman-key --init
 pacman -Syu --noconfirm
 pacman -S base-devel git gcc-fortran rsync wget --noconfirm --needed
-### Video capture related
-pacman -S opencv mplayer ffmpeg gstreamer gstreamer0.10-plugins mencoder --noconfirm --needed
+
+### Video capture related Not needed in Node
+#pacman -S opencv mplayer ffmpeg gstreamer gstreamer0.10-plugins mencoder --noconfirm --needed
 # a desktop environment may be useful:
 pacman -S xorg-server xorg-utils xorg-server-utils xorg-xinit xf86-video-fbdev lxde slim --noconfirm --needed
 # utilities
@@ -53,7 +54,6 @@ echo 'Key=PSV_WIFI_pIAEZF2s@jmKH' >> /etc/netctl/psv_wifi
 # Uncomment this if your ssid is hidden
 #echo 'Hidden=yes'
 
-
 ######################################################################################
 echo 'Enabling startuup deamons'
 
@@ -67,7 +67,9 @@ systemctl start sshd.service
 netctl start psv_wifi
 netctl enable psv_wifi
 
-
+# Setting passwordless ssh, this is the content of id_rsa.pub
+#echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKXjWAfHrJ/HAPO3d4vu5s5+Xxw5NDKX1a8rqx3amo0WO7wWe0m2uv+rnJuH7xvWCKMOGlv9jgj1vSSNcuMT30tzioHqRf/k7scUXFPoWxvxTZtqXizZwKe93mfOvCC5Ni5zLtUyMqycnLPGP2K1Rf0Xvx/WLP94bcxXyTaGtftvTcAIC53Kll1XgyHSxsh1ou7rTXt57V0/1wnWqOGH1Y+AMqUkBEKjU2QUZyYoUaVSfwBwSpIi8tvH/Ng5aEH6BGs4cqDnXUBWpdDD6JdR5NxhqYK0lcpWltBlSz8RFvoOKpyQ/0vs5ysNPgX/N4eaHWhECRFD5oNkNXIUBRpe3/ psv@polygonaltree.com
+#' > /home/psv/.ssh/authorized_keys
 
 
 #TODOs: locale/TIMEZONE/keyboard ...
@@ -81,11 +83,6 @@ useradd -m -g users -G wheel -s /bin/bash  -p $pass $USER_NAME
 
 echo 'exec startlxde' >> /home/$USER_NAME/.xinitrc
 chown $USER_NAME /home/$USER_NAME/.xinitrc
-
-# Setting passwordless ssh, this is the content of id_rsa.pub
-mkdir -p /home/$USER_NAME/.ssh
-echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKXjWAfHrJ/HAPO3d4vu5s5+Xxw5NDKX1a8rqx3amo0WO7wWe0m2uv+rnJuH7xvWCKMOGlv9jgj1vSSNcuMT30tzioHqRf/k7scUXFPoWxvxTZtqXizZwKe93mfOvCC5Ni5zLtUyMqycnLPGP2K1Rf0Xvx/WLP94bcxXyTaGtftvTcAIC53Kll1XgyHSxsh1ou7rTXt57V0/1wnWqOGH1Y+AMqUkBEKjU2QUZyYoUaVSfwBwSpIi8tvH/Ng5aEH6BGs4cqDnXUBWpdDD6JdR5NxhqYK0lcpWltBlSz8RFvoOKpyQ/0vs5ysNPgX/N4eaHWhECRFD5oNkNXIUBRpe3/ psv@polygonaltree.com
-' >> /home/$USER_NAME/.ssh/authorized_keys
 
 ############################################
 echo 'Generating boot config'
