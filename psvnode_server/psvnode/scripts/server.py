@@ -77,7 +77,7 @@ def index():
 def devices():
 
     strs = subprocess.check_output(shlex.split('ip r l'))
-    host_ip = strs.split(b'src')[-1].split()[0]
+    host_ip = strs.split(b'wlan0')[0].split()[-2]
     host_ip = host_ip.decode('utf-8').split('.')
 
     subnet_ip = ".".join(host_ip[0:3])
