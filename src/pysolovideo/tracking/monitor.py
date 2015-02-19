@@ -129,16 +129,20 @@ class Monitor(object):
         frame_cp = frame.copy()
         positions = self._last_positions
         for track_u in self._unit_trackers:
-            cv2.putText(frame_cp, str(track_u.roi.idx), track_u.roi.offset, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.75, (255,255,0))
+            cv2.putText(frame_cp, str(track_u.roi.idx), track_u.roi.offset, cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,0))
+            roi_colour = (0, 255,0)
+            cv2.drawContours(frame_cp,[track_u.roi.polygon],-1, roi_colour, 1, cv2.CV_AA)
             try:
                 pos = positions[track_u.roi.idx]
+                if pos is None:
+                    continue
             except KeyError:
                 continue
 
-            if pos["has_interacted"]:
-                roi_colour = (0, 255,0)
-            else:
-                roi_colour = (255,0 , 255)
+            # if pos["has_interacted"]:
+            #     roi_colour = (0, 255,0)
+            # else:
+            #     roi_colour = (255,0 , 255)
 
 
             if pos["is_inferred"]== True:
@@ -146,7 +150,7 @@ class Monitor(object):
             else:
                 colour = (0,255,255)
 
-            cv2.drawContours(frame_cp,[track_u.roi.polygon],-1, roi_colour, 1, cv2.CV_AA)
+
             cv2.ellipse(frame_cp,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),colour,1,cv2.CV_AA)
 
         return frame_cp
@@ -183,12 +187,14 @@ class Monitor(object):
                     data_row = track_u(t, frame)
 
                     if data_row is None:
+                        self._last_positions[track_u.roi.idx] = None
                         continue
 
                     abs_pos = track_u.get_last_position(absolute=True)
 
-                    if abs_pos is not None:
-                        self._last_positions[track_u.roi.idx] = abs_pos
+                    # if abs_pos is not None:
+                    self._last_positions[track_u.roi.idx] = abs_pos
+
                     if not result_writer is None:
                         result_writer.write(t,track_u.roi, data_row)
 

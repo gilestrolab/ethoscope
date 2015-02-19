@@ -118,6 +118,8 @@ class ControlThread(Thread):
 
         pos = {}
         for k,v in p.items():
+            if v is None:
+                continue
             pos[k] = dict(v)
             pos[k]["roi_idx"] = k
 
@@ -144,10 +146,10 @@ class ControlThread(Thread):
             self._thread_init()
             logging.info("Starting monitor")
 
-            rw = ResultWriter(self._mysql_db_name ,self._metadata)
+            with ResultWriter(self._mysql_db_name ,self._metadata) as rw:
+                self._info["status"] = "running"
+                self._monit.run(rw)
 
-            self._info["status"] = "running"
-            self._monit.run(rw)
             logging.info("Stopping Monitor thread")
             self.stop()
 

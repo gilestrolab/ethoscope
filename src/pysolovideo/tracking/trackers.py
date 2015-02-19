@@ -30,6 +30,9 @@ class BoolVariableBase(IntVariableBase):
 class IsInferredVariable(BoolVariableBase):
     header_name = "is_inferred"
 
+class Strong(BoolVariableBase):
+    header_name = "am_i_strong"
+
 class PhiVariable(IntVariableBase):
     header_name = "phi"
     functional_type = "angle"
@@ -82,8 +85,6 @@ class DataPoint(collections.OrderedDict):
 
     def append(self, item):
         self.__setitem__(item.header_name, item)
-
-
 
 
 class NoPositionError(Exception):
@@ -139,7 +140,7 @@ class BaseTracker(object):
 
         return point
 
-    def _infer_position(self, t, max_time=60 * 1000):
+    def _infer_position(self, t, max_time=30 * 1000):
         if len(self._times) == 0:
             return None
         if t - self._last_non_inferred_time  > max_time:

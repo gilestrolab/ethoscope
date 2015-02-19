@@ -18,6 +18,7 @@ class ResultDBWriterBase(object):
     def __init__(self,  metadata=None, *args, **kwargs):
         self._last_t, self._last_flush_t = 0, 0
         self.metadata = metadata
+        self._conn = None
         if self.metadata is None:
             self.metadata  = {}
 
@@ -100,9 +101,14 @@ class ResultDBWriterBase(object):
         command = "INSERT INTO ROI_MAP VALUES %s" % str((fd["idx"], fd["value"], fd["x"], fd["y"], fd["w"], fd["h"]))
         c.execute(command)
 
-    def __del__(self):
-        self.flush()
-        self._conn.close()
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        logging.info("Closing result writer")
+        self._conn.commit()
+        if self._conn is not None:
+            self._conn.close()
     def close(self):
         pass
 
@@ -117,29 +123,70 @@ class ResultWriter(ResultDBWriterBase):
         super(ResultWriter, self).__init__(*args, **kwargs)
 
     def _get_connection(self):
-
-        return  MySQLdb.connect(host="localhost",
-                     user="psv",
-                      passwd="psv",
+        try:
+            db =   MySQLdb.connect(host="localhost",
+                     user="psv", passwd="psv",
                       db=self._db_name)
+            print "db ok", db
+        except MySQLdb.OperationalError:
+            logging.warning("Database does not seem to exist. Creating it")
+            db =   MySQLdb.connect(host="localhost",
+                     user="psv", passwd="psv")
+
+            c = db.cursor()
+            cmd = "RESET MASTER"
+            logging.info("Removing binary log")
+            c.execute(cmd)
+            cmd = "CREATE DATABASE %s" % self._db_name
+            c.execute(cmd)
+            logging.info("Database created")
+
+            cmd = "SET GLOBAL innodb_file_per_table=1"
+            c.execute(cmd)
+            cmd = "SET GLOBAL innodb_file_format=Barracuda"
+            c.execute(cmd)
+            cmd = "SET GLOBAL autocommit=0"
+            c.execute(cmd)
+            db.close()
+
+            db = self._get_connection()
+        return  db
 
     def _clean_up(self):
         logging.info("connecting to mysql db")
-        cn = MySQLdb.connect(host="localhost",
-                     user="psv",
-                      passwd="psv")
+
+        cn = self._get_connection()
+
         logging.info("Setting up cursor")
         c = cn.cursor()
-        command = "DROP DATABASE IF EXISTS %s" % self._db_name
 
-        logging.info("Resetting DB")
+
+        #Truncate all tables before dropping db for performance
+        command = "SHOW TABLES"
         c.execute(command)
-        command = "CREATE DATABASE %s" % self._db_name
+
+        # to_truncate = ["RENAME TABLE %s"% t
+        to_execute  = []
+        for t in c:
+            t = t[0]
+            command = "TRUNCATE TABLE %s" % t
+            to_execute.append(command)
+            # to_execute.append("RENAME TABLE %s TO OLD_%s, TMP_%s TO %s" % (t,t,t,t))
+            # to_execute.append("DROP TABLE OLD_%s" % t)
+        logging.info("Truncating all database tables")
+        # import multiprocessing
+        # multiprocessing.Pool(1)
+        for te in to_execute:
+            c.execute(te)
+        cn.commit()
+
+        logging.info("Dropping entire database")
+        command = "DROP DATABASE IF EXISTS %s" % self._db_name
         c.execute(command)
-        logging.info("Cleaned up")
         cn.close()
+
     def _create_table(self, cursor, name, fields, engine="MyISAM"):
-        command = "CREATE TABLE %s (%s) ENGINE %s" % (name, fields, engine)
+        command = "CREATE TABLE %s (%s) ENGINE %s KEY_BLOCK_SIZE=16" % (name, fields, engine)
         cursor.execute(command)
 
 
