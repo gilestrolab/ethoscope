@@ -10,7 +10,7 @@ import MySQLdb
 #
 #TODO add HIGH_PRIORITY to inserts!
 class ResultDBWriterBase(object):
-    _flush_every_ns = 10 # flush every 10s of data
+    _flush_every_ns = 30 # flush every 10s of data
 
     def _create_table(self, cursor, name, fields):
         raise NotImplementedError()
@@ -59,7 +59,7 @@ class ResultDBWriterBase(object):
         self._add(t, roi, data_row)
 
     def flush(self):
-        if (self._last_t - self._last_flush_t) < self._flush_every_ns * 1000:
+        if (self._last_t - self._last_flush_t) < (self._flush_every_ns * 1000):
             return
         self._conn.commit()
         self._last_flush_t =  self._last_t
@@ -127,7 +127,6 @@ class ResultWriter(ResultDBWriterBase):
             db =   MySQLdb.connect(host="localhost",
                      user="psv", passwd="psv",
                       db=self._db_name)
-            print "db ok", db
         except MySQLdb.OperationalError:
             logging.warning("Database does not seem to exist. Creating it")
             db =   MySQLdb.connect(host="localhost",

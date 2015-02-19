@@ -2,11 +2,14 @@ from bottle import *
 import shlex
 import urllib2
 import subprocess
+import socket
 import json
 import multiprocessing
 import logging
 import traceback
 from psvnode.utils.acquisition import Acquisition
+from netifaces import interfaces, ifaddresses, AF_INET
+import optparse
 
 app = Bottle()
 STATIC_DIR = "../../static"
@@ -55,6 +58,12 @@ def format_post_get_url(id, what,type=None, port=9000):
         return url + "/" + type
     return url
 
+def get_subnet_ip(device="wlan0"):
+    try:
+        ip = ifaddresses(device)[AF_INET][0]["addr"]
+        return ".".join(ip.split(".")[0:3])
+    except ValueError:
+        raise ValueError("Device '%s' is not valid" % device)
 @app.get('/favicon.ico')
 def get_favicon():
     return server_static(STATIC_DIR+'/img/favicon.ico')
@@ -76,11 +85,8 @@ def index():
 @app.get('/devices')
 def devices():
 
-    strs = subprocess.check_output(shlex.split('ip r l'))
-    host_ip = strs.split(b'wlan0')[0].split()[-2]
-    host_ip = host_ip.decode('utf-8').split('.')
 
-    subnet_ip = ".".join(host_ip[0:3])
+    subnet_ip = get_subnet_ip(SUBNET_DEVICE)
 
     logging.info("Scanning attached devices")
     urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(256)]
@@ -217,6 +223,24 @@ def get_log(id):
 
 
 if __name__ == '__main__':
+    # TODO where to save the files and the logs
+
+    logging.getLogger().setLevel(logging.INFO)
+
+    parser = optparse.OptionParser()
+    parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
+    parser.add_option("-p", "--port", dest="port", default=80,help="port")
+    (options, args) = parser.parse_args()
+
+    option_dict = vars(options)
+    DEBUG = option_dict["debug"]
+    PORT = option_dict["port"]
+
+    if DEBUG:
+        SUBNET_DEVICE = b'enp3s0'
+    else:
+        SUBNET_DEVICE = b'wlan0'
+
 
     global devices_map
     devices_map = {}
@@ -225,19 +249,24 @@ if __name__ == '__main__':
     acquisition = {}
 
 
-    logging.getLogger().setLevel(logging.INFO)
+
+
     for k, device in devices_map.iteritems():
         if device['status'] == 'running':
             acquisition[k]= Acquisition(device)
             acquisition[k].start()
     try:
-        #get the connected devices that are doing tracking and start acquisitions threads.
-        # @luis TODO => I am not quite sure about debug here.
-        run(app, host='0.0.0.0', port=8000, debug=debug)
+
+        run(app, host='0.0.0.0', port=PORT, debug=DEBUG)
 
     except KeyboardInterrupt:
         pass
+
+    except socket.error as e:
+        logging.error(traceback.format_exc(e))
+        logging.error("Port %i is probably not accessible for you. Maybe use another one e.g.`-p 8000`" % PORT)
     except Exception as e:
+
         logging.error(traceback.format_exc(e))
 
     finally:

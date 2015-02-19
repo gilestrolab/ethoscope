@@ -24,5 +24,6 @@ setup(
         "bottle>=0.12.8",
         "pexpect>=3.3", # FIXME possibly not needed anymore
         "MySQL-python >= 1.2.5",
+        "netifaces >= 0.10.4"
     ],
 )

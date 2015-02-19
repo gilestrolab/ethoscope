@@ -61,11 +61,14 @@ class TestMySQL(unittest.TestCase):
         #n = 40000 # 2.22h of data
 
         for t in range(0, n):
+            rt = t * 1000 /5
+            # print rt
             if t % (n/100)== 0:
                 logging.info("filling with dummy variables: %f percent" % (100.*float(t)/float(n)))
             for r in rois:
                 data = rpg.make_one_point()
-                rw.write(t*100, r, data)
+
+                rw.write(rt , r, data)
             rw.flush()
         rw.close()
 
