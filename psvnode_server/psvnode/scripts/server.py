@@ -15,7 +15,7 @@ app = Bottle()
 STATIC_DIR = "../../static"
 
 
-def scan_url(url, timeout=0.5, port=9000):
+def get_data_from_url(url, timeout=0.5, port=9000):
     """
     Pings an url and try parsing its message as JSON data. This is typically used within a multithreading.Pool.map in
     order to request multiple arbitrary urls.
@@ -40,6 +40,18 @@ def scan_url(url, timeout=0.5, port=9000):
     except Exception as e:
         logging.error("Unexpected error whilst scanning url: %s" % url )
         raise e
+
+def get_data_from_id(id):
+    url = format_post_get_url(id,"data")
+    req = urllib2.Request(url=url)
+    f = urllib2.urlopen(req)
+    message = f.read()
+    if message:
+        data = json.loads(message)
+        return data
+    else:
+        raise urllib2.URLError("No data at this url `%s`" % url)
+
 def format_post_get_url(id, what,type=None, port=9000):
     """
     Just a routine to format our GET urls. This improves readability whilst allowing us to change convention (e.g. port) without rewriting everything.
@@ -84,14 +96,11 @@ def index():
 
 @app.get('/devices')
 def devices():
-
-
     subnet_ip = get_subnet_ip(SUBNET_DEVICE)
-
     logging.info("Scanning attached devices")
     urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(256)]
     pool = multiprocessing.Pool(256)
-    devices_list = pool.map(scan_url, urls_to_scan)
+    devices_list = pool.map(get_data_from_url, urls_to_scan)
     pool.terminate()
 
     global devices_map
@@ -99,6 +108,7 @@ def devices():
     for d in devices_list:
         if d is None:
             continue
+        print d
         devices_map[d["machine_id"]] = d
 
     logging.info("%i devices found:" % len(devices_map))
@@ -118,6 +128,7 @@ def post_devices_list():
     # @Luis I don't get this, is is meant to update device status on request?
     # When is that used?  I presume it should be updated at every refresh right?
     global devices_map
+    #TODO just update here ;)
     data = request.body.read()
     data = json.loads(data)
     device_id = data['device_id']
@@ -128,35 +139,39 @@ def post_devices_list():
 @app.get('/device/<id>/data')
 def device(id):
     try:
-        url = format_post_get_url(id,"data")
-        req = urllib2.Request(url=url)
-        f = urllib2.urlopen(req)
-        message = f.read()
-        if message:
-            data = json.loads(message)
-            return data
-    except Exception as e:
-        return {'error':traceback.format_exc(e)}
-        
-@app.get('/device/<id>/controls/<type_of_req>')
-def device(id, type_of_req):
-    try:
-        url = format_post_get_url(id,"controls", type=type_of_req)
-        req = urllib2.Request(url=url)
-        f = urllib2.urlopen(req,{})
-        message = f.read()
-        if message:
-            data = json.loads(message)
-            return data
+        data = get_data_from_id(id)
 
-    except Exception as e:
-        logging.error(traceback.format_exc(e))
+        devices_map[id].update(data)
+        return data
+
+    except urllib2.URLError as e:
+        del devices_map[id]
         return {'error':traceback.format_exc(e)}
+    except Exception as e:
+        return {'error':traceback.format_exc(e)}
+
+# @LUIS do we use that ?
+# FIXME
+# @app.get('/device/<id>/controls/<type_of_req>')
+# def device(id, type_of_req):
+#     try:
+#         url = format_post_get_url(id,"controls", type=type_of_req)
+#         req = urllib2.Request(url=url)
+#         f = urllib2.urlopen(req,{})
+#         message = f.read()
+#         if message:
+#             data = json.loads(message)
+#             devices_map[id].delete te(data)
+#             print "updating device map for", id
+#             return data
+#
+#     except Exception as e:
+#         logging.error(traceback.format_exc(e))
+#         return {'error':traceback.format_exc(e)}
 
 @app.post('/device/<id>/controls/<type_of_req>')
 def device(id, type_of_req):
     global acquisition
-
     try:
         data = request.body.read()
         url = format_post_get_url(id,"controls", type=type_of_req)
@@ -167,7 +182,10 @@ def device(id, type_of_req):
             return
 
         data = json.loads(message)
-        #start acquisition thread
+
+        # Just updating the device map
+        device_info = get_data_from_id(id)
+        devices_map[id].update(device_info)
         try:
             if type_of_req == 'start' and data['status'] == 'started':
                 acquisition[id] = Acquisition(devices_map[id])
@@ -260,13 +278,14 @@ if __name__ == '__main__':
         run(app, host='0.0.0.0', port=PORT, debug=DEBUG)
 
     except KeyboardInterrupt:
+        logging.info("Stopping server cleanly")
         pass
 
     except socket.error as e:
         logging.error(traceback.format_exc(e))
         logging.error("Port %i is probably not accessible for you. Maybe use another one e.g.`-p 8000`" % PORT)
-    except Exception as e:
 
+    except Exception as e:
         logging.error(traceback.format_exc(e))
 
     finally:

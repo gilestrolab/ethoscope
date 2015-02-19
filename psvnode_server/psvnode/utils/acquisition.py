@@ -73,6 +73,7 @@ class Acquisition(Thread):
             raise e
     # let us ensure the garbage collector does its work
     def __del__(self):
+        logging.info("Stopping acquisition thread")
         self.stop()
 
     def stop(self):
