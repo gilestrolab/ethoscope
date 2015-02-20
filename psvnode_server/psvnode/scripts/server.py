@@ -35,13 +35,15 @@ def scan_one_device(url, timeout=.5, port=9000):
             return
         resp = json.loads(message)
 
-        return update_device_map(resp['id'],"data")
+        return (resp['id'],url)
 
     except urllib2.URLError:
-        return
+        logging.warning("URL error whist scanning url: %s" % url )
+        return None, None       
     except Exception as e:
         logging.error("Unexpected error whilst scanning url: %s" % url )
         raise e
+
 
 
 def update_device_map(id, what,type=None, port=9000, data=None):
@@ -58,11 +60,13 @@ def update_device_map(id, what,type=None, port=9000, data=None):
 
     ip = devices_map[id]["ip"]
 
-    url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
-    if type is not None:
-        url = url + "/" + type
 
-    req = urllib2.Request(url=url, data = data, headers={'Content-Type': 'application/json'})
+    request_url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
+
+    if type is not None:
+        request_url = request_url + "/" + type
+
+    req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
 
     f = urllib2.urlopen(req)
     message = f.read()
@@ -108,17 +112,22 @@ def index():
 def scan_subnet():
     subnet_ip = get_subnet_ip(SUBNET_DEVICE)
     logging.info("Scanning attached devices")
-    urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(2,254)]
+    # urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(2,254)]
+    urls_to_scan = ["http://%s.150" % subnet_ip]
+    print urls_to_scan
     pool = multiprocessing.Pool(len(urls_to_scan))
-    devices_list = pool.map(scan_one_device, urls_to_scan)
+    devices_id_url_list = pool.map(scan_one_device, urls_to_scan)
+
     pool.terminate()
 
     global devices_map
     devices_map = {}
-    for d in devices_list:
-        if d is None:
+    for id, ip in devices_id_url_list :
+        if id is None:
             continue
-        devices_map[d["machine_id"]] = d
+        devices_map[id] = {"ip":ip}
+        update_device_map(id,what="data")
+
 
     logging.info("%i devices found:" % len(devices_map))
 
@@ -222,7 +231,7 @@ if __name__ == '__main__':
     PORT = option_dict["port"]
 
     if DEBUG:
-        SUBNET_DEVICE = b'enp3s0'
+        SUBNET_DEVICE = b'eno1'
     else:
         SUBNET_DEVICE = b'wlan0'
 
