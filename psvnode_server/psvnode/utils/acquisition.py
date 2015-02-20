@@ -5,8 +5,8 @@ import os
 from threading import Thread
 import json
 import urllib2
-import traceback
 from mysql_backup import MySQLdbToSQlite
+import traceback
 
 class Acquisition(Thread):
     _db_credentials = {
@@ -61,45 +61,52 @@ class Acquisition(Thread):
         super(Acquisition, self).__init__()
 
     def _update_device_info(self, what="data", port=9000):
-        ip = self._device_info["ip"]
-        request_url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
-        req = urllib2.Request(url=request_url, headers={'Content-Type': 'application/json'})
+        try:
+            ip = self._device_info["ip"]
+            id = self._device_info["machine_id"]
 
-        message = urllib2.urlopen(req).read()
+            request_url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
+            req = urllib2.Request(url=request_url, headers={'Content-Type': 'application/json'})
+            f = urllib2.urlopen(req)
+            message = f.read()
 
-        if message:
-            data = json.loads(message)
-            self._device_info.update(data)
-
+            if message:
+                data = json.loads(message)
+                self._device_info.update(data)
+        except Exception as e:
+            logging.error(traceback.format_exc(e))
 
     def run(self):
 
         try:
-
+            t0 = time.time()
             mirror = None
 
             while not self._force_stop:
-
+                time.sleep(.1)
+                now = time.time()
+                if now - t0 < self._delay_between_updates:
+                    continue
+                t0 = now
                 self._update_device_info()
-                time.sleep(self._delay_between_updates)
-
-                if self._device_info["status"] is not "running":
-                    print "status in acquisition:======== ", self._device_info["status"]
+                if self._device_info["status"] != "running":
                     mirror = None
                     continue
+
                 if mirror is None:
                     mirror= MySQLdbToSQlite(self._output_db_file, self._db_credentials["name"],
                                     remote_host=self._database_ip,
                                     remote_pass=self._db_credentials["password"],
                                     remote_user=self._db_credentials["user"])
-
-
                 mirror.update_roi_tables()
+
+
+
 
         except Exception as e:
             logging.error(traceback.format_exc(e))
             raise e
-    # let us ensure the garbage collector does its work
+
     def __del__(self):
         logging.info("Stopping acquisition thread")
         self.stop()

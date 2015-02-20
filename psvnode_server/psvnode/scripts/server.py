@@ -243,9 +243,6 @@ if __name__ == '__main__':
 
     acquisition = {}
 
-
-
-
     for k, device in devices_map.iteritems():
         if device['status'] == 'running':
             acquisition[k]= Acquisition(device)
@@ -269,52 +266,3 @@ if __name__ == '__main__':
         for a in acquisition.values():
             a.stop()
             a.join()
-
-
-# def get_data_from_id(id):
-#     url = format_post_get_url(id,"data")
-#     req = urllib2.Request(url=url)
-#     f = urllib2.urlopen(req)
-#     message = f.read()
-#     if message:
-#         data = json.loads(message)
-#         return data
-#     else:
-#         raise urllib2.URLError("No data at this url `%s`" % url)
-
-# def format_post_get_url(id, what,type=None, port=9000):
-#     """
-#     Just a routine to format our GET urls. This improves readability whilst allowing us to change convention (e.g. port) without rewriting everything.
-#
-#     :param id: machine unique identifier
-#     :param what: e.g. /data, /control
-#     :param type: the type of request for POST
-#     :param port:
-#     :return:
-#     """
-#
-#     ip = devices_map[id]["ip"]
-#
-#     url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
-#     if type is not None:
-#         return url + "/" + type
-#     return url
-
-# @LUIS do we use that ?
-# FIXME
-# @app.get('/device/<id>/controls/<type_of_req>')
-# def device(id, type_of_req):
-#     try:
-#         url = format_post_get_url(id,"controls", type=type_of_req)
-#         req = urllib2.Request(url=url)
-#         f = urllib2.urlopen(req,{})
-#         message = f.read()
-#         if message:
-#             data = json.loads(message)
-#             devices_map[id].delete te(data)
-#             print "updating device map for", id
-#             return data
-#
-#     except Exception as e:
-#         logging.error(traceback.format_exc(e))
-#         return {'error':traceback.format_exc(e)}
