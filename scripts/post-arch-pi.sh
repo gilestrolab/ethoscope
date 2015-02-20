@@ -55,6 +55,17 @@ echo 'Key=PSV_WIFI_pIAEZF2s@jmKH' >> /etc/netctl/psv_wifi
 
 
 ######################################################################################
+
+#Updating ntp.conf
+
+echo 'server 192.169.123.1' >> /etc/ntp.conf
+echo 'server 127.0.0.0' >> /etc/ntp.conf
+echo 'restrict default kod limited nomodify nopeer noquery notrap' >> /etc/ntp.conf
+echo 'restrict 127.0.0.1' >> /etc/ntp.conf
+echo 'restrict ::1' >> /etc/ntp.conf
+echo 'driftfile /var/lib/ntp/ntp.drift' >> /etc/ntp.conf
+
+######################################################################################
 echo 'Enabling startuup deamons'
 
 # Enable networktime protocol
