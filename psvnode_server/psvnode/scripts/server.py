@@ -221,7 +221,7 @@ if __name__ == '__main__':
     PORT = option_dict["port"]
 
     if DEBUG:
-        SUBNET_DEVICE = b'enp3s0'
+        SUBNET_DEVICE = b'eno1'
     else:
         SUBNET_DEVICE = b'wlan0'
 
