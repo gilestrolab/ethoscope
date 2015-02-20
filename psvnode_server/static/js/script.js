@@ -109,29 +109,20 @@
                     device_ip = data;
                 });
 
+        refresh_data = $interval(refresh, 3000);
+
         $scope.sm.start = function(){
-            $scope.starting = true;
-            starting_tracking.appendChild(spStart.el);
-
-            $http.post('/device/'+device_id+'/controls/start', data={"time":Date.now() / 1000.})
-                 .success(function(data){
-                    $scope.device.status = data.status;
-                    if (data.status == 'started'){
-                        $timeout(refresh,1000);
-                        refresh_data = $interval(refresh, 3000);
-
-                    }
-                });
+                            $scope.starting = true;
+                            starting_tracking.appendChild(spStart.el);
+                            $http.post('/device/'+device_id+'/controls/start', data={"time":Date.now() / 1000.})
+                                 .success(function(data){$scope.device.status = data.status;});
         };
 
         $scope.sm.stop = function(){
-            $http.post('/device/'+device_id+'/controls/stop', data={})
-                 .success(function(data){
-                    $scope.device.status = data.status;
-                    if (data.status == 'stopped'){
-                        $interval.cancel(refresh_data);
-                    }
-                });
+                            $http.post('/device/'+device_id+'/controls/stop', data={})
+                            .success(function(data){
+                                $scope.device.status = data.status;
+                            });
         };
 
         $scope.sm.download = function(){
@@ -141,12 +132,12 @@
         $scope.sm.log = function(){
             var log_file_path = ''
             if ($scope.showLog == false){
-                    log_file_path = $scope.device.log_file;
-                    $http.post('/device/'+device_id+'/log', data={"file_path":log_file_path})
-                        .success(function(data, status, headers, config){
-                            $scope.log = data;
-                            $scope.showLog = true;
-                        });
+                log_file_path = $scope.device.log_file;
+                $http.post('/device/'+device_id+'/log', data={"file_path":log_file_path})
+                     .success(function(data, status, headers, config){
+                        $scope.log = data;
+                        $scope.showLog = true;
+                     });
             }else{
                 $scope.showLog = false;
             }
@@ -197,10 +188,10 @@
                         $scope.starting= false;
                         spStart.stop();
                     }
-                    });
-            }
+                 });
+       }
 
-        });
+    });
 
     app.controller('sdController',  function($scope, $http,$routeParams)  {
 

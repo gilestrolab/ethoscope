@@ -34,6 +34,7 @@ def scan_one_device(url, timeout=.5, port=9000):
         if not message:
             return
         resp = json.loads(message)
+
         return update_device_map(resp['id'],"data")
 
     except urllib2.URLError:
