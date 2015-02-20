@@ -60,13 +60,11 @@ def update_device_map(id, what="data",type=None, port=9000, data=None):
 
     ip = devices_map[id]["ip"]
 
-
     request_url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
 
     if type is not None:
         request_url = request_url + "/" + type
 
-    req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
     req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
 
     f = urllib2.urlopen(req)
@@ -79,6 +77,7 @@ def update_device_map(id, what="data",type=None, port=9000, data=None):
             scan_subnet()
         try:
             devices_map[id].update(data)
+
         except KeyError:
             logging.error("Device %s is not detected" % id)
             raise KeyError("Device %s is not detected" % id)
@@ -157,19 +156,20 @@ def device(id, type_of_req):
     global acquisition
     try:
         post_data = request.body.read()
-        update_device_map(id, "controls", type_of_req, data=post_data)
+        update_device_map(id, "data")
         device_info = devices_map[id]
-        # try:
 
         if type_of_req == 'start':
             if device_info['status'] == 'stopped':
+                update_device_map(id, "controls", type_of_req, data=post_data)
                 acquisition[id] = Acquisition(devices_map[id])
                 acquisition[id].start()
             else:
                 raise Exception("Cannot start, device %s status is `%s`" %  (id, device_info['status']))
 
         elif type_of_req == 'stop':
-            if device_info['status'] == 'started':
+            if device_info['status'] == 'running':
+                update_device_map(id, "controls", type_of_req, data=post_data)
                 acquisition[id].stop()
                 acquisition[id].join()
             else:

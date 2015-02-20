@@ -147,7 +147,9 @@ class ControlThread(Thread):
             logging.info("Starting monitor")
 
             with ResultWriter(self._mysql_db_name ,self._metadata) as rw:
+
                 self._info["status"] = "running"
+                logging.info("Setting monitor status as running: '%s'" % self._info["status"] )
                 self._monit.run(rw)
 
             logging.info("Stopping Monitor thread")

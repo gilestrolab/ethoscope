@@ -3,7 +3,8 @@ import datetime
 import logging
 import os
 from threading import Thread
-# from  multiprocessing import Process
+import json
+import urllib2
 import traceback
 from mysql_backup import MySQLdbToSQlite
 
@@ -14,18 +15,18 @@ class Acquisition(Thread):
             "password":"psv"
         }
 
-    _delay_between_updates = 1 # seconds
+    _delay_between_updates = 5  # seconds
 
     def __init__(self, device_info, result_main_dir="/psv_results/"):
 
+        self._device_info = device_info
+        self._database_ip = os.path.basename(self._device_info["ip"])
 
-        self._database_ip = os.path.basename(device_info["ip"])
-
-        date_time = datetime.datetime.fromtimestamp(int(device_info["time"]))
+        date_time = datetime.datetime.fromtimestamp(int(self._device_info["time"]))
 
 
         formated_time = date_time.strftime('%Y-%m-%d_%H:%M:%S')
-        device_name = device_info["machine_id"]
+        device_name = self._device_info["machine_id"]
         self._file_name = "%s_%s.db" % (formated_time, device_name)
 
         self._output_db_file = os.path.join(result_main_dir,
@@ -59,13 +60,40 @@ class Acquisition(Thread):
 
         super(Acquisition, self).__init__()
 
+    def _update_device_info(self, what="data", port=9000):
+        ip = self._device_info["ip"]
+        request_url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
+        req = urllib2.Request(url=request_url, headers={'Content-Type': 'application/json'})
+
+        message = urllib2.urlopen(req).read()
+
+        if message:
+            data = json.loads(message)
+            self._device_info.update(data)
+
+
     def run(self):
 
         try:
-            mirror= MySQLdbToSQlite(self._output_db_file, self._db_credentials["name"], remote_host=self._database_ip,
-                                    remote_pass=self._db_credentials["password"], remote_user=self._db_credentials["user"])
+
+            mirror = None
+
             while not self._force_stop:
+
+                self._update_device_info()
                 time.sleep(self._delay_between_updates)
+
+                if self._device_info["status"] is not "running":
+                    print "status in acquisition:======== ", self._device_info["status"]
+                    mirror = None
+                    continue
+                if mirror is None:
+                    mirror= MySQLdbToSQlite(self._output_db_file, self._db_credentials["name"],
+                                    remote_host=self._database_ip,
+                                    remote_pass=self._db_credentials["password"],
+                                    remote_user=self._db_credentials["user"])
+
+
                 mirror.update_roi_tables()
 
         except Exception as e:
