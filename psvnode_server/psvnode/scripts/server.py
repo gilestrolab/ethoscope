@@ -39,14 +39,14 @@ def scan_one_device(url, timeout=.5, port=9000):
 
     except urllib2.URLError:
         logging.warning("URL error whist scanning url: %s" % url )
-        return None, None       
+        return None, None
     except Exception as e:
         logging.error("Unexpected error whilst scanning url: %s" % url )
         raise e
 
 
 
-def update_device_map(id, what,type=None, port=9000, data=None):
+def update_device_map(id, what="data",type=None, port=9000, data=None):
     """
     Just a routine to format our GET urls. This improves readability whilst allowing us to change convention (e.g. port) without rewriting everything.
 
@@ -59,7 +59,6 @@ def update_device_map(id, what,type=None, port=9000, data=None):
     global devices_map
 
     ip = devices_map[id]["ip"]
-
 
     request_url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
 
@@ -78,6 +77,7 @@ def update_device_map(id, what,type=None, port=9000, data=None):
             scan_subnet()
         try:
             devices_map[id].update(data)
+
         except KeyError:
             logging.error("Device %s is not detected" % id)
             raise KeyError("Device %s is not detected" % id)
@@ -112,13 +112,11 @@ def index():
 def scan_subnet():
     subnet_ip = get_subnet_ip(SUBNET_DEVICE)
     logging.info("Scanning attached devices")
-    # urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(2,254)]
-    urls_to_scan = ["http://%s.150" % subnet_ip]
-    print urls_to_scan
+    urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(2,254)]
     pool = multiprocessing.Pool(len(urls_to_scan))
     devices_id_url_list = pool.map(scan_one_device, urls_to_scan)
 
-    pool.terminate()
+
 
     global devices_map
     devices_map = {}
@@ -126,14 +124,15 @@ def scan_subnet():
         if id is None:
             continue
         devices_map[id] = {"ip":ip}
-        update_device_map(id,what="data")
 
+    map(update_device_map, devices_map.keys())
 
+    pool.terminate()
     logging.info("%i devices found:" % len(devices_map))
 
     for k,v in devices_map.items():
         logging.info("%s\t@\t%s" % (k,v["ip"]))
-
+    return devices_map
 
 @app.get('/devices_list')
 def get_devices_list():
@@ -156,19 +155,20 @@ def device(id, type_of_req):
     global acquisition
     try:
         post_data = request.body.read()
-        update_device_map(id, "control", type_of_req, data=post_data)
+        update_device_map(id, "data")
         device_info = devices_map[id]
-        # try:
 
         if type_of_req == 'start':
             if device_info['status'] == 'stopped':
+                update_device_map(id, "controls", type_of_req, data=post_data)
                 acquisition[id] = Acquisition(devices_map[id])
                 acquisition[id].start()
             else:
                 raise Exception("Cannot start, device %s status is `%s`" %  (id, device_info['status']))
 
         elif type_of_req == 'stop':
-            if device_info['status'] == 'started':
+            if device_info['status'] == 'running':
+                update_device_map(id, "controls", type_of_req, data=post_data)
                 acquisition[id].stop()
                 acquisition[id].join()
             else:
@@ -242,9 +242,6 @@ if __name__ == '__main__':
 
     acquisition = {}
 
-
-
-
     for k, device in devices_map.iteritems():
         if device['status'] == 'running':
             acquisition[k]= Acquisition(device)
@@ -268,52 +265,3 @@ if __name__ == '__main__':
         for a in acquisition.values():
             a.stop()
             a.join()
-
-
-# def get_data_from_id(id):
-#     url = format_post_get_url(id,"data")
-#     req = urllib2.Request(url=url)
-#     f = urllib2.urlopen(req)
-#     message = f.read()
-#     if message:
-#         data = json.loads(message)
-#         return data
-#     else:
-#         raise urllib2.URLError("No data at this url `%s`" % url)
-
-# def format_post_get_url(id, what,type=None, port=9000):
-#     """
-#     Just a routine to format our GET urls. This improves readability whilst allowing us to change convention (e.g. port) without rewriting everything.
-#
-#     :param id: machine unique identifier
-#     :param what: e.g. /data, /control
-#     :param type: the type of request for POST
-#     :param port:
-#     :return:
-#     """
-#
-#     ip = devices_map[id]["ip"]
-#
-#     url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
-#     if type is not None:
-#         return url + "/" + type
-#     return url
-
-# @LUIS do we use that ?
-# FIXME
-# @app.get('/device/<id>/controls/<type_of_req>')
-# def device(id, type_of_req):
-#     try:
-#         url = format_post_get_url(id,"controls", type=type_of_req)
-#         req = urllib2.Request(url=url)
-#         f = urllib2.urlopen(req,{})
-#         message = f.read()
-#         if message:
-#             data = json.loads(message)
-#             devices_map[id].delete te(data)
-#             print "updating device map for", id
-#             return data
-#
-#     except Exception as e:
-#         logging.error(traceback.format_exc(e))
-#         return {'error':traceback.format_exc(e)}
