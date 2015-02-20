@@ -39,14 +39,14 @@ def scan_one_device(url, timeout=.5, port=9000):
 
     except urllib2.URLError:
         logging.warning("URL error whist scanning url: %s" % url )
-        return None, None       
+        return None, None
     except Exception as e:
         logging.error("Unexpected error whilst scanning url: %s" % url )
         raise e
 
 
 
-def update_device_map(id, what,type=None, port=9000, data=None):
+def update_device_map(id, what="data",type=None, port=9000, data=None):
     """
     Just a routine to format our GET urls. This improves readability whilst allowing us to change convention (e.g. port) without rewriting everything.
 
@@ -66,6 +66,7 @@ def update_device_map(id, what,type=None, port=9000, data=None):
     if type is not None:
         request_url = request_url + "/" + type
 
+    req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
     req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
 
     f = urllib2.urlopen(req)
@@ -114,11 +115,10 @@ def scan_subnet():
     logging.info("Scanning attached devices")
     # urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(2,254)]
     urls_to_scan = ["http://%s.150" % subnet_ip]
-    print urls_to_scan
     pool = multiprocessing.Pool(len(urls_to_scan))
     devices_id_url_list = pool.map(scan_one_device, urls_to_scan)
 
-    pool.terminate()
+
 
     global devices_map
     devices_map = {}
@@ -126,14 +126,15 @@ def scan_subnet():
         if id is None:
             continue
         devices_map[id] = {"ip":ip}
-        update_device_map(id,what="data")
 
+    map(update_device_map, devices_map.keys())
 
+    pool.terminate()
     logging.info("%i devices found:" % len(devices_map))
 
     for k,v in devices_map.items():
         logging.info("%s\t@\t%s" % (k,v["ip"]))
-
+    return devices_map
 
 @app.get('/devices_list')
 def get_devices_list():
@@ -156,7 +157,7 @@ def device(id, type_of_req):
     global acquisition
     try:
         post_data = request.body.read()
-        update_device_map(id, "control", type_of_req, data=post_data)
+        update_device_map(id, "controls", type_of_req, data=post_data)
         device_info = devices_map[id]
         # try:
 
