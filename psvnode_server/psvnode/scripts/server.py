@@ -112,8 +112,7 @@ def index():
 def scan_subnet():
     subnet_ip = get_subnet_ip(SUBNET_DEVICE)
     logging.info("Scanning attached devices")
-    # urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(2,254)]
-    urls_to_scan = ["http://%s.150" % subnet_ip]
+    urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(2,254)]
     pool = multiprocessing.Pool(len(urls_to_scan))
     devices_id_url_list = pool.map(scan_one_device, urls_to_scan)
 
