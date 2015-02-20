@@ -25,7 +25,8 @@ def server_static(filepath):
 def name():
     global control
     try:
-        return control.info
+        return {"id": control.info["machine_id"]}
+
     except Exception as e:
         return {'error':e}
 
@@ -48,7 +49,7 @@ def controls(id, action):
                     control = ControlThread(machine_id=machine_id, name='SM15-001', video_file=INPUT_VIDEO,
                             psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
                     control.start()
-                    return {'status': 'started'}
+                    return info(id)
 
                 elif action == 'stop' or action == 'poweroff':
                     control.stop()
@@ -60,7 +61,7 @@ def controls(id, action):
                         logging.info("Powering off Device.")
                         # fixme, this is non blocking, is it ? maybe we should do something else
                         call('poweroff')
-                    return {'status': 'stopped'}
+                    return info(id)
 
 
             except Exception as e:
@@ -71,7 +72,7 @@ def controls(id, action):
 
 
 @api.get('/data/<id>')
-def data(id):
+def info(id):
     if id == machine_id:
         return control.info
     else:
@@ -94,7 +95,8 @@ if __name__ == '__main__':
         import getpass
         DURATION = 60*60 * 100
         if getpass.getuser() == "quentin":
-            INPUT_VIDEO = '/data/pysolo_video_samples/monitor_new_targets_long.avi'
+            INPUT_VIDEO = '/data/pysolo_video_samples/monitor_new_targets_short.avi'
+            # INPUT_VIDEO = '/data/pysolo_video_samples/monitor_new_targets_long.avi'
             PSV_DIR = "/psv_data/results/"
         elif getpass.getuser() == "asterix":
             PSV_DIR = "/tmp/psv_data"
