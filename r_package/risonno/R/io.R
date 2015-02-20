@@ -129,6 +129,7 @@ loadMetaData <- function(FILE){
 	dbDisconnect(con)
 	v <- as.list(metadata$value)
 	names(v) <- metadata$field
+	#fixme explicitly GMT
 	v$date_time <- as.POSIXct(as.integer(v$date_time),origin="1970-01-01")
 	return(v)		
 	}

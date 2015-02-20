@@ -148,7 +148,16 @@ mysql -u root -e "CREATE USER \"$USER_NAME\"@'%' IDENTIFIED BY \"$PASSWORD\""
 mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO \"$USER_NAME\"@'localhost' WITH GRANT OPTION";
 mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO \"$USER_NAME\"@'%' WITH GRANT OPTION";
 ###############mysql -u root -e "SET GLOBAL expire_logs_days = 2"
+#partitions stuff
+# make partition system
+#cd /mnt/
+#mkdir sda_var pi_var
+#mount /dev/sda2 /mnt/sda_var
+#mount /dev/mmXXX  /mnt/pi_var
+#cp -ax /mnt/pi_var/* /mnt/sda_var
+#echo "" >> /etc/fstab
 
+####################
 # our software.
 # TODO use AUR!
 echo 'Installing PSV package'

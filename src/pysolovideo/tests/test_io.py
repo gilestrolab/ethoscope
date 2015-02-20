@@ -86,7 +86,7 @@ class TestMySQL(unittest.TestCase):
 
     def test_mysql(self):
         logging.getLogger().setLevel(logging.INFO)
-        with ResultWriter("psv_db") as rw:
+        with ResultWriter("psv_test_io") as rw:
 
             self._test_dbwriter(rw)
         self.assertEqual(1, 1)
