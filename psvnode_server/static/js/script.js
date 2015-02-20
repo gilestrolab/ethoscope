@@ -98,10 +98,6 @@
 
         $http.get('/device/'+device_id+'/data').success(function(data){
             $scope.device = data;
-            if ($scope.device.status == 'running'){
-                        refresh();
-                        refresh_data = $interval(refresh, 3000);
-                    }
         });
 
         $http.get('/device/'+device_id+'/ip').success(function(data){
@@ -112,7 +108,6 @@
         refresh_data = $interval(refresh, 3000);
 
         $scope.sm.start = function(){
-                            $scope.starting = true;
                             starting_tracking.appendChild(spStart.el);
                             $http.post('/device/'+device_id+'/controls/start', data={"time":Date.now() / 1000.})
                                  .success(function(data){$scope.device.status = data.status;});
@@ -184,8 +179,7 @@
                     $scope.device= data;
                     $scope.device.img = device_ip+':9000/static'+$scope.device.last_drawn_img + '?' + new Date().getTime();
                     $scope.device.ip = device_ip;
-                    if ($scope.starting == true && $scope.device.status == 'running'){
-                        $scope.starting= false;
+                    if (typeof spStart != undefined && $scope.device.status == 'running'){
                         spStart.stop();
                     }
                  });
