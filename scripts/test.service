@@ -1,0 +1,12 @@
+[Unit]
+Description= test for python
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python2 /data1/PolygonalTree/Github\x20repo/pySolo-Video/src/scripts/device_server.py
+WorkingDirectory="/data1/PolygonalTree/Github\ repo/pySolo-Video/src/scripts/"
+
+[Install]
+WantedBy=multi-user.target
+
