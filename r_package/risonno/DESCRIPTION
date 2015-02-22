@@ -20,7 +20,8 @@ License: GPL (>=3.0)
 Depends:
     R (>= 2.15.0),
     MASS,
-    RSQLite
+    RSQLite,
+    data.table
 LazyLoad: TRUE
 Collate:
     'io.R'
