@@ -5,7 +5,7 @@ import os
 from threading import Thread
 # from  multiprocessing import Process
 import traceback
-from mysql_backup import MySQLdbToSQlite
+from mysql_backup import MySQLdbToSQlite, DBNotReadyError
 
 class Acquisition(Thread):
     _db_credentials = {
@@ -14,7 +14,7 @@ class Acquisition(Thread):
             "password":"psv"
         }
 
-    _delay_between_updates = 1 # seconds
+    _delay_between_updates = 5 # seconds
 
     def __init__(self, device_info, result_main_dir="/psv_results/"):
 
@@ -68,6 +68,10 @@ class Acquisition(Thread):
                 time.sleep(self._delay_between_updates)
                 mirror.update_roi_tables()
 
+        except DBNotReadyError as e:
+            logging.warning(e)
+            logging.warning("Database not ready, will try later")
+            pass
         except Exception as e:
             logging.error(traceback.format_exc(e))
             raise e

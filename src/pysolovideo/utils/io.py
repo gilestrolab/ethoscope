@@ -15,9 +15,10 @@ class ResultDBWriterBase(object):
     def _create_table(self, cursor, name, fields):
         raise NotImplementedError()
 
-    def __init__(self,  metadata=None, *args, **kwargs):
+    def __init__(self,  rois, metadata=None, *args, **kwargs):
         self._last_t, self._last_flush_t = 0, 0
         self.metadata = metadata
+        self._rois = rois
         self._conn = None
         if self.metadata is None:
             self.metadata  = {}
@@ -25,12 +26,16 @@ class ResultDBWriterBase(object):
         self._clean_up()
         self._conn = self._get_connection()
         c = self._conn.cursor()
-
-        self._initialised = set()
         self._var_map_initialised = False
 
         logging.info("Creating master table 'ROI_MAP'")
         self._create_table(c, "ROI_MAP", "roi_idx SMALLINT, roi_value SMALLINT, x SMALLINT,y SMALLINT,w SMALLINT,h SMALLINT")
+
+        for r in self._rois:
+            fd = r.get_feature_dict()
+            command = "INSERT INTO ROI_MAP VALUES %s" % str((fd["idx"], fd["value"], fd["x"], fd["y"], fd["w"], fd["h"]))
+            c.execute(command)
+
 
         logging.info("Creating variable map table 'VAR_MAP'")
         self._create_table(c, "VAR_MAP", "var_name CHAR(100), sql_type CHAR(100), functional_type CHAR(100)")
@@ -53,9 +58,10 @@ class ResultDBWriterBase(object):
     def write(self, t, roi, data_row):
         self._last_t = t
         if not self._var_map_initialised:
+            for r in self._rois:
+                self._initialise(r, data_row)
             self._initialise_var_map(data_row)
-        if roi.idx not in self._initialised:
-            self._initialise(roi, data_row)
+
         self._add(t, roi, data_row)
 
     def flush(self):
@@ -66,7 +72,7 @@ class ResultDBWriterBase(object):
 
 
     def _add(self,t, roi, data_row):
-        tp = (t,) + tuple(data_row.values())
+        tp = (0, t) + tuple(data_row.values())
         command = '''INSERT INTO ROI_%i VALUES %s''' % (roi.idx, tp)
         c = self._conn.cursor()
         c.execute(command)
@@ -83,23 +89,14 @@ class ResultDBWriterBase(object):
 
     def _initialise(self, roi, data_row):
         # We make a new dir to store results
-        fields = ["t INT"]
-
+        fields = ["id INT  NOT NULL AUTO_INCREMENT PRIMARY KEY" ,"t INT"]
         for dt in data_row.values():
             fields.append("%s %s" % (dt.header_name, dt.sql_data_type))
-
         fields = ", ".join(fields)
-
-        self._initialised |= {roi.idx}
-
         c = self._conn.cursor()
-
         table_name = "ROI_%i" % roi.idx
         self._create_table(c, table_name, fields)
 
-        fd = roi.get_feature_dict()
-        command = "INSERT INTO ROI_MAP VALUES %s" % str((fd["idx"], fd["value"], fd["x"], fd["y"], fd["w"], fd["h"]))
-        c.execute(command)
 
     def __enter__(self):
         return self

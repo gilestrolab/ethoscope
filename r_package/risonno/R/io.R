@@ -75,6 +75,7 @@ loadROIsFromFile <- function(FILE, rois = NULL, min_time = 0, max_time = Inf, re
 	sql_query_fun <- function(i){
 		sql_query <- sprintf("SELECT * FROM ROI_%i WHERE t >= %e %s",i,min_time, max_time_condition )
 		roi_df <- dbGetQuery(con, sql_query)	
+		roi_df$id <- NULL
 		if(time_in_seconds)
 			roi_df$t <- roi_df$t / 1e3
 		roi_row <- subset(roi_map, roi_idx == i)

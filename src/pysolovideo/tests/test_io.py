@@ -44,7 +44,7 @@ class RandomResultGenerator(object):
 
 class TestMySQL(unittest.TestCase):
 
-    def _test_dbwriter(self, rw):
+    def _test_dbwriter(self, RWClass, *args, **kwargs):
         """
         This test hardcode ROIs and generate random results for a set of arbitrary variables.
         The goal is to be able to test and benchmark result write independently of any tracking
@@ -56,37 +56,36 @@ class TestMySQL(unittest.TestCase):
         rois = [ROI(coordinates +i*100) for i in range(1,33)]
         rpg = RandomResultGenerator()
 
-        # n = 4000000 # 222h of data
-        n = 400000 # 22.2h of data
-        #n = 40000 # 2.22h of data
+        with RWClass(rois=rois, *args, **kwargs) as rw:
+            # n = 4000000 # 222h of data
+            # n = 400000 # 22.2h of data
+            n = 40000 # 2.22h of data
 
-        for t in range(0, n):
-            rt = t * 1000 /5
-            # print rt
-            if t % (n/100)== 0:
-                logging.info("filling with dummy variables: %f percent" % (100.*float(t)/float(n)))
-            for r in rois:
-                data = rpg.make_one_point()
+            for t in range(0, n):
+                rt = t * 1000 /5
+                # print rt
+                if t % (n/100)== 0:
+                    logging.info("filling with dummy variables: %f percent" % (100.*float(t)/float(n)))
+                for r in rois:
+                    data = rpg.make_one_point()
+                    rw.write(rt , r, data)
 
-                rw.write(rt , r, data)
-            rw.flush()
-        rw.close()
 
 
 
     def test_sqlite(self):
+        logging.getLogger().setLevel(logging.INFO)
         a = tempfile.mkdtemp(prefix="psv_results_")
-        try:
-            with SQLiteResultWriter(a) as rw:
-                self._test_dbwriter(rw)
 
+        try:
+
+            self._test_dbwriter(SQLiteResultWriter,a)
             self.assertEqual(1, 1)
         finally:
-            shutil.rmtree(a)
+            logging.info(a)
+            # shutil.rmtree(a)
 
     def test_mysql(self):
         logging.getLogger().setLevel(logging.INFO)
-        with ResultWriter("psv_test_io") as rw:
+        self._test_dbwriter(ResultWriter, db_name="psv_test_io")
 
-            self._test_dbwriter(rw)
-        self.assertEqual(1, 1)

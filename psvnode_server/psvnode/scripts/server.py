@@ -108,7 +108,6 @@ def devices():
     for d in devices_list:
         if d is None:
             continue
-        print d
         devices_map[d["machine_id"]] = d
 
     logging.info("%i devices found:" % len(devices_map))

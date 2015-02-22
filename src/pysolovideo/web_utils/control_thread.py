@@ -143,13 +143,39 @@ class ControlThread(Thread):
             logging.info("Starting Monitor thread")
 
             self._info["error"] = None
-            self._thread_init()
+
+
+            self._last_info_t_stamp = 0
+            self._last_info_frame_idx = 0
+
+            if self._video_file is None:
+                cam = V4L2Camera(0, target_fps=10, target_resolution=(1280, 920))
+            else:
+                cam = MovieVirtualCamera(self._video_file, use_wall_clock=True)
+
+            logging.info("Building ROIs")
+            roi_builder = SleepMonitorWithTargetROIBuilder()
+            rois = roi_builder(cam)
+
+            logging.info("Initialising monitor")
+
+            self._metadata = {
+                         "machine_id": self._info["machine_id"],
+                         "date_time": cam.start_time, #the camera start time is the reference 0
+                         "frame_width":cam.width,
+                         "frame_height":cam.height,
+                          "psv_version": pkg_resources.get_distribution("pysolovideo").version
+                          }
+            #the camera start time is the reference 0
+            self._info["time"] = cam.start_time
+            self._monit = Monitor(cam, AdaptiveBGModel, rois,
+                        *self._monit_args, **self._monit_kwargs)
+
             logging.info("Starting monitor")
 
-            with ResultWriter(self._mysql_db_name ,self._metadata) as rw:
+            with ResultWriter(self._mysql_db_name ,rois, self._metadata) as rw:
                 self._info["status"] = "running"
                 self._monit.run(rw)
-
             logging.info("Stopping Monitor thread")
             self.stop()
 
@@ -160,34 +186,6 @@ class ControlThread(Thread):
         except Exception as e:
             self.stop(traceback.format_exc(e))
 
-    def _thread_init(self):
-        logging.info("Starting camera")
-
-        self._last_info_t_stamp = 0
-        self._last_info_frame_idx = 0
-
-        if self._video_file is None:
-            cam = V4L2Camera(0, target_fps=10, target_resolution=(1280, 920))
-        else:
-            cam = MovieVirtualCamera(self._video_file, use_wall_clock=True)
-
-        logging.info("Building ROIs")
-        roi_builder = SleepMonitorWithTargetROIBuilder()
-        rois = roi_builder(cam)
-
-        logging.info("Initialising monitor")
-
-        self._metadata = {
-                     "machine_id": self._info["machine_id"],
-                     "date_time": cam.start_time, #the camera start time is the reference 0
-                     "frame_width":cam.width,
-                     "frame_height":cam.height,
-                      "psv_version": pkg_resources.get_distribution("pysolovideo").version
-                      }
-        #the camera start time is the reference 0
-        self._info["time"] = cam.start_time
-        self._monit = Monitor(cam, AdaptiveBGModel, rois,
-                    *self._monit_args, **self._monit_kwargs)
 
     def stop(self, error=None):
         self._info["status"] = "stopping"

@@ -8,24 +8,8 @@ import os
 import logging
 
 
-
-"""
-#
-# import time
-#
-# # cloning = MySQLdbToSQlite("/psv_data/test/boom.db", "psv_db", remote_host="localhost", overwrite=False)
-# cloning = MySQLdbToSQlite("/psv_data/test/boome.db", "psv_db", remote_host="129.31.135.153",remote_pass="psv", remote_user="psv")
-#
-# try:
-#     while True:
-#         cloning.update_roi_tables()
-#         time.sleep(5)
-# except Exception as e:
-#     logging.info(e)
-#
-#
-
-"""
+class DBNotReadyError(Exception):
+    pass
 
 class MySQLdbToSQlite(object):
     def     __init__(self, dst_path, remote_db_name="psv_db", remote_host="localhost", remote_user="root", remote_pass="", overwrite=True):
@@ -73,8 +57,20 @@ class MySQLdbToSQlite(object):
             pass
 
         with sqlite3.connect(self._dst_path, check_same_thread=False) as conn:
-            self._copy_table("VAR_MAP", src, conn)
-            self._copy_table("METADATA", src, conn)
+            src_cur = src.cursor()
+
+            command = "SELECT * FROM VAR_MAP"
+            src_cur.execute(command)
+            #empty var map means no reads are present yet
+            if len([i for i in src_cur]) == 0:
+                raise DBNotReadyError("No read are available for this database yet")
+
+            command = "SHOW TABLES"
+            src_cur.execute(command)
+            tables = [c[0] for c in src_cur]
+            for t in tables:
+                self._copy_table(t, src, conn)
+
             #TODO checksum of ordered metadata ?
             logging.info("Database mirroring initialised")
 
@@ -100,9 +96,10 @@ class MySQLdbToSQlite(object):
     def _copy_table(self,table_name, src, dst):
         src_cur = src.cursor()
         dst_cur = dst.cursor()
+
         src_command = "SHOW COLUMNS FROM %s " % table_name
 
-        src_cur.execute(src_command )
+        src_cur.execute(src_command)
         col_list = []
         for c in src_cur:
              col_list.append(" ".join(c[0:2]))
@@ -130,7 +127,7 @@ class MySQLdbToSQlite(object):
         dst_cur = dst.cursor()
 
         try:
-            dst_command= "SELECT t FROM %s ORDER BY t DESC LIMIT 1" % table_name
+            dst_command= "SELECT id FROM %s ORDER BY id DESC LIMIT 1" % table_name
             dst_cur.execute(dst_command)
         except (sqlite3.OperationalError, MySQLdb.ProgrammingError):
             self._copy_table(table_name, src, dst)
@@ -139,7 +136,7 @@ class MySQLdbToSQlite(object):
         last_t_in_dst = 0
         for c in dst_cur:
             last_t_in_dst = c[0]
-        src_command = "SELECT * FROM %s WHERE t > %d" % (table_name, last_t_in_dst)
+        src_command = "SELECT * FROM %s WHERE id > %d" % (table_name, last_t_in_dst)
         src_cur.execute(src_command)
         for sc in src_cur:
             tp = tuple([str(v) for v in sc ])
