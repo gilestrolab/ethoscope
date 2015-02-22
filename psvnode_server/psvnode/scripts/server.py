@@ -34,8 +34,7 @@ def scan_one_device(url, timeout=.5, port=9000):
         if not message:
             return
         resp = json.loads(message)
-        print resp["machine_id"]
-        return (resp['machine_id'],url)
+        return (resp['id'],url)
 
     except urllib2.URLError:
         logging.warning("URL error whist scanning url: %s" % url )

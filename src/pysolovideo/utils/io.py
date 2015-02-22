@@ -1,6 +1,9 @@
+from test.test_set import cube
+
 __author__ = 'quentin'
 
 # from pysolovideo.utils.debug import PSVException
+import time, datetime
 import os
 import logging
 import sqlite3
@@ -11,14 +14,17 @@ import MySQLdb
 #TODO add HIGH_PRIORITY to inserts!
 class ResultDBWriterBase(object):
     _flush_every_ns = 30 # flush every 10s of data
+    _dam_file_period = 60 # Get activity for every N s of data
 
     def _create_table(self, cursor, name, fields):
         raise NotImplementedError()
 
-    def __init__(self,  rois, metadata=None, *args, **kwargs):
-        self._last_t, self._last_flush_t = 0, 0
+    def __init__(self,  rois, metadata=None, make_dam_like_table=True, *args, **kwargs):
+        self._last_t, self._last_flush_t, self._last_dam_t = [0] * 3
+
         self.metadata = metadata
         self._rois = rois
+        self._make_dam_like_table = make_dam_like_table
         self._conn = None
         if self.metadata is None:
             self.metadata  = {}
@@ -40,6 +46,25 @@ class ResultDBWriterBase(object):
         logging.info("Creating variable map table 'VAR_MAP'")
         self._create_table(c, "VAR_MAP", "var_name CHAR(100), sql_type CHAR(100), functional_type CHAR(100)")
 
+        if self._make_dam_like_table:
+            fields = ["id INT  NOT NULL AUTO_INCREMENT PRIMARY KEY",
+                      "day CHAR(100)",
+                      "month CHAR(100)",
+                      "year CHAR(100)",
+                      "time CHAR(100)"]
+
+            for i in range(7):
+                fields.append("DUMMY_FIELD_%d SMALLINT" % i)
+            for r in rois:
+                fields.append("ROI_%d FLOAT(8,5)" % r.idx)
+            logging.info("Creating 'CSV_DAM_ACTIVITY' table")
+            fields = ",".join(fields)
+            self._create_table(c,"CSV_DAM_ACTIVITY", fields)
+            self._dam_history_dic = {}
+            for r in rois:
+                self._dam_history_dic[r.idx] = {"last_pos":None,
+                                                "cummul_dist":0
+                                                }
 
         logging.info("Creating 'METADATA' table")
         self._create_table(c,"METADATA", "field CHAR(100), value CHAR(200)")
@@ -56,6 +81,16 @@ class ResultDBWriterBase(object):
         raise NotImplementedError()
 
     def write(self, t, roi, data_row):
+        if self._make_dam_like_table:
+            current_pos =  data_row["x"] + 1j*data_row["y"]
+
+            if self._dam_history_dic[roi.idx]["last_pos"] is not None:
+                dist = abs(current_pos - self._dam_history_dic[roi.idx]["last_pos"] )
+                dist /= roi.longest_axis
+                self._dam_history_dic[roi.idx]["cummul_dist"] += dist
+            self._dam_history_dic[roi.idx]["last_pos"] = current_pos
+
+
         self._last_t = t
         if not self._var_map_initialised:
             for r in self._rois:
@@ -64,7 +99,34 @@ class ResultDBWriterBase(object):
 
         self._add(t, roi, data_row)
 
+
+
+    def _update_dam_table(self):
+
+        dt = datetime.datetime.fromtimestamp(int(time.time()))
+        date_time_fields = dt.strftime("%d,%b,%Y,%H:%M:%S").split(",")
+        values = [0] + date_time_fields
+
+
+        for i in range(7):
+            values.append(str(i))
+        for r in self._rois:
+            values.append(self._dam_history_dic[r.idx]["cummul_dist"])
+
+        command = '''INSERT INTO CSV_DAM_ACTIVITY VALUES %s''' % str(tuple(values))
+
+        c = self._conn.cursor()
+
+        c.execute(command)
+        for r in self._rois:
+            self._dam_history_dic[r.idx]["cummul_dist"] = 0
+
     def flush(self):
+        if self._make_dam_like_table and (self._last_t - self._last_dam_t) > (self._dam_file_period * 1000):
+            self._last_dam_t =  self._last_t
+            self._update_dam_table()
+
+
         if (self._last_t - self._last_flush_t) < (self._flush_every_ns * 1000):
             return
         self._conn.commit()
@@ -183,6 +245,7 @@ class ResultWriter(ResultDBWriterBase):
 
     def _create_table(self, cursor, name, fields, engine="MyISAM"):
         command = "CREATE TABLE %s (%s) ENGINE %s KEY_BLOCK_SIZE=16" % (name, fields, engine)
+        logging.info("Creating database table with: " + command)
         cursor.execute(command)
 
 

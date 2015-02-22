@@ -25,7 +25,7 @@ def server_static(filepath):
 def name():
     global control
     try:
-        return {"id": control.info["machine_id"]}
+        return {"id": control.info["id"]}
 
     except Exception as e:
         return {'error':e}

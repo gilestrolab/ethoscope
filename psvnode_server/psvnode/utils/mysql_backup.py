@@ -36,7 +36,10 @@ class MySQLdbToSQlite(object):
         src = MySQLdb.connect(host=self._remote_host, user=self._remote_user,
                                          passwd=self._remote_pass, db=self._remote_db_name)
 
+
         self._dst_path=dst_path
+        self._dst_dir = os.path.dirname(self._dst_path)
+
         logging.info("Initializing local database static tables at %s" % dst_path)
         # we remove file and create dir, if needed
 
@@ -92,6 +95,7 @@ class MySQLdbToSQlite(object):
             rois_in_src = set([c[0] for c in dst_cur])
             for i in rois_in_src :
                 self._update_one_roi_table("ROI_%i" % i, src, dst)
+            self._update_one_roi_table("CSV_DAM_ACTIVITY", src, dst, True)
 
     def _copy_table(self,table_name, src, dst):
         src_cur = src.cursor()
@@ -121,7 +125,7 @@ class MySQLdbToSQlite(object):
             dst_cur.execute(dst_command)
         dst.commit()
 
-    def _update_one_roi_table(self, table_name, src, dst):
+    def _update_one_roi_table(self, table_name, src, dst, dump_in_csv=None):
 
         src_cur = src.cursor()
         dst_cur = dst.cursor()
@@ -138,10 +142,18 @@ class MySQLdbToSQlite(object):
             last_t_in_dst = c[0]
         src_command = "SELECT * FROM %s WHERE id > %d" % (table_name, last_t_in_dst)
         src_cur.execute(src_command)
+
+
         for sc in src_cur:
             tp = tuple([str(v) for v in sc ])
             dst_command = "INSERT INTO %s VALUES %s" % (table_name, tp)
             dst_cur.execute(dst_command)
+            if dump_in_csv is not None:
+                out_file = os.path.join(self._dst_dir, table_name + ".txt")
+                with open(out_file,"a") as f:
+                    row = "\t".join(["{0}".format(val) for val in sc])
+                    f.write(row)
+                    f.write("\n")
 
         dst.commit()
 

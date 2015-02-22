@@ -72,7 +72,7 @@ class ControlThread(Thread):
                         "log_file": os.path.join(psv_dir, self._log_file),
                         "dbg_img": os.path.join(psv_dir, self._dbg_img_file),
                         "last_drawn_img": os.path.join(self._tmp_dir, self._tmp_last_img_file),
-                        "machine_id": machine_id,
+                        "id": machine_id,
                         "name": name,
                         "type": type_of_device,
                         "db_name":self._mysql_db_name,
@@ -160,7 +160,7 @@ class ControlThread(Thread):
             logging.info("Initialising monitor")
 
             self._metadata = {
-                         "machine_id": self._info["machine_id"],
+                         "machine_id": self._info["id"],
                          "date_time": cam.start_time, #the camera start time is the reference 0
                          "frame_width":cam.width,
                          "frame_height":cam.height,

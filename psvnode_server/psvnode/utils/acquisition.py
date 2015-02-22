@@ -28,7 +28,7 @@ class Acquisition(Thread):
 
 
         formated_time = date_time.strftime('%Y-%m-%d_%H:%M:%S')
-        device_name = self._device_info["machine_id"]
+        device_name = self._device_info["id"]
         self._file_name = "%s_%s.db" % (formated_time, device_name)
 
         self._output_db_file = os.path.join(result_main_dir,
@@ -65,7 +65,7 @@ class Acquisition(Thread):
     def _update_device_info(self, what="data", port=9000):
         try:
             ip = self._device_info["ip"]
-            id = self._device_info["machine_id"]
+            id = self._device_info["id"]
 
             request_url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
             req = urllib2.Request(url=request_url, headers={'Content-Type': 'application/json'})

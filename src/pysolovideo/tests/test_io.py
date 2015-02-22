@@ -69,6 +69,7 @@ class TestMySQL(unittest.TestCase):
                 for r in rois:
                     data = rpg.make_one_point()
                     rw.write(rt , r, data)
+                rw.flush()
 
 
 
@@ -83,7 +84,7 @@ class TestMySQL(unittest.TestCase):
             self.assertEqual(1, 1)
         finally:
             logging.info(a)
-            # shutil.rmtree(a)
+            shutil.rmtree(a)
 
     def test_mysql(self):
         logging.getLogger().setLevel(logging.INFO)
