@@ -90,7 +90,7 @@
     app.controller('smController', function($scope, $http, $routeParams, $interval, $timeout)  {
         device_id = $routeParams.device_id;
         var device_ip;
-        $scope.sm = {}
+        $scope.sm = {};
         var refresh_data = false;
         var spStart= new Spinner(opts).spin();
         var starting_tracking= document.getElementById('starting');
@@ -98,10 +98,6 @@
 
         $http.get('/device/'+device_id+'/data').success(function(data){
             $scope.device = data;
-            if ($scope.device.status == 'running'){
-                        refresh();
-                        refresh_data = $interval(refresh, 3000);
-                    }
         });
 
         $http.get('/device/'+device_id+'/ip').success(function(data){
@@ -109,33 +105,19 @@
                     device_ip = data;
                 });
 
+        refresh_data = $interval(refresh, 3000);
+
         $scope.sm.start = function(){
-            $scope.starting = true;
-            starting_tracking.appendChild(spStart.el);
-
-            $http.post('/device/'+device_id+'/controls/start', data={"time":Date.now() / 1000.})
-                 .success(function(data){
-
-                    $scope.device.status = data.status;
-                    if (data.status == 'started'){
-                        $http.post('/devices_list', data={"device_id":device_id,"status":"running"})
-                        $timeout(refresh,1000);
-                        refresh_data = $interval(refresh, 3000);
-
-                    }
-                });
+                            starting_tracking.appendChild(spStart.el);
+                            $http.post('/device/'+device_id+'/controls/start', data={"time":Date.now() / 1000.})
+                                 .success(function(data){$scope.device.status = data.status;});
         };
 
         $scope.sm.stop = function(){
-            $http.post('/device/'+device_id+'/controls/stop', data={})
-                 .success(function(data){
-                    $scope.device.status = data.status;
-                    if (data.status == 'stopped'){
-                        $http.post('/devices_list', data={"device_id":device_id,"status":"stopped"})
-                        //TODO: does not stop.
-                        $interval.cancel(refresh_data);
-                    }
-                });
+                            $http.post('/device/'+device_id+'/controls/stop', data={})
+                            .success(function(data){
+                                $scope.device.status = data.status;
+                            });
         };
 
         $scope.sm.download = function(){
@@ -145,12 +127,12 @@
         $scope.sm.log = function(){
             var log_file_path = ''
             if ($scope.showLog == false){
-                    log_file_path = $scope.device.log_file;
-                    $http.post('/device/'+device_id+'/log', data={"file_path":log_file_path})
-                        .success(function(data, status, headers, config){
-                            $scope.log = data;
-                            $scope.showLog = true;
-                        });
+                log_file_path = $scope.device.log_file;
+                $http.post('/device/'+device_id+'/log', data={"file_path":log_file_path})
+                     .success(function(data, status, headers, config){
+                        $scope.log = data;
+                        $scope.showLog = true;
+                     });
             }else{
                 $scope.showLog = false;
             }
@@ -158,17 +140,13 @@
 
         $scope.sm.poweroff = function(){
                 $http.post('/device/'+device_id+'/controls/poweroff', data={})
-                .success(function(data){
+                     .success(function(data){
+                })
+        };
 
-            })
-        }
-
-        $scope.sm.alert= function(message){
-                alert(message);
-            }
+        $scope.sm.alert= function(message){alert(message);};
 
         $scope.sm.elapsedtime = function(t){
-
             // Calculate the number of days left
             var days=Math.floor(t / 86400);
             // After deducting the days calculate the number of hours left
@@ -179,24 +157,19 @@
             var secs = Math.floor((t - (days * 86400 ) - (hours *3600 ) - (minutes*60)))
 
             if (days>0){
-            var x =  days + " days, " + hours + "h, " + minutes + "min,  " + secs + "s ";
+                var x =  days + " days, " + hours + "h, " + minutes + "min,  " + secs + "s ";
             }else if ( days==0 && hours>0){
-            var x =   hours + "h, " + minutes + "min,  " + secs + "s ";
+                var x =   hours + "h, " + minutes + "min,  " + secs + "s ";
             }else if(days==0 && hours==0 && minutes>0){
-            var x =  minutes + "min,  " + secs + "s ";
+                var x =  minutes + "min,  " + secs + "s ";
             }else if(days==0 && hours==0 && minutes==0 && secs > 0){
-            var x =  secs + " s ";
+                var x =  secs + " s ";
             }
-
-
-
             return x;
 
         };
          $scope.sm.start_date_time = function(unix_timestamp){
-
             var date = new Date(unix_timestamp*1000);
-
             return date.toUTCString();
         };
 
@@ -206,12 +179,11 @@
                     $scope.device= data;
                     $scope.device.img = device_ip+':9000/static'+$scope.device.last_drawn_img + '?' + new Date().getTime();
                     $scope.device.ip = device_ip;
-                if ($scope.starting == true && $scope.device.status == 'running'){
-                    $scope.starting= false;
-                    spStart.stop();
-                }
-                });
-        }
+                    if (typeof spStart != undefined && $scope.device.status == 'running'){
+                        spStart.stop();
+                    }
+                 });
+       }
 
     });
 

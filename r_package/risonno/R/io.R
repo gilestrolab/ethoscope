@@ -91,9 +91,8 @@ loadROIsFromFile <- function(FILE, rois = NULL, min_time = 0, max_time = Inf, re
 		}
 			
 		if(!is.null(FUN))
-			out_roi_data <- FUN(roi_df, ...)
-			
-		return(out_roi_data)
+			return(FUN(roi_df, ...))
+		return(roi_df)
 	}
 	out <- lapply(rois, sql_query_fun)
 	dbDisconnect(con)

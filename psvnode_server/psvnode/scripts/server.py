@@ -7,6 +7,7 @@ import json
 import multiprocessing
 import logging
 import traceback
+from pexpect.screen import screen
 from psvnode.utils.acquisition import Acquisition
 from netifaces import interfaces, ifaddresses, AF_INET
 import optparse
@@ -15,7 +16,7 @@ app = Bottle()
 STATIC_DIR = "../../static"
 
 
-def get_data_from_url(url, timeout=0.5, port=9000):
+def scan_one_device(url, timeout=.5, port=9000):
     """
     Pings an url and try parsing its message as JSON data. This is typically used within a multithreading.Pool.map in
     order to request multiple arbitrary urls.
@@ -32,27 +33,20 @@ def get_data_from_url(url, timeout=0.5, port=9000):
         message = f.read()
         if not message:
             return
-        data = json.loads(message)
-        data['ip'] = url
-        return data
+        resp = json.loads(message)
+        print resp["machine_id"]
+        return (resp['machine_id'],url)
+
     except urllib2.URLError:
-        return
+        logging.warning("URL error whist scanning url: %s" % url )
+        return None, None
     except Exception as e:
         logging.error("Unexpected error whilst scanning url: %s" % url )
         raise e
 
-def get_data_from_id(id):
-    url = format_post_get_url(id,"data")
-    req = urllib2.Request(url=url)
-    f = urllib2.urlopen(req)
-    message = f.read()
-    if message:
-        data = json.loads(message)
-        return data
-    else:
-        raise urllib2.URLError("No data at this url `%s`" % url)
 
-def format_post_get_url(id, what,type=None, port=9000):
+
+def update_device_map(id, what="data",type=None, port=9000, data=None):
     """
     Just a routine to format our GET urls. This improves readability whilst allowing us to change convention (e.g. port) without rewriting everything.
 
@@ -62,13 +56,32 @@ def format_post_get_url(id, what,type=None, port=9000):
     :param port:
     :return:
     """
+    global devices_map
 
     ip = devices_map[id]["ip"]
 
-    url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
+    request_url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
+
     if type is not None:
-        return url + "/" + type
-    return url
+        request_url = request_url + "/" + type
+
+    req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
+
+    f = urllib2.urlopen(req)
+    message = f.read()
+    if message:
+        data = json.loads(message)
+
+        if not id in  devices_map:
+            logging.warning("Device %s is not in device map. Rescanning subnet..." % id)
+            scan_subnet()
+        try:
+            devices_map[id].update(data)
+
+        except KeyError:
+            logging.error("Device %s is not detected" % id)
+            raise KeyError("Device %s is not detected" % id)
+
 
 def get_subnet_ip(device="wlan0"):
     try:
@@ -76,6 +89,7 @@ def get_subnet_ip(device="wlan0"):
         return ".".join(ip.split(".")[0:3])
     except ValueError:
         raise ValueError("Device '%s' is not valid" % device)
+
 @app.get('/favicon.ico')
 def get_favicon():
     return server_static(STATIC_DIR+'/img/favicon.ico')
@@ -95,26 +109,29 @@ def index():
 #################################
 
 @app.get('/devices')
-def devices():
+def scan_subnet():
     subnet_ip = get_subnet_ip(SUBNET_DEVICE)
     logging.info("Scanning attached devices")
-    urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(256)]
-    pool = multiprocessing.Pool(256)
-    devices_list = pool.map(get_data_from_url, urls_to_scan)
-    pool.terminate()
+    urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(2,254)]
+    pool = multiprocessing.Pool(len(urls_to_scan))
+    devices_id_url_list = pool.map(scan_one_device, urls_to_scan)
+
+
 
     global devices_map
     devices_map = {}
-    for d in devices_list:
-        if d is None:
+    for id, ip in devices_id_url_list :
+        if id is None:
             continue
-        devices_map[d["machine_id"]] = d
+        devices_map[id] = {"ip":ip}
 
+    map(update_device_map, devices_map.keys())
+
+    pool.terminate()
     logging.info("%i devices found:" % len(devices_map))
 
     for k,v in devices_map.items():
         logging.info("%s\t@\t%s" % (k,v["ip"]))
-
     return devices_map
 
 @app.get('/devices_list')
@@ -122,80 +139,40 @@ def get_devices_list():
     global devices_map
     return devices_map
 
-@app.post('/devices_list')
-def post_devices_list():
-    # @Luis I don't get this, is is meant to update device status on request?
-    # When is that used?  I presume it should be updated at every refresh right?
-    global devices_map
-    #TODO just update here ;)
-    data = request.body.read()
-    data = json.loads(data)
-    device_id = data['device_id']
-    status = data['status']
-    devices_map[device_id]['status'] = status
 
 #Get the information of one Sleep Monitor
 @app.get('/device/<id>/data')
 def device(id):
     try:
-        data = get_data_from_id(id)
-
-        devices_map[id].update(data)
-        return data
-
-    except urllib2.URLError as e:
-        del devices_map[id]
-        return {'error':traceback.format_exc(e)}
+        update_device_map(id,what="data")
+        return devices_map[id]
     except Exception as e:
         return {'error':traceback.format_exc(e)}
 
-# @LUIS do we use that ?
-# FIXME
-# @app.get('/device/<id>/controls/<type_of_req>')
-# def device(id, type_of_req):
-#     try:
-#         url = format_post_get_url(id,"controls", type=type_of_req)
-#         req = urllib2.Request(url=url)
-#         f = urllib2.urlopen(req,{})
-#         message = f.read()
-#         if message:
-#             data = json.loads(message)
-#             devices_map[id].delete te(data)
-#             print "updating device map for", id
-#             return data
-#
-#     except Exception as e:
-#         logging.error(traceback.format_exc(e))
-#         return {'error':traceback.format_exc(e)}
 
 @app.post('/device/<id>/controls/<type_of_req>')
 def device(id, type_of_req):
     global acquisition
     try:
-        data = request.body.read()
-        url = format_post_get_url(id,"controls", type=type_of_req)
-        req = urllib2.Request(url, data=data, headers={'Content-Type': 'application/json'})
-        f = urllib2.urlopen(req)
-        message = f.read()
-        if not message:
-            return
+        post_data = request.body.read()
+        update_device_map(id, "data")
+        device_info = devices_map[id]
 
-        data = json.loads(message)
-
-        # Just updating the device map
-        device_info = get_data_from_id(id)
-        devices_map[id].update(device_info)
-        try:
-            if type_of_req == 'start' and data['status'] == 'started':
+        if type_of_req == 'start':
+            if device_info['status'] == 'stopped':
+                update_device_map(id, "controls", type_of_req, data=post_data)
                 acquisition[id] = Acquisition(devices_map[id])
                 acquisition[id].start()
-            if type_of_req == 'stop' and data['status'] == 'stopped' and acquisition is not None:
+            else:
+                raise Exception("Cannot start, device %s status is `%s`" %  (id, device_info['status']))
+
+        elif type_of_req == 'stop':
+            if device_info['status'] == 'running':
+                update_device_map(id, "controls", type_of_req, data=post_data)
                 acquisition[id].stop()
                 acquisition[id].join()
-        except Exception as e:
-            data['error'] = e
-            logging.error(traceback.format_exc(e))
-            return data
+            else:
+                raise Exception("Cannot stop, device %s status is `%s`" %  (id, device_info['status']))
 
     except Exception as e:
         logging.error(traceback.format_exc(e))
@@ -261,12 +238,9 @@ if __name__ == '__main__':
 
     global devices_map
     devices_map = {}
-    devices_map = devices()
+    scan_subnet()
 
     acquisition = {}
-
-
-
 
     for k, device in devices_map.iteritems():
         if device['status'] == 'running':
@@ -291,5 +265,3 @@ if __name__ == '__main__':
         for a in acquisition.values():
             a.stop()
             a.join()
-
-
