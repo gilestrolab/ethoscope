@@ -16,7 +16,7 @@ class Acquisition(Thread):
         }
 
 
-    _delay_between_updates = 5 # seconds
+    _delay_between_updates = 60 * 5 # seconds
 
 
     def __init__(self, device_info, result_main_dir="/psv_results/"):
