@@ -24,11 +24,14 @@ NULL
 #' }
 #' \dontrun{
 #' ####### Using the FUN argument to resample data as it is loaded.
-#' # This is preferable for very large dataset, or when owrking with
+#' # This is preferable for very large dataset, or when working with
 #' # little RAM.
 #' # First, we compute the last time point available for all ROIs
 #' out <- loadROIsFromFile(FILE, FUN=function(d)max(d$t))
 #' max_t <- max(unlist(out))
+#' # experiemental conditions:
+#' conditions <- cbind(roi_id=1:32, expand.grid(treatment=c(T,F), genotype=LETTERS[1:4]))
+#' print(conditions)
 #'
 #' # Then we apply the interpolateROIData to all ROIs
 #'  out <- loadROIsFromFile(FILE, 
@@ -37,23 +40,25 @@ NULL
 #' 	}
 #' @seealso \code{\link{loadMetaData}} To display global informations about the experiment. 
 #' @export
-loadROIsFromFile <- function(FILE, rois = NULL, min_time = 0, max_time = Inf, relative_distances = TRUE, FUN=NULL, ...){
-	
-	time_in_seconds <- TRUE
+loadROIsFromFile <- function(FILE, rois = NULL, min_time = 0,
+				max_time = Inf, relative_distances = TRUE,
+				condition_df = NULL, time_in_seconds=TRUE,
+				FUN=NULL, ...){
 
 	con <- dbConnect(SQLite(), FILE)
-	roi_map <- dbGetQuery(con, "SELECT * FROM ROI_MAP")
-	var_map <- dbGetQuery(con, "SELECT * FROM VAR_MAP")
+	roi_map <- as.data.table(dbGetQuery(con, "SELECT * FROM ROI_MAP"))
+	var_map <- as.data.table(dbGetQuery(con, "SELECT * FROM VAR_MAP"))
 	
-	rownames(roi_map) <- roi_map$roi_idx
-	rownames(var_map) <- var_map$var_name
+	setkey(roi_map, roi_idx)
+	setkey(var_map, var_name)
 	
-	available_rois  <- roi_map$roi_idx
+	
+	available_rois  <- roi_map[ ,roi_idx]
+	
 	if(is.null(rois))
 		rois <- available_rois
 	
 	matched <- rois %in% available_rois
-	
 	unmatched_idx <-  which(!matched)
 	
 	for(i in rois[unmatched_idx])
@@ -75,19 +80,21 @@ loadROIsFromFile <- function(FILE, rois = NULL, min_time = 0, max_time = Inf, re
 	sql_query_fun <- function(i){
 		sql_query <- sprintf("SELECT * FROM ROI_%i WHERE t >= %e %s",i,min_time, max_time_condition )
 		roi_dt <- as.data.table(dbGetQuery(con, sql_query)	)
-		roi_dt$id <- NULL
-		roi_row <- subset(roi_map, roi_idx == i)
+		roi_dt[, id := NULL]
+		roi_dt[, roi_id := i]
+		roi_row <- roi_map[i]
 		
 		if(time_in_seconds)
 			roi_dt[, t:= t/1e3]
-		
-		
-		w <- max(c(roi_row[1,"w"], roi_row[1,"h"]))
+		roi_width <- max(c(roi_row[,w], roi_row[,h]))
 		for(var_n in var_map$var_name){
-			if(var_map[var_n, "functional_type"] == "distance")
-				roi_dt[,var_n := var_n/w]
-			if(var_map[var_n, "sql_type"] == "BOOLEAN")
-				roi_dt[,var_n := as.logical(var_n)]
+			if(var_map[var_n, functional_type] == "distance"){			
+				roi_dt[, (var_n) := get(var_n) / roi_width]
+
+			}
+			if(var_map[var_n, sql_type] == "BOOLEAN"){
+				roi_dt[, (var_n) := as.logical(get(var_n))]
+			}
 		}
 			
 		if(!is.null(FUN))
@@ -96,14 +103,22 @@ loadROIsFromFile <- function(FILE, rois = NULL, min_time = 0, max_time = Inf, re
 	}
 	out <- lapply(rois, sql_query_fun)
 	dbDisconnect(con)
+	out <- rbindlist(out)
+	setkey(out, roi_id)
 	
-	names(out) <- paste0("ROI_", rois)
+	if(!is.null(condition_df)){
+		condition_df <- as.data.table(condition_df)
+		out <- out[condition_df]
+		}
+#~ 	names(out) <- paste0("ROI_", rois)
 	
-	if(length(out) == 1)
-		return (out[[1]])
+#~ 	if(length(out) == 1)
+#~ 		return (out[[1]])
 		
 	return(out)		
 }
+
+dd <- loadROIsFromFile(FILE, condition_df=conditions)
 NULL
 #' Get metadata from a result file.
 #' 
