@@ -1,56 +1,36 @@
+rm(list=ls())
 library(risonno)
-FILE <- "~/Desktop/test2.db"
+library(ggplot2)
 
 
 
-out <- loadROIsFromFile(FILE, FUN=function(d)max(d$t))
-max_t <- max(unlist(out))
-roi_dfs <- loadROIsFromFile(FILE, 
-	FUN=interpolateROIData, start=0,
-	stop = max_t, fs=1)
 
-activity <- function(d){
-	comp = d$x + 1i*d$y
+
+
+
+
+activity <- function(x,y){
+	comp = x + 1i*y
 	distance <- c(0, abs(diff(comp)))
-	d$activity <- distance
-	return(d)
+	return(distance)
 }
 
+# read a file
+FILE <- "./test_data/short_data.db"
+conditions <- cbind(roi_id=1:32, expand.grid(treatment=c(T,F), genotype=LETTERS[1:4]))
+dt <- loadROIsFromFile(FILE, FUN=interpolateROIData, fs=1, condition_df = conditions)
 
-roi_dfs <- lapply(roi_dfs, activity)
+# compute activity for each ROI in place
+dt[,activity:=activity(x,y) , by=key(dt)]
 
-pdf(w=16,h=9)
-lapply(names(roi_dfs), function(n) {
-	
-	d <- roi_dfs[[n]]
-	tt <- d$t/3600;
-	
-	y <- filter(d$activity, rep(1,601))
-	sparse_idx <- seq(0, length(tt), length.out=1e4)
-	tt <- tt[sparse_idx]
-	y <- y[sparse_idx]
+# exclude activity when sum <= 3
+activ <- dt[, list(mask=sum(activity) > 3),by=roi_id]
+good_rois <- activ[mask==T,roi_id]
+dt <- dt[.(good_rois)]
 
-	plot(y ~ tt, type='l',ylim=c(0,50),
-	xlab="time(h)",
-	ylab="Activity (tube lenght walked in 10min)",
-	main=n)
-	abline(v = 40.25 + -10 :10 * 12, col="blue", lwd=3, lty=2)
-	return(NULL)
-	})
-dev.off()
+#
+ggplot(data = dt, aes(x=t, y=activity, colour=as.factor(roi_id))) + geom_line()
 
-pdf("test.pdf", w=16,h=9)
-lapply(names(roi_dfs), function(n) {
-	
-	d <- roi_dfs[[n]]
-	tt <- d$t/3600;
-	
-	y <- filter(d$activity, rep(1,61)) # on min
+tp <- dt[,list(activity=mean(activity)) , by=c("treatment","t")]
+ggplot(data = tp, aes(x=t, y=activity, colour=as.factor(treatment))) + geom_line()
 
- 	hist(log10(y), nclass=100, xlab="log10(Activity) (lenght of tube/min)",freq=F,xlim=c(0,1), ylim=c(0,1), main=n)
-	#plot(density(na.omit(y)), xlab="Activity (lenght of tube/min)",freq=F,xlim=c(0,10), log="y")
-
-	abline(v = .1, col="blue", lwd=3, lty=2)
-	return(NULL)
-	})
-dev.off()

@@ -9,7 +9,9 @@ NULL
 #' @param rois a vector of ROI indices to read. NULL returns all ROIs
 #' @param min_time exclude data before min_time (in seconds)
 #' @param max_time exclude data after max_time (in seconds)
+#' @param condition_df an optionnal dataframe to provide experiemental conditions for each ROI. This dataframe should have one row per ROI and, at least, a \code{roi_id} column.
 #' @param relative_distance whether distance is converted between 0 and 1 relatively to the width of the ROI. If FALSE, varibales such as x,y, w and h are returned is returned in absolute number of pixels.
+#' @param time_in_seconds whether time is expressed in seconds (TRUE) or milliseconds (FALSE).
 #' @param FUN an optionnal function to be applied to the resulting dataframe. It can be used, for instance, to compute summary statistics, or to transform the data.
 #' @param ... extra arguments to be passed to \code{FUN}
 #' @return If \code{rois} has only one element, a dataframe. Otherwise, a list of dataframes (one per ROI)
@@ -79,7 +81,7 @@ loadROIsFromFile <- function(FILE, rois = NULL, min_time = 0,
 	
 	sql_query_fun <- function(i){
 		sql_query <- sprintf("SELECT * FROM ROI_%i WHERE t >= %e %s",i,min_time, max_time_condition )
-		roi_dt <- as.data.table(dbGetQuery(con, sql_query)	)
+		roi_dt <- as.data.table(dbGetQuery(con, sql_query))
 		roi_dt[, id := NULL]
 		roi_dt[, roi_id := i]
 		roi_row <- roi_map[i]
@@ -118,7 +120,7 @@ loadROIsFromFile <- function(FILE, rois = NULL, min_time = 0,
 	return(out)		
 }
 
-dd <- loadROIsFromFile(FILE, condition_df=conditions)
+#~ dd <- loadROIsFromFile(FILE, condition_df=conditions)
 NULL
 #' Get metadata from a result file.
 #' 

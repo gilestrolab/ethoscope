@@ -29,33 +29,67 @@ NULL
 #' @seealso \code{\link{loadROIsFromFile}} in order to load ROI data.
 #' @export
 
-interpolateROIData <- function(d,min_n_points=11, fs=NA, start_time=NA, stop_time=NA){
-			
-	if(nrow(d) < min_n_points)
-		stop("This dataframe does not have enough rows to be resampled")
-		t0 <- d[1,'t']
-		tf <- d[nrow(d),'t']
-		if(!is.na(start_time))
-			t0 <- start_time
-		if(!is.na(stop_time))
-			tf <- stop_time
+interpolateROIData <- function(d,min_n_points=11, fs=NA, start_time=0, stop_time=NA){	
+	
+	if(nrow(d) < min_n_points){
+		warning("This data table does not have enough rows to be resampled. NULL returned")
+		return(NULL)
+		}
 		
-		
-		if (is.na(fs))
-			fs <- median(diff(d[,"t"]))
+	t0 <- d[1,t]
+	tf <- d[.N,t]
+	if(!is.na(start_time))
+		t0 <- start_time
+	if(!is.na(stop_time))
+		tf <- stop_time
+	
+	
+	if (is.na(fs))
+		fs <- median(diff(d[,t]))
+	
+	
+	dt <- (tf-t0)
 
-		dt <- (tf-t0)
+	t_out <- seq(from = t0, to = tf, by=1/fs)
+	bin_length <- 1/fs
+	
+	time_in_bin <- bin_length * round(d[,t] /bin_length)
+	
+	variables_to_interpol <- colnames(d)[colnames(d) != "t"]
+	new_d <- lapply(variables_to_interpol, function(xx){
+		var_class <- class(d[,get(xx)])
+		method <- ifelse(var_class == "numeric","linear","constant")
+		
 
-		t_out <- seq(from = t0, to = tf, by=1/fs)
+		if(method == "numeric")
+			 binned_dt = d[, list(t=mean(t), y=mean(get(xx))), by=time_in_bin]
+		else
+			binned_dt = d[, list(t=mean(t), y=get(xx)[1]), by=time_in_bin]
+			#fixme
+		if(var_class == "character"){
+			binned_dt[,y := as.factor(y) ]
+			var_class <- "factor"
+		}
+				
+
+		 
+		y_out <- approx(x=binned_dt[,t], y=binned_dt[,y],xout=t_out, method=method, rule=c(2,2))$y
+		 
+		if(var_class == "factor")
+			y_out <- as.factor(levels(binned_dt[,y])[y_out[1]])
 		
-		t_in <- d[,"t"]
-		
-		
-		new_d <- lapply(d[,colnames(d) != "t"],
-			function(v){
-				approx(x=t_in, y=v,xout=t_out)$y
-			}
-		)
-		new_d <- data.frame(t=t_out,new_d)
-		return(new_d)
+		y_out <- as(y_out, var_class)
+		return(y_out)
+		})
+	
+	names(new_d) <- variables_to_interpol
+	
+	new_dt <- as.data.table(data.frame(t=t_out, new_d))
+	
+	
+	
+	
+	
+	return(new_dt)
 }
+
