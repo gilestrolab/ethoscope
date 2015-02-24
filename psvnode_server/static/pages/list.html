@@ -7,17 +7,18 @@
         <div  id="loading_devices" class="spinner"></div>
 
     </div>
-    <div class="col-lg-4 alert alert-info" ng-repeat="device in devices" ng-if="device.type == req_device_type">
-        <a  href="{{device.type}}/{{device.machine_id}}">
-            <h3 ng-if="device_type == 'Sleep Monitor'">Sleep Monitor</h3>
-            <h3 ng-if="device_type == 'Sleep Deprivator'">Sleep Deprivator</h3>
-            <!--<div><span class="fa fa-paw"></span> ID: {{device.machine_id}}</div>-->
+<a ng-repeat="device in devices" href="{{device.type}}/{{device.id}}">
+        <div class="col-lg-4 alert alert-info" >
+            <h3 ng-if="device.type == 'sm'">Sleep Monitor</h3>
+            <h3 ng-if="device.type == 'sd'">Sleep Deprivator</h3>
+             <!--<div><span class="fa fa-paw"></span> ID: {{device.machine_id}}</div>-->
             <div><span class="fa fa-genderless"></span> Name: {{device.name}}</div>
             <div><span ng-if="device.status == 'running'" class="fa fa-circle color-green"></span>
             <span ng-if="device.status == 'stopped'" class="fa fa-circle color-red"></span> Status: {{device.status}}
-
             </div>
+            <div>
+                <span class="fa fa-laptop"></span> IP: {{device.ip}}
+            </div>
+        </div>
+    </a>
 
-            <!--<div><span class="fa fa-laptop"></span> IP: {{device.ip}}</div>-->
-        </a>
-    </div>

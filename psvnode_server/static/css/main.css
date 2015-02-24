@@ -22,3 +22,10 @@
 }
 
 
+.option{
+    text-align: center;
+}
+
+.file-list{
+    list-style: none;
+}

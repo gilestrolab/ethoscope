@@ -10,12 +10,7 @@
       <link rel="stylesheet" href="/static/css/font-awesome.min.css" />
         <link rel="stylesheet" href="/static/css/main.css" />
 
-      <!-- SPELLS -->
-      <!-- load angular and angular route via CDN -->
-      <script src="static/js/vendor/angular.min.js"></script>
-      <script src="static/js/vendor/angular-route.min.js"></script>
-      <script src="static/js/vendor/spinner.js"></script>
-      <script src="/static/js/script.js"></script>
+
     </head>
     <body ng-controller="mainController">
 
@@ -31,6 +26,7 @@
                     <li><a href="/"><i class="fa fa-home"></i> Home</a></li>
                     <li><a href="list/sm"><i class="fa fa-shield"></i> Sleep Monitors</a></li>
                     <li><a href="list/sd"><i class="fa fa-comment"></i> Sleep Deprivators</a></li>
+                    <li><a href="/more"><i class="fa fa-cog"></i> More</a></li>
                 </ul>
             </div>
             </nav>
@@ -43,8 +39,17 @@
         </div>
 
     <!--JS-->
+
+    <!-- load angular and angular route via CDN -->
+    <script src="static/js/vendor/angular.min.js"></script>
+    <script src="static/js/vendor/angular-route.min.js"></script>
+    <script src="static/js/vendor/spinner.js"></script>
+    <script src="/static/js/script.js"></script>
     <script src="static/js/vendor/jquery.min.js"></script>
     <script src="static/js/vendor/bootstrap.min.js"></script>
+    <script src="static/js/controllers/smController.js"></script>
+        <script src="static/js/controllers/moreController.js"></script>
+
 
     </body>
     </html>

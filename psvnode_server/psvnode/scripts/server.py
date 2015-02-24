@@ -10,6 +10,7 @@ import traceback
 from pexpect.screen import screen
 from psvnode.utils.acquisition import Acquisition
 from netifaces import interfaces, ifaddresses, AF_INET
+from os import walk
 import optparse
 
 app = Bottle()
@@ -177,14 +178,41 @@ def device(id, type_of_req):
         logging.error(traceback.format_exc(e))
         return {'error':traceback.format_exc(e)}
 
+#Browse, delete and download files from node
+@app.get('/browse/<folder:path>')
+def browse(folder):
+    try:
+        if folder == 'null':
+            directory = RESULTS_DIR
+        else:
+            directory = '/'+folder
+        files = []
+        dir =[]
+        for (dirpath, dirnames, filenames) in walk(directory):
+            for name in filenames:
+                if dirpath==directory:
+                    files.append(os.path.join(dirpath, name))
+            for name in dirnames:
+                if dirpath==directory:
+                    dir.append(os.path.join(dirpath, name))
+
+        return{'files': files, 'dir':dir}
+    except Exception as e:
+        return {'error': traceback.format_exc(e)}
+
+def file_process(arg,dir,files):
+    return files
+
+
 @app.get('/list/<type>')
 def redirection_to_home(type):
     return redirect('/#/list/'+type)
-
+@app.get('/more')
+def redirection_to_home():
+    return redirect('/#/more/')
 @app.get('/sm/<id>')
 def redirection_to_home(id):
     return redirect('/#/sm/'+id)
-
 @app.get('/device/<id>/ip')
 def redirection_to_home(id):
     if len(devices_map) > 0:
@@ -202,7 +230,7 @@ def get_log(id):
         # url  = format_post_get_url(id,"static",type=data["file_path"])
         # req = urllib2.Request(url)
         #TO DISCUSS @luis static files url not understood
-        req = urllib2.Request(url=devices_map[id]['ip']+':9000/static/'+data["file_path"])
+        req = urllib2.Request(url=devices_map[id]['ip']+':9000/static'+data["file_path"])
 
         f = urllib2.urlopen(req)
         result = {}
@@ -230,9 +258,15 @@ if __name__ == '__main__':
     PORT = option_dict["port"]
 
     if DEBUG:
-        SUBNET_DEVICE = b'enp3s0'
+        import getpass
+        if getpass.getuser() == "quentin":
+            SUBNET_DEVICE = b'enp3s0'
+        if getpass.getuser() == "asterix":
+            SUBNET_DEVICE = b'lo'
+            RESULTS_DIR = "/tmp/"
     else:
         SUBNET_DEVICE = b'wlan0'
+        RESULTS_DIR = "/results/"
 
 
     global devices_map
