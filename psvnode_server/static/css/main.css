@@ -29,3 +29,6 @@
 .file-list{
     list-style: none;
 }
+.right{
+    float:right;
+}

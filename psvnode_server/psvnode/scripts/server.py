@@ -98,6 +98,9 @@ def get_favicon():
 def server_static(filepath):
     return static_file(filepath, root=STATIC_DIR)
 
+@app.route('/download/<filepath:path>')
+def server_download(filepath):
+    return static_file(filepath, root="/", download=filepath)
 
 @app.route('/')
 def index():
@@ -187,16 +190,19 @@ def browse(folder):
         else:
             directory = '/'+folder
         files = []
-        dir =[]
+        file_id=0
         for (dirpath, dirnames, filenames) in walk(directory):
-            for name in filenames:
-                if dirpath==directory:
-                    files.append(os.path.join(dirpath, name))
             for name in dirnames:
                 if dirpath==directory:
-                    dir.append(os.path.join(dirpath, name))
+                    files.append({'name':os.path.join(dirpath, name), 'is_dir':True, 'id':file_id})
+                    file_id += 1
+            for name in filenames:
+                if dirpath==directory:
+                    files.append({'name':os.path.join(dirpath, name), 'is_dir':False, 'id':file_id})
+                    file_id += 1
 
-        return{'files': files, 'dir':dir}
+
+        return{'files': files}
     except Exception as e:
         return {'error': traceback.format_exc(e)}
 
