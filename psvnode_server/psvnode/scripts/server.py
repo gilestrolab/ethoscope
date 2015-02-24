@@ -164,7 +164,7 @@ def device(id, type_of_req):
         if type_of_req == 'start':
             if device_info['status'] == 'stopped':
                 update_device_map(id, "controls", type_of_req, data=post_data)
-                acquisition[id] = Acquisition(devices_map[id])
+                acquisition[id] = Acquisition(devices_map[id], result_main_dir=RESULTS_DIR)
                 acquisition[id].start()
             else:
                 raise Exception("Cannot start, device %s status is `%s`" %  (id, device_info['status']))
@@ -263,16 +263,18 @@ if __name__ == '__main__':
     DEBUG = option_dict["debug"]
     PORT = option_dict["port"]
 
+    RESULTS_DIR = "/psv_results/"
+
     if DEBUG:
         import getpass
         if getpass.getuser() == "quentin":
             SUBNET_DEVICE = b'enp3s0'
         if getpass.getuser() == "asterix":
             SUBNET_DEVICE = b'lo'
-            RESULTS_DIR = "/tmp/"
+            RESULTS_DIR = "/tmp/psv_results"
     else:
         SUBNET_DEVICE = b'wlan0'
-        RESULTS_DIR = "/results/"
+
 
 
     global devices_map
@@ -283,7 +285,7 @@ if __name__ == '__main__':
 
     for k, device in devices_map.iteritems():
         if device['status'] == 'running':
-            acquisition[k]= Acquisition(device)
+            acquisition[k]= Acquisition(device, result_main_dir=RESULTS_DIR)
             acquisition[k].start()
     try:
 

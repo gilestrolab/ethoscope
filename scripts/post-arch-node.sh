@@ -12,8 +12,8 @@ set -e # stop if any error happens
 
 USER_NAME=node
 PASSWORD=node
-PSV_DATA_DIR=/node_data
-PSV_DB_NAME=node_db
+PSV_DATA_DIR=/psv_results
+
 
 ############# PACKAGES #########################
 echo 'Installing and updating packages'
@@ -134,16 +134,6 @@ hostnamectl set-hostname $hostname
 mkdir -p $PSV_DATA_DIR
 chmod 777 $PSV_DATA_DIR -R
 
-systemctl enable mysqld.service
-systemctl start mysqld.service
-
-## not even useful:
-#mysql -u root -e "create database $PSV_DB_NAME";
-
-mysql -u root -e "CREATE USER \"$USER_NAME\"@'localhost' IDENTIFIED BY \"$PASSWORD\""
-mysql -u root -e "CREATE USER \"$USER_NAME\"@'%' IDENTIFIED BY \"$PASSWORD\""
-mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO \"$USER_NAME\"@'localhost' WITH GRANT OPTION";
-mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO \"$USER_NAME\"@'%' WITH GRANT OPTION";
 
 
 # our software.
