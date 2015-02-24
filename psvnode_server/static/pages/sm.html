@@ -17,15 +17,18 @@
         </div>
         <div id="starting" class="spinner" >
         </div>
-        <div ng-if="device.status == initializating">
-            <p>Please wait. Initialising the tracking...</p>
+        <div ng-if="device.status == 'initializating'">
+            <p>Please wait, system is starting</p>
+        </div>
+        <div ng-if="device.status == 'stopping'">
+            <p>Stopping tracking...</p>
         </div>
 
         <button class="btn btn-success btn-xl" ng-if="device.status == 'stopped'" ng-click="sm.start()">Start</button>
         <button class="btn btn-danger" ng-if="device.status == 'running'"  ng-click="sm.stop()">Stop</button>
 
-        <button class="btn btn-info" ng-if="device.status == 'stopping'"  ng-click="sm.alert('Please wait, system is stopping')">Stopping</button>
-        <button class="btn btn-info" ng-if="device.status == 'initialising'"  ng-click="sm.alert('Please wait, system is starting')">Starting</button>
+        <button class="btn btn-info disable" ng-if="device.status == 'stopping'"  ng-click="sm.alert('Please wait, system is stopping')">Stopping</button>
+        <button class="btn btn-danger disable" ng-if="device.status == 'initialising'"  ng-click="sm.alert('Please wait, system is starting')">Starting</button>
 
         <button class="btn btn-info" data-toggle="modal" data-target="#downloadModal">Download Data</button>
         <button class="btn btn-info" ng-click="sm.log()">Log</button>
@@ -40,7 +43,7 @@
 
     <div ng-if="showLog == true">
         <pre>
-        <p class="log" ng-repeat="(key,entry) in log">{{key}}: {{entry}}</p></pre>
+        <p class="log" ng-repeat="(key,entry) in log | toArray |orderBy: 'key'">{{key}}: {{entry}}</p></pre>
     </div>
 
     <div ng-if="device.status == false">
