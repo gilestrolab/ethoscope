@@ -111,7 +111,22 @@ class Acquisition(Thread):
 
             except Exception as e:
                 logging.error(traceback.format_exc(e))
-                raise e
+
+                self._force_stop = True
+
+
+        try:
+            logging.info("Try final mirroring of the DB")
+            if mirror is None:
+                mirror= MySQLdbToSQlite(self._output_db_file, self._db_credentials["name"],
+                    remote_host=self._database_ip,
+                    remote_pass=self._db_credentials["password"],
+                    remote_user=self._db_credentials["user"])
+            mirror.update_roi_tables()
+            logging.info("Success")
+        except Exception as f:
+            logging.error(traceback.format_exc(f))
+
 
     def __del__(self):
         logging.info("Stopping acquisition thread")
