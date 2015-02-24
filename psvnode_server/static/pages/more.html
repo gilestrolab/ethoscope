@@ -19,13 +19,20 @@
         <button class="btn btn-success">Download</button>
         <button class="btn btn-danger">Delete</button>
     </div>
+    <div id="controls" class="">
+        <a href="" ng-click="browse(prev_dir)"><span class="fa fa-chevron-left"></span> Back</a>
+    </div>
     <table class="table table-striped">
         <thead>
         <th>Name</th>
         <th>Select </th>
         </thead>
         <tbody ng-repeat="dir in files.dir">
-            <td><span class="fa fa-folder-o"></span><span ng-if="dir.length > 25">{{dir.substring(0,25)}}...</span><span ng-if="dir.length <= 25">{{dir}}</span></td>
+            <td>
+                <a href="" ng-click="browse(dir)">
+                <span class="fa fa-folder-o"></span><span ng-if="dir.length > 25">{{dir.substring(0,25)}}...</span><span ng-if="dir.length <= 25">{{dir}}</span>
+                </a>
+            </td>
             <td><input type="checkbox"></td>
         </tbody>
         <tbody ng-repeat="file in files.files">
@@ -33,5 +40,4 @@
             <td><input type="checkbox"></td>
         </tbody>
     </table>
-
 </div>

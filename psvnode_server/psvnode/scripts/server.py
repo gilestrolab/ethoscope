@@ -179,17 +179,23 @@ def device(id, type_of_req):
         return {'error':traceback.format_exc(e)}
 
 #Browse, delete and download files from node
-@app.get('/browse/<option>')
-def browse(option):
+@app.get('/browse/<folder:path>')
+def browse(folder):
     try:
-        if option == 'all':
-            files = []
-            dir =[]
-            for (dirpath, dirnames, filenames) in walk(RESULTS_DIR):
-                files.extend(filenames)
-                dir.extend(dirnames)
+        if folder == 'null':
+            directory = RESULTS_DIR
+        else:
+            directory = '/'+folder
+        files = []
+        dir =[]
+        for (dirpath, dirnames, filenames) in walk(directory):
+            for name in filenames:
+                if dirpath==directory:
+                    files.append(os.path.join(dirpath, name))
+            for name in dirnames:
+                if dirpath==directory:
+                    dir.append(os.path.join(dirpath, name))
 
-            print response
         return{'files': files, 'dir':dir}
     except Exception as e:
         return {'error': traceback.format_exc(e)}
