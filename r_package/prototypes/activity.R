@@ -3,12 +3,6 @@ library(risonno)
 library(ggplot2)
 
 
-
-
-
-
-
-
 activity <- function(x,y){
 	comp = x + 1i*y
 	distance <- c(0, abs(diff(comp)))
