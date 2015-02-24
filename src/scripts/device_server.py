@@ -123,7 +123,6 @@ if __name__ == '__main__':
     try:
         run(api, host='0.0.0.0', port=port, debug=debug)
     except Exception as e:
-
         logging.error(e)
     finally:
         if control is not None:

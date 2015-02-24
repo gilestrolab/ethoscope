@@ -129,8 +129,14 @@ class Monitor(object):
         frame_cp = frame.copy()
         positions = self._last_positions
         for track_u in self._unit_trackers:
-            cv2.putText(frame_cp, str(track_u.roi.idx), track_u.roi.offset, cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,0))
+            # cv2.putText(frame_cp, str(track_u.roi.idx), track_u.roi.offset, cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,0))
+            x,y = track_u.roi.offset
+            y += track_u.roi.rectangle[3]/2
+
+            cv2.putText(frame_cp, str(track_u.roi.idx), (x,y), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,0))
+            black_colour = (0, 0,0)
             roi_colour = (0, 255,0)
+            cv2.drawContours(frame_cp,[track_u.roi.polygon],-1, black_colour, 3, cv2.CV_AA)
             cv2.drawContours(frame_cp,[track_u.roi.polygon],-1, roi_colour, 1, cv2.CV_AA)
             try:
                 pos = positions[track_u.roi.idx]
@@ -151,6 +157,7 @@ class Monitor(object):
                 colour = (0,255,255)
 
 
+            cv2.ellipse(frame_cp,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),black_colour,3,cv2.CV_AA)
             cv2.ellipse(frame_cp,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),colour,1,cv2.CV_AA)
 
         return frame_cp
