@@ -13,11 +13,12 @@
 </div>
 <div ng-if="showFiles" class="col-xs-12">
     <h2>Files to be dowloaded:</h2>
-    <div class="alert alert-info">
-        <p>Select All: <input type="checkbox"></p>
+    <div class="alert alert-info col-xs-12">
         <p>Actions for selected files:</p>
-        <button class="btn btn-success">Download</button>
+        <button class="btn btn-success" ng-click="browse.dowload()">Download</button>
         <button class="btn btn-danger">Delete</button>
+        <button ng-if="selected_all == false" class="right btn btn-info" ng-click="browse.toggleAll()">Select All</button>
+        <button ng-if="selected_all == true" class="right btn btn-warning" ng-click="browse.toggleAll()">Deselect All</button>
     </div>
     <div id="controls" class="">
         <a href="" ng-click="browse(prev_dir)"><span class="fa fa-chevron-left"></span> Back</a>
@@ -27,17 +28,18 @@
         <th>Name</th>
         <th>Select </th>
         </thead>
-        <tbody ng-repeat="dir in files.dir">
-            <td>
-                <a href="" ng-click="browse(dir)">
-                <span class="fa fa-folder-o"></span><span ng-if="dir.length > 25">{{dir.substring(0,25)}}...</span><span ng-if="dir.length <= 25">{{dir}}</span>
+        <tbody ng-repeat="file in files.files">
+             <td ng-if="file.is_dir == true">
+                <a href="" ng-click="browse(dir.name)">
+                <span class="fa fa-folder-o"></span><span ng-if="file.name.length > 75">{{file.name.substring(0,75)}}...</span><span ng-if="file.name.length <= 75"> {{file.name}}</span>
                 </a>
             </td>
-            <td><input type="checkbox"></td>
-        </tbody>
-        <tbody ng-repeat="file in files.files">
-            <td><span class="fa fa-file-o"></span><span ng-if="file.length > 25">{{file.substring(0,25)}}...</span><span ng-if="file.length <= 25">{{file}}</span></td>
-            <td><input type="checkbox"></td>
+            <td ng-if="file.is_dir == false">
+            <a ng-href="/download{{file.name}}"  target="_self">
+                <span class="fa fa-file-o"></span><span ng-if="file.name.length > 75">{{file.name.substring(0,75)}}...</span><span ng-if="file.name.length <= 75"> {{file.name}}</span>
+            </a>
+            </td>
+            <td><input type="checkbox" checklist-model="selected.files" checklist-value="file"></td>
         </tbody>
     </table>
 </div>
