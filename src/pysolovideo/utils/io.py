@@ -191,10 +191,19 @@ class ResultWriter(ResultDBWriterBase):
             db =   MySQLdb.connect(host="localhost",
                      user="psv", passwd="psv")
 
+
             c = db.cursor()
-            cmd = "RESET MASTER"
-            logging.info("Removing binary log")
-            c.execute(cmd)
+
+            try:
+                cmd = "RESET MASTER"
+                logging.info("Removing binary log")
+                c.execute(cmd)
+            except MySQLdb.OperationalError as e:
+                logging.warning("Binary log seems disabled, got:")
+                logging.warning(e)
+
+
+
             cmd = "CREATE DATABASE %s" % self._db_name
             c.execute(cmd)
             logging.info("Database created")
