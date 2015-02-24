@@ -21,7 +21,7 @@ echo 'Installing and updating packages'
 # pacman-db-update
 # pacman-key --init
 pacman -Syu --noconfirm
-pacman -S base-devel git gcc-fortran rsync wget --noconfirm --needed
+pacman -S base-devel git gcc-fortran rsync wget fping --noconfirm --needed
 
 ### Video capture related Not needed in Node
 #pacman -S opencv mplayer ffmpeg gstreamer gstreamer0.10-plugins mencoder --noconfirm --needed

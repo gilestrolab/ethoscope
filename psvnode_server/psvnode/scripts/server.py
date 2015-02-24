@@ -16,8 +16,26 @@ import optparse
 app = Bottle()
 STATIC_DIR = "../../static"
 
+def which(program):
+    # verbatim from
+    # http://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
+    def is_exe(fpath):
+        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
-def scan_one_device(url, timeout=.5, port=9000):
+    fpath, fname = os.path.split(program)
+    if fpath:
+        if is_exe(program):
+            return program
+    else:
+        for path in os.environ["PATH"].split(os.pathsep):
+            path = path.strip('"')
+            exe_file = os.path.join(path, program)
+            if is_exe(exe_file):
+                return exe_file
+
+    return None
+
+def scan_one_device(url, timeout=1, port=9000):
     """
     Pings an url and try parsing its message as JSON data. This is typically used within a multithreading.Pool.map in
     order to request multiple arbitrary urls.
@@ -28,17 +46,34 @@ def scan_one_device(url, timeout=.5, port=9000):
     :return: The message, parsed as dictionary. the "ip" (==url) field is also added to the result.
     If the url could not be reached, None is returned
     """
+
+    try:
+
+        if not which("fping"):
+            raise Exception("fping not available")
+        ping = os.system(" fping %s -t 50  > /dev/null 2>&1 " % os.path.basename(url))
+    except Exception as e:
+        ping = 0
+        logging.error("Could not ping. Assuming 'alive'")
+        logging.error(traceback.format_exc(e))
+
+
+    if ping != 0:
+        logging.info("url: %s, not responding. Skipping" % url )
+        return None, None
+
     try:
         req = urllib2.Request(url="%s:%i/id" % (url, port))
         f = urllib2.urlopen(req, timeout=timeout)
         message = f.read()
         if not message:
+            logging.error("URL error whist scanning url: %s. No message back." % url )
             return
         resp = json.loads(message)
         return (resp['id'],url)
 
     except urllib2.URLError:
-        logging.warning("URL error whist scanning url: %s" % url )
+        logging.error("URL error whist scanning url: %s. Server down?" % url )
         return None, None
     except Exception as e:
         logging.error("Unexpected error whilst scanning url: %s" % url )

@@ -160,8 +160,7 @@ mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO \"$USER_NAME\"@'localhost' WITH
 mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO \"$USER_NAME\"@'%' WITH GRANT OPTION";
 
 
-# this disables binary logs to save on I/O, space
-# this disables binary logs to save on I/O, space
+# This disables binary logs to save on I/O, space
 # 1 backup:
 cp /etc/mysql/my.cnf  /etc/mysql/my.cnf-bak
 # remove log-bin lines
