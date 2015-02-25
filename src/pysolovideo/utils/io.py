@@ -13,14 +13,14 @@ import MySQLdb
 #
 #TODO add HIGH_PRIORITY to inserts!
 class ResultDBWriterBase(object):
-    _flush_every_ns = 30 # flush every 10s of data
+    _flush_every_n_rows = 120 # flush every 10s of data
     _dam_file_period = 60 # Get activity for every N s of data
 
     def _create_table(self, cursor, name, fields):
         raise NotImplementedError()
 
     def __init__(self,  rois, metadata=None, make_dam_like_table=True, *args, **kwargs):
-        self._last_t, self._last_flush_t, self._last_dam_t = [0] * 3
+        self._last_t, self._last_flush_n, self._last_dam_t = [0] * 3
 
         self.metadata = metadata
         self._rois = rois
@@ -127,10 +127,11 @@ class ResultDBWriterBase(object):
             self._update_dam_table()
 
 
-        if (self._last_t - self._last_flush_t) < (self._flush_every_ns * 1000):
-            return
-        self._conn.commit()
-        self._last_flush_t =  self._last_t
+        if self._last_flush_n  >= self._flush_every_n_rows:
+            self._last_n = 0
+            self._conn.commit()
+        self._last_flush_n += 1
+
 
 
     def _add(self,t, roi, data_row):
