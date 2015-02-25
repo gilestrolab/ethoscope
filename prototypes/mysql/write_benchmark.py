@@ -62,8 +62,9 @@ if __name__ == "__main__":
             import time
             t0 = time.time()
             try:
-                for t in range(0, n):
-
+                t = 0
+                while t < n:
+                    t+=1
 
                     rt = t * 1000 /5
 
