@@ -2,7 +2,7 @@ __author__ = 'quentin'
 
 
 import unittest
-import os
+import time
 import shutil
 import random
 import tempfile
@@ -13,6 +13,9 @@ from pysolovideo.utils.io import ResultWriter, SQLiteResultWriter
 from pysolovideo.tracking.trackers import DataPoint, BoolVariableBase, IntVariableBase, DistanceIntVarBase
 import logging
 import numpy as np
+
+np.random.seed(1)
+
 class DummyBoolVariable(BoolVariableBase):
     header_name="dummy_bool"
 
@@ -42,15 +45,11 @@ class RandomResultGenerator(object):
         return out
 
 
-class TestMySQL(unittest.TestCase):
+if __name__ == "__main__":
 
-    def _test_dbwriter(self, RWClass, *args, **kwargs):
-        """
-        This test hardcode ROIs and generate random results for a set of arbitrary variables.
-        The goal is to be able to test and benchmark result write independently of any tracking
 
-        :return:
-        """
+    def test_dbwriter(RWClass, *args, **kwargs):
+
         # building five rois
         coordinates = np.array([(0,0), (100,0), (100,100), (0,100)])
         rois = [ROI(coordinates +i*100) for i in range(1,33)]
@@ -59,36 +58,29 @@ class TestMySQL(unittest.TestCase):
         with RWClass(rois=rois, *args, **kwargs) as rw:
             # n = 4000000 # 222h of data
             # n = 400000 # 22.2h of data
-            n = 40000 # 2.22h of data
+            n = 400000000 # 2.22h of data
             import time
             t0 = time.time()
-            for t in range(0, n):
-                rt = t * 1000 /5
+            try:
+                t = 0
+                while t < n:
+                    t+=1
 
-                if t % (n/100)== 0:
-                    logging.info("filling with dummy variables: %f percent" % (100.*float(t)/float(n)))
-                for r in rois:
-                    data = rpg.make_one_point()
-                    rw.write(rt , r, data)
-                print time.time() - t0
-                rw.flush()
+                    rt = t * 1000 /5
+
+                    if t % (n/100)== 0:
+                        logging.info("filling with dummy variables: %f percent" % (100.*float(t)/float(n)))
+                    for r in rois:
+                        data = rpg.make_one_point()
+                        rw.write(rt , r, data)
+                    if t % 100 == 0:
+                        print t, time.time() - t0
+                        t0 = time.time()
+                    rw.flush()
+            except KeyboardInterrupt:
+                return
+
+    test_dbwriter(ResultWriter, db_name="psv_test_io")
 
 
-
-
-    def test_sqlite(self):
-        logging.getLogger().setLevel(logging.INFO)
-        a = tempfile.mkdtemp(prefix="psv_results_")
-
-        try:
-
-            self._test_dbwriter(SQLiteResultWriter,a)
-            self.assertEqual(1, 1)
-        finally:
-            logging.info(a)
-            shutil.rmtree(a)
-
-    def test_mysql(self):
-        logging.getLogger().setLevel(logging.INFO)
-        self._test_dbwriter(ResultWriter, db_name="psv_test_io")
 

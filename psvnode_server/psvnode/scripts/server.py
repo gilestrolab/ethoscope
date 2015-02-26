@@ -16,8 +16,26 @@ import optparse
 app = Bottle()
 STATIC_DIR = "../../static"
 
+def which(program):
+    # verbatim from
+    # http://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
+    def is_exe(fpath):
+        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
-def scan_one_device(url, timeout=.5, port=9000):
+    fpath, fname = os.path.split(program)
+    if fpath:
+        if is_exe(program):
+            return program
+    else:
+        for path in os.environ["PATH"].split(os.pathsep):
+            path = path.strip('"')
+            exe_file = os.path.join(path, program)
+            if is_exe(exe_file):
+                return exe_file
+
+    return None
+
+def scan_one_device(url, timeout=1, port=9000):
     """
     Pings an url and try parsing its message as JSON data. This is typically used within a multithreading.Pool.map in
     order to request multiple arbitrary urls.
@@ -28,17 +46,34 @@ def scan_one_device(url, timeout=.5, port=9000):
     :return: The message, parsed as dictionary. the "ip" (==url) field is also added to the result.
     If the url could not be reached, None is returned
     """
+
+    try:
+
+        if not which("fping"):
+            raise Exception("fping not available")
+        ping = os.system(" fping %s -t 50  > /dev/null 2>&1 " % os.path.basename(url))
+    except Exception as e:
+        ping = 0
+        logging.error("Could not ping. Assuming 'alive'")
+        logging.error(traceback.format_exc(e))
+
+
+    if ping != 0:
+        logging.info("url: %s, not responding. Skipping" % url )
+        return None, None
+
     try:
         req = urllib2.Request(url="%s:%i/id" % (url, port))
         f = urllib2.urlopen(req, timeout=timeout)
         message = f.read()
         if not message:
+            logging.error("URL error whist scanning url: %s. No message back." % url )
             return
         resp = json.loads(message)
         return (resp['id'],url)
 
     except urllib2.URLError:
-        logging.warning("URL error whist scanning url: %s" % url )
+        logging.error("URL error whist scanning url: %s. Server down?" % url )
         return None, None
     except Exception as e:
         logging.error("Unexpected error whilst scanning url: %s" % url )
@@ -98,6 +133,9 @@ def get_favicon():
 def server_static(filepath):
     return static_file(filepath, root=STATIC_DIR)
 
+@app.route('/download/<filepath:path>')
+def server_download(filepath):
+    return static_file(filepath, root="/", download=filepath)
 
 @app.route('/')
 def index():
@@ -161,7 +199,7 @@ def device(id, type_of_req):
         if type_of_req == 'start':
             if device_info['status'] == 'stopped':
                 update_device_map(id, "controls", type_of_req, data=post_data)
-                acquisition[id] = Acquisition(devices_map[id])
+                acquisition[id] = Acquisition(devices_map[id], result_main_dir=RESULTS_DIR)
                 acquisition[id].start()
             else:
                 raise Exception("Cannot start, device %s status is `%s`" %  (id, device_info['status']))
@@ -179,18 +217,27 @@ def device(id, type_of_req):
         return {'error':traceback.format_exc(e)}
 
 #Browse, delete and download files from node
-@app.get('/browse/<option>')
-def browse(option):
+@app.get('/browse/<folder:path>')
+def browse(folder):
     try:
-        if option == 'all':
-            files = []
-            dir =[]
-            for (dirpath, dirnames, filenames) in walk(RESULTS_DIR):
-                files.extend(filenames)
-                dir.extend(dirnames)
+        if folder == 'null':
+            directory = RESULTS_DIR
+        else:
+            directory = '/'+folder
+        files = []
+        file_id=0
+        for (dirpath, dirnames, filenames) in walk(directory):
+            for name in dirnames:
+                if dirpath==directory:
+                    files.append({'name':os.path.join(dirpath, name), 'is_dir':True, 'id':file_id})
+                    file_id += 1
+            for name in filenames:
+                if dirpath==directory:
+                    files.append({'name':os.path.join(dirpath, name), 'is_dir':False, 'id':file_id})
+                    file_id += 1
 
-            print response
-        return{'files': files, 'dir':dir}
+
+        return{'files': files}
     except Exception as e:
         return {'error': traceback.format_exc(e)}
 
@@ -251,16 +298,18 @@ if __name__ == '__main__':
     DEBUG = option_dict["debug"]
     PORT = option_dict["port"]
 
+    RESULTS_DIR = "/psv_results/"
+
     if DEBUG:
         import getpass
         if getpass.getuser() == "quentin":
             SUBNET_DEVICE = b'enp3s0'
         if getpass.getuser() == "asterix":
             SUBNET_DEVICE = b'lo'
-            RESULTS_DIR = "/tmp/"
+            RESULTS_DIR = "/tmp/psv_results"
     else:
         SUBNET_DEVICE = b'wlan0'
-        RESULTS_DIR = "/results/"
+
 
 
     global devices_map
@@ -271,7 +320,7 @@ if __name__ == '__main__':
 
     for k, device in devices_map.iteritems():
         if device['status'] == 'running':
-            acquisition[k]= Acquisition(device)
+            acquisition[k]= Acquisition(device, result_main_dir=RESULTS_DIR)
             acquisition[k].start()
     try:
 

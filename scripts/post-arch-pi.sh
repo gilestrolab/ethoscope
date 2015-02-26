@@ -158,6 +158,14 @@ mysql -u root -e "CREATE USER \"$USER_NAME\"@'localhost' IDENTIFIED BY \"$PASSWO
 mysql -u root -e "CREATE USER \"$USER_NAME\"@'%' IDENTIFIED BY \"$PASSWORD\""
 mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO \"$USER_NAME\"@'localhost' WITH GRANT OPTION";
 mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO \"$USER_NAME\"@'%' WITH GRANT OPTION";
+
+
+# This disables binary logs to save on I/O, space
+# 1 backup:
+cp /etc/mysql/my.cnf  /etc/mysql/my.cnf-bak
+# remove log-bin lines
+cat /etc/mysql/my.cnf-bak | grep -v log-bin >  /etc/mysql/my.cnf
+
 ###############mysql -u root -e "SET GLOBAL expire_logs_days = 2"
 #partitions stuff
 # make partition system
