@@ -139,11 +139,13 @@ class ResultDBWriterBase(object):
 
                 self._insert_dict[k] = ""
 
-        if to_commit:
-            self._conn.commit()
-
         self._last_flush_t =  self._last_t
 
+        if to_commit:
+            self._conn.commit()
+            return True
+
+        return False
 
     def _add(self,t, roi, data_row):
 
