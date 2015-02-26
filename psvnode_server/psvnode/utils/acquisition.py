@@ -3,12 +3,14 @@ import datetime
 import logging
 import os
 from threading import Thread
+import multiprocessing
+import ctypes
 from mysql_backup import MySQLdbToSQlite, DBNotReadyError
 import json
 import urllib2
 import traceback
 
-class Acquisition(Thread):
+class Acquisition(multiprocessing.Process):
     _db_credentials = {
             "name":"psv_db",
             "user":"psv",
@@ -38,7 +40,8 @@ class Acquisition(Thread):
                                             self._file_name
                                             )
 
-        self._force_stop = False
+        self._force_stop = multiprocessing.Value(ctypes.c_int, False)
+
 
 
         logging.info("Linking%s, %s\n\tsaving at '%s'" % (device_name, self._database_ip, self._output_db_file))
@@ -80,59 +83,67 @@ class Acquisition(Thread):
             logging.error(traceback.format_exc(e))
 
     def run(self):
-
-
-        t0 = time.time()
         mirror = None
 
-        while not self._force_stop:
-            try:
-                time.sleep(.3)
-                now = time.time()
-                if now - t0 < self._delay_between_updates:
-                    continue
-                t0 = now
-                self._update_device_info()
-                if self._device_info["status"] != "running":
-                    mirror = None
-                    continue
+        try:
+            t0 = time.time() - self._delay_between_updates # so we do not wait until first backup
+            while not self._force_stop.value:
+                try:
+                    time.sleep(.3)
+                    now = time.time()
+                    if now - t0 < self._delay_between_updates:
+                        continue
+                    t0 = now
+                    self._update_device_info()
+                    if self._device_info["status"] != "running":
+                        mirror = None
+                        continue
 
+                    if mirror is None:
+                        mirror= MySQLdbToSQlite(self._output_db_file, self._db_credentials["name"],
+                                        remote_host=self._database_ip,
+                                        remote_pass=self._db_credentials["password"],
+                                        remote_user=self._db_credentials["user"])
+                    mirror.update_roi_tables()
+
+                except DBNotReadyError as e:
+                    logging.warning(e)
+                    logging.warning("Database not ready, will try later")
+                    pass
+
+                except Exception as e:
+                    logging.error(traceback.format_exc(e))
+                    self._force_stop = True
+
+        except KeyboardInterrupt:
+            logging.info("Keyboard interupt: stopping backup")
+        except Exception as e:
+            logging.error("unhandled error in process")
+            logging.error(traceback.format_exc(e))
+
+
+        finally:
+            try:
+                logging.info("Try final mirroring of the DB")
                 if mirror is None:
                     mirror= MySQLdbToSQlite(self._output_db_file, self._db_credentials["name"],
-                                    remote_host=self._database_ip,
-                                    remote_pass=self._db_credentials["password"],
-                                    remote_user=self._db_credentials["user"])
+                        remote_host=self._database_ip,
+                        remote_pass=self._db_credentials["password"],
+                        remote_user=self._db_credentials["user"])
                 mirror.update_roi_tables()
-
-
-            except DBNotReadyError as e:
-                logging.warning(e)
-                logging.warning("Database not ready, will try later")
-                pass
-
-            except Exception as e:
-                logging.error(traceback.format_exc(e))
-
-                self._force_stop = True
-
-
-        try:
-            logging.info("Try final mirroring of the DB")
-            if mirror is None:
-                mirror= MySQLdbToSQlite(self._output_db_file, self._db_credentials["name"],
-                    remote_host=self._database_ip,
-                    remote_pass=self._db_credentials["password"],
-                    remote_user=self._db_credentials["user"])
-            mirror.update_roi_tables()
-            logging.info("Success")
-        except Exception as f:
-            logging.error(traceback.format_exc(f))
+                logging.info("Success")
+            except Exception as f:
+                logging.error(traceback.format_exc(f))
 
 
     def __del__(self):
-        logging.info("Stopping acquisition thread")
-        self.stop()
+        self._force_stop.value = True
+
+
 
     def stop(self):
-        self._force_stop = True
+        logging.info("Stopping acquisition thread")
+        self._force_stop.value = True
+
+
 

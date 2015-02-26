@@ -208,7 +208,9 @@ def device(id, type_of_req):
             if device_info['status'] == 'running':
                 update_device_map(id, "controls", type_of_req, data=post_data)
                 acquisition[id].stop()
+                logging.info("Joining process")
                 acquisition[id].join()
+                logging.info("Joined OK")
             else:
                 raise Exception("Cannot stop, device %s status is `%s`" %  (id, device_info['status']))
 
@@ -341,6 +343,11 @@ if __name__ == '__main__':
         logging.error(traceback.format_exc(e))
 
     finally:
+        logging.info("Joining acquisition processes")
         for a in acquisition.values():
             a.stop()
+            logging.info("Joining process")
             a.join()
+            logging.info("Joined OK")
+
+        logging.info("Closing server")

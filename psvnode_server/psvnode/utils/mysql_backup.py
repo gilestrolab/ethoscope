@@ -139,14 +139,6 @@ class MySQLdbToSQlite(object):
         dst.commit()
 
 
-        #
-        # for c in src_cur:
-        #     tp = tuple([str(v) for v in c ])
-        #
-        #     dst_command = "INSERT INTO %s VALUES %s" % (table_name, tp)
-        #     dst_cur.execute(dst_command)
-        # dst.commit()
-
     def _update_one_roi_table(self, table_name, src, dst, dump_in_csv=None):
 
         src_cur = src.cursor()
