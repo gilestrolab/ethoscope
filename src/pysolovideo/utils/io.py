@@ -85,24 +85,21 @@ class ResultDBWriterBase(object):
     def write(self, t, roi, data_row):
         if self._make_dam_like_table:
             current_pos =  data_row["x"] + 1j*data_row["y"]
-
             if self._dam_history_dic[roi.idx]["last_pos"] is not None:
                 dist = abs(current_pos - self._dam_history_dic[roi.idx]["last_pos"] )
                 dist /= roi.longest_axis
                 self._dam_history_dic[roi.idx]["cummul_dist"] += dist
             self._dam_history_dic[roi.idx]["last_pos"] = current_pos
 
-
-        self._last_t = t
         if not self._var_map_initialised:
             for r in self._rois:
                 self._initialise(r, data_row)
             self._initialise_var_map(data_row)
 
         self._add(t, roi, data_row)
+        self._last_t = t
 
     def _update_dam_table(self):
-        return
 
         dt = datetime.datetime.fromtimestamp(int(time.time()))
         date_time_fields = dt.strftime("%d,%b,%Y,%H:%M:%S").split(",")
@@ -123,13 +120,11 @@ class ResultDBWriterBase(object):
             self._dam_history_dic[r.idx]["cummul_dist"] = 0
 
     def flush(self):
-        if self._make_dam_like_table and (self._last_t - self._last_dam_t) > (self._dam_file_period * 1000):
-            self._last_dam_t =  self._last_t
-            self._update_dam_table()
+        if self._make_dam_like_table:
+            if (self._last_t - self._last_dam_t) > (self._dam_file_period * 1000):
+                self._last_dam_t =  self._last_t
+                self._update_dam_table()
 
-
-        # if (self._last_t - self._last_flush_t) < (self._flush_every_ns ):
-        #     return
         c = self._conn.cursor()
         to_commit = False
         for k, v in self._insert_dict.iteritems():
@@ -139,7 +134,6 @@ class ResultDBWriterBase(object):
 
                 self._insert_dict[k] = ""
 
-        self._last_flush_t =  self._last_t
 
         if to_commit:
             self._conn.commit()

@@ -12,6 +12,8 @@ class DBNotReadyError(Exception):
     pass
 
 class MySQLdbToSQlite(object):
+    _max_n_rows_to_insert = 1000
+
     def     __init__(self, dst_path, remote_db_name="psv_db", remote_host="localhost", remote_user="root", remote_pass="", overwrite=True):
         """
         A class to backup remote psv MySQL data base into a local sqlite3 one.
@@ -87,8 +89,6 @@ class MySQLdbToSQlite(object):
                                          passwd=self._remote_pass, db=self._remote_db_name)
 
         with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
-
-            self._copy_table("ROI_MAP", src, dst)
             dst_cur = src.cursor()
             command = "SELECT roi_idx FROM ROI_MAP"
             dst_cur.execute(command)
@@ -118,12 +118,34 @@ class MySQLdbToSQlite(object):
         src_command = "SELECT * FROM %s " % table_name
 
         src_cur.execute(src_command)
-        for c in src_cur:
-            tp = tuple([str(v) for v in c ])
 
-            dst_command = "INSERT INTO %s VALUES %s" % (table_name, tp)
+        to_insert = []
+        i = 0
+        for sc in src_cur:
+            i+=1
+            tp = tuple([str(v) for v in sc ])
+            to_insert.append(str(tp))
+            if len(to_insert) > self._max_n_rows_to_insert:
+                value_string = ",".join(to_insert)
+                dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string )
+                dst_cur.execute(dst_command)
+                dst.commit()
+                to_insert = []
+
+        if len(to_insert) > 0:
+            value_string = ",".join(to_insert)
+            dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string )
             dst_cur.execute(dst_command)
         dst.commit()
+
+
+        #
+        # for c in src_cur:
+        #     tp = tuple([str(v) for v in c ])
+        #
+        #     dst_command = "INSERT INTO %s VALUES %s" % (table_name, tp)
+        #     dst_cur.execute(dst_command)
+        # dst.commit()
 
     def _update_one_roi_table(self, table_name, src, dst, dump_in_csv=None):
 
@@ -144,16 +166,33 @@ class MySQLdbToSQlite(object):
         src_cur.execute(src_command)
 
 
-        for sc in src_cur:
-            tp = tuple([str(v) for v in sc ])
-            dst_command = "INSERT INTO %s VALUES %s" % (table_name, tp)
-            dst_cur.execute(dst_command)
-            if dump_in_csv is not None:
-                out_file = os.path.join(self._dst_dir, table_name + ".txt")
-                with open(out_file,"a") as f:
-                    row = "\t".join(["{0}".format(val) for val in sc])
-                    f.write(row)
-                    f.write("\n")
 
+        to_insert = []
+        i = 0
+        for sc in src_cur:
+            i+=1
+            tp = tuple([str(v) for v in sc ])
+            to_insert.append(str(tp))
+            if len(to_insert) > self._max_n_rows_to_insert:
+                value_string = ",".join(to_insert)
+                dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string )
+                dst_cur.execute(dst_command)
+                dst.commit()
+                to_insert = []
+
+        if len(to_insert) > 0:
+            value_string = ",".join(to_insert)
+            dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string )
+            dst_cur.execute(dst_command)
         dst.commit()
+
+
+            # if dump_in_csv is not None:
+            #     out_file = os.path.join(self._dst_dir, table_name + ".txt")
+            #     with open(out_file,"a") as f:
+            #         row = "\t".join(["{0}".format(val) for val in sc])
+            #         f.write(row)
+            #         f.write("\n")
+
+
 

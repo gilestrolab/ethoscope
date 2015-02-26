@@ -66,8 +66,8 @@ if __name__ == "__main__":
                 while t < n:
                     t+=1
 
-                    rt = t * 1000 /5
 
+                    rt = time.time() * 1000
                     if t % (n/100)== 0:
                         logging.info("filling with dummy variables: %f percent" % (100.*float(t)/float(n)))
                     for r in rois:
@@ -76,9 +76,9 @@ if __name__ == "__main__":
 
                     t0 = time.time()
                     flushed = rw.flush()
-
-                    if t % 100 == 0:
-                        print t, flushed, time.time() - t0
+                    #
+                    # if t % 100 == 0:
+                    #     print t, flushed, time.time() - t0
 
             except KeyboardInterrupt:
                 return

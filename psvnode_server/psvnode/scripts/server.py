@@ -237,7 +237,8 @@ def browse(folder):
                     file_id += 1
 
 
-        return{'files': files}
+        return {'files': files}
+
     except Exception as e:
         return {'error': traceback.format_exc(e)}
 
@@ -328,6 +329,8 @@ if __name__ == '__main__':
         import getpass
         if getpass.getuser() == "quentin":
             SUBNET_DEVICE = b'enp3s0'
+            SUBNET_DEVICE = b'eno1'
+
         if getpass.getuser() == "asterix":
             SUBNET_DEVICE = b'lo'
             RESULTS_DIR = "/tmp/psv_results"
