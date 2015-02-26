@@ -35,7 +35,7 @@
                 </a>
             </td>
             <td ng-if="file.is_dir == false">
-            <a ng-href="/download{{file.name}}"  target="_self">
+            <a ng-href="/download{{file.name}}"  target="_blank">
                 <span class="fa fa-file-o"></span><span ng-if="file.name.length > 75">{{file.name.substring(0,75)}}...</span><span ng-if="file.name.length <= 75"> {{file.name}}</span>
             </a>
             </td>
