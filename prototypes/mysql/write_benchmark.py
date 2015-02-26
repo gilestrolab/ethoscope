@@ -73,10 +73,13 @@ if __name__ == "__main__":
                     for r in rois:
                         data = rpg.make_one_point()
                         rw.write(rt , r, data)
+
+                    t0 = time.time()
+                    flushed = rw.flush()
+
                     if t % 100 == 0:
-                        print t, time.time() - t0
-                        t0 = time.time()
-                    rw.flush()
+                        print t, flushed, time.time() - t0
+
             except KeyboardInterrupt:
                 return
 
