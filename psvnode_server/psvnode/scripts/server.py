@@ -16,6 +16,7 @@ import optparse
 app = Bottle()
 STATIC_DIR = "../../static"
 
+
 def which(program):
     # verbatim from
     # http://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
@@ -107,7 +108,7 @@ def update_device_map(id, what="data",type=None, port=9000, data=None):
     if message:
         data = json.loads(message)
 
-        if not id in  devices_map:
+        if not id in devices_map:
             logging.warning("Device %s is not in device map. Rescanning subnet..." % id)
             scan_subnet()
         try:
@@ -187,7 +188,6 @@ def device(id):
     except Exception as e:
         return {'error':traceback.format_exc(e)}
 
-
 @app.post('/device/<id>/controls/<type_of_req>')
 def device(id, type_of_req):
     global acquisition
@@ -244,9 +244,30 @@ def browse(folder):
     except Exception as e:
         return {'error': traceback.format_exc(e)}
 
-def file_process(arg,dir,files):
-    return files
+#def file_process(arg,dir,files):
+#    return files
+@app.post('/update/')
+def update_systems():
+    devices_to_update = request.json
+    try:
+        #mirror the github repo in node
+        bare_update= subprocess.Popen(['git','fetch', '--all', '-p'],cwd=GIT_BARE_REPO_DIR,
+                                          stdout=subprocess.PIPE,
+                                          stderr=subprocess.PIPE)
+        logging.error(bare_update.stderr.read())
+        logging.info(bar_update.stdout.read())
+        #update node
+        node_update = subprocess.Popen(['git','pull'],cwd=GIT_WORKING_DIR,
+                                          stdout=subprocess.PIPE,
+                                          stderr=subprocess.PIPE)
+        logging.error(node_update.stderr.read())
+        logging.info(node_update.stdout.read())
+        #update devices in list
+        for device in devices_to_update:
+            update_device_map(device['id'], what="update")
 
+    except Exception as e:
+        return {'error':traceback.format_exc(e)}
 
 @app.get('/list/<type>')
 def redirection_to_home(type):
@@ -302,6 +323,9 @@ if __name__ == '__main__':
     PORT = option_dict["port"]
 
     RESULTS_DIR = "/psv_results/"
+    GIT_BARE_REPO_DIR = "/var/pySolo-Video"
+    GIT_WORKING_DIR = "/home/node/pySolo-Video"
+
 
     if DEBUG:
         import getpass

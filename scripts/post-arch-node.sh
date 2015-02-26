@@ -134,6 +134,7 @@ hostnamectl set-hostname $hostname
 mkdir -p $PSV_DATA_DIR
 chmod 777 $PSV_DATA_DIR -R
 
+git bare https://github.com/gilestrolab/pySolo-Video.git
 
 
 # our software.
