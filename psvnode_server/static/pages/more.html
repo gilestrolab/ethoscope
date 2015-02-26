@@ -30,12 +30,12 @@
         </thead>
         <tbody ng-repeat="file in files.files">
              <td ng-if="file.is_dir == true">
-                <a href="" ng-click="browse(dir.name)">
+                <a href="" ng-click="browse(file.name)">
                 <span class="fa fa-folder-o"></span><span ng-if="file.name.length > 75">{{file.name.substring(0,75)}}...</span><span ng-if="file.name.length <= 75"> {{file.name}}</span>
                 </a>
             </td>
             <td ng-if="file.is_dir == false">
-            <a ng-href="/download{{file.name}}"  target="_self">
+            <a ng-href="/download{{file.name}}"  target="_blank">
                 <span class="fa fa-file-o"></span><span ng-if="file.name.length > 75">{{file.name.substring(0,75)}}...</span><span ng-if="file.name.length <= 75"> {{file.name}}</span>
             </a>
             </td>
