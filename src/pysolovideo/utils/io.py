@@ -13,7 +13,8 @@ import MySQLdb
 #
 #TODO add HIGH_PRIORITY to inserts!
 class ResultDBWriterBase(object):
-    _flush_every_ns = 30 # flush every 10s of data
+    # _flush_every_ns = 30 # flush every 10s of data
+    _max_insert_string_len = 1000
     _dam_file_period = 60 # Get activity for every N s of data
 
     def _create_table(self, cursor, name, fields):
@@ -26,6 +27,7 @@ class ResultDBWriterBase(object):
         self._rois = rois
         self._make_dam_like_table = make_dam_like_table
         self._conn = None
+        self._insert_dict = {}
         if self.metadata is None:
             self.metadata  = {}
 
@@ -99,9 +101,8 @@ class ResultDBWriterBase(object):
 
         self._add(t, roi, data_row)
 
-
-
     def _update_dam_table(self):
+        return
 
         dt = datetime.datetime.fromtimestamp(int(time.time()))
         date_time_fields = dt.strftime("%d,%b,%Y,%H:%M:%S").split(",")
@@ -127,17 +128,33 @@ class ResultDBWriterBase(object):
             self._update_dam_table()
 
 
-        if (self._last_t - self._last_flush_t) < (self._flush_every_ns * 1000):
-            return
-        self._conn.commit()
+        # if (self._last_t - self._last_flush_t) < (self._flush_every_ns ):
+        #     return
+        c = self._conn.cursor()
+        to_commit = False
+        for k, v in self._insert_dict.iteritems():
+            if len(v) > self._max_insert_string_len:
+                to_commit = True
+                c.execute(v)
+
+                self._insert_dict[k] = ""
+
+        if to_commit:
+            self._conn.commit()
+
         self._last_flush_t =  self._last_t
 
 
     def _add(self,t, roi, data_row):
+
+        roi_id = roi.idx
         tp = (0, t) + tuple(data_row.values())
-        command = '''INSERT INTO ROI_%i VALUES %s''' % (roi.idx, tp)
-        c = self._conn.cursor()
-        c.execute(command)
+
+        if roi_id not in self._insert_dict  or self._insert_dict[roi_id] == "":
+            command = 'INSERT INTO ROI_%i VALUES %s' % (roi_id, str(tp))
+            self._insert_dict[roi_id] = command
+        else:
+            self._insert_dict[roi_id] += ("," + str(tp))
 
 
     def _initialise_var_map(self,  data_row):
