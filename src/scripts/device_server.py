@@ -78,6 +78,18 @@ def info(id):
     else:
         return {'error': "Error on machine ID"}
 
+@app.post('/update/')
+def update_system():
+    try:
+        #update node
+        device_update = subprocess.Popen(['git','pull'],cwd=GIT_WORKING_DIR,
+                                          stdout=subprocess.PIPE,
+                                          stderr=subprocess.PIPE)
+        logging.error(device_update.stderr.read())
+        logging.info(device_update.stdout.read())
+        return {'updated':True}
+    except Exception as e:
+        return {'error':e, 'updated':False}
 
 if __name__ == '__main__':
 
