@@ -139,7 +139,7 @@ class ResultWriter(object):
         self._write_async_command(command)
 
 
-    def __init__(self,  rois, metadata=None, make_dam_like_table=True, *args, **kwargs):
+    def __init__(self, dummy_db_name, rois, metadata=None, make_dam_like_table=True, *args, **kwargs):
         self._async_writer = AsyncMySQLWriter()
         self._last_t, self._last_flush_t, self._last_dam_t = [0] * 3
 

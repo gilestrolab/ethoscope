@@ -331,7 +331,7 @@ if __name__ == '__main__':
         import getpass
         if getpass.getuser() == "quentin":
             SUBNET_DEVICE = b'enp3s0'
-            SUBNET_DEVICE = b'eno1'
+            # SUBNET_DEVICE = b'eno1'
 
         if getpass.getuser() == "asterix":
             SUBNET_DEVICE = b'lo'
