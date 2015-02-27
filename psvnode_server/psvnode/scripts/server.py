@@ -277,13 +277,14 @@ def check_update():
                                       cwd=GIT_BARE_REPO_DIR,
                                     )
         response_from_fetch, error_from_fetch = bare_update.communicate()
-        logging.info(response_from_fetch.decode())
+        if response_from_fetch != '':
+            logging.info(response_from_fetch.decode())
         if error_from_fetch is not None:
             logging.error(error_from_fetch)
         if error_from_fetch.find('up to date')>0:
             return {'version':'You have the last version, not update needed.'}
         else:
-            version =error_from_fetch.split('\n')[1]
+            version =error_from_fetch.split('\n')[1].split(' ')[0:2]
             return {'version': 'There is a new version to be updated. Version:'+version}
 
     except Exception as e:
@@ -345,7 +346,7 @@ if __name__ == '__main__':
     RESULTS_DIR = "/psv_results/"
     GIT_BARE_REPO_DIR = "/var/pySolo-Video.git"
     GIT_WORKING_DIR = "/home/node/pySolo-Video"
-    BRANCH = 'psv-package'
+    BRANCH = 'psv-dev-updates'
 
     if DEBUG:
         import getpass
