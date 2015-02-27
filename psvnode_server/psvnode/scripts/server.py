@@ -271,7 +271,7 @@ def update_systems():
 @app.get('/update/check')
 def check_update():
     try:
-        bare_update= subprocess.Popen(['git','fetch', '-v', 'origin', 'psv-dev-updates:psv-dev-updates'],
+        bare_update= subprocess.Popen(['git','fetch', '-v', 'origin', BRANCH+':'+BRANCH],
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE,
                                       cwd=GIT_BARE_REPO_DIR,
@@ -283,7 +283,8 @@ def check_update():
         if error_from_fetch.find('up to date')>0:
             return {'version':'You have the last version, not update needed.'}
         else:
-            return {'version': 'There is a new version to be updated. Version:'+error_from_fetch.split('\n')[1].split(' ')[1]}
+            version = 
+            return {'version': 'There is a new version to be updated. Version:'+error_from_fetch.split('\n')[1].find[BRANCH]}
 
     except Exception as e:
         return {'error':traceback.format_exc(e)}
