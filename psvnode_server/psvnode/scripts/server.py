@@ -283,7 +283,7 @@ def check_update():
         if error_from_fetch.find('up to date')>0:
             return {'version':'You have the last version, not update needed.'}
         else:
-            return {'version': 'There is a new version to be updated. Version:'+error_from_fetch.split(' ')[1]}
+            return {'version': 'There is a new version to be updated. Version:'+error_from_fetch.split(' ')[2]}
 
     except Exception as e:
         return {'error':traceback.format_exc(e)}
