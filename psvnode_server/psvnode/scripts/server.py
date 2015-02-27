@@ -246,7 +246,7 @@ def browse(folder):
 
 #def file_process(arg,dir,files):
 #    return files
-@app.post('/update/')
+@app.post('/update')
 def update_systems():
     devices_to_update = request.json
     try:
@@ -335,7 +335,7 @@ if __name__ == '__main__':
 
         if getpass.getuser() == "asterix":
             SUBNET_DEVICE = b'lo'
-            RESULTS_DIR = "/tmp/psv_results"
+            RESULTS_DIR = "/tmp/"
     else:
         SUBNET_DEVICE = b'wlan0'
 
