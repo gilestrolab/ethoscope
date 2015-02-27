@@ -7,8 +7,20 @@
                             icon:"fa fa-refresh",
                             color:"alert alert-info",
                             opt: "browse"
-                    }];
+                            },
+                          {name:"Update System",
+                           icon:"fa fa-refresh",
+                           color:"alert alert-warning",
+                           opt:"update";
+                          }
+                         ];
         $scope.exec_option = function(opt){
+            switch(opt){
+                case "browse":
+                    $scope.browse();
+                case "update";
+                    $scope.update();
+            };
             if(opt == "browse"){
                 $scope.browse();
             }
@@ -17,9 +29,6 @@
             var prev_folder= folder.split("/");
             prev_folder.pop();
             $scope.prev_dir = prev_folder.join('/');
-            console.log(folder);
-            console.log(prev_folder);
-            console.log($scope.prev_dir);
             $http.get("/browse"+folder)
                      .success(function(res){
                                 console.log(res);
@@ -29,7 +38,6 @@
         };
         $scope.browse.dowload = function(){
             if($scope.selected.files.length == 1){
-                console.log($scope.selected.files[0].name);
                 $http.get('/static/'+$scope.selected.files.name);
             }
         };
@@ -41,8 +49,17 @@
             }else {
                 $scope.selected.files = [];
                 $scope.selected_all = false;
-                console.log($scope.selected.files);
             }
+        };
+
+        $scope.update = function(){
+            //check if there is a new version
+            $http.get("/update/check")
+                 .success(function(res){
+                    $scope.showUpdates = true;
+                    $scope.update.text = res;
+            })
+            //$http.post("/update", data = data)
         };
 
 

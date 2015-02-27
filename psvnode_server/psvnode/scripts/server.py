@@ -251,7 +251,7 @@ def update_systems():
     devices_to_update = request.json
     try:
         #mirror the github repo in node
-        bare_update= subprocess.Popen(['git','fetch', '--all', '-p'],cwd=GIT_BARE_REPO_DIR,
+        bare_update= subprocess.Popen(['git','fetch', 'origin', 'psv-package:psv-package'],cwd=GIT_BARE_REPO_DIR,
                                           stdout=subprocess.PIPE,
                                           stderr=subprocess.PIPE)
         logging.error(bare_update.stderr.read())
@@ -265,6 +265,25 @@ def update_systems():
         #update devices in list
         for device in devices_to_update:
             update_device_map(device['id'], what="update")
+
+    except Exception as e:
+        return {'error':traceback.format_exc(e)}
+@app.get('/update/check')
+def check_update():
+    try:
+        bare_update= subprocess.Popen(['git','fetch', '-v', 'origin', 'psv-package:psv-package'],cwd=GIT_BARE_REPO_DIR,
+                                          stdout=subprocess.PIPE,
+                                          stderr=subprocess.PIPE)
+        response_from_fetch = bare_update.stdout.read()
+        error_on_fetch = bare_update.stderr.read()
+        logging.info(response_from_fetch)
+        if error_on_fetch:
+            logging.error(bare_update.stderr.read())
+
+        if response_from_fetch.find('up to date'):
+            return {'version':'You have the last version, not update needed.'}
+        else:
+            return {'version': 'There is a new version to be updated.'}
 
     except Exception as e:
         return {'error':traceback.format_exc(e)}
@@ -323,7 +342,7 @@ if __name__ == '__main__':
     PORT = option_dict["port"]
 
     RESULTS_DIR = "/psv_results/"
-    GIT_BARE_REPO_DIR = "/var/pySolo-Video"
+    GIT_BARE_REPO_DIR = "/var/pySolo-Video.git"
     GIT_WORKING_DIR = "/home/node/pySolo-Video"
 
 
@@ -336,6 +355,8 @@ if __name__ == '__main__':
         if getpass.getuser() == "asterix":
             SUBNET_DEVICE = b'lo'
             RESULTS_DIR = "/tmp/"
+            GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
+            GIT_WORKING_DIR = "/data1/todel/pySolo-Video"
     else:
         SUBNET_DEVICE = b'wlan0'
 

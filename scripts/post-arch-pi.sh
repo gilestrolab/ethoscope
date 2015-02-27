@@ -79,9 +79,10 @@ netctl start psv_wifi
 netctl enable psv_wifi
 
 
+#TODO add ntpd configuration to use the node as sync server.
 
 
-#TODOs: locale/TIMEZONE/keyboard ...
+#TODO s: locale/TIMEZONE/keyboard ...
 
 ##########################################################################################
 # add password without stoping
@@ -93,10 +94,13 @@ useradd -m -g users -G wheel -s /bin/bash  -p $pass $USER_NAME
 echo 'exec startlxde' >> /home/$USER_NAME/.xinitrc
 chown $USER_NAME /home/$USER_NAME/.xinitrc
 
-# Setting passwordless ssh, this is the content of id_rsa.pub
+
+
+# Setting passwordless ssh, this is the content of id_rsa (private Key on node).
 mkdir -p /home/$USER_NAME/.ssh
-echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKXjWAfHrJ/HAPO3d4vu5s5+Xxw5NDKX1a8rqx3amo0WO7wWe0m2uv+rnJuH7xvWCKMOGlv9jgj1vSSNcuMT30tzioHqRf/k7scUXFPoWxvxTZtqXizZwKe93mfOvCC5Ni5zLtUyMqycnLPGP2K1Rf0Xvx/WLP94bcxXyTaGtftvTcAIC53Kll1XgyHSxsh1ou7rTXt57V0/1wnWqOGH1Y+AMqUkBEKjU2QUZyYoUaVSfwBwSpIi8tvH/Ng5aEH6BGs4cqDnXUBWpdDD6JdR5NxhqYK0lcpWltBlSz8RFvoOKpyQ/0vs5ysNPgX/N4eaHWhECRFD5oNkNXIUBRpe3/ psv@polygonaltree.com
-' >> /home/$USER_NAME/.ssh/authorized_keys
+TODO do not use a relative path.
+cp ../misc/id_rsa /home/$USER_NAME/.ssh/id_rsa
+
 
 ############################################
 echo 'Generating boot config'
@@ -177,6 +181,12 @@ cat /etc/mysql/my.cnf-bak | grep -v log-bin >  /etc/mysql/my.cnf
 #echo "" >> /etc/fstab
 
 ####################
+
+##########
+#Create a local working copy from the bare repo on node (192.168.123.1)
+git clone node@192.169.123.1:/var/pySolo-Video.git /home/$USER_NAME
+
+
 # our software.
 # TODO use AUR!
 echo 'Installing PSV package'
