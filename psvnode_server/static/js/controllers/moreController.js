@@ -4,21 +4,21 @@
         $scope.selected_all = false;
         $scope.showOptions = true;
         $scope.options = [{name:"Browse Files",
-                            icon:"fa fa-refresh",
+                            icon:"fa fa-folder-open-o",
                             color:"alert alert-info",
                             opt: "browse"
                             },
                           {name:"Update System",
                            icon:"fa fa-refresh",
                            color:"alert alert-warning",
-                           opt:"update";
+                           opt:"update",
                           }
                          ];
         $scope.exec_option = function(opt){
             switch(opt){
                 case "browse":
                     $scope.browse();
-                case "update";
+                case "update":
                     $scope.update();
             };
             if(opt == "browse"){
@@ -58,6 +58,7 @@
                  .success(function(res){
                     $scope.showUpdates = true;
                     $scope.update.text = res;
+                    console.log(res);
             })
             //$http.post("/update", data = data)
         };

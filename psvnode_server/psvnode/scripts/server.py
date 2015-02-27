@@ -274,13 +274,13 @@ def check_update():
         bare_update= subprocess.Popen(['git','fetch', '-v', 'origin', 'psv-package:psv-package'],cwd=GIT_BARE_REPO_DIR,
                                           stdout=subprocess.PIPE,
                                           stderr=subprocess.PIPE)
+        print bare_update.stderr.read()
         response_from_fetch = bare_update.stdout.read()
         error_on_fetch = bare_update.stderr.read()
-        logging.info(response_from_fetch)
+        logging.info(str(response_from_fetch))
         if error_on_fetch:
-            logging.error(bare_update.stderr.read())
-
-        if response_from_fetch.find('up to date'):
+            logging.error(str(bare_update.stderr.read()))
+        if response_from_fetch.find('up to date')>-1:
             return {'version':'You have the last version, not update needed.'}
         else:
             return {'version': 'There is a new version to be updated.'}
@@ -355,7 +355,7 @@ if __name__ == '__main__':
         if getpass.getuser() == "asterix":
             SUBNET_DEVICE = b'lo'
             RESULTS_DIR = "/tmp/"
-            GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
+            GIT_BARE_REPO_DIR = "/data1/todel/pySolo-updates.git"
             GIT_WORKING_DIR = "/data1/todel/pySolo-Video"
     else:
         SUBNET_DEVICE = b'wlan0'
