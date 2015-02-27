@@ -282,10 +282,10 @@ def check_update():
         if error_from_fetch is not None:
             logging.error(error_from_fetch)
         if error_from_fetch.find('up to date')>0:
-            return {'version':'You have the last version, not update needed.'}
+            return {'need_update':False, 'version':'N/A'}
         else:
-            version =error_from_fetch.split('\n')[1].split(BRANCH)[0]
-            return {'version': 'There is a new version to be updated. Version:'+version}
+            version = error_from_fetch.split('\n')[1].split(BRANCH)[0]
+            return {'need_update': True, 'Version':version}
 
     except Exception as e:
         return {'error':traceback.format_exc(e)}

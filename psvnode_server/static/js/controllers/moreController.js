@@ -57,7 +57,15 @@
             $http.get("/update/check")
                  .success(function(res){
                     $scope.showUpdates = true;
-                    $scope.update.text = res;
+                    if (res.need_update == false){
+                        $scope.update.text = "You have the latest version. Update is not needed.";
+                    }else{
+                        $scope.update.text = "There is a new version" + res.version;
+                        $scope.update.need_update = true;
+                        $http.get('/devices').success(function(data){
+                            $scope.devices = data;
+                        })
+                    }
                     console.log(res);
             })
             //$http.post("/update", data = data)

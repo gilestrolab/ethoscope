@@ -43,3 +43,43 @@
         </tbody>
     </table>
 </div>
+<div ng-if="showUpdates" class="col-xs-12">
+    <h3>{{update.text}}</h3>
+    <div ng-if="update.need_update == true">
+        <h2>The following devices will be updated.</h2>
+        <table class="table table-striped">
+            <thead>
+            <th>Name</th>
+            <th>Select </th>
+            </thead>
+            <tbody ng-repeat="device in devices" ng-if="device.status == 'stopped'">
+                 <td>
+                    <a href="#/sm/{{device.id}}" target=_blank>
+                    <span class="fa fa-circle-o"></span><span>{{device.name}}</span>
+                    </a>
+                </td>
+                <td><input type="checkbox" checklist-model="" checklist-value=""></td>
+            </tbody>
+        </table>
+
+        <div class="alert alert-danger">
+        <h2>This devices will not be updated</h2>
+            <p> They are connected but started. If you want to update them you need to stop the adquisition.</p>
+            <table class="table table-striped">
+            <thead>
+            <th>Name</th>
+            <th>Select </th>
+            </thead>
+            <tbody ng-repeat="device in devices" ng-if="device.status != 'stopped'">
+                 <td>
+                    <a href="#/sm/{{device.id}}" target=_blank>
+                    <span class="fa fa-circle-o"></span><span>{{device.name}}</span>
+                    </a>
+                </td>
+                <td><input type="checkbox" checklist-model="" checklist-value=""></td>
+            </tbody>
+        </table>
+        </div>
+    </div>
+
+</div>
