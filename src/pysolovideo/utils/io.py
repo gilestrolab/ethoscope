@@ -47,6 +47,7 @@ def _delete_my_sql_db():
     command = "DROP DATABASE IF EXISTS %s" %db_name
     c.execute(command)
     db.commit()
+    db.close()
 
 
 def _create_mysql_db():
@@ -84,25 +85,21 @@ def async_mysql_writer(queue):
         while run:
             try:
                 msg = queue.get()
-                print "msg", len(msg)
                 if (msg == 'DONE'):
                     break
                 c = db.cursor()
                 c.execute(msg)
                 db.commit()
             except:
-                print "br"
+                pass
 
 
     except Exception as e:
-        print "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
         logging.error("MySQL async process stopped with an exception")
         logging.error(traceback.format_exc(e))
     finally:
-        print "aaaaaaaaaaaaa"
-        db.commit()
+        # db.commit()
         db.close()
-        print "b"
 
 
 
@@ -113,24 +110,15 @@ class AsyncMySQLWriter(object):
         self._mysql_writer.daemon = True
         self._mysql_writer.start()
     def write_command(self, command):
-        #print "writing", command[0:30]
         self._queue.put(command)
 
     def close(self):
-        logging.info("Closing async mysql writer")
-
-        logging.info("Joining process")
-
-        logging.info("AAAA")
-
+        logging.info("Closing mysql async queue")
         self._queue.put("DONE")
-
+        logging.info("Joining thread")
         self._mysql_writer.join()
-        logging.info("AAAA")
-
+        logging.info("Freeing queue")
         self._queue.close()
-        logging.info("NNNNNN")
-
         logging.info("Joined OK")
 
 
@@ -162,7 +150,6 @@ class ResultWriter(object):
         self._insert_dict = {}
         if self.metadata is None:
             self.metadata  = {}
-
 
         self._var_map_initialised = False
 
@@ -217,13 +204,10 @@ class ResultWriter(object):
         self._last_t = t
 
     def flush(self):
-
         for k, v in self._insert_dict.iteritems():
             if len(v) > self._max_insert_string_len:
                 self._write_async_command(v)
                 self._insert_dict[k] = ""
-
-
         return False
 
     def _add(self,t, roi, data_row):
