@@ -284,7 +284,7 @@ def check_update():
         if error_from_fetch.find('up to date')>0:
             return {'version':'You have the last version, not update needed.'}
         else:
-            version =error_from_fetch.split('\n')[1].split(' ')[0:2]
+            version =error_from_fetch.split('\n')[1].split(' ')[2]
             return {'version': 'There is a new version to be updated. Version:'+version}
 
     except Exception as e:
