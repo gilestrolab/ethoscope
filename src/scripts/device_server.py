@@ -78,7 +78,7 @@ def info(id):
     else:
         return {'error': "Error on machine ID"}
 
-@app.post('/update')
+@api.post('/update')
 def update_system():
     try:
         #update node
