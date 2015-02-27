@@ -238,7 +238,6 @@ def browse(folder):
                     files.append({'name':os.path.join(dirpath, name), 'is_dir':False, 'id':file_id})
                     file_id += 1
 
-
         return {'files': files}
 
     except Exception as e:
