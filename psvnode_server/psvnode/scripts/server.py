@@ -9,6 +9,7 @@ import logging
 import traceback
 from pexpect.screen import screen
 from psvnode.utils.acquisition import Acquisition
+from psvnode.utils.helpers import get_version
 from netifaces import interfaces, ifaddresses, AF_INET
 from os import walk
 import optparse
@@ -118,13 +119,14 @@ def update_device_map(id, what="data",type=None, port=9000, data=None):
             logging.error("Device %s is not detected" % id)
             raise KeyError("Device %s is not detected" % id)
 
-
 def get_subnet_ip(device="wlan0"):
     try:
         ip = ifaddresses(device)[AF_INET][0]["addr"]
         return ".".join(ip.split(".")[0:3])
     except ValueError:
         raise ValueError("Device '%s' is not valid" % device)
+
+
 
 @app.get('/favicon.ico')
 def get_favicon():
@@ -154,8 +156,6 @@ def scan_subnet():
     urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(2,254)]
     pool = multiprocessing.Pool(len(urls_to_scan))
     devices_id_url_list = pool.map(scan_one_device, urls_to_scan)
-
-
 
     global devices_map
     devices_map = {}
@@ -218,6 +218,15 @@ def device(id, type_of_req):
         logging.error(traceback.format_exc(e))
         return {'error':traceback.format_exc(e)}
 
+
+
+#################################
+# NODE Functions
+#################################
+@app.get('/node/status')
+def node_status():
+    return {'is_updated': is_updated}
+
 #Browse, delete and download files from node
 @app.get('/browse/<folder:path>')
 def browse(folder):
@@ -243,16 +252,16 @@ def browse(folder):
     except Exception as e:
         return {'error': traceback.format_exc(e)}
 
-#def file_process(arg,dir,files):
-#    return files
+
 @app.post('/update')
 def update_systems():
     devices_to_update = request.json
     try:
         #mirror the github repo in node
-        bare_update= subprocess.Popen(['git','fetch', 'origin', 'psv-package:psv-package'],cwd=GIT_BARE_REPO_DIR,
-                                          stdout=subprocess.PIPE,
-                                          stderr=subprocess.PIPE)
+        bare_update= subprocess.Popen(['git','fetch', 'origin', BRANCH+':'+BRANCH],
+                                      cwd=GIT_BARE_REPO_DIR,
+                                      stdout=subprocess.PIPE,
+                                      stderr=subprocess.PIPE)
         logging.error(bare_update.stderr.read())
         logging.info(bar_update.stdout.read())
         #update node
@@ -267,24 +276,37 @@ def update_systems():
 
     except Exception as e:
         return {'error':traceback.format_exc(e)}
+
 @app.get('/update/check')
 def check_update():
+    update={}
     try:
-        bare_update= subprocess.Popen(['git','fetch', '-v', 'origin', BRANCH+':'+BRANCH],
+        #check if there is a new version on the repo
+        bare_update= subprocess.Popen(['git', 'fetch', '-v', 'origin', BRANCH+':'+BRANCH],
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE,
                                       cwd=GIT_BARE_REPO_DIR,
                                     )
         response_from_fetch, error_from_fetch = bare_update.communicate()
         if response_from_fetch != '':
-            logging.info(response_from_fetch.decode())
-        if error_from_fetch is not None:
+            logging.info(response_from_fetch)
+        if error_from_fetch != '':
             logging.error(error_from_fetch)
-        if error_from_fetch.find('up to date')>0:
-            return {'need_update':False, 'version':'N/A'}
-        else:
-            version = error_from_fetch.split('\n')[1].split(BRANCH)[0]
-            return {'need_update': True, 'Version':version}
+        #check version
+        origin_version = get_version(GIT_BARE_REPO_DIR, BRANCH)
+        node_version = get_version(GIT_WORKING_DIR, BRANCH)
+        if node_version != origin_version:
+            update['node']={'version':node_version, 'name':'Node', 'id':'Node'}
+
+        #check connected devices
+        for key,d in devices_map.iteritems():
+            if d['version'] != origin_version:
+                update[d.id]= d
+            #else:
+            #    update[d.id]={'updated': True, 'device': d}
+        return update
+
+
 
     except Exception as e:
         return {'error':traceback.format_exc(e)}
@@ -357,7 +379,7 @@ if __name__ == '__main__':
             SUBNET_DEVICE = b'lo'
             RESULTS_DIR = "/tmp/"
             GIT_BARE_REPO_DIR = "/data1/todel/pySolo-updates"
-            GIT_WORKING_DIR = "/data1/todel/pySolo-Video"
+            GIT_WORKING_DIR = "/data1/todel/pySolo-Video-node"
     else:
         SUBNET_DEVICE = b'wlan0'
 
@@ -368,6 +390,14 @@ if __name__ == '__main__':
     scan_subnet()
 
     acquisition = {}
+
+    origin_version = get_version(GIT_BARE_REPO_DIR, BRANCH)
+    node_version = get_version(GIT_WORKING_DIR, BRANCH)
+    if origin_version != node_version:
+        is_updated = False
+    else:
+        is_updated = True
+
 
     for k, device in devices_map.iteritems():
         if device['status'] == 'running':

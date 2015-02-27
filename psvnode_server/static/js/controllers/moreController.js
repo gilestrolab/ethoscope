@@ -57,14 +57,12 @@
             $http.get("/update/check")
                  .success(function(res){
                     $scope.showUpdates = true;
-                    if (res.need_update == false){
-                        $scope.update.text = "You have the latest version. Update is not needed.";
+                    if (res){
+                        $scope.update.text = "All the connected devices and Node are update to the latest version. Well Done!";
                     }else{
-                        $scope.update.text = "There is a new version" + res.version;
+                        $scope.update.text = "There is a new version and some devices need to be updated";
                         $scope.update.need_update = true;
-                        $http.get('/devices').success(function(data){
-                            $scope.devices = data;
-                        })
+                        $scope.devices_to_update=res;
                     }
                     console.log(res);
             })

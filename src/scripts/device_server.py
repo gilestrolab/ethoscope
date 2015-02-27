@@ -6,7 +6,7 @@ import datetime
 from optparse import OptionParser
 from bottle import *
 from pysolovideo.web_utils.control_thread import ControlThread
-from pysolovideo.web_utils.helpers import get_machine_id
+from pysolovideo.web_utils.helpers import get_machine_id, get_version
 from subprocess import call
 
 api = Bottle()
@@ -82,12 +82,19 @@ def info(id):
 def update_system():
     try:
         #update node
-        device_update = subprocess.Popen(['git','pull'],cwd=GIT_WORKING_DIR,
-                                          stdout=subprocess.PIPE,
-                                          stderr=subprocess.PIPE)
-        logging.error(device_update.stderr.read())
-        logging.info(device_update.stdout.read())
-        return {'updated':True}
+        device_update = subprocess.Popen(['git', 'pull'],
+                                         cwd=GIT_WORKING_DIR,
+                                         stdout=subprocess.PIPE,
+                                         stderr=subprocess.PIPE)
+        stdout, stderr = device_update.communicate()
+        if stderr != '':
+            logging.error("Error on update:"+stderr)
+        if stdout != '':
+            logging.info("Update result:"+stdout)
+
+        ##Need to restart the server. Scary thing.
+        #subprocess.call('restart_script.sh')
+
     except Exception as e:
         return {'error':e, 'updated':False}
 
@@ -103,6 +110,7 @@ if __name__ == '__main__':
 
     machine_id = get_machine_id()
 
+
     if debug:
         import getpass
         DURATION = 60*60 * 100
@@ -110,12 +118,19 @@ if __name__ == '__main__':
             INPUT_VIDEO = '/data/pysolo_video_samples/monitor_new_targets_short.avi'
             # INPUT_VIDEO = '/data/pysolo_video_samples/monitor_new_targets_long.avi'
             PSV_DIR = "/psv_data/results/"
+            #fixme Put your working directories
+            GIT_WORKING_DIR = "/tmp/"
+            BRANCH = 'psv-dev'
         elif getpass.getuser() == "asterix":
             PSV_DIR = "/tmp/psv_data"
             INPUT_VIDEO = '/data1/monitor_new_targets_short.avi'
+            GIT_WORKING_DIR = "/data1/todel/pySolo-Video-device"
+            BRANCH = 'psv-dev-updates'
         elif getpass.getuser() == "psv" or getpass.getuser() == "root":
             INPUT_VIDEO = "/data/monitor_new_targets_short.avi"
             PSV_DIR = "/psv_data/results"
+            GIT_WORKING_DIR = "/home/psv/pySolo-Video"
+            BRANCH = 'psv-dev'
         else:
             raise Exception("where is your debugging video?")
         DRAW_RESULTS = True
@@ -126,9 +141,15 @@ if __name__ == '__main__':
         DRAW_RESULTS =False
         # fixme => we should have mounted /dev/sda/ onto a custom location instead @luis @quentin
         PSV_DIR = "/psv_data/results"
+        GIT_WORKING_DIR = '/home/psv/pySolo-Video'
+        BRANCH = 'psv-package'
+
+    version = get_version(GIT_WORKING_DIR, BRANCH)
+
+    print version
 
     # fixme => the name should be hardcoded in a encrypted file? file.
-    control = ControlThread(machine_id=machine_id, name='SM15-001', video_file=INPUT_VIDEO,
+    control = ControlThread(machine_id=machine_id, name='SM15-001', version=version, video_file=INPUT_VIDEO,
                             psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
 
 
