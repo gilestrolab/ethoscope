@@ -44,15 +44,23 @@
     </table>
 </div>
 <div ng-if="showUpdates" class="col-xs-12">
-    <h3>{{update.text}}</h3>
-    {{devices_to_update}}
-    <div ng-if="update.need_update == true">
+    <h3>{{update_text}}</h3>
+    <div ng-if="update_need_update == true">
         <h2>The following devices will be updated.</h2>
+        <button class="btn btn-success" ng-click="update(devices_to_update)">Update All</button>
         <table class="table table-striped">
             <thead>
             <th>Name</th>
             <th>Select </th>
             </thead>
+            <tbody ng-repeat="device in devices_to_update" ng-if="device.name == 'Node'" >
+                <tr class="warning">
+                <td>
+                    <span class="fa fa-circle-o"></span><span> {{device.name}}</span>
+                </td>
+                <td><input type="checkbox" checklist-model="" checklist-value=""></td>
+                    </tr>
+            </tbody>
             <tbody ng-repeat="device in devices_to_update" ng-if="device.status == 'stopped'">
                  <td>
                     <a href="#/sm/{{device.id}}" target=_blank>
@@ -71,7 +79,7 @@
             <th>Name</th>
             <th>Select </th>
             </thead>
-            <tbody ng-repeat="device in devices" ng-if="device.status != 'stopped'">
+            <tbody ng-repeat="device in devices_to_update" ng-if="device.status != 'stopped'">
                  <td>
                     <a href="#/sm/{{device.id}}" target=_blank>
                     <span class="fa fa-circle-o"></span><span>{{device.name}}</span>

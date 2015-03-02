@@ -17,4 +17,4 @@ def get_version(dir, branch):
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
     stdout,stderr = version.communicate()
-    return stdout
+    return stdout.strip('\n')

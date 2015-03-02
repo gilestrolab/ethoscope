@@ -19,7 +19,7 @@
                 case "browse":
                     $scope.browse();
                 case "update":
-                    $scope.update();
+                    $scope.check_update();
             };
             if(opt == "browse"){
                 $scope.browse();
@@ -52,21 +52,27 @@
             }
         };
 
-        $scope.update = function(){
+        $scope.check_update = function(){
             //check if there is a new version
             $http.get("/update/check")
                  .success(function(res){
                     $scope.showUpdates = true;
-                    if (res){
-                        $scope.update.text = "All the connected devices and Node are update to the latest version. Well Done!";
+                    if (Object.keys(res).length == 0){
+                        $scope.update_text = "All the connected devices and Node are update to the latest version. Well Done!";
                     }else{
-                        $scope.update.text = "There is a new version and some devices need to be updated";
-                        $scope.update.need_update = true;
+                        $scope.update_text = "There is a new version and some devices need to be updated";
+                        $scope.update_need_update = true;
                         $scope.devices_to_update=res;
                     }
                     console.log(res);
             })
             //$http.post("/update", data = data)
+        };
+        $scope.update_selected = function(devices_to_update){
+            $http.post('/update', data = devices_to_update)
+                 .success(function(data){
+                    $scope.update_result= data;
+            })
         };
 
 

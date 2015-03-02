@@ -257,13 +257,7 @@ def browse(folder):
 def update_systems():
     devices_to_update = request.json
     try:
-        #mirror the github repo in node
-        bare_update= subprocess.Popen(['git','fetch', 'origin', BRANCH+':'+BRANCH],
-                                      cwd=GIT_BARE_REPO_DIR,
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE)
-        logging.error(bare_update.stderr.read())
-        logging.info(bar_update.stdout.read())
+
         #update node
         node_update = subprocess.Popen(['git','pull'],cwd=GIT_WORKING_DIR,
                                           stdout=subprocess.PIPE,
@@ -272,7 +266,18 @@ def update_systems():
         logging.info(node_update.stdout.read())
         #update devices in list
         for device in devices_to_update:
-            update_device_map(device['id'], what="update")
+            if device.name == Node:
+                #update node
+                node_update = subprocess.Popen(['git','pull'],cwd=GIT_WORKING_DIR,
+                                                  stdout=subprocess.PIPE,
+                                                  stderr=subprocess.PIPE)
+                response_from_fetch, error_from_fetch = node_update.communicate()
+                if response_from_fetch != '':
+                    logging.info(response_from_fetch)
+                if error_from_fetch != '':
+                    logging.error(error_from_fetch)
+            else:
+                update_device_map(device['id'], what="update")
 
     except Exception as e:
         return {'error':traceback.format_exc(e)}
@@ -295,13 +300,15 @@ def check_update():
         #check version
         origin_version = get_version(GIT_BARE_REPO_DIR, BRANCH)
         node_version = get_version(GIT_WORKING_DIR, BRANCH)
+        print "0:",origin_version
+        print "node:", node_version
         if node_version != origin_version:
             update['node']={'version':node_version, 'name':'Node', 'id':'Node'}
 
         #check connected devices
         for key,d in devices_map.iteritems():
             if d['version'] != origin_version:
-                update[d.id]= d
+                update[d['id']]= d
             #else:
             #    update[d.id]={'updated': True, 'device': d}
         return update
@@ -378,8 +385,8 @@ if __name__ == '__main__':
         if getpass.getuser() == "asterix":
             SUBNET_DEVICE = b'lo'
             RESULTS_DIR = "/tmp/"
-            GIT_BARE_REPO_DIR = "/data1/todel/pySolo-updates"
-            GIT_WORKING_DIR = "/data1/todel/pySolo-Video-node"
+            GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
+            GIT_WORKING_DIR = "/data1/todel/pySolo-video-node"
     else:
         SUBNET_DEVICE = b'wlan0'
 

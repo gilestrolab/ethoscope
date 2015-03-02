@@ -78,25 +78,28 @@ def info(id):
     else:
         return {'error': "Error on machine ID"}
 
-@api.post('/update')
-def update_system():
-    try:
-        #update node
-        device_update = subprocess.Popen(['git', 'pull'],
-                                         cwd=GIT_WORKING_DIR,
-                                         stdout=subprocess.PIPE,
-                                         stderr=subprocess.PIPE)
-        stdout, stderr = device_update.communicate()
-        if stderr != '':
-            logging.error("Error on update:"+stderr)
-        if stdout != '':
-            logging.info("Update result:"+stdout)
+@api.post('/update/<id>')
+def update_system(id):
+    if id == machine_id:
+        try:
+            #update node
+            device_update = subprocess.Popen(['git', 'pull'],
+                                             cwd=GIT_WORKING_DIR,
+                                             stdout=subprocess.PIPE,
+                                             stderr=subprocess.PIPE)
+            stdout, stderr = device_update.communicate()
+            if stderr != '':
+                logging.error("Error on update:"+stderr)
+            if stdout != '':
+                logging.info("Update result:"+stdout)
 
-        ##Need to restart the server. Scary thing.
-        #subprocess.call('restart_script.sh')
+            ##Need to restart the server. Scary thing.
+            #subprocess.call('restart_script.sh')
 
-    except Exception as e:
-        return {'error':e, 'updated':False}
+        except Exception as e:
+            return {'error':e, 'updated':False}
+    else:
+        return {'error':"Error on machine ID"}
 
 if __name__ == '__main__':
 
@@ -124,7 +127,7 @@ if __name__ == '__main__':
         elif getpass.getuser() == "asterix":
             PSV_DIR = "/tmp/psv_data"
             INPUT_VIDEO = '/data1/monitor_new_targets_short.avi'
-            GIT_WORKING_DIR = "/data1/todel/pySolo-Video-device"
+            GIT_WORKING_DIR = "/data1/todel/pySolo-video-device"
             BRANCH = 'psv-dev-updates'
         elif getpass.getuser() == "psv" or getpass.getuser() == "root":
             INPUT_VIDEO = "/data/monitor_new_targets_short.avi"
