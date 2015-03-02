@@ -57,7 +57,7 @@
             $http.get("/update/check")
                  .success(function(res){
                     if (Object.keys(res).length == 0){
-                        $scope.update_text = "All the connected devices and Node are update to the latest version. Well Done!";
+                        $scope.update_text = "All connected devices and the Node are up to update. Well Done!";
                         $scope.update_need_update = false;
                         $scope.devices_to_update={};
 
