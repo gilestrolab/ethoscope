@@ -17,13 +17,14 @@
         $scope.exec_option = function(opt){
             switch(opt){
                 case "browse":
+                    $scope.showOption = opt;
                     $scope.browse();
+
                 case "update":
+                    $scope.showOption =  opt;
                     $scope.check_update();
+
             };
-            if(opt == "browse"){
-                $scope.browse();
-            }
         }
         $scope.browse=function(folder="/null"){
             var prev_folder= folder.split("/");
@@ -32,7 +33,6 @@
             $http.get("/browse"+folder)
                      .success(function(res){
                                 console.log(res);
-                        $scope.showFiles =  true;
                         $scope.files = res;
                      })
         };
@@ -56,7 +56,6 @@
             //check if there is a new version
             $http.get("/update/check")
                  .success(function(res){
-                    $scope.showUpdates = true;
                     if (Object.keys(res).length == 0){
                         $scope.update_text = "All the connected devices and Node are update to the latest version. Well Done!";
                     }else{

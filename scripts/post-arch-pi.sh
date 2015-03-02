@@ -193,6 +193,6 @@ echo 'Installing PSV package'
 wget https://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
 tar -xvf psv.tar.gz
 cd pySolo-Video-*/src
-pip2 install -e .
+pip2 install .
 
 echo 'SUCESS, please reboot'

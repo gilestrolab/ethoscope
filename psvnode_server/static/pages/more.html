@@ -1,17 +1,16 @@
 <div ng-if="showOptions" class="col-xs-12">
-    <a href="" ng-repeat="option in options" ng-click="exec_option(option.opt)">
-        <div class="col-xs-1 option {{option.color}}"  >
+    <div ng-repeat="option in options">
+    <a href=""  ng-click="exec_option(option.opt)" class="col-xs-1 option {{option.color}}"  >
                 <p class="{{option.icon}}"></p>
                 <p>{{option.name}}</p>
-        </div>
-    </a>
+        </a>
 
-
+</div>
 
 
 
 </div>
-<div ng-if="showFiles" class="col-xs-12">
+<div ng-if="showOption == 'browse'" class="col-xs-12">
     <h2>Files to be dowloaded:</h2>
     <div class="alert alert-info col-xs-12">
         <p>Actions for selected files:</p>
@@ -43,7 +42,7 @@
         </tbody>
     </table>
 </div>
-<div ng-if="showUpdates" class="col-xs-12">
+<div ng-if="showOption=='update'" class="col-xs-12">
     <h3>{{update_text}}</h3>
     <div ng-if="update_need_update == true">
         <h2>The following devices will be updated.</h2>
