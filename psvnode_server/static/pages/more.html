@@ -1,17 +1,16 @@
 <div ng-if="showOptions" class="col-xs-12">
-    <a href="" ng-repeat="option in options" ng-click="exec_option(option.opt)">
-        <div class="col-xs-1 option {{option.color}}"  >
+    <div ng-repeat="option in options">
+    <a href=""  ng-click="exec_option(option.opt)" class="col-xs-1 option {{option.color}}"  >
                 <p class="{{option.icon}}"></p>
                 <p>{{option.name}}</p>
-        </div>
-    </a>
+        </a>
 
-
+</div>
 
 
 
 </div>
-<div ng-if="showFiles" class="col-xs-12">
+<div ng-if="showOption == 'browse'" class="col-xs-12">
     <h2>Files to be dowloaded:</h2>
     <div class="alert alert-info col-xs-12">
         <p>Actions for selected files:</p>
@@ -42,4 +41,54 @@
             <td><input type="checkbox" checklist-model="selected.files" checklist-value="file"></td>
         </tbody>
     </table>
+</div>
+<div ng-if="showOption=='update'" class="col-xs-12">
+    <div ng-if="update_waiting" class="alert alert-warning"><h1 >Wait until all the devices are updated, this can take a while. Do not disconnect them from the mains.</h1></div>
+    <h3>{{update_text}}</h3>
+    <div ng-if="update_need_update == true">
+        <h2>The following devices will be updated.</h2>
+        <button class="btn btn-success" ng-click="update_selected(devices_to_update)">Update All</button>
+        <table class="table table-striped">
+            <thead>
+            <th>Name</th>
+            <th>Select </th>
+            </thead>
+            <tbody ng-repeat="device in devices_to_update" ng-if="device.name == 'Node'" >
+                <tr class="warning">
+                <td>
+                    <span class="fa fa-circle-o"></span><span> {{device.name}}</span>
+                </td>
+                <td><input type="checkbox" checklist-model="" checklist-value=""></td>
+                    </tr>
+            </tbody>
+            <tbody ng-repeat="device in devices_to_update" ng-if="device.status == 'stopped'">
+                 <td>
+                    <a href="#/sm/{{device.id}}" target=_blank>
+                    <span class="fa fa-circle-o"></span><span> {{device.name}}</span>
+                    </a>
+                </td>
+                <td><input type="checkbox" checklist-model="" checklist-value=""></td>
+            </tbody>
+        </table>
+
+        <div class="alert alert-danger" ng-if="started==true">
+        <h2>This devices will not be updated</h2>
+            <p> They are connected but started. If you want to update them you need to stop the adquisition.</p>
+            <table class="table table-striped">
+            <thead>
+            <th>Name</th>
+            <th>Select </th>
+            </thead>
+            <tbody ng-repeat="device in devices_to_update" ng-if="device.status != 'stopped' && device.name != 'Node'">
+                 <td>
+                    <a href="#/sm/{{device.id}}" target=_blank>
+                    <span class="fa fa-circle-o"></span><span>{{device.name}}</span>
+                    </a>
+                </td>
+                <td><input type="checkbox" checklist-model="" checklist-value=""></td>
+            </tbody>
+        </table>
+        </div>
+    </div>
+
 </div>

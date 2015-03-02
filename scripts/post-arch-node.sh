@@ -67,9 +67,11 @@ systemctl start sshd.service
 netctl start psv_wifi
 netctl enable psv_wifi
 
-# Setting passwordless ssh, this is the content of id_rsa.pub
-#echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKXjWAfHrJ/HAPO3d4vu5s5+Xxw5NDKX1a8rqx3amo0WO7wWe0m2uv+rnJuH7xvWCKMOGlv9jgj1vSSNcuMT30tzioHqRf/k7scUXFPoWxvxTZtqXizZwKe93mfOvCC5Ni5zLtUyMqycnLPGP2K1Rf0Xvx/WLP94bcxXyTaGtftvTcAIC53Kll1XgyHSxsh1ou7rTXt57V0/1wnWqOGH1Y+AMqUkBEKjU2QUZyYoUaVSfwBwSpIi8tvH/Ng5aEH6BGs4cqDnXUBWpdDD6JdR5NxhqYK0lcpWltBlSz8RFvoOKpyQ/0vs5ysNPgX/N4eaHWhECRFD5oNkNXIUBRpe3/ psv@polygonaltree.com
-#' > /home/psv/.ssh/authorized_keys
+# Setting passwordless ssh, this is the content of id_rsa.pub used in git updates.
+TODO do not use a relative path.
+mkdir -p /home/$USER_NAME/.ssh
+echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKXjWAfHrJ/HAPO3d4vu5s5+Xxw5NDKX1a8rqx3amo0WO7wWe0m2uv+rnJuH7xvWCKMOGlv9jgj1vSSNcuMT30tzioHqRf/k7scUXFPoWxvxTZtqXizZwKe93mfOvCC5Ni5zLtUyMqycnLPGP2K1Rf0Xvx/WLP94bcxXyTaGtftvTcAIC53Kll1XgyHSxsh1ou7rTXt57V0/1wnWqOGH1Y+AMqUkBEKjU2QUZyYoUaVSfwBwSpIi8tvH/Ng5aEH6BGs4cqDnXUBWpdDD6JdR5NxhqYK0lcpWltBlSz8RFvoOKpyQ/0vs5ysNPgX/N4eaHWhECRFD5oNkNXIUBRpe3/ psv@polygonaltree.com
+' >> /home/$USER_NAME/.ssh/authorized_keys
 
 
 #TODOs: locale/TIMEZONE/keyboard ...
@@ -134,8 +136,10 @@ hostnamectl set-hostname $hostname
 mkdir -p $PSV_DATA_DIR
 chmod 777 $PSV_DATA_DIR -R
 
-git bare https://github.com/gilestrolab/pySolo-Video.git
-
+#Create a Bare repository with only the production branch in node, it is on /var/
+git clone --bare -b psv-package --single-branch https://github.com/gilestrolab/pySolo-Video.git /var/pySolo-Video.git
+#Create a local working copy from the bare repo on node
+git clone /var/pySolo-Video.git /home/$USER_NAME/
 
 # our software.
 # TODO use AUR!
@@ -143,6 +147,6 @@ echo 'Installing PSV package'
 wget https://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
 tar -xvf psv.tar.gz
 cd pySolo-Video-*/src
-pip2 install .
+pip2 install -e .
 
 echo 'SUCESS, please reboot'

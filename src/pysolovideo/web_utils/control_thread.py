@@ -39,7 +39,7 @@ class ControlThread(Thread):
                             "fps":0
                             }
 
-    def __init__(self, machine_id, name, psv_dir, video_file=None, *args, **kwargs):
+    def __init__(self, machine_id, name, version, psv_dir, video_file=None, *args, **kwargs):
         self._monit_args = args
         self._monit_kwargs = kwargs
         self._metadata = None
@@ -74,6 +74,7 @@ class ControlThread(Thread):
                         "last_drawn_img": os.path.join(self._tmp_dir, self._tmp_last_img_file),
                         "id": machine_id,
                         "name": name,
+                        "version": version,
                         "type": type_of_device,
                         "db_name":self._mysql_db_name,
                         "monitor_info": self._default_monitor_info
