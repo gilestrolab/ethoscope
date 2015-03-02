@@ -81,6 +81,7 @@ def info(id):
 @api.post('/update/<id>')
 def update_system(id):
     if id == machine_id:
+        print "update"
         try:
             #update node
             device_update = subprocess.Popen(['git', 'pull'],

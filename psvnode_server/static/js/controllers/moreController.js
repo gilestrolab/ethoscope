@@ -63,14 +63,22 @@
                         $scope.update_text = "There is a new version and some devices need to be updated";
                         $scope.update_need_update = true;
                         $scope.devices_to_update=res;
+                        for (dev in res){
+                            if (dev.status != 'stopped'){
+                                $scope.started == true;
+                                break;
+                            }
+                        }
                     }
                     console.log(res);
             })
             //$http.post("/update", data = data)
         };
         $scope.update_selected = function(devices_to_update){
+            console.log(devices_to_update);
             $http.post('/update', data = devices_to_update)
                  .success(function(data){
+                console.log("done");
                     $scope.update_result= data;
             })
         };

@@ -47,7 +47,7 @@
     <h3>{{update_text}}</h3>
     <div ng-if="update_need_update == true">
         <h2>The following devices will be updated.</h2>
-        <button class="btn btn-success" ng-click="update(devices_to_update)">Update All</button>
+        <button class="btn btn-success" ng-click="update_selected(devices_to_update)">Update All</button>
         <table class="table table-striped">
             <thead>
             <th>Name</th>
@@ -71,7 +71,7 @@
             </tbody>
         </table>
 
-        <div class="alert alert-danger">
+        <div class="alert alert-danger" ng-if="started==true">
         <h2>This devices will not be updated</h2>
             <p> They are connected but started. If you want to update them you need to stop the adquisition.</p>
             <table class="table table-striped">
@@ -79,7 +79,7 @@
             <th>Name</th>
             <th>Select </th>
             </thead>
-            <tbody ng-repeat="device in devices_to_update" ng-if="device.status != 'stopped'">
+            <tbody ng-repeat="device in devices_to_update" ng-if="device.status != 'stopped' && device.name != 'Node'">
                  <td>
                     <a href="#/sm/{{device.id}}" target=_blank>
                     <span class="fa fa-circle-o"></span><span>{{device.name}}</span>

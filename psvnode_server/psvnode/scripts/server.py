@@ -257,16 +257,8 @@ def browse(folder):
 def update_systems():
     devices_to_update = request.json
     try:
-
-        #update node
-        node_update = subprocess.Popen(['git','pull'],cwd=GIT_WORKING_DIR,
-                                          stdout=subprocess.PIPE,
-                                          stderr=subprocess.PIPE)
-        logging.error(node_update.stderr.read())
-        logging.info(node_update.stdout.read())
-        #update devices in list
-        for device in devices_to_update:
-            if device.name == Node:
+        for key, d in devices_to_update.iteritems():
+            if d['name'] == 'Node':
                 #update node
                 node_update = subprocess.Popen(['git','pull'],cwd=GIT_WORKING_DIR,
                                                   stdout=subprocess.PIPE,
@@ -277,7 +269,7 @@ def update_systems():
                 if error_from_fetch != '':
                     logging.error(error_from_fetch)
             else:
-                update_device_map(device['id'], what="update")
+                update_device_map(d['id'], what="update", data={'update':True})
 
     except Exception as e:
         return {'error':traceback.format_exc(e)}
@@ -300,8 +292,6 @@ def check_update():
         #check version
         origin_version = get_version(GIT_BARE_REPO_DIR, BRANCH)
         node_version = get_version(GIT_WORKING_DIR, BRANCH)
-        print "0:",origin_version
-        print "node:", node_version
         if node_version != origin_version:
             update['node']={'version':node_version, 'name':'Node', 'id':'Node'}
 
