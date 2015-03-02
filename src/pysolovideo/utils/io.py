@@ -86,20 +86,36 @@ def async_mysql_writer(queue):
             try:
                 msg = queue.get()
                 if (msg == 'DONE'):
-                    break
+                    run=False
+                    continue
                 c = db.cursor()
                 c.execute(msg)
                 db.commit()
             except:
-                pass
+                run=False
+                try:
+                    logging.error("Failed to run mysql command:\n%s" % msg)
+                except:
+                    logging.error("Did not retrieve queue value")
+
+            finally:
+                if queue.empty():
+                    #we sleep iff we have an empty queue. this way, we don't over use a cpu
+                    time.sleep(.1)
 
 
-    except Exception as e:
+
+    except KeyboardInterrupt:
+        logging.warning("MySQL async process interupted with KeyboardInterrupt")
+    except:
         logging.error("MySQL async process stopped with an exception")
-        logging.error(traceback.format_exc(e))
+
     finally:
-        # db.commit()
+        logging.info("Closing async mysql writer")
+        queue.close()
         db.close()
+
+
 
 
 
@@ -107,7 +123,6 @@ class AsyncMySQLWriter(object):
     def __init__(self):
         self._queue = multiprocessing.JoinableQueue()
         self._mysql_writer = multiprocessing.Process(target=async_mysql_writer, args=((self._queue),))
-        self._mysql_writer.daemon = True
         self._mysql_writer.start()
     def write_command(self, command):
         self._queue.put(command)
@@ -115,10 +130,10 @@ class AsyncMySQLWriter(object):
     def close(self):
         logging.info("Closing mysql async queue")
         self._queue.put("DONE")
+        logging.info("Freeing queue")
+        self._queue.cancel_join_thread()
         logging.info("Joining thread")
         self._mysql_writer.join()
-        logging.info("Freeing queue")
-        self._queue.close()
         logging.info("Joined OK")
 
 

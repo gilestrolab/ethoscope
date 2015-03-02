@@ -55,7 +55,7 @@ if __name__ == "__main__":
         rois = [ROI(coordinates +i*100) for i in range(1,33)]
         rpg = RandomResultGenerator()
 
-        with RWClass(rois=rois, *args, **kwargs) as rw:
+        with RWClass(None, rois=rois, *args, **kwargs) as rw:
             # n = 4000000 # 222h of data
             # n = 400000 # 22.2h of data
             n = 4000 # 2.22h of data
@@ -78,9 +78,11 @@ if __name__ == "__main__":
                     #
                     # if t % 100 == 0:
                     #     print t, flushed, time.time() - t0
+                print "OK"
 
             except KeyboardInterrupt:
                 return
+        print "OK"
 
     test_dbwriter(ResultWriter, db_name="psv_test_io")
 
