@@ -97,7 +97,7 @@ def update_system(id):
             #subprocess.call('restart_script.sh')
 
         except Exception as e:
-            return {'error':e, 'updated':'true'}
+            return {'error':e, 'updated':False}
     else:
         return {'error':"Error on machine ID"}
 
