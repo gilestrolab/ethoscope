@@ -297,6 +297,7 @@ def check_update():
 
         #check connected devices
         for key,d in devices_map.iteritems():
+            update_device_map(d['id'], what="data")
             if d['version'] != origin_version:
                 update[d['id']]= d
             #else:

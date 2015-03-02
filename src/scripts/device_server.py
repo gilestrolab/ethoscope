@@ -95,7 +95,7 @@ def update_system(id):
 
             ##Need to restart the server. Scary thing.
             #subprocess.call('restart_script.sh')
-
+            return {'updated':'true'}
         except Exception as e:
             return {'error':e, 'updated':False}
     else:
