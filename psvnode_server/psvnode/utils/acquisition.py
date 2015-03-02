@@ -19,8 +19,8 @@ class Acquisition(multiprocessing.Process):
 
 
     _delay_between_updates = 60 * 5 # seconds
-    #_delay_between_updates = 10 # seconds
-
+    # _delay_between_updates = 10 # seconds
+    _last_backup_timeout = 30 #seconds
 
     def __init__(self, device_info, result_main_dir="/psv_results/"):
 
@@ -95,8 +95,9 @@ class Acquisition(multiprocessing.Process):
                         continue
                     t0 = now
                     self._update_device_info()
-                    if self._device_info["status"] != "running":
+                    if self._device_info["status"] != "running" and self._device_info["status"] != "stopping":
                         mirror = None
+                        t0 = time.time() - self._delay_between_updates
                         continue
 
                     if mirror is None:
@@ -116,7 +117,7 @@ class Acquisition(multiprocessing.Process):
                     self._force_stop = True
 
         except KeyboardInterrupt:
-            logging.info("Keyboard interupt: stopping backup")
+            logging.info("Keyboard interrupt: stopping backup")
         except Exception as e:
             logging.error("unhandled error in process")
             logging.error(traceback.format_exc(e))
@@ -125,13 +126,25 @@ class Acquisition(multiprocessing.Process):
         finally:
             try:
                 logging.info("Try final mirroring of the DB")
-                if mirror is None:
-                    mirror= MySQLdbToSQlite(self._output_db_file, self._db_credentials["name"],
-                        remote_host=self._database_ip,
-                        remote_pass=self._db_credentials["password"],
-                        remote_user=self._db_credentials["user"])
-                mirror.update_roi_tables()
-                logging.info("Success")
+                logging.info("Waiting for device to stop...")
+                i = 0
+                while i < self._last_backup_timeout:
+                    time.sleep(1.0)
+                    i += 1
+                    self._update_device_info()
+                    if self._device_info["status"] != "stopped":
+                        continue
+
+                    if mirror is None:
+                        mirror= MySQLdbToSQlite(self._output_db_file, self._db_credentials["name"],
+                            remote_host=self._database_ip,
+                            remote_pass=self._db_credentials["password"],
+                            remote_user=self._db_credentials["user"])
+                    mirror.update_roi_tables()
+                    logging.info("Success")
+                    return
+                raise Exception("Last backup timed out. Device did not stop.")
+
             except Exception as f:
                 logging.error(traceback.format_exc(f))
 
