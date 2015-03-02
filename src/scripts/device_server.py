@@ -82,7 +82,6 @@ def info(id):
 def update_system(id):
     if id == machine_id:
         try:
-            #update node
             device_update = subprocess.Popen(['git', 'pull'],
                                              cwd=GIT_WORKING_DIR,
                                              stdout=subprocess.PIPE,
@@ -97,6 +96,7 @@ def update_system(id):
             #subprocess.call('restart_script.sh')
             return {'updated':'true'}
         except Exception as e:
+            print e
             return {'error':e, 'updated':False}
     else:
         return {'error':"Error on machine ID"}
