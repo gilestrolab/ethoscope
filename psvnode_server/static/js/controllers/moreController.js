@@ -58,6 +58,8 @@
                  .success(function(res){
                     if (Object.keys(res).length == 0){
                         $scope.update_text = "All the connected devices and Node are update to the latest version. Well Done!";
+                        $scope.devices_to_update={};
+
                     }else{
                         $scope.update_text = "There is a new version and some devices need to be updated";
                         $scope.update_need_update = true;
