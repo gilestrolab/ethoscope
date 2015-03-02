@@ -43,6 +43,7 @@
     </table>
 </div>
 <div ng-if="showOption=='update'" class="col-xs-12">
+    <div ng-if="update_waiting" class="alert alert-warning"><h1 >Wait until all the devices are updated, this can take a while. Do not disconnect them from the mains.</h1></div>
     <h3>{{update_text}}</h3>
     <div ng-if="update_need_update == true">
         <h2>The following devices will be updated.</h2>

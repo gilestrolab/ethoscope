@@ -1,5 +1,5 @@
 (function(){
-    var moreController = function($scope, $http){
+    var moreController = function($scope, $http, $timeout){
         $scope.selected = {'files':[]};
         $scope.selected_all = false;
         $scope.showOptions = true;
@@ -77,8 +77,10 @@
             console.log(devices_to_update);
             $http.post('/update', data = devices_to_update)
                  .success(function(data){
-                console.log("done");
                     $scope.update_result= data;
+                    $scope.update_waiting = true;
+                    $timeout($scope.check_update, 6000);
+                    $timeout(function(){$scope.update_waiting = false;}, 6000);
             })
         };
 
