@@ -94,7 +94,8 @@ def update_system(id):
                 logging.info("Update result:"+stdout)
 
             ##Need to restart the server. Scary thing.
-            subprocess.call('./restart.sh '+str(os.getgid()), shell=True)
+            print './restart.sh '+str(os.getgid())
+            #subprocess.call('./restart.sh '+str(os.getgid()), shell=True)
 
             #return {'updated':'true'}
 
