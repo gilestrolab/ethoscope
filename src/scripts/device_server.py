@@ -101,8 +101,8 @@ def update_system(id):
                     control.join()
             except Exception as e:
                 logging.error(e)
-            os.execv('device_server.py', ['-d'])
-            #subprocess.Popen(['bash','./restart.sh',str(os.getpid())])
+            #os.execv('device_server.py', ['-d'])
+            subprocess.Popen(['bash','./restart.sh',str(os.getpid())])
             #os.spawnv(os.P_NOWAIT,'./restart.sh',str(os.getpid()))
             #return {'updated':'true'}
 
