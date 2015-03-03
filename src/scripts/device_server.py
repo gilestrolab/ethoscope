@@ -101,12 +101,12 @@ def update_system(id):
             except Exception as e:
                 logging.error(e)
 
-            #pid=subprocess.Popen(['./restart.sh',str(os.getpid())]).pid
+            pid=subprocess.Popen(['./restart.sh',str(os.getpid())]).pid
             #print "PID", pid
                           #stderr=subprocess.PIPE,
                           #stdout=subprocess.PIPE)
             #subprocess.call('./restart.sh '+str(os.getpid()), shell=True)
-            os.execl('./device_server.py','-d')
+            #os.execl('./device_server.py','-d')
             #return {'update':'restarting'}
 
         except Exception as e:
