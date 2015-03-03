@@ -96,6 +96,7 @@ def update_system(id):
             ##Need to restart the server. Scary thing.
             #Fixme this is for development, in the final version the script needs to restart the service
             subprocess.Popen(['./restart.sh',str(os.getpid())],
+                             executable= '/bin/bash',
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
 
