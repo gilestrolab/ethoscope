@@ -277,7 +277,6 @@ def update_systems():
         print e
         return {'error':traceback.format_exc(e)}
     if restart_node is True:
-        print "Reseting NOde ---------________________________"
         try:
             #last but not least restart the node server:
             logging.info("starting to reset Node")
