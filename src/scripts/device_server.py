@@ -162,6 +162,7 @@ if __name__ == '__main__':
         BRANCH = 'psv-package'
 
     version = get_version(GIT_WORKING_DIR, BRANCH)
+    print "version",version
 
     # fixme => the name should be hardcoded in a encrypted file? file.
     control = ControlThread(machine_id=machine_id, name='SM15-001', version=version, video_file=INPUT_VIDEO,
