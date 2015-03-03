@@ -101,6 +101,7 @@ def update_system(id):
                 logging.error(e)
 
             subprocess.call(['bash','./restart.sh',str(os.getpid())],
+                            shell=True,
                             stderr=subprocess.PIPE,
                             stdout=subprocess.PIPE)
 
