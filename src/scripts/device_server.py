@@ -108,7 +108,7 @@ def update_system(id):
             #return {'update':'restarting'}
 
         except Exception as e:
-            print e
+            print traceback.format_exc(e)
             #return {'error':e, 'updated':False}
     else:
         return {'error':"Error on machine ID"}
