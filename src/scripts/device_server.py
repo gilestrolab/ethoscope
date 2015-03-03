@@ -99,6 +99,8 @@ def update_system(id):
                 if control is not None and control.is_alive():
                     control.stop()
                     control.join()
+                    #control=None
+
 
             except Exception as e:
                 logging.error(e)
@@ -177,6 +179,7 @@ if __name__ == '__main__':
         if control is not None and control.is_alive():
             control.stop()
             control.join()
+            control=None
 
 
 
