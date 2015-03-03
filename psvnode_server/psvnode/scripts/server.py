@@ -269,7 +269,7 @@ def update_systems():
                 if error_from_fetch != '':
                     logging.error(error_from_fetch)
             else:
-                update_device_map(d['id'], what="update", data='update')
+                update_device_map(d['id'], what="update", data={'update':True})
 
     except Exception as e:
         return {'error':traceback.format_exc(e)}
