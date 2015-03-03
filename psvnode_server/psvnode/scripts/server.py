@@ -268,6 +268,7 @@ def update_systems():
                     logging.info(response_from_fetch)
                 if error_from_fetch != '':
                     logging.error(error_from_fetch)
+                print "Version", get_version(GIT_WORKING_DIR,BRANCH)
             else:
                 update_device_map(d['id'], what="update", data={'update': 'true'})
 
