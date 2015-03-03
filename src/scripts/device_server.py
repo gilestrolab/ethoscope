@@ -1,6 +1,8 @@
 __author__ = 'luis'
 
 import logging
+import traceback
+
 
 import datetime
 from optparse import OptionParser
