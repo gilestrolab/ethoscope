@@ -118,6 +118,9 @@ def close():
         control.stop()
         control.join()
         control=None
+    else:
+        #destroy control to prevent old values.
+        control = None
 
 if __name__ == '__main__':
 
