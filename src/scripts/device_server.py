@@ -96,17 +96,17 @@ def update_system(id):
 
             ##Need to restart the server. Scary thing.
             #Fixme this is for development, in the final version the script needs to restart the service
-            #try:
-            #    close()
-            #except Exception as e:
-            #    logging.error(e)
+            try:
+                close()
+            except Exception as e:
+                logging.error(e)
 
-            pid=subprocess.Popen(['./restart.sh',str(os.getpid())]).pid
-            print "PID", pid
+            #pid=subprocess.Popen(['./restart.sh',str(os.getpid())]).pid
+            #print "PID", pid
                           #stderr=subprocess.PIPE,
                           #stdout=subprocess.PIPE)
             #subprocess.call('./restart.sh '+str(os.getpid()), shell=True)
-            #os.execl('./device_server.py','-d')
+            os.execl('./device_server.py','-d')
             #return {'update':'restarting'}
 
         except Exception as e:
