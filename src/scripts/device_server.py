@@ -47,7 +47,7 @@ def controls(id, action):
                     date = datetime.fromtimestamp(t)
                     # date_time = date.isoformat()
 
-                    control = ControlThread(machine_id=machine_id, name='SM15-001', video_file=INPUT_VIDEO,
+                    control = ControlThread(machine_id=machine_id, name='SM15-001', version=version, video_file=INPUT_VIDEO,
                             psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
                     control.start()
                     return info(id)
@@ -101,7 +101,7 @@ def update_system(id):
             #except Exception as e:
             #    logging.error(e)
 
-            subprocess.Popen(['./restart.sh',str(os.getpid())])
+            pid=subprocess.Popen(['./restart.sh',str(os.getpid())]).pid
                           #stderr=subprocess.PIPE,
                           #stdout=subprocess.PIPE)
             #subprocess.call('./restart.sh '+str(os.getpid()), shell=True)
