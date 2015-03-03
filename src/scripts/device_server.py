@@ -95,10 +95,10 @@ def update_system(id):
 
             ##Need to restart the server. Scary thing.
             #Fixme this is for development, in the final version the script needs to restart the service
-            try:
-                close()
-            except Exception as e:
-                logging.error(e)
+            #try:
+            #    close()
+            #except Exception as e:
+            #    logging.error(e)
 
             subprocess.Popen(['./restart.sh',str(os.getpid())],
                             stderr=subprocess.PIPE,
