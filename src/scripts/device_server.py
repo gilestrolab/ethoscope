@@ -102,8 +102,8 @@ def update_system(id):
             except Exception as e:
                 logging.error(e)
 
-            subprocess.Popen(['bash','./restart.sh',str(os.getpid())])
-            
+            subprocess.Popen(['bash','./restart.sh',str(os.getpid())], shell=True)
+
 
 
         except Exception as e:
