@@ -99,14 +99,15 @@ def update_system(id):
                 if control is not None and control.is_alive():
                     control.stop()
                     control.join()
+
             except Exception as e:
                 logging.error(e)
-
             #subprocess.Popen(['bash','./restart.sh',str(os.getpid())])
             os.execl('./device_server.py','-d')
 
 
         except Exception as e:
+            print e
             return {'error':e, 'updated':False}
     else:
         return {'error':"Error on machine ID"}
