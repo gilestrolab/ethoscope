@@ -184,6 +184,7 @@ if __name__ == '__main__':
     try:
         run(api, host='0.0.0.0', port=port, debug=debug,)
     except Exception as e:
+        print e
         logging.error(e)
     finally:
         close()
