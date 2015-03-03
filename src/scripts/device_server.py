@@ -125,6 +125,7 @@ def close():
     else:
         #destroy control to prevent old values.
         control = None
+    print "Closing server------------"
 
 if __name__ == '__main__':
 
