@@ -277,6 +277,9 @@ def update_systems():
 
 @app.get('/update/check')
 def check_update():
+
+    global devices_map
+
     update={}
     try:
         #check internet connection
