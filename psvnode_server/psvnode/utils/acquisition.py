@@ -84,7 +84,7 @@ class Acquisition(multiprocessing.Process):
 
     def run(self):
         mirror = None
-
+        has_been_running_once = True
         try:
             t0 = time.time() - self._delay_between_updates # so we do not wait until first backup
             while not self._force_stop.value:
@@ -99,7 +99,7 @@ class Acquisition(multiprocessing.Process):
                         mirror = None
                         t0 = time.time() - self._delay_between_updates
                         continue
-
+                    has_been_running_once = True
                     if mirror is None:
                         mirror= MySQLdbToSQlite(self._output_db_file, self._db_credentials["name"],
                                         remote_host=self._database_ip,
@@ -125,6 +125,10 @@ class Acquisition(multiprocessing.Process):
 
         finally:
             try:
+                if has_been_running_once:
+                    logging.info("Device was not running; not trying last backup")
+                    return
+
                 logging.info("Try final mirroring of the DB")
                 logging.info("Waiting for device to stop...")
                 i = 0
@@ -148,11 +152,8 @@ class Acquisition(multiprocessing.Process):
             except Exception as f:
                 logging.error(traceback.format_exc(f))
 
-
     def __del__(self):
         self._force_stop.value = True
-
-
 
     def stop(self):
         logging.info("Stopping acquisition thread")
