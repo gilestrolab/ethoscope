@@ -319,7 +319,7 @@ def check_update():
             update['node']={'version':node_version, 'name':'Node', 'id':'Node'}
 
         #check connected devices
-        scan_subnet()
+        devices_map=scan_subnet()
         for key,d in devices_map.iteritems():
             if d['version'] != origin_version:
                 update[d['id']]= d
