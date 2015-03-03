@@ -111,8 +111,7 @@ def update_system(id):
             print e
             #return {'error':e, 'updated':False}
     else:
-        pass
-        #return {'error':"Error on machine ID"}
+        return {'error':"Error on machine ID"}
 
 
 def close():
