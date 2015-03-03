@@ -96,12 +96,7 @@ def update_system(id):
             ##Need to restart the server. Scary thing.
             #Fixme this is for development, in the final version the script needs to restart the service
             try:
-                if control is not None and control.is_alive():
-                    control.stop()
-                    control.join()
-                    control=None
-
-
+                close()
             except Exception as e:
                 logging.error(e)
 
@@ -116,6 +111,13 @@ def update_system(id):
         pass
         #return {'error':"Error on machine ID"}
 
+
+def close():
+    global control
+    if control is not None and control.is_alive():
+        control.stop()
+        control.join()
+        control=None
 
 if __name__ == '__main__':
 
@@ -176,10 +178,8 @@ if __name__ == '__main__':
     except Exception as e:
         logging.error(e)
     finally:
-        if control is not None and control.is_alive():
-            control.stop()
-            control.join()
-            control=None
+        close()
+
 
 
 
