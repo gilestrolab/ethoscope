@@ -3,7 +3,6 @@ __author__ = 'luis'
 import logging
 import traceback
 
-
 import datetime
 from optparse import OptionParser
 from bottle import *
@@ -105,7 +104,7 @@ def update_system(id):
             #subprocess.Popen(['./restart.sh',str(os.getpid())],
             #                stderr=subprocess.PIPE,
             #                stdout=subprocess.PIPE)
-            #subprocess.call('./restart.sh '+str(os.getpid()) )
+            subprocess.call('./restart.sh '+str(os.getpid()), shell=True)
             #os.execl('./device_server.py','-d')
             #return {'update':'restarting'}
 
