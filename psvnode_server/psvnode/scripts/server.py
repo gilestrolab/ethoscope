@@ -304,17 +304,14 @@ def check_update():
             update['node']={'version':node_version, 'name':'Node', 'id':'Node'}
 
         #check connected devices
-        scan_subnet()
+        devices_map = scan_subnet()
         for key,d in devices_map.iteritems():
-            update_device_map(d['id'],what="data")
             print "Version in Node-------->",d['version']
             if d['version'] != origin_version:
                 update[d['id']]= d
             #else:
             #    update[d.id]={'updated': True, 'device': d}
         return update
-
-
 
     except Exception as e:
         return {'error':traceback.format_exc(e)}
