@@ -96,10 +96,6 @@ def update_system(id):
 
             ##Need to restart the server. Scary thing.
             #Fixme this is for development, in the final version the script needs to restart the service
-            #try:
-            #    close()
-            #except Exception as e:
-            #    logging.error(e)
 
             pid=subprocess.Popen(['./restart.sh',str(os.getpid())],
                                  close_fds=True,
@@ -112,8 +108,7 @@ def update_system(id):
             return {'update':'restarting'}
 
         except Exception as e:
-            print traceback.format_exc(e)
-            #return {'error':e, 'updated':False}
+            return {'error':e, 'updated':False}
     else:
         return {'error':"Error on machine ID"}
 
@@ -127,7 +122,6 @@ def close():
     else:
         #destroy control to prevent old values.
         control = None
-    print "Closing server------------"
 
 if __name__ == '__main__':
 
@@ -176,7 +170,6 @@ if __name__ == '__main__':
         BRANCH = 'psv-package'
 
     version = get_version(GIT_WORKING_DIR, BRANCH)
-    print "version",version
 
     # fixme => the name should be hardcoded in a encrypted file? file.
     control = ControlThread(machine_id=machine_id, name='SM15-001', version=version, video_file=INPUT_VIDEO,
@@ -186,7 +179,6 @@ if __name__ == '__main__':
     try:
         run(api, host='0.0.0.0', port=port, debug=debug,)
     except Exception as e:
-        print e
         logging.error(e)
     finally:
         close()
