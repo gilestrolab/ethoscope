@@ -271,7 +271,7 @@ def update_systems():
                 restart_node = True
 
             else:
-                update_device_map(d['id'], what="update", data={'update': 'true'})
+                update_device_map(d['id'], what="update", data='update')
 
     except Exception as e:
         print e
@@ -290,15 +290,13 @@ def update_systems():
 
 @app.get('/update/check')
 def check_update():
-
     global devices_map
-
-    update={}
+    update = {}
     try:
         #check internet connection
         try:
             response=urllib2.urlopen('http://google.com', timeout=1)
-        except urllib2.URLError, e: #Exception as e :
+        except urllib2.URLError, e:
             update['error'] = traceback.format_exc(e)
         #check if there is a new version on the repo
         bare_update= subprocess.Popen(['git', 'fetch', '-v', 'origin', BRANCH+':'+BRANCH],
@@ -316,15 +314,14 @@ def check_update():
         node_version = get_version(GIT_WORKING_DIR, BRANCH)
 
         if node_version != origin_version:
-            update['node']={'version':node_version, 'name':'Node', 'id':'Node'}
+            update['node'] = {'version':node_version, 'name':'Node', 'id':'Node'}
 
         #check connected devices
-        devices_map=scan_subnet()
-        for key,d in devices_map.iteritems():
+        devices_map = scan_subnet()
+        for key, d in devices_map.iteritems():
             if d['version'] != origin_version:
-                update[d['id']]= d
-            #else:
-            #    update[d.id]={'updated': True, 'device': d}
+                update[d['id']] = d
+
         return update
 
     except Exception as e:
