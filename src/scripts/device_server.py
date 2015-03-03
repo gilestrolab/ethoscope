@@ -104,7 +104,7 @@ def update_system(id):
             #os.execv('device_server.py', ['-d'])
             subprocess.Popen(['bash','./restart.sh',str(os.getpid())])
             #os.spawnv(os.P_NOWAIT,'./restart.sh',str(os.getpid()))
-            #return {'updated':'true'}
+            
 
         except Exception as e:
             return {'error':e, 'updated':False}
