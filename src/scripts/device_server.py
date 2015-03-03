@@ -95,7 +95,7 @@ def update_system(id):
             ##Need to restart the server. Scary thing.
             #Fixme this is for development, in the final version the script needs to restart the service
 
-            pid=subprocess.Popen([RESTART_FILE,str(os.getpid())],
+            pid=subprocess.Popen([RESTART_FILE, str(os.getpid())],
                                  close_fds=True,
                                  env=os.environ.copy())
 
