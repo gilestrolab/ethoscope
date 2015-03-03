@@ -94,8 +94,10 @@ def update_system(id):
                 logging.info("Update result:"+stdout)
 
             ##Need to restart the server. Scary thing.
-            #subprocess.call('restart_script.sh')
-            return {'updated':'true'}
+            subprocess.call('restart.sh')
+
+            #return {'updated':'true'}
+
         except Exception as e:
             return {'error':e, 'updated':False}
     else:
