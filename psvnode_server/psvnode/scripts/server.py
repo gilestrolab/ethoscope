@@ -268,7 +268,6 @@ def update_systems():
                     logging.info(response_from_fetch)
                 if error_from_fetch != '':
                     logging.error(error_from_fetch)
-                print "Version", get_version(GIT_WORKING_DIR,BRANCH)
             else:
                 update_device_map(d['id'], what="update", data={'update': 'true'})
 
@@ -301,15 +300,13 @@ def check_update():
         #check version
         origin_version = get_version(GIT_BARE_REPO_DIR, BRANCH)
         node_version = get_version(GIT_WORKING_DIR, BRANCH)
-        print "origin_version", origin_version
-        print "node_version",node_version
+
         if node_version != origin_version:
             update['node']={'version':node_version, 'name':'Node', 'id':'Node'}
 
         #check connected devices
-        devices_map = scan_subnet()
+        scan_subnet()
         for key,d in devices_map.iteritems():
-            print "Version in Node-------->",d['version']
             if d['version'] != origin_version:
                 update[d['id']]= d
             #else:
