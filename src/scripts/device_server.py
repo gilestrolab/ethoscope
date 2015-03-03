@@ -95,9 +95,15 @@ def update_system(id):
 
             ##Need to restart the server. Scary thing.
             #Fixme this is for development, in the final version the script needs to restart the service
-            #os.execv('device_server.py', ['-d'])
-            subprocess.Popen(['bash','./restart.sh',str(os.getpid())])
-            os.spawnv(os.P_OVERLAY,'./restart.sh',str(os.getpid()))
+            try:
+                if control is not None and control.is_alive():
+                    control.stop()
+                    control.join()
+            except Exception as e:
+                logging.error(e)
+            os.execv('device_server.py', ['-d'])
+            #subprocess.Popen(['bash','./restart.sh',str(os.getpid())])
+            #os.spawnv(os.P_NOWAIT,'./restart.sh',str(os.getpid()))
             #return {'updated':'true'}
 
         except Exception as e:
@@ -164,7 +170,7 @@ if __name__ == '__main__':
     except Exception as e:
         logging.error(e)
     finally:
-        if control is not None:
+        if control is not None and control.is_alive():
             control.stop()
             control.join()
 
