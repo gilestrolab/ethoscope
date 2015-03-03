@@ -95,14 +95,10 @@ def update_system(id):
             ##Need to restart the server. Scary thing.
             #Fixme this is for development, in the final version the script needs to restart the service
 
-            pid=subprocess.Popen(['./restart.sh',str(os.getpid())],
+            pid=subprocess.Popen([RESTART_FILE,str(os.getpid())],
                                  close_fds=True,
                                  env=os.environ.copy())
-            #print "PID", pid
-                          #stderr=subprocess.PIPE,
-                          #stdout=subprocess.PIPE)
-            #subprocess.call('./restart.sh '+str(os.getpid()), shell=True)
-            #os.execl('./device_server.py','-d')
+
             return {'update':'restarting'}
 
         except Exception as e:
@@ -137,6 +133,8 @@ if __name__ == '__main__':
     if debug:
         import getpass
         DURATION = 60*60 * 100
+        RESTART_FILE = "./restart.sh"
+
         if getpass.getuser() == "quentin":
             INPUT_VIDEO = '/data/pysolo_video_samples/monitor_new_targets_short.avi'
             # INPUT_VIDEO = '/data/pysolo_video_samples/monitor_new_targets_long.avi'
@@ -166,6 +164,8 @@ if __name__ == '__main__':
         PSV_DIR = "/psv_data/results"
         GIT_WORKING_DIR = '/home/psv/pySolo-Video'
         BRANCH = 'psv-package'
+        RESTART_FILE = "./restart_production.sh"
+
 
     version = get_version(GIT_WORKING_DIR, BRANCH)
 

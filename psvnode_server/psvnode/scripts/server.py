@@ -271,8 +271,15 @@ def update_systems():
             else:
                 update_device_map(d['id'], what="update", data={'update': 'true'})
 
+        #last but not least restart the node server:
+        #Fixme this is for development, in the final version the script needs to restart the service
+        pid=subprocess.Popen([RESTART_FILE,str(os.getpid())],
+                                 close_fds=True,
+                                 env=os.environ.copy())
+
     except Exception as e:
         return {'error':traceback.format_exc(e)}
+
 
 @app.get('/update/check')
 def check_update():
@@ -385,8 +392,11 @@ if __name__ == '__main__':
             RESULTS_DIR = "/tmp/"
             GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
             GIT_WORKING_DIR = "/data1/todel/pySolo-video-node"
+            RESTART_FILE = "./restart.sh"
     else:
         SUBNET_DEVICE = b'wlan0'
+        RESTART_FILE = "./restart_production.sh"
+
 
 
 
