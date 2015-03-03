@@ -271,16 +271,20 @@ def update_systems():
             else:
                 update_device_map(d['id'], what="update", data={'update': 'true'})
 
-        print "Restart NOde"
-        #last but not least restart the node server:
-        logging.info("starting to reset Node")
-        pid=subprocess.Popen([RESTART_FILE,str(os.getpid())],
-                                 close_fds=True,
-                                 env=os.environ.copy())
-
     except Exception as e:
         print e
         return {'error':traceback.format_exc(e)}
+    try:
+        print "Restart NOde"
+        #last but not least restart the node server:
+        logging.info("starting to reset Node")
+        pid=subprocess.Popen([RESTART_FILE, str(os.getpid())],
+                             close_fds=True,
+                             env=os.environ.copy())
+    except Exception as e:
+        print e
+        return {'error':traceback.format_exc(e)}
+
 
 
 @app.get('/update/check')
