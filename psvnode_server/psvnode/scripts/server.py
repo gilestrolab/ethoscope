@@ -272,7 +272,7 @@ def update_systems():
                 update_device_map(d['id'], what="update", data={'update': 'true'})
 
         #last but not least restart the node server:
-        #Fixme this is for development, in the final version the script needs to restart the service
+        logging.info("starting to reset Node")
         pid=subprocess.Popen([RESTART_FILE,str(os.getpid())],
                                  close_fds=True,
                                  env=os.environ.copy())
