@@ -102,6 +102,7 @@ def update_system(id):
             #    logging.error(e)
 
             pid=subprocess.Popen(['./restart.sh',str(os.getpid())]).pid
+            print "PID", pid
                           #stderr=subprocess.PIPE,
                           #stdout=subprocess.PIPE)
             #subprocess.call('./restart.sh '+str(os.getpid()), shell=True)
