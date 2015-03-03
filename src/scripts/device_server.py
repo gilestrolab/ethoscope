@@ -101,10 +101,10 @@ def update_system(id):
                     control.join()
             except Exception as e:
                 logging.error(e)
-            #os.execv('device_server.py', ['-d'])
+
             subprocess.Popen(['bash','./restart.sh',str(os.getpid())])
-            #os.spawnv(os.P_NOWAIT,'./restart.sh',str(os.getpid()))
             
+
 
         except Exception as e:
             return {'error':e, 'updated':False}
