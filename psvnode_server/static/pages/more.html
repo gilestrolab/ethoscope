@@ -50,7 +50,6 @@
     </div>
     <h1 ng-if="!devices_to_update.error">{{update_text}}</h1>
     <div ng-if="(update_need_update == true) && (!(devices_to_update.hasOwnProperty('error')))">
-        <h1>{{update_text}}</h1>
         <h2>The following devices will be updated.</h2>
         <button class="btn btn-success" ng-click="update_selected(devices_to_update)">Update All</button>
         <table class="table table-striped">
