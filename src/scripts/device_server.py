@@ -104,7 +104,7 @@ def update_system(id):
                 logging.error(e)
 
             #subprocess.call(['bash','./restart.sh',str(os.getpid())])
-            #os.execl('./device_server.py','-d')
+            os.execl('./device_server.py','-d')
 
 
         except Exception as e:
@@ -168,7 +168,7 @@ if __name__ == '__main__':
 
 
     try:
-        run(api, host='0.0.0.0', port=port, debug=debug, reloader=True)
+        run(api, host='0.0.0.0', port=port, debug=debug,)
     except Exception as e:
         logging.error(e)
     finally:
