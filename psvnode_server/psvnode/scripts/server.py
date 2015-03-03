@@ -389,7 +389,7 @@ if __name__ == '__main__':
             SUBNET_DEVICE = b'enp3s0'
             # SUBNET_DEVICE = b'eno1'
             #FIXME @Quentin, plase add your variables here
-            
+
         if getpass.getuser() == "asterix":
             SUBNET_DEVICE = b'lo'
             RESULTS_DIR = "/tmp/"
