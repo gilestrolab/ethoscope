@@ -413,7 +413,7 @@ if __name__ == '__main__':
             acquisition[k].start()
     try:
 
-        run(app, host='0.0.0.0', port=PORT, debug=DEBUG)
+        run(app, host='0.0.0.0', port=PORT, debug=DEBUG,)
 
     except KeyboardInterrupt:
         logging.info("Stopping server cleanly")
