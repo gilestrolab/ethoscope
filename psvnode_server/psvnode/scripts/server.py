@@ -268,20 +268,23 @@ def update_systems():
                     logging.info(response_from_fetch)
                 if error_from_fetch != '':
                     logging.error(error_from_fetch)
+                restart_node = True
+
             else:
                 update_device_map(d['id'], what="update", data={'update': 'true'})
 
     except Exception as e:
         print e
         return {'error':traceback.format_exc(e)}
-    try:
-        #last but not least restart the node server:
-        logging.info("starting to reset Node")
-        pid=subprocess.Popen([RESTART_FILE, str(os.getpid())],
-                             close_fds=True,
-                             env=os.environ.copy())
-    except Exception as e:
-        return {'error':traceback.format_exc(e)}
+    if restart_node:
+        try:
+            #last but not least restart the node server:
+            logging.info("starting to reset Node")
+            pid=subprocess.Popen([RESTART_FILE, str(os.getpid())],
+                                 close_fds=True,
+                                 env=os.environ.copy())
+        except Exception as e:
+            return {'error':traceback.format_exc(e)}
 
 
 
