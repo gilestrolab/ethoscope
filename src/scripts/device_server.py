@@ -102,6 +102,7 @@ def update_system(id):
 
             except Exception as e:
                 logging.error(e)
+                
             #run(api, host='0.0.0.0', port=port, debug=debug, reloader=True)
             #subprocess.call(['bash','./restart.sh',str(os.getpid())])
             #os.execl('./device_server.py','-d')
