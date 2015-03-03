@@ -82,8 +82,8 @@
                  .success(function(data){
                     $scope.update_result= data;
                     $scope.update_waiting = true;
-                    $timeout($scope.check_update, 6000);
-                    $timeout(function(){$scope.update_waiting = false;}, 6000);
+                    $timeout($scope.check_update, 15000);
+                    $timeout(function(){$scope.update_waiting = false;}, 15000);
             })
         };
 
