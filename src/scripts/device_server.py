@@ -101,7 +101,9 @@ def update_system(id):
             #except Exception as e:
             #    logging.error(e)
 
-            pid=subprocess.Popen(['./restart.sh',str(os.getpid())],env='/bin/bash')
+            pid=subprocess.Popen(['./restart.sh',str(os.getpid())],
+                                 close_fds=True,
+                                 env=os.environ.copy())
             #print "PID", pid
                           #stderr=subprocess.PIPE,
                           #stdout=subprocess.PIPE)
