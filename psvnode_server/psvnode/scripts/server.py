@@ -298,6 +298,8 @@ def check_update():
         #check version
         origin_version = get_version(GIT_BARE_REPO_DIR, BRANCH)
         node_version = get_version(GIT_WORKING_DIR, BRANCH)
+        print "origin_version", origin_version
+        print "node_version",node_version
         if node_version != origin_version:
             update['node']={'version':node_version, 'name':'Node', 'id':'Node'}
 
