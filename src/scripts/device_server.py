@@ -107,7 +107,7 @@ def update_system(id):
                           #stdout=subprocess.PIPE)
             #subprocess.call('./restart.sh '+str(os.getpid()), shell=True)
             #os.execl('./device_server.py','-d')
-            #return {'update':'restarting'}
+            return {'update':'restarting'}
 
         except Exception as e:
             print traceback.format_exc(e)
