@@ -97,7 +97,7 @@ def update_system(id):
             #Fixme this is for development, in the final version the script needs to restart the service
             #os.execv('device_server.py', ['-d'])
             #subprocess.Popen(['bash','./restart.sh',str(os.getpid())])
-            os.spawnv(os.P_NOWAIT,'./device_server.py','-d')
+            os.spawnv(os.P_NOWAIT,'./restart.sh',str(os.getpid()))
             #return {'updated':'true'}
 
         except Exception as e:
