@@ -278,6 +278,11 @@ def update_systems():
 def check_update():
     update={}
     try:
+        #check internet connection
+        try:
+            response=urllib2.urlopen('http://google.com', timeout=1)
+        except urllib2.URLError, e: #Exception as e :
+            update['error'] = traceback.format_exc(e)
         #check if there is a new version on the repo
         bare_update= subprocess.Popen(['git', 'fetch', '-v', 'origin', BRANCH+':'+BRANCH],
                                       stdout=subprocess.PIPE,

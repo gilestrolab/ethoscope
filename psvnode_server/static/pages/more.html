@@ -44,8 +44,13 @@
 </div>
 <div ng-if="showOption=='update'" class="col-xs-12">
     <div ng-if="update_waiting" class="alert alert-warning"><h1 >Wait until all the devices are updated, this can take a while. Do not disconnect them from the mains.</h1></div>
-    <h3>{{update_text}}</h3>
-    <div ng-if="update_need_update == true">
+    <div ng-if="devices_to_update.error">
+        <h3 >Error on check the update. Have your node internet connection?</h3>
+        <p>Error details: {{devices_to_update.error}}</p>
+    </div>
+    <h1 ng-if="!devices_to_update.error">{{update_text}}</h1>
+    <div ng-if="(update_need_update == true) && (!(devices_to_update.hasOwnProperty('error')))">
+        <h1>{{update_text}}</h1>
         <h2>The following devices will be updated.</h2>
         <button class="btn btn-success" ng-click="update_selected(devices_to_update)">Update All</button>
         <table class="table table-striped">
