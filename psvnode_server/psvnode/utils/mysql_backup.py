@@ -95,7 +95,8 @@ class MySQLdbToSQlite(object):
             rois_in_src = set([c[0] for c in dst_cur])
             for i in rois_in_src :
                 self._update_one_roi_table("ROI_%i" % i, src, dst)
-            self._update_one_roi_table("CSV_DAM_ACTIVITY", src, dst, True)
+
+            self._update_one_roi_table("CSV_DAM_ACTIVITY", src, dst, dump_in_csv=True)
 
     def _copy_table(self,table_name, src, dst):
         src_cur = src.cursor()
@@ -139,7 +140,7 @@ class MySQLdbToSQlite(object):
         dst.commit()
 
 
-    def _update_one_roi_table(self, table_name, src, dst, dump_in_csv=None):
+    def _update_one_roi_table(self, table_name, src, dst, dump_in_csv=False):
 
         src_cur = src.cursor()
         dst_cur = dst.cursor()
@@ -172,6 +173,13 @@ class MySQLdbToSQlite(object):
                 dst.commit()
                 to_insert = []
 
+            if dump_in_csv:
+                out_file = os.path.join(self._dst_dir, table_name + ".txt")
+                with open(out_file,"a") as f:
+                    row = "\t".join(["{0}".format(val) for val in sc])
+                    f.write(row)
+                    f.write("\n")
+
         if len(to_insert) > 0:
             value_string = ",".join(to_insert)
             dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string )
@@ -179,12 +187,6 @@ class MySQLdbToSQlite(object):
         dst.commit()
 
 
-            # if dump_in_csv is not None:
-            #     out_file = os.path.join(self._dst_dir, table_name + ".txt")
-            #     with open(out_file,"a") as f:
-            #         row = "\t".join(["{0}".format(val) for val in sc])
-            #         f.write(row)
-            #         f.write("\n")
 
 
 

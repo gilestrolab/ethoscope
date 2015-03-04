@@ -71,8 +71,7 @@ class TestMySQL(unittest.TestCase):
                     data = rpg.make_one_point()
                     rw.write(rt , r, data)
                 print time.time() - t0
-                rw.flush()
-
+                rw.flush(t)
 
 
 

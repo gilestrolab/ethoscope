@@ -19,7 +19,7 @@ class Acquisition(multiprocessing.Process):
 
 
     _delay_between_updates = 60 * 5 # seconds
-    # _delay_between_updates = 10 # seconds
+    #_delay_between_updates = 10 # seconds
     _last_backup_timeout = 30 #seconds
 
     def __init__(self, device_info, result_main_dir="/psv_results/"):
@@ -30,11 +30,13 @@ class Acquisition(multiprocessing.Process):
         date_time = datetime.datetime.fromtimestamp(int(self._device_info["time"]))
 
 
-        formated_time = date_time.strftime('%Y-%m-%d_%H:%M:%S')
-        device_name = self._device_info["id"]
-        self._file_name = "%s_%s.db" % (formated_time, device_name)
+        formated_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
+        device_id = self._device_info["id"]
+        device_name = self._device_info["name"]
+        self._file_name = "%s_%s.db" % (formated_time, device_id)
 
         self._output_db_file = os.path.join(result_main_dir,
+                                            device_id,
                                             device_name,
                                             formated_time,
                                             self._file_name
@@ -44,7 +46,7 @@ class Acquisition(multiprocessing.Process):
 
 
 
-        logging.info("Linking%s, %s\n\tsaving at '%s'" % (device_name, self._database_ip, self._output_db_file))
+        logging.info("Linking%s, %s\n\tsaving at '%s'" % (device_id, self._database_ip, self._output_db_file))
 
         # fixme THIS SHOULD BE a different LOG FILE **PER ACQUISITION**/ or we should format log accordingly
         # the latter solution is prob better actually! so we have a global log for server and no need to link it in different thread
@@ -84,7 +86,7 @@ class Acquisition(multiprocessing.Process):
 
     def run(self):
         mirror = None
-        has_been_running_once = True
+        has_been_running_once = False
         try:
             t0 = time.time() - self._delay_between_updates # so we do not wait until first backup
             while not self._force_stop.value:
@@ -107,6 +109,7 @@ class Acquisition(multiprocessing.Process):
                                         remote_user=self._db_credentials["user"])
                     mirror.update_roi_tables()
 
+
                 except DBNotReadyError as e:
                     logging.warning(e)
                     logging.warning("Database not ready, will try later")
@@ -114,7 +117,7 @@ class Acquisition(multiprocessing.Process):
 
                 except Exception as e:
                     logging.error(traceback.format_exc(e))
-                    self._force_stop = True
+                    self._force_stop.value = True
 
         except KeyboardInterrupt:
             logging.info("Keyboard interrupt: stopping backup")
@@ -125,7 +128,7 @@ class Acquisition(multiprocessing.Process):
 
         finally:
             try:
-                if has_been_running_once:
+                if not has_been_running_once:
                     logging.info("Device was not running; not trying last backup")
                     return
 
