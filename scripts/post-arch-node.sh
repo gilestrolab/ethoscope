@@ -82,7 +82,7 @@ systemctl start node.service
 systemctl enable node.service
 
 # Setting passwordless ssh, this is the content of id_rsa.pub used in git updates.
-TODO do not use a relative path.
+#TODO do not use a relative path.
 mkdir -p /home/$USER_NAME/.ssh
 echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKXjWAfHrJ/HAPO3d4vu5s5+Xxw5NDKX1a8rqx3amo0WO7wWe0m2uv+rnJuH7xvWCKMOGlv9jgj1vSSNcuMT30tzioHqRf/k7scUXFPoWxvxTZtqXizZwKe93mfOvCC5Ni5zLtUyMqycnLPGP2K1Rf0Xvx/WLP94bcxXyTaGtftvTcAIC53Kll1XgyHSxsh1ou7rTXt57V0/1wnWqOGH1Y+AMqUkBEKjU2QUZyYoUaVSfwBwSpIi8tvH/Ng5aEH6BGs4cqDnXUBWpdDD6JdR5NxhqYK0lcpWltBlSz8RFvoOKpyQ/0vs5ysNPgX/N4eaHWhECRFD5oNkNXIUBRpe3/ psv@polygonaltree.com
 ' >> /home/$USER_NAME/.ssh/authorized_keys
@@ -95,7 +95,7 @@ echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKXjWAfHrJ/HAPO3d4vu5s5+Xxw5NDKX1a8r
 echo 'Creating default user'
 
 pass=$(perl -e 'print crypt($ARGV[0], "password")' $PASSWORD)
-useradd -m -g users -G wheel -s /bin/bash  -p $pass $USER_NAME
+useradd -m -g users -G wheel -s /bin/bash  -p $pass $USER_NAME || echo 'user exists'
 
 echo 'exec startlxde' >> /home/$USER_NAME/.xinitrc
 chown $USER_NAME /home/$USER_NAME/.xinitrc
@@ -153,7 +153,7 @@ chmod 777 $PSV_DATA_DIR -R
 #Create a Bare repository with only the production branch in node, it is on /var/
 git clone --bare -b psv-package --single-branch https://github.com/gilestrolab/pySolo-Video.git /var/pySolo-Video.git
 #Create a local working copy from the bare repo on node
-git clone /var/pySolo-Video.git /home/$USER_NAME/
+git clone /var/pySolo-Video.git /home/$USER_NAME/pySolo-Video
 
 # our software.
 # TODO use AUR!
