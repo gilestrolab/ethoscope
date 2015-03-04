@@ -206,7 +206,7 @@ class Monitor(object):
                         result_writer.write(t,track_u.roi, data_row)
 
                 if not result_writer is None:
-                    result_writer.flush()
+                    result_writer.flush(t)
 
                 if (self._draw_results and i % self.draw_every_n == 0) or not vw is None :
                     tmp = self._draw_on_frame(frame)

@@ -7,7 +7,7 @@ import shutil
 import random
 import tempfile
 from pysolovideo.tracking.roi_builders import ROI
-from pysolovideo.utils.io import ResultWriter, SQLiteResultWriter
+from pysolovideo.utils.io import ResultWriter#, SQLiteResultWriter
 
 
 from pysolovideo.tracking.trackers import DataPoint, BoolVariableBase, IntVariableBase, DistanceIntVarBase
@@ -55,29 +55,27 @@ if __name__ == "__main__":
         rois = [ROI(coordinates +i*100) for i in range(1,33)]
         rpg = RandomResultGenerator()
 
-        with RWClass(None, rois=rois, *args, **kwargs) as rw:
+        with RWClass(rois=rois, *args, **kwargs) as rw:
             # n = 4000000 # 222h of data
             # n = 400000 # 22.2h of data
-            n = 4000 # 2.22h of data
+            # n = 9000 # 2.22h of data
+            t_max = 60 * 60 * 1000
             import time
-            t0 = time.time()
+            t0 = 0
             try:
                 t = 0
-                while t < n:
-                    t+=1
-
-
-                    rt = time.time() * 1000
-                    if t % (n/100)== 0:
-                        logging.info("filling with dummy variables: %f percent" % (100.*float(t)/float(n)))
+                while t < t_max:
+                    t += random.uniform(100,100 * 75)
+                    rt = t
+                    print "rt", rt/1000
+                    # if t % (t_max/100) == 0:
+                    #     logging.info("filling with dummy variables: %f percent" % (100.*float(t)/float(n)))
                     for r in rois:
                         data = rpg.make_one_point()
                         rw.write(rt , r, data)
 
-                    rw.flush()
-                    #
-                    # if t % 100 == 0:
-                    #     print t, flushed, time.time() - t0
+                    rw.flush(rt)
+
                 print "OK"
 
             except KeyboardInterrupt:

@@ -22,7 +22,7 @@ import pkg_resources
 import glob
 import traceback
 from pysolovideo.utils.io import ResultWriter
-from pysolovideo.utils.io import SQLiteResultWriter
+
 
 # http://localhost:9001/controls/3a92bcf229a34c4db2be733f6802094d/start
 # {"time": "372894738."}
