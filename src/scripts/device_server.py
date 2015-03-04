@@ -19,7 +19,7 @@ def server_static(filepath):
     return static_file(filepath, root="/", download=filepath)
 
 
-#fixme all this info should be in control.info
+# fixme all this info should be in control.info
 @api.get('/id')
 def name():
     global control
@@ -80,7 +80,7 @@ def info(id):
 
 @api.post('/update/<id>')
 def update_system(id):
-    if id == machine_id:
+    if id == machine_id and control.info['status'] == 'stopped':
         try:
             device_update = subprocess.Popen(['git', 'pull'],
                                              cwd=GIT_WORKING_DIR,
@@ -92,19 +92,17 @@ def update_system(id):
             if stdout != '':
                 logging.info("Update result:"+stdout)
 
-            ##Need to restart the server. Scary thing.
-            #Fixme this is for development, in the final version the script needs to restart the service
-
-            pid=subprocess.Popen([RESTART_FILE, str(os.getpid())],
-                                 close_fds=True,
-                                 env=os.environ.copy())
+            # Sever restarting to changes have effect.
+            pid = subprocess.Popen([RESTART_FILE, str(os.getpid())],
+                                   close_fds=True,
+                                   env=os.environ.copy())
 
             return {'update':'restarting'}
 
         except Exception as e:
             return {'error':e, 'updated':False}
     else:
-        return {'error':"Error on machine ID"}
+        return {'error': 'Error on machine ID or not Stopped'}
 
 
 def close():
@@ -114,7 +112,7 @@ def close():
         control.join()
         control=None
     else:
-        #destroy control to prevent old values.
+        # destroy control to prevent old values.
         control = None
 
 if __name__ == '__main__':
@@ -172,7 +170,6 @@ if __name__ == '__main__':
     # fixme => the name should be hardcoded in a encrypted file? file.
     control = ControlThread(machine_id=machine_id, name='SM15-001', version=version, video_file=INPUT_VIDEO,
                             psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
-
 
     try:
         run(api, host='0.0.0.0', port=port, debug=debug)
