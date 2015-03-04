@@ -198,6 +198,8 @@ class DAMFileHelper(object):
     def flush(self,t):
         out =  OrderedDict()
         tick = int(round((t/1000.0)/self._period))
+        if len(self._activity_accum) < 1:
+            return []
 
         m  = min(self._activity_accum.keys())
         todel = []
@@ -277,6 +279,9 @@ class ResultWriter(object):
         for k,v in self.metadata.items():
             command = "INSERT INTO METADATA VALUES %s" % str((k, v))
             self._write_async_command(command)
+        while not self._queue.empty():
+            logging.info("waiting for queue to be processed")
+            time.sleep(.1)
         logging.info("Result writer initialised")
 
 

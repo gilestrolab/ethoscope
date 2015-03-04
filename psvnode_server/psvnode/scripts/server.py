@@ -274,8 +274,8 @@ def update_systems():
                 update_device_map(d['id'], what="update", data='update')
 
     except Exception as e:
-        print e
         return {'error':traceback.format_exc(e)}
+
     if restart_node is True:
         try:
             #last but not least restart the node server:
@@ -390,14 +390,14 @@ if __name__ == '__main__':
         if getpass.getuser() == "quentin":
             SUBNET_DEVICE = b'enp3s0'
             # SUBNET_DEVICE = b'eno1'
-            #FIXME @Quentin, plase add your variables here
+            GIT_BARE_REPO_DIR = GIT_WORKING_DIR  = "./"
 
         if getpass.getuser() == "asterix":
             SUBNET_DEVICE = b'lo'
             RESULTS_DIR = "/tmp/"
             GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
             GIT_WORKING_DIR = "/data1/todel/pySolo-video-node"
-            RESTART_FILE = "./restart.sh"
+        RESTART_FILE = "./restart.sh"
     else:
         SUBNET_DEVICE = b'wlan0'
         RESTART_FILE = "./restart_production.sh"
