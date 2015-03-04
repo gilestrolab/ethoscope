@@ -14,7 +14,7 @@
     <h2>Files to be dowloaded:</h2>
     <div class="alert alert-info col-xs-12">
         <p>Actions for selected files:</p>
-        <button class="btn btn-success" ng-click="browse.dowload()">Download</button>
+        <button class="btn btn-success" ng-click="browse.dowload()" data-toggle="modal" data-target="#downloadModal">Download</button>
         <button class="btn btn-danger">Delete</button>
         <button ng-if="selected_all == false" class="right btn btn-info" ng-click="browse.toggleAll()">Select All</button>
         <button ng-if="selected_all == true" class="right btn btn-warning" ng-click="browse.toggleAll()">Deselect All</button>
@@ -30,18 +30,40 @@
         <tbody ng-repeat="file in files.files">
              <td ng-if="file.is_dir == true">
                 <a href="" ng-click="browse(file.name)">
-                <span class="fa fa-folder-o"></span><span ng-if="file.name.length > 75">{{file.name.substring(0,75)}}...</span><span ng-if="file.name.length <= 75"> {{file.name}}</span>
+                <span class="fa fa-folder-o"></span><span ng-if="file.route_to_show.length > 75">{{file.route_to_show.substring(0,75)}}...</span><span ng-if="file.route_to_show.length <= 75"> {{file.route_to_show}}</span>
                 </a>
             </td>
             <td ng-if="file.is_dir == false">
             <a ng-href="/download{{file.name}}"  target="_blank">
-                <span class="fa fa-file-o"></span><span ng-if="file.name.length > 75">{{file.name.substring(0,75)}}...</span><span ng-if="file.name.length <= 75"> {{file.name}}</span>
+                <span class="fa fa-file-o"></span><span ng-if="file.route_to_show.length > 75">{{file.route_to_show.substring(0,75)}}...</span><span ng-if="file.route_to_show.length <= 75"> {{file.route_to_show}}</span>
             </a>
             </td>
             <td><input type="checkbox" checklist-model="selected.files" checklist-value="file"></td>
         </tbody>
     </table>
 </div>
+
+<!-- Modal download -->
+<div class="modal fade" id="downloadModal" tabindex="-1" role="dialog" aria-labelledby="downloadModal" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Download selected files from this link</h4>
+      </div>
+      <div class="modal-body">
+       <ul>
+       <li ng-repeat="file in selected.files">{{file.route_to_show}}</li>
+       </ul>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <a href="{{browse.download_url}}" target="_blank" type="button" class="btn btn-primary">Download All</a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div ng-if="showOption=='update'" class="col-xs-12">
     <div ng-if="update_waiting" class="alert alert-warning"><h1 >Wait until all the devices are updated, this can take a while. Do not disconnect them from the mains.</h1></div>
     <div ng-if="devices_to_update.error">
@@ -52,6 +74,7 @@
     <div ng-if="(update_need_update == true) && (!(devices_to_update.hasOwnProperty('error')))">
         <h2>The following devices will be updated.</h2>
         <button class="btn btn-success" ng-click="update_selected(devices_to_update)">Update All</button>
+        <button class="btn btn-default" ng-click="update_selected(devices_to_update_selected)">Update All</button>
         <table class="table table-striped">
             <thead>
             <th>Name</th>
@@ -62,7 +85,7 @@
                 <td>
                     <span class="fa fa-circle-o"></span><span> {{device.name}}</span>
                 </td>
-                <td><input type="checkbox" checklist-model="" checklist-value=""></td>
+                <td><input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="device"></td>
                     </tr>
             </tbody>
             <tbody ng-repeat="device in devices_to_update" ng-if="device.status == 'stopped'">
@@ -71,7 +94,7 @@
                     <span class="fa fa-circle-o"></span><span> {{device.name}}</span>
                     </a>
                 </td>
-                <td><input type="checkbox" checklist-model="" checklist-value=""></td>
+                <td><input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="device"></td>
             </tbody>
         </table>
 
@@ -89,7 +112,7 @@
                     <span class="fa fa-circle-o"></span><span>{{device.name}}</span>
                     </a>
                 </td>
-                <td><input type="checkbox" checklist-model="" checklist-value=""></td>
+
             </tbody>
         </table>
         </div>

@@ -26,31 +26,50 @@
 
             };
         }
+
+// Browse - Functions
         $scope.browse=function(folder="/null"){
             var prev_folder= folder.split("/");
             prev_folder.pop();
             $scope.prev_dir = prev_folder.join('/');
             $http.get("/browse"+folder)
                      .success(function(res){
-                                console.log(res);
+                        for (key in res.files){
+                            file = res.files[key]
+                            file.route_to_show = file.name.split("/").slice(3).join("/");
+                        }
                         $scope.files = res;
                      })
         };
         $scope.browse.dowload = function(){
             if($scope.selected.files.length == 1){
-                $http.get('/static/'+$scope.selected.files.name);
+                console.log("files to download");
+                console.log($scope.selected.files[0].name);
+                $scope.browse.download_url = '/download'+$scope.selected.files[0].name;
+                $scope.browse.show_download_panel = true;
+            }else{
+                console.log("files to download");
+                console.log($scope.selected.files);
+                $scope.browse.download_url ='';
+                $http.post('/request_download/files', data=$scope.selected)
+                     .success(function(res){
+                        console.log(res);
+                         $scope.browse.download_url = '/download'+res.url;
+                     })
             }
         };
         $scope.browse.toggleAll = function(){
             if($scope.selected_all == false){
                 $scope.selected.files = angular.copy($scope.files.files);
                 $scope.selected_all = true;
-                console.log($scope.selected.files);
             }else {
                 $scope.selected.files = [];
                 $scope.selected_all = false;
             }
         };
+
+// Updates - Functions
+        $scope.devices_to_update_selected = {}
 
         $scope.check_update = function(){
             //check if there is a new version
@@ -72,12 +91,10 @@
                             }
                         }
                     }
-                    console.log(res);
             })
             //$http.post("/update", data = data)
         };
         $scope.update_selected = function(devices_to_update){
-            console.log(devices_to_update);
             $http.post('/update', data = devices_to_update)
                  .success(function(data){
                     $scope.update_result= data;

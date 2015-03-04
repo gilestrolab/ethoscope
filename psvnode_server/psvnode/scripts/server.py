@@ -13,6 +13,8 @@ from psvnode.utils.helpers import get_version
 from netifaces import interfaces, ifaddresses, AF_INET
 from os import walk
 import optparse
+import zipfile
+import datetime
 
 app = Bottle()
 STATIC_DIR = "../../static"
@@ -252,7 +254,6 @@ def browse(folder):
     except Exception as e:
         return {'error': traceback.format_exc(e)}
 
-
 @app.post('/update')
 def update_systems():
     devices_to_update = request.json
@@ -278,15 +279,15 @@ def update_systems():
 
     if restart_node is True:
         try:
-            #last but not least restart the node server:
-            logging.info("starting to reset Node")
+            # stop acquisition thread
+            close()
+            # last but not least restart the node server:
+            logging.info("Reset Node")
             pid=subprocess.Popen([RESTART_FILE, str(os.getpid())],
                                  close_fds=True,
                                  env=os.environ.copy())
         except Exception as e:
             return {'error':traceback.format_exc(e)}
-
-
 
 @app.get('/update/check')
 def check_update():
@@ -327,6 +328,28 @@ def check_update():
     except Exception as e:
         return {'error':traceback.format_exc(e)}
 
+@app.post('/request_download/<what>')
+def download(what):
+    print what
+    if what == 'files':
+        try:
+            # zip the files and provide a link to download it
+            req_files = request.json
+            t = datetime.datetime.now()
+            #FIXME change the route for this? and old zips need to be erased
+            zip_file_name = RESULTS_DIR+'/results_'+t.strftime("%y%m%d_%H%M%S")+'.zip'
+            zf = zipfile.ZipFile(zip_file_name, mode='a')
+
+            for f in req_files['files']:
+                print f
+                zf.write(f['name'])
+            zf.close()
+        except Exception as e:
+            print e
+            logging.error(e)
+
+        return {'url':zip_file_name}
+
 @app.get('/list/<type>')
 def redirection_to_home(type):
     return redirect('/#/list/'+type)
@@ -365,6 +388,16 @@ def get_log(id):
     except Exception as e:
         return {'error':traceback.format_exc(e)}
 
+
+def close():
+    logging.info("Joining acquisition processes")
+    for a in acquisition.values():
+        a.stop()
+        logging.info("Joining process")
+        a.join()
+        logging.info("Joined OK")
+
+    logging.info("Closing server")
 
 if __name__ == '__main__':
     # TODO where to save the files and the logs
@@ -439,11 +472,4 @@ if __name__ == '__main__':
         logging.error(traceback.format_exc(e))
 
     finally:
-        logging.info("Joining acquisition processes")
-        for a in acquisition.values():
-            a.stop()
-            logging.info("Joining process")
-            a.join()
-            logging.info("Joined OK")
-
-        logging.info("Closing server")
+        close()
