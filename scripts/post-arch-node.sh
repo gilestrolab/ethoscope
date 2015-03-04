@@ -73,7 +73,8 @@ systemctl enable ntpd.service
 systemctl enable sshd.service
 systemctl start sshd.service
 #setting up wifi
-netctl start psv_wifi
+# FIXME this not work if not psv-wifi
+#netctl start psv_wifi
 netctl enable psv_wifi
 
 #node service
@@ -157,7 +158,7 @@ git clone /var/pySolo-Video.git /home/$USER_NAME/
 # our software.
 # TODO use AUR!
 echo 'Installing PSV package'
-#wget https://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
+#wget hthttp://stackoverflow.com/questions/758819/python-mysqldb-connection-problemstps://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
 tar -xvf psv.tar.gz
 cd /home/node/pySolo-Video/psvnode_server
 pip2 install -e .
