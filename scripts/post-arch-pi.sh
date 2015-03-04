@@ -66,6 +66,13 @@ echo 'restrict ::1' >> /etc/ntp.conf
 echo 'driftfile /var/lib/ntp/ntp.drift' >> /etc/ntp.conf
 
 ######################################################################################
+
+#Creating service for device_server.py
+
+cp ./device.service /etc/systemd/system/device.service
+
+systemctl daemon-reload
+######################################################################################
 echo 'Enabling startuup deamons'
 
 # Enable networktime protocol
@@ -78,8 +85,10 @@ systemctl start sshd.service
 netctl start psv_wifi
 netctl enable psv_wifi
 
+#device service
+systemctl start device.service
+systemctl enable device.service
 
-#TODO add ntpd configuration to use the node as sync server.
 
 
 #TODO s: locale/TIMEZONE/keyboard ...
@@ -190,9 +199,9 @@ git clone node@192.169.123.1:/var/pySolo-Video.git /home/$USER_NAME
 # our software.
 # TODO use AUR!
 echo 'Installing PSV package'
-wget https://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
+#wget https://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
 tar -xvf psv.tar.gz
-cd pySolo-Video-*/src
+cd /home/psv/pySolo-Video/src
 pip2 install .
 
 

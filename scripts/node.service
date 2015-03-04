@@ -1,0 +1,12 @@
+[Unit]
+Description= test for python
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python2 /home/node/pySolo-Video/psvnode_server/psvnode/scripts/server.py
+WorkingDirectory="/home/node/pySolo-Video/psvnode_server/psvnode/scripts/"
+
+[Install]
+WantedBy=multi-user.target
+

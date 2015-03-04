@@ -55,6 +55,15 @@ echo 'Key=PSV_WIFI_pIAEZF2s@jmKH' >> /etc/netctl/psv_wifi
 #echo 'Hidden=yes'
 
 ######################################################################################
+
+#Creating service for device_server.py
+
+cp ./node.service /etc/systemd/system/node.service
+
+systemctl daemon-reload
+######################################################################################
+
+######################################################################################
 echo 'Enabling startuup deamons'
 
 # Enable networktime protocol
@@ -66,6 +75,10 @@ systemctl start sshd.service
 #setting up wifi
 netctl start psv_wifi
 netctl enable psv_wifi
+
+#node service
+systemctl start node.service
+systemctl enable node.service
 
 # Setting passwordless ssh, this is the content of id_rsa.pub used in git updates.
 TODO do not use a relative path.
@@ -144,9 +157,9 @@ git clone /var/pySolo-Video.git /home/$USER_NAME/
 # our software.
 # TODO use AUR!
 echo 'Installing PSV package'
-wget https://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
+#wget https://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
 tar -xvf psv.tar.gz
-cd pySolo-Video-*/src
+cd /home/node/pySolo-Video/psvnode_server
 pip2 install -e .
 
 echo 'SUCESS, please reboot'
