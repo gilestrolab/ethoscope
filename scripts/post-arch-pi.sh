@@ -82,7 +82,7 @@ systemctl daemon-reload
 echo 'Enabling startuup deamons'
 
 systemctl disable systemd-networkd
-
+ip link set eth0 down
 # Enable networktime protocol
 systemctl start ntpd.service
 systemctl enable ntpd.service
@@ -93,6 +93,7 @@ systemctl start sshd.service
 #Fixme this does not work if the pi is not connected to a psv_wifi
 #netctl start psv_wifi
 netctl enable psv_wifi
+netctl start psv_wifi
 netctl enable eth0
 netctl start eth0
 
@@ -169,6 +170,44 @@ hostnamectl set-hostname $hostname
 
 mkdir -p $PSV_DATA_DIR
 chmod 777 $PSV_DATA_DIR -R
+
+
+
+#### set the ssd
+echo "o
+n
+p
+
+
++14G
+
+n
+p
+
+
+
+w
+" | fdisk /dev/sda
+
+mkfs.ext4 /dev/sda1
+mkfs.ext4 /dev/sda2
+mkdir -p $PSV_DATA_DIR
+chmod 744 $PSV_DATA_DIR -R
+mount /dev/sda2 $PSV_DATA_DIR
+cp /etc/fstab /etc/fstab-bak
+echo "/dev/sda1 /var ext4 defaults,rw,relatime,data=ordered 0 1" >> /etc/fstab
+echo "/dev/sda2 $PSV_DATA_DIR ext4 defaults,rw,relatime,data=ordered 0 1" >> /etc/fstab
+mkdir /mnt/var
+mount /dev/sda1 /mnt/var
+init 1
+cd /var
+cp -ax * /mnt/var
+cd /
+mv var var.old
+mkdir /var
+umount /dev/sda1
+mount /dev/sda1 /var
+
 
 systemctl enable mysqld.service
 systemctl start mysqld.service

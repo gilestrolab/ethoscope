@@ -165,6 +165,7 @@ p
 1
 
 
+
 w
 " | fdisk /dev/sda
 

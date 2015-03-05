@@ -128,6 +128,14 @@ if __name__ == '__main__':
     machine_id = get_machine_id()
 
 
+    INPUT_VIDEO = None
+    DURATION = None
+    DRAW_RESULTS =False
+    PSV_DIR = "/psv_data/results"
+    GIT_WORKING_DIR = '/home/psv/pySolo-Video'
+    BRANCH = 'psv-package'
+    RESTART_FILE = "./restart_production.sh"
+
     if debug:
         import getpass
         DURATION = 60*60 * 100
@@ -153,16 +161,6 @@ if __name__ == '__main__':
         else:
             raise Exception("where is your debugging video?")
         DRAW_RESULTS = True
-
-    else:
-        INPUT_VIDEO = None
-        DURATION = None
-        DRAW_RESULTS =False
-        # fixme => we should have mounted /dev/sda/ onto a custom location instead @luis @quentin
-        PSV_DIR = "/psv_data/results"
-        GIT_WORKING_DIR = '/home/psv/pySolo-Video'
-        BRANCH = 'psv-package'
-        RESTART_FILE = "./restart_production.sh"
 
 
     version = get_version(GIT_WORKING_DIR, BRANCH)
