@@ -54,6 +54,7 @@ echo 'Key=PSV_WIFI_pIAEZF2s@jmKH' >> /etc/netctl/psv_wifi
 # Uncomment this if your ssid is hidden
 #echo 'Hidden=yes'
 
+#
 #####################################################################################
 echo 'Description=eth0 Network' >> /etc/netctl/eth0
 echo 'Interface=eth0' >> /etc/netctl/eth0
