@@ -142,7 +142,8 @@ gpasswd -a $USER_NAME tty
 # The hostname is derived from the **machine-id**, located in /etc/machine-id
 
 device_id=$(cat /etc/machine-id)
-hostname=PI_$device_id
+#hostname=PI_$device_id
+hostname='node'
 echo "Hostname is $hostname"
 hostnamectl set-hostname $hostname
 
