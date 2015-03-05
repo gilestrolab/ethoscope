@@ -202,7 +202,7 @@ git clone node@192.169.123.1:/var/pySolo-Video.git /home/$USER_NAME/pySolo-Video
 # TODO use AUR!
 echo 'Installing PSV package'
 #wget https://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
-tar -xvf psv.tar.gz
+#tar -xvf psv.tar.gz
 cd /home/psv/pySolo-Video/src
 pip2 install .
 
