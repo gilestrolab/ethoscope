@@ -31,7 +31,7 @@ pacman -S ntp bash-completion --noconfirm --needed
 pacman -S raspberrypi-firmware{,-tools,-bootloader,-examples} --noconfirm --needed
 
 # preinstalling dependencies will save compiling time on python packages
-pacman -S python2-pip python2-numpy python2-bottle python2-pyserial --noconfirm --needed
+pacman -S python2-pip python2-numpy python2-bottle python2-pyserial mysql-python --noconfirm --needed
 
 # mariadb
 pacman -S mariadb --noconfirm --needed
@@ -39,6 +39,7 @@ pacman -S mariadb --noconfirm --needed
 #setup Wifi dongle
 #pacman -S netctl
 pacman -S wpa_supplicant --noconfirm --needed
+
 
 echo 'Description=psv wifi network' >> /etc/netctl/psv_wifi
 echo 'Interface=wlan0' >> /etc/netctl/psv_wifi
@@ -53,8 +54,13 @@ echo 'Key=PSV_WIFI_pIAEZF2s@jmKH' >> /etc/netctl/psv_wifi
 # Uncomment this if your ssid is hidden
 #echo 'Hidden=yes'
 
-
 ######################################################################################
+echo 'Description=eth0 Network' >> /etc/netctl/eth0
+echo 'Interface=eth0' >> /etc/netctl/eth0
+echo 'Connection=ethernet' >> /etc/netctl/eth0
+echo 'IP=dhcp' >> /etc/netctl/eth0
+######################################################################################
+
 
 #Updating ntp.conf
 
@@ -75,6 +81,8 @@ systemctl daemon-reload
 ######################################################################################
 echo 'Enabling startuup deamons'
 
+systemctl disable systemd-networkd
+
 # Enable networktime protocol
 systemctl start ntpd.service
 systemctl enable ntpd.service
@@ -85,6 +93,8 @@ systemctl start sshd.service
 #Fixme this does not work if the pi is not connected to a psv_wifi
 #netctl start psv_wifi
 netctl enable psv_wifi
+netctl enable eth0
+netctl start eth0
 
 #device service
 systemctl start device.service
