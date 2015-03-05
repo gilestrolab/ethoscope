@@ -66,6 +66,13 @@ echo 'restrict ::1' >> /etc/ntp.conf
 echo 'driftfile /var/lib/ntp/ntp.drift' >> /etc/ntp.conf
 
 ######################################################################################
+
+#Creating service for device_server.py
+
+cp ./device.service /etc/systemd/system/device.service
+
+systemctl daemon-reload
+######################################################################################
 echo 'Enabling startuup deamons'
 
 # Enable networktime protocol
@@ -75,11 +82,14 @@ systemctl enable ntpd.service
 systemctl enable sshd.service
 systemctl start sshd.service
 #setting up wifi
-netctl start psv_wifi
+#Fixme this does not work if the pi is not connected to a psv_wifi
+#netctl start psv_wifi
 netctl enable psv_wifi
 
+#device service
+systemctl start device.service
+systemctl enable device.service
 
-#TODO add ntpd configuration to use the node as sync server.
 
 
 #TODO s: locale/TIMEZONE/keyboard ...
@@ -89,17 +99,15 @@ netctl enable psv_wifi
 echo 'Creating default user'
 
 pass=$(perl -e 'print crypt($ARGV[0], "password")' $PASSWORD)
-useradd -m -g users -G wheel -s /bin/bash  -p $pass $USER_NAME
+useradd -m -g users -G wheel -s /bin/bash  -p $pass $USER_NAME || echo 'warning: user exists'
 
 echo 'exec startlxde' >> /home/$USER_NAME/.xinitrc
 chown $USER_NAME /home/$USER_NAME/.xinitrc
 
-
-
 # Setting passwordless ssh, this is the content of id_rsa (private Key on node).
 mkdir -p /home/$USER_NAME/.ssh
-TODO do not use a relative path.
-cp ../misc/id_rsa /home/$USER_NAME/.ssh/id_rsa
+#TODO do not use a relative path.
+cp ./ssh_keys/id_rsa /home/$USER_NAME/.ssh/id_rsa
 
 
 ############################################
@@ -184,16 +192,19 @@ cat /etc/mysql/my.cnf-bak | grep -v log-bin >  /etc/mysql/my.cnf
 
 ##########
 #Create a local working copy from the bare repo on node (192.168.123.1)
-git clone node@192.169.123.1:/var/pySolo-Video.git /home/$USER_NAME
+echo 'Cloning from Node'
+
+# FIXME this needs a node in the network to set up the psv
+git clone node@192.169.123.1:/var/pySolo-Video.git /home/$USER_NAME/pySolo-Video
 
 
 # our software.
 # TODO use AUR!
 echo 'Installing PSV package'
-wget https://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
-tar -xvf psv.tar.gz
-cd pySolo-Video-*/src
-pip2 install .
+#wget https://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
+#tar -xvf psv.tar.gz
+cd /home/psv/pySolo-Video/src
+pip2 install -e .
 
 
 echo 'SUCESS, please reboot'

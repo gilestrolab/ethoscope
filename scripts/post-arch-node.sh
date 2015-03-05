@@ -55,6 +55,15 @@ echo 'Key=PSV_WIFI_pIAEZF2s@jmKH' >> /etc/netctl/psv_wifi
 #echo 'Hidden=yes'
 
 ######################################################################################
+
+#Creating service for device_server.py
+
+cp ./node.service /etc/systemd/system/node.service
+
+systemctl daemon-reload
+######################################################################################
+
+######################################################################################
 echo 'Enabling startuup deamons'
 
 # Enable networktime protocol
@@ -64,11 +73,16 @@ systemctl enable ntpd.service
 systemctl enable sshd.service
 systemctl start sshd.service
 #setting up wifi
-netctl start psv_wifi
+# FIXME this not work if not psv-wifi
+#netctl start psv_wifi
 netctl enable psv_wifi
 
+#node service
+systemctl start node.service
+systemctl enable node.service
+
 # Setting passwordless ssh, this is the content of id_rsa.pub used in git updates.
-TODO do not use a relative path.
+#TODO do not use a relative path.
 mkdir -p /home/$USER_NAME/.ssh
 echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKXjWAfHrJ/HAPO3d4vu5s5+Xxw5NDKX1a8rqx3amo0WO7wWe0m2uv+rnJuH7xvWCKMOGlv9jgj1vSSNcuMT30tzioHqRf/k7scUXFPoWxvxTZtqXizZwKe93mfOvCC5Ni5zLtUyMqycnLPGP2K1Rf0Xvx/WLP94bcxXyTaGtftvTcAIC53Kll1XgyHSxsh1ou7rTXt57V0/1wnWqOGH1Y+AMqUkBEKjU2QUZyYoUaVSfwBwSpIi8tvH/Ng5aEH6BGs4cqDnXUBWpdDD6JdR5NxhqYK0lcpWltBlSz8RFvoOKpyQ/0vs5ysNPgX/N4eaHWhECRFD5oNkNXIUBRpe3/ psv@polygonaltree.com
 ' >> /home/$USER_NAME/.ssh/authorized_keys
@@ -81,7 +95,7 @@ echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKXjWAfHrJ/HAPO3d4vu5s5+Xxw5NDKX1a8r
 echo 'Creating default user'
 
 pass=$(perl -e 'print crypt($ARGV[0], "password")' $PASSWORD)
-useradd -m -g users -G wheel -s /bin/bash  -p $pass $USER_NAME
+useradd -m -g users -G wheel -s /bin/bash  -p $pass $USER_NAME || echo 'user exists'
 
 echo 'exec startlxde' >> /home/$USER_NAME/.xinitrc
 chown $USER_NAME /home/$USER_NAME/.xinitrc
@@ -128,7 +142,8 @@ gpasswd -a $USER_NAME tty
 # The hostname is derived from the **machine-id**, located in /etc/machine-id
 
 device_id=$(cat /etc/machine-id)
-hostname=PI_$device_id
+#hostname=PI_$device_id
+hostname='node'
 echo "Hostname is $hostname"
 hostnamectl set-hostname $hostname
 
@@ -139,14 +154,14 @@ chmod 777 $PSV_DATA_DIR -R
 #Create a Bare repository with only the production branch in node, it is on /var/
 git clone --bare -b psv-package --single-branch https://github.com/gilestrolab/pySolo-Video.git /var/pySolo-Video.git
 #Create a local working copy from the bare repo on node
-git clone /var/pySolo-Video.git /home/$USER_NAME/
+git clone /var/pySolo-Video.git /home/$USER_NAME/pySolo-Video
 
 # our software.
 # TODO use AUR!
 echo 'Installing PSV package'
-wget https://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
-tar -xvf psv.tar.gz
-cd pySolo-Video-*/src
+#wget hthttp://stackoverflow.com/questions/758819/python-mysqldb-connection-problemstps://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
+#tar -xvf psv.tar.gz
+cd /home/node/pySolo-Video/psvnode_server
 pip2 install -e .
 
 echo 'SUCESS, please reboot'
