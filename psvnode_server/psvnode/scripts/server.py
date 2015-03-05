@@ -257,6 +257,7 @@ def browse(folder):
 def update_systems():
     devices_to_update = request.json
     try:
+        restart_node = False
         for key, d in devices_to_update.iteritems():
             if d['name'] == 'Node':
                 #update node
