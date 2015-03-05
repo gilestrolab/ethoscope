@@ -416,7 +416,7 @@ if __name__ == '__main__':
     RESULTS_DIR = "/psv_results/"
     GIT_BARE_REPO_DIR = "/var/pySolo-Video.git"
     GIT_WORKING_DIR = "/home/node/pySolo-Video"
-    BRANCH = 'psv-dev-updates'
+    BRANCH = 'psv-package'
 
     if DEBUG:
         import getpass
@@ -430,6 +430,8 @@ if __name__ == '__main__':
             RESULTS_DIR = "/tmp/"
             GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
             GIT_WORKING_DIR = "/data1/todel/pySolo-video-node"
+            BRANCH = 'psv-dev'
+
         RESTART_FILE = "./restart.sh"
     else:
         SUBNET_DEVICE = b'wlan0'
