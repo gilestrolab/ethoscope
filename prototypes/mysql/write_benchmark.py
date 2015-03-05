@@ -64,7 +64,9 @@ if __name__ == "__main__":
             t0 = 0
             try:
                 t = 0
+                import cv2
                 while t < t_max:
+                    img = cv2.imread("/home/quentin/Desktop/Screenshot from 2015-02-14 14:21:13.png")
                     t += random.uniform(100,100 * 75)
                     rt = t
                     print "rt", rt/1000
@@ -74,7 +76,7 @@ if __name__ == "__main__":
                         data = rpg.make_one_point()
                         rw.write(rt , r, data)
 
-                    rw.flush(rt)
+                    rw.flush(rt, img=img)
 
                 print "OK"
 
