@@ -72,7 +72,7 @@ systemctl daemon-reload
 echo 'Enabling startuup deamons'
 
 systemctl disable systemd-networkd
-
+ip link set eth0 down
 # Enable networktime protocol
 systemctl start ntpd.service
 systemctl enable ntpd.service
@@ -84,6 +84,7 @@ systemctl start sshd.service
 netctl start psv_wifi || echo 'No psv_wifi connection'
 netctl enable psv_wifi
 netctl enable eth0
+netctl start eth0
 
 #node service
 systemctl start node.service
@@ -156,8 +157,34 @@ echo "Hostname is $hostname"
 hostnamectl set-hostname $hostname
 
 
+
+#### set the ssd
+echo "o
+n
+p
+1
+
+
+w
+" | fdisk /dev/sda
+
+mkfs.ext4 /dev/sda1
 mkdir -p $PSV_DATA_DIR
-chmod 777 $PSV_DATA_DIR -R
+chmod 744 $PSV_DATA_DIR -R
+mount /dev/sda1 $PSV_DATA_DIR
+cp /etc/fstab /etc/fstab-bak
+echo "/dev/sda1 $PSV_DATA_DIR ext4 defaults,rw,relatime,data=ordered 0 1" >> /etc/fstab
+
+
+
+
+
+
+
+
+
+
+
 
 #Create a Bare repository with only the production branch in node, it is on /var/
 git clone --bare -b psv-package --single-branch https://github.com/gilestrolab/pySolo-Video.git /var/pySolo-Video.git

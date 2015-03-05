@@ -1,5 +1,5 @@
 from bottle import *
-import shlex
+
 import urllib2
 import subprocess
 import socket
@@ -7,10 +7,9 @@ import json
 import multiprocessing
 import logging
 import traceback
-from pexpect.screen import screen
 from psvnode.utils.acquisition import Acquisition
 from psvnode.utils.helpers import get_version
-from netifaces import interfaces, ifaddresses, AF_INET
+from netifaces import ifaddresses, AF_INET
 from os import walk
 import optparse
 import zipfile
