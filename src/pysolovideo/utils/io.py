@@ -5,14 +5,14 @@ __author__ = 'quentin'
 # from pysolovideo.utils.debug import PSVException
 import time, datetime
 import traceback
-import os
 import logging
 from collections import OrderedDict
 import sqlite3
 import MySQLdb
 import multiprocessing
-
-
+import cv2
+import tempfile
+import os
 
 
 class AsyncMySQLWriter(multiprocessing.Process):
@@ -101,6 +101,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
                     c = db.cursor()
                     c.execute(msg)
                     db.commit()
+
                 except:
                     do_run=False
                     try:
@@ -123,7 +124,30 @@ class AsyncMySQLWriter(multiprocessing.Process):
             self._queue.close()
             db.close()
 
+class ImgToMySQLHelper(object):
+    _table_name = "IMG_SNAPSHOTS"
+    def __init__(self, period = 60.0):
+        self._period = period
+        self._last_tick = 0
+        self._tmp_file = tempfile.mktemp(prefix="psv_", suffix=".jpg")
+    def __del__(self):
+        try:
+            os.remove(self._tmp_file)
+        except:
+            logging.error("Could not remove temp file: %s" % self._tmp_file)
 
+
+    def flush(self, t, img):
+        tick = int(round((t/1000.0)/self._period))
+        if tick == self._last_tick:
+            return
+        cv2.imwrite(self._tmp_file, img)
+        bstring = open(self._tmp_file, "rb").read()
+        cmd = "INSERT INTO %s VALUES %s" % (self._table_name, str((0, int(t), bstring)))
+
+        self._last_tick = tick
+
+        return cmd
 
 class DAMFileHelper(object):
 
@@ -153,6 +177,7 @@ class DAMFileHelper(object):
         logging.info("Creating 'CSV_DAM_ACTIVITY' table")
         fields = ",".join(fields)
         return fields
+
     def _compute_distance_for_roi(self, roi, data):
         last_pos = self._last_positions[roi.idx]
         current_pos = data["x"] + 1j*data["y"]
@@ -160,7 +185,6 @@ class DAMFileHelper(object):
         if last_pos is None:
             self._last_positions[roi.idx] = current_pos
             return 0
-
 
         dist = abs(current_pos - last_pos)
         dist /= roi.longest_axis
@@ -191,8 +215,6 @@ class DAMFileHelper(object):
 
         command = '''INSERT INTO CSV_DAM_ACTIVITY VALUES %s''' % str(tuple(values))
         return command
-
-
 
 
     def flush(self,t):
@@ -232,9 +254,7 @@ class ResultWriter(object):
     # _flush_every_ns = 30 # flush every 10s of data
     _max_insert_string_len = 1000
 
-
-
-    def __init__(self, db_name, rois, metadata=None, make_dam_like_table=True, *args, **kwargs):
+    def __init__(self, db_name, rois, metadata=None, make_dam_like_table=True, take_frame_shots=False, *args, **kwargs):
         self._queue = multiprocessing.JoinableQueue()
         self._async_writer = AsyncMySQLWriter(db_name, self._queue)
         self._async_writer.start()
@@ -247,6 +267,11 @@ class ResultWriter(object):
             self._dam_file_helper = DAMFileHelper(n_rois=len(rois))
         else:
             self._dam_file_helper = None
+
+        if take_frame_shots:
+            self._shot_saver = ImgToMySQLHelper()
+        else:
+            self._shot_saver = None
 
         self._insert_dict = {}
         if self.metadata is None:
@@ -265,6 +290,9 @@ class ResultWriter(object):
 
         logging.info("Creating variable map table 'VAR_MAP'")
         self._create_table("VAR_MAP", "var_name CHAR(100), sql_type CHAR(100), functional_type CHAR(100)")
+
+        if self._shot_saver is not None:
+            self._create_table("IMG_SNAPSHOTS", "id INT  NOT NULL AUTO_INCREMENT PRIMARY KEY , t INT, img LONGBLOB")
 
 
         logging.info("Creating 'CSV_DAM_ACTIVITY' table")
@@ -297,10 +325,14 @@ class ResultWriter(object):
         if self._dam_file_helper is not None:
             self._dam_file_helper.input_roi_data(t, roi, data_row)
 
-    def flush(self, t):
+    def flush(self, t, img=None):
         if self._dam_file_helper is not None:
             out = self._dam_file_helper.flush(t)
             for c in out:
+                self._write_async_command(c)
+        if self._shot_saver is not None and img is not None:
+            c = self._shot_saver.flush(t,img)
+            if c is not None:
                 self._write_async_command(c)
 
         for k, v in self._insert_dict.iteritems():
@@ -350,13 +382,11 @@ class ResultWriter(object):
 
         logging.info("Closing mysql async queue")
         self._queue.put("DONE")
-        logging.info("Freeing queue")
-        logging.info("Joining thread")
-        time.sleep(.1)
-        self._queue.cancel_join_thread()
-        time.sleep(.1)
-        self._async_writer.join()
 
+        logging.info("Freeing queue")
+        self._queue.cancel_join_thread()
+        logging.info("Joining thread")
+        self._async_writer.join()
         logging.info("Joined OK")
 
     def close(self):

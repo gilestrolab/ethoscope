@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 ExecStart=/usr/bin/python2 /home/psv/pySolo-Video/src/scripts/device_server.py
-WorkingDirectory="/home/psv/pySolo-Video/src/scripts/"
+WorkingDirectory=/home/psv/pySolo-Video/src/scripts/
 
 [Install]
 WantedBy=multi-user.target

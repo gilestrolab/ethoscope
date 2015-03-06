@@ -309,8 +309,6 @@ class SleepDepROIBuilder(BaseROIBuilder):
         # pl.plot(np.diff(mm))
         # pl.show()
 
-
-
         # find continuous regions in vector:
         stop_start = []
         area_under_curves = []
@@ -562,10 +560,12 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
         if rad % 2 == 0:
             rad += 1
 
-
+        med = np.median(grey)
+        scale = 255/(med)
+        cv2.multiply(grey,scale,dst=grey)
         bin = np.copy(grey)
         score_map = np.zeros_like(bin)
-        for t in range(0, 255,1):
+        for t in range(0, 255,5):
             cv2.threshold(grey, t, 255,cv2.THRESH_BINARY_INV,bin)
 
 
@@ -580,7 +580,6 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
                 if score >0:
                     cv2.drawContours(bin,[c],0,score,-1)
             cv2.add(bin, score_map,score_map)
-
         return score_map
 
 
@@ -662,17 +661,6 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
         sorted_a = [sp for sp in src_points if not sp is sorted_b and not sp is sorted_c][0]
 
         sorted_src_pts = np.array([sorted_a, sorted_b, sorted_c], dtype=np.float32)
-        # sorted_src_pts += [
-        #     # IMPORTANT B and C are not touching the grove, so we add + one radius
-        #                     [-mean_diam/2.,-mean_diam/2 ],
-        #                     [-mean_diam/2.,mean_diam/2. + mean_diam/4],
-        #                     [mean_diam/2.,mean_diam/2. + mean_diam/4]
-        #                   ]
-
-        for sp in sorted_src_pts:
-            cv2.circle(img, tuple(sp),5, (0,255,255),-1)
-
-
 
         sorted_src_pts += [
                             [+mean_diam * .75 , +mean_diam * 1.],
@@ -680,34 +668,40 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
                             [-mean_diam* .75, -mean_diam* 1.]
                           ]
 
-        dst_points = np.array([(1,0),
-                               (1,1),
-                               (0,1)], dtype=np.float32)
+        dst_points = np.array([(0,-1),
+                               (0,0),
+                               (-1,0)], dtype=np.float32)
 
 
         wrap_mat = cv2.getAffineTransform(dst_points, sorted_src_pts)
 
-        origin = np.array((sorted_src_pts[2][0],sorted_src_pts[0][1]), dtype=np.float32)
+
+        origin = np.array((sorted_src_pts[1][0],sorted_src_pts[1][1]), dtype=np.float32)
 
         rois = []
         val = 1
         vertical_offset =  0.1/16.
+
+        # cv2.circle(img,tuple(ori),3,(255,255,0),-1)
+        # cv2.imshow("test", img)
+        # cv2.waitKey(-1)
+
         for left in (True,False):
             for i in range(16):
-                y = float(i)/16.0
+                y = -1 + float(i)/16.0
 
                 if left:
-                    x = 0.
+                    x = -1 + 0.
                 else:
-                    x = 0.5
+                    x = -1 + 0.5 + 1/100.
 
                 pt1 = np.array([x,y + vertical_offset,0], dtype=np.float32)
                 pt2 = np.array([x,y + 1./16. - vertical_offset,0], dtype=np.float32)
 
                 if left:
-                    x = 0.5
+                    x = -1 + 0.5 - 1/100.
                 else:
-                    x = 1.0
+                    x = -1 + 1.0
 
                 pt4 = np.array([x,y+ vertical_offset,0], dtype=np.float32)
                 pt3 = np.array([x,y + 1./16. - vertical_offset,0], dtype=np.float32)
@@ -727,7 +721,11 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
 
                 ct = np.array([pt1,pt2, pt3, pt4]).reshape((1,4,2))
                 rois.append(ROI(ct, value=val))
+                #
+                cv2.drawContours(img,[ct], -1, (255,0,0),3)
 
+                # cv2.imshow("test", img)
+                # cv2.waitKey(-1)
                 val += 1
 
         return rois

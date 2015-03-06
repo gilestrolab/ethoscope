@@ -40,11 +40,12 @@ class MySQLdbToSQlite(object):
 
 
         self._dst_path=dst_path
-        self._dst_dir = os.path.dirname(self._dst_path)
+        logging.info("Initializing local database static tables at %s" % self._dst_path)
 
-        logging.info("Initializing local database static tables at %s" % dst_path)
+        self._dam_file_name = os.path.splitext(self._dst_path)[0] + ".txt"
+
+
         # we remove file and create dir, if needed
-
         try:
             if overwrite:
                 logging.info("Trying to remove old database")
@@ -59,6 +60,10 @@ class MySQLdbToSQlite(object):
             logging.info("Success")
         except OSError as e:
             logging.warning(e)
+            pass
+
+        # just erase old file
+        with open(self._dam_file_name,"w") as f:
             pass
 
         with sqlite3.connect(self._dst_path, check_same_thread=False) as conn:
@@ -174,8 +179,7 @@ class MySQLdbToSQlite(object):
                 to_insert = []
 
             if dump_in_csv:
-                out_file = os.path.join(self._dst_dir, table_name + ".txt")
-                with open(out_file,"a") as f:
+                with open(self._dam_file_name,"a") as f:
                     row = "\t".join(["{0}".format(val) for val in sc])
                     f.write(row)
                     f.write("\n")

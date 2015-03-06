@@ -32,7 +32,7 @@ pacman -S ntp bash-completion --noconfirm --needed
 pacman -S raspberrypi-firmware{,-tools,-bootloader,-examples} --noconfirm --needed
 
 # preinstalling dependencies will save compiling time on python packages
-pacman -S python2-pip python2-numpy python2-bottle python2-pyserial --noconfirm --needed
+pacman -S python2-pip python2-numpy python2-bottle python2-pyserial mysql-python python2-netifaces --noconfirm --needed
 
 # mariadb
 pacman -S mariadb --noconfirm --needed
@@ -54,6 +54,12 @@ echo 'Key=PSV_WIFI_pIAEZF2s@jmKH' >> /etc/netctl/psv_wifi
 # Uncomment this if your ssid is hidden
 #echo 'Hidden=yes'
 
+#
+#####################################################################################
+echo 'Description=eth0 Network' >> /etc/netctl/eth0
+echo 'Interface=eth0' >> /etc/netctl/eth0
+echo 'Connection=ethernet' >> /etc/netctl/eth0
+echo 'IP=dhcp' >> /etc/netctl/eth0
 ######################################################################################
 
 #Creating service for device_server.py
@@ -66,6 +72,8 @@ systemctl daemon-reload
 ######################################################################################
 echo 'Enabling startuup deamons'
 
+systemctl disable systemd-networkd
+ip link set eth0 down
 # Enable networktime protocol
 systemctl start ntpd.service
 systemctl enable ntpd.service
@@ -74,8 +82,10 @@ systemctl enable sshd.service
 systemctl start sshd.service
 #setting up wifi
 # FIXME this not work if not psv-wifi
-#netctl start psv_wifi
+netctl start psv_wifi || echo 'No psv_wifi connection'
 netctl enable psv_wifi
+netctl enable eth0
+netctl start eth0
 
 #node service
 systemctl start node.service
@@ -148,8 +158,35 @@ echo "Hostname is $hostname"
 hostnamectl set-hostname $hostname
 
 
+
+#### set the ssd
+echo "o
+n
+p
+1
+
+
+
+w
+" | fdisk /dev/sda
+
+mkfs.ext4 /dev/sda1
 mkdir -p $PSV_DATA_DIR
-chmod 777 $PSV_DATA_DIR -R
+chmod 744 $PSV_DATA_DIR -R
+mount /dev/sda1 $PSV_DATA_DIR
+cp /etc/fstab /etc/fstab-bak
+echo "/dev/sda1 $PSV_DATA_DIR ext4 defaults,rw,relatime,data=ordered 0 1" >> /etc/fstab
+
+
+
+
+
+
+
+
+
+
+
 
 #Create a Bare repository with only the production branch in node, it is on /var/
 git clone --bare -b psv-package --single-branch https://github.com/gilestrolab/pySolo-Video.git /var/pySolo-Video.git

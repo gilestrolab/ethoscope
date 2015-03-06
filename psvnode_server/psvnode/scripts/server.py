@@ -1,5 +1,5 @@
 from bottle import *
-import shlex
+
 import urllib2
 import subprocess
 import socket
@@ -7,10 +7,10 @@ import json
 import multiprocessing
 import logging
 import traceback
-from pexpect.screen import screen
 from psvnode.utils.acquisition import Acquisition
 from psvnode.utils.helpers import get_version
-from netifaces import interfaces, ifaddresses, AF_INET
+from psvnode.utils.helpers import which
+from netifaces import ifaddresses, AF_INET
 from os import walk
 import optparse
 import zipfile
@@ -20,24 +20,7 @@ app = Bottle()
 STATIC_DIR = "../../static"
 
 
-def which(program):
-    # verbatim from
-    # http://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
-    def is_exe(fpath):
-        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
-    fpath, fname = os.path.split(program)
-    if fpath:
-        if is_exe(program):
-            return program
-    else:
-        for path in os.environ["PATH"].split(os.pathsep):
-            path = path.strip('"')
-            exe_file = os.path.join(path, program)
-            if is_exe(exe_file):
-                return exe_file
-
-    return None
 
 def scan_one_device(url, timeout=1, port=9000):
     """
@@ -258,6 +241,7 @@ def browse(folder):
 def update_systems():
     devices_to_update = request.json
     try:
+        restart_node = False
         for key, d in devices_to_update.iteritems():
             if d['name'] == 'Node':
                 #update node
@@ -416,7 +400,7 @@ if __name__ == '__main__':
     RESULTS_DIR = "/psv_results/"
     GIT_BARE_REPO_DIR = "/var/pySolo-Video.git"
     GIT_WORKING_DIR = "/home/node/pySolo-Video"
-    BRANCH = 'psv-dev-updates'
+    BRANCH = 'psv-package'
 
     if DEBUG:
         import getpass
@@ -430,6 +414,8 @@ if __name__ == '__main__':
             RESULTS_DIR = "/tmp/"
             GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
             GIT_WORKING_DIR = "/data1/todel/pySolo-video-node"
+            BRANCH = 'psv-dev'
+
         RESTART_FILE = "./restart.sh"
     else:
         SUBNET_DEVICE = b'wlan0'
