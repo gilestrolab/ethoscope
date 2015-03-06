@@ -1,6 +1,6 @@
 (function(){
     var app = angular.module('flyApp');
-app.controller('smController', function($scope, $http, $routeParams, $interval, $timeout)  {
+app.controller('smController', function($scope, $http, $routeParams, $interval, $timeout, $location)  {
         device_id = $routeParams.device_id;
         var device_ip;
         $scope.sm = {};
@@ -54,6 +54,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
         $scope.sm.poweroff = function(){
                 $http.post('/device/'+device_id+'/controls/poweroff', data={})
                      .success(function(data){
+                        $location.path( "/" );
                 })
         };
 

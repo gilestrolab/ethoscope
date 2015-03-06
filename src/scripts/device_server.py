@@ -51,9 +51,10 @@ def controls(id, action):
                     return info(id)
 
                 elif action == 'stop' or action == 'poweroff':
-                    control.stop()
-                    control.join()
-                    logging.info("Stopping monitor")
+                    if control.info['status'] == 'running':
+                        control.stop()
+                        control.join()
+                        logging.info("Stopping monitor")
 
                     if action == 'poweroff':
                         logging.info("Stopping monitor due to poweroff request")
