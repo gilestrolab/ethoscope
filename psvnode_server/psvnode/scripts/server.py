@@ -297,7 +297,7 @@ def check_update():
         #check version
         origin_version = get_version(GIT_BARE_REPO_DIR, BRANCH)
         node_version = get_version(GIT_WORKING_DIR, BRANCH)
-
+        origin = {'version':origin_version, 'name':'Origin'}
         if node_version != origin_version:
             update['node'] = {'version':node_version, 'name':'Node', 'id':'Node'}
 
@@ -307,8 +307,7 @@ def check_update():
             if d['version'] != origin_version:
                 update[d['id']] = d
 
-        return update
-
+        return {'devices_to_update':update, 'origin':origin}
     except Exception as e:
         return {'error':traceback.format_exc(e)}
 
