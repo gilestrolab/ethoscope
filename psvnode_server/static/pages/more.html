@@ -74,7 +74,8 @@
     <div ng-if="(update_need_update == true) && (!(devices_to_update.hasOwnProperty('error')))">
         <h2>The following devices will be updated.</h2>
         <button class="btn btn-success" ng-click="update_selected(devices_to_update)">Update All</button>
-        <button class="btn btn-default" ng-click="update_selected(devices_to_update_selected)">Update All</button>
+        <button class="btn btn-default" ng-click="update_selected(devices_to_update_selected)">Update Selected</button>
+        <p>Upstream version: {{origin.version}}</p>
         <table class="table table-striped">
             <thead>
             <th>Name</th>
@@ -87,12 +88,10 @@
                 <td>
                     <span class="fa fa-circle-o"></span><span> {{device.name}}</span>
                 </td>
-                <td>{{device.status}}</td>
+                <td>N/A</td>
                 <td>{{device.version}}</td>
 
                 <td><input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="device"></td>
-                <td>{{device.status}}</td>
-                <td>{{device.version}}</td>
                 </tr>
 
             </tbody>
@@ -102,6 +101,8 @@
                     <span class="fa fa-circle-o"></span><span> {{device.name}}</span>
                     </a>
                 </td>
+                <td>{{device.status}}</td>
+                <td>{{device.version}}</td>
                 <td><input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="device"></td>
 
             </tbody>

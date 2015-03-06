@@ -75,16 +75,22 @@
             //check if there is a new version
             $http.get("/update/check")
                  .success(function(res){
-                    if (Object.keys(res).length == 0){
+                    if(res.error){
+                        $scope.devices_to_update = {}
+                        $scope.devices_to_update.error = res.error;
+                    }
+                    if (Object.keys(res.devices_to_update).length == 0){
                         $scope.update_text = "All connected devices and the Node are up to update. Well Done!";
                         $scope.update_need_update = false;
+                        $scope.origin = res.origin;
                         $scope.devices_to_update={};
 
                     }else{
                         $scope.update_text = "There is a new version and some devices need to be updated";
                         $scope.update_need_update = true;
-                        $scope.devices_to_update=res;
-                        for (dev in res){
+                        $scope.devices_to_update=res.devices_to_update;
+                        $scope.origin = res.origin;
+                        for (dev in res.devices_to_update){
                             if (dev.status != 'stopped'){
                                 $scope.started == true;
                                 break;
