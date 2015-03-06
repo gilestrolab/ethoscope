@@ -192,19 +192,19 @@ def device(id, type_of_req):
         elif type_of_req == 'stop':
 
             if device_info['status'] == 'running':
-                stop_device(device_info,post_data)
+                stop_device(id,post_data)
             else:
                 raise Exception("Cannot stop, device %s status is `%s`" %  (id, device_info['status']))
         elif type_of_req == 'poweroff':
             if device_info['status'] == 'running':
-                stop_device(device_info,post_data)
+                stop_device(id,post_data)
             update_device_map(id, "controls", type_of_req, data=post_data)
 
     except Exception as e:
         logging.error(traceback.format_exc(e))
         return {'error':traceback.format_exc(e)}
 
-def stop_device(device_info, post_data):
+def stop_device(id, post_data):
     update_device_map(id, "controls", 'stop', data=post_data)
     acquisition[id].stop()
     logging.info("Joining process")
