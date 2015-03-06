@@ -78,6 +78,8 @@
         <table class="table table-striped">
             <thead>
             <th>Name</th>
+            <th>Status</th>
+            <th>Software version</th>
             <th>Select </th>
             </thead>
             <tbody ng-repeat="device in devices_to_update" ng-if="device.name == 'Node'" >
@@ -85,8 +87,14 @@
                 <td>
                     <span class="fa fa-circle-o"></span><span> {{device.name}}</span>
                 </td>
+                <td>{{device.status}}</td>
+                <td>{{device.version}}</td>
+
                 <td><input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="device"></td>
-                    </tr>
+                <td>{{device.status}}</td>
+                <td>{{device.version}}</td>
+                </tr>
+
             </tbody>
             <tbody ng-repeat="device in devices_to_update" ng-if="device.status == 'stopped'">
                  <td>
@@ -95,6 +103,7 @@
                     </a>
                 </td>
                 <td><input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="device"></td>
+
             </tbody>
         </table>
 
@@ -104,7 +113,8 @@
             <table class="table table-striped">
             <thead>
             <th>Name</th>
-            <th>Select </th>
+            <th>Status</th>
+            <th>Software version</th>
             </thead>
             <tbody ng-repeat="device in devices_to_update" ng-if="device.status != 'stopped' && device.name != 'Node'">
                  <td>
@@ -112,6 +122,9 @@
                     <span class="fa fa-circle-o"></span><span>{{device.name}}</span>
                     </a>
                 </td>
+                <td>{{device.status}}</td>
+                <td>{{device.version}}</td>
+
 
             </tbody>
         </table>
