@@ -2,7 +2,7 @@ import time
 import datetime
 import logging
 import os
-from threading import Thread
+from psvnode.utils.helpers import which
 import multiprocessing
 import ctypes
 from mysql_backup import MySQLdbToSQlite, DBNotReadyError
@@ -69,9 +69,23 @@ class Acquisition(multiprocessing.Process):
         super(Acquisition, self).__init__()
 
     def _update_device_info(self, what="data", port=9000):
+
+
         try:
             ip = self._device_info["ip"]
             id = self._device_info["id"]
+
+            try:
+                if not which("fping"):
+                    raise Exception("fping not available")
+                ping = os.system(" fping %s -t 50  > /dev/null 2>&1 " % os.path.basename(ip))
+            except Exception as f:
+                ping = 0
+                logging.error("Could not ping. Assuming 'alive'")
+                logging.error(traceback.format_exc(f))
+
+            if ping != 0:
+                raise Exception("Target device '%s' is not responding to ping" % ip)
 
             request_url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
             req = urllib2.Request(url=request_url, headers={'Content-Type': 'application/json'})
@@ -81,6 +95,7 @@ class Acquisition(multiprocessing.Process):
             if message:
                 data = json.loads(message)
                 self._device_info.update(data)
+
         except Exception as e:
             logging.error(traceback.format_exc(e))
 
@@ -128,6 +143,7 @@ class Acquisition(multiprocessing.Process):
 
         finally:
             try:
+                print "has_been_running_once", has_been_running_once
                 if not has_been_running_once:
                     logging.info("Device was not running; not trying last backup")
                     return
@@ -150,7 +166,7 @@ class Acquisition(multiprocessing.Process):
                     mirror.update_roi_tables()
                     logging.info("Success")
                     return
-                raise Exception("Last backup timed out. Device did not stop.")
+                raise Exception("Last backup timed out. Device did not stop, or could not reach device.")
 
             except Exception as f:
                 logging.error(traceback.format_exc(f))
