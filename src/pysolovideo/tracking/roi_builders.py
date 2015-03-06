@@ -106,7 +106,7 @@ class BaseROIBuilder(object):
         else:
             for i, (_, frame) in enumerate(camera):
                 accum.append(frame)
-                if i  >= 10:
+                if i  >= 5:
                     break
 
             accum = np.median(np.array(accum),0).astype(np.uint8)
