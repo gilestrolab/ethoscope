@@ -71,11 +71,11 @@
         <p>Error details: {{devices_to_update.error}}</p>
     </div>
     <h1 ng-if="!devices_to_update.error">{{update_text}}</h1>
+    <h3>Upstream version: {{origin.version}}</h3>
     <div ng-if="(update_need_update == true) && (!(devices_to_update.hasOwnProperty('error')))">
         <h2>The following devices will be updated.</h2>
         <button class="btn btn-success" ng-click="update_selected(devices_to_update)">Update All</button>
         <button class="btn btn-default" ng-click="update_selected(devices_to_update_selected)">Update Selected</button>
-        <p>Upstream version: {{origin.version}}</p>
         <table class="table table-striped">
             <thead>
             <th>Name</th>
