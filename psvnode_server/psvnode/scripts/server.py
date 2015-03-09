@@ -408,7 +408,7 @@ if __name__ == '__main__':
         if getpass.getuser() == "quentin":
             SUBNET_DEVICE = b'enp3s0'
             # SUBNET_DEVICE = b'eno1'
-            GIT_BARE_REPO_DIR = GIT_WORKING_DIR  = "./"
+            GIT_BARE_REPO_DIR = GIT_WORKING_DIR = "./"
 
         if getpass.getuser() == "asterix":
             SUBNET_DEVICE = b'lo'
@@ -421,9 +421,6 @@ if __name__ == '__main__':
     else:
         SUBNET_DEVICE = b'wlan0'
         RESTART_FILE = "./restart_production.sh"
-
-
-
 
     global devices_map
     devices_map = {}
@@ -445,7 +442,9 @@ if __name__ == '__main__':
             acquisition[k].start()
     try:
 
-        run(app, host='0.0.0.0', port=PORT, debug=debug, server='cherrypy')
+        #run(app, host='0.0.0.0', port=PORT, debug=debug, server='cherrypy')
+        run(app, host='0.0.0.0', port=PORT, debug=debug)
+
 
     except KeyboardInterrupt:
         logging.info("Stopping server cleanly")

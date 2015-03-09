@@ -14,6 +14,7 @@
         <button class="btn btn-danger">Delete</button>
         <button ng-if="selected_all == false" class="right btn btn-info" ng-click="browse.toggleAll()">Select All</button>
         <button ng-if="selected_all == true" class="right btn btn-warning" ng-click="browse.toggleAll()">Deselect All</button>
+        <button ng-if="node.version != origin.version" class="btn btn-primary">Update Node</button>
     </div>
     <div id="controls" class="">
         <a href="" ng-click="browse(prev_dir)"><span class="fa fa-chevron-left"></span> Back</a>
@@ -89,7 +90,7 @@
                     </a>
                 </td>
                 <td>{{node.status}} / {{}}
-                    <span ng-if="d.version != origin.version">Outdated</span>                         <span ng-if="d.version == origin.version">Up to date</span>
+                    <span ng-if="node.version != origin.version">Outdated</span>                     <span ng-if="node.version == origin.version">Up to date</span>
                 </td>
                 <td>{{node.version}}</td>
                 <td>
@@ -122,4 +123,22 @@
         </div>
     </div>
 
+</div>
+<!-- Modal download -->
+<div class="modal fade" id="updateNodeModal" tabindex="-1" role="dialog" aria-labelledby="updateNodeModal" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Update of Node</h4>
+      </div>
+      <div class="modal-body">
+       <h4>Connection with Node will be lost during restart. Updating the node can take some minutes if there is started devices.</h4>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <button ng-click="update_selected(node)" target="_blank" type="button" class="btn btn-primary">Update Node</button>
+      </div>
+    </div>
+  </div>
 </div>

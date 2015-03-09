@@ -7,7 +7,7 @@
         <div  id="loading_devices" class="spinner"></div>
 
     </div>
-<a ng-repeat="device in devices" href="{{device.type}}/{{device.id}}" ng-if="device.type == req_device_type" class="option">
+<a ng-repeat="device in devices" href="{{device.type}}/{{device.id}}" ng-if="device.type == req_device_type" class="device-list">
         <div class="col-lg-4 alert alert-info" >
             <h3 ng-if="device.type == 'sm'">Sleep Monitor</h3>
             <h3 ng-if="device.type == 'sd'">Sleep Deprivator</h3>

@@ -36,11 +36,17 @@
                 templateUrl : '/static/pages/sd.html',
                 controller  : 'sdController'
             })
-        // route for the sleep depriver page
+            // route for the management page
             .when('/more', {
                 templateUrl : '/static/pages/more.html',
                 controller  : 'moreController as ctrl',
-            });
+            })
+            // route for the help page
+            /*.when('/help', {
+                templateUrl : '/static/pages/help.html',
+                controller  : 'helpController'
+            })*/
+        ;
         // use the HTML5 History API
         $locationProvider.html5Mode(true);
     });
@@ -51,6 +57,10 @@
             $scope.devices = data;
 
         })
+       var t= new Date();
+        $scope.time =t.toUTCString();
+        $scope.localtime =t.toString();
+
         //Scan for SM or SD connected.
         $scope.get_devices = function(){
             var spinner= new Spinner(opts).spin();

@@ -12,7 +12,7 @@
                            icon:"fa fa-refresh",
                            color:"alert alert-warning",
                            opt:"update",
-                          }
+                          },
                          ];
         $scope.exec_option = function(opt){
             switch(opt){
