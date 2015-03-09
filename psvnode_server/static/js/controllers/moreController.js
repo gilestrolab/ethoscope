@@ -25,10 +25,11 @@
                     $scope.check_update();
 
             };
-        }
+        };
 
 // Browse - Functions
-        $scope.browse=function(folder="/null"){
+        $scope.browse=function(folder){
+            folder = folder || "/null"
             var prev_folder= folder.split("/");
             prev_folder.pop();
             $scope.prev_dir = prev_folder.join('/');
