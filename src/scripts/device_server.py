@@ -153,7 +153,7 @@ if __name__ == '__main__':
             PSV_DIR = "/tmp/psv_data"
             INPUT_VIDEO = '/data1/monitor_new_targets_short.avi'
             GIT_WORKING_DIR = "/data1/todel/pySolo-video-device"
-            BRANCH = 'psv-dev-updates'
+            BRANCH = 'psv-dev'
         elif getpass.getuser() == "psv" or getpass.getuser() == "root":
             INPUT_VIDEO = "/data/monitor_new_targets_short.avi"
             PSV_DIR = "/psv_data/results"
@@ -171,8 +171,9 @@ if __name__ == '__main__':
                             psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
 
     try:
-        run(api, host='0.0.0.0', port=port, debug=debug)
+        run(api, host='0.0.0.0', port=port, debug=debug, server='cherrypy')
     except Exception as e:
+        print e
         logging.error(e)
     finally:
         close()

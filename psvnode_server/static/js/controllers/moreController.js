@@ -76,21 +76,21 @@
             $http.get("/update/check")
                  .success(function(res){
                     if(res.error){
-                        $scope.devices_to_update = {}
-                        $scope.devices_to_update.error = res.error;
+                        $scope.attached_devices = {}
+                        $scope.attached_devices.error = res.error;
                     }
-                    if (Object.keys(res.devices_to_update).length == 0){
+                    if (Object.keys(res.attached_devices).length == 0){
                         $scope.update_text = "All connected devices and the Node are up to update. Well Done!";
                         $scope.update_need_update = false;
                         $scope.origin = res.origin;
-                        $scope.devices_to_update={};
+                        $scope.attached_devices={};
 
                     }else{
                         $scope.update_text = "There is a new version and some devices need to be updated";
                         $scope.update_need_update = true;
-                        $scope.devices_to_update=res.devices_to_update;
+                        $scope.attached_devices=res.attached_devices;
                         $scope.origin = res.origin;
-                        for (dev in res.devices_to_update){
+                        for (dev in res.attached_devices){
                             if (dev.status != 'stopped'){
                                 $scope.started == true;
                                 break;

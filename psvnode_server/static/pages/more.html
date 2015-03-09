@@ -70,10 +70,10 @@
         <h3 >Error on check the update. Have your node internet connection?</h3>
         <p>Error details: {{devices_to_update.error}}</p>
     </div>
-    <h1 ng-if="!devices_to_update.error">{{update_text}}</h1>
+    <!--<h1 ng-if="!devices_to_update.error">{{update_text}}</h1>-->
     <h3>Upstream version: {{origin.version}}</h3>
     <div ng-if="(update_need_update == true) && (!(devices_to_update.hasOwnProperty('error')))">
-        <h2>The following devices will be updated.</h2>
+        <!--<h2>The following devices will be updated.</h2>-->
         <button class="btn btn-success" ng-click="update_selected(devices_to_update)">Update All</button>
         <button class="btn btn-default" ng-click="update_selected(devices_to_update_selected)">Update Selected</button>
         <table class="table table-striped">
@@ -83,48 +83,31 @@
             <th>Software version</th>
             <th>Select </th>
             </thead>
-            <tbody ng-repeat="device in devices_to_update" ng-if="device.name == 'Node'" >
-                <tr class="warning">
-                <td>
-                    <span class="fa fa-circle-o"></span><span> {{device.name}}</span>
-                </td>
-                <td>N/A</td>
-                <td>{{device.version}}</td>
+            <tbody ng-repeat="(k, d) in attached_devices" >
 
-                <td><input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="device"></td>
-                </tr>
 
-            </tbody>
-            <tbody ng-repeat="device in devices_to_update" ng-if="device.status == 'stopped'">
+                <tr class="danger" ng-if="d.version != origin.version && d.status != 'stopped'">
+                <tr class="warning" ng-if="d.version != origin.version && d.status == 'stopped'">
+                <tr class="success" ng-if="d.version == origin.version">
+
                  <td>
-                    <a href="#/sm/{{device.id}}" target=_blank>
-                    <span class="fa fa-circle-o"></span><span> {{device.name}}</span>
+                    <a href="#/sm/{{d.id}}" target=_blank ng-if="d.name != 'Node'">
+                    <span class="fa fa-circle-o"></span><span> {{d.name}}</span>
+                    </a>
+                     <a href="" ng-if="d.name == 'Node'">
+                     <span class="fa fa-circle-o"></span><span> {{d.name}}</span>
                     </a>
                 </td>
-                <td>{{device.status}}</td>
-                <td>{{device.version}}</td>
-                <td><input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="device"></td>
-
+                <td>{{d.status}} / {{}}
+                    <span ng-if="d.version != origin.version">Outdated</span>                         <span ng-if="d.version == origin.version">Up to date</span>
+                </td>
+                <td>{{d.version}}</td>
+                <td>
+                    <input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="device" ng-if="d.version != origin.version && d.status != 'stopped'">
+                    </td>
+            </tr>
             </tbody>
         </table>
-
-        <div class="alert alert-danger" ng-if="started==true">
-        <h2>This devices will not be updated</h2>
-            <p> They are connected but started. If you want to update them you need to stop the adquisition.</p>
-            <table class="table table-striped">
-            <thead>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Software version</th>
-            </thead>
-            <tbody ng-repeat="device in devices_to_update" ng-if="device.status != 'stopped' && device.name != 'Node'">
-                 <td>
-                    <a href="#/sm/{{device.id}}" target=_blank>
-                    <span class="fa fa-circle-o"></span><span>{{device.name}}</span>
-                    </a>
-                </td>
-                <td>{{device.status}}</td>
-                <td>{{device.version}}</td>
 
 
             </tbody>

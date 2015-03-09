@@ -306,18 +306,18 @@ def check_update():
         origin_version = get_version(GIT_BARE_REPO_DIR, BRANCH)
         node_version = get_version(GIT_WORKING_DIR, BRANCH)
         origin = {'version':origin_version, 'name':'Origin'}
-        if node_version != origin_version:
-            update['node'] = {'version':node_version, 'name':'Node', 'id':'Node'}
-
-        #check connected devices
         devices_map = scan_subnet()
-        for key, d in devices_map.iteritems():
-            if d['version'] != origin_version:
-                update[d['id']] = d
+        devices_map.update({'node':{'version':node_version, 'status':'ON','name':'Node', 'id':'Node'}})
+        #check connected devices
+        #for key, d in devices_map.iteritems():
+        #    if d['version'] != origin_version:
+        #        update[d['id']] = d
+        print devices_map
 
-        return {'devices_to_update':update, 'origin':origin}
+        return {'update':update, 'attached_devices':devices_map,'origin':origin}
     except Exception as e:
-        return {'error':traceback.format_exc(e)}
+        print traceback.format_exc(e)
+        return {'update':{'error':traceback.format_exc(e)}}
 
 @app.post('/request_download/<what>')
 def download(what):
@@ -451,7 +451,7 @@ if __name__ == '__main__':
             acquisition[k].start()
     try:
 
-        run(app, host='0.0.0.0', port=PORT, debug=DEBUG)
+        run(app, host='0.0.0.0', port=PORT, debug=debug, server='cherrypy')
 
     except KeyboardInterrupt:
         logging.info("Stopping server cleanly")

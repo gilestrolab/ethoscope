@@ -32,7 +32,7 @@ pacman -S ntp bash-completion --noconfirm --needed
 pacman -S raspberrypi-firmware{,-tools,-bootloader,-examples} --noconfirm --needed
 
 # preinstalling dependencies will save compiling time on python packages
-pacman -S python2-pip python2-numpy python2-bottle python2-pyserial mysql-python python2-netifaces --noconfirm --needed
+pacman -S python2-pip python2-numpy python2-bottle python2-pyserial mysql-python python2-netifaces python2-cherrypy --noconfirm --needed
 
 # mariadb
 pacman -S mariadb --noconfirm --needed
