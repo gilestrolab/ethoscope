@@ -99,6 +99,7 @@ def update_device_map(id, what="data",type=None, port=9000, data=None):
             scan_subnet()
         try:
             devices_map[id].update(data)
+            return data
 
         except KeyError:
             logging.error("Device %s is not detected" % id)
@@ -141,6 +142,7 @@ def scan_subnet():
     urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(2,254)]
     pool = multiprocessing.Pool(len(urls_to_scan))
     devices_id_url_list = pool.map(scan_one_device, urls_to_scan)
+    pool.terminate()
 
     global devices_map
     devices_map = {}
@@ -149,9 +151,16 @@ def scan_subnet():
             continue
         devices_map[id] = {"ip":ip}
 
-    map(update_device_map, devices_map.keys())
 
+    pool = multiprocessing.Pool(len(devices_map))
+    # we update device map manually as it is a global variable and won't exist in another process
+    device_data = pool.map(update_device_map, devices_map.keys())
     pool.terminate()
+    for k,d in zip(devices_map.keys(), device_data):
+        devices_map[k].update(d)
+
+
+
     logging.info("%i devices found:" % len(devices_map))
 
     for k,v in devices_map.items():
@@ -253,9 +262,10 @@ def update_systems():
         for key, d in devices_to_update.iteritems():
             if d['name'] == 'Node':
                 #update node
-                node_update = subprocess.Popen(['git','pull'],cwd=GIT_WORKING_DIR,
-                                                  stdout=subprocess.PIPE,
-                                                  stderr=subprocess.PIPE)
+                node_update = subprocess.Popen(['git', 'pull', "origin", BRANCH],
+                                                cwd=GIT_WORKING_DIR,
+                                                stdout=subprocess.PIPE,
+                                                stderr=subprocess.PIPE)
                 response_from_fetch, error_from_fetch = node_update.communicate()
                 if response_from_fetch != '':
                     logging.info(response_from_fetch)
@@ -406,8 +416,8 @@ if __name__ == '__main__':
     if DEBUG:
         import getpass
         if getpass.getuser() == "quentin":
-            SUBNET_DEVICE = b'enp3s0'
-            # SUBNET_DEVICE = b'eno1'
+            # SUBNET_DEVICE = b'enp3s0'
+            SUBNET_DEVICE = b'eno1'
             GIT_BARE_REPO_DIR = GIT_WORKING_DIR = "./"
 
         if getpass.getuser() == "asterix":
