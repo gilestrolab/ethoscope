@@ -15,7 +15,7 @@ from os import walk
 import optparse
 import zipfile
 import datetime
-
+import fnmatch
 app = Bottle()
 STATIC_DIR = "../../static"
 
@@ -221,6 +221,32 @@ def node_status():
     return {'is_updated': is_updated}
 
 #Browse, delete and download files from node
+
+@app.get('/result_files/<type>')
+def result_file(type):
+    """
+    :param type:'all', 'db' or 'txt'
+    :return: a dict with a single key: "files" which maps a list of matching result files (absolute path)
+    """
+
+    try:
+        type="txt"
+        if type == "all":
+            pattern =  '*'
+        else:
+            pattern =  '*.'+type
+
+        matches = []
+        for root, dirnames, filenames in os.walk(RESULTS_DIR):
+            for f in fnmatch.filter(filenames, pattern):
+                matches.append(os.path.join(root, f))
+            return {"files":matches}
+
+    except Exception as e:
+        logging.error(traceback.format_exc(e))
+        return {'error':traceback.format_exc(e)}
+
+
 @app.get('/browse/<folder:path>')
 def browse(folder):
     try:
