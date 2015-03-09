@@ -83,6 +83,7 @@
                         $scope.update_text = "All connected devices and the Node are up to update. Well Done!";
                         $scope.update_need_update = false;
                         $scope.origin = res.origin;
+                        $scope.node = res.update.node;
                         $scope.attached_devices={};
 
                     }else{
@@ -90,6 +91,7 @@
                         $scope.update_need_update = true;
                         $scope.attached_devices=res.attached_devices;
                         $scope.origin = res.origin;
+                        $scope.node = res.update.node;
                         for (dev in res.attached_devices){
                             if (dev.status != 'stopped'){
                                 $scope.started == true;

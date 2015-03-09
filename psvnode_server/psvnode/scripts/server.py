@@ -307,13 +307,7 @@ def check_update():
         node_version = get_version(GIT_WORKING_DIR, BRANCH)
         origin = {'version':origin_version, 'name':'Origin'}
         devices_map = scan_subnet()
-        devices_map.update({'node':{'version':node_version, 'status':'ON','name':'Node', 'id':'Node'}})
-        #check connected devices
-        #for key, d in devices_map.iteritems():
-        #    if d['version'] != origin_version:
-        #        update[d['id']] = d
-        print devices_map
-
+        update.update({'node':{'version':node_version, 'status':'ON','name':'Node', 'id':'Node'}})
         return {'update':update, 'attached_devices':devices_map,'origin':origin}
     except Exception as e:
         print traceback.format_exc(e)
