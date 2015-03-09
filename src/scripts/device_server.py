@@ -153,7 +153,7 @@ if __name__ == '__main__':
             PSV_DIR = "/tmp/psv_data"
             INPUT_VIDEO = '/data1/monitor_new_targets_short.avi'
             GIT_WORKING_DIR = "/data1/todel/pySolo-video-device"
-            BRANCH = 'psv-dev'
+            BRANCH = 'psv-package'
         elif getpass.getuser() == "psv" or getpass.getuser() == "root":
             INPUT_VIDEO = "/data/monitor_new_targets_short.avi"
             PSV_DIR = "/psv_data/results"

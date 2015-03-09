@@ -425,7 +425,7 @@ if __name__ == '__main__':
             RESULTS_DIR = "/tmp/"
             GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
             GIT_WORKING_DIR = "/data1/todel/pySolo-video-node"
-            BRANCH = 'psv-dev'
+            BRANCH = 'psv-package'
 
         RESTART_FILE = "./restart.sh"
     else:
