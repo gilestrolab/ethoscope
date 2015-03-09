@@ -52,15 +52,22 @@
     });
 
     // create the controller and inject Angular's $scope
-    app.controller('mainController', function($scope, $http) {
+    app.controller('mainController', function($scope, $http, $interval) {
         $http.get('/devices_list').success(function(data){
             $scope.devices = data;
 
         })
-       var t= new Date();
-        $scope.time =t.toUTCString();
-        $scope.localtime =t.toString();
-
+        var get_date = function(){
+            var t= new Date();
+            $scope.time =t.toUTCString();
+            $scope.localtime =t.toString();
+        }
+        get_date();
+         refresh_time = $interval(get_date, 60000);
+        //clear interval when scope is destroyed
+        $scope.$on("$destroy", function(){
+            $interval.cancel(refresh_data);
+        });
         //Scan for SM or SD connected.
         $scope.get_devices = function(){
             var spinner= new Spinner(opts).spin();
