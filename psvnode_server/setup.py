@@ -23,6 +23,7 @@ setup(
     install_requires=[
         "bottle>=0.12.8",
         "MySQL-python >= 1.2.5",
-        "netifaces >= 0.10.4"
+        "netifaces >= 0.10.4",
+        "cherrypy >= 3.6.0"
     ],
 )

@@ -31,5 +31,6 @@ setup(
         "pyserial>=2.7",
         "bottle>=0.12.8",
         "MySQL-python >= 1.2.5",
+        "cherrypy >= 3.6.0"
     ],
 )

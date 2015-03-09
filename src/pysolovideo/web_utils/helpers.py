@@ -11,6 +11,7 @@ def get_machine_id():
     f.close()
     return pi_id
 
+
 def get_version(dir, branch):
     version = subprocess.Popen(['git', 'rev-parse', branch] ,
                                    cwd=dir,
