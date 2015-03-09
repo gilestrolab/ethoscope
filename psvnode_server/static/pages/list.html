@@ -14,10 +14,10 @@
              <!--<div><span class="fa fa-paw"></span> ID: {{device.machine_id}}</div>-->
             <div><span class="fa fa-genderless"></span> Name: {{device.name}}</div>
             <div><span ng-if="device.status == 'running'" class="fa fa-circle color-green"></span>
-            <span ng-if="device.status == 'stopped'" class="fa fa-circle color-red"></span> Version: {{device.status}}
+            <span ng-if="device.status == 'stopped'" class="fa fa-circle color-red"></span> Status: {{device.status}}
             </div>
             <div>
-            <span class="fa fa-cog"></span> Status: {{device.version}}
+            <span class="fa fa-cog"></span> Version: {{device.version}}
             </div>
             <div>
                 <span class="fa fa-laptop"></span> IP: {{device.ip}}
