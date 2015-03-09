@@ -66,7 +66,7 @@
          refresh_time = $interval(get_date, 60000);
         //clear interval when scope is destroyed
         $scope.$on("$destroy", function(){
-            $interval.cancel(refresh_data);
+            $interval.cancel(refresh_time);
         });
         //Scan for SM or SD connected.
         $scope.get_devices = function(){

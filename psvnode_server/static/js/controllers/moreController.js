@@ -69,14 +69,14 @@
         };
 
 // Updates - Functions
-        $scope.devices_to_update_selected = {}
+        $scope.devices_to_update_selected = {};
 
         $scope.check_update = function(){
             //check if there is a new version
             $http.get("/update/check")
                  .success(function(res){
                     if(res.error){
-                        $scope.attached_devices = {}
+                        $scope.attached_devices = {};
                         $scope.attached_devices.error = res.error;
                     }
                     if (Object.keys(res.attached_devices).length == 0){
