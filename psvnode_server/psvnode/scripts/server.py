@@ -151,6 +151,9 @@ def scan_subnet():
             continue
         devices_map[id] = {"ip":ip}
 
+    logging.info("%i devices found:" % len(devices_map))
+    if len(devices_map) < 1:
+        return  devices_map
 
     pool = multiprocessing.Pool(len(devices_map))
     # we update device map manually as it is a global variable and won't exist in another process
@@ -158,11 +161,6 @@ def scan_subnet():
     pool.terminate()
     for k,d in zip(devices_map.keys(), device_data):
         devices_map[k].update(d)
-
-
-
-    logging.info("%i devices found:" % len(devices_map))
-
     for k,v in devices_map.items():
         logging.info("%s\t@\t%s" % (k,v["ip"]))
     return devices_map
