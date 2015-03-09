@@ -17,9 +17,7 @@ from pysolovideo.utils.debug import PSVException
 import shutil
 import logging
 import time
-# to add pkg version in metadata
-import pkg_resources
-import glob
+
 import traceback
 from pysolovideo.utils.io import ResultWriter
 
@@ -165,7 +163,7 @@ class ControlThread(Thread):
                          "date_time": cam.start_time, #the camera start time is the reference 0
                          "frame_width":cam.width,
                          "frame_height":cam.height,
-                          "psv_version": pkg_resources.get_distribution("pysolovideo").version
+                         "version": self._info["version"]
                           }
             #the camera start time is the reference 0
             self._info["time"] = cam.start_time

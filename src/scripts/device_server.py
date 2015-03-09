@@ -147,7 +147,7 @@ if __name__ == '__main__':
             # INPUT_VIDEO = '/data/pysolo_video_samples/monitor_new_targets_long.avi'
             PSV_DIR = "/psv_data/results/"
             #fixme Put your working directories
-            GIT_WORKING_DIR = "/tmp/"
+            GIT_WORKING_DIR = "./"
             BRANCH = 'psv-dev'
         elif getpass.getuser() == "asterix":
             PSV_DIR = "/tmp/psv_data"
@@ -165,6 +165,8 @@ if __name__ == '__main__':
 
 
     version = get_version(GIT_WORKING_DIR, BRANCH)
+    print GIT_WORKING_DIR, BRANCH
+    print version
 
     # fixme => the name should be hardcoded in a encrypted file? file.
     control = ControlThread(machine_id=machine_id, name='SM15-001', version=version, video_file=INPUT_VIDEO,
