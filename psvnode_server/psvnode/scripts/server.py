@@ -314,7 +314,7 @@ def check_update():
             logging.error(error_from_fetch)
         #check version
         origin_version = get_version(GIT_BARE_REPO_DIR, BRANCH)
-        node_version = get_version(GIT_WORKING_DIR, BRANCH)
+        
         origin = {'version':origin_version, 'name':'Origin'}
         devices_map = scan_subnet()
         update.update({'node':{'version':node_version, 'status':'ON','name':'Node', 'id':'Node'}})
