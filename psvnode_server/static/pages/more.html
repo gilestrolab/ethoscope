@@ -98,20 +98,45 @@
             </tr>
             </tbody>
             <tbody ng-repeat="(k, d) in attached_devices" >
-                <tr class="danger" ng-show="d.version != origin.version && d.status != 'stopped'">
-                <tr class="warning" ng-show="d.version != origin.version && d.status == 'stopped'">
+                <tr class="danger" ng-if="d.version != origin.version && d.status != 'stopped'">
+                <td>
+                    <a href="#/sm/{{d.id}}" target=_blank ng-if="d.name != 'Node'">
+                    <span class="fa fa-circle-o"></span><span> {{d.name}}</span>
+                    </a>
+                </td>
+                <td>{{d.status}} /
+                    <span ng-if="d.version != origin.version">Outdated</span>
+                </td>
+                <td>{{d.version}}</td>
+                <td>
+                    <input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="device" ng-if="d.version != origin.version && d.status != 'stopped'">
+                    </td>
+                </tr>
+                <tr class="warning" ng-if="d.version != origin.version && d.status == 'stopped'">
+                    <td>
+                    <a href="#/sm/{{d.id}}" target=_blank ng-if="d.name != 'Node'">
+                    <span class="fa fa-circle-o"></span><span> {{d.name}}</span>
+                    </a>
+                </td>
+                <td>{{d.status}} /
+                    <span ng-if="d.version != origin.version">Outdated</span>
+                </td>
+                <td>{{d.version}}</td>
+                <td>
+                    <input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="device" ng-if="d.version != origin.version && d.status != 'stopped'">
+                    </td>
+                </tr>
                 <tr class="success" ng-show="d.version == origin.version">
                  <td>
                     <a href="#/sm/{{d.id}}" target=_blank ng-if="d.name != 'Node'">
                     <span class="fa fa-circle-o"></span><span> {{d.name}}</span>
                     </a>
                 </td>
-                <td>{{d.status}} / {{}}
-                    <span ng-if="d.version != origin.version">Outdated</span>                         <span ng-if="d.version == origin.version">Up to date</span>
+                <td>{{d.status}} /
+                    <span ng-if="d.version == origin.version">Up to date</span>
                 </td>
                 <td>{{d.version}}</td>
                 <td>
-                    <input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="device" ng-if="d.version != origin.version && d.status != 'stopped'">
                     </td>
             </tr>
             </tbody>
