@@ -81,21 +81,32 @@
             <th>Select </th>
             </thead>
             <tbody>
-                <tr class="danger" ng-if="node.version != origin.version"></tr>
+                <tr class="danger" ng-if="node.version != origin.version">
+                    <td>
+                    <a href="" target="_blank ">
+                    <span class="fa fa-circle-o"></span><span> {{node.name}}</span>
+                    </a>
+                </td>
+                <td>{{node.status}} / {{}}
+                    <span ng-if="node.version != origin.version">Outdated</span>
+                </td>
+                <td>{{node.version}}</td>
+                <td>
+                </td>
+                </tr>
                 <tr class="success" ng-if="node.version == origin.version">
-
                  <td>
                     <a href="" target="_blank ">
                     <span class="fa fa-circle-o"></span><span> {{node.name}}</span>
                     </a>
                 </td>
                 <td>{{node.status}} / {{}}
-                    <span ng-if="node.version != origin.version">Outdated</span>                     <span ng-if="node.version == origin.version">Up to date</span>
+                     <span ng-if="node.version == origin.version">Up to date</span>
                 </td>
                 <td>{{node.version}}</td>
                 <td>
                     </td>
-            </tr>
+                </tr>
             </tbody>
             <tbody ng-repeat="(k, d) in attached_devices" >
                 <tr class="danger" ng-if="d.version != origin.version && d.status != 'stopped'">
