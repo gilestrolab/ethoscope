@@ -3,12 +3,11 @@
 app.controller('smController', function($scope, $http, $routeParams, $interval, $timeout, $location)  {
         device_id = $routeParams.device_id;
         var device_ip;
+        $scope.device = {};
         $scope.sm = {};
         var refresh_data = false;
         var spStart= new Spinner(opts).spin();
         var starting_tracking= document.getElementById('starting');
-
-
         $http.get('/device/'+device_id+'/data').success(function(data){
             $scope.device = data;
         });

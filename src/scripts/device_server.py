@@ -83,7 +83,7 @@ def info(id):
 def update_system(id):
     if id == machine_id and control.info['status'] == 'stopped':
         try:
-            device_update = subprocess.Popen(['git', 'pull'],
+            device_update = subprocess.Popen(['git', 'pull', "origin", BRANCH],
                                              cwd=GIT_WORKING_DIR,
                                              stdout=subprocess.PIPE,
                                              stderr=subprocess.PIPE)
@@ -153,7 +153,7 @@ if __name__ == '__main__':
             PSV_DIR = "/tmp/psv_data"
             INPUT_VIDEO = '/data1/monitor_new_targets_short.avi'
             GIT_WORKING_DIR = "/data1/todel/pySolo-video-device"
-            BRANCH = 'psv-dev'
+            BRANCH = 'psv-package'
         elif getpass.getuser() == "psv" or getpass.getuser() == "root":
             INPUT_VIDEO = "/data/monitor_new_targets_short.avi"
             PSV_DIR = "/psv_data/results"
@@ -165,8 +165,6 @@ if __name__ == '__main__':
 
 
     version = get_version(GIT_WORKING_DIR, BRANCH)
-    print GIT_WORKING_DIR, BRANCH
-    print version
 
     # fixme => the name should be hardcoded in a encrypted file? file.
     control = ControlThread(machine_id=machine_id, name='SM15-001', version=version, video_file=INPUT_VIDEO,
