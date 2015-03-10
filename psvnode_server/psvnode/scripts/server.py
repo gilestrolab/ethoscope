@@ -341,7 +341,7 @@ def check_update():
         update.update({'node':{'version':node_version, 'status':'ON','name':'Node', 'id':'Node'}})
         return {'update':update, 'attached_devices':devices_map,'origin':origin}
     except Exception as e:
-        print traceback.format_exc(e)
+        logging.error(traceback.format_exc(e))
         return {'update':{'error':traceback.format_exc(e)}}
 
 
@@ -453,9 +453,6 @@ if __name__ == '__main__':
             GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
             GIT_WORKING_DIR = "/data1/todel/pySolo-video-node"
             BRANCH = 'psv-package'
-
-    PORT = 80
-    SUBNET_DEVICE = b'enp3s0'
 
     global devices_map
     devices_map = {}
