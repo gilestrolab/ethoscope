@@ -6,10 +6,14 @@
         <button class="btn btn-default" ng-click="get_devices()">Scan Network for Devices</button>
 
         <div  id="loading_devices" class="spinner"></div>
+        <div id="node-info">
+            <p><span class="fa fa-clock-o"></span> Node Time: {{time}}</p>
+            <p><span class="fa fa-clock-o"></span> Local Time: {{localtime}}</p>
+        </div>
 
     </div>
 
-    <a ng-repeat="device in devices" href="{{device.type}}/{{device.id}}">
+    <a ng-repeat="device in devices" href="{{device.type}}/{{device.id}}"  class="device-list">
         <div class="col-lg-4 alert alert-info" >
             <h3 ng-if="device.type == 'sm'">Sleep Monitor</h3>
             <h3 ng-if="device.type == 'sd'">Sleep Deprivator</h3>
@@ -17,6 +21,9 @@
             <div><span class="fa fa-genderless"></span> Name: {{device.name}}</div>
             <div><span ng-if="device.status == 'running'" class="fa fa-circle color-green"></span>
             <span ng-if="device.status == 'stopped'" class="fa fa-circle color-red"></span> Status: {{device.status}}
+            </div>
+            <div>
+            <span class="fa fa-cog"></span> Version: {{device.version}}
             </div>
             <div>
                 <span class="fa fa-laptop"></span> IP: {{device.ip}}

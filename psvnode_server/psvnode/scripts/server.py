@@ -99,6 +99,7 @@ def update_device_map(id, what="data",type=None, port=9000, data=None):
             scan_subnet()
         try:
             devices_map[id].update(data)
+            return data
 
         except KeyError:
             logging.error("Device %s is not detected" % id)
@@ -141,6 +142,7 @@ def scan_subnet():
     urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(2,254)]
     pool = multiprocessing.Pool(len(urls_to_scan))
     devices_id_url_list = pool.map(scan_one_device, urls_to_scan)
+    pool.terminate()
 
     global devices_map
     devices_map = {}
@@ -149,11 +151,16 @@ def scan_subnet():
             continue
         devices_map[id] = {"ip":ip}
 
-    map(update_device_map, devices_map.keys())
-
-    pool.terminate()
     logging.info("%i devices found:" % len(devices_map))
+    if len(devices_map) < 1:
+        return  devices_map
 
+    pool = multiprocessing.Pool(len(devices_map))
+    # we update device map manually as it is a global variable and won't exist in another process
+    device_data = pool.map(update_device_map, devices_map.keys())
+    pool.terminate()
+    for k,d in zip(devices_map.keys(), device_data):
+        devices_map[k].update(d)
     for k,v in devices_map.items():
         logging.info("%s\t@\t%s" % (k,v["ip"]))
     return devices_map
@@ -279,9 +286,10 @@ def update_systems():
         for key, d in devices_to_update.iteritems():
             if d['name'] == 'Node':
                 #update node
-                node_update = subprocess.Popen(['git','pull'],cwd=GIT_WORKING_DIR,
-                                                  stdout=subprocess.PIPE,
-                                                  stderr=subprocess.PIPE)
+                node_update = subprocess.Popen(['git', 'pull', "origin", BRANCH],
+                                                cwd=GIT_WORKING_DIR,
+                                                stdout=subprocess.PIPE,
+                                                stderr=subprocess.PIPE)
                 response_from_fetch, error_from_fetch = node_update.communicate()
                 if response_from_fetch != '':
                     logging.info(response_from_fetch)
@@ -330,16 +338,10 @@ def check_update():
             logging.error(error_from_fetch)
         #check version
         origin_version = get_version(GIT_BARE_REPO_DIR, BRANCH)
-        node_version = get_version(GIT_WORKING_DIR, BRANCH)
+        
         origin = {'version':origin_version, 'name':'Origin'}
         devices_map = scan_subnet()
-        devices_map.update({'node':{'version':node_version, 'status':'ON','name':'Node', 'id':'Node'}})
-        #check connected devices
-        #for key, d in devices_map.iteritems():
-        #    if d['version'] != origin_version:
-        #        update[d['id']] = d
-        print devices_map
-
+        update.update({'node':{'version':node_version, 'status':'ON','name':'Node', 'id':'Node'}})
         return {'update':update, 'attached_devices':devices_map,'origin':origin}
     except Exception as e:
         print traceback.format_exc(e)
@@ -438,24 +440,21 @@ if __name__ == '__main__':
     if DEBUG:
         import getpass
         if getpass.getuser() == "quentin":
-            SUBNET_DEVICE = b'enp3s0'
-            # SUBNET_DEVICE = b'eno1'
-            GIT_BARE_REPO_DIR = GIT_WORKING_DIR  = "./"
+            # SUBNET_DEVICE = b'enp3s0'
+            SUBNET_DEVICE = b'eno1'
+            GIT_BARE_REPO_DIR = GIT_WORKING_DIR = "./"
 
         if getpass.getuser() == "asterix":
             SUBNET_DEVICE = b'lo'
             RESULTS_DIR = "/tmp/"
             GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
             GIT_WORKING_DIR = "/data1/todel/pySolo-video-node"
-            BRANCH = 'psv-dev'
+            BRANCH = 'psv-package'
 
         RESTART_FILE = "./restart.sh"
     else:
         SUBNET_DEVICE = b'wlan0'
         RESTART_FILE = "./restart_production.sh"
-
-
-
 
     global devices_map
     devices_map = {}
@@ -477,7 +476,9 @@ if __name__ == '__main__':
             acquisition[k].start()
     try:
 
-        run(app, host='0.0.0.0', port=PORT, debug=debug, server='cherrypy')
+        #run(app, host='0.0.0.0', port=PORT, debug=debug, server='cherrypy')
+        run(app, host='0.0.0.0', port=PORT, debug=debug)
+
 
     except KeyboardInterrupt:
         logging.info("Stopping server cleanly")

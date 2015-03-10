@@ -1,6 +1,7 @@
 [Unit]
 Description= test for python
-After=network.target
+Wants=ntpd.service
+After=ntpd.service
 
 [Service]
 Type=simple

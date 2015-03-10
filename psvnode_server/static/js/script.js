@@ -36,21 +36,38 @@
                 templateUrl : '/static/pages/sd.html',
                 controller  : 'sdController'
             })
-        // route for the sleep depriver page
+            // route for the management page
             .when('/more', {
                 templateUrl : '/static/pages/more.html',
                 controller  : 'moreController as ctrl',
-            });
+            })
+            // route for the help page
+            /*.when('/help', {
+                templateUrl : '/static/pages/help.html',
+                controller  : 'helpController'
+            })*/
+        ;
         // use the HTML5 History API
         $locationProvider.html5Mode(true);
     });
 
     // create the controller and inject Angular's $scope
-    app.controller('mainController', function($scope, $http) {
+    app.controller('mainController', function($scope, $http, $interval) {
         $http.get('/devices_list').success(function(data){
             $scope.devices = data;
 
         })
+        var get_date = function(){
+            var t= new Date();
+            $scope.time =t.toUTCString();
+            $scope.localtime =t.toString();
+        }
+        get_date();
+         refresh_time = $interval(get_date, 60000);
+        //clear interval when scope is destroyed
+        $scope.$on("$destroy", function(){
+            $interval.cancel(refresh_time);
+        });
         //Scan for SM or SD connected.
         $scope.get_devices = function(){
             var spinner= new Spinner(opts).spin();

@@ -12,7 +12,7 @@
                            icon:"fa fa-refresh",
                            color:"alert alert-warning",
                            opt:"update",
-                          }
+                          },
                          ];
         $scope.exec_option = function(opt){
             switch(opt){
@@ -25,10 +25,11 @@
                     $scope.check_update();
 
             };
-        }
+        };
 
 // Browse - Functions
-        $scope.browse=function(folder="/null"){
+        $scope.browse=function(folder){
+            folder = folder || "/null"
             var prev_folder= folder.split("/");
             prev_folder.pop();
             $scope.prev_dir = prev_folder.join('/');
@@ -69,20 +70,21 @@
         };
 
 // Updates - Functions
-        $scope.devices_to_update_selected = {}
+        $scope.devices_to_update_selected = {};
 
         $scope.check_update = function(){
             //check if there is a new version
             $http.get("/update/check")
                  .success(function(res){
                     if(res.error){
-                        $scope.attached_devices = {}
+                        $scope.attached_devices = {};
                         $scope.attached_devices.error = res.error;
                     }
                     if (Object.keys(res.attached_devices).length == 0){
                         $scope.update_text = "All connected devices and the Node are up to update. Well Done!";
                         $scope.update_need_update = false;
                         $scope.origin = res.origin;
+                        $scope.node = res.update.node;
                         $scope.attached_devices={};
 
                     }else{
@@ -90,6 +92,7 @@
                         $scope.update_need_update = true;
                         $scope.attached_devices=res.attached_devices;
                         $scope.origin = res.origin;
+                        $scope.node = res.update.node;
                         for (dev in res.attached_devices){
                             if (dev.status != 'stopped'){
                                 $scope.started == true;
