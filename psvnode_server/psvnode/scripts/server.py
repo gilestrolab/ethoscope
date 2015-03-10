@@ -238,14 +238,15 @@ def browse(folder):
         files = []
         file_id=0
         for (dirpath, dirnames, filenames) in walk(directory):
-            for name in dirnames:
-                if dirpath==directory:
-                    files.append({'name':os.path.join(dirpath, name), 'is_dir':True, 'id':file_id})
-                    file_id += 1
+            #for name in dirnames:
+                #if dirpath==directory:
+                #files.append({'name': name, 'path': os.path.join(dirpath, name), 'id': file_id})
+                #file_id += 1
             for name in filenames:
-                if dirpath==directory:
-                    files.append({'name':os.path.join(dirpath, name), 'is_dir':False, 'id':file_id})
-                    file_id += 1
+                #if dirpath==directory:
+                path = os.path.relpath(os.path.join(dirpath,name),directory)
+                files.append({'file': name, 'name': path, 'id': file_id})
+                file_id += 1
 
         return {'files': files}
 
@@ -420,7 +421,7 @@ if __name__ == '__main__':
 
         if getpass.getuser() == "asterix":
             SUBNET_DEVICE = b'lo'
-            RESULTS_DIR = "/tmp/"
+            RESULTS_DIR = "/data1/todel/psv_results"
             GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
             GIT_WORKING_DIR = "/data1/todel/pySolo-video-node"
             BRANCH = 'psv-package'

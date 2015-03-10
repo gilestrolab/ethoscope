@@ -35,11 +35,20 @@
             $scope.prev_dir = prev_folder.join('/');
             $http.get("/browse"+folder)
                      .success(function(res){
+                        filesObj =[];
                         for (key in res.files){
-                            file = res.files[key]
-                            file.route_to_show = file.name.split("/").slice(3).join("/");
+                            //res.files[key].route_to_show =  res.files[key].name.split("/").slice(3).join("/");
+                            path = res.files[key].name.split('/');
+                            file = {'device_id':path[0],
+                                    'device_name':path[1],
+                                    'exp_date':path[2],
+                                    'file':path[3],
+                                    'url':res.files[key].name};
+                            filesObj.push(file);
                         }
+                        console.log(res);
                         $scope.files = res;
+                        $scope.filesObj = filesObj;
                      })
         };
         $scope.browse.dowload = function(){
