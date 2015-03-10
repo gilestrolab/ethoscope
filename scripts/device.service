@@ -1,6 +1,6 @@
 [Unit]
 Description=Pysolovideo device server
-Wants=ntpd.service
+Wants=ntpd.service mysqld.service
 After=ntpd.service
 
 
