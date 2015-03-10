@@ -92,13 +92,8 @@ def update_system(id):
                 logging.error("Error on update:"+stderr)
             if stdout != '':
                 logging.info("Update result:"+stdout)
-
-            # Sever restarting to changes have effect.
-            pid = subprocess.Popen([RESTART_FILE, str(os.getpid())],
-                                   close_fds=True,
-                                   env=os.environ.copy())
-
-            return {'update':'restarting'}
+            logging.info("Restarting script now. Systemd should restart script")
+            close()
 
         except Exception as e:
             return {'error':e, 'updated':False}
@@ -106,15 +101,16 @@ def update_system(id):
         return {'error': 'Error on machine ID or not Stopped'}
 
 
-def close():
+def close(exit_status=0):
     global control
     if control is not None and control.is_alive():
         control.stop()
         control.join()
         control=None
     else:
-        # destroy control to prevent old values.
+
         control = None
+    exit(exit_status)
 
 if __name__ == '__main__':
 
@@ -135,12 +131,11 @@ if __name__ == '__main__':
     PSV_DIR = "/psv_data/results"
     GIT_WORKING_DIR = '/home/psv/pySolo-Video'
     BRANCH = 'psv-package'
-    RESTART_FILE = "./restart_production.sh"
+
 
     if debug:
         import getpass
         DURATION = 60*60 * 100
-        RESTART_FILE = "./restart.sh"
 
         if getpass.getuser() == "quentin":
             INPUT_VIDEO = '/data/pysolo_video_samples/monitor_new_targets_short.avi'
@@ -173,8 +168,8 @@ if __name__ == '__main__':
     try:
         run(api, host='0.0.0.0', port=port, debug=debug, server='cherrypy')
     except Exception as e:
-        print e
         logging.error(e)
+        close(1)
     finally:
         close()
 

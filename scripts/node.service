@@ -1,12 +1,16 @@
 [Unit]
-Description= test for python
+Description=Pysolovideo node server
 Wants=ntpd.service
 After=ntpd.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python2 /home/node/pySolo-Video/psvnode_server/psvnode/scripts/server.py
 WorkingDirectory=/home/node/pySolo-Video/psvnode_server/psvnode/scripts/
+ExecStart=/usr/bin/python2  /home/node/pySolo-Video/psvnode_server/psvnode/scripts/server.py
+#WorkingDirectory=/home/quentin/comput/psv-git/psvnode_server/psvnode/scripts/
+#ExecStart=/usr/bin/python2 /home/quentin/comput/psv-git/psvnode_server/psvnode/scripts/server.py
+RestartSec=5
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
