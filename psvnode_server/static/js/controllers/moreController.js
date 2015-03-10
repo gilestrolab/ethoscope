@@ -26,9 +26,7 @@
 
             };
         };
-        $('#browse_table').on( 'click', 'tbody tr', function () {
-  window.location.href = $(this).attr('href');
-} );
+
 
         $scope.browse_table = $('#browse_table').DataTable({
                             "paging": true,
@@ -38,15 +36,15 @@
                             "columns": [
                                     { "data": "device_name",
                                     render :function (data, type, full, meta) {
-                                                    return '<td><a ng-href="/download/'+full.url+'" target="_blank">'+data+'</a></td>'}},
+                                                    return '<td><a href="#/sm/'+full.device_id+'" target="_blank">'+data+'</a></td>'}},
                                     { "data": "exp_date",
                                       render:function(data, type, full, meta){
-                                           return '<td><a ng-href="/download/'+full.url+'"  target="_blank">'+data+'</a></td>'
+                                           return '<td>'+data+'</td>'
                                         }
                                     },
                                     { "data":"file",
                                      render:function(data, type, full, meta){
-                                     return '<td><a ng-href="/download/'+full.url+'"  target="_blank">'+data+'</a></td>'
+                                     return '<td><a href="/download'+full.url+'"  target="_blank">'+data+'</a></td>'
                                     }
                                     },
                                     { "data": null,
@@ -74,13 +72,13 @@
                                     'device_name':path[1],
                                     'exp_date':path[2],
                                     'file':path[3],
-                                    'url':res.files[key].name};
+                                    'url':res.absolute_path+'/'+res.files[key].name};
                             filesObj.push(file);
                         }
-                        console.log(filesObj);
                         $scope.files = res;
                         $scope.filesObj = filesObj;
-                console.log($scope.table);
+                        $scope.abs_path = res.absolute_path;
+                console.log($scope.abs_path);
 
                 $scope.browse_table.clear();
                 $scope.browse_table.rows.add(filesObj).draw();

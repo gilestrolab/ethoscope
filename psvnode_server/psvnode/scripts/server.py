@@ -248,7 +248,7 @@ def browse(folder):
                 files.append({'file': name, 'name': path, 'id': file_id})
                 file_id += 1
 
-        return {'files': files}
+        return {'files': files, 'absolute_path': directory}
 
     except Exception as e:
         return {'error': traceback.format_exc(e)}
