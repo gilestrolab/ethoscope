@@ -306,12 +306,9 @@ def update_systems():
     if restart_node is True:
         try:
             # stop acquisition thread
+            logging.info("Stopping server. Should be restarted automatically by systemd")
             close()
-            # last but not least restart the node server:
-            logging.info("Reset Node")
-            pid=subprocess.Popen([RESTART_FILE, str(os.getpid())],
-                                 close_fds=True,
-                                 env=os.environ.copy())
+
         except Exception as e:
             return {'error':traceback.format_exc(e)}
 
@@ -346,6 +343,7 @@ def check_update():
     except Exception as e:
         print traceback.format_exc(e)
         return {'update':{'error':traceback.format_exc(e)}}
+
 
 @app.post('/request_download/<what>')
 def download(what):
@@ -408,7 +406,7 @@ def get_log(id):
         return {'error':traceback.format_exc(e)}
 
 
-def close():
+def close(exist_status=0):
     logging.info("Joining acquisition processes")
     for a in acquisition.values():
         a.stop()
@@ -417,6 +415,8 @@ def close():
         logging.info("Joined OK")
 
     logging.info("Closing server")
+    exit(exist_status)
+
 
 if __name__ == '__main__':
     # TODO where to save the files and the logs
@@ -436,11 +436,14 @@ if __name__ == '__main__':
     GIT_BARE_REPO_DIR = "/var/pySolo-Video.git"
     GIT_WORKING_DIR = "/home/node/pySolo-Video"
     BRANCH = 'psv-package'
+    SUBNET_DEVICE = b'wlan0'
+
+
 
     if DEBUG:
         import getpass
         if getpass.getuser() == "quentin":
-            # SUBNET_DEVICE = b'enp3s0'
+
             SUBNET_DEVICE = b'eno1'
             GIT_BARE_REPO_DIR = GIT_WORKING_DIR = "./"
 
@@ -451,10 +454,8 @@ if __name__ == '__main__':
             GIT_WORKING_DIR = "/data1/todel/pySolo-video-node"
             BRANCH = 'psv-package'
 
-        RESTART_FILE = "./restart.sh"
-    else:
-        SUBNET_DEVICE = b'wlan0'
-        RESTART_FILE = "./restart_production.sh"
+    PORT = 80
+    SUBNET_DEVICE = b'enp3s0'
 
     global devices_map
     devices_map = {}
@@ -490,6 +491,6 @@ if __name__ == '__main__':
 
     except Exception as e:
         logging.error(traceback.format_exc(e))
-
+        close(1)
     finally:
         close()
