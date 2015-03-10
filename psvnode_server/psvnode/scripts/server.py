@@ -238,12 +238,7 @@ def browse(folder):
         files = []
         file_id=0
         for (dirpath, dirnames, filenames) in walk(directory):
-            #for name in dirnames:
-                #if dirpath==directory:
-                #files.append({'name': name, 'path': os.path.join(dirpath, name), 'id': file_id})
-                #file_id += 1
             for name in filenames:
-                #if dirpath==directory:
                 path = os.path.relpath(os.path.join(dirpath,name),directory)
                 files.append({'file': name, 'name': path, 'id': file_id})
                 file_id += 1
@@ -297,30 +292,38 @@ def check_update():
     try:
         #check internet connection
         try:
-            response=urllib2.urlopen('http://google.com', timeout=1)
-        except urllib2.URLError, e:
-            update['error'] = traceback.format_exc(e)
+
+            if not which("fping"):
+                raise Exception("fping not available")
+            ping = os.system(" fping %s -t 50  > /dev/null 2>&1 " % '8.8.8.8')
+        except Exception as e:
+            ping = 0
+            logging.error("Could not ping. Assuming 'alive'")
+            logging.error(traceback.format_exc(e))
+            update['error'] = 'No internet connection, check cable. Error: ', e
+
         #check if there is a new version on the repo
         bare_update= subprocess.Popen(['git', 'fetch', '-v', 'origin', BRANCH+':'+BRANCH],
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE,
                                       cwd=GIT_BARE_REPO_DIR,
-                                    )
+                                      )
         response_from_fetch, error_from_fetch = bare_update.communicate()
         if response_from_fetch != '':
             logging.info(response_from_fetch)
         if error_from_fetch != '':
             logging.error(error_from_fetch)
+            update['error'] = error_from_fetch
         #check version
         origin_version = get_version(GIT_BARE_REPO_DIR, BRANCH)
         
-        origin = {'version':origin_version, 'name':'Origin'}
+        origin = {'version': origin_version, 'name': 'Origin'}
         devices_map = scan_subnet()
-        update.update({'node':{'version':node_version, 'status':'ON','name':'Node', 'id':'Node'}})
-        return {'update':update, 'attached_devices':devices_map,'origin':origin}
+        update.update({'node': {'version': node_version, 'status': 'ON','name': 'Node', 'id':'Node'}})
+        return {'update': update, 'attached_devices': devices_map, 'origin': origin}
     except Exception as e:
         print traceback.format_exc(e)
-        return {'update':{'error':traceback.format_exc(e)}}
+        return {'update': {'error': traceback.format_exc(e)}}
 
 @app.post('/request_download/<what>')
 def download(what):
