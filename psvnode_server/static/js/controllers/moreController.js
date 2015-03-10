@@ -26,6 +26,37 @@
 
             };
         };
+        $('#browse_table').on( 'click', 'tbody tr', function () {
+  window.location.href = $(this).attr('href');
+} );
+
+        $scope.browse_table = $('#browse_table').DataTable({
+                            "paging": true,
+                            "searching": true,
+                            "order":[2,'desc'],
+                            "dom": '<"col-xs-12"<"right"f>><"col-xs-12"t><"right"p><"clear">',
+                            "columns": [
+                                    { "data": "device_name",
+                                    render :function (data, type, full, meta) {
+                                                    return '<td><a ng-href="/download/'+full.url+'" target="_blank">'+data+'</a></td>'}},
+                                    { "data": "exp_date",
+                                      render:function(data, type, full, meta){
+                                           return '<td><a ng-href="/download/'+full.url+'"  target="_blank">'+data+'</a></td>'
+                                        }
+                                    },
+                                    { "data":"file",
+                                     render:function(data, type, full, meta){
+                                     return '<td><a ng-href="/download/'+full.url+'"  target="_blank">'+data+'</a></td>'
+                                    }
+                                    },
+                                    { "data": null,
+                                    render: function(data, type, full, meta){
+                                     return '<td><input type="checkbox" checklist-model="selected.files" checklist-value="'+full.url+'"></td>'
+                                                }},
+
+                                ],
+
+        });
 
 // Browse - Functions
         $scope.browse=function(folder){
@@ -46,9 +77,13 @@
                                     'url':res.files[key].name};
                             filesObj.push(file);
                         }
-                        console.log(res);
+                        console.log(filesObj);
                         $scope.files = res;
                         $scope.filesObj = filesObj;
+                console.log($scope.table);
+
+                $scope.browse_table.clear();
+                $scope.browse_table.rows.add(filesObj).draw();
                      })
         };
         $scope.browse.dowload = function(){

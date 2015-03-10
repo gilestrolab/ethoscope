@@ -6,9 +6,9 @@
         </a>
     </div>
 </div>
-<div ng-if="showOption == 'browse'" class="col-xs-12">
+<div ng-show="showOption == 'browse'" class="col-xs-12">
     <h2>Files to be dowloaded:</h2>
-    <div class="alert alert-info col-xs-12">
+    <div class="alert alert-info ">
         <p>Actions for selected files:</p>
         <button class="btn btn-success" ng-click="browse.dowload()" data-toggle="modal" data-target="#downloadModal">Download</button>
         <button class="btn btn-danger">Delete</button>
@@ -16,9 +16,9 @@
         <button ng-if="selected_all == true" class="right btn btn-warning" ng-click="browse.toggleAll()">Deselect All</button>
 
     </div>
-    <div id="controls" class="">
+    <!--<div id="controls" class="">
         <a href="" ng-click="browse(prev_dir)"><span class="fa fa-chevron-left"></span> Back</a>
-    </div>
+    </div>-->
     <table id="browse_table" class="table table-striped">
         <thead>
         <th><span class="fa fa-circle-o"></span> Device Name</th>
@@ -26,29 +26,7 @@
         <th><span class="fa fa-file-o"></span> File</th>
         <th>Select </th>
         </thead>
-        <tbody ng-repeat="file in filesObj">
-<!--             <td ng-if="file.is_dir == true">
-                <a href="" ng-click="browse(file.name)">
-                <span class="fa fa-folder-o"></span><span ng-if="file.route_to_show.length > 75">{{file.route_to_show.substring(0,75)}}...</span><span ng-if="file.route_to_show.length <= 75"> {{file.route_to_show}}</span>
-                </a>
-            </td>-->
-            <td>
-            <a ng-href="/download{{file.url}}"  target="_blank">
-                 {{file.device_name}}
-            </a>
-            </td>
-            <td>
-            <a ng-href="/download{{file.url}}"  target="_blank">
-                {{file.exp_date}}
-            </a>
-            </td>
-            <td>
-            <a ng-href="/download{{file.url}}"  target="_blank">
-                {{file.file}}
-            </a>
-            </td>
-            <td><input type="checkbox" checklist-model="selected.files" checklist-value="file.url"></td>
-        </tbody>
+
     </table>
 </div>
 
@@ -193,3 +171,38 @@
     </div>
   </div>
 </div>
+
+
+<script>
+    (function(){
+        console.log("table");
+ table = $('#browse_table').DataTable({
+                            paging: true,
+                            searching: true,
+                            order:[2,'desc'],
+                            "oLanguage": {
+                                  "sSearch": "Filter Offers: "
+                            }
+
+                        });
+
+})();</script>
+<!--<tbody ng-repeat="file in filesObj">
+
+            <td>
+            <a ng-href="/download{{file.url}}"  target="_blank">
+                 {{file.device_name}}
+            </a>
+            </td>
+            <td>
+            <a ng-href="/download{{file.url}}"  target="_blank">
+                {{file.exp_date}}
+            </a>
+            </td>
+            <td>
+            <a ng-href="/download{{file.url}}"  target="_blank">
+                {{file.file}}
+            </a>
+            </td>
+            <td><input type="checkbox" checklist-model="selected.files" checklist-value="file.url"></td>
+        </tbody>-->
