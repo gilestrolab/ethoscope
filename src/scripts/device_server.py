@@ -5,7 +5,7 @@ import datetime
 from optparse import OptionParser
 from bottle import *
 from pysolovideo.web_utils.control_thread import ControlThread
-from pysolovideo.web_utils.helpers import get_machine_id, get_version, get_machine_name
+from pysolovideo.web_utils.helpers import get_machine_info, get_version
 from subprocess import call
 
 api = Bottle()
@@ -122,8 +122,6 @@ if __name__ == '__main__':
     debug = option_dict["debug"]
     port = option_dict["port"]
 
-    machine_id = get_machine_id()
-    machine_name = get_machine_name()
 
     INPUT_VIDEO = None
     DURATION = None
@@ -131,7 +129,11 @@ if __name__ == '__main__':
     PSV_DIR = "/psv_data/results"
     GIT_WORKING_DIR = '/home/psv/pySolo-Video'
     BRANCH = 'psv-package'
+    MACHINE_ID_FILE = '/etc/machine-id'
+    MACHINE_NAME_FILE = '/etc/machine-name'
 
+    machine_id = get_machine_info(MACHINE_ID_FILE)
+    machine_name = get_machine_name(MACHINE_NAME_FILE)
 
     if debug:
         import getpass
