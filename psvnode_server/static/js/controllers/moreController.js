@@ -67,12 +67,12 @@
                         filesObj =[];
                         for (key in res.files){
                             //res.files[key].route_to_show =  res.files[key].name.split("/").slice(3).join("/");
-                            path = res.files[key].name.split('/');
-                            file = {'device_id':path[0],
-                                    'device_name':path[1],
-                                    'exp_date':path[2],
-                                    'file':path[3],
-                                    'url':res.absolute_path+'/'+res.files[key].name};
+                            path = res.files[key].abs_path.split('/');
+                            file = {'device_id':path[-4],
+                                    'device_name':path[-3],
+                                    'exp_date':path[-2],
+                                    'file':path[-1],
+                                    'url':res.files[key].abs_path};
                             filesObj.push(file);
                         }
                         $scope.files = res;
