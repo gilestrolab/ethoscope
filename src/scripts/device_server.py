@@ -133,7 +133,8 @@ if __name__ == '__main__':
     MACHINE_NAME_FILE = '/etc/machine-name'
 
     machine_id = get_machine_info(MACHINE_ID_FILE)
-    machine_name = get_machine_name(MACHINE_NAME_FILE)
+    machine_name = get_machine_info(MACHINE_NAME_FILE)
+
 
     if debug:
         import getpass
@@ -168,7 +169,7 @@ if __name__ == '__main__':
                             psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
 
     try:
-        run(api, host='0.0.0.0', port=port, debug=debug, server='cherrypy')
+        run(api, host='0.0.0.0', port=port, server='cherrypy')
     except Exception as e:
         logging.error(e)
         close(1)
