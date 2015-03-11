@@ -41,7 +41,7 @@ pacman -S mariadb --noconfirm --needed
 pacman -S wpa_supplicant --noconfirm --needed
 
 
-echo 'Description=psv wifi network' >> /etc/netctl/psv_wifi
+echo 'Description=psv wifi network' > /etc/netctl/psv_wifi
 echo 'Interface=wlan0' >> /etc/netctl/psv_wifi
 echo 'Connection=wireless' >> /etc/netctl/psv_wifi
 echo 'Security=wpa' >> /etc/netctl/psv_wifi
@@ -55,7 +55,7 @@ echo 'Key=PSV_WIFI_pIAEZF2s@jmKH' >> /etc/netctl/psv_wifi
 #echo 'Hidden=yes'
 
 ######################################################################################
-echo 'Description=eth0 Network' >> /etc/netctl/eth0
+echo 'Description=eth0 Network' > /etc/netctl/eth0
 echo 'Interface=eth0' >> /etc/netctl/eth0
 echo 'Connection=ethernet' >> /etc/netctl/eth0
 echo 'IP=dhcp' >> /etc/netctl/eth0
@@ -64,7 +64,7 @@ echo 'IP=dhcp' >> /etc/netctl/eth0
 
 #Updating ntp.conf
 
-echo 'server 192.169.123.1' >> /etc/ntp.conf
+echo 'server 192.169.123.1' > /etc/ntp.conf
 echo 'server 127.0.0.0' >> /etc/ntp.conf
 echo 'restrict default kod limited nomodify nopeer noquery notrap' >> /etc/ntp.conf
 echo 'restrict 127.0.0.1' >> /etc/ntp.conf
