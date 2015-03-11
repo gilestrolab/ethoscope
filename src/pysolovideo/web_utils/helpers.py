@@ -8,13 +8,16 @@ def get_machine_info(path):
     """
     Reads the machine NAME file and returns the value.
     """
+    log = logging.Logger("dummy")
     try:
+
         with open(path,'r') as f:
             info = f.readline().rstrip()
         return info
     except Exception as e:
-        logging.error(traceback.format_exc(e))
+        log.error(traceback.format_exc(e))
         return 'Debug-'+str(random.randint(1,100))
+
 
 def get_version(dir, branch):
     version = subprocess.Popen(['git', 'rev-parse', branch] ,
