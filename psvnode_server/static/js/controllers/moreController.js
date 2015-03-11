@@ -126,7 +126,7 @@
                         $scope.update_text = "All connected devices and the Node are up to update. Well Done!";
                         $scope.update_need_update = false;
                         $scope.origin = res.origin;
-                        $scope.node = {'node':res.update.node};
+                        $scope.node = res.update.node;
                         $scope.attached_devices={};
 
                     }else{
@@ -134,7 +134,7 @@
                         $scope.update_need_update = true;
                         $scope.attached_devices=res.attached_devices;
                         $scope.origin = res.origin;
-                        $scope.node = {'node':res.update.node};
+                        $scope.node = res.update.node;
                         for (dev in res.attached_devices){
                             if (dev.status != 'stopped'){
                                 $scope.started == true;
@@ -153,6 +153,14 @@
                     $timeout($scope.check_update, 15000);
                     $timeout(function(){$scope.update_waiting = false;}, 15000);
             })
+        };
+         $scope.update_node = function(node){
+            $http.post('/update', data = {'node':node});
+            $('#updateNodeModal').modal('hide');
+            $scope.update_result= data;
+            $scope.update_waiting = true;
+            $timeout($scope.check_update, 15000);
+            $timeout(function(){$scope.update_waiting = false;}, 15000);
         };
 
     }
