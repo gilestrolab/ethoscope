@@ -143,7 +143,7 @@
                         }
                     }
             })
-            //$http.post("/update", data = data)
+
         };
         $scope.update_selected = function(devices_to_update){
             $http.post('/update', data = devices_to_update)
