@@ -80,7 +80,7 @@
                     <span class="fa fa-circle-o"></span><span> {{node.name}}</span>
                     </a>
                 </td>
-                <td>{{node.status}} / {{}}
+                <td>{{node.status}} /
                     <span ng-if="node.version != origin.version">Outdated</span>
                 </td>
                 <td>{{node.version}}</td>
@@ -93,7 +93,7 @@
                     <span class="fa fa-circle-o"></span><span> {{node.name}}</span>
                     </a>
                 </td>
-                <td>{{node.status}} / {{}}
+                <td>{{node.status}} /
                      Up to date
                 </td>
                 <td>{{node.version}}</td>
@@ -166,7 +166,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-        <button ng-click="update_selected({'node':node})" target="_blank" type="button" class="btn btn-primary">Update Node</button>
+        <button ng-click="update_selected(node)" target="_blank" type="button" class="btn btn-primary">Update Node</button>
       </div>
     </div>
   </div>

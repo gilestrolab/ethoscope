@@ -146,6 +146,9 @@
             //$http.post("/update", data = data)
         };
         $scope.update_selected = function(devices_to_update){
+            if (devices_to_update.length == 1){
+                devices_to_update={'device':devices_to_update};
+            }
             $http.post('/update', data = devices_to_update)
                  .success(function(data){
                     $scope.update_result= data;
