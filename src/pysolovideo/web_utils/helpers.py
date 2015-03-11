@@ -1,6 +1,8 @@
 
 import subprocess
 import random
+import logging
+import traceback
 
 def get_machine_id():
     """
@@ -12,9 +14,9 @@ def get_machine_id():
     f.close()
     return pi_id
 
-def get_machine_id():
+def get_machine_name():
     """
-    Reads the machine ID file and returns the value.
+    Reads the machine NAME file and returns the value.
     """
     try:
         f = open('/etc/machine-name', 'r')
@@ -23,8 +25,8 @@ def get_machine_id():
         f.close()
         return pi_name
     except Exception as e:
-        print e
-        return 'Debug-'+random.randint(1,100)
+        logging.error(traceback.format_exc(e))
+        return 'Debug-'+str(random.randint(1,100))
 
 def get_version(dir, branch):
     version = subprocess.Popen(['git', 'rev-parse', branch] ,
