@@ -15,7 +15,7 @@ from os import walk
 import optparse
 import zipfile
 import datetime
-
+import fnmatch
 app = Bottle()
 STATIC_DIR = "../../static"
 
@@ -228,6 +228,32 @@ def node_status():
     return {'is_updated': is_updated}
 
 #Browse, delete and download files from node
+
+@app.get('/result_files/<type>')
+def result_file(type):
+    """
+    :param type:'all', 'db' or 'txt'
+    :return: a dict with a single key: "files" which maps a list of matching result files (absolute path)
+    """
+
+    try:
+        type="txt"
+        if type == "all":
+            pattern =  '*'
+        else:
+            pattern =  '*.'+type
+
+        matches = []
+        for root, dirnames, filenames in os.walk(RESULTS_DIR):
+            for f in fnmatch.filter(filenames, pattern):
+                matches.append(os.path.join(root, f))
+            return {"files":matches}
+
+    except Exception as e:
+        logging.error(traceback.format_exc(e))
+        return {'error':traceback.format_exc(e)}
+
+
 @app.get('/browse/<folder:path>')
 def browse(folder):
     try:
@@ -276,12 +302,9 @@ def update_systems():
     if restart_node is True:
         try:
             # stop acquisition thread
+            logging.info("Stopping server. Should be restarted automatically by systemd")
             close()
-            # last but not least restart the node server:
-            logging.info("Reset Node")
-            pid=subprocess.Popen([RESTART_FILE, str(os.getpid())],
-                                 close_fds=True,
-                                 env=os.environ.copy())
+
         except Exception as e:
             return {'error':traceback.format_exc(e)}
 
@@ -322,30 +345,38 @@ def check_update():
         update.update({'node': {'version': node_version, 'status': 'ON','name': 'Node', 'id':'Node'}})
         return {'update': update, 'attached_devices': devices_map, 'origin': origin}
     except Exception as e:
-        print traceback.format_exc(e)
-        return {'update': {'error': traceback.format_exc(e)}}
+        logging.error(traceback.format_exc(e))
+        return {'update':{'error':traceback.format_exc(e)}}
+
+
 
 @app.post('/request_download/<what>')
 def download(what):
-    print what
-    if what == 'files':
-        try:
-            # zip the files and provide a link to download it
+    try:
+        # zip the files and provide a link to download it
+        if what == 'files':
             req_files = request.json
             t = datetime.datetime.now()
             #FIXME change the route for this? and old zips need to be erased
             zip_file_name = RESULTS_DIR+'/results_'+t.strftime("%y%m%d_%H%M%S")+'.zip'
             zf = zipfile.ZipFile(zip_file_name, mode='a')
-
+            logging.info("Saving files : %s in %s" % (str(req_files['files']),zip_file_name) )
             for f in req_files['files']:
-                print f
                 zf.write(f['name'])
             zf.close()
-        except Exception as e:
-            print e
-            logging.error(e)
 
-        return {'url':zip_file_name}
+            return {'url':zip_file_name}
+
+        else:
+            raise NotImplementedError()
+
+    except Exception as e:
+        logging.error(e)
+        return {'error':traceback.format_exc(e)}
+
+
+
+
 
 @app.get('/list/<type>')
 def redirection_to_home(type):
@@ -386,7 +417,7 @@ def get_log(id):
         return {'error':traceback.format_exc(e)}
 
 
-def close():
+def close(exist_status=0):
     logging.info("Joining acquisition processes")
     for a in acquisition.values():
         a.stop()
@@ -395,6 +426,8 @@ def close():
         logging.info("Joined OK")
 
     logging.info("Closing server")
+    exit(exist_status)
+
 
 if __name__ == '__main__':
     # TODO where to save the files and the logs
@@ -414,11 +447,14 @@ if __name__ == '__main__':
     GIT_BARE_REPO_DIR = "/var/pySolo-Video.git"
     GIT_WORKING_DIR = "/home/node/pySolo-Video"
     BRANCH = 'psv-package'
+    SUBNET_DEVICE = b'wlan0'
+
+
 
     if DEBUG:
         import getpass
         if getpass.getuser() == "quentin":
-            # SUBNET_DEVICE = b'enp3s0'
+
             SUBNET_DEVICE = b'eno1'
             GIT_BARE_REPO_DIR = GIT_WORKING_DIR = "./"
 
@@ -428,11 +464,6 @@ if __name__ == '__main__':
             GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
             GIT_WORKING_DIR = "/data1/todel/pySolo-video-node"
             BRANCH = 'psv-package'
-
-        RESTART_FILE = "./restart.sh"
-    else:
-        SUBNET_DEVICE = b'wlan0'
-        RESTART_FILE = "./restart_production.sh"
 
     global devices_map
     devices_map = {}
@@ -468,6 +499,6 @@ if __name__ == '__main__':
 
     except Exception as e:
         logging.error(traceback.format_exc(e))
-
+        close(1)
     finally:
         close()
