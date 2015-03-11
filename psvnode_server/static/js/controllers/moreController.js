@@ -126,7 +126,7 @@
                         $scope.update_text = "All connected devices and the Node are up to update. Well Done!";
                         $scope.update_need_update = false;
                         $scope.origin = res.origin;
-                        $scope.node = res.update.node;
+                        $scope.node = {'node':res.update.node};
                         $scope.attached_devices={};
 
                     }else{
@@ -146,9 +146,6 @@
             //$http.post("/update", data = data)
         };
         $scope.update_selected = function(devices_to_update){
-            if (devices_to_update.length == 1){
-                devices_to_update={'device':devices_to_update};
-            }
             $http.post('/update', data = devices_to_update)
                  .success(function(data){
                     $scope.update_result= data;
