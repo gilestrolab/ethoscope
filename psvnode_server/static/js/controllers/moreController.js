@@ -158,7 +158,6 @@
             })
         };
 
-
     }
     angular.module('flyApp').controller('moreController',moreController);
 })()
