@@ -134,7 +134,7 @@
                         $scope.update_need_update = true;
                         $scope.attached_devices=res.attached_devices;
                         $scope.origin = res.origin;
-                        $scope.node = res.update.node;
+                        $scope.node = {'node':res.update.node};
                         for (dev in res.attached_devices){
                             if (dev.status != 'stopped'){
                                 $scope.started == true;
