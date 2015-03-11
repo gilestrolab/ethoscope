@@ -173,7 +173,7 @@ class DAMFileHelper(object):
         for i in range(7):
             fields.append("DUMMY_FIELD_%d SMALLINT" % i)
         for r in range(1,self._n_rois +1):
-            fields.append("ROI_%d FLOAT(8,5)" % r)
+            fields.append("ROI_%d SMALLINT" % r)
         logging.info("Creating 'CSV_DAM_ACTIVITY' table")
         fields = ",".join(fields)
         return fields
@@ -211,7 +211,7 @@ class DAMFileHelper(object):
         for i in range(7):
             values.append(str(i))
         for i in range(1, self._n_rois +1):
-            values.append(vals[i])
+            values.append(int(round(vals[i])))
 
         command = '''INSERT INTO CSV_DAM_ACTIVITY VALUES %s''' % str(tuple(values))
         return command
