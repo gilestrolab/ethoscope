@@ -137,42 +137,52 @@ def index():
 
 @app.get('/devices')
 def scan_subnet():
-    subnet_ip = get_subnet_ip(SUBNET_DEVICE)
-    logging.info("Scanning attached devices")
-    urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(2,254)]
-    pool = multiprocessing.Pool(len(urls_to_scan))
-    devices_id_url_list = pool.map(scan_one_device, urls_to_scan)
-    pool.terminate()
-
+    global scanning_locked
     global devices_map
-    devices_map = {}
-    for id, ip in devices_id_url_list :
-        if id is None:
-            continue
-        devices_map[id] = {"ip":ip}
+    if scanning_locked:
+        logging.warning("Already scanning devices. Ignoring get request.")
+        return devices_map
+    try:
+        scanning_locked = True
+        subnet_ip = get_subnet_ip(SUBNET_DEVICE)
+        logging.info("Scanning attached devices")
+        urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(2,254)]
+        pool = multiprocessing.Pool(64)
+        devices_id_url_list = pool.map(scan_one_device, urls_to_scan)
+        pool.terminate()
 
-    logging.info("%i devices found:" % len(devices_map))
-    if len(devices_map) < 1:
-        return  devices_map
 
-    pool = multiprocessing.Pool(len(devices_map))
-    # we update device map manually as it is a global variable and won't exist in another process
-    device_data = pool.map(update_device_map, devices_map.keys())
-    pool.terminate()
-    for k,d in zip(devices_map.keys(), device_data):
-        devices_map[k].update(d)
+        devices_map = {}
+        for id, ip in devices_id_url_list :
+            if id is None:
+                continue
+            devices_map[id] = {"ip":ip}
 
-    for k,v in devices_map.items():
-        logging.info("%s\t@\t%s" % (k,v["ip"]))
+        logging.info("%i devices found:" % len(devices_map))
+        if len(devices_map) < 1:
+            return  devices_map
 
-    for k, device in devices_map.iteritems():
-        # if the device is running AND acquisition is not handled yet, we make a new process for it
-        if device['status'] == 'running':
-            if k not in acquisition.keys():
-                acquisition[k]= Acquisition(device, result_main_dir=RESULTS_DIR)
-                acquisition[k].start()
+        pool = multiprocessing.Pool(len(devices_map))
+        # we update device map manually as it is a global variable and won't exist in another process
+        device_data = pool.map(update_device_map, devices_map.keys())
+        pool.terminate()
+        for k,d in zip(devices_map.keys(), device_data):
+            devices_map[k].update(d)
 
-    return devices_map
+        for k,v in devices_map.items():
+            logging.info("%s\t@\t%s" % (k,v["ip"]))
+
+        for k, device in devices_map.iteritems():
+            # if the device is running AND acquisition is not handled yet, we make a new process for it
+            if device['status'] == 'running':
+                if k not in acquisition.keys():
+                    acquisition[k]= Acquisition(device, result_main_dir=RESULTS_DIR)
+                    acquisition[k].start()
+    except Exception as e:
+        logging.error(traceback.format_exc(e))
+    finally:
+        scanning_locked = False
+        return devices_map
 
 @app.get('/devices_list')
 def get_devices_list():
@@ -475,10 +485,18 @@ if __name__ == '__main__':
             BRANCH = 'psv-package'
 
     global devices_map
+    global scanning_locked
+    global acquisition
+
+
+    scanning_locked = False
     devices_map = {}
+    acquisition = {}
+
+
     scan_subnet()
 
-    acquisition = {}
+
 
     origin_version = get_version(GIT_BARE_REPO_DIR, BRANCH)
     node_version = get_version(GIT_WORKING_DIR, BRANCH)
