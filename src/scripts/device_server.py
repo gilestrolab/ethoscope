@@ -127,7 +127,7 @@ if __name__ == '__main__':
     port = option_dict["port"]
 
     machine_id = get_machine_id()
-
+    machine_name = get_machine_name()
 
     INPUT_VIDEO = None
     DURATION = None
@@ -167,7 +167,7 @@ if __name__ == '__main__':
     version = get_version(GIT_WORKING_DIR, BRANCH)
 
     # fixme => the name should be hardcoded in a encrypted file? file.
-    control = ControlThread(machine_id=machine_id, name='SM15-001', version=version, video_file=INPUT_VIDEO,
+    control = ControlThread(machine_id=machine_id, name=machine_name, version=version, video_file=INPUT_VIDEO,
                             psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
 
     try:
