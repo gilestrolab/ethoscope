@@ -161,8 +161,17 @@ def scan_subnet():
     pool.terminate()
     for k,d in zip(devices_map.keys(), device_data):
         devices_map[k].update(d)
+
     for k,v in devices_map.items():
         logging.info("%s\t@\t%s" % (k,v["ip"]))
+
+    for k, device in devices_map.iteritems():
+        # if the device is running AND acquisition is not handled yet, we make a new process for it
+        if device['status'] == 'running':
+            if k not in acquisition.keys():
+                acquisition[k]= Acquisition(device, result_main_dir=RESULTS_DIR)
+                acquisition[k].start()
+
     return devices_map
 
 @app.get('/devices_list')
@@ -216,7 +225,8 @@ def stop_device(id, post_data):
     acquisition[id].stop()
     logging.info("Joining process")
     acquisition[id].join()
-    logging.info("Joined OK")
+    logging.info("Removing device %s from acquisition map" % id)
+    del acquisition[id]
 
 
 
@@ -477,11 +487,6 @@ if __name__ == '__main__':
     else:
         is_updated = True
 
-
-    for k, device in devices_map.iteritems():
-        if device['status'] == 'running':
-            acquisition[k]= Acquisition(device, result_main_dir=RESULTS_DIR)
-            acquisition[k].start()
     try:
 
         #run(app, host='0.0.0.0', port=PORT, debug=debug, server='cherrypy')
