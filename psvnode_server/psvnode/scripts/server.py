@@ -262,14 +262,13 @@ def browse(folder):
         else:
             directory = '/'+folder
         files = []
-        file_id=0
         for (dirpath, dirnames, filenames) in walk(directory):
             for name in filenames:
-                path = os.path.relpath(os.path.join(dirpath,name),directory)
-                files.append({'file': name, 'name': path, 'id': file_id})
-                file_id += 1
+                abs_path = os.path.join(dirpath,name)
+                #rel_path = os.path.relpath(abs_path,directory)
+                files.append({'abs_path':abs_path})
 
-        return {'files': files, 'absolute_path': directory}
+        return {'files': files}
 
     except Exception as e:
         return {'error': traceback.format_exc(e)}
@@ -358,7 +357,7 @@ def download(what):
             req_files = request.json
             t = datetime.datetime.now()
             #FIXME change the route for this? and old zips need to be erased
-            zip_file_name = RESULTS_DIR+'/results_'+t.strftime("%y%m%d_%H%M%S")+'.zip'
+            zip_file_name = os.path.join(RESULTS_DIR,'results_'+t.strftime("%y%m%d_%H%M%S")+'.zip')
             zf = zipfile.ZipFile(zip_file_name, mode='a')
             logging.info("Saving files : %s in %s" % (str(req_files['files']),zip_file_name) )
             for f in req_files['files']:
@@ -443,7 +442,7 @@ if __name__ == '__main__':
     DEBUG = option_dict["debug"]
     PORT = option_dict["port"]
 
-    RESULTS_DIR = "/psv_results/"
+    RESULTS_DIR = "/psv_results"
     GIT_BARE_REPO_DIR = "/var/pySolo-Video.git"
     GIT_WORKING_DIR = "/home/node/pySolo-Video"
     BRANCH = 'psv-package'

@@ -5,7 +5,7 @@ import datetime
 from optparse import OptionParser
 from bottle import *
 from pysolovideo.web_utils.control_thread import ControlThread
-from pysolovideo.web_utils.helpers import get_machine_id, get_version
+from pysolovideo.web_utils.helpers import get_machine_id, get_version, get_machine_name
 from subprocess import call
 
 api = Bottle()
