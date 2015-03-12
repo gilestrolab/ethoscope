@@ -41,6 +41,9 @@ pacman -S mariadb --noconfirm --needed
 #pacman -S netctl
 pacman -S wpa_supplicant --noconfirm --needed
 
+pip2 install python-nmap
+pip2 install eventlet
+
 echo 'Description=psv wifi network' >> /etc/netctl/psv_wifi
 echo 'Interface=wlan0' >> /etc/netctl/psv_wifi
 echo 'Connection=wireless' >> /etc/netctl/psv_wifi
