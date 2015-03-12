@@ -13,7 +13,7 @@
                            color:"alert alert-warning",
                            opt:"update",
                           },
-                          {name:"Node Management",
+                          {name:"Manage Node",
                            icon:"fa fa-cog",
                            color:"alert alert-success",
                            opt:"nodeManage",
@@ -21,13 +21,14 @@
                          ];
 
         $scope.exec_option = function(opt){
-            scope.showOption =  opt;
+            $scope.showOption =  opt;
             switch(opt){
                 case "browse":
                     $scope.browse();
                 case "update":
                     $scope.check_update();
                 case "nodeManage":
+                    get_node_info();
 
             };
         };
@@ -164,6 +165,23 @@
             $scope.update_waiting = true;
             $timeout($scope.check_update, 15000);
             $timeout(function(){$scope.update_waiting = false;}, 15000);
+        };
+
+
+/// Node Management update
+        $scope.nodeManagement = {};
+        var get_node_info = function(){
+            $http.get('/node/info').success(function(res){
+                $scope.nodeManagement.info = res;
+            })
+        }
+        $scope.nodeManagement.time = new Date();
+        $scope.nodeManagement.time = $scope.nodeManagement.time.toString();
+        $scope.nodeManagement.action = function(action){
+               $http.post('/node-actions', data = {'action':action})
+               .success(function(res){
+                $scope.nodeManagement[action]=res;
+               });
         };
 
     }
