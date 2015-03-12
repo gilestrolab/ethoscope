@@ -138,7 +138,7 @@ class MySQLdbToSQlite(object):
             if len(to_insert) > self._max_n_rows_to_insert:
                 value_string = ",".join(to_insert)
                 dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string )
-                logging.info(("dst_cmd2", dst_command))
+                print table_name
                 dst_cur.execute(dst_command)
                 dst.commit()
                 to_insert = []
