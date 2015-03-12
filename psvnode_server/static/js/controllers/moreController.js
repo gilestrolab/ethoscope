@@ -13,20 +13,27 @@
                            color:"alert alert-warning",
                            opt:"update",
                           },
+                          {name:"Manage Node",
+                           icon:"fa fa-cog",
+                           color:"alert alert-success",
+                           opt:"nodeManage",
+                          },
                          ];
+
         $scope.exec_option = function(opt){
+            $scope.showOption =  opt;
             switch(opt){
                 case "browse":
-                    $scope.showOption = opt;
                     $scope.browse();
-
                 case "update":
-                    $scope.showOption =  opt;
                     $scope.check_update();
+                case "nodeManage":
+                    get_node_info();
 
             };
         };
 
+        ///Browse Functions
 
         $scope.browse_table = $('#browse_table').DataTable({
                             "paging": true,
@@ -56,7 +63,6 @@
 
         });
 
-// Browse - Functions
         $scope.browse=function(folder){
             folder = folder || "/null"
             var prev_folder= folder.split("/");
@@ -66,7 +72,6 @@
                      .success(function(res){
                         filesObj =[];
                         for (key in res.files){
-                            //res.files[key].route_to_show =  res.files[key].name.split("/").slice(3).join("/");
                             path = res.files[key].abs_path.split('/');
                             file = {'device_id':path[-4],
                                     'device_name':path[-3],
@@ -111,7 +116,7 @@
             }
         };
 
-// Updates - Functions
+/// Updates - Functions
         $scope.devices_to_update_selected = {};
 
         $scope.check_update = function(){
@@ -160,6 +165,23 @@
             $scope.update_waiting = true;
             $timeout($scope.check_update, 15000);
             $timeout(function(){$scope.update_waiting = false;}, 15000);
+        };
+
+
+/// Node Management update
+        $scope.nodeManagement = {};
+        var get_node_info = function(){
+            $http.get('/node/info').success(function(res){
+                $scope.nodeManagement.info = res;
+            })
+        }
+        $scope.nodeManagement.time = new Date();
+        $scope.nodeManagement.time = $scope.nodeManagement.time.toString();
+        $scope.nodeManagement.action = function(action){
+               $http.post('/node-actions', data = {'action':action})
+               .success(function(res){
+                $scope.nodeManagement[action]=res;
+               });
         };
 
     }

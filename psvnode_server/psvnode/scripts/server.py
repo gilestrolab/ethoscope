@@ -1,7 +1,6 @@
 from bottle import *
 
-
-import  urllib2
+import urllib2
 import subprocess
 import socket
 import json
@@ -382,8 +381,25 @@ def download(what):
         logging.error(e)
         return {'error':traceback.format_exc(e)}
 
-
-
+@app.get('/node/<req>')
+def node_actions(req):
+        if req == 'info':
+            df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout = subprocess.PIPE)
+            diskFree = df.communicate()[0]
+            disk_usage =  diskFree.split("\n")[1].split()
+            return {'disk_usage': disk_usage}
+        else:
+            raise NotImplementedError()
+            return {'error':'Nothing here'}
+@app.post('/node-actions/')
+def node_actions():
+        action = request.json
+        if action == 'poweroff':
+            logging.info('User request a poweroff, shutting down system. Bye bye.')
+            print "Me apago"
+            #close()
+        else:
+            raise NotImplementedError()
 
 
 @app.get('/list/<type>')

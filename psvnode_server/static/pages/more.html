@@ -172,6 +172,29 @@
   </div>
 </div>
 
+<div ng-if="showOption == 'nodeManage'" class="col-xs-12">
+    <hr></hr>
+    <div>
+        <h3>Node Parameters</h3>
+        <p>Time on Network: {{nodeManagement.time}}</p>
+        <p>Disk Usage: </p>
+        <ul class="list-group col-xs-6">
+        <li class="list-group-item">Device: {{nodeManagement.info.disk_usage[0]}}</li>
+        <li class="list-group-item">Total Size: {{nodeManagement.info.disk_usage[1]}}</li>
+            <li class="list-group-item">Used: {{nodeManagement.info.disk_usage[2]}}</li>
+            <li class="list-group-item">Available: {{nodeManagement.info.disk_usage[3]}}</li>
+            <li class="list-group-item">% used: {{nodeManagement.info.disk_usage[4]}}</li>
+            <li class="list-group-item">Mounted on: {{nodeManagement.info.disk_usage[5]}}</li>
+        </ul>
+    </div>
+
+<div class="col-xs-12">
+<button class="btn btn-danger" ng-click="nodeManagement.action('poweroff')">Power off Node</button>
+    </div>
+
+</div>
+
+
 <script>
     (function(){
         console.log("table");
