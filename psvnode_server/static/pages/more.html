@@ -10,8 +10,8 @@
     <h2>Files to be dowloaded:</h2>
     <div class="alert alert-info ">
         <p>Actions for selected files:</p>
-        <button class="btn btn-success" ng-click="browse.dowload()" data-toggle="modal" data-target="#downloadModal">Download</button>
-        <button class="btn btn-danger">Delete</button>
+        <button  class="btn btn-success" ng-click="browse.dowload()"  data-target="#downloadModal">Download</button>
+        <button class="btn btn-danger" data-target="#deleteModal" data-toggle="modal">Delete</button>
         <button ng-if="selected_all == false" class="right btn btn-info" ng-click="browse.toggleAll()">Select All</button>
         <button ng-if="selected_all == true" class="right btn btn-warning" ng-click="browse.toggleAll()">Deselect All</button>
 
@@ -19,6 +19,7 @@
     <!--<div id="controls" class="">
         <a href="" ng-click="browse(prev_dir)"><span class="fa fa-chevron-left"></span> Back</a>
     </div>-->
+
     <table id="browse_table" class="table table-striped">
         <thead>
         <th><span class="fa fa-circle-o"></span> Device Name</th>
@@ -26,8 +27,8 @@
         <th><span class="fa fa-file-o"></span> File</th>
         <th>Select </th>
         </thead>
-
     </table>
+
 </div>
 
 <!-- Modal download -->
@@ -36,21 +37,40 @@
     <div class="modal-content">
       <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="myModalLabel">Download selected files from this link</h4>
+        <h4 class="modal-title" id="myModalLabel">Download selected files as compresed zip file.</h4>
       </div>
       <div class="modal-body">
        <ul>
-       <li ng-repeat="file in selected.files">{{file.route_to_show}}</li>
+       <li ng-repeat="file in selected.files">{{file.file}}</li>
        </ul>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-        <a href="{{browse.download_url}}" target="_blank" type="button" class="btn btn-primary">Download All</a>
+        <a href="{{browse.download_url}}" target="_blank" type="button" class="btn btn-primary">Download as Zip</a>
       </div>
     </div>
   </div>
 </div>
-
+<!-- Modal Delete -->
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="downloadModal" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Are you sure you want to remove the selected files?</h4>
+      </div>
+      <div class="modal-body">
+       <ul>
+       <li ng-repeat="file in selected.files">{{file.file}}</li>
+       </ul>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <a href="{{browse.download_url}}" target="_blank" type="button" class="btn btn-danger">Remove Selected</a>
+      </div>
+    </div>
+  </div>
+</div>
 <div ng-if="showOption=='update'" class="col-xs-12">
     <div ng-if="update_waiting" class="alert alert-warning"><h1 >Wait until all the devices are updated, this can take a while. Do not disconnect them from the mains.</h1></div>
     <div ng-if="update.error">
