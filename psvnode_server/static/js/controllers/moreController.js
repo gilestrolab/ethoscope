@@ -143,7 +143,6 @@
                         }
                     }
             })
-            //$http.post("/update", data = data)
         };
         $scope.update_selected = function(devices_to_update){
             $http.post('/update', data = devices_to_update)
@@ -154,7 +153,14 @@
                     $timeout(function(){$scope.update_waiting = false;}, 15000);
             })
         };
-
+         $scope.update_node = function(node){
+            $http.post('/update', data = {'node':node});
+            $('#updateNodeModal').modal('hide');
+            $scope.update_result= data;
+            $scope.update_waiting = true;
+            $timeout($scope.check_update, 15000);
+            $timeout(function(){$scope.update_waiting = false;}, 15000);
+        };
 
     }
     angular.module('flyApp').controller('moreController',moreController);

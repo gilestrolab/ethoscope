@@ -65,7 +65,7 @@
         <!--<h2>The following devices will be updated.</h2>-->
         <button class="btn btn-success" ng-click="update_selected(devices_to_update)">Update All</button>
         <button class="btn btn-default" ng-click="update_selected(devices_to_update_selected)">Update Selected</button>
-        <button ng-if="node.version != origin.version" class="btn btn-primary">Update Node</button>
+        <button ng-if="node.version != origin.version" class="btn btn-primary" data-toggle="modal" data-target="#updateNodeModal" >Update Node</button>
         <table class="table table-striped">
             <thead>
             <th>Name</th>
@@ -80,7 +80,7 @@
                     <span class="fa fa-circle-o"></span><span> {{node.name}}</span>
                     </a>
                 </td>
-                <td>{{node.status}} / {{}}
+                <td>{{node.status}} /
                     <span ng-if="node.version != origin.version">Outdated</span>
                 </td>
                 <td>{{node.version}}</td>
@@ -93,7 +93,7 @@
                     <span class="fa fa-circle-o"></span><span> {{node.name}}</span>
                     </a>
                 </td>
-                <td>{{node.status}} / {{}}
+                <td>{{node.status}} /
                      Up to date
                 </td>
                 <td>{{node.version}}</td>
@@ -166,12 +166,11 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-        <button ng-click="update_selected(node)" target="_blank" type="button" class="btn btn-primary">Update Node</button>
+        <button ng-click="update_node(node)" target="_blank" type="button" class="btn btn-primary">Update Node</button>
       </div>
     </div>
   </div>
 </div>
-
 
 <script>
     (function(){
@@ -187,22 +186,4 @@
                         });
 
 })();</script>
-<!--<tbody ng-repeat="file in filesObj">
 
-            <td>
-            <a ng-href="/download{{file.url}}"  target="_blank">
-                 {{file.device_name}}
-            </a>
-            </td>
-            <td>
-            <a ng-href="/download{{file.url}}"  target="_blank">
-                {{file.exp_date}}
-            </a>
-            </td>
-            <td>
-            <a ng-href="/download{{file.url}}"  target="_blank">
-                {{file.file}}
-            </a>
-            </td>
-            <td><input type="checkbox" checklist-model="selected.files" checklist-value="file.url"></td>
-        </tbody>-->

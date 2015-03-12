@@ -61,7 +61,7 @@ class ControlThread(Thread):
         elif name.find('SD')==0:
             type_of_device = 'sd'
         else:
-            type_of_device = 'Unknown'
+            type_of_device = 'sm'
 
         self._tmp_dir = tempfile.mkdtemp(prefix="psv_")
         self._info = {  "status": "stopped",

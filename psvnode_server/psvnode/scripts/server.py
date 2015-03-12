@@ -91,6 +91,7 @@ def index():
 #################################
 
 @app.get('/devices')
+<<<<<<< HEAD
 def scan_subnet(ip_range=(2,253)):
     global devices_map
 
@@ -144,6 +145,7 @@ def scan_subnet(ip_range=(2,253)):
                 acquisition[k].start()
 
     return devices_map
+
 
 @app.get('/devices_list')
 def get_devices_list():
@@ -262,7 +264,7 @@ def update_systems():
         for key, d in devices_to_update.iteritems():
             if d['name'] == 'Node':
                 #update node
-                node_update = subprocess.Popen(['git', 'pull', "origin", BRANCH],
+                node_update = subprocess.Popen(['git', 'pull', "origin", BRANCH+':'+BRANCH],
                                                 cwd=GIT_WORKING_DIR,
                                                 stdout=subprocess.PIPE,
                                                 stderr=subprocess.PIPE)
@@ -284,7 +286,8 @@ def update_systems():
             # stop acquisition thread
             logging.info("Stopping server. Should be restarted automatically by systemd")
             close()
-
+        except KeyboardInterrupt as k:
+            raise k
         except Exception as e:
             return {'error':traceback.format_exc(e)}
 
@@ -406,7 +409,8 @@ def close(exist_status=0):
         logging.info("Joined OK")
 
     logging.info("Closing server")
-    exit(exist_status)
+    os._exit(exist_status)
+    #exit(exist_status)
 
 #======================================================================================================================#
 
@@ -450,10 +454,18 @@ if __name__ == '__main__':
             BRANCH = 'psv-package'
 
     global devices_map
+    global scanning_locked
+    global acquisition
+
+
+    scanning_locked = False
     devices_map = {}
+    acquisition = {}
+
+
     scan_subnet()
 
-    acquisition = {}
+
 
     origin_version = get_version(GIT_BARE_REPO_DIR, BRANCH)
     node_version = get_version(GIT_WORKING_DIR, BRANCH)
