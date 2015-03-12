@@ -1,7 +1,7 @@
 
 import logging
 import json
-from eventlet.green import  urllib2 as gul
+import  urllib2 as urllib2
 import subprocess
 import os
 
@@ -34,6 +34,8 @@ def which(program):
 
 
 
+
+
 def scan_one_device(ip, timeout=1, port=9000, page="id"):
     """
 
@@ -48,21 +50,22 @@ def scan_one_device(ip, timeout=1, port=9000, page="id"):
 
     url="%s:%i/%s" % (ip, port, page)
     try:
-        req = gul.Request(url)
-        f = gul.urlopen(req, timeout=timeout)
+        req = urllib2.Request(url)
+        f = urllib2.urlopen(req, timeout=timeout)
         message = f.read()
 
         if not message:
             logging.error("URL error whist scanning url: %s. No message back." % url )
-            raise gul.URLError()
+            raise urllib2.URLError("No message back")
         try:
             resp = json.loads(message)
             return (resp['id'],ip)
         except ValueError:
             logging.error("Could not parse response from %s as JSON object" % url )
 
-    except gul.URLError:
-        logging.error("URL error whist scanning url: %s. Server down?" % url )
+    except urllib2.URLError:
+        pass
+        # logging.error("URL error whist scanning url: %s. Server down?" % url )
 
     except Exception as e:
         logging.error("Unexpected error whilst scanning url: %s" % url )
