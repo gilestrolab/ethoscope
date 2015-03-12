@@ -1,71 +1,26 @@
 from bottle import *
 
-import urllib2
+# import urllib2
+from eventlet.green import  urllib2
 import subprocess
 import socket
 import json
 import multiprocessing
+
 import logging
 import traceback
 from psvnode.utils.acquisition import Acquisition
 from psvnode.utils.helpers import get_version
-from psvnode.utils.helpers import which
+
 from netifaces import ifaddresses, AF_INET
 from os import walk
 import optparse
 import zipfile
 import datetime
 import fnmatch
+
 app = Bottle()
 STATIC_DIR = "../../static"
-
-
-
-
-def scan_one_device(url, timeout=1, port=9000):
-    """
-    Pings an url and try parsing its message as JSON data. This is typically used within a multithreading.Pool.map in
-    order to request multiple arbitrary urls.
-
-    :param url: the url to parse
-    :param timeout: the timeout of the url request
-    :param port: the port to request
-    :return: The message, parsed as dictionary. the "ip" (==url) field is also added to the result.
-    If the url could not be reached, None is returned
-    """
-
-    try:
-
-        if not which("fping"):
-            raise Exception("fping not available")
-        ping = os.system(" fping %s -t 50  > /dev/null 2>&1 " % os.path.basename(url))
-    except Exception as e:
-        ping = 0
-        logging.error("Could not ping. Assuming 'alive'")
-        logging.error(traceback.format_exc(e))
-
-
-    if ping != 0:
-        logging.info("url: %s, not responding. Skipping" % url )
-        return None, None
-
-    try:
-        req = urllib2.Request(url="%s:%i/id" % (url, port))
-        f = urllib2.urlopen(req, timeout=timeout)
-        message = f.read()
-        if not message:
-            logging.error("URL error whist scanning url: %s. No message back." % url )
-            return
-        resp = json.loads(message)
-        return (resp['id'],url)
-
-    except urllib2.URLError:
-        logging.error("URL error whist scanning url: %s. Server down?" % url )
-        return None, None
-    except Exception as e:
-        logging.error("Unexpected error whilst scanning url: %s" % url )
-        raise e
-
 
 
 def update_device_map(id, what="data",type=None, port=9000, data=None):
@@ -136,29 +91,45 @@ def index():
 #################################
 
 @app.get('/devices')
-def scan_subnet():
+def scan_subnet(ip_range=(2,253)):
+    global devices_map
+
     subnet_ip = get_subnet_ip(SUBNET_DEVICE)
     logging.info("Scanning attached devices")
-    urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(2,254)]
-    pool = multiprocessing.Pool(len(urls_to_scan))
-    devices_id_url_list = pool.map(scan_one_device, urls_to_scan)
-    pool.terminate()
 
-    global devices_map
-    devices_map = {}
-    for id, ip in devices_id_url_list :
+    import eventlet
+    import nmap
+    from psvnode.utils.helpers import scan_one_device
+
+
+    nm = nmap.PortScanner()
+
+
+    to_scan = "%s.%i-%i" % (subnet_ip, ip_range[0], ip_range[1])
+    scanned = nm.scan(to_scan, arguments="-sn")
+    url_candidates= ["http://%s" % str(s) for s in scanned["scan"].keys()]
+
+    if len(url_candidates) < 1:
+        logging.warning("No candidate device detected")
+        return  devices_map
+
+    logging.info("Detected %i url candidates" % len(url_candidates))
+    pool = eventlet.GreenPool(64)
+
+    for id, ip in pool.imap(scan_one_device, url_candidates):
         if id is None:
             continue
         devices_map[id] = {"ip":ip}
 
-    logging.info("%i devices found:" % len(devices_map))
-    if len(devices_map) < 1:
-        return  devices_map
 
-    pool = multiprocessing.Pool(len(devices_map))
-    # we update device map manually as it is a global variable and won't exist in another process
-    device_data = pool.map(update_device_map, devices_map.keys())
-    pool.terminate()
+    logging.info("Detected %i devices from %i candidates:" % (len(devices_map), len(url_candidates)))
+    if len(devices_map) < 1:
+        logging.warning("No device detected")
+        return  devices_map
+    pool = eventlet.GreenPool(64)
+
+    device_data = pool.imap(update_device_map, devices_map.keys())
+
     for k,d in zip(devices_map.keys(), device_data):
         devices_map[k].update(d)
     for k,v in devices_map.items():
@@ -417,6 +388,9 @@ def close(exist_status=0):
     logging.info("Closing server")
     exit(exist_status)
 
+#======================================================================================================================#
+
+
 
 if __name__ == '__main__':
     # TODO where to save the files and the logs
@@ -444,7 +418,8 @@ if __name__ == '__main__':
         import getpass
         if getpass.getuser() == "quentin":
 
-            SUBNET_DEVICE = b'eno1'
+            SUBNET_DEVICE = b'enp3s0'
+            #SUBNET_DEVICE = b'eno1'
             GIT_BARE_REPO_DIR = GIT_WORKING_DIR = "./"
 
         if getpass.getuser() == "asterix":
