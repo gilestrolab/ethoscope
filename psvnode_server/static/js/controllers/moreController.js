@@ -121,32 +121,26 @@
 
         $scope.check_update = function(){
             //check if there is a new version
+            $scope.update={};
             $http.get("/update/check")
                  .success(function(res){
-                    if(res.error){
-                        $scope.attached_devices = {};
-                        $scope.attached_devices.error = res.error;
-                    }
-                    if (Object.keys(res.attached_devices).length == 0){
-                        $scope.update_text = "All connected devices and the Node are up to update. Well Done!";
-                        $scope.update_need_update = false;
-                        $scope.origin = res.origin;
-                        $scope.node = res.update.node;
-                        $scope.attached_devices={};
-
-                    }else{
-                        $scope.update_text = "There is a new version and some devices need to be updated";
-                        $scope.update_need_update = true;
-                        $scope.attached_devices=res.attached_devices;
-                        $scope.origin = res.origin;
-                        $scope.node = res.update.node;
-                        for (dev in res.attached_devices){
-                            if (dev.status != 'stopped'){
-                                $scope.started == true;
-                                break;
-                            }
+                    if(res.update.error){
+                        if(res.update.error.indexOf('up to date')<0){
+                            $scope.update.error = res.update.error;
                         }
                     }
+
+                    $scope.update_text = "There is a new version and some devices need to be updated";
+                    $scope.attached_devices=res.attached_devices;
+                    $scope.origin = res.origin;
+                    $scope.node = res.update.node;
+                    /*for (dev in res.attached_devices){
+                        if (dev.status != 'stopped'){
+                            $scope.started == true;
+                            break;
+                        }
+                    }*/
+
             })
         };
         $scope.update_selected = function(devices_to_update){
