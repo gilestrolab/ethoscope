@@ -5,12 +5,12 @@ from eventlet.green import  urllib2
 import subprocess
 import socket
 import json
-import multiprocessing
 
 import logging
 import traceback
 from psvnode.utils.acquisition import Acquisition
 from psvnode.utils.helpers import get_version
+from psvnode.utils.helpers import which
 
 from netifaces import ifaddresses, AF_INET
 from os import walk
@@ -91,7 +91,7 @@ def index():
 #################################
 
 @app.get('/devices')
-<<<<<<< HEAD
+
 def scan_subnet(ip_range=(2,253)):
     global devices_map
 
@@ -134,8 +134,8 @@ def scan_subnet(ip_range=(2,253)):
     for k,d in zip(devices_map.keys(), device_data):
         devices_map[k].update(d)
 
-    for k,v in devices_map.items():
-        logging.info("%s\t@\t%s" % (k,v["ip"]))
+    # for k,v in devices_map.items():
+    #     logging.info("%s\t@\t%s" % (k,v["ip"]))
 
     for k, device in devices_map.iteritems():
         # if the device is running AND acquisition is not handled yet, we make a new process for it
@@ -298,7 +298,7 @@ def check_update():
     try:
         #check internet connection
         try:
-
+            #fixme ping is simply not used here!
             if not which("fping"):
                 raise Exception("fping not available")
             ping = os.system(" fping %s -t 50  > /dev/null 2>&1 " % '8.8.8.8')
