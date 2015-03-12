@@ -1,7 +1,7 @@
 from bottle import *
 
-# import urllib2
-from eventlet.green import  urllib2
+
+import  urllib2
 import subprocess
 import socket
 import json
@@ -19,8 +19,18 @@ import zipfile
 import datetime
 import fnmatch
 
+
+import concurrent.futures as futures
+import concurrent
+
+from psvnode.utils.helpers import scan_one_device
+
+
+
 app = Bottle()
 STATIC_DIR = "../../static"
+
+
 
 
 def update_device_map(id, what="data",type=None, port=9000, data=None):
@@ -46,6 +56,7 @@ def update_device_map(id, what="data",type=None, port=9000, data=None):
 
     f = urllib2.urlopen(req)
     message = f.read()
+
     if message:
         data = json.loads(message)
 
@@ -91,60 +102,74 @@ def index():
 #################################
 
 @app.get('/devices')
-
 def scan_subnet(ip_range=(2,253)):
     global devices_map
+    try:
 
-    subnet_ip = get_subnet_ip(SUBNET_DEVICE)
-    logging.info("Scanning attached devices")
-
-    import eventlet
-    import nmap
-    from psvnode.utils.helpers import scan_one_device
+        devices_map = {}
 
 
-    nm = nmap.PortScanner()
+        subnet_ip = get_subnet_ip(SUBNET_DEVICE)
+        logging.info("Scanning attached devices")
 
 
-    to_scan = "%s.%i-%i" % (subnet_ip, ip_range[0], ip_range[1])
-    scanned = nm.scan(to_scan, arguments="-sn")
-    url_candidates= ["http://%s" % str(s) for s in scanned["scan"].keys()]
+        scanned = [ "%s.%i" % (subnet_ip, i) for i in range(2,253) ]
+        urls= ["http://%s" % str(s) for s in scanned]
 
-    if len(url_candidates) < 1:
-        logging.warning("No candidate device detected")
-        return  devices_map
+        # We can use a with statement to ensure threads are cleaned up promptly
+        with futures.ThreadPoolExecutor(max_workers=128) as executor:
+            # Start the load operations and mark each future with its URL
 
-    logging.info("Detected %i url candidates" % len(url_candidates))
-    pool = eventlet.GreenPool(64)
+            fs = [executor.submit(scan_one_device, url) for url in urls]
+            for f in concurrent.futures.as_completed(fs):
 
-    for id, ip in pool.imap(scan_one_device, url_candidates):
-        if id is None:
-            continue
-        devices_map[id] = {"ip":ip}
+                try:
+                    id, ip = f.result()
+                    if id is None:
+                        continue
+                    devices_map[id] = {"ip":ip}
+
+                except Exception as e:
+                    logging.error("Error whilst pinging url")
+                    logging.error(traceback.format_exc(e))
 
 
-    logging.info("Detected %i devices from %i candidates:" % (len(devices_map), len(url_candidates)))
-    if len(devices_map) < 1:
-        logging.warning("No device detected")
-        return  devices_map
-    pool = eventlet.GreenPool(64)
 
-    device_data = pool.imap(update_device_map, devices_map.keys())
 
-    for k,d in zip(devices_map.keys(), device_data):
-        devices_map[k].update(d)
+        if len(devices_map) < 1:
+            logging.warning("No device detected")
+            return  devices_map
 
-    # for k,v in devices_map.items():
-    #     logging.info("%s\t@\t%s" % (k,v["ip"]))
+        logging.info("Detected %i devices:\n%s" % (len(devices_map), str(devices_map.keys())))
+        # We can use a with statement to ensure threads are cleaned up promptly
+        with futures.ThreadPoolExecutor(max_workers=128) as executor:
+            # Start the load operations and mark each future with its URL
+            fs = {}
+            for id in devices_map.keys():
+                fs[executor.submit(update_device_map,id)] = id
 
-    for k, device in devices_map.iteritems():
-        # if the device is running AND acquisition is not handled yet, we make a new process for it
-        if device['status'] == 'running':
-            if k not in acquisition.keys():
-                acquisition[k]= Acquisition(device, result_main_dir=RESULTS_DIR)
-                acquisition[k].start()
+            for f in concurrent.futures.as_completed(fs):
+                id = fs[f]
+                try:
+                    data = f.result()
+                    devices_map[id].update(data)
+                except Exception as e:
+                    logging.error("Could not get data from device %s :" % id)
+                    logging.error(traceback.format_exc(e))
 
-    return devices_map
+
+
+        for k, device in devices_map.iteritems():
+            # if the device is running AND acquisition is not handled yet, we make a new process for it
+            if device['status'] == 'running':
+                if k not in acquisition.keys():
+                    acquisition[k]= Acquisition(device, result_main_dir=RESULTS_DIR)
+                    acquisition[k].start()
+
+        return devices_map
+    except Exception as e:
+        logging.error("Unexpected exception when scanning for devices:")
+        logging.error(traceback.format_exc(e))
 
 
 @app.get('/devices_list')

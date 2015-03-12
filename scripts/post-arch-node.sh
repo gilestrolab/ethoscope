@@ -32,7 +32,7 @@ pacman -S ntp bash-completion --noconfirm --needed
 pacman -S raspberrypi-firmware{,-tools,-bootloader,-examples} --noconfirm --needed
 
 # preinstalling dependencies will save compiling time on python packages
-pacman -S python2-pip python2-numpy python2-bottle python2-pyserial mysql-python python2-netifaces python2-cherrypy --noconfirm --needed
+pacman -S python2-pip python2-numpy python2-bottle python2-pyserial mysql-python python2-netifaces python2-cherrypy python2-futures --noconfirm --needed
 
 # mariadb
 pacman -S mariadb --noconfirm --needed
@@ -41,8 +41,6 @@ pacman -S mariadb --noconfirm --needed
 #pacman -S netctl
 pacman -S wpa_supplicant --noconfirm --needed
 
-pip2 install python-nmap
-pip2 install eventlet
 
 echo 'Description=psv wifi network' >> /etc/netctl/psv_wifi
 echo 'Interface=wlan0' >> /etc/netctl/psv_wifi
