@@ -1,15 +1,22 @@
 
 import subprocess
+import random
+import logging
+import traceback
 
-def get_machine_id():
+def get_machine_info(path):
     """
-    Reads the machine ID file and returns the value.
+    Reads the machine NAME file and returns the value.
     """
-    f = open('/etc/machine-id', 'r')
-    pi_id = f.readline()
-    pi_id = pi_id.strip()
-    f.close()
-    return pi_id
+    log = logging.Logger("dummy")
+    try:
+
+        with open(path,'r') as f:
+            info = f.readline().rstrip()
+        return info
+    except Exception as e:
+        log.error(traceback.format_exc(e))
+        return 'Debug-'+str(random.randint(1,100))
 
 
 def get_version(dir, branch):

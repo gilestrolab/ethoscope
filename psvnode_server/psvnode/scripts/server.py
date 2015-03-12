@@ -132,8 +132,17 @@ def scan_subnet(ip_range=(2,253)):
 
     for k,d in zip(devices_map.keys(), device_data):
         devices_map[k].update(d)
+
     for k,v in devices_map.items():
         logging.info("%s\t@\t%s" % (k,v["ip"]))
+
+    for k, device in devices_map.iteritems():
+        # if the device is running AND acquisition is not handled yet, we make a new process for it
+        if device['status'] == 'running':
+            if k not in acquisition.keys():
+                acquisition[k]= Acquisition(device, result_main_dir=RESULTS_DIR)
+                acquisition[k].start()
+
     return devices_map
 
 @app.get('/devices_list')
@@ -187,7 +196,8 @@ def stop_device(id, post_data):
     acquisition[id].stop()
     logging.info("Joining process")
     acquisition[id].join()
-    logging.info("Joined OK")
+    logging.info("Removing device %s from acquisition map" % id)
+    del acquisition[id]
 
 
 
@@ -233,16 +243,11 @@ def browse(folder):
         else:
             directory = '/'+folder
         files = []
-        file_id=0
         for (dirpath, dirnames, filenames) in walk(directory):
-            for name in dirnames:
-                if dirpath==directory:
-                    files.append({'name':os.path.join(dirpath, name), 'is_dir':True, 'id':file_id})
-                    file_id += 1
             for name in filenames:
-                if dirpath==directory:
-                    files.append({'name':os.path.join(dirpath, name), 'is_dir':False, 'id':file_id})
-                    file_id += 1
+                abs_path = os.path.join(dirpath,name)
+                #rel_path = os.path.relpath(abs_path,directory)
+                files.append({'abs_path':abs_path})
 
         return {'files': files}
 
@@ -290,53 +295,68 @@ def check_update():
     try:
         #check internet connection
         try:
-            response=urllib2.urlopen('http://google.com', timeout=1)
-        except urllib2.URLError, e:
-            update['error'] = traceback.format_exc(e)
+
+            if not which("fping"):
+                raise Exception("fping not available")
+            ping = os.system(" fping %s -t 50  > /dev/null 2>&1 " % '8.8.8.8')
+        except Exception as e:
+            ping = 0
+            logging.error("Could not ping. Assuming 'alive'")
+            logging.error(traceback.format_exc(e))
+            update['error'] = 'No internet connection, check cable. Error: ', e
+
         #check if there is a new version on the repo
         bare_update= subprocess.Popen(['git', 'fetch', '-v', 'origin', BRANCH+':'+BRANCH],
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE,
                                       cwd=GIT_BARE_REPO_DIR,
-                                    )
+                                      )
         response_from_fetch, error_from_fetch = bare_update.communicate()
         if response_from_fetch != '':
             logging.info(response_from_fetch)
         if error_from_fetch != '':
             logging.error(error_from_fetch)
+            update['error'] = error_from_fetch
         #check version
         origin_version = get_version(GIT_BARE_REPO_DIR, BRANCH)
         
-        origin = {'version':origin_version, 'name':'Origin'}
+        origin = {'version': origin_version, 'name': 'Origin'}
         devices_map = scan_subnet()
-        update.update({'node':{'version':node_version, 'status':'ON','name':'Node', 'id':'Node'}})
-        return {'update':update, 'attached_devices':devices_map,'origin':origin}
+        update.update({'node': {'version': node_version, 'status': 'ON','name': 'Node', 'id':'Node'}})
+        return {'update': update, 'attached_devices': devices_map, 'origin': origin}
     except Exception as e:
         logging.error(traceback.format_exc(e))
         return {'update':{'error':traceback.format_exc(e)}}
 
 
+
 @app.post('/request_download/<what>')
 def download(what):
-    print what
-    if what == 'files':
-        try:
-            # zip the files and provide a link to download it
+    try:
+        # zip the files and provide a link to download it
+        if what == 'files':
             req_files = request.json
             t = datetime.datetime.now()
             #FIXME change the route for this? and old zips need to be erased
-            zip_file_name = RESULTS_DIR+'/results_'+t.strftime("%y%m%d_%H%M%S")+'.zip'
+            zip_file_name = os.path.join(RESULTS_DIR,'results_'+t.strftime("%y%m%d_%H%M%S")+'.zip')
             zf = zipfile.ZipFile(zip_file_name, mode='a')
-
+            logging.info("Saving files : %s in %s" % (str(req_files['files']),zip_file_name) )
             for f in req_files['files']:
-                print f
                 zf.write(f['name'])
             zf.close()
-        except Exception as e:
-            print e
-            logging.error(e)
 
-        return {'url':zip_file_name}
+            return {'url':zip_file_name}
+
+        else:
+            raise NotImplementedError()
+
+    except Exception as e:
+        logging.error(e)
+        return {'error':traceback.format_exc(e)}
+
+
+
+
 
 @app.get('/list/<type>')
 def redirection_to_home(type):
@@ -406,7 +426,7 @@ if __name__ == '__main__':
     DEBUG = option_dict["debug"]
     PORT = option_dict["port"]
 
-    RESULTS_DIR = "/psv_results/"
+    RESULTS_DIR = "/psv_results"
     GIT_BARE_REPO_DIR = "/var/pySolo-Video.git"
     GIT_WORKING_DIR = "/home/node/pySolo-Video"
     BRANCH = 'psv-package'
@@ -424,7 +444,7 @@ if __name__ == '__main__':
 
         if getpass.getuser() == "asterix":
             SUBNET_DEVICE = b'lo'
-            RESULTS_DIR = "/tmp/"
+            RESULTS_DIR = "/data1/todel/psv_results"
             GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
             GIT_WORKING_DIR = "/data1/todel/pySolo-video-node"
             BRANCH = 'psv-package'
@@ -442,11 +462,6 @@ if __name__ == '__main__':
     else:
         is_updated = True
 
-
-    for k, device in devices_map.iteritems():
-        if device['status'] == 'running':
-            acquisition[k]= Acquisition(device, result_main_dir=RESULTS_DIR)
-            acquisition[k].start()
     try:
 
         #run(app, host='0.0.0.0', port=PORT, debug=debug, server='cherrypy')
