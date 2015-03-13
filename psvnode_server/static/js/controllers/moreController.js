@@ -126,6 +126,7 @@
             })
         };
         $scope.update_selected = function(devices_to_update){
+            console.log(devices_to_update);
             if (devices_to_update == 'all'){
                 devices_to_update=[]
                 for (key in $scope.attached_devices){
@@ -144,7 +145,7 @@
             })
         };
          $scope.update_node = function(node){
-            $http.post('/update', data = {'node':node});
+            $http.post('/update', data =node);
             $('#updateNodeModal').modal('hide');
             $scope.update_result= data;
             $scope.update_waiting = true;
