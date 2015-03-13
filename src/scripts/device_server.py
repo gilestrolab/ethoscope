@@ -110,7 +110,7 @@ def close(exit_status=0):
     else:
 
         control = None
-    exit(exit_status)
+    os._exit(exit_status)
 
 if __name__ == '__main__':
 
