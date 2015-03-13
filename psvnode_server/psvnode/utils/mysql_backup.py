@@ -102,7 +102,7 @@ class MySQLdbToSQlite(object):
                 self._update_one_roi_table("ROI_%i" % i, src, dst)
 
             #fixme
-            #self._update_one_roi_table("CSV_DAM_ACTIVITY", src, dst, dump_in_csv=True)
+            self._update_one_roi_table("CSV_DAM_ACTIVITY", src, dst, dump_in_csv=True)
 
     # def _overwrite_table(self,table_name, src, dst):
     #     src_cur = src.cursor()
@@ -124,9 +124,9 @@ class MySQLdbToSQlite(object):
 
 
     def _copy_table(self,table_name, src, dst):
-        #fixme
-        if table_name == "CSV_DAM_ACTIVITY":
-            return
+        # #fixme
+        # if table_name == "CSV_DAM_ACTIVITY":
+        #     return
 
         src_cur = src.cursor()
         dst_cur = dst.cursor()
