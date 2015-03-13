@@ -126,8 +126,12 @@
             })
         };
         $scope.update_selected = function(devices_to_update){
-            console.log(devices_to_update);
-            console.log($scope.devices_to_update_selected);
+            if (devices_to_update == 'all'){
+                devices_to_update=[]
+                for (key in $scope.attached_devices){
+                    devices_to_update.push($scope.attached_devices[key]);
+                }
+            }
             $http.post('/update', data = devices_to_update)
                  .success(function(data){
                     if (data.error){
