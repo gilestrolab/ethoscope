@@ -383,14 +383,14 @@ def download(what):
 
 @app.get('/node/<req>')
 def node_actions(req):
-        if req == 'info':
-            df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout = subprocess.PIPE)
-            diskFree = df.communicate()[0]
-            disk_usage =  diskFree.split("\n")[1].split()
-            return {'disk_usage': disk_usage}
-        else:
-            raise NotImplementedError()
-            return {'error':'Nothing here'}
+    if req == 'info':
+        df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout = subprocess.PIPE)
+        diskFree = df.communicate()[0]
+        disk_usage =  diskFree.split("\n")[1].split()
+        return {'disk_usage': disk_usage}
+    else:
+        raise NotImplementedError()
+        return {'error':'Nothing here'}
 @app.post('/node-actions/')
 def node_actions():
         action = request.json
@@ -400,6 +400,24 @@ def node_actions():
             #close()
         else:
             raise NotImplementedError()
+@app.post('/remove_files')
+def remove_files():
+    try:
+        req = request.json
+        res = []
+        for f in req['files']:
+            print f
+            rm = subprocess.Popen(['rm', f['url']],
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+            out, err = rm.communicate()
+            logging.info(out)
+            logging.error(err)
+            res.append(f['url'])
+        return {'result': res}
+    except Exception as e:
+        logging.error(e)
+        return {'error':e}
 
 
 @app.get('/list/<type>')
