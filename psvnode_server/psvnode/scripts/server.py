@@ -76,11 +76,11 @@ def update_device_map(id, what="data",type=None, port=9000, data=None):
 
     except urllib2.URLError as e:
         if hasattr(e, 'reason'):
-            print 'We failed to reach a server.'
-            print 'Reason: ', e.reason
+            logging.error('We failed to reach a server.')
+            logging.error('Reason: ', e.reason)
         elif hasattr(e, 'code'):
-            print 'The server couldn\'t fulfill the request.'
-            print 'Error code: ', e.code
+            logging.error('The server couldn\'t fulfill the request.')
+            logging.error('Error code: ', e.code)
 
 def get_subnet_ip(device="wlan0"):
     try:
@@ -297,9 +297,7 @@ def update_systems():
     devices_to_update = request.json
     try:
         restart_node = False
-        print devices_to_update
         for d in devices_to_update:
-            print d
             if d['name'] == 'Node':
                 #update node
                 node_update = subprocess.Popen(['git', 'pull'],
@@ -405,13 +403,12 @@ def node_actions(req):
     else:
         raise NotImplementedError()
         return {'error':'Nothing here'}
-@app.post('/node-actions/')
+@app.post('/node-actions')
 def node_actions():
         action = request.json
-        if action == 'poweroff':
+        if action['action'] == 'poweroff':
             logging.info('User request a poweroff, shutting down system. Bye bye.')
-            print "Me apago"
-            #close()
+            close()
         else:
             raise NotImplementedError()
 @app.post('/remove_files')
@@ -420,7 +417,6 @@ def remove_files():
         req = request.json
         res = []
         for f in req['files']:
-            print f
             rm = subprocess.Popen(['rm', f['url']],
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
