@@ -123,7 +123,6 @@
                     $scope.origin = res.origin;
                     $scope.node = res.update.node;
 
-
             })
         };
         $scope.update_selected = function(devices_to_update){
