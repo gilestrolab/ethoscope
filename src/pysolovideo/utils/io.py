@@ -20,6 +20,8 @@ class AsyncMySQLWriter(multiprocessing.Process):
     def __init__(self, db_name, queue):
         self._db_name = db_name
         self._queue = queue
+        self._delete_my_sql_db()
+        self._create_mysql_db()
         super(AsyncMySQLWriter,self).__init__()
 
 

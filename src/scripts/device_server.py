@@ -83,7 +83,7 @@ def info(id):
 def update_system(id):
     if id == machine_id and control.info['status'] == 'stopped':
         try:
-            device_update = subprocess.Popen(['git', 'pull', "origin", BRANCH+':'+BRANCH],
+            device_update = subprocess.Popen(['git', 'pull', "origin", BRANCH],
                                              cwd=GIT_WORKING_DIR,
                                              stdout=subprocess.PIPE,
                                              stderr=subprocess.PIPE)
