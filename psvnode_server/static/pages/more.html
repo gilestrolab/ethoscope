@@ -94,7 +94,7 @@
     <h4>{{update_text}}</h4>
     <div >
         <!--<h2>The following devices will be updated.</h2>-->
-        <button class="btn btn-success" ng-click="update_selected(attached_devices)">Update All Devices</button>
+        <button class="btn btn-success" ng-click="update_selected([attached_devices])">Update All Devices</button>
         <button class="btn btn-default" ng-click="update_selected(devices_to_update_selected)">Update Selected</button>
         <button ng-if="node.version != origin.version" class="btn btn-primary" data-toggle="modal" data-target="#updateNodeModal" >Update Node</button>
 
