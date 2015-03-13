@@ -35,7 +35,7 @@
 
         ///Browse Functions
 
-        $scope.browse_table = $('#browse_table').DataTable({
+        /*$scope.browse_table = $('#browse_table').DataTable({
                             "paging": true,
                             "searching": true,
                             "order":[2,'desc'],
@@ -56,15 +56,13 @@
                                     },
                                     { "data": null,
                                     render: function(data, type, full, meta){
-                                     return '<td><input type="checkbox" ng-model="selected.files.'+full+' " ></td>'
+                                     return '<td><center><input type="checkbox" ng-model="" value="'+full.url+'" ></center></td>'
                                                 }},
 
                                 ],
 
-        });
-        $('#browse_table tbody').on( 'click', 'tr', function () {
-        $(this).toggleClass('selected');
-    } );
+        });*/
+
 
         $scope.browse=function(folder){
             folder = folder || "/null"
@@ -87,14 +85,13 @@
                         $scope.files = res;
                         $scope.filesObj = filesObj;
                         $scope.abs_path = res.absolute_path;
-                $scope.browse_table.clear();
-                $scope.browse_table.rows.add(filesObj).draw();
+                //$scope.browse_table.clear();
+                //$scope.browse_table.rows.add(filesObj).draw();
                 console.log($scope.filesObj);
                      })
         };
         $scope.browse.dowload = function(){
-            form_data=$('#selected_files').serialize();
-            console.log(form_data);
+
             if($scope.selected.files.length == 1){
                 $('#downloadModal').modal('show');
                 $scope.browse.download_url = '/download'+$scope.selected.files[0].name;
@@ -109,6 +106,15 @@
                      })
             }
         };
+        $scope.browse.remove_files = function(){
+            $http.post('/remove_files', data=$scope.selected)
+                 .success(function(res){
+                        console.log(res);
+                        $('#deleteModal').modal('hide');
+                        $scope.exec_option('browse');
+                 });
+            };
+
         $scope.browse.toggleAll = function(){
             if($scope.selected_all == false){
 
