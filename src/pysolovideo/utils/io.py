@@ -19,6 +19,9 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
     def __init__(self, db_name, queue):
         self._db_name = db_name
+        self._db_user_name = "psv"
+        self._db_user_pass = "psv"
+
         self._queue = queue
         self._delete_my_sql_db()
         self._create_mysql_db()
@@ -28,7 +31,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
     def _delete_my_sql_db(self):
         try:
             db =   MySQLdb.connect(host="localhost",
-                 user="psv", passwd="psv", db=self._db_name)
+                 user=self._db_user_name, passwd=self._db_user_pass, db=self._db_name)
         except MySQLdb.OperationalError:
             logging.warning("Database does not exist. Cannot delete it")
             return
@@ -63,7 +66,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
     def _create_mysql_db(self):
 
         db =   MySQLdb.connect(host="localhost",
-                 user="psv", passwd="psv")
+                 user=self._db_user_name, passwd=self._db_user_pass)
 
         c = db.cursor()
 
@@ -81,18 +84,18 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
     def _get_connection(self):
         db =   MySQLdb.connect(host="localhost",
-                 user="psv", passwd="psv",
+                 user=self._db_user_name, passwd=self._db_user_pass,
                   db=self._db_name)
         return db
 
     def run(self):
 
-        self._delete_my_sql_db()
-        self._create_mysql_db()
-        db = self._get_connection()
-
+        db = None
         do_run = True
         try:
+            self._delete_my_sql_db()
+            self._create_mysql_db()
+            db = self._get_connection()
             while do_run:
                 try:
                     msg = self._queue.get()
@@ -116,15 +119,22 @@ class AsyncMySQLWriter(multiprocessing.Process):
                         #we sleep iff we have an empty queue. this way, we don't over use a cpu
                         time.sleep(.1)
 
-        except KeyboardInterrupt:
+        except KeyboardInterrupt as e:
             logging.warning("DB async process interrupted with KeyboardInterrupt")
-        except:
+            raise e
+
+        except Exception as e:
             logging.error("DB async process stopped with an exception")
+            raise e
 
         finally:
             logging.info("Closing async mysql writer")
+            while not self._queue.empty():
+                self._queue.get()
+
             self._queue.close()
-            db.close()
+            if db is not None:
+                db.close()
 
 class ImgToMySQLHelper(object):
     _table_name = "IMG_SNAPSHOTS"

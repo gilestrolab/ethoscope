@@ -160,6 +160,7 @@ class ControlThread(Thread):
 
             self._metadata = {
                          "machine_id": self._info["id"],
+                         "machine_name": self._info["name"],
                          "date_time": cam.start_time, #the camera start time is the reference 0
                          "frame_width":cam.width,
                          "frame_height":cam.height,

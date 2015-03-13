@@ -459,7 +459,7 @@ def get_log(id):
         return {'error':traceback.format_exc(e)}
 
 
-def close(exist_status=0):
+def close(exit_status=0):
     logging.info("Joining acquisition processes")
     for a in acquisition.values():
         a.stop()
@@ -468,8 +468,8 @@ def close(exist_status=0):
         logging.info("Joined OK")
 
     logging.info("Closing server")
-    os._exit(exist_status)
-    #exit(exist_status)
+    os._exit(exit_status)
+    
 
 #======================================================================================================================#
 
