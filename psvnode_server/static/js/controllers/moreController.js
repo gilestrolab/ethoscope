@@ -35,34 +35,6 @@
 
         ///Browse Functions
 
-        /*$scope.browse_table = $('#browse_table').DataTable({
-                            "paging": true,
-                            "searching": true,
-                            "order":[2,'desc'],
-                            "dom": '<"col-xs-12"il<"right"f>><"col-xs-12"t><"right"p><"clear">',
-                            "columns": [
-                                    { "data": "device_name",
-                                    render :function (data, type, full, meta) {
-                                                    return '<td><a href="#/sm/'+full.device_id+'" target="_blank">'+full.device_name+'</a></td>'}},
-                                    { "data": "exp_date",
-                                      render:function(data, type, full, meta){
-                                           return '<td>'+full.exp_date+'</td>'
-                                        }
-                                    },
-                                    { "data":"file",
-                                     render:function(data, type, full, meta){
-                                     return '<td><a href="/download'+full.url+'"  target="_blank" >'+full.file+'</a></td>'
-                                    }
-                                    },
-                                    { "data": null,
-                                    render: function(data, type, full, meta){
-                                     return '<td><center><input type="checkbox" ng-model="" value="'+full.url+'" ></center></td>'
-                                                }},
-
-                                ],
-
-        });*/
-
 
         $scope.browse=function(folder){
             folder = folder || "/null"
@@ -128,7 +100,7 @@
         };
 
 /// Updates - Functions
-        $scope.devices_to_update_selected = {};
+        $scope.devices_to_update_selected = [];
 
         $scope.check_update = function(){
             //check if there is a new version
@@ -140,23 +112,28 @@
                             $scope.update.error = res.update.error;
                         }
                     }
+                    for (dev in res.attached_devices){
+                        if (dev.version != res.origin.version){
+                            $scope.update_text = "There is a new version and some devices need to be updated";
+                            break;
+                        }
+                    }
 
-                    $scope.update_text = "There is a new version and some devices need to be updated";
                     $scope.attached_devices=res.attached_devices;
                     $scope.origin = res.origin;
                     $scope.node = res.update.node;
-                    /*for (dev in res.attached_devices){
-                        if (dev.status != 'stopped'){
-                            $scope.started == true;
-                            break;
-                        }
-                    }*/
+
 
             })
         };
         $scope.update_selected = function(devices_to_update){
+            console.log(devices_to_update);
+            console.log($scope.devices_to_update_selected);
             $http.post('/update', data = devices_to_update)
                  .success(function(data){
+                    if (data.error){
+                        $scope.update.error = data.error;
+                    }
                     $scope.update_result= data;
                     $scope.update_waiting = true;
                     $timeout($scope.check_update, 15000);

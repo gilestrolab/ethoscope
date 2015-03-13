@@ -285,10 +285,12 @@ def update_systems():
     devices_to_update = request.json
     try:
         restart_node = False
-        for key, d in devices_to_update.iteritems():
+        print devices_to_update
+        for d in devices_to_update:
+            print d
             if d['name'] == 'Node':
                 #update node
-                node_update = subprocess.Popen(['git', 'pull', "origin", BRANCH+':'+BRANCH],
+                node_update = subprocess.Popen(['git', 'pull'],
                                                 cwd=GIT_WORKING_DIR,
                                                 stdout=subprocess.PIPE,
                                                 stderr=subprocess.PIPE)
@@ -509,8 +511,8 @@ if __name__ == '__main__':
             SUBNET_DEVICE = b'lo'
             RESULTS_DIR = "/data1/todel/psv_results"
             GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
-            GIT_WORKING_DIR = "/data1/todel/pySolo-video-node"
-            BRANCH = 'psv-dev'
+            GIT_WORKING_DIR = "/data1/todel/pySolo-Node"
+            BRANCH = 'psv-package'
 
     global devices_map
     global scanning_locked
