@@ -1,7 +1,5 @@
 __author__ = 'quentin'
 
-
-
 import MySQLdb
 import sqlite3
 import os
@@ -16,6 +14,7 @@ class MySQLdbToSQlite(object):
 
     def     __init__(self, dst_path, remote_db_name="psv_db", remote_host="localhost", remote_user="root", remote_pass="", overwrite=False):
         """
+
         A class to backup remote psv MySQL data base into a local sqlite3 one.
         The name of the static (not updated during run) and the dynamic tables is hardcoded.
         The `update_roi_tables` method will fetch only the new datapoint at each run.
@@ -90,6 +89,7 @@ class MySQLdbToSQlite(object):
 
         :return:
         """
+
         src = MySQLdb.connect(host=self._remote_host, user=self._remote_user,
                                          passwd=self._remote_pass, db=self._remote_db_name)
 
@@ -104,10 +104,30 @@ class MySQLdbToSQlite(object):
             #fixme
             #self._update_one_roi_table("CSV_DAM_ACTIVITY", src, dst, dump_in_csv=True)
 
+    # def _overwrite_table(self,table_name, src, dst):
+    #     src_cur = src.cursor()
+    #     dst_cur = dst.cursor()
+    #
+    #     src_command = "SHOW COLUMNS FROM %s " % table_name
+    #
+    #     src_cur.execute(src_command)
+    #     col_list = []
+    #     for c in src_cur:
+    #          col_list.append(" ".join(c[0:2]))
+    #
+    #     formated_cols_names = ", ".join(col_list)
+    #
+    #     dst_command = "DROP TABLE IF EXISTS %s" % table_name
+    #     dst_cur.execute(dst_command)
+    #     dst_command = "CREATE TABLE IF NOT EXISTS %s (%s)" % (table_name ,formated_cols_names)
+    #     dst_cur.execute(dst_command)
+
+
     def _copy_table(self,table_name, src, dst):
         #fixme
         if table_name == "CSV_DAM_ACTIVITY":
             return
+
         src_cur = src.cursor()
         dst_cur = dst.cursor()
 
@@ -120,9 +140,10 @@ class MySQLdbToSQlite(object):
 
         formated_cols_names = ", ".join(col_list)
 
-        dst_command = "DROP TABLE IF EXISTS %s" % table_name
-        dst_cur.execute(dst_command)
-        dst_command = "CREATE TABLE %s (%s) " % (table_name ,formated_cols_names)
+        # dst_command = "DROP TABLE IF EXISTS %s" % table_name
+        # dst_cur.execute(dst_command)
+
+        dst_command = "CREATE TABLE IF NOT EXISTS %s (%s)" % (table_name ,formated_cols_names)
         dst_cur.execute(dst_command)
 
         src_command = "SELECT * FROM %s " % table_name
@@ -138,7 +159,6 @@ class MySQLdbToSQlite(object):
             if len(to_insert) > self._max_n_rows_to_insert:
                 value_string = ",".join(to_insert)
                 dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string )
-                print table_name
                 dst_cur.execute(dst_command)
                 dst.commit()
                 to_insert = []
@@ -146,7 +166,6 @@ class MySQLdbToSQlite(object):
         if len(to_insert) > 0:
             value_string = ",".join(to_insert)
             dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string )
-            logging.info(("dst_cmd2", dst_command))
             dst_cur.execute(dst_command)
         dst.commit()
 
@@ -160,13 +179,14 @@ class MySQLdbToSQlite(object):
             dst_command= "SELECT id FROM %s ORDER BY id DESC LIMIT 1" % table_name
             dst_cur.execute(dst_command)
         except (sqlite3.OperationalError, MySQLdb.ProgrammingError):
+
             self._copy_table(table_name, src, dst)
             return
 
-        last_t_in_dst = 0
+        last_id_in_dst = 0
         for c in dst_cur:
-            last_t_in_dst = c[0]
-        src_command = "SELECT * FROM %s WHERE id > %d" % (table_name, last_t_in_dst)
+            last_id_in_dst = c[0]
+        src_command = "SELECT * FROM %s WHERE id > %d" % (table_name, last_id_in_dst)
         src_cur.execute(src_command)
 
 

@@ -18,7 +18,10 @@ class Acquisition(multiprocessing.Process):
         }
 
 
-    _delay_between_updates = 60 * 5 # seconds
+    #fixme
+    _delay_between_updates = 60 * 1 # seconds
+
+    # _delay_between_updates = 10 # seconds
     #_delay_between_updates = 10 # seconds
     _last_backup_timeout = 30 #seconds
 
