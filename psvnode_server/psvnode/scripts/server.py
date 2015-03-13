@@ -367,9 +367,9 @@ def download(what):
             #FIXME change the route for this? and old zips need to be erased
             zip_file_name = os.path.join(RESULTS_DIR,'results_'+t.strftime("%y%m%d_%H%M%S")+'.zip')
             zf = zipfile.ZipFile(zip_file_name, mode='a')
-            logging.info("Saving files : %s in %s" % (str(req_files['files']),zip_file_name) )
+            logging.info("Saving files : %s in %s" % (str(req_files['files']), zip_file_name) )
             for f in req_files['files']:
-                zf.write(f['name'])
+                zf.write(f['url'])
             zf.close()
 
             return {'url':zip_file_name}
@@ -492,7 +492,7 @@ if __name__ == '__main__':
             RESULTS_DIR = "/data1/todel/psv_results"
             GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
             GIT_WORKING_DIR = "/data1/todel/pySolo-video-node"
-            BRANCH = 'psv-package'
+            BRANCH = 'psv-dev'
 
     global devices_map
     global scanning_locked

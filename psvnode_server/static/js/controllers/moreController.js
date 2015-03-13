@@ -39,29 +39,32 @@
                             "paging": true,
                             "searching": true,
                             "order":[2,'desc'],
-                            "dom": '<"col-xs-12"<"right"f>><"col-xs-12"t><"right"p><"clear">',
+                            "dom": '<"col-xs-12"il<"right"f>><"col-xs-12"t><"right"p><"clear">',
                             "columns": [
                                     { "data": "device_name",
                                     render :function (data, type, full, meta) {
-                                                    return '<td><a href="#/sm/'+full.device_id+'" target="_blank">'+data+'</a></td>'}},
+                                                    return '<td><a href="#/sm/'+full.device_id+'" target="_blank">'+full.device_name+'</a></td>'}},
                                     { "data": "exp_date",
                                       render:function(data, type, full, meta){
-                                           return '<td>'+data+'</td>'
+                                           return '<td>'+full.exp_date+'</td>'
                                         }
                                     },
                                     { "data":"file",
                                      render:function(data, type, full, meta){
-                                     return '<td><a href="/download'+full.url+'"  target="_blank">'+data+'</a></td>'
+                                     return '<td><a href="/download'+full.url+'"  target="_blank" >'+full.file+'</a></td>'
                                     }
                                     },
                                     { "data": null,
                                     render: function(data, type, full, meta){
-                                     return '<td><input type="checkbox" checklist-model="selected.files" checklist-value="'+full.url+'"></td>'
+                                     return '<td><input type="checkbox" ng-model="selected.files.'+full+' " ></td>'
                                                 }},
 
                                 ],
 
         });
+        $('#browse_table tbody').on( 'click', 'tr', function () {
+        $(this).toggleClass('selected');
+    } );
 
         $scope.browse=function(folder){
             folder = folder || "/null"
@@ -73,31 +76,31 @@
                         filesObj =[];
                         for (key in res.files){
                             path = res.files[key].abs_path.split('/');
-                            file = {'device_id':path[-4],
-                                    'device_name':path[-3],
-                                    'exp_date':path[-2],
-                                    'file':path[-1],
+                            length = path.length;
+                            file = {'device_id':path[length-4],
+                                    'device_name':path[length-3],
+                                    'exp_date':path[length-2],
+                                    'file':path[length-1],
                                     'url':res.files[key].abs_path};
                             filesObj.push(file);
                         }
                         $scope.files = res;
                         $scope.filesObj = filesObj;
                         $scope.abs_path = res.absolute_path;
-                console.log($scope.abs_path);
-
                 $scope.browse_table.clear();
                 $scope.browse_table.rows.add(filesObj).draw();
+                console.log($scope.filesObj);
                      })
         };
         $scope.browse.dowload = function(){
+            form_data=$('#selected_files').serialize();
+            console.log(form_data);
             if($scope.selected.files.length == 1){
-                console.log("files to download");
-                console.log($scope.selected.files[0].name);
+                $('#downloadModal').modal('show');
                 $scope.browse.download_url = '/download'+$scope.selected.files[0].name;
                 $scope.browse.show_download_panel = true;
             }else{
-                console.log("files to download");
-                console.log($scope.selected.files);
+                $('#downloadModal').modal('show');
                 $scope.browse.download_url ='';
                 $http.post('/request_download/files', data=$scope.selected)
                      .success(function(res){
@@ -108,8 +111,10 @@
         };
         $scope.browse.toggleAll = function(){
             if($scope.selected_all == false){
-                $scope.selected.files = angular.copy($scope.files.files);
+
+                $scope.selected.files = angular.copy($scope.filesObj);
                 $scope.selected_all = true;
+                console.log($scope.selected);
             }else {
                 $scope.selected.files = [];
                 $scope.selected_all = false;
@@ -121,32 +126,26 @@
 
         $scope.check_update = function(){
             //check if there is a new version
+            $scope.update={};
             $http.get("/update/check")
                  .success(function(res){
-                    if(res.error){
-                        $scope.attached_devices = {};
-                        $scope.attached_devices.error = res.error;
-                    }
-                    if (Object.keys(res.attached_devices).length == 0){
-                        $scope.update_text = "All connected devices and the Node are up to update. Well Done!";
-                        $scope.update_need_update = false;
-                        $scope.origin = res.origin;
-                        $scope.node = res.update.node;
-                        $scope.attached_devices={};
-
-                    }else{
-                        $scope.update_text = "There is a new version and some devices need to be updated";
-                        $scope.update_need_update = true;
-                        $scope.attached_devices=res.attached_devices;
-                        $scope.origin = res.origin;
-                        $scope.node = res.update.node;
-                        for (dev in res.attached_devices){
-                            if (dev.status != 'stopped'){
-                                $scope.started == true;
-                                break;
-                            }
+                    if(res.update.error){
+                        if(res.update.error.indexOf('up to date')<0){
+                            $scope.update.error = res.update.error;
                         }
                     }
+
+                    $scope.update_text = "There is a new version and some devices need to be updated";
+                    $scope.attached_devices=res.attached_devices;
+                    $scope.origin = res.origin;
+                    $scope.node = res.update.node;
+                    /*for (dev in res.attached_devices){
+                        if (dev.status != 'stopped'){
+                            $scope.started == true;
+                            break;
+                        }
+                    }*/
+
             })
         };
         $scope.update_selected = function(devices_to_update){
