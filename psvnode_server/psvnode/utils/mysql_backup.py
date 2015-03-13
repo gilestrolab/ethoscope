@@ -45,14 +45,28 @@ class MySQLdbToSQlite(object):
 
 
         # we remove file and create dir, if needed
-        try:
-            if overwrite:
-                logging.info("Trying to remove old database")
+
+        if overwrite:
+            logging.info("Trying to remove old database")
+            try:
                 os.remove(self._dst_path)
                 logging.info("Success")
-        except OSError as e:
-            logging.warning(e)
-            pass
+            except OSError as e:
+                logging.warning(e)
+                pass
+
+            logging.info("Trying to remove old DAM file")
+
+            try:
+                os.remove(self._dam_file_name)
+                logging.info("Success")
+            except OSError as e:
+                logging.warning(e)
+                pass
+
+        #
+
+
         try:
             logging.info("Making parent directories")
             os.makedirs(os.path.dirname(self._dst_path))
@@ -61,8 +75,8 @@ class MySQLdbToSQlite(object):
             logging.warning(e)
             pass
 
-        # just erase old file
-        with open(self._dam_file_name,"w") as f:
+        with open(self._dam_file_name,"a"):
+            logging.info("Ensuring DAM file exists at %s" % self._dam_file_name)
             pass
 
         with sqlite3.connect(self._dst_path, check_same_thread=False) as conn:
@@ -81,7 +95,8 @@ class MySQLdbToSQlite(object):
                 self._copy_table(t, src, conn)
 
             #TODO checksum of ordered metadata ?
-            logging.info("Database mirroring initialised")
+
+        logging.info("Database mirroring initialised")
 
     def update_roi_tables(self):
         """
@@ -101,50 +116,13 @@ class MySQLdbToSQlite(object):
             for i in rois_in_src :
                 self._update_one_roi_table("ROI_%i" % i, src, dst)
 
-            #fixme
+
             self._update_one_roi_table("CSV_DAM_ACTIVITY", src, dst, dump_in_csv=True)
 
-    # def _overwrite_table(self,table_name, src, dst):
-    #     src_cur = src.cursor()
-    #     dst_cur = dst.cursor()
-    #
-    #     src_command = "SHOW COLUMNS FROM %s " % table_name
-    #
-    #     src_cur.execute(src_command)
-    #     col_list = []
-    #     for c in src_cur:
-    #          col_list.append(" ".join(c[0:2]))
-    #
-    #     formated_cols_names = ", ".join(col_list)
-    #
-    #     dst_command = "DROP TABLE IF EXISTS %s" % table_name
-    #     dst_cur.execute(dst_command)
-    #     dst_command = "CREATE TABLE IF NOT EXISTS %s (%s)" % (table_name ,formated_cols_names)
-    #     dst_cur.execute(dst_command)
 
-
-    def _copy_table(self,table_name, src, dst):
-        # #fixme
-        # if table_name == "CSV_DAM_ACTIVITY":
-        #     return
-
+    def _replace_table(self,table_name, src, dst):
         src_cur = src.cursor()
         dst_cur = dst.cursor()
-
-        src_command = "SHOW COLUMNS FROM %s " % table_name
-
-        src_cur.execute(src_command)
-        col_list = []
-        for c in src_cur:
-             col_list.append(" ".join(c[0:2]))
-
-        formated_cols_names = ", ".join(col_list)
-
-        # dst_command = "DROP TABLE IF EXISTS %s" % table_name
-        # dst_cur.execute(dst_command)
-
-        dst_command = "CREATE TABLE IF NOT EXISTS %s (%s)" % (table_name ,formated_cols_names)
-        dst_cur.execute(dst_command)
 
         src_command = "SELECT * FROM %s " % table_name
 
@@ -170,8 +148,33 @@ class MySQLdbToSQlite(object):
         dst.commit()
 
 
-    def _update_one_roi_table(self, table_name, src, dst, dump_in_csv=False):
+    def _copy_table(self,table_name, src, dst):
 
+
+        src_cur = src.cursor()
+        dst_cur = dst.cursor()
+
+        src_command = "SHOW COLUMNS FROM %s " % table_name
+
+        src_cur.execute(src_command)
+        col_list = []
+        for c in src_cur:
+             col_list.append(" ".join(c[0:2]))
+
+        formated_cols_names = ", ".join(col_list)
+
+
+        try:
+            dst_command = "CREATE TABLE %s (%s)" % (table_name ,formated_cols_names)
+            dst_cur.execute(dst_command)
+
+        except sqlite3.OperationalError:
+            logging.info("Table %s exists, not copying it" % table_name)
+            return
+
+        self._replace_table(table_name, src, dst)
+
+    def _update_one_roi_table(self, table_name, src, dst, dump_in_csv=False):
         src_cur = src.cursor()
         dst_cur = dst.cursor()
 
@@ -179,8 +182,8 @@ class MySQLdbToSQlite(object):
             dst_command= "SELECT id FROM %s ORDER BY id DESC LIMIT 1" % table_name
             dst_cur.execute(dst_command)
         except (sqlite3.OperationalError, MySQLdb.ProgrammingError):
-
-            self._copy_table(table_name, src, dst)
+            logging.warning(" Local table %s appears empty. Rebuilding it from source" % table_name)
+            self._replace_table(table_name, src, dst)
             return
 
         last_id_in_dst = 0
