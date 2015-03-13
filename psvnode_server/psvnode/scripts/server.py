@@ -53,22 +53,34 @@ def update_device_map(id, what="data",type=None, port=9000, data=None):
 
     req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
 
-    f = urllib2.urlopen(req)
-    message = f.read()
+    try:
+        f = urllib2.urlopen(req)
+        message = f.read()
 
-    if message:
-        data = json.loads(message)
+        if message:
+            data = json.loads(message)
 
-        if not id in devices_map:
-            logging.warning("Device %s is not in device map. Rescanning subnet..." % id)
-            scan_subnet()
-        try:
-            devices_map[id].update(data)
-            return data
+            if not id in devices_map:
+                logging.warning("Device %s is not in device map. Rescanning subnet..." % id)
+                scan_subnet()
+            try:
+                devices_map[id].update(data)
+                return data
 
-        except KeyError:
-            logging.error("Device %s is not detected" % id)
-            raise KeyError("Device %s is not detected" % id)
+            except KeyError:
+                logging.error("Device %s is not detected" % id)
+                raise KeyError("Device %s is not detected" % id)
+
+    except urllib2.httplib.BadStatusLine:
+        logging.error('BadlineSatus, most probably due to update device and auto-reset')
+
+    except urllib2.URLError as e:
+        if hasattr(e, 'reason'):
+            print 'We failed to reach a server.'
+            print 'Reason: ', e.reason
+        elif hasattr(e, 'code'):
+            print 'The server couldn\'t fulfill the request.'
+            print 'Error code: ', e.code
 
 def get_subnet_ip(device="wlan0"):
     try:
