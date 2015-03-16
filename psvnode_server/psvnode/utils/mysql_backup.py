@@ -109,10 +109,14 @@ class MySQLdbToSQlite(object):
                                          passwd=self._remote_pass, db=self._remote_db_name)
 
         with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
+
+            self._update_one_roi_table("ROI_MAP", src, dst)
+
             dst_cur = src.cursor()
             command = "SELECT roi_idx FROM ROI_MAP"
             dst_cur.execute(command)
             rois_in_src = set([c[0] for c in dst_cur])
+            print rois_in_src
             for i in rois_in_src :
                 self._update_one_roi_table("ROI_%i" % i, src, dst)
 
