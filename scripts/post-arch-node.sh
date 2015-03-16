@@ -117,8 +117,10 @@ echo 'Generating boot config'
 echo 'start_file=start_x.elf' > /boot/config.txt
 echo 'fixup_file=fixup_x.dat' >> /boot/config.txt
 echo 'disable_camera_led=1' >> /boot/config.txt
-#gpu_mem_512=64
-#gpu_mem_256=64
+echo 'dtparam=i2c1=on' >> /boot/config.txt
+echo 'dtparam=i2c_arm=on' >> /boot/config.txt
+#gpu_mem_512=64'
+#gpu_mem_256=64'
 
 
 ###Turbo #FIXME NOT needed for piv2.0
@@ -139,6 +141,21 @@ echo 'Loading bcm2835 module'
 #to use the camera through v4l2
 # modprobe bcm2835-v4l2
 echo "bcm2835-v4l2" > /etc/modules-load.d/picamera.conf
+
+echo 'Loading IC2'
+echo "ic2-bcm2708" > /etc/modules-load.d/ic2.conf
+echo "ic2-dev" > /etc/modules-load.d/.ic2.conf
+
+echo 'Loading clock'
+echo 'rtc-ds1307' > /etc/modules-load.d/clock.conf
+echo 'ds1307 0x68' > /sys/class/i2c-adapter/i2c-1/new_device
+echo 'setting date to clock'
+echo date
+hwclock -w
+
+echo 'creating service to start clock on boot'
+systemctl enable clock.service
+systemctl start clock.service
 
 echo 'Setting permissions for using arduino'
 #SEE https://wiki.archlinux.org/index.php/arduino#Configuration
