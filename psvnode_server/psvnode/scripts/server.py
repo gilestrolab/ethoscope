@@ -11,7 +11,7 @@ from psvnode.utils.acquisition import Acquisition
 from psvnode.utils.helpers import get_version
 from psvnode.utils.helpers import which
 
-from netifaces import ifaddresses, AF_INET
+from netifaces import ifaddresses, AF_INET, AF_LINK
 from os import walk
 import optparse
 import zipfile
@@ -394,12 +394,21 @@ def download(what):
         return {'error':traceback.format_exc(e)}
 
 @app.get('/node/<req>')
-def node_actions(req):
+def node_actions(req, device='eth0'):
     if req == 'info':
-        df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout = subprocess.PIPE)
-        diskFree = df.communicate()[0]
-        disk_usage =  diskFree.split("\n")[1].split()
-        return {'disk_usage': disk_usage}
+        df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout=subprocess.PIPE)
+        disk_free = df.communicate()[0]
+        disk_usage = disk_free.split("\n")[1].split()
+        ip = "No IP assigned, check cable"
+        MAC_addr = None
+        addrs = ifaddresses(device)
+        MAC_addr = addrs[AF_LINK][0]["addr"]
+        try:
+            ip = addrs[AF_INET][0]["addr"]
+        except Exception as e:
+            logging.error(e)
+
+        return {'disk_usage': disk_usage, 'MAC_addr': MAC_addr, 'ip': ip}
     else:
         raise NotImplementedError()
         return {'error':'Nothing here'}

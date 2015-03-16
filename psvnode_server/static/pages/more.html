@@ -211,12 +211,17 @@
         <p>Time on Network: {{nodeManagement.time}}</p>
         <p>Disk Usage: </p>
         <ul class="list-group col-xs-6">
-        <li class="list-group-item">Device: {{nodeManagement.info.disk_usage[0]}}</li>
-        <li class="list-group-item">Total Size: {{nodeManagement.info.disk_usage[1]}}</li>
+            <li class="list-group-item">Device: {{nodeManagement.info.disk_usage[0]}}</li>
+            <li class="list-group-item">Total Size: {{nodeManagement.info.disk_usage[1]}}</li>
             <li class="list-group-item">Used: {{nodeManagement.info.disk_usage[2]}}</li>
             <li class="list-group-item">Available: {{nodeManagement.info.disk_usage[3]}}</li>
             <li class="list-group-item">% used: {{nodeManagement.info.disk_usage[4]}}</li>
             <li class="list-group-item">Mounted on: {{nodeManagement.info.disk_usage[5]}}</li>
+        </ul>
+        <p>Internet Network: </p>
+        <ul class="list-group col-xs-6">
+            <li class="list-group-item">Device IP: {{nodeManagement.info.ip}}</li>
+            <li class="list-group-item">Ethernet MAC Address: {{nodeManagement.info.MAC_addr}}</li>
         </ul>
     </div>
 
