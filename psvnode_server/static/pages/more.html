@@ -91,9 +91,10 @@
     <h3>Upstream version: {{origin.version}}</h3>
     <h3>Node version: {{node.version}}</h3>
 
+    <h4>{{update_text}}</h4>
     <div >
         <!--<h2>The following devices will be updated.</h2>-->
-        <button class="btn btn-success" ng-click="update_selected(devices_to_update)">Update All</button>
+        <button class="btn btn-success" ng-click="update_selected('all')">Update All Devices</button>
         <button class="btn btn-default" ng-click="update_selected(devices_to_update_selected)">Update Selected</button>
         <button ng-if="node.version != origin.version" class="btn btn-primary" data-toggle="modal" data-target="#updateNodeModal" >Update Node</button>
 
@@ -144,7 +145,7 @@
                 </td>
                 <td>{{d.version}}</td>
                 <td>
-                    <input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="device" ng-if="d.version != origin.version && d.status != 'stopped'">
+
                     </td>
                 </tr>
                 <tr class="warning" ng-if="d.version != origin.version && d.status == 'stopped'">
@@ -158,7 +159,7 @@
                 </td>
                 <td>{{d.version}}</td>
                 <td>
-                    <input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="device" ng-if="d.version != origin.version && d.status != 'stopped'">
+                    <input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="d">
                     </td>
                 </tr>
                 <tr class="success" ng-show="d.version == origin.version">
@@ -184,7 +185,7 @@
     </div>
 
 </div>
-<!-- Modal download -->
+<!-- Modal Update Node -->
 <div class="modal fade" id="updateNodeModal" tabindex="-1" role="dialog" aria-labelledby="updateNodeModal" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -197,7 +198,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-        <button ng-click="update_node(node)" target="_blank" type="button" class="btn btn-primary">Update Node</button>
+        <button ng-click="update_node([node])" target="_blank" type="button" class="btn btn-primary">Update Node</button>
       </div>
     </div>
   </div>

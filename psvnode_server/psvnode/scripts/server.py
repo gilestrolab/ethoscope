@@ -53,22 +53,34 @@ def update_device_map(id, what="data",type=None, port=9000, data=None):
 
     req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
 
-    f = urllib2.urlopen(req)
-    message = f.read()
+    try:
+        f = urllib2.urlopen(req)
+        message = f.read()
 
-    if message:
-        data = json.loads(message)
+        if message:
+            data = json.loads(message)
 
-        if not id in devices_map:
-            logging.warning("Device %s is not in device map. Rescanning subnet..." % id)
-            scan_subnet()
-        try:
-            devices_map[id].update(data)
-            return data
+            if not id in devices_map:
+                logging.warning("Device %s is not in device map. Rescanning subnet..." % id)
+                scan_subnet()
+            try:
+                devices_map[id].update(data)
+                return data
 
-        except KeyError:
-            logging.error("Device %s is not detected" % id)
-            raise KeyError("Device %s is not detected" % id)
+            except KeyError:
+                logging.error("Device %s is not detected" % id)
+                raise KeyError("Device %s is not detected" % id)
+
+    except urllib2.httplib.BadStatusLine:
+        logging.error('BadlineSatus, most probably due to update device and auto-reset')
+
+    except urllib2.URLError as e:
+        if hasattr(e, 'reason'):
+            logging.error('We failed to reach a server.')
+            logging.error('Reason: ', e.reason)
+        elif hasattr(e, 'code'):
+            logging.error('The server couldn\'t fulfill the request.')
+            logging.error('Error code: ', e.code)
 
 def get_subnet_ip(device="wlan0"):
     try:
@@ -285,10 +297,10 @@ def update_systems():
     devices_to_update = request.json
     try:
         restart_node = False
-        for key, d in devices_to_update.iteritems():
+        for d in devices_to_update:
             if d['name'] == 'Node':
                 #update node
-                node_update = subprocess.Popen(['git', 'pull', "origin", BRANCH+':'+BRANCH],
+                node_update = subprocess.Popen(['git', 'pull'],
                                                 cwd=GIT_WORKING_DIR,
                                                 stdout=subprocess.PIPE,
                                                 stderr=subprocess.PIPE)
@@ -391,13 +403,12 @@ def node_actions(req):
     else:
         raise NotImplementedError()
         return {'error':'Nothing here'}
-@app.post('/node-actions/')
+@app.post('/node-actions')
 def node_actions():
         action = request.json
-        if action == 'poweroff':
+        if action['action'] == 'poweroff':
             logging.info('User request a poweroff, shutting down system. Bye bye.')
-            print "Me apago"
-            #close()
+            close()
         else:
             raise NotImplementedError()
 @app.post('/remove_files')
@@ -406,7 +417,6 @@ def remove_files():
         req = request.json
         res = []
         for f in req['files']:
-            print f
             rm = subprocess.Popen(['rm', f['url']],
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
@@ -509,8 +519,8 @@ if __name__ == '__main__':
             SUBNET_DEVICE = b'lo'
             RESULTS_DIR = "/data1/todel/psv_results"
             GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
-            GIT_WORKING_DIR = "/data1/todel/pySolo-video-node"
-            BRANCH = 'psv-dev'
+            GIT_WORKING_DIR = "/data1/todel/pySolo-Node"
+            BRANCH = 'psv-package'
 
     global devices_map
     global scanning_locked
