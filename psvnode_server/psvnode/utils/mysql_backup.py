@@ -92,7 +92,10 @@ class MySQLdbToSQlite(object):
             src_cur.execute(command)
             tables = [c[0] for c in src_cur]
             for t in tables:
-                self._copy_table(t, src, conn)
+                if t == "CSV_DAM_ACTIVITY":
+                    self._copy_table(t, src, conn, dump_in_csv=True)
+                else:
+                    self._copy_table(t, src, conn, dump_in_csv=False)
 
             #TODO checksum of ordered metadata ?
 
@@ -110,13 +113,12 @@ class MySQLdbToSQlite(object):
 
         with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
 
-            self._update_one_roi_table("ROI_MAP", src, dst)
+
 
             dst_cur = src.cursor()
             command = "SELECT roi_idx FROM ROI_MAP"
             dst_cur.execute(command)
             rois_in_src = set([c[0] for c in dst_cur])
-            print rois_in_src
             for i in rois_in_src :
                 self._update_one_roi_table("ROI_%i" % i, src, dst)
 
@@ -124,7 +126,7 @@ class MySQLdbToSQlite(object):
             self._update_one_roi_table("CSV_DAM_ACTIVITY", src, dst, dump_in_csv=True)
 
 
-    def _replace_table(self,table_name, src, dst):
+    def _replace_table(self,table_name, src, dst, dump_in_csv=False):
         src_cur = src.cursor()
         dst_cur = dst.cursor()
 
@@ -144,6 +146,11 @@ class MySQLdbToSQlite(object):
                 dst_cur.execute(dst_command)
                 dst.commit()
                 to_insert = []
+            if dump_in_csv:
+                with open(self._dam_file_name,"a") as f:
+                    row = "\t".join(["{0}".format(val) for val in sc])
+                    f.write(row)
+                    f.write("\n")
 
         if len(to_insert) > 0:
             value_string = ",".join(to_insert)
@@ -152,7 +159,7 @@ class MySQLdbToSQlite(object):
         dst.commit()
 
 
-    def _copy_table(self,table_name, src, dst):
+    def _copy_table(self,table_name, src, dst, dump_in_csv=False):
 
 
         src_cur = src.cursor()
@@ -176,7 +183,7 @@ class MySQLdbToSQlite(object):
             logging.info("Table %s exists, not copying it" % table_name)
             return
 
-        self._replace_table(table_name, src, dst)
+        self._replace_table(table_name, src, dst, dump_in_csv)
 
     def _update_one_roi_table(self, table_name, src, dst, dump_in_csv=False):
         src_cur = src.cursor()
