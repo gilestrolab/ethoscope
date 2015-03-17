@@ -120,6 +120,7 @@ mkdir -p /home/$USER_NAME/.ssh
 cp ./ssh_keys/id_rsa /home/$USER_NAME/.ssh/id_rsa
 chmod 600 /home/$USER_NAME/.ssh/id_rsa
 # copy to root keys as well!!
+mkdir -p /root/.ssh
 cp ./ssh_keys/id_rsa /root/.ssh/id_rsa
 chmod 600 /root/.ssh/id_rsa
 
