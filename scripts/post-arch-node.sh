@@ -30,6 +30,7 @@ pacman -S xorg-server xorg-utils xorg-server-utils xorg-xinit xf86-video-fbdev l
 # utilities
 pacman -S ntp bash-completion --noconfirm --needed
 pacman -S raspberrypi-firmware{,-tools,-bootloader,-examples} --noconfirm --needed
+pacman -S dnsmasq
 
 # preinstalling dependencies will save compiling time on python packages
 pacman -S python2-pip python2-numpy python2-bottle python2-pyserial mysql-python python2-netifaces python2-cherrypy python2-futures --noconfirm --needed
@@ -42,7 +43,7 @@ pacman -S mariadb --noconfirm --needed
 pacman -S wpa_supplicant --noconfirm --needed
 
 
-echo 'Description=psv wifi network' >> /etc/netctl/psv_wifi
+echo 'Description=psv wifi network' > /etc/netctl/psv_wifi
 echo 'Interface=wlan0' >> /etc/netctl/psv_wifi
 echo 'Connection=wireless' >> /etc/netctl/psv_wifi
 echo 'Security=wpa' >> /etc/netctl/psv_wifi
@@ -57,7 +58,7 @@ echo 'Key=PSV_WIFI_pIAEZF2s@jmKH' >> /etc/netctl/psv_wifi
 
 #
 #####################################################################################
-echo 'Description=eth0 Network' >> /etc/netctl/eth0
+echo 'Description=eth0 Network' > /etc/netctl/eth0
 echo 'Interface=eth0' >> /etc/netctl/eth0
 echo 'Connection=ethernet' >> /etc/netctl/eth0
 echo 'IP=dhcp' >> /etc/netctl/eth0
@@ -66,6 +67,16 @@ echo 'IP=dhcp' >> /etc/netctl/eth0
 #Creating service for device_server.py
 
 cp ./node.service /etc/systemd/system/node.service
+
+#configuring dns server:
+echo 'interface=wlan0' >/etc/dnsmasq.conf
+echo 'dhcp-option = 6,192.169.123.1' >> /etc/dnsmasq.conf
+echo 'no-hosts' >> /etc/dnsmasq.conf
+echo 'addn-hosts=/etc/host.dnsmasq' >> /etc/dnsmasq.conf
+#domain=polygonaltreenetwork.com,192.169.123.0/24
+
+echo '192.169.123.1    node' >> /etc/hosts.dnsmasq
+
 
 systemctl daemon-reload
 ######################################################################################
@@ -145,7 +156,7 @@ echo "bcm2835-v4l2" > /etc/modules-load.d/picamera.conf
 echo 'Loading IC2'
 echo "ic2-bcm2708" > /etc/modules-load.d/ic2.conf
 echo "ic2-dev" > /etc/modules-load.d/.ic2.conf
-
+modprobe bcm2835-v4l2
 echo 'Loading clock'
 echo 'rtc-ds1307' > /etc/modules-load.d/clock.conf
 echo 'ds1307 0x68' > /sys/class/i2c-adapter/i2c-1/new_device
@@ -154,6 +165,8 @@ echo date
 hwclock -w
 
 echo 'creating service to start clock on boot'
+cp ./clock.service /etc/systemd/system/clock.service
+systemctl daemon-reload
 systemctl enable clock.service
 systemctl start clock.service
 
@@ -200,12 +213,6 @@ echo "/dev/sda1 $PSV_DATA_DIR ext4 defaults,rw,relatime,data=ordered 0 1" >> /et
 
 
 
-
-
-
-
-
-
 #Create a Bare repository with only the production branch in node, it is on /var/
 git clone --bare -b psv-package --single-branch https://github.com/gilestrolab/pySolo-Video.git /var/pySolo-Video.git
 #Create a local working copy from the bare repo on node
@@ -216,7 +223,7 @@ git clone /var/pySolo-Video.git /home/$USER_NAME/pySolo-Video
 echo 'Installing PSV package'
 #wget hthttp://stackoverflow.com/questions/758819/python-mysqldb-connection-problemstps://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
 #tar -xvf psv.tar.gz
-cd /home/node/pySolo-Video/psvnode_server
+cd /home/$USER_NAME/pySolo-Video/psvnode_server
 pip2 install -e .
 
 echo 'SUCESS, please reboot'
