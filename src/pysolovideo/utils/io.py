@@ -230,16 +230,20 @@ class DAMFileHelper(object):
 
 
     def flush(self,t):
+
         out =  OrderedDict()
         tick = int(round((t/1000.0)/self._period))
+
         if len(self._activity_accum) < 1:
+            self._activity_accum[tick] = OrderedDict()
+            for r in range(1, self._n_rois +1):
+                self._activity_accum[tick][r] = 0
             return []
+
 
         m  = min(self._activity_accum.keys())
         todel = []
-
         for i in range(m, tick ):
-
             if i not in self._activity_accum.keys():
                 self._activity_accum[i] = OrderedDict()
                 for r in range(1, self._n_rois +1):
