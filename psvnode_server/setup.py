@@ -24,6 +24,8 @@ setup(
         "bottle>=0.12.8",
         "MySQL-python >= 1.2.5",
         "netifaces >= 0.10.4",
-        "cherrypy >= 3.6.0"
+        "cherrypy >= 3.6.0",
+        "eventlet >= 0.17.1",
+        "python-nmap >= 0.3.4"
     ],
 )

@@ -4,67 +4,31 @@ import urllib2
 import subprocess
 import socket
 import json
-import multiprocessing
+
 import logging
 import traceback
 from psvnode.utils.acquisition import Acquisition
 from psvnode.utils.helpers import get_version
 from psvnode.utils.helpers import which
-from netifaces import ifaddresses, AF_INET
+
+from netifaces import ifaddresses, AF_INET, AF_LINK
 from os import walk
 import optparse
 import zipfile
 import datetime
 import fnmatch
+
+
+import concurrent.futures as futures
+import concurrent
+
+from psvnode.utils.helpers import scan_one_device
+
+
+
 app = Bottle()
 STATIC_DIR = "../../static"
 
-
-
-
-def scan_one_device(url, timeout=1, port=9000):
-    """
-    Pings an url and try parsing its message as JSON data. This is typically used within a multithreading.Pool.map in
-    order to request multiple arbitrary urls.
-
-    :param url: the url to parse
-    :param timeout: the timeout of the url request
-    :param port: the port to request
-    :return: The message, parsed as dictionary. the "ip" (==url) field is also added to the result.
-    If the url could not be reached, None is returned
-    """
-
-    try:
-
-        if not which("fping"):
-            raise Exception("fping not available")
-        ping = os.system(" fping %s -t 50  > /dev/null 2>&1 " % os.path.basename(url))
-    except Exception as e:
-        ping = 0
-        logging.error("Could not ping. Assuming 'alive'")
-        logging.error(traceback.format_exc(e))
-
-
-    if ping != 0:
-        logging.info("url: %s, not responding. Skipping" % url )
-        return None, None
-
-    try:
-        req = urllib2.Request(url="%s:%i/id" % (url, port))
-        f = urllib2.urlopen(req, timeout=timeout)
-        message = f.read()
-        if not message:
-            logging.error("URL error whist scanning url: %s. No message back." % url )
-            return
-        resp = json.loads(message)
-        return (resp['id'],url)
-
-    except urllib2.URLError:
-        logging.error("URL error whist scanning url: %s. Server down?" % url )
-        return None, None
-    except Exception as e:
-        logging.error("Unexpected error whilst scanning url: %s" % url )
-        raise e
 
 
 
@@ -89,21 +53,34 @@ def update_device_map(id, what="data",type=None, port=9000, data=None):
 
     req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
 
-    f = urllib2.urlopen(req)
-    message = f.read()
-    if message:
-        data = json.loads(message)
+    try:
+        f = urllib2.urlopen(req)
+        message = f.read()
 
-        if not id in devices_map:
-            logging.warning("Device %s is not in device map. Rescanning subnet..." % id)
-            scan_subnet()
-        try:
-            devices_map[id].update(data)
-            return data
+        if message:
+            data = json.loads(message)
 
-        except KeyError:
-            logging.error("Device %s is not detected" % id)
-            raise KeyError("Device %s is not detected" % id)
+            if not id in devices_map:
+                logging.warning("Device %s is not in device map. Rescanning subnet..." % id)
+                scan_subnet()
+            try:
+                devices_map[id].update(data)
+                return data
+
+            except KeyError:
+                logging.error("Device %s is not detected" % id)
+                raise KeyError("Device %s is not detected" % id)
+
+    except urllib2.httplib.BadStatusLine:
+        logging.error('BadlineSatus, most probably due to update device and auto-reset')
+
+    except urllib2.URLError as e:
+        if hasattr(e, 'reason'):
+            logging.error('We failed to reach a server.')
+            logging.error('Reason: ', e.reason)
+        elif hasattr(e, 'code'):
+            logging.error('The server couldn\'t fulfill the request.')
+            logging.error('Error code: ', e.code)
 
 def get_subnet_ip(device="wlan0"):
     try:
@@ -136,41 +113,62 @@ def index():
 #################################
 
 @app.get('/devices')
-def scan_subnet():
-    global scanning_locked
+def scan_subnet(ip_range=(2,253)):
     global devices_map
-    if scanning_locked:
-        logging.warning("Already scanning devices. Ignoring get request.")
-        return devices_map
     try:
-        scanning_locked = True
-        subnet_ip = get_subnet_ip(SUBNET_DEVICE)
-        logging.info("Scanning attached devices")
-        urls_to_scan = ["http://%s.%i" % (subnet_ip,i)  for i in range(2,254)]
-        pool = multiprocessing.Pool(64)
-        devices_id_url_list = pool.map(scan_one_device, urls_to_scan)
-        pool.terminate()
-
 
         devices_map = {}
-        for id, ip in devices_id_url_list :
-            if id is None:
-                continue
-            devices_map[id] = {"ip":ip}
 
-        logging.info("%i devices found:" % len(devices_map))
+
+        subnet_ip = get_subnet_ip(SUBNET_DEVICE)
+        logging.info("Scanning attached devices")
+
+
+        scanned = [ "%s.%i" % (subnet_ip, i) for i in range(2,253) ]
+        urls= ["http://%s" % str(s) for s in scanned]
+
+        # We can use a with statement to ensure threads are cleaned up promptly
+        with futures.ThreadPoolExecutor(max_workers=128) as executor:
+            # Start the load operations and mark each future with its URL
+
+            fs = [executor.submit(scan_one_device, url) for url in urls]
+            for f in concurrent.futures.as_completed(fs):
+
+                try:
+                    id, ip = f.result()
+                    if id is None:
+                        continue
+                    devices_map[id] = {"ip":ip}
+
+                except Exception as e:
+                    logging.error("Error whilst pinging url")
+                    logging.error(traceback.format_exc(e))
+
+
+
+
         if len(devices_map) < 1:
+            logging.warning("No device detected")
             return  devices_map
 
-        pool = multiprocessing.Pool(len(devices_map))
-        # we update device map manually as it is a global variable and won't exist in another process
-        device_data = pool.map(update_device_map, devices_map.keys())
-        pool.terminate()
-        for k,d in zip(devices_map.keys(), device_data):
-            devices_map[k].update(d)
+        logging.info("Detected %i devices:\n%s" % (len(devices_map), str(devices_map.keys())))
+        # We can use a with statement to ensure threads are cleaned up promptly
+        with futures.ThreadPoolExecutor(max_workers=128) as executor:
+            # Start the load operations and mark each future with its URL
+            fs = {}
+            for id in devices_map.keys():
+                fs[executor.submit(update_device_map,id)] = id
 
-        for k,v in devices_map.items():
-            logging.info("%s\t@\t%s" % (k,v["ip"]))
+            for f in concurrent.futures.as_completed(fs):
+                id = fs[f]
+                try:
+                    data = f.result()
+                    devices_map[id].update(data)
+                except Exception as e:
+                    logging.error("Could not get data from device %s :" % id)
+                    logging.error(traceback.format_exc(e))
+
+
 
         for k, device in devices_map.iteritems():
             # if the device is running AND acquisition is not handled yet, we make a new process for it
@@ -178,11 +176,12 @@ def scan_subnet():
                 if k not in acquisition.keys():
                     acquisition[k]= Acquisition(device, result_main_dir=RESULTS_DIR)
                     acquisition[k].start()
-    except Exception as e:
-        logging.error(traceback.format_exc(e))
-    finally:
-        scanning_locked = False
+
         return devices_map
+    except Exception as e:
+        logging.error("Unexpected exception when scanning for devices:")
+        logging.error(traceback.format_exc(e))
+
 
 @app.get('/devices_list')
 def get_devices_list():
@@ -298,10 +297,10 @@ def update_systems():
     devices_to_update = request.json
     try:
         restart_node = False
-        for key, d in devices_to_update.iteritems():
+        for d in devices_to_update:
             if d['name'] == 'Node':
                 #update node
-                node_update = subprocess.Popen(['git', 'pull', "origin", BRANCH+':'+BRANCH],
+                node_update = subprocess.Popen(['git', 'pull'],
                                                 cwd=GIT_WORKING_DIR,
                                                 stdout=subprocess.PIPE,
                                                 stderr=subprocess.PIPE)
@@ -335,7 +334,7 @@ def check_update():
     try:
         #check internet connection
         try:
-
+            #fixme ping is simply not used here!
             if not which("fping"):
                 raise Exception("fping not available")
             ping = os.system(" fping %s -t 50  > /dev/null 2>&1 " % '8.8.8.8')
@@ -380,9 +379,9 @@ def download(what):
             #FIXME change the route for this? and old zips need to be erased
             zip_file_name = os.path.join(RESULTS_DIR,'results_'+t.strftime("%y%m%d_%H%M%S")+'.zip')
             zf = zipfile.ZipFile(zip_file_name, mode='a')
-            logging.info("Saving files : %s in %s" % (str(req_files['files']),zip_file_name) )
+            logging.info("Saving files : %s in %s" % (str(req_files['files']), zip_file_name) )
             for f in req_files['files']:
-                zf.write(f['name'])
+                zf.write(f['url'])
             zf.close()
 
             return {'url':zip_file_name}
@@ -394,8 +393,50 @@ def download(what):
         logging.error(e)
         return {'error':traceback.format_exc(e)}
 
+@app.get('/node/<req>')
+def node_actions(req, device='eth0'):
+    if req == 'info':
+        df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout=subprocess.PIPE)
+        disk_free = df.communicate()[0]
+        disk_usage = disk_free.split("\n")[1].split()
+        ip = "No IP assigned, check cable"
+        MAC_addr = None
+        addrs = ifaddresses(device)
+        MAC_addr = addrs[AF_LINK][0]["addr"]
+        try:
+            ip = addrs[AF_INET][0]["addr"]
+        except Exception as e:
+            logging.error(e)
 
-
+        return {'disk_usage': disk_usage, 'MAC_addr': MAC_addr, 'ip': ip}
+    else:
+        raise NotImplementedError()
+        return {'error':'Nothing here'}
+@app.post('/node-actions')
+def node_actions():
+        action = request.json
+        if action['action'] == 'poweroff':
+            logging.info('User request a poweroff, shutting down system. Bye bye.')
+            close()
+        else:
+            raise NotImplementedError()
+@app.post('/remove_files')
+def remove_files():
+    try:
+        req = request.json
+        res = []
+        for f in req['files']:
+            rm = subprocess.Popen(['rm', f['url']],
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
+            out, err = rm.communicate()
+            logging.info(out)
+            logging.error(err)
+            res.append(f['url'])
+        return {'result': res}
+    except Exception as e:
+        logging.error(e)
+        return {'error':e}
 
 
 @app.get('/list/<type>')
@@ -437,7 +478,7 @@ def get_log(id):
         return {'error':traceback.format_exc(e)}
 
 
-def close(exist_status=0):
+def close(exit_status=0):
     logging.info("Joining acquisition processes")
     for a in acquisition.values():
         a.stop()
@@ -446,8 +487,11 @@ def close(exist_status=0):
         logging.info("Joined OK")
 
     logging.info("Closing server")
-    os._exit(exist_status)
-    #exit(exist_status)
+    os._exit(exit_status)
+    
+
+#======================================================================================================================#
+
 
 
 if __name__ == '__main__':
@@ -476,14 +520,15 @@ if __name__ == '__main__':
         import getpass
         if getpass.getuser() == "quentin":
 
-            SUBNET_DEVICE = b'eno1'
+            SUBNET_DEVICE = b'enp3s0'
+            #SUBNET_DEVICE = b'eno1'
             GIT_BARE_REPO_DIR = GIT_WORKING_DIR = "./"
 
         if getpass.getuser() == "asterix":
             SUBNET_DEVICE = b'lo'
             RESULTS_DIR = "/data1/todel/psv_results"
             GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
-            GIT_WORKING_DIR = "/data1/todel/pySolo-video-node"
+            GIT_WORKING_DIR = "/data1/todel/pySolo-Node"
             BRANCH = 'psv-package'
 
     global devices_map

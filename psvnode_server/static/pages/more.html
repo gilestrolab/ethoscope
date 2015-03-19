@@ -10,23 +10,36 @@
     <h2>Files to be dowloaded:</h2>
     <div class="alert alert-info ">
         <p>Actions for selected files:</p>
-        <button class="btn btn-success" ng-click="browse.dowload()" data-toggle="modal" data-target="#downloadModal">Download</button>
-        <button class="btn btn-danger">Delete</button>
+        <button  class="btn btn-success" ng-click="browse.dowload()"  data-target="#downloadModal">Download</button>
+        <button class="btn btn-danger" data-target="#deleteModal" data-toggle="modal">Delete</button>
         <button ng-if="selected_all == false" class="right btn btn-info" ng-click="browse.toggleAll()">Select All</button>
         <button ng-if="selected_all == true" class="right btn btn-warning" ng-click="browse.toggleAll()">Deselect All</button>
 
     </div>
-    <!--<div id="controls" class="">
-        <a href="" ng-click="browse(prev_dir)"><span class="fa fa-chevron-left"></span> Back</a>
-    </div>-->
-    <table id="browse_table" class="table table-striped">
+    <div>
+    <span>Total files: <strong>{{filesObj.length}}</strong></span>
+    <p> You can sort the files clicking on the column name or filter with "search"</p>
+    </div>
+    <div id="controls" class="right">
+
+        <span class="fa fa-search"></span><span>Search: <input ng-model="searchText"></span>
+    </div>
+
+    <table id="" class="table table-striped">
         <thead>
-        <th><span class="fa fa-circle-o"></span> Device Name</th>
-        <th><span class="fa fa-calendar-o"></span> Exp Date</th>
-        <th><span class="fa fa-file-o"></span> File</th>
+            <th><a href="" ng-click="predicate = 'device_name'; reverse=false"><span class="fa fa-circle-o"></span> Device Name</a></th>
+        <th><a href="" ng-click="predicate = 'exp_date'; reverse=true"><span class="fa fa-calendar-o"></span> Exp Date</th>
+        <th><a href="" ng-click="predicate = 'file'; reverse=false"><span class="fa fa-file-o"></span> File</th>
         <th>Select </th>
         </thead>
-
+        <tbody>
+            <tr ng-repeat="file in filesObj | filter:searchText | orderBy: predicate:reverse">
+                <td><a href="#/sm{{file.device_id}}" target="_blank">{{file.device_name}}</a></td>
+                <td>{{file.exp_date}}</td>
+                <td><a href="/download{{file.url}}" target="_blank">{{file.file}}</a></td>
+                <td> <input type="checkbox" checklist-model="selected.files" checklist-value="file"></td>
+            </tr>
+        </tbody>
     </table>
 </div>
 
@@ -36,67 +49,86 @@
     <div class="modal-content">
       <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="myModalLabel">Download selected files from this link</h4>
+        <h4 class="modal-title" id="myModalLabel">Download selected files as compresed zip file.</h4>
       </div>
       <div class="modal-body">
        <ul>
-       <li ng-repeat="file in selected.files">{{file.route_to_show}}</li>
+       <li ng-repeat="file in selected.files">{{file.file}}</li>
        </ul>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-        <a href="{{browse.download_url}}" target="_blank" type="button" class="btn btn-primary">Download All</a>
+        <a href="{{browse.download_url}}" target="_blank" type="button" class="btn btn-primary">Download as Zip</a>
       </div>
     </div>
   </div>
 </div>
-
+<!-- Modal Delete -->
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="downloadModal" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Are you sure you want to remove the selected files?</h4>
+      </div>
+      <div class="modal-body">
+       <ul>
+       <li ng-repeat="file in selected.files">{{file.file}}</li>
+       </ul>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <button ng-click="browse.remove_files()" type="button" class="btn btn-danger">Remove Selected</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div ng-if="showOption=='update'" class="col-xs-12">
     <div ng-if="update_waiting" class="alert alert-warning"><h1 >Wait until all the devices are updated, this can take a while. Do not disconnect them from the mains.</h1></div>
-    <div ng-if="devices_to_update.error">
-        <h3 >Error on check the update. Have your node internet connection?</h3>
-        <p>Error details: {{devices_to_update.error}}</p>
+    <div ng-if="update.error">
+        <h3>Error details: {{update.error}}</h3>
     </div>
-    <!--<h1 ng-if="!devices_to_update.error">{{update_text}}</h1>-->
     <h3>Upstream version: {{origin.version}}</h3>
-    <h3>Node version: {{node.node.version}}</h3>
+    <h3>Node version: {{node.version}}</h3>
 
-    <div ng-if="(update_need_update == true) && (!(devices_to_update.hasOwnProperty('error')))">
+    <h4>{{update_text}}</h4>
+    <div >
         <!--<h2>The following devices will be updated.</h2>-->
-        <button class="btn btn-success" ng-click="update_selected(devices_to_update)">Update All</button>
+        <button class="btn btn-success" ng-click="update_selected('all')">Update All Devices</button>
         <button class="btn btn-default" ng-click="update_selected(devices_to_update_selected)">Update Selected</button>
-        <button ng-if="node.node.version != origin.version" class="btn btn-primary" data-toggle="modal" data-target="#updateNodeModal" >Update Node</button>
-        <table class="table table-striped">
+        <button ng-if="node.version != origin.version" class="btn btn-primary" data-toggle="modal" data-target="#updateNodeModal" >Update Node</button>
+
+        <table class="table table-striped" >
             <thead>
             <th>Name</th>
             <th>Status</th>
             <th>Software version</th>
-            <th>Select </th>
+            <th><center>Select</center></th>
             </thead>
             <tbody>
-                <tr class="danger" ng-if="node.node.version != origin.version">
+                <tr class="danger" ng-if="node.version != origin.version">
                     <td>
                     <a href="" target="_blank ">
-                    <span class="fa fa-circle-o"></span><span> {{node.node.name}}</span>
+                    <span class="fa fa-circle-o"></span><span> {{node.name}}</span>
                     </a>
                 </td>
-                <td>{{node.node.status}} /
-                    <span ng-if="node.node.version != origin.version">Outdated</span>
+                <td>{{node.status}} /
+                    <span ng-if="node.version != origin.version">Outdated</span>
                 </td>
-                <td>{{node.node.version}}</td>
+                <td>{{node.version}}</td>
                 <td>
                 </td>
                 </tr>
-                <tr class="success" ng-if="node.node.version == origin.version">
+                <tr class="success" ng-if="node.version == origin.version">
                  <td>
                     <a href="" target="_blank ">
-                    <span class="fa fa-circle-o"></span><span> {{node.node.name}}</span>
+                    <span class="fa fa-circle-o"></span><span> {{node.name}}</span>
                     </a>
                 </td>
-                <td>{{node.node.status}} /
+                <td>{{node.status}} /
                      Up to date
                 </td>
-                <td>{{node.node.version}}</td>
+                <td>{{node.version}}</td>
                 <td>
                     </td>
                 </tr>
@@ -113,7 +145,7 @@
                 </td>
                 <td>{{d.version}}</td>
                 <td>
-                    <input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="device" ng-if="d.version != origin.version && d.status != 'stopped'">
+
                     </td>
                 </tr>
                 <tr class="warning" ng-if="d.version != origin.version && d.status == 'stopped'">
@@ -127,7 +159,7 @@
                 </td>
                 <td>{{d.version}}</td>
                 <td>
-                    <input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="device" ng-if="d.version != origin.version && d.status != 'stopped'">
+                    <input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="d">
                     </td>
                 </tr>
                 <tr class="success" ng-show="d.version == origin.version">
@@ -141,7 +173,7 @@
                 </td>
                 <td>{{d.version}}</td>
                 <td>
-                    </td>
+                </td>
             </tr>
             </tbody>
         </table>
@@ -153,7 +185,7 @@
     </div>
 
 </div>
-<!-- Modal download -->
+<!-- Modal Update Node -->
 <div class="modal fade" id="updateNodeModal" tabindex="-1" role="dialog" aria-labelledby="updateNodeModal" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -166,11 +198,39 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-        <button ng-click="update_selected(node)" target="_blank" type="button" class="btn btn-primary">Update Node</button>
+        <button ng-click="update_node([node])" target="_blank" type="button" class="btn btn-primary">Update Node</button>
       </div>
     </div>
   </div>
 </div>
+
+<div ng-if="showOption == 'nodeManage'" class="col-xs-12">
+    <hr></hr>
+    <div>
+        <h3>Node Parameters</h3>
+        <p>Time on Network: {{nodeManagement.time}}</p>
+        <p>Disk Usage: </p>
+        <ul class="list-group col-xs-6">
+            <li class="list-group-item">Device: {{nodeManagement.info.disk_usage[0]}}</li>
+            <li class="list-group-item">Total Size: {{nodeManagement.info.disk_usage[1]}}</li>
+            <li class="list-group-item">Used: {{nodeManagement.info.disk_usage[2]}}</li>
+            <li class="list-group-item">Available: {{nodeManagement.info.disk_usage[3]}}</li>
+            <li class="list-group-item">% used: {{nodeManagement.info.disk_usage[4]}}</li>
+            <li class="list-group-item">Mounted on: {{nodeManagement.info.disk_usage[5]}}</li>
+        </ul>
+        <p>Internet Network: </p>
+        <ul class="list-group col-xs-6">
+            <li class="list-group-item">Device IP: {{nodeManagement.info.ip}}</li>
+            <li class="list-group-item">Ethernet MAC Address: {{nodeManagement.info.MAC_addr}}</li>
+        </ul>
+    </div>
+
+<div class="col-xs-12">
+<button class="btn btn-danger" ng-click="nodeManagement.action('poweroff')">Power off Node</button>
+    </div>
+
+</div>
+
 
 <script>
     (function(){

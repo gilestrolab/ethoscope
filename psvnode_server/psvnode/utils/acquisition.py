@@ -18,7 +18,7 @@ class Acquisition(multiprocessing.Process):
         }
 
 
-    _delay_between_updates = 60 * 5 # seconds
+    _delay_between_updates = 5 * 60 # seconds
     #_delay_between_updates = 10 # seconds
     _last_backup_timeout = 30 #seconds
 
@@ -143,7 +143,6 @@ class Acquisition(multiprocessing.Process):
 
         finally:
             try:
-                print "has_been_running_once", has_been_running_once
                 if not has_been_running_once:
                     logging.info("Device was not running; not trying last backup")
                     return

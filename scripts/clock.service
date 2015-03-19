@@ -1,0 +1,11 @@
+[Unit]
+Description=Node clock
+#After=sysinit.target
+
+[Service]
+Type=oneshot
+ExecStart= echo 'ds1307 0x68' > /sys/class/i2c-adapter/i2c-1/new_device
+ExecStart= sudo hwclock -s
+[Install]
+WantedBy=sysinit.target
+

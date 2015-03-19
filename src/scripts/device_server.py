@@ -45,7 +45,7 @@ def controls(id, action):
                     date = datetime.fromtimestamp(t)
                     # date_time = date.isoformat()
 
-                    control = ControlThread(machine_id=machine_id, name='SM15-001', version=version, video_file=INPUT_VIDEO,
+                    control = ControlThread(machine_id=machine_id, name=machine_name, version=version, video_file=INPUT_VIDEO,
                             psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
                     control.start()
                     return info(id)
@@ -83,7 +83,7 @@ def info(id):
 def update_system(id):
     if id == machine_id and control.info['status'] == 'stopped':
         try:
-            device_update = subprocess.Popen(['git', 'pull', "origin", BRANCH+':'+BRANCH],
+            device_update = subprocess.Popen(['git', 'pull'],
                                              cwd=GIT_WORKING_DIR,
                                              stdout=subprocess.PIPE,
                                              stderr=subprocess.PIPE)
@@ -110,7 +110,7 @@ def close(exit_status=0):
     else:
 
         control = None
-    exit(exit_status)
+    os._exit(exit_status)
 
 if __name__ == '__main__':
 
@@ -150,7 +150,7 @@ if __name__ == '__main__':
         elif getpass.getuser() == "asterix":
             PSV_DIR = "/tmp/psv_data"
             INPUT_VIDEO = '/data1/monitor_new_targets_short.avi'
-            GIT_WORKING_DIR = "/data1/todel/pySolo-video-device"
+            GIT_WORKING_DIR = "/data1/todel/pySolo-Device"
             BRANCH = 'psv-package'
         elif getpass.getuser() == "psv" or getpass.getuser() == "root":
             INPUT_VIDEO = "/data/monitor_new_targets_short.avi"

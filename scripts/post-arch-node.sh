@@ -30,9 +30,10 @@ pacman -S xorg-server xorg-utils xorg-server-utils xorg-xinit xf86-video-fbdev l
 # utilities
 pacman -S ntp bash-completion --noconfirm --needed
 pacman -S raspberrypi-firmware{,-tools,-bootloader,-examples} --noconfirm --needed
+pacman -S dnsmasq
 
 # preinstalling dependencies will save compiling time on python packages
-pacman -S python2-pip python2-numpy python2-bottle python2-pyserial mysql-python python2-netifaces python2-cherrypy --noconfirm --needed
+pacman -S python2-pip python2-numpy python2-bottle python2-pyserial mysql-python python2-netifaces python2-cherrypy python2-futures --noconfirm --needed
 
 # mariadb
 pacman -S mariadb --noconfirm --needed
@@ -41,7 +42,8 @@ pacman -S mariadb --noconfirm --needed
 #pacman -S netctl
 pacman -S wpa_supplicant --noconfirm --needed
 
-echo 'Description=psv wifi network' >> /etc/netctl/psv_wifi
+
+echo 'Description=psv wifi network' > /etc/netctl/psv_wifi
 echo 'Interface=wlan0' >> /etc/netctl/psv_wifi
 echo 'Connection=wireless' >> /etc/netctl/psv_wifi
 echo 'Security=wpa' >> /etc/netctl/psv_wifi
@@ -56,7 +58,7 @@ echo 'Key=PSV_WIFI_pIAEZF2s@jmKH' >> /etc/netctl/psv_wifi
 
 #
 #####################################################################################
-echo 'Description=eth0 Network' >> /etc/netctl/eth0
+echo 'Description=eth0 Network' > /etc/netctl/eth0
 echo 'Interface=eth0' >> /etc/netctl/eth0
 echo 'Connection=ethernet' >> /etc/netctl/eth0
 echo 'IP=dhcp' >> /etc/netctl/eth0
@@ -66,6 +68,16 @@ echo 'IP=dhcp' >> /etc/netctl/eth0
 
 cp ./node.service /etc/systemd/system/node.service
 cp ./rtc.service /etc/systemd/system/rtc.service
+
+#configuring dns server:
+echo 'interface=wlan0' >/etc/dnsmasq.conf
+echo 'dhcp-option = 6,192.169.123.1' >> /etc/dnsmasq.conf
+echo 'no-hosts' >> /etc/dnsmasq.conf
+echo 'addn-hosts=/etc/host.dnsmasq' >> /etc/dnsmasq.conf
+#domain=polygonaltreenetwork.com,192.169.123.0/24
+
+echo '192.169.123.1    node' >> /etc/hosts.dnsmasq
+
 
 systemctl daemon-reload
 ######################################################################################
@@ -117,8 +129,10 @@ echo 'Generating boot config'
 echo 'start_file=start_x.elf' > /boot/config.txt
 echo 'fixup_file=fixup_x.dat' >> /boot/config.txt
 echo 'disable_camera_led=1' >> /boot/config.txt
-#gpu_mem_512=64
-#gpu_mem_256=64
+echo 'dtparam=i2c1=on' >> /boot/config.txt
+echo 'dtparam=i2c_arm=on' >> /boot/config.txt
+#gpu_mem_512=64'
+#gpu_mem_256=64'
 
 
 ###Turbo #FIXME NOT needed for piv2.0
@@ -139,6 +153,23 @@ echo 'Loading bcm2835 module'
 #to use the camera through v4l2
 # modprobe bcm2835-v4l2
 echo "bcm2835-v4l2" > /etc/modules-load.d/picamera.conf
+
+echo 'Loading IC2'
+echo "ic2-bcm2708" > /etc/modules-load.d/ic2.conf
+echo "ic2-dev" > /etc/modules-load.d/.ic2.conf
+modprobe bcm2835-v4l2
+echo 'Loading clock'
+echo 'rtc-ds1307' > /etc/modules-load.d/clock.conf
+echo 'ds1307 0x68' > /sys/class/i2c-adapter/i2c-1/new_device
+echo 'setting date to clock'
+echo date
+hwclock -w
+
+echo 'creating service to start clock on boot'
+cp ./clock.service /etc/systemd/system/clock.service
+systemctl daemon-reload
+systemctl enable clock.service
+systemctl start clock.service
 
 echo 'Setting permissions for using arduino'
 #SEE https://wiki.archlinux.org/index.php/arduino#Configuration
@@ -183,12 +214,6 @@ echo "/dev/sda1 $PSV_DATA_DIR ext4 defaults,rw,relatime,data=ordered 0 1" >> /et
 
 
 
-
-
-
-
-
-
 #Create a Bare repository with only the production branch in node, it is on /var/
 git clone --bare -b psv-package --single-branch https://github.com/gilestrolab/pySolo-Video.git /var/pySolo-Video.git
 #Create a local working copy from the bare repo on node
@@ -199,7 +224,7 @@ git clone /var/pySolo-Video.git /home/$USER_NAME/pySolo-Video
 echo 'Installing PSV package'
 #wget hthttp://stackoverflow.com/questions/758819/python-mysqldb-connection-problemstps://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
 #tar -xvf psv.tar.gz
-cd /home/node/pySolo-Video/psvnode_server
+cd /home/$USER_NAME/pySolo-Video/psvnode_server
 pip2 install -e .
 
 echo 'SUCESS, please reboot'
