@@ -1,6 +1,5 @@
 [Unit]
 Description=Node clock
-After=time-sync.target
 
 [Service]
 Type=simple
