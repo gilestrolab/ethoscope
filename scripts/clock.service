@@ -4,8 +4,9 @@ Description=Node clock
 
 [Service]
 Type=oneshot
-ExecStart= echo 'ds1307 0x68' > /sys/class/i2c-adapter/i2c-1/new_device
-ExecStart= sudo hwclock -s
+ExecStart=/usr/bin/python2  /home/node/pySolo-Video/scripts/init_rc_clock.py
+ExecStart=/usr/bin/hwclock -s
+
 [Install]
 WantedBy=sysinit.target
 
