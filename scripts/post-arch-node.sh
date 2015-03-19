@@ -65,6 +65,7 @@ echo 'IP=dhcp' >> /etc/netctl/eth0
 #Creating service for device_server.py
 
 cp ./node.service /etc/systemd/system/node.service
+cp ./rtc.service /etc/systemd/system/rtc.service
 
 systemctl daemon-reload
 ######################################################################################
