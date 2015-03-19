@@ -1,7 +1,6 @@
 [Unit]
 Description=Node clock
-After=ntpd.service
-Wants=ntpd.service
+Before=ntpd.service
 
 [Service]
 Type=simple
