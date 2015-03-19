@@ -2,6 +2,8 @@
 Description=Pysolovideo node server
 Wants=ntpd.service
 After=ntpd.service
+Wants=clock.service
+After=clock.service
 
 [Service]
 Type=simple
