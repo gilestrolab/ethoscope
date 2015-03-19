@@ -3,7 +3,7 @@ Description=Node clock
 After=time-sync.target
 
 [Service]
-Type=oneshot
+Type=simple
 ExecStart=/usr/bin/python2  /home/node/pySolo-Video/scripts/init_rc_clock.py
 
 [Install]
