@@ -121,14 +121,21 @@ if __name__ == '__main__':
     option_dict = vars(options)
     debug = option_dict["debug"]
     port = option_dict["port"]
-
+    # import ConfigParser
+    # config = ConfigParser.RawConfigParser(allow_no_value=True)
+    # for loc in os.curdir, os.path.expanduser("~"), "/etc/pysolovideo/", os.environ.get("PSV_DEV_SERV_CONF"):
+    #     try:
+    #         with open(os.path.join(loc,"device_server.conf")) as source:
+    #             config.readfp(source)
+    #     except IOError:
+    #         pass
 
     INPUT_VIDEO = None
     DURATION = None
     DRAW_RESULTS =False
     PSV_DIR = "/psv_data/results"
     GIT_WORKING_DIR = '/home/psv/pySolo-Video'
-    BRANCH = 'psv-package'
+    BRANCH = 'psv-dev'
     MACHINE_ID_FILE = '/etc/machine-id'
     MACHINE_NAME_FILE = '/etc/machine-name'
 

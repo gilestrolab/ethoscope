@@ -13,7 +13,7 @@ set -e # stop if any error happens
 export USER_NAME=node
 export PASSWORD=node
 export PSV_DATA_DIR=/psv_results
-export STABLE_BRANCH=psv-package
+export STABLE_BRANCH=psv-dev
 
 
 ############# PACKAGES #########################
@@ -46,7 +46,7 @@ pacman -S wpa_supplicant --noconfirm --needed
 
 
 #Create a Bare repository with only the production branch in node, it is on /var/
-git clone --bare -b $STABLE_BRANCH--single-branch https://github.com/gilestrolab/pySolo-Video.git /var/pySolo-Video.git
+git clone --bare -b $STABLE_BRANCH --single-branch https://github.com/gilestrolab/pySolo-Video.git /var/pySolo-Video.git
 #Create a local working copy from the bare repo on node
 git clone /var/pySolo-Video.git /home/$USER_NAME/pySolo-Video
 
