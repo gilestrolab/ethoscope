@@ -137,27 +137,6 @@ echo 'cma_hwm=' >>  /boot/config.txt
 echo 'cma_offline_start=' >>  /boot/config.txt
 
 
-
-echo 'Loading IC2'
-echo "ic2-bcm2708" > /etc/modules-load.d/ic2.conf
-echo "ic2-dev" > /etc/modules-load.d/.ic2.conf
-#modprobe ic2-bcm2708
-#modprobe ic2-dev
-
-
-echo 'Loading clock'
-echo 'rtc-ds1307' > /etc/modules-load.d/clock.conf
-echo 'ds1307 0x68' > /sys/class/i2c-adapter/i2c-1/new_device
-echo 'setting date to clock'
-echo date
-hwclock -w
-
-echo 'creating service to start clock on boot'
-cp ./clock.service /etc/systemd/system/clock.service
-systemctl daemon-reload
-systemctl enable clock.service
-systemctl start clock.service
-
 echo 'Setting permissions for using arduino'
 #SEE https://wiki.archlinux.org/index.php/arduino#Configuration
 gpasswd -a $USER_NAME uucp
@@ -214,4 +193,34 @@ echo 'Installing PSV package'
 cd /home/$USER_NAME/pySolo-Video/psvnode_server
 pip2 install -e .
 
+
+
+
+echo 'Loading IC2'
+echo "ic2-bcm2708" > /etc/modules-load.d/ic2.conf
+echo "ic2-dev" > /etc/modules-load.d/.ic2.conf
+
+
+echo 'Loading clock'
+echo 'rtc-ds1307' > /etc/modules-load.d/clock.conf
+echo 'ds1307 0x68' > /sys/class/i2c-adapter/i2c-1/new_device
+echo 'setting date to clock'
+echo date
+hwclock -w
+
+#modprobe ic2-bcm2708
+#modprobe ic2-dev
+
+
+echo 'creating service to start clock on boot'
+cp ./clock.service /etc/systemd/system/clock.service
+systemctl daemon-reload
+systemctl enable clock.service
+systemctl start clock.service
+
+
 echo 'SUCESS, please reboot'
+
+
+
+
