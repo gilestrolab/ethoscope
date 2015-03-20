@@ -141,7 +141,8 @@ echo 'cma_offline_start=' >>  /boot/config.txt
 echo 'Loading IC2'
 echo "ic2-bcm2708" > /etc/modules-load.d/ic2.conf
 echo "ic2-dev" > /etc/modules-load.d/.ic2.conf
-modprobe bcm2835-v4l2
+modprobe ic2-bcm2708
+modprobe ic2-dev
 
 echo 'Loading clock'
 echo 'rtc-ds1307' > /etc/modules-load.d/clock.conf
