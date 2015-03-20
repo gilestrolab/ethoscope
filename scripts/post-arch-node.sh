@@ -57,6 +57,7 @@ echo 'Installing PSV package'
 #tar -xvf psv.tar.gz
 cd /home/$USER_NAME/pySolo-Video/psvnode_server
 pip2 install -e .
+cd -
 
 
 
