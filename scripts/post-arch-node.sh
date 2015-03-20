@@ -68,6 +68,7 @@ echo 'IP=dhcp' >> /etc/netctl/eth0
 
 cp ./node.service /etc/systemd/system/node.service
 
+
 #configuring dns server:
 echo 'interface=wlan0' >/etc/dnsmasq.conf
 echo 'dhcp-option = 6,192.169.123.1' >> /etc/dnsmasq.conf
@@ -157,6 +158,7 @@ echo 'Loading IC2'
 echo "ic2-bcm2708" > /etc/modules-load.d/ic2.conf
 echo "ic2-dev" > /etc/modules-load.d/.ic2.conf
 modprobe bcm2835-v4l2
+
 echo 'Loading clock'
 echo 'rtc-ds1307' > /etc/modules-load.d/clock.conf
 echo 'ds1307 0x68' > /sys/class/i2c-adapter/i2c-1/new_device
