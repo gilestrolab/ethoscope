@@ -43,6 +43,22 @@ pacman -S mariadb --noconfirm --needed
 pacman -S wpa_supplicant --noconfirm --needed
 
 
+
+#Create a Bare repository with only the production branch in node, it is on /var/
+git clone --bare -b psv-package --single-branch https://github.com/gilestrolab/pySolo-Video.git /var/pySolo-Video.git
+#Create a local working copy from the bare repo on node
+git clone /var/pySolo-Video.git /home/$USER_NAME/pySolo-Video
+
+# our software.
+# TODO use AUR!
+echo 'Installing PSV package'
+#wget hthttp://stackoverflow.com/questions/758819/python-mysqldb-connection-problemstps://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
+#tar -xvf psv.tar.gz
+cd /home/$USER_NAME/pySolo-Video/psvnode_server
+pip2 install -e .
+
+
+
 echo 'Description=psv wifi network' > /etc/netctl/psv_wifi
 echo 'Interface=wlan0' >> /etc/netctl/psv_wifi
 echo 'Connection=wireless' >> /etc/netctl/psv_wifi
@@ -174,25 +190,6 @@ chmod 744 $PSV_DATA_DIR -R
 mount /dev/sda1 $PSV_DATA_DIR
 cp /etc/fstab /etc/fstab-bak
 echo "/dev/sda1 $PSV_DATA_DIR ext4 defaults,rw,relatime,data=ordered 0 1" >> /etc/fstab
-
-
-
-
-
-
-#Create a Bare repository with only the production branch in node, it is on /var/
-git clone --bare -b psv-package --single-branch https://github.com/gilestrolab/pySolo-Video.git /var/pySolo-Video.git
-#Create a local working copy from the bare repo on node
-git clone /var/pySolo-Video.git /home/$USER_NAME/pySolo-Video
-
-# our software.
-# TODO use AUR!
-echo 'Installing PSV package'
-#wget hthttp://stackoverflow.com/questions/758819/python-mysqldb-connection-problemstps://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
-#tar -xvf psv.tar.gz
-cd /home/$USER_NAME/pySolo-Video/psvnode_server
-pip2 install -e .
-
 
 
 
