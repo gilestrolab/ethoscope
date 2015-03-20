@@ -30,7 +30,7 @@ pacman -S xorg-server xorg-utils xorg-server-utils xorg-xinit xf86-video-fbdev l
 # utilities
 pacman -S ntp bash-completion --noconfirm --needed
 pacman -S raspberrypi-firmware{,-tools,-bootloader,-examples} --noconfirm --needed
-pacman -S dnsmasq
+pacman -S dnsmasq --noconfirm --needed
 
 # preinstalling dependencies will save compiling time on python packages
 pacman -S python2-pip python2-numpy python2-bottle python2-pyserial mysql-python python2-netifaces python2-cherrypy python2-futures --noconfirm --needed
@@ -131,28 +131,12 @@ echo 'fixup_file=fixup_x.dat' >> /boot/config.txt
 echo 'disable_camera_led=1' >> /boot/config.txt
 echo 'dtparam=i2c1=on' >> /boot/config.txt
 echo 'dtparam=i2c_arm=on' >> /boot/config.txt
-#gpu_mem_512=64'
-#gpu_mem_256=64'
-
-
-###Turbo #FIXME NOT needed for piv2.0
-#echo 'arm_freq=1000' >> /boot/config.txt
-#echo 'core_freq=500' >> /boot/config.txt
-#echo 'sdram_freq=500' >> /boot/config.txt
-#echo 'over_voltage=6' >> /boot/config.txt
-
-### TODO test, is that enough?
 echo 'gpu_mem=256' >>  /boot/config.txt
 echo 'cma_lwm=' >>  /boot/config.txt
 echo 'cma_hwm=' >>  /boot/config.txt
 echo 'cma_offline_start=' >>  /boot/config.txt
 
 
-echo 'Loading bcm2835 module'
-
-#to use the camera through v4l2
-# modprobe bcm2835-v4l2
-echo "bcm2835-v4l2" > /etc/modules-load.d/picamera.conf
 
 echo 'Loading IC2'
 echo "ic2-bcm2708" > /etc/modules-load.d/ic2.conf
