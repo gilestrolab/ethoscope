@@ -10,10 +10,10 @@
 
 set -e # stop if any error happens
 
-USER_NAME=psv
-PASSWORD=psv
-PSV_DATA_DIR=/psv_data
-PSV_DB_NAME=psv_db
+export USER_NAME=psv
+export PASSWORD=psv
+export PSV_DATA_DIR=/psv_data
+export PSV_DB_NAME=psv_db
 
 ############# PACKAGES #########################
 echo 'Installing and updating packages'

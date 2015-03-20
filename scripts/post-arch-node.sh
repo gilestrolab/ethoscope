@@ -10,9 +10,9 @@
 
 set -e # stop if any error happens
 
-USER_NAME=node
-PASSWORD=node
-PSV_DATA_DIR=/psv_results
+export USER_NAME=node
+export PASSWORD=node
+export PSV_DATA_DIR=/psv_results
 
 
 ############# PACKAGES #########################
