@@ -171,6 +171,8 @@ class DAMFileHelper(object):
         self._n_rois = n_rois
         self._distance_map ={}
         self._last_positions ={}
+        self._scale = 100 # multiply by this factor before converting wor to float activity
+        
         for i in range(1, self._n_rois +1):
             self._distance_map[i] = 0
             self._last_positions[i] = None
@@ -223,7 +225,7 @@ class DAMFileHelper(object):
         for i in range(7):
             values.append(str(i))
         for i in range(1, self._n_rois +1):
-            values.append(int(round(vals[i])))
+            values.append(int(round(self._scale * vals[i])))
 
         command = '''INSERT INTO CSV_DAM_ACTIVITY VALUES %s''' % str(tuple(values))
         return command
