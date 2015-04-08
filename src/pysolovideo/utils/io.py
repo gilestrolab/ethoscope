@@ -172,7 +172,7 @@ class DAMFileHelper(object):
         self._distance_map ={}
         self._last_positions ={}
         self._scale = 100 # multiply by this factor before converting wor to float activity
-        
+
         for i in range(1, self._n_rois +1):
             self._distance_map[i] = 0
             self._last_positions[i] = None
