@@ -87,9 +87,10 @@ class Monitor(object):
         # self._time_diffs = []
 
         if rois is None:
-            rois = rbs.DefaultROIBuilder()(camera)
-
-        self._camera.restart()
+            raise NotImplementedError("rois must exist (not be None)")
+        #     rois = rbs.DefaultROIBuilder()(camera)
+        #
+        #
 
         if interactors is None:
             self._unit_trackers = [TrackingUnit(tracker_class, r, None) for r in rois]

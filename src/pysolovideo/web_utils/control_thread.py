@@ -157,6 +157,7 @@ class ControlThread(Thread):
             rois = roi_builder(cam)
 
             logging.info("Initialising monitor")
+            cam.restart()
 
             self._metadata = {
                          "machine_id": self._info["id"],
