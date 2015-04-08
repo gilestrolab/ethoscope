@@ -179,9 +179,7 @@ class DAMFileHelper(object):
 
     def make_dam_file_sql_fields(self):
         fields = ["id INT  NOT NULL AUTO_INCREMENT PRIMARY KEY",
-          "day CHAR(100)",
-          "month CHAR(100)",
-          "year CHAR(100)",
+          "date CHAR(100)",
           "time CHAR(100)"]
 
         for i in range(7):
@@ -219,7 +217,7 @@ class DAMFileHelper(object):
     def _make_sql_command(self, vals):
 
         dt = datetime.datetime.fromtimestamp(int(time.time()))
-        date_time_fields = dt.strftime("%d,%b,%Y,%H:%M:%S").split(",")
+        date_time_fields = dt.strftime("%d %b %Y,%H:%M:%S").split(",")
         values = [0] + date_time_fields
 
         for i in range(7):
