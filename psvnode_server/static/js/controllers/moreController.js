@@ -25,10 +25,13 @@
             switch(opt){
                 case "browse":
                     $scope.browse();
+                    break;
                 case "update":
                     $scope.check_update();
+                    break;
                 case "nodeManage":
                     get_node_info();
+                    break;
 
             };
         };
