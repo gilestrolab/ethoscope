@@ -40,7 +40,7 @@
     <div id = "error" class="alert alert-danger text-center" ng-if="device.error">
         <p>Sorry there has been an error: {{device.error}}</p>
 
-         <img  ng-src="{{device.ip}}:9000/static{{device.dbg_img}}" alt="debug image" ng-if="device.dbg_img != null">
+         <img  ng-src="{{device.ip}}:9000/static{{device.dbg_img}}?{{device.slapsedtime}}" alt="No debug image" ng-if="device.dbg_img != null" width="480">
     </div>
 
     <div ng-if="showLog == true">
