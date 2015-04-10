@@ -66,7 +66,7 @@ echo 'IP=dhcp' >> /etc/netctl/eth0
 #Updating ntp.conf
 
 echo 'server 192.169.123.1' > /etc/ntp.conf
-echo 'server 127.0.0.0' >> /etc/ntp.conf
+echo 'server 127.0.0.1' >> /etc/ntp.conf
 echo 'restrict default kod limited nomodify nopeer noquery notrap' >> /etc/ntp.conf
 echo 'restrict 127.0.0.1' >> /etc/ntp.conf
 echo 'restrict ::1' >> /etc/ntp.conf
@@ -175,8 +175,8 @@ hostnamectl set-hostname $hostname
 
 echo "setting up mysql"
 mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
-systemctl enable mysqld.service
 systemctl start mysqld.service
+systemctl enable mysqld.service
 
 ## not even useful:
 #mysql -u root -e "create database $PSV_DB_NAME";
