@@ -66,7 +66,8 @@ echo 'IP=dhcp' >> /etc/netctl/eth0
 #Updating ntp.conf
 
 echo 'server 192.169.123.1' > /etc/ntp.conf
-echo 'server 127.0.0.1' >> /etc/ntp.conf
+echo 'server 127.127.1.0' >> /etc/ntp.conf
+echo 'fudge 127.127.1.0 stratum 10' >> /etc/ntp.conf
 echo 'restrict default kod limited nomodify nopeer noquery notrap' >> /etc/ntp.conf
 echo 'restrict 127.0.0.1' >> /etc/ntp.conf
 echo 'restrict ::1' >> /etc/ntp.conf
