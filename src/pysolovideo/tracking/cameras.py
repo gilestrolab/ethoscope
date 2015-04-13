@@ -23,6 +23,7 @@ class BaseCamera(object):
         pass
 
     def __del__(self):
+        logging.info("Closing camera")
         self._close()
 
     def __iter__(self):
@@ -317,8 +318,9 @@ class OurPiCamera(BaseCamera):
         return self._start_time
 
     def _close(self):
-
+        self._raw_capture.truncate(0)
         self.capture.close()
+
         # self.capture.release()
 
     def _frame_iter(self):
