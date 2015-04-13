@@ -22,7 +22,7 @@ class BaseCamera(object):
     def __init__(self, *args, **kwargs):
         pass
 
-    def __del__(self):
+    def __exit__(self):
         logging.info("Closing camera")
         self._close()
 
@@ -255,7 +255,7 @@ class OurPiCamera(BaseCamera):
 
     def __init__(self, target_fps=10, target_resolution=(960,720), *args, **kwargs):
 
-
+        logging.info("Initialising camera")
         w,h = target_resolution
         self.capture = PiCamera()
 
@@ -290,7 +290,9 @@ class OurPiCamera(BaseCamera):
 
 
         super(OurPiCamera, self).__init__(*args, **kwargs)
+
         self._start_time = time.time()
+        logging.info("Camera initialised")
 
     def _warm_up(self):
         logging.info("%s is warming up" % (str(self)))
