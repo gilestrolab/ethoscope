@@ -50,6 +50,7 @@ class TrackingUnit(object):
 
 
     def __call__(self, t, img):
+
         data_row = self._tracker(t,img)
 
         if data_row is None:

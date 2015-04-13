@@ -225,6 +225,7 @@ class Monitor(object):
 
         except Exception as e:
             logging.info("Monitor closing with an exception: '%s'" % str(e))
+            raise PSVException("TODEL", frame)
             raise e
 
         finally:
