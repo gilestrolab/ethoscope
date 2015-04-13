@@ -354,11 +354,12 @@ class OurPiCamera(BaseCamera):
             if to_sleep < 0:
                 if self._frame_idx % 5000 == 0:
                     logging.warning("The target FPS (%f) could not be reached. Effective FPS is about %f" % (self._target_fps, self._frame_idx/(now - self._start_time)))
-                next(self._cap_it)
+                #next(self._cap_it)
 
             # we simply drop frames until we go above expected time
             while now < expected_time:
-                next(self._cap_it)
+                # next(self._cap_it)
+                time.sleep(.01)
                 now = time.time()
 
 
