@@ -195,11 +195,11 @@ class Monitor(object):
                 for j,track_u in enumerate(self._unit_trackers):
                     logging.info(j)
                     data_row = track_u(t, frame)
-
+                    logging.info("b1")
                     if data_row is None:
                         self._last_positions[track_u.roi.idx] = None
                         continue
-                    logging.info("b")
+                    logging.info("b2")
                     abs_pos = track_u.get_last_position(absolute=True)
 
                     # if abs_pos is not None:
@@ -207,7 +207,7 @@ class Monitor(object):
 
                     if not result_writer is None:
                         result_writer.write(t,track_u.roi, data_row)
-                    logging.info("c")
+                    logging.info("b3")
 
                 if not result_writer is None:
                     result_writer.flush(t, frame)
