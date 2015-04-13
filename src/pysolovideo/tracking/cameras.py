@@ -317,12 +317,14 @@ class OurPiCamera(BaseCamera):
         return self._start_time
 
     def _close(self):
-        pass
+
+        self.capture.close()
         # self.capture.release()
 
     def _frame_iter(self):
 
         # capture frames from the camera
+
         for frame in self.capture.capture_continuous(self._raw_capture, format="bgr", use_video_port=True):
             # grab the raw NumPy array representing the image, then initialize the timestamp
             # and occupied/unoccupied text
@@ -330,6 +332,7 @@ class OurPiCamera(BaseCamera):
         # clear the stream in preparation for the next frame
             self._raw_capture.truncate(0)
             yield frame.array
+
 
 
 
