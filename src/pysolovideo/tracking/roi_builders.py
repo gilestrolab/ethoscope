@@ -88,9 +88,16 @@ class ROI(object):
 
     def __call__(self,img):
         x,y,w,h = self._rectangle
-        out = img[y : y + h, x : x +w]
 
-        assert(out.shape[0:2] == self._mask.shape)
+
+
+        try:
+            out = img[y : y + h, x : x +w]
+        except:
+            raise PSVException("Error whilst slicing region of interest %s" % str(self.get_feature_dict()), img)
+
+        if out.shape[0:2] != self._mask.shape:
+            raise PSVException("Error whilst slicing region of interest. Possibly, the region out of the image: %s" % str(self.get_feature_dict()), img )
 
         return out, self._mask
 
