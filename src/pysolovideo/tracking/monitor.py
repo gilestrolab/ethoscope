@@ -225,7 +225,9 @@ class Monitor(object):
 
         except Exception as e:
             logging.info("Monitor closing with an exception: '%s'" % str(e))
-            raise PSVException("TODEL", frame)
+            tmp = self._draw_on_frame(frame)
+            raise PSVException("TODEL", tmp)
+
             raise e
 
         finally:
