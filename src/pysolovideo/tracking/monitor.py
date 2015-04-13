@@ -192,7 +192,7 @@ class Monitor(object):
                     vw = cv2.VideoWriter(self._video_out, cv2.cv.CV_FOURCC(*'DIVX'), 50, (frame.shape[1], frame.shape[0])) # fixme the 50 is arbitrary
 
                 for j,track_u in enumerate(self._unit_trackers):
-                    print track_u.roi.get_feature_dict()
+                    logging.info(track_u.roi.get_feature_dict())
                     logging.info(j)
                     data_row = track_u(t, frame)
                     logging.info("b1")
