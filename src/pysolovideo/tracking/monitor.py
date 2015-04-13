@@ -188,17 +188,18 @@ class Monitor(object):
                 self._last_frame_idx = i
                 self._last_time_stamp = t
                 self._frame_buffer = frame
-
+                logging.info("a")
                 if self._video_out is not None and vw is None:
                     vw = cv2.VideoWriter(self._video_out, cv2.cv.CV_FOURCC(*'DIVX'), 50, (frame.shape[1], frame.shape[0])) # fixme the 50 is arbitrary
 
                 for j,track_u in enumerate(self._unit_trackers):
+                    logging.info(j)
                     data_row = track_u(t, frame)
 
                     if data_row is None:
                         self._last_positions[track_u.roi.idx] = None
                         continue
-
+                    logging.info("b")
                     abs_pos = track_u.get_last_position(absolute=True)
 
                     # if abs_pos is not None:
@@ -206,6 +207,7 @@ class Monitor(object):
 
                     if not result_writer is None:
                         result_writer.write(t,track_u.roi, data_row)
+                    logging.info("c")
 
                 if not result_writer is None:
                     result_writer.flush(t, frame)
