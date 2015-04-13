@@ -279,7 +279,9 @@ class OurPiCamera(BaseCamera):
         self._frame = im
 
 
-        assert(len(im.shape) >1)
+
+        if len(im.shape) < 2:
+            raise PSVException("The camera image is corrupted (less that 2 dimensions)")
 
         self._resolution = (im.shape[1], im.shape[0])
         if self._resolution != target_resolution:

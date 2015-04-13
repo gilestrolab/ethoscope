@@ -146,40 +146,45 @@ class ControlThread(Thread):
 
             self._last_info_t_stamp = 0
             self._last_info_frame_idx = 0
+            try:
+                if self._video_file is None:
+                    cam = OurPiCamera( target_fps=10, target_resolution=(1280, 960))
+                else:
+                    cam = MovieVirtualCamera(self._video_file, use_wall_clock=True)
 
-            if self._video_file is None:
-                cam = OurPiCamera( target_fps=10, target_resolution=(1280, 960))
-            else:
-                cam = MovieVirtualCamera(self._video_file, use_wall_clock=True)
+                logging.info("Building ROIs")
+                roi_builder = SleepMonitorWithTargetROIBuilder()
+                rois = roi_builder(cam)
 
-            logging.info("Building ROIs")
-            roi_builder = SleepMonitorWithTargetROIBuilder()
-            rois = roi_builder(cam)
+                logging.info("Initialising monitor")
+                cam.restart()
 
-            logging.info("Initialising monitor")
-            cam.restart()
+                self._metadata = {
+                             "machine_id": self._info["id"],
+                             "machine_name": self._info["name"],
+                             "date_time": cam.start_time, #the camera start time is the reference 0
+                             "frame_width":cam.width,
+                             "frame_height":cam.height,
+                             "version": self._info["version"]
+                              }
+                #the camera start time is the reference 0
+                self._info["time"] = cam.start_time
+                self._monit = Monitor(cam, AdaptiveBGModel, rois,
+                            *self._monit_args, **self._monit_kwargs)
 
-            self._metadata = {
-                         "machine_id": self._info["id"],
-                         "machine_name": self._info["name"],
-                         "date_time": cam.start_time, #the camera start time is the reference 0
-                         "frame_width":cam.width,
-                         "frame_height":cam.height,
-                         "version": self._info["version"]
-                          }
-            #the camera start time is the reference 0
-            self._info["time"] = cam.start_time
-            self._monit = Monitor(cam, AdaptiveBGModel, rois,
-                        *self._monit_args, **self._monit_kwargs)
+                logging.info("Starting monitor")
 
-            logging.info("Starting monitor")
-
-            with ResultWriter(self._mysql_db_name ,rois, self._metadata) as rw:
-                self._info["status"] = "running"
-                logging.info("Setting monitor status as running: '%s'" % self._info["status"] )
-                self._monit.run(rw)
-            logging.info("Stopping Monitor thread")
-            self.stop()
+                with ResultWriter(self._mysql_db_name ,rois, self._metadata) as rw:
+                    self._info["status"] = "running"
+                    logging.info("Setting monitor status as running: '%s'" % self._info["status"] )
+                    self._monit.run(rw)
+                logging.info("Stopping Monitor thread")
+                self.stop()
+            finally:
+                try:
+                    cam._close()
+                except:
+                    pass
 
         except PSVException as e:
             if e.img is not  None:
