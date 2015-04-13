@@ -249,25 +249,29 @@ class V4L2Camera(BaseCamera):
 
 
 
+
 class OurPiCamera(BaseCamera):
 
-    def __init__(self,device, target_fps=5, target_resolution=(960,720), *args, **kwargs):
-        self.capture = PiCamera()
+    def __init__(self, target_fps=10, target_resolution=(960,720), *args, **kwargs):
 
 
         w,h = target_resolution
+        self.capture = PiCamera()
+
         self.capture.resolution = target_resolution
         if not isinstance(target_fps, int):
             raise PSVException("FPS must be an integer number")
         self.capture.framerate = target_fps
 
-        self._target_fps = float(target_fps)
         self._raw_capture = PiRGBArray(self.capture, size=target_resolution)
+
+        self._target_fps = float(target_fps)
         self._warm_up()
 
-        # preallocate image buffer => faster
-        self.capture.capture(self._raw_capture, format="bgr")
-        im = self._raw_capture.array
+        self._cap_it = self._frame_iter()
+
+        im = next(self._cap_it)
+
         if im is None:
             raise PSVException("Error whist retrieving video frame. Got None instead. Camera not plugged?")
 
@@ -316,6 +320,18 @@ class OurPiCamera(BaseCamera):
         pass
         # self.capture.release()
 
+    def _frame_iter(self):
+
+        # capture frames from the camera
+        for frame in self.capture.capture_continuous(self._raw_capture, format="bgr", use_video_port=True):
+            # grab the raw NumPy array representing the image, then initialize the timestamp
+            # and occupied/unoccupied text
+
+        # clear the stream in preparation for the next frame
+            self._raw_capture.truncate(0)
+            yield frame.array
+
+
 
     def _next_image(self):
 
@@ -329,16 +345,14 @@ class OurPiCamera(BaseCamera):
             if to_sleep < 0:
                 if self._frame_idx % 5000 == 0:
                     logging.warning("The target FPS (%f) could not be reached. Effective FPS is about %f" % (self._target_fps, self._frame_idx/(now - self._start_time)))
-                self.capture.capture(self._raw_capture, format="bgr")
-
+                next(self._cap_it)
 
             # we simply drop frames until we go above expected time
             while now < expected_time:
-                self.capture.capture(self._raw_capture, format="bgr")
+                next(self._cap_it)
                 now = time.time()
-        else:
-            self.capture.capture(self._raw_capture, format="bgr")
 
-        self._frame = self._raw_capture.array
+
+        self._frame = next(self._cap_it)
 
         return self._frame
