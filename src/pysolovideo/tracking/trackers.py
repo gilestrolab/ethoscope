@@ -8,7 +8,7 @@ from collections import deque
 
 import collections
 import copy
-
+from pysolovideo.utils.debug import PSVException
 class IntVariableBase(int):
     sql_data_type = "SMALLINT"
     header_name = None
@@ -323,7 +323,8 @@ class BackgroundModel(object):
 
     def update(self, img_t, t, fg_mask=None):
         dt = float(t - self.last_t)
-        assert(dt >= 0)
+        if dt < 0:
+            raise PSVException("Negative time interval between two consecutive frames")
 
         # clip the half life to possible value:
         self._current_half_life = np.clip(self._current_half_life, self._min_half_life, self._max_half_life)
