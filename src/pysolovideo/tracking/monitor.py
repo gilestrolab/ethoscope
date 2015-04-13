@@ -176,7 +176,8 @@ class Monitor(object):
             self._is_running = True
             for i,(t, frame) in enumerate(self._camera):
 
-
+                logging.info(t)
+                logging.info(frame.shape)
 
                 if self._force_stop:
                     logging.info("Monitor object stopped from external request")
