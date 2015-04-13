@@ -148,7 +148,7 @@ class ControlThread(Thread):
             self._last_info_frame_idx = 0
             try:
                 if self._video_file is None:
-                    cam = OurPiCamera( target_fps=10, target_resolution=(1280, 960))
+                    cam = OurPiCamera( target_fps=3, target_resolution=(1280, 960))
                 else:
                     cam = MovieVirtualCamera(self._video_file, use_wall_clock=True)
 
