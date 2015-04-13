@@ -6,6 +6,11 @@ import time
 import logging
 import os
 from pysolovideo.utils.debug import PSVException
+try:
+    from picamera.array import PiRGBArray
+    from picamera import PiCamera
+except:
+    logging.warning("Could not load picamera module")
 
 class BaseCamera(object):
     #TODO catch exception eg, if initialise with a wrong file
@@ -173,6 +178,7 @@ class V4L2Camera(BaseCamera):
 
         self._frame = im
 
+
         #TODO better exception handling is needed here / what do we do if initial capture fails...
         assert(len(im.shape) >1)
 
@@ -238,5 +244,101 @@ class V4L2Camera(BaseCamera):
         self.capture.retrieve(self._frame)
 
 
+
+        return self._frame
+
+
+
+class OurPiCamera(BaseCamera):
+
+    def __init__(self,device, target_fps=5, target_resolution=(960,720), *args, **kwargs):
+        self.capture = PiCamera()
+
+
+        w,h = target_resolution
+        self.capture.resolution = target_resolution
+        if not isinstance(target_fps, int):
+            raise PSVException("FPS must be an integer number")
+        self.capture.framerate = target_fps
+
+        self._target_fps = float(target_fps)
+        self._raw_capture = PiRGBArray(self.capture, size=target_resolution)
+        self._warm_up()
+
+        # preallocate image buffer => faster
+        self.capture.capture(self._raw_capture, format="bgr")
+        im = self._raw_capture.array
+        if im is None:
+            raise PSVException("Error whist retrieving video frame. Got None instead. Camera not plugged?")
+
+        self._frame = im
+
+
+        assert(len(im.shape) >1)
+
+        self._resolution = (im.shape[1], im.shape[0])
+        if self._resolution != target_resolution:
+            if w > 0 and h > 0:
+                logging.warning('Target resolution "%s" could NOT be achieved. Effective resolution is "%s"' % (target_resolution, self._resolution ))
+            else:
+                logging.info('Maximal effective resolution is "%s"' % str(self._resolution))
+
+
+        super(OurPiCamera, self).__init__(*args, **kwargs)
+        self._start_time = time.time()
+
+    def _warm_up(self):
+        logging.info("%s is warming up" % (str(self)))
+        time.sleep(1)
+
+    def restart(self):
+        self._frame_idx = 0
+        self._start_time = time.time()
+
+    def is_opened(self):
+        return True
+        # return self.capture.isOpened()
+
+
+    def is_last_frame(self):
+        return False
+
+    def _time_stamp(self):
+        now = time.time()
+        # relative time stamp
+        return now - self._start_time
+
+    @property
+    def start_time(self):
+        return self._start_time
+
+    def _close(self):
+        pass
+        # self.capture.release()
+
+
+    def _next_image(self):
+
+        if self._frame_idx >0 :
+            expected_time =  self._start_time + self._frame_idx / self._target_fps
+            now = time.time()
+
+            to_sleep = expected_time - now
+
+            # Warnings if the fps is so high that we cannot grab fast enough
+            if to_sleep < 0:
+                if self._frame_idx % 5000 == 0:
+                    logging.warning("The target FPS (%f) could not be reached. Effective FPS is about %f" % (self._target_fps, self._frame_idx/(now - self._start_time)))
+                self.capture.capture(self._raw_capture, format="bgr")
+
+
+            # we simply drop frames until we go above expected time
+            while now < expected_time:
+                self.capture.capture(self._raw_capture, format="bgr")
+                now = time.time()
+        else:
+            self.capture.capture(self._raw_capture, format="bgr")
+
+        self._frame = self._raw_capture.array
 
         return self._frame

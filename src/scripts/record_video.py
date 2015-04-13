@@ -1,7 +1,8 @@
 from __future__ import print_function
 from optparse import OptionParser
 
-from pysolovideo.tracking.cameras import V4L2Camera
+# from pysolovideo.tracking.cameras import V4L2Camera
+from pysolovideo.tracking.cameras import OurPiCamera
 import cv2
 import cv
 
@@ -30,7 +31,8 @@ if __name__ == "__main__":
 
 
 
-    cam = V4L2Camera(device,target_fps=option_dict["fps"], target_resolution=(option_dict["w"],option_dict["h"]))
+    # cam = V4L2Camera(device,target_fps=option_dict["fps"], target_resolution=(option_dict["w"],option_dict["h"]))
+    cam = OurPiCamera(device,target_fps=option_dict["fps"], target_resolution=(option_dict["w"],option_dict["h"]))
 
     # preview:
     print("Press any key to start recording")
