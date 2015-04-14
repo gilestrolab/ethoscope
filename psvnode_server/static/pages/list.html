@@ -3,7 +3,7 @@
         <h1>{{device_type}}s</h1>
         <div>Here you will see the list of connected: {{device_type}}</div>
 
-        <button class="btn btn-default" ng-click="get_devices()">Scan Network for {{device_type}}s</button>
+        <button class="btn btn-default" ng-click="get_devices_list(device_type)">Scan Network for {{device_type}}s</button>
         <div  id="loading_devices" class="spinner"></div>
 
     </div>
@@ -20,13 +20,13 @@
             </thead>
             <tbody>
             <tr ng-repeat="device in devices">
-                <td ng-if="device.type == 'sm'">Sleep Monitor</td>
+                <td ng-show="device.type == 'sm'">Sleep Monitor</td>
                 <td>
-                    <a href="/#sm/{{device.id}}" target="_blank ">
+                    <a ng-href="/#sm/{{device.id}}" target="_blank">
                     <span class="fa fa-circle-o"></span><span> {{device.name}}</span>
                     </a>
                 </td>
-                <td><span ng-if="device.status == 'running'" class="fa fa-circle color-green"></span>
+                <td><span ng-show="device.status == 'running'" class="fa fa-circle color-green"></span>
             <span ng-if="device.status == 'stopped'" class="fa fa-circle color-red"></span> {{device.status}}</td>
                 <td>{{device.monitor_info.last_time_stamp}}</td>
                 <td>{{device.ip}}</td>

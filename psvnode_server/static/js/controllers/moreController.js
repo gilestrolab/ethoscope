@@ -1,9 +1,10 @@
 (function(){
-    var moreController = function($scope, $http, $timeout){
+    var moreController = function($scope, $http, $timeout, $routeParams){
+
         $scope.selected = {'files':[]};
         $scope.selected_all = false;
         $scope.showOptions = true;
-        $scope.options = [{name:"Browse Files",
+        $scope.options = [{name:"Browse / Download Files",
                             icon:"fa fa-folder-open-o",
                             color:"alert alert-info",
                             opt: "browse"
@@ -21,6 +22,9 @@
                          ];
 
         $scope.exec_option = function(opt){
+            if (opt.name == '$viewContentLoaded'){
+                opt = $routeParams.option;
+            };
             $scope.showOption =  opt;
             switch(opt){
                 case "browse":
@@ -32,10 +36,14 @@
                 case "nodeManage":
                     get_node_info();
                     break;
-
+                case "all":
+                    break;
             };
         };
-
+        console.log($routeParams.option);
+        if ($routeParams.option != 'undefined'){
+        $scope.$on('$viewContentLoaded',$scope.exec_option);
+        }
         ///Browse Functions
 
 
@@ -173,6 +181,8 @@
                });
         };
 
+
     }
-    angular.module('flyApp').controller('moreController',moreController);
+
+ angular.module('flyApp').controller('moreController',moreController);
 })()

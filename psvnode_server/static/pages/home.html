@@ -1,5 +1,5 @@
 <!-- home.html -->
-    <div class="jumbotron text-center" >
+    <div class="jumbotron text-center" ng-cloak>
         <h1>Device List</h1>
         <div>Scan the network to autodectect connected devices</div>
 
@@ -13,7 +13,7 @@
 
     </div>
 
-<table class="table table-striped" >
+<table class="table table-striped" ng-cloak>
             <thead>
             <th>Type</th>
             <th>Name</th>
@@ -28,7 +28,7 @@
                 <td ng-if="device.type == 'sm'">Sleep Monitor</td>
                 <td ng-if="device.type == 'sd'">Sleep Deprivator</td>
                 <td>
-                    <a href="/#sm/{{device.id}}" target="_blank ">
+                    <a ng-href="/#sm/{{device.id}}" target="_blank">
                     <span class="fa fa-circle-o"></span><span> {{device.name}}</span>
                     </a>
                 </td>

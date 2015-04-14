@@ -37,7 +37,7 @@
                 controller  : 'sdController'
             })
             // route for the management page
-            .when('/more', {
+            .when('/more/:option', {
                 templateUrl : '/static/pages/more.html',
                 controller  : 'moreController as ctrl',
             })
@@ -52,16 +52,15 @@
     });
 
     // create the controller and inject Angular's $scope
-    app.controller('mainController', function($scope, $http, $interval) {
+    app.controller('mainController', function($scope, $http, $interval, $timeout) {
         $http.get('/devices_list').success(function(data){
             $scope.devices = data;
-
-        })
+        });
         var get_date = function(){
             var t= new Date();
             $scope.time =t.toUTCString();
             $scope.localtime =t.toString();
-        }
+        };
         get_date();
          refresh_time = $interval(get_date, 60000);
         //clear interval when scope is destroyed
@@ -80,7 +79,10 @@
                 $scope.loading_devices = false;
 
             })
-        }
+        };
+
+        $scope.$on('$viewContentLoaded',$scope.get_devices);
+
     });
 
 
@@ -90,23 +92,32 @@
             $scope.device_type = "Sleep Monitor";
         }else if ($scope.req_device_type == 'sd'){
             $scope.device_type = "Sleep Deprivator";
-        }
-        $http.get('/devices_list').success(function(data){
-            $scope.devices = data;
-        })
+        };
 
-        $scope.get_devices = function(){
+        //$http.get('/devices_list').success(function(data){
+        //    $scope.devices = data;
+        //})
+
+        $scope.get_devices_list = function(){
+            list=[];
             var spinner= new Spinner(opts).spin();
             var loadingContainer = document.getElementById('loading_devices');
             loadingContainer.appendChild(spinner.el);
             $scope.loading_devices = true;
             $http.get('/devices').success(function(data){
-                $scope.devices = data;
+                for (device in data){
+                    if (data[device].type == $scope.req_device_type){
+                        list.push(data[device]);
+                    }
+                }
+                $scope.devices = list;
                 spinner.stop();
                 $scope.loading_devices = false;
 
+
             })
         }
+ $scope.$on('$viewContentLoaded',$scope.get_devices_list);
     });
 
 

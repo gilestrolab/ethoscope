@@ -32,14 +32,13 @@
         <button class="btn btn-info disable" ng-if="device.status == 'stopping'"  ng-click="sm.alert('Please wait, system is stopping')">Stopping</button>
         <button class="btn btn-danger disable" ng-if="device.status == 'initialising'"  ng-click="sm.alert('Please wait, system is starting')">Starting</button>
 
-        <button class="btn btn-info" data-toggle="modal" data-target="#downloadModal">Download Data</button>
+        <a href="/#/more/browse" class="btn btn-info">Download Data</a>
         <button class="btn btn-info" ng-click="sm.log()">Log</button>
         <button class="btn btn-danger" data-toggle="modal" data-target="#powerOffAlert">Power off Device</button>
 
     </div>
     <div id = "error" class="alert alert-danger text-center" ng-if="device.error">
         <p>Sorry there has been an error: {{device.error}}</p>
-
          <img  ng-src="{{device.ip}}:9000/static{{device.dbg_img}}?{{device.slapsedtime}}" alt="No debug image" ng-if="device.dbg_img != null" width="480">
     </div>
 
@@ -119,10 +118,11 @@
     <div class="modal-content">
       <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="myModalLabel">Modal title</h4>
+        <h4 class="modal-title" id="myModalLabel">Download Data</h4>
       </div>
       <div class="modal-body">
-       <a ng-repeat="file in device.monitor_info.result_files" href="{{device.ip}}:9000/download{{file}}" target="_blank">Device: {{file}}</a>
+          {{device}}
+       <a ng-repeat="file in device.monitor_info.result_files" href="/download{{file}}" target="_blank">Device: {{file}}</a>
           <a ng-repeat="file in device.monitor_info.result_files" href="/download{{file}}" target="_blank">Node: {{file}}</a>
       </div>
       <div class="modal-footer">
