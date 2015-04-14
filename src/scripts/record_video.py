@@ -32,16 +32,19 @@ if __name__ == "__main__":
 
 
     # cam = V4L2Camera(device,target_fps=option_dict["fps"], target_resolution=(option_dict["w"],option_dict["h"]))
-    cam = OurPiCamera(device,target_fps=option_dict["fps"], target_resolution=(option_dict["w"],option_dict["h"]))
+    cam = OurPiCamera(target_fps=option_dict["fps"], target_resolution=(option_dict["w"],option_dict["h"]))
 
     # preview:
     print("Press any key to start recording")
-    for _,frame in cam:
+    t0=0
+    for t1,frame in cam:
         cv2.imshow("preview", frame)
+        print(t1-t0)
+
         k = cv2.waitKey(1)
         if k > 0:
             break
-
+        t0 = t1
 
     if option_dict["out"] is None :
         exit()
