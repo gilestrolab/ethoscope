@@ -117,10 +117,12 @@ if __name__ == '__main__':
     parser = OptionParser()
     parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-p", "--port", dest="port", default=9000,help="port")
+    parser.add_option("-b", "--branch", dest="branch", default="psv-package",help="the branch to work from")
     (options, args) = parser.parse_args()
     option_dict = vars(options)
     debug = option_dict["debug"]
     port = option_dict["port"]
+    branch = option_dict["branch"]
     # import ConfigParser
     # config = ConfigParser.RawConfigParser(allow_no_value=True)
     # for loc in os.curdir, os.path.expanduser("~"), "/etc/pysolovideo/", os.environ.get("PSV_DEV_SERV_CONF"):
@@ -135,7 +137,7 @@ if __name__ == '__main__':
     DRAW_RESULTS =False
     PSV_DIR = "/psv_data/results"
     GIT_WORKING_DIR = '/home/psv/pySolo-Video'
-    BRANCH = 'psv-dev'
+
     MACHINE_ID_FILE = '/etc/machine-id'
     MACHINE_NAME_FILE = '/etc/machine-name'
 
@@ -153,23 +155,22 @@ if __name__ == '__main__':
             PSV_DIR = "/psv_data/results/"
             #fixme Put your working directories
             GIT_WORKING_DIR = "./"
-            BRANCH = 'psv-dev'
+
         elif getpass.getuser() == "asterix":
             PSV_DIR = "/tmp/psv_data"
             INPUT_VIDEO = '/data1/monitor_new_targets_short.avi'
             GIT_WORKING_DIR = "/data1/todel/pySolo-Device"
-            BRANCH = 'psv-package'
+
         elif getpass.getuser() == "psv" or getpass.getuser() == "root":
             INPUT_VIDEO = "/data/monitor_new_targets_short.avi"
             PSV_DIR = "/psv_data/results"
             GIT_WORKING_DIR = "/home/psv/pySolo-Video"
-            BRANCH = 'psv-dev'
         else:
             raise Exception("where is your debugging video?")
         DRAW_RESULTS = True
 
 
-    version = get_version(GIT_WORKING_DIR, BRANCH)
+    version = get_version(GIT_WORKING_DIR, branch)
 
     # fixme => the name should be hardcoded in a encrypted file? file.
     control = ControlThread(machine_id=machine_id, name=machine_name, version=version, video_file=INPUT_VIDEO,
