@@ -345,7 +345,7 @@ def check_update():
             update['error'] = 'No internet connection, check cable. Error: ', e
 
         #check if there is a new version on the repo
-        bare_update= subprocess.Popen(['git', 'fetch', '-v', 'origin', BRANCH+':'+BRANCH],
+        bare_update= subprocess.Popen(['git', 'fetch', '-v', 'origin', branch+':'+branch],
                                       stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE,
                                       cwd=GIT_BARE_REPO_DIR,
@@ -357,7 +357,7 @@ def check_update():
             logging.error(error_from_fetch)
             update['error'] = error_from_fetch
         #check version
-        origin_version = get_version(GIT_BARE_REPO_DIR, BRANCH)
+        origin_version = get_version(GIT_BARE_REPO_DIR, branch)
         
         origin = {'version': origin_version, 'name': 'Origin'}
         devices_map = scan_subnet()
@@ -502,16 +502,19 @@ if __name__ == '__main__':
     parser = optparse.OptionParser()
     parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-p", "--port", dest="port", default=80,help="port")
+    parser.add_option("-b", "--branch", dest="branch", default="psv-package",help="the branch to work from")
+
     (options, args) = parser.parse_args()
 
     option_dict = vars(options)
     DEBUG = option_dict["debug"]
     PORT = option_dict["port"]
+    branch = option_dict["branch"]
 
     RESULTS_DIR = "/psv_results"
     GIT_BARE_REPO_DIR = "/var/pySolo-Video.git"
     GIT_WORKING_DIR = "/home/node/pySolo-Video"
-    BRANCH = 'psv-dev'
+
     SUBNET_DEVICE = b'wlan0'
 
 
@@ -529,7 +532,6 @@ if __name__ == '__main__':
             RESULTS_DIR = "/data1/todel/psv_results"
             GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
             GIT_WORKING_DIR = "/data1/todel/pySolo-Node"
-            BRANCH = 'psv-package'
 
     global devices_map
     global scanning_locked
@@ -545,8 +547,9 @@ if __name__ == '__main__':
 
 
 
-    origin_version = get_version(GIT_BARE_REPO_DIR, BRANCH)
-    node_version = get_version(GIT_WORKING_DIR, BRANCH)
+    origin_version = get_version(GIT_BARE_REPO_DIR, branch)
+    node_version = get_version(GIT_WORKING_DIR, branch)
+
     if origin_version != node_version:
         is_updated = False
     else:
