@@ -58,11 +58,14 @@
                         for (key in res.files){
                             path = res.files[key].abs_path.split('/');
                             length = path.length;
+                            size = bytesToSize(res.files[key].size)
                             file = {'device_id':path[length-4],
                                     'device_name':path[length-3],
                                     'exp_date':path[length-2],
                                     'file':path[length-1],
-                                    'url':res.files[key].abs_path};
+                                    'url':res.files[key].abs_path,
+                                    'size':size};
+
                             filesObj.push(file);
                         }
                         $scope.files = res;
@@ -109,6 +112,13 @@
                 $scope.selected_all = false;
             }
         };
+        bytesToSize = function (bytes) {
+   if(bytes == 0) return '0 Byte';
+   var k = 1000;
+   var sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+   var i = Math.floor(Math.log(bytes) / Math.log(k));
+   return (bytes / Math.pow(k, i)).toPrecision(3) + ' ' + sizes[i];
+}
 
 /// Updates - Functions
         $scope.devices_to_update_selected = [];
