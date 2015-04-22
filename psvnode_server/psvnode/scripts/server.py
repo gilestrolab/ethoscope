@@ -284,8 +284,9 @@ def browse(folder):
         for (dirpath, dirnames, filenames) in walk(directory):
             for name in filenames:
                 abs_path = os.path.join(dirpath,name)
+                size = os.path.getsize(abs_path)
                 #rel_path = os.path.relpath(abs_path,directory)
-                files.append({'abs_path':abs_path})
+                files.append({'abs_path':abs_path, 'size':size})
 
         return {'files': files}
 
@@ -454,6 +455,9 @@ def redirection_to_home(id):
         return devices_map[id]['ip']
     else:
         return "no devices"
+@app.get('/more/<action>')
+def redirection_to_more(action):
+    return redirect('/#/more/'+action)
 
 @app.post('/device/<id>/log')
 def get_log(id):

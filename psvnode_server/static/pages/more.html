@@ -30,6 +30,7 @@
             <th><a href="" ng-click="predicate = 'device_name'; reverse=false"><span class="fa fa-circle-o"></span> Device Name</a></th>
         <th><a href="" ng-click="predicate = 'exp_date'; reverse=true"><span class="fa fa-calendar-o"></span> Exp Date</th>
         <th><a href="" ng-click="predicate = 'file'; reverse=false"><span class="fa fa-file-o"></span> File</th>
+        <th><a href="" ng-click="predicate = 'size'; reverse=false"><span class="fa fa-file-o"></span> Size </th>
         <th>Select </th>
         </thead>
         <tbody>
@@ -37,6 +38,7 @@
                 <td><a href="#/sm{{file.device_id}}" target="_blank">{{file.device_name}}</a></td>
                 <td>{{file.exp_date}}</td>
                 <td><a href="/download{{file.url}}" target="_blank">{{file.file}}</a></td>
+                <td>{{file.size}}</td>
                 <td> <input type="checkbox" checklist-model="selected.files" checklist-value="file"></td>
             </tr>
         </tbody>
