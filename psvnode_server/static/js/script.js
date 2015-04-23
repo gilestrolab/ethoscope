@@ -63,8 +63,12 @@
         });
 
         var get_date = function(){
+            $http.get('/node/time').success(function(data){
+            console.log(data);
+            t = new Date(data.time);
+            $scope.time = t.toString();
+        });
             var t= new Date();
-            //$scope.time =t.toUTCString();
             $scope.localtime =t.toString();
         };
         get_date();
