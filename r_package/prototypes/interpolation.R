@@ -8,10 +8,6 @@ N <- 50000
 fs <- 1/10
 set.seed(1)
 
-
-
-
-
 average <- function(x){
 	if(is.numeric(x)){
 		return(mean(x))

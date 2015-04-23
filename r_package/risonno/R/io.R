@@ -12,7 +12,10 @@ NULL
 #' @param condition_df an optionnal dataframe to provide experiemental conditions for each ROI. This dataframe should have one row per ROI and, at least, a \code{roi_id} column.
 #' @param relative_distance whether distance is converted between 0 and 1 relatively to the width of the ROI. If FALSE, varibales such as x,y, w and h are returned is returned in absolute number of pixels.
 #' @param time_in_seconds whether time is expressed in seconds (TRUE) or milliseconds (FALSE).
+#' @param reference_hour the hour, in the day, to use as t0 reference.
+#' @param add_file_name whether to add the name of the input file as an extra column.
 #' @param FUN an optionnal function to be applied to the resulting dataframe. It can be used, for instance, to compute summary statistics, or to transform the data.
+#' @param n_core the number of core used for applying FUN to selected ROIs
 #' @param ... extra arguments to be passed to \code{FUN}
 #' @return If \code{rois} has only one element, a dataframe. Otherwise, a list of dataframes (one per ROI)
 #' @note Analysis of many long (sevaral days) recording can use a lot of memory. 
@@ -45,15 +48,22 @@ NULL
 loadROIsFromFile <- function(FILE, rois = NULL, min_time = 0,
 				max_time = Inf, relative_distances = TRUE,
 				condition_df = NULL, time_in_seconds=TRUE,
-				FUN=NULL, ...){
+				reference_hour=NULL,
+				add_file_name=FALSE,
+				FUN=NULL,
+				n_cores=1, #fixme
+			
+				...){
 
+	metadata <- loadMetaData(FILE)
+	
+	
 	con <- dbConnect(SQLite(), FILE)
 	roi_map <- as.data.table(dbGetQuery(con, "SELECT * FROM ROI_MAP"))
 	var_map <- as.data.table(dbGetQuery(con, "SELECT * FROM VAR_MAP"))
 	
 	setkey(roi_map, roi_idx)
 	setkey(var_map, var_name)
-	
 	
 	available_rois  <- roi_map[ ,roi_idx]
 	
@@ -80,42 +90,76 @@ loadROIsFromFile <- function(FILE, rois = NULL, min_time = 0,
 	min_time <- min_time * 1000 # to ms
 	
 	sql_query_fun <- function(i){
+		print(i)
 		sql_query <- sprintf("SELECT * FROM ROI_%i WHERE t >= %e %s",i,min_time, max_time_condition )
 		roi_dt <- as.data.table(dbGetQuery(con, sql_query))
 		roi_dt[, id := NULL]
 		roi_dt[, roi_id := i]
 		roi_row <- roi_map[i]
 		
+		
+		
+		if(!is.null(reference_hour)){
+			p <- metadata$date_time
+			hour_start <- as.numeric(format(p, "%H")) + as.numeric(format(p, "%M")) / 60 +  as.numeric(format(p, "%S")) / 3600
+			ms_after_ref <- ((hour_start - reference_hour) %% 24) * 3600 * 1000
+			roi_dt[, t:= (t + ms_after_ref) ]
+		}
+		
 		if(time_in_seconds)
 			roi_dt[, t:= t/1e3]
+		
 		roi_width <- max(c(roi_row[,w], roi_row[,h]))
 		for(var_n in var_map$var_name){
-			if(var_map[var_n, functional_type] == "distance"){			
+			if(var_map[var_n, functional_type] == "distance"){
 				roi_dt[, (var_n) := get(var_n) / roi_width]
-
 			}
 			if(var_map[var_n, sql_type] == "BOOLEAN"){
 				roi_dt[, (var_n) := as.logical(get(var_n))]
 			}
 		}
-			
-		if(!is.null(FUN))
-			return(FUN(roi_dt, ...))
 		return(roi_dt)
 	}
+
 	out <- lapply(rois, sql_query_fun)
 	dbDisconnect(con)
+	
+	if(!is.null(FUN)){
+		
+		#FIXME
+		if(n_cores > 1){
+			library(parallel)
+			cl <- makeCluster(n_cores)
+			clusterEvalQ(cl, {library(data.table); library(zoo)})
+			clusterEvalQ(cl, sessionInfo())
+			out <- parLapply(cl, out, FUN, ...)
+			stopCluster(cl)
+		}
+
+		else{
+			out <- lapply(out, FUN, ...)
+		}
+	}
+
+	
 	out <- rbindlist(out)
-	setkey(out, roi_id)
+	
+
+	if(add_file_name){
+		out[, file := basename(FILE)]
+		
+		setkeyv(out, c("file", "roi_id"))
+#~ 		print(key(out))
+	}
+	else{
+		setkeyv(out, "roi_id")
+	}
+	
 	
 	if(!is.null(condition_df)){
 		condition_df <- as.data.table(condition_df)
 		out <- out[condition_df]
 		}
-#~ 	names(out) <- paste0("ROI_", rois)
-	
-#~ 	if(length(out) == 1)
-#~ 		return (out[[1]])
 		
 	return(out)		
 }
@@ -144,7 +188,7 @@ loadMetaData <- function(FILE){
 	v <- as.list(metadata$value)
 	names(v) <- metadata$field
 	#fixme explicitly GMT
-	v$date_time <- as.POSIXct(as.integer(v$date_time),origin="1970-01-01")
+	v$date_time <- as.POSIXct(as.integer(v$date_time),origin="1970-01-01",tz = "GMT")
 	return(v)		
 	}
 	

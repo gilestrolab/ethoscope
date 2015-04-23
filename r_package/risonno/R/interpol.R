@@ -29,7 +29,63 @@ NULL
 #' @seealso \code{\link{loadROIsFromFile}} in order to load ROI data.
 #' @export
 
-interpolateROIData <- function(d,min_n_points=11, fs=NA, start_time=0, stop_time=NA){	
+interpolateROIData <- function(data, fs){
+	d <- copy(data)
+	ori_keys <- key(d)
+	sampling_period <- 1/fs
+	d[, t := sampling_period * round(d[,t] /sampling_period)]
+	setkey(d, "t")
+
+	d <- d[,lapply(.SD,average),by=t]
+
+
+	ts <- as.ts(zoo(d,d[,t]))
+	d <- as.data.table(ts)
+	d[,t := index(ts)]
+	setkey(d, "t")
+
+	missing_idxs <- apply(is.na(d),1,any)
+	
+	missing_points <- d[missing_idxs,t]
+ 	dd <- as.data.table(lapply(d, interpolate, t=d[,t], t_out=missing_points))
+ 	setkey(dd, "t")
+	
+	d[missing_idxs,] <- dd
+
+	setkeyv(d, ori_keys)
+	return(d)
+
+}
+
+average <- function(x){
+	if(is.numeric(x)){
+		return(mean(x))
+		}
+	else{
+		#fixme
+		return(x[1])
+		}
+	}
+
+
+interpolate <- function(t, yy, t_out){
+	if(is.numeric(yy)){
+		return(interp1(t, yy, t_out, "linear"))
+	}
+	
+	else{
+			yy <- as.factor(yy)
+			levs <- levels(yy)
+			yy <- unclass(yy)
+			attr(yy, "levels") <- NULL
+			out <- interp1(t, yy, t_out, "nearest")
+			out <- as.factor(levs[out])
+			return(out)
+		}
+}
+
+
+interpolateROIData_old <- function(d,min_n_points=11, fs=NA, start_time=0, stop_time=NA){	
 	
 	if(nrow(d) < min_n_points){
 		warning("This data table does not have enough rows to be resampled. NULL returned")
@@ -92,4 +148,3 @@ interpolateROIData <- function(d,min_n_points=11, fs=NA, start_time=0, stop_time
 	
 	return(new_dt)
 }
-
