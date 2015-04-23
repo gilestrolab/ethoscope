@@ -1,7 +1,7 @@
 <!-- list.html -->
     <div class="jumbotron text-center" >
         <h1>{{device_type}}s</h1>
-        <div>Here you will see the list of connected: {{device_type}}</div>
+        <div class="intro">Here you will see the list of connected: {{device_type}}</div>
 
         <button class="btn btn-default" ng-click="get_devices_list(device_type)">Scan Network for {{device_type}}s</button>
         <div  id="loading_devices" class="spinner"></div>

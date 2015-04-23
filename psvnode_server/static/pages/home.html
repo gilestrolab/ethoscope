@@ -1,14 +1,14 @@
 <!-- home.html -->
     <div class="jumbotron text-center" ng-cloak>
         <h1>Device List</h1>
-        <div>Scan the network to autodectect connected devices</div>
+        <div class="intro">Scan the network to autodectect connected devices</div>
 
-        <button class="btn btn-default" ng-click="get_devices()">Scan Network for Devices</button>
+        <button class=" btn btn-default" ng-click="get_devices()">Scan Network for Devices</button>
 
         <div  id="loading_devices" class="spinner"></div>
-        <div id="node-info">
+        <div id="node-info" class="intro">
             <p><span class="fa fa-clock-o"></span> Node Time: {{time}}</p>
-            <p><span class="fa fa-clock-o"></span> Local Time: {{localtime}}</p>
+            <p><span class="fa fa-clock-o"></span> Your Time: {{localtime}}</p>
         </div>
 
     </div>

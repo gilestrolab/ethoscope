@@ -53,12 +53,18 @@
 
     // create the controller and inject Angular's $scope
     app.controller('mainController', function($scope, $http, $interval, $timeout) {
+        $http.get('/node/time').success(function(data){
+            console.log(data);
+            t = new Date(data.time);
+            $scope.time = t.toString();
+        });
         $http.get('/devices_list').success(function(data){
             $scope.devices = data;
         });
+
         var get_date = function(){
             var t= new Date();
-            $scope.time =t.toUTCString();
+            //$scope.time =t.toUTCString();
             $scope.localtime =t.toString();
         };
         get_date();

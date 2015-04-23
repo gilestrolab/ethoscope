@@ -410,6 +410,8 @@ def node_actions(req, device='eth0'):
             logging.error(e)
 
         return {'disk_usage': disk_usage, 'MAC_addr': MAC_addr, 'ip': ip}
+    if req == 'time':
+        return {'time':datetime.datetime.now().isoformat()}
     else:
         raise NotImplementedError()
         return {'error':'Nothing here'}

@@ -143,6 +143,8 @@
                     $scope.attached_devices=res.attached_devices;
                     $scope.origin = res.origin;
                     $scope.node = res.update.node;
+                    $('#updateDevicesModal').modal('hide');
+
 
             })
         };
