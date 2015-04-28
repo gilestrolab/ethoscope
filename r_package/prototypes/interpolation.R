@@ -18,7 +18,6 @@ average <- function(x){
 		}
 	}
 
-
 interpolate <- function(t, yy, t_out){
 	if(is.numeric(yy)){
 		return(interp1(t, yy, t_out, "linear"))
@@ -44,11 +43,11 @@ interpolateROIData <- function(data, fs){
 	setkey(d, "t")
 
 	d <- d[,lapply(.SD,average),by=t]
-
+	data.table(t2=seq(from=d[1,t2], to=d[.N,t2], by=sampling_period))
 
 	ts <- as.ts(zoo(d,d[,t]))
 	d <- as.data.table(ts)
-	d[,t := index(ts)]
+	d[,t :=, to = ]
 	setkey(d, "t")
 
 	missing_idxs <- apply(is.na(d),1,any)
@@ -69,35 +68,28 @@ interpolateROIData <- function(data, fs){
 
 
 ###########################################################################
-
-y <- cumsum(rnorm(N))
-t <- sort(jitter(1:N))
-y2 <- y[N] + cumsum(rnorm(N))
-t2 <- sort(jitter((2*N + 1 ): (3*N))) 
-
-y <- c(y,y2)
-t <- 1000 + c(t,t2)
-
-d <- data.table(y,t)
-
-	
-	d[, V1:=rnorm(.N)]
-	d[, V2:=rnorm(.N)]
-	d[, V3:=rnorm(.N)]
+FILE <- "/data/psv_results/2015-04-17_17-06-49_00016dfce6e94dee9bb1a845281b086e.db"
+#~ conditions <- cbind(roi_id=1:32, expand.grid(treatment=c(T,F), genotype=LETTERS[1:4]))
+#~ dt <- loadROIsFromFile(FILE, FUN=interpolateROIData, fs=1/10, condition_df = conditions)
+dd <- loadROIsFromFile(FILE)
+d = dd[roi_id==2,]
+#~ 	
+#~ 	d[, V1:=rnorm(.N)]
+#~ 	d[, V2:=rnorm(.N)]
+#~ 	d[, V3:=rnorm(.N)]
 #~ 	d[, V4:=rnorm(.N)]
 #~ 	d[, V5:=rnorm(.N)]
 #~ 	d[, V1:=ifelse(rnorm(.N) > 0, "a", "b")]
 #~ 	d[, V2:=ifelse(rnorm(.N) > 0, "a", "b")]
 #~ 	d[, V3:=ifelse(rnorm(.N) > 0, "a", "b")]
-	d[, V4:=ifelse(rnorm(.N) > 0, "a", "b")]
-	d[, V5:=ifelse(rnorm(.N) > 0, "c", "v")]
+#~ 	d[, V4:=ifelse(rnorm(.N) > 0, "a", "b")]
+#~ 	d[, V5:=ifelse(rnorm(.N) > 0, "c", "v")]
 #~ 	setkey(d, "V5")
 ################################
 
- 
-plot(y ~ t, d, type='l', xlim=c(0,t[length(t)]),lwd=2)
 
-dt <- interpolateROIData(d, fs)
+
+di <- interpolateROIData(d, fs)
 
 
 #~ o <- microbenchmark(

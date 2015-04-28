@@ -15,7 +15,7 @@ activity <- function(x,y){
 FILE <- "/data/psv_results/2015-04-17_17-06-49_00016dfce6e94dee9bb1a845281b086e.db"
 #~ conditions <- cbind(roi_id=1:32, expand.grid(treatment=c(T,F), genotype=LETTERS[1:4]))
 #~ dt <- loadROIsFromFile(FILE, FUN=interpolateROIData, fs=1/10, condition_df = conditions)
-d <- loadROIsFromFile(FILE, FUN=interpolateROIData, fs=1/10,n_cores=1)
+dt <- loadROIsFromFile(FILE, FUN=interpolateROIData, fs=1/10,n_cores=1)
 
 # compute activity for each ROI in place
 dt[,activity:=activity(x,y) , by=key(dt)]
