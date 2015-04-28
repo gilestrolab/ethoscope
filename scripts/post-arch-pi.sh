@@ -36,6 +36,7 @@ pacman -S python2-pip python2-numpy python2-bottle python2-pyserial mysql-python
 
 # mariadb
 pacman -S mariadb --noconfirm --needed
+pacman -S fake-hwclock --noconfirm --needed
 
 #setup Wifi dongle
 #pacman -S netctl
@@ -90,6 +91,8 @@ ip link set eth0 down
 # Enable networktime protocol
 systemctl start ntpd.service
 systemctl enable ntpd.service
+systemctl enable fake-hwclock  fake-hwclock-save.timer
+systemctl start fake-hwclock
 # Setting up ssh server
 systemctl enable sshd.service
 systemctl start sshd.service
