@@ -21,7 +21,8 @@ Depends:
     R (>= 2.15.0),
     MASS,
     RSQLite,
-    data.table
+    data.table,
+    pracma
 LazyLoad: TRUE
 Collate:
     'io.R'
