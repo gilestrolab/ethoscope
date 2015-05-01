@@ -5,18 +5,9 @@ library(zoo)
 library(microbenchmark)
 
 N <- 50000
-fs <- 1/10
+fs <- 1
 set.seed(1)
 
-average <- function(x){
-	if(is.numeric(x)){
-		return(mean(x))
-		}
-	else{
-		#fixme
-		return(x[1])
-		}
-	}
 
 interpolate <- function(t, yy, t_out){
 	if(is.numeric(yy)){
@@ -37,27 +28,36 @@ interpolate <- function(t, yy, t_out){
 interpolateROIData <- function(data, fs){
 	d <- copy(data)
 	ori_keys <- key(d)
-	print(ori_keys)
+	
 	sampling_period <- 1/fs
-	d[, t := sampling_period * round(d[,t] /sampling_period)]
-	setkey(d, "t")
-
-	d <- d[,lapply(.SD,average),by=t]
-	data.table(t2=seq(from=d[1,t2], to=d[.N,t2], by=sampling_period))
-
-	ts <- as.ts(zoo(d,d[,t]))
-	d <- as.data.table(ts)
-	d[,t :=, to = ]
-	setkey(d, "t")
-
-	missing_idxs <- apply(is.na(d),1,any)
+	d[, t_round := sampling_period * round(d[,t] /sampling_period)]
+	setkey(d, "t_round")
+	# FIXME!
+	d <- d[,lapply(.SD,mean),by=t_round]
 	
-	missing_points <- d[missing_idxs,t]
- 	dd <- as.data.table(lapply(d, interpolate, t=d[,t], t_out=missing_points))
- 	setkey(dd, "t")
 	
-	d[missing_idxs,] <- dd
-
+	
+	
+	# all possible required output times
+	t_out <- seq(from=d[1,t_round], to=d[.N,t_round], by=sampling_period)
+	
+	t_to_interpolate <- setdiff(t_out, d$t_round)
+	
+	to_interpolate_dt <- d[t_round==t_to_interpolate]
+	
+	missing_points <- lapply(d, interpolate, t=d[,t], t_out=t_to_interpolate)
+	
+	
+	missing_points <- as.data.table(missing_points)
+	missing_points[ , t_round := t_to_interpolate]
+ 	setkey(missing_points, "t_round")
+ 	d <- rbind(missing_points, d)
+ 	
+	# we ensure the dt is time sorted
+	setkey(d, "t_round")
+	d$t_round <- NULL
+	
+	# we restitute old keys
 	setkeyv(d, ori_keys)
 	return(d)
 
@@ -69,27 +69,13 @@ interpolateROIData <- function(data, fs){
 
 ###########################################################################
 FILE <- "/data/psv_results/2015-04-17_17-06-49_00016dfce6e94dee9bb1a845281b086e.db"
-#~ conditions <- cbind(roi_id=1:32, expand.grid(treatment=c(T,F), genotype=LETTERS[1:4]))
-#~ dt <- loadROIsFromFile(FILE, FUN=interpolateROIData, fs=1/10, condition_df = conditions)
-dd <- loadROIsFromFile(FILE)
-d = dd[roi_id==2,]
-#~ 	
-#~ 	d[, V1:=rnorm(.N)]
-#~ 	d[, V2:=rnorm(.N)]
-#~ 	d[, V3:=rnorm(.N)]
-#~ 	d[, V4:=rnorm(.N)]
-#~ 	d[, V5:=rnorm(.N)]
-#~ 	d[, V1:=ifelse(rnorm(.N) > 0, "a", "b")]
-#~ 	d[, V2:=ifelse(rnorm(.N) > 0, "a", "b")]
-#~ 	d[, V3:=ifelse(rnorm(.N) > 0, "a", "b")]
-#~ 	d[, V4:=ifelse(rnorm(.N) > 0, "a", "b")]
-#~ 	d[, V5:=ifelse(rnorm(.N) > 0, "c", "v")]
-#~ 	setkey(d, "V5")
-################################
 
+d <- loadROIsFromFile(FILE,rois=2)
+d <- d[t < 300 | t > 700]
 
+t = system.time(di <- interpolateROIData(d, fs))
+print(t)
 
-di <- interpolateROIData(d, fs)
 
 
 #~ o <- microbenchmark(
