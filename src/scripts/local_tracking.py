@@ -1,8 +1,5 @@
 __author__ = 'quentin'
 
-
-# Interface to V4l
-from pysolovideo.tracking.cameras import V4L2Camera
 from pysolovideo.tracking.cameras import MovieVirtualCamera
 
 # Build ROIs from greyscale image
@@ -13,7 +10,7 @@ from pysolovideo.tracking.trackers import AdaptiveBGModel
 
 # the standard monitor
 from pysolovideo.tracking.monitor import Monitor
-from pysolovideo.utils.io import ResultWriter
+from pysolovideo.utils.io import SQLiteResultWriter
 
 import pkg_resources
 import optparse
@@ -79,7 +76,7 @@ if __name__ == "__main__":
 
 
     try:
-        with ResultWriter("psv" ,rois, metadata) as rw:
+        with SQLiteResultWriter("/tmp/psv.db" ,rois, metadata) as rw:
             logging.info("Running monitor" )
             monit.run(rw)
     except KeyboardInterrupt:

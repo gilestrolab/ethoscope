@@ -266,13 +266,14 @@ class DAMFileHelper(object):
         out = [self._make_sql_command(v) for v in out.values()]
 
         return out
+
 class ResultWriter(object):
     # _flush_every_ns = 30 # flush every 10s of data
     _max_insert_string_len = 1000
-
+    _async_writing_class = AsyncMySQLWriter
     def __init__(self, db_name, rois, metadata=None, make_dam_like_table=True, take_frame_shots=False, *args, **kwargs):
         self._queue = multiprocessing.JoinableQueue()
-        self._async_writer = AsyncMySQLWriter(db_name, self._queue)
+        self._async_writer = self._async_writing_class(db_name, self._queue)
         self._async_writer.start()
 
         self._last_t, self._last_flush_t, self._last_dam_t = [0] * 3
@@ -418,67 +419,122 @@ class ResultWriter(object):
         logging.info("Creating database table with: " + command)
         self._write_async_command(command)
 
-
-#
-# class ResultWriterBak():
-#
-#     _flush_every_ns = 10 # flush every 10s of data
-#     _db_name = None
-#
-#     def __init__(self, db_name, *args, **kwargs):
-#         self._async_writer = AsyncMySQLWriter()
-#         super(ResultWriter, self).__init__(*args, **kwargs)
-#
-#
-#
-#     def _write_async_command(self, command):
-#         self._async_writer.write_command(command)
-#
-#
-#
-#
-#     # def _clean_up(self):
-#     #
-#     #     c.execute(command)
-#     #     cn.close()
-#
-#     def _create_table(self, name, fields, engine="MyISAM"):
-#         command = "CREATE TABLE %s (%s) ENGINE %s KEY_BLOCK_SIZE=16" % (name, fields, engine)
-#         logging.info("Creating database table with: " + command)
-#         self._write_async_command(command)
-#
 #
 
-# class SQLiteResultWriter(ResultDBWriterBase):
-#     _sqlite_basename = "psv_result.db"
-#
-#     _pragmas = {"temp_store": "MEMORY",
-#     "journal_mode": "OFF",
-#     "locking_mode":  "EXCLUSIVE"}
-#
-#     def __init__(self, dir_path, *args, **kwargs):
-#         self._path = os.path.join(dir_path, self._sqlite_basename)
-#         super(SQLiteResultWriter, self).__init__(*args, **kwargs)
-#
-#         c = self._conn.cursor()
-#         logging.info("Setting DB parameters'")
-#         for k,v in self._pragmas.items():
-#             command = "PRAGMA %s = %s" %(str(k), str(v))
-#             c.execute(command)
-#
-#     def _clean_up(self):
-#         try :
-#             os.remove(self._path)
-#         except:
-#             pass
-#
-#     def _get_connection(self):
-#         conn = sqlite3.connect(self._path, check_same_thread=False)
-#         return conn
-#     def _create_table(self, cursor, name, fields):
-#         command = "CREATE TABLE %s (%s)" % (name, fields)
-#         cursor.execute(command)
-#
-#
-#
-#
+
+
+class AsyncSQLiteWriter(multiprocessing.Process):
+    _pragmas = {"temp_store": "MEMORY",
+                "journal_mode": "OFF",
+                "locking_mode":  "EXCLUSIVE"}
+
+    def __init__(self, db_name, queue):
+        self._db_name = db_name
+        self._queue = queue
+
+
+
+        super(AsyncSQLiteWriter,self).__init__()
+        try:
+            os.remove(self._db_name)
+        except:
+            pass
+
+        conn = self._get_connection()
+
+        c = conn.cursor()
+        logging.info("Setting DB parameters'")
+        for k,v in self._pragmas.items():
+            command = "PRAGMA %s = %s" %(str(k), str(v))
+            c.execute(command)
+
+        
+    def _get_connection(self):
+        db =   sqlite3.connect(self._db_name)
+        return db
+
+
+    def run(self):
+
+        db = None
+        do_run = True
+        try:
+
+            db = self._get_connection()
+            while do_run:
+                try:
+                    msg = self._queue.get()
+
+                    if (msg == 'DONE'):
+                        do_run=False
+                        continue
+                    c = db.cursor()
+                    c.execute(msg)
+                    db.commit()
+
+                except:
+                    do_run=False
+                    try:
+                        logging.error("Failed to run mysql command:\n%s" % msg)
+                    except:
+                        logging.error("Did not retrieve queue value")
+
+                finally:
+                    if self._queue.empty():
+                        #we sleep iff we have an empty queue. this way, we don't over use a cpu
+                        time.sleep(.1)
+
+        except KeyboardInterrupt as e:
+            logging.warning("DB async process interrupted with KeyboardInterrupt")
+            raise e
+
+        except Exception as e:
+            logging.error("DB async process stopped with an exception")
+            raise e
+
+        finally:
+            logging.info("Closing async mysql writer")
+            while not self._queue.empty():
+                self._queue.get()
+
+            self._queue.close()
+            if db is not None:
+                db.close()
+
+
+
+class Null(object):
+    def __repr__(self):
+        return "NULL"
+    def __str__(self):
+        return "NULL"
+
+class SQLiteResultWriter(ResultWriter):
+    _async_writing_class = AsyncSQLiteWriter
+    _null= Null()
+    def __init__(self, db_name, rois, metadata=None, make_dam_like_table=False, take_frame_shots=False, *args, **kwargs):
+        super(SQLiteResultWriter, self).__init__(db_name, rois, metadata,make_dam_like_table=False, take_frame_shots=False, *args, **kwargs)
+
+
+    def _create_table(self, name, fields, engine=None):
+
+        fields = fields.replace("NOT NULL", "")
+        print fields
+        command = "CREATE TABLE %s (%s)" % (name,fields)
+        logging.info("Creating database table with: " + command)
+        self._write_async_command(command)
+
+
+
+    def _add(self,t, roi, data_row):
+        t = int(round(t))
+        roi_id = roi.idx
+
+        tp = (self._null, t) + tuple(data_row.values())
+
+        if roi_id not in self._insert_dict  or self._insert_dict[roi_id] == "":
+            command = 'INSERT INTO ROI_%i VALUES %s' % (roi_id, str(tp))
+            self._insert_dict[roi_id] = command
+        else:
+            self._insert_dict[roi_id] += ("," + str(tp))
+
