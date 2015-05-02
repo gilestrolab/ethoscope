@@ -76,7 +76,7 @@ if __name__ == "__main__":
 
 
     try:
-        with SQLiteResultWriter("/tmp/psv.db" ,rois, metadata) as rw:
+        with SQLiteResultWriter( option_dict["out"],rois, metadata) as rw:
             logging.info("Running monitor" )
             monit.run(rw)
     except KeyboardInterrupt:
