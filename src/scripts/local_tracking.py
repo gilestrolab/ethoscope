@@ -31,7 +31,7 @@ if __name__ == "__main__":
     parser.add_option("-i", "--input", dest="input", help="the output video file", type="str")
     #
     parser.add_option("-r", "--result-video", dest="result_video", help="the path to an optional annotated video file."
-                                                                "This is useful to show the result on a video.",
+                                                                "This is     useful to show the result on a video.",
                                                                 type="str", default=None)
 
     parser.add_option("-d", "--draw-every",dest="draw_every", help="how_often to draw frames", default=0, type="int")
@@ -48,7 +48,7 @@ if __name__ == "__main__":
 
     logging.info("Starting Monitor thread")
 
-    cam = MovieVirtualCamera(option_dict ["input"], use_wall_clock=True)
+    cam = MovieVirtualCamera(option_dict ["input"], use_wall_clock=False)
 
     roi_builder = SleepMonitorWithTargetROIBuilder()
     rois = roi_builder(cam)
