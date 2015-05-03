@@ -2,7 +2,7 @@ rm(list=ls())
 library(risonno)
 library(ggplot2)
 
-FILE <- "./results/validation_out.db"
+FILE <- "/data/validation_out.db"
 
 activity <- function(x,y){
 	comp = x + 1i*y
@@ -42,9 +42,10 @@ setkeyv(ref,c('roi_id','t'))
 pdt <- merge(pos_at_t, ref)
 pdt[,distance := abs((xt + 1i*yt) - (x +1i*y))]
 #todo invert axis -> food?
-ggplot(pdt,aes(xt,x,colour=behaviour,shape=behaviour)) +
+
+ggplot(pdt,aes(xt,x)) +
 	geom_smooth(method='lm',formula=y~x) +
-	geom_point()
+	geom_point(aes(colour=behaviour, shape=behaviour, size=2, alpha=.5))
 
 mod <- lm(xt ~x, pdt)	
 print(summary(mod))
@@ -57,8 +58,8 @@ o = dt_hack[, interpolateROIData(.SD,fs=1/10), by=key(dt)]
 act_at_t = o[t %in% unique(ref[,t]),list(t=t, activity=activity,roi_id=roi_id)]
 setkeyv(act_at_t,c('roi_id','t'))
 
-pdt <- merge(act_at_t, ref)
+pdt2 <- merge(act_at_t, ref)
 
-summary(lm(log10(activity+1e-3) ~ behaviour,pdt))
+summary(lm(log10(activity+1e-3) ~ behaviour,pdt2))
 
 #fixme, we also should use max/5%centile/... walked distance -> is it beter than max?!!
