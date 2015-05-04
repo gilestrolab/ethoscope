@@ -1,0 +1,21 @@
+
+rm(list=ls())
+library(risonno)
+library(data.table)
+library(ggplot2)
+
+
+path <- c(
+	"/data/psv_results/00016dfce6e94dee9bb1a845281b086e/GGSM-001/2015-04-17_17-06-49/2015-04-17_17-06-49_00016dfce6e94dee9bb1a845281b086e.db",
+	"/data/psv_results/00026dfce6e94dee9bb1a845281b086e/GGSM-002/2015-04-17_17-09-18/2015-04-17_17-09-18_00026dfce6e94dee9bb1a845281b086e.db"
+#~  	"/data/psv_results/00036dfce6e94dee9bb1a845281b086e/GGSM-003/2015-04-17_17-10-32/2015-04-17_17-10-32_00036dfce6e94dee9bb1a845281b086e.db",
+#~  	"/data/psv_results/00046dfce6e94dee9bb1a845281b086e/GGSM-004/2015-04-17_17-11-11/2015-04-17_17-11-11_00046dfce6e94dee9bb1a845281b086e.db"
+	)
+
+conditions <- as.factor(c("ctrl", "quinine"))#, "camphor_1", "camphor_2"))
+
+ref <- data.table(path,conditions)
+
+dt <- loadMultipleFiles(files=ref, rois=c(2:15,17:31), reference_hour = 9)
+
+

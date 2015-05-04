@@ -52,7 +52,8 @@ interpolateROIData <- function(data, fs){
  	d <- rbind(missing_points, d)
  	
 	# we ensure the dt is time sorted
-	setkey(d, "t_round")
+	d[,t:=t_round]
+	setkey(d, "t")
 	d$t_round <- NULL
 	
 	# we restitute old keys

@@ -140,6 +140,7 @@ loadROIsFromFile <- function(FILE, rois = NULL, min_time = 0,
 	return(out)		
 }
 
+
 NULL
 #' Get metadata from a result file.
 #' 
