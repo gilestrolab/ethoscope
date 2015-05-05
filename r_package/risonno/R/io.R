@@ -109,15 +109,16 @@ loadROIsFromFile <- function(FILE, rois = NULL, min_time = 0,
 				roi_dt[, (var_n) := as.logical(get(var_n))]
 			}
 		}
+		if(!is.null(FUN)){
+			roi_dt <- FUN(roi_dt, ...)
+		}	
 		return(roi_dt)
 	}
 
 	out <- lapply(rois, sql_query_fun)
 	dbDisconnect(con)
 	
-	if(!is.null(FUN)){
-		out <- lapply(out, FUN, ...)
-	}
+	
 
 	
 	out <- rbindlist(out)
