@@ -22,12 +22,11 @@ NULL
 #' @note Analysis of many long (sevaral days) recording can use a large amount of RAM. 
 #' Therefore, it can sometimes be advantageaous to load an process ROIs one by one.
 #' @examples
-#' \dontrun{
-#' FILE <- "result.db"
-#' out <- loadROIsFromFile(FILE,c(1,3,55))
+#' 
+#' file <- loadSampleData("validation.db")
+#' dt <- loadROIsFromFile(file)
 #' #histogram of x marginal distribution
-#' hist(out[roi_id == 1, x], nclass=100)
-#' }
+#' hist(dt[roi_id == 3, x], nclass=100) 
 #' \dontrun{
 #' # More realistec example where we have experiemental conditions, and 
 #' we want to resample data at 1.0Hz.
@@ -42,53 +41,171 @@ NULL
 #' 	}
 #' @seealso \code{\link{loadMetaData}} To display global informations about the experiment. 
 #' @export
-loadROIsFromFile <- function(FILE, rois = NULL, min_time = 0,
-				max_time = Inf, relative_distances = TRUE,
-				condition_df = NULL, time_in_seconds=TRUE,
+loadPsvData <- function(what,
+				min_time = 0,
+				max_time = Inf, 
 				reference_hour=NULL,
 				add_file_name=FALSE,
 				FUN=NULL,
 				...){
+	
+	# from the `what` argument, we build a `master_table` that we will map to the actual data.
+	
+	# case 1 what is a file, or a vector of files
+	if(is.character(what)){
+		# todo check whether file exists
+		master_table <- data.table(path=what, file=basename(what))
+		# We load all available ROIs since user did not provide ROI info
+		master_table <- master_table[,list(
+				roi_id=availableROIs(path),
+				file=file),by=path]
+	}
+	else if(is.data.frame(what)){
+		
+		if(!"path" %in% colnames(what))
+			stop("When `what` is a data.frame, it MUST have a column named 'path'")
+		master_table <- as.data.table(what)
+		#fixme check uniqueness of file/use path as key?
+		master_table[,path := as.character(path)]
+		master_table[,file := basename(path)]
+		
+		setkey(master_table,file)
+		
+		if(!"roi_id" %in% colnames(what)){
+			m <- master_table[,list(roi_id=availableROIs(path)),by=key(master_table)]
+			master_table <- m[master_table]
+		}
+
+		}
+	else{
+		stop("Unexpected `what` argument!")
+		}
+	
+	setkeyv(master_table,c("file","roi_id"))
+	
+	l_dt <- lapply(1:nrow(master_table),
+			function(i){
+				roi_id <- master_table[i,roi_id]
+				file <- master_table[i,file]
+				path <- master_table[i,path]
+				out <- loadOneROI(path,	roi_id=roi_id,
+									min_time = min_time,
+									max_time = max_time, 
+									reference_hour=reference_hour)
+				if(nrow(out) == 0){
+					warning(sprintf("No data in ROI %i, from FILE %s. Skipping",roi_id, path))
+					return(NULL)
+					}
 					
-	metadata <- loadMetaData(FILE)
+				if(!is.null(FUN))
+					out <- FUN(out,...)
+				out[,file:=file]
+				setkeyv(out,c("file","roi_id"))
+				})
+				
+	l_dt <- l_dt[!sapply(l_dt,is.null)]
+	if(length(unique(lapply(l_dt,key))) > 1){
+		stop("Data tables do not have the same keys")
+		}
+	keys <- key(l_dt[[1]])
+
+	out <- rbindlist(l_dt)
+	rm(l_dt)
 	
-	con <- dbConnect(SQLite(), FILE)
-	roi_map <- as.data.table(dbGetQuery(con, "SELECT * FROM ROI_MAP"))
-	var_map <- as.data.table(dbGetQuery(con, "SELECT * FROM VAR_MAP"))
+	setkeyv(out, keys)
+	master_table[out]
+}
+{
+#~ dt <- loadPsvData(FILE)
+#~ map <- data.frame(path = FILE, roi_id=c(2:10))
+#~ dt <- loadPsvData(map)
+#~ 
+#~ map <- array.expand(path = c(FILE,FILE))
+#~ dt <- loadPsvData(map)
+
+#~ map <- data.frame(genotype = c("A","B"), path = c(FILE,"/data/2015-04-17_17-10-32_00036dfce6e94dee9bb1a845281b086e.db"))
+#~ dt <- loadPsvData(map)
+}
+
+#~ 
+#~ exp1_map <- data.frame(replicate=1, roi_id=2:15,path=FILE, genotype=c("A","B"))
+#~ exp2_map <- data.frame(replicate=2, roi_id=17:32,path="/data/2015-04-17_17-10-32_00036dfce6e94dee9bb1a845281b086e.db", genotype=c("A","B"))
+#~ map <- rbind(exp1_map, exp2_map)
+#~ dt <- loadPsvData(map,max_time=10*3600,FUN=sleepAnalysis)
+
+#todo check duplicated!
+
+#~ 	matched <- rois %in% available_rois
+#~ 	unmatched_idx <-  which(!matched)
+#~ 	
+#~ 	for(i in rois[unmatched_idx])
+#~ 		warning(sprintf("Roi %i is not in the table", i))
+#~ 	
+#~ 	rois <- rois[matched]
 	
-	setkey(roi_map, roi_idx)
-	setkey(var_map, var_name)
+#~ 	if (length(rois) == 0)
+#~ 		stop(sprintf("No ROI to be read. available ROIs are: %s", str(sort(available_rois))))
+#~ 	
+#~ 	
+#~ 	
+#~ 	
+#~ 	out <- lapply(rois, sql_query_fun)
+#~ 	dbDisconnect(con)
+#~ 	
 	
-	available_rois  <- roi_map[ ,roi_idx]
-	
-	if(is.null(rois))
-		rois <- available_rois
-	
-	matched <- rois %in% available_rois
-	unmatched_idx <-  which(!matched)
-	
-	for(i in rois[unmatched_idx])
-		warning(sprintf("Roi %i is not in the table", i))
-	
-	rois <- rois[matched]
-	
-	if (length(rois) == 0)
-		stop(sprintf("No ROI to be read. available ROIs are: %s", str(sort(available_rois))))
-	
-	if(max_time == Inf)
-		max_time_condition <- ""
-	else
-		max_time_condition <-  sprintf("AND t < %e", max_time * 1000) 
-	
-	min_time <- min_time * 1000 # to ms
-	
-	sql_query_fun <- function(i){
-		print(i)
-		sql_query <- sprintf("SELECT * FROM ROI_%i WHERE t >= %e %s",i,min_time, max_time_condition )
+#~ 
+#~ 	
+#~ 	out <- rbindlist(out)
+#~ 	
+#~ 
+#~ 	if(add_file_name){
+#~ 		out[, file := basename(FILE)]
+#~ 		setkeyv(out, c("file", "roi_id"))
+#~ 	}
+#~ 	else{
+#~ 		setkeyv(out, "roi_id")
+#~ 	}
+#~ 	
+#~ 	
+#~ 	if(!is.null(condition_df)){
+#~ 		condition_df <- as.data.table(condition_df)
+#~ 		out <- out[condition_df]
+#~ 		}
+#~ 		
+#~ 	return(out)		
+#~ }
+
+loadOneROI <- function(
+		FILE,
+		roi_id, 
+		min_time=0, # In  s
+		max_time=Inf,
+		reference_hour=NULL){
+		
+		metadata <- loadMetaData(FILE)
+		con <- dbConnect(SQLite(), FILE)
+		
+		var_map <- as.data.table(dbGetQuery(con, "SELECT * FROM VAR_MAP"))
+		setkey(var_map, var_name)
+		roi_map <- as.data.table(dbGetQuery(con, "SELECT * FROM ROI_MAP"))
+		roi_row <- roi_map[roi_idx == roi_id,]
+		if(nrow(roi_row) == 0 ){
+			warning(sprintf("ROI %i does not exist, skipping",roi_id))
+			return(NULL)
+		}
+		if(max_time == Inf)
+			max_time_condition <- ""
+		else
+			max_time_condition <-  sprintf("AND t < %e", max_time * 1000) 
+			
+		min_time <- min_time * 1000 
+		
+		sql_query <- sprintf("SELECT * FROM ROI_%i WHERE t >= %e %s",roi_id,min_time, max_time_condition )
+		
 		roi_dt <- as.data.table(dbGetQuery(con, sql_query))
 		roi_dt[, id := NULL]
-		roi_dt[, roi_id := i]
-		roi_row <- roi_map[i]
+		roi_dt[, roi_id := roi_id]
+		
 		
 		if(!is.null(reference_hour)){
 			p <- metadata$date_time
@@ -97,8 +214,8 @@ loadROIsFromFile <- function(FILE, rois = NULL, min_time = 0,
 			roi_dt[, t:= (t + ms_after_ref) ]
 		}
 		
-		if(time_in_seconds)
-			roi_dt[, t:= t/1e3]
+		#time_in_seconds
+		roi_dt[, t:= t/1e3]
 		
 		roi_width <- max(c(roi_row[,w], roi_row[,h]))
 		for(var_n in var_map$var_name){
@@ -109,40 +226,11 @@ loadROIsFromFile <- function(FILE, rois = NULL, min_time = 0,
 				roi_dt[, (var_n) := as.logical(get(var_n))]
 			}
 		}
-		if(!is.null(FUN)){
-			roi_dt <- FUN(roi_dt, ...)
-		}	
 		return(roi_dt)
 	}
 
-	out <- lapply(rois, sql_query_fun)
-	dbDisconnect(con)
-	
-	
-
-	
-	out <- rbindlist(out)
-	
-
-	if(add_file_name){
-		out[, file := basename(FILE)]
-		setkeyv(out, c("file", "roi_id"))
-	}
-	else{
-		setkeyv(out, "roi_id")
-	}
-	
-	
-	if(!is.null(condition_df)){
-		condition_df <- as.data.table(condition_df)
-		out <- out[condition_df]
-		}
-		
-	return(out)		
-}
-
-
 NULL
+
 #' Get metadata from a result file.
 #' 
 #' This function is used to obtain meta data -- such as `time and date of the experiment' , `aquisition device', `version of the software' and others--
@@ -201,8 +289,9 @@ NULL
 #' }
 #' @seealso \code{\link{loadROIsFromFile}} to load single files.
 #' @export
-loadMultipleFiles <- function(files, ...){
+loadMultipleFiles <- function(files, rois, ...){
 	path <- files
+	
 	file_dt <- as.data.table(path)
 	if(!("path" %in% colnames(file_dt)))
 		stop("file_dt should be a dataframe with, at least, a column names 'path'")
@@ -272,3 +361,43 @@ loadDAMFiles <- function(FILES, channels = NULL, min_time = 0, max_time = Inf, i
 	return(df_l)
 }	
 
+NULL
+#' TODO
+#' 
+#' TODO
+#' TODO...... . .............. ... . .. . ...... 
+
+#' @export
+loadSampleData <- function(name="",list=F){
+	db_file <- system.file("data/db_files.tar.xz", package="risonno")
+	
+	if(list == T){
+		content <- untar(db_file, list=T)
+		db_files <- content
+		out <- basename(content)[dirname(content) != '.']
+		return(out)
+		}
+	if(name == "")
+		stop("INVALID FILE NAME. List available files using `list=TRUE`")
+	
+	d <- tempdir()
+	file_name <- file.path("db_files",name)
+	r <- untar(db_file, files=file_name,exdir=d)
+	if(r == 2){
+		unlink(d, recursive=T)
+		stop("INVALID FILE NAME. List available files using `list=TRUE`")
+		}
+	out <-file.path(d,file_name)
+	warning("Do not, forget to unlink file")
+	return(out)
+}
+
+availableROIs <- function(FILE){
+	con <- dbConnect(SQLite(), FILE)
+	roi_map <- as.data.table(dbGetQuery(con, "SELECT * FROM ROI_MAP"))
+	setkey(roi_map, roi_idx)
+
+	available_rois  <- roi_map[ ,roi_idx]
+	dbDisconnect(con)
+	return(available_rois)
+}
