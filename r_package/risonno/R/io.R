@@ -321,7 +321,70 @@ loadMultipleFiles <- function(files, rois, ...){
 	out <- file_dt[out]
 	setkeyv(out, keys)
 	return(out)
-	} 
+	}
+NULL
+
+# @include
+NULL
+#' Read a text file formatted as DAM2 into a single data table
+#'
+#' This function is used to conveniently change the format of one file from DAM2 to risonno.
+#'
+#' @param FILE the name of the input file.
+#' @param min_time exclude data before min_time (in seconds). This time is relative to the start of the experiement.
+#' @param max_time exclude data after max_time (in seconds). This time is relative to the start of the experiement.
+#' @return If \code{rois} has only one element, a dataframe. Otherwise, a list of dataframes (one per ROI)
+#' @note Analysis of many long (sevaral days) recording can use a large amount of RAM.
+#' Therefore, it can sometimes be advantageaous to load an process ROIs one by one.
+#' @examples
+#' \dontrun{
+#' FILE <- "Monitor53.txt"
+#' out <- loadDAMFile(FILE)
+#' #histogram of x marginal distribution
+#' hist(out[roi_id == 1, x], nclass=100)
+#' }
+#' \dontrun{
+#' # More realistec example where we have experiemental conditions, and
+#' we want to resample data at 1.0Hz.
+#' # First, the conditions:
+#' conditions <- cbind(roi_id=1:32, expand.grid(treatment=c(T,F), genotype=LETTERS[1:4]))
+#' print(conditions)
+#' @seealso \code{\link{loadMetaData}} To display global informations about the experiment.
+#' @export
+loadDAMFile <- function(FILE, channels = NULL, min_time = 0, max_time = Inf, interval = 60){
+	### hardcodded constants
+	DAM_COL_TYPES <- c(
+		"integer", "character", "character",
+		#rep(NULL, 7), ## these columns are irrelevant, NULL means we will discard them straight away
+		rep("double", 32)
+		)
+
+	DAM_COL_NAMES <- c("idx", "day_month_year", "time", sprintf("channel_%02d", 1:32))
+
+	dt_list <- fread(FILE, drop=4:10, header = FALSE)
+	setnames(dt_list,DAM_COL_NAMES)
+	dt_list[,datetime:=paste(day_month_year,time, sep=":")]
+	dt_list[,t:=as.POSIXct(strptime(datetime,"%d %b %Y:%H:%M:%S"))]
+	#clean table from unused parameters (idx,time, datetime...)
+	dt_list[,time:=NULL]
+	dt_list[,datetime:=NULL]
+	dt_list[,idx:=NULL]
+	dt_list[,day_month_year:=NULL]
+	#for (i in seq(1,7,1) dt_list[,not_in_use_+i]
+	#melting using pacakage reshape
+	dt_risonno <- as.data.table(melt(dt_list,id="t"))
+
+    roi_value <- function(channel_string){
+        s <- strsplit(channel_string,"_")
+        num <- as.integer(sapply(s,function(x) x[2]))
+        return(num)
+    }
+    #get the values on activity
+    dt_risonno[,activity:=value]
+    dt_risonno[,roi_id:=roi_value(as.character(variable))]
+	return(dt_risonno)
+}
+
 
 NULL
 
