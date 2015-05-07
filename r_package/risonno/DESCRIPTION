@@ -22,10 +22,12 @@ Depends:
     MASS,
     RSQLite,
     data.table,
-    pracma
+    pracma,
+    zoo
 LazyLoad: TRUE
 Collate:
     'io.R'
     'interpol.R'
     'plots.R'
+    'sleep.R'
 URL: https://github.com/gilestrolab/pySolo-Video

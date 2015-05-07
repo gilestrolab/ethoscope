@@ -3,10 +3,6 @@ library(risonno)
 library(data.table)
 library(ggplot2)
 
-sampling_period <- 10#s
-ACTIV_THR <- 0.03
-
-
 
 sleepAnalysis <- function(data,
 			fs=2.0, #Hz
@@ -50,46 +46,28 @@ sleep_contiguous <- function(moving,fs,min_valid_time=5*60){
 	inverse.rle(r_sleep)
 }
 
-
-#~ path <- "/data/psv_results/00016dfce6e94dee9bb1a845281b086e/GGSM-001/2015-04-17_17-06-49/2015-04-17_17-06-49_00016dfce6e94dee9bb1a845281b086e.db"
-
-#~ path <- "/data/validation/validation_out.db"
-#~ rois <- c(1:3,5:19,21:32)
-#~ 
-#~ d <- loadROIsFromFile(path, rois=rois, reference_hour = 9, FUN=sleepAnalysis)
-#~ d[,x:=ifelse(roi_id > 16, 1-x,x)]
-#~ 
-#~ # Density plots with semi-transparent fill
-#~ print(
-#~ 	ggplot(d, aes(x=x, fill=asleep)) + geom_density(alpha=.3)
-#~ )
-#~ 
-#~ 
-
-
-
-
-path <- "/data/validation/validation_out.db"
-rois <- c(1:3,5:19,21:32)
-d1 <- loadROIsFromFile(path, rois=rois, reference_hour = 9, FUN=sleepAnalysis,max_time=3600*20)
-d1[,condition:="wet"]
-
-path <- "/data/psv_results/00016dfce6e94dee9bb1a845281b086e/GGSM-001/2015-04-17_17-06-49/2015-04-17_17-06-49_00016dfce6e94dee9bb1a845281b086e.db"
-rois <- c(2:15,18:31)
-d2 <- loadROIsFromFile(path, rois=rois, reference_hour = 9, FUN=sleepAnalysis,max_time=3600*20)
-d2[,condition:="dry"]
-
-d <- rbind(d1,d2)
-d[,x:=ifelse(roi_id > 16, 1-x,x)]
-
-print(
-	ggplot(d[asleep==T,], aes(x=x, fill=condition)) + geom_density(alpha=.3)  + 
-		ggtitle("Position in the tube when ASLEEP\n~30 flies, 24h")
-)
-
-print(
-	ggplot(d[asleep==F,], aes(x=x, fill=condition)) + geom_density(alpha=.3)  + 
-		ggtitle("Position in the tube when ACTIVE\n~30 flies, 24h")
-)
-
-ggplot(d, aes(x=x, fill=condition,linetype=asleep)) + geom_density(alpha=.3) 
+#'
+#'path <- "/data/validation/validation_out.db"
+#'rois <- c(1:3,5:19,21:32)
+#'d1 <- loadROIsFromFile(path, rois=rois, reference_hour = 9, FUN=sleepAnalysis,max_time=3600*20)
+#'d1[,condition:="wet"]
+#'
+#'path <- "/data/psv_results/00016dfce6e94dee9bb1a845281b086e/GGSM-001/2015-04-17_17-06-49/2015-04-17_17-06-49_00016dfce6e94dee9bb1a845281b086e.db"
+#'rois <- c(2:15,18:31)
+#'d2 <- loadROIsFromFile(path, rois=rois, reference_hour = 9, FUN=sleepAnalysis,max_time=3600*20)
+#'d2[,condition:="dry"]
+#'
+#'d <- rbind(d1,d2)
+#'d[,x:=ifelse(roi_id > 16, 1-x,x)]
+#'
+#'print(
+#'	ggplot(d[asleep==T,], aes(x=x, fill=condition)) + geom_density(alpha=.3)  + 
+#'		ggtitle("Position in the tube when ASLEEP\n~30 flies, 24h")
+#')
+#'
+#'print(
+#'	ggplot(d[asleep==F,], aes(x=x, fill=condition)) + geom_density(alpha=.3)  + 
+#'		ggtitle("Position in the tube when ACTIVE\n~30 flies, 24h")
+#')
+#'
+#'ggplot(d, aes(x=x, fill=condition,linetype=asleep)) + geom_density(alpha=.3) 
