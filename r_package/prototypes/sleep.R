@@ -20,7 +20,7 @@ sleepAnalysis <- function(data,
 	# TODO
 	d <- d
 	
-	d[, t := time_window_length * round(d[,t] /time_window_length)]
+	d[, t := time_window_length * floor(d[,t] /time_window_length)]
 	setkeyv(d, "t")
 
 #	d_small <- totalWlkdDistClassif(d)
