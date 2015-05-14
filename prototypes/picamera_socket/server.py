@@ -2,7 +2,7 @@ import numpy as np
 import picamera
 import picamera.array
 
-class DetectMotion(picamera.array.PiMotionAnalysis):
+class DetectMotion(picamera.array.PiRGBAnalysis):
     def analyse(self, a):
 
         # If there're more than 10 vectors with a magnitude greater
