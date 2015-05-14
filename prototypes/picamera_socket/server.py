@@ -1,44 +1,33 @@
-import io
-import socket
-import struct
-# from PIL import Image
+
+from picamera.array import PiRGBArray
+from picamera import PiCamera
 import cv2
 import numpy as np
 
-# Start a socket listening for connections on 0.0.0.0:8000 (0.0.0.0 means
-# all interfaces)
-server_socket = socket.socket()
-server_socket.bind(('0.0.0.0', 8080))
-server_socket.listen(0)
 
-# Accept a single connection and make a file-like object out of it
-connection = server_socket.accept()[0].makefile('rb')
-try:
-    while True:
-        # Read the length of the image as a 32-bit unsigned int. If the
-        # length is zero, quit the loop
-        image_len = struct.unpack('<L', connection.read(struct.calcsize('<L')))[0]
-        if not image_len:
-            break
-        # Construct a stream to hold the image data and read the image
-        # data from the connection
-        image_stream = io.BytesIO()
-        image_stream.write(connection.read(image_len))
-        # Rewind the stream, open it as an image with PIL and do some
-        # processing on it
-        image_stream.seek(0)
-        # image = Image.open(image_stream)
-        # print('Image is %dx%d' % image.size)
-        # image.verify()
-        # print('Image is verified')
 
-        # # Construct a numpy array from the stream
-        # data = np.fromstring(image_stream.getvalue(), dtype=np.uint8)
-        # # "Decode" the image from the array, preserving colour
-        # image = cv2.imdecode(data, 1)
-        # # OpenCV returns an array with data in BGR order. If you want RGB instead
-        # # use the following...
-        # image = image[:, :, ::-1]
-finally:
-    connection.close()
-    server_socket.close()
+target_resolution=(1280, 960)
+capture.framerate = 5
+capture = PiCamera()
+capture.resolution = target_resolution
+
+
+raw_capture = PiRGBArray(capture, target_resolution)
+
+
+
+def _frame_iter(capture, _raw_capture):
+
+    # capture frames from the camera
+
+    for frame in capture.capture_continuous(_raw_capture, format="bgr", use_video_port=True):
+        # grab the raw NumPy array representing the image, then initialize the timestamp
+        # and occupied/unoccupied text
+
+    # clear the stream in preparation for the next frame
+        _raw_capture.truncate(0)
+        yield frame.array
+
+
+for f in _frame_iter(capture, raw_capture):
+    print f.shape
