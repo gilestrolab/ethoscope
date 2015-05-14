@@ -1,23 +1,33 @@
 
 from picamera.array import PiRGBArray
-import picamera
+from picamera import PiCamera
 import cv2
 import numpy as np
 import time
+capture = PiCamera()
 
-class DetectMotion(picamera.array.PiRGBAnalysis):
-    img = None
+target_resolution=(1280, 960)
+capture.resolution = target_resolution
+capture.framerate = 5
+
+raw_capture = PiRGBArray(capture, target_resolution)
+
+
+
+def _frame_iter(capture, _raw_capture):
+
+    # capture frames from the camera
+
+    for frame in capture.capture_continuous(_raw_capture, format="bgr", use_video_port=True):
+        # grab the raw NumPy array representing the image, then initialize the timestamp
+        # and occupied/unoccupied text
+
+    # clear the stream in preparation for the next frame
+        _raw_capture.flush()
+        yield frame.array
+
+t0 = time.time()
+for f in _frame_iter(capture, raw_capture):
+    print time.time() - t0
     t0 = time.time()
-    def analyse(self, a):
-        print time.time() - self.t0 
-        self.t0 = time.time()
-        self.img = a
-
-
-with picamera.PiCamera() as camera:
-    with DetectMotion(camera) as output:
-        camera.resolution = (640, 480)
-        camera.start_recording(
-              '/dev/null', format='bgr', motion_output=output)
-        camera.wait_recording(30)
-        camera.stop_recording()
+    print f.shape
