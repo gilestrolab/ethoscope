@@ -1,33 +1,22 @@
-
-from picamera.array import PiRGBArray
-from picamera import PiCamera
-import cv2
 import numpy as np
-import time
-capture = PiCamera()
+import picamera
+import picamera.array
 
-target_resolution=(1280, 960)
-capture.resolution = target_resolution
-capture.framerate = 5
+class DetectMotion(picamera.array.PiMotionAnalysis):
+    def analyse(self, a):
+        a = np.sqrt(
+            np.square(a['x'].astype(np.float)) +
+            np.square(a['y'].astype(np.float))
+            ).clip(0, 255).astype(np.uint8)
+        # If there're more than 10 vectors with a magnitude greater
+        # than 60, then say we've detected motion
+        if (a > 60).sum() > 10:
+            print('Motion detected!')
 
-raw_capture = PiRGBArray(capture, target_resolution)
-
-
-
-def _frame_iter(capture, _raw_capture):
-
-    # capture frames from the camera
-
-    for frame in capture.capture_continuous(_raw_capture, format="bgr", use_video_port=True):
-        # grab the raw NumPy array representing the image, then initialize the timestamp
-        # and occupied/unoccupied text
-
-    # clear the stream in preparation for the next frame
-        _raw_capture.flush()
-        yield frame.array
-
-t0 = time.time()
-for f in _frame_iter(capture, raw_capture):
-    print time.time() - t0
-    t0 = time.time()
-    print f.shape
+with picamera.PiCamera() as camera:
+    with DetectMotion(camera) as output:
+        camera.resolution = (640, 480)
+        camera.start_recording(
+              '/dev/null', format='h264', motion_output=output)
+        camera.wait_recording(30)
+        camera.stop_recording()
