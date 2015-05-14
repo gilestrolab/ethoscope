@@ -27,7 +27,7 @@ import logging
 if __name__ == "__main__":
 
     parser = optparse.OptionParser()
-    parser.add_option("-o", "--output", dest="out", help="the output file (eg out.csv   )", type="str")
+    parser.add_option("-o", "--output", dest="out", help="the output file (eg out.csv   )", type="str",default=None)
     parser.add_option("-i", "--input", dest="input", help="the output video file", type="str")
     #
     parser.add_option("-r", "--result-video", dest="result_video", help="the path to an optional annotated video file."
@@ -76,9 +76,12 @@ if __name__ == "__main__":
 
 
     try:
-        with SQLiteResultWriter( option_dict["out"],rois, metadata) as rw:
-            logging.info("Running monitor" )
-            monit.run(rw)
+        if option_dict["out"] is None:
+            monit.run(None)
+        else:
+            with SQLiteResultWriter(option_dict["out"],rois, metadata) as rw:
+                logging.info("Running monitor" )
+                monit.run(rw)
     except KeyboardInterrupt:
         logging.info("Keyboard Exception, stopping monitor")
         monit.stop()
