@@ -1,4 +1,20 @@
-
+#' remove data points when the time serie is too sparse
+curateSparseRoiData <- function(
+	data,
+	window=60,#s
+	min_points=10#
+	){
+	d <- copy(data)
+	d[, t_w := window * floor(t/window)]
+	sparsity <- d[, t_w := window * floor(t/window)]
+	d[,sparsity := .N,by=t_w]
+	d[,sparsity := .N,by=t_w]
+	d <- d[sparsity >min_points,]
+	d$t_w <- NULL
+	d$sparsity <- NULL
+	d
+	}
+	
 totalWlkdDistClassif <- function(d,activity_threshold=.03){
 	
 	d[,activity := activity(x,y)]
@@ -16,11 +32,10 @@ sleepAnalysis <- function(data,
 			){ 
 	d <- copy(data)
 	ori_keys <- key(d)
-	#1 curate data
-	# TODO
-	d <- d
 	
-	d[, t := time_window_length * floor(d[,t] /time_window_length)]
+	d <- curateSparseRoiData(d)
+	
+	d[, t := time_window_length * floor(t/time_window_length)]
 	setkeyv(d, "t")
 
 #	d_small <- totalWlkdDistClassif(d)

@@ -215,6 +215,10 @@ loadOneROI <- function(
 				roi_dt[, (var_n) := as.logical(get(var_n))]
 			}
 		}
+		if("is_inferred" %in% colnames(roi_dt))
+			roi_dt <- roi_dt[is_inferred==F]
+			roi_dt$is_inferred <- NULL
+			
 		return(roi_dt)
 	}
 
