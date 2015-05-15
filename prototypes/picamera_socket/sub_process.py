@@ -37,20 +37,10 @@ class PiFrameGrabber(multiprocessing.Process):
             raw_capture = PiRGBArray(capture, size=self._target_resolution)
 
             for frame in capture.capture_continuous(raw_capture, format="bgr", use_video_port=True):
-                # print "getting frame"
-
-                # to_break = False
-                # while not self._queue.empty():
-                #     msg = self._queue.get()
-                #     if msg is None:
-                #         to_break =True
-                # if to_break:
-                #     logging.info("Camera frame grabber was instructed to stop by parent process")
-                #     break
-
                 raw_capture.truncate(0)
-                out = np.copy(frame.array)
-                # out = out[0:100]
+                # out = np.copy(frame.array)
+                out = cv2.cvtColor(frame.array,cv2.COLOR_BGR2GRAY)
+
                 self._queue.put(out)
 
 
