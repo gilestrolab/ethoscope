@@ -167,6 +167,13 @@ class OurPiCameraAsync(BaseCamera):
 #         break
 # c.close()
 #
-c = OurPiCameraAsync(target_fps=5,target_resolution=(1280,960))
+c = OurPiCameraAsync(target_fps=6,target_resolution=(1280,960))
+t0 = 0
+import cv2
 for t,f in c:
-    print t,f.shape
+    print t - t0
+    t0 = t
+    cv2.imshow("t",f)
+    cv2.waitKey(1)
+
+
