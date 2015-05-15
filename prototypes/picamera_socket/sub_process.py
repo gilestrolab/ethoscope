@@ -73,7 +73,7 @@ class OurPiCameraAsync(BaseCamera):
 
 
 
-        self._queue = multiprocessing.Queue(maxsize=10)
+        self._queue = multiprocessing.Queue(maxsize=2)
         self._p = PiFrameGrabber(target_fps,target_resolution,self._queue)
         self._p.daemon = True
         self._p.start()
@@ -124,8 +124,7 @@ class OurPiCameraAsync(BaseCamera):
         return self._start_time
 
     def _close(self):
-
-        self._queue.put(None)
+        # self._queue.put(None)
         self._p.join(timeout=5)
 
     def _next_image(self):
@@ -175,12 +174,13 @@ class OurPiCameraAsync(BaseCamera):
 #
 c = OurPiCameraAsync(target_fps=20,target_resolution=(1280,960))
 t0 = 0
+try:
+    for t,f in c:
+        print t - t0
+        t0 = t
 
-for t,f in c:
-    print t - t0
-    t0 = t
-    time.sleep(.5)
-    # cv2.imshow("t",f)
-    # cv2.waitKey(int(1000.0/2))
-
+        cv2.imshow("t",f)
+        cv2.waitKey(400)
+except:
+    c._close()
 
