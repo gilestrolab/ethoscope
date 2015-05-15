@@ -374,7 +374,7 @@ class PiFrameGrabber(multiprocessing.Process):
 
     def __init__(self, target_fps, target_resolution, queue,stop_queue):
         self._queue = queue
-        self._stop_queue = queue
+        self._stop_queue = stop_queue
         self._target_fps = target_fps
         self._target_resolution = target_resolution
 
@@ -469,6 +469,7 @@ class OurPiCameraAsync(BaseCamera):
         return self._start_time
 
     def _close(self):
+        logging.info("Requesting grabbing process to stop!")
         self._stop_queue.put(None)
         logging.info("Joining grabbing process")
         self._p.join()
