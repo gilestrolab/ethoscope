@@ -37,7 +37,7 @@ class PiFrameGrabber(multiprocessing.Process):
             raw_capture = PiRGBArray(capture, size=self._target_resolution)
 
             for frame in capture.capture_continuous(raw_capture, format="bgr", use_video_port=True):
-
+                print "getting frame"
 
                 to_break = False
                 while not self._queue.empty():
@@ -49,6 +49,7 @@ class PiFrameGrabber(multiprocessing.Process):
                     break
                 raw_capture.truncate(0)
                 out = np.copy(frame.array)
+                print "putting frame"
                 self._queue.put(out)
 
 
