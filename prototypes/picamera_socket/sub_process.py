@@ -52,10 +52,11 @@ class PiFrameGrabber(multiprocessing.Process):
                 out = np.copy(frame.array)
                 # out = out[0:100]
                 self._queue.put(out)
-                print "frame PUT"
+
 
 
         finally:
+            logging.info("Closing Camera frame grabber thread")
             capture.close()
 
 
