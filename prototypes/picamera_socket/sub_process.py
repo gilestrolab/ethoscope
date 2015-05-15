@@ -174,6 +174,6 @@ for t,f in c:
     print t - t0
     t0 = t
     cv2.imshow("t",f)
-    cv2.waitKey(1)
+    cv2.waitKey(1000.0/2)
 
 
