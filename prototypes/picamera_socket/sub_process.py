@@ -48,7 +48,7 @@ class PiFrameGrabber(multiprocessing.Process):
                     logging.info("Camera frame grabber was instructed to stop by parent process")
                     break
                 raw_capture.truncate(0)
-                out = np.copy(frame.array)
+                out = cv2.cvtColor(frame.array,cv2.COLOR_BGR2GRAY)
                 print "putting frame"
                 self._queue.put(out)
                 print "frame PUT"
@@ -177,7 +177,7 @@ import cv2
 for t,f in c:
     print t - t0
     t0 = t
-    cv2.imshow("t",f)
-    cv2.waitKey(int(1000.0/2))
+    # cv2.imshow("t",f)
+    # cv2.waitKey(int(1000.0/2))
 
 
