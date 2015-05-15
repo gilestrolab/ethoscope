@@ -5,7 +5,7 @@ from threading import Thread
 from pysolovideo.tracking.monitor import Monitor
 
 # Interface to V4l
-from pysolovideo.tracking.cameras import OurPiCamera
+from pysolovideo.tracking.cameras import OurPiCameraAsync
 from pysolovideo.tracking.cameras import MovieVirtualCamera
 
 # Build ROIs from greyscale image
@@ -148,7 +148,7 @@ class ControlThread(Thread):
             self._last_info_frame_idx = 0
             try:
                 if self._video_file is None:
-                    cam = OurPiCamera( target_fps=3, target_resolution=(1280, 960))
+                    cam = OurPiCameraAsync( target_fps=20, target_resolution=(1280, 960))
                 else:
                     cam = MovieVirtualCamera(self._video_file, use_wall_clock=True)
 
