@@ -369,7 +369,6 @@ class OurPiCamera(BaseCamera):
         self._frame = next(self._cap_it)
 
         return self._frame
-
 class PiFrameGrabber(multiprocessing.Process):
 
     def __init__(self, target_fps, target_resolution, queue,stop_queue):
@@ -377,35 +376,34 @@ class PiFrameGrabber(multiprocessing.Process):
         self._stop_queue = stop_queue
         self._target_fps = target_fps
         self._target_resolution = target_resolution
-
-
         super(PiFrameGrabber, self).__init__()
 
 
     def run(self):
-        with  PiCamera() as capture:
-            capture.resolution = self._target_resolution
+        try:
+            with  PiCamera() as capture:
+                capture.resolution = self._target_resolution
 
-            capture.framerate = self._target_fps
-            raw_capture = PiRGBArray(capture, size=self._target_resolution)
+                capture.framerate = self._target_fps
+                raw_capture = PiRGBArray(capture, size=self._target_resolution)
 
-            for frame in capture.capture_continuous(raw_capture, format="bgr", use_video_port=True):
-                if not self._stop_queue.empty():
-                    logging.info("The stop queue is not empty. Stop acquiring frames")
+                for frame in capture.capture_continuous(raw_capture, format="bgr", use_video_port=True):
+                    if not self._stop_queue.empty():
+                        logging.info("The stop queue is not empty. Stop acquiring frames")
 
-                    self._stop_queue.get()
-                    self._stop_queue.task_done()
-                    logging.info("Stop Task Done")
-                    break
-                raw_capture.truncate(0)
-                # out = np.copy(frame.array)
-                out = cv2.cvtColor(frame.array,cv2.COLOR_BGR2GRAY)
+                        self._stop_queue.get()
+                        self._stop_queue.task_done()
+                        logging.info("Stop Task Done")
+                        break
+                    raw_capture.truncate(0)
+                    # out = np.copy(frame.array)
+                    out = cv2.cvtColor(frame.array,cv2.COLOR_BGR2GRAY)
 
-                self._queue.put(out)
-        logging.info("Camera Frame grabber stopped acquisition cleanly")
-
-
-
+                    self._queue.put(out)
+        finally:
+            self._stop_queue.close()
+            self._queue.close()
+            logging.info("Camera Frame grabber stopped acquisition cleanly")
 
 
 class OurPiCameraAsync(BaseCamera):
@@ -417,7 +415,6 @@ class OurPiCameraAsync(BaseCamera):
 
         if not isinstance(target_fps, int):
             raise PSVException("FPS must be an integer number")
-
 
 
         self._queue = multiprocessing.Queue(maxsize=2)
@@ -474,15 +471,26 @@ class OurPiCameraAsync(BaseCamera):
 
     def _close(self):
         logging.info("Requesting grabbing process to stop!")
+
         self._stop_queue.put(None)
+
+        while not self._queue.empty():
+             self._queue.get()
+
         logging.info("Joining stop queue")
-        self._stop_queue.join()
+
+        self._stop_queue.cancel_join_thread()
+        self._queue.cancel_join_thread()
+
+        logging.info("Stopping stop queue")
+        self._stop_queue.close()
+
         logging.info("Stopping queue")
         self._queue.close()
-        logging.info("Joining subprocess")
+
+        logging.info("Joining process")
         self._p.join()
         logging.info("All joined ok")
-
 
     def _next_image(self):
 
