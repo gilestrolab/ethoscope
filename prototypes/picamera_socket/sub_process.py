@@ -136,6 +136,7 @@ class OurPiCameraAsync(BaseCamera):
             g = self._queue.get(timeout=30)
 
             print "time to get", time.time() - t0
+            print "qs", self._queue.qsize()
             return g
         except Exception as e:
             raise PSVException("Could not get frame from camera\n%s", str(e))
