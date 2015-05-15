@@ -40,16 +40,18 @@ class PiFrameGrabber(multiprocessing.Process):
                 # print "getting frame"
 
                 to_break = False
-                while not self._queue.empty():
+
+                while self._queue.qsize() > 2:
                     msg = self._queue.get()
                     if msg is None:
                         to_break =True
                 if to_break:
                     logging.info("Camera frame grabber was instructed to stop by parent process")
                     break
+
                 raw_capture.truncate(0)
                 out = cv2.cvtColor(frame.array,cv2.COLOR_BGR2GRAY)
-                print "putting frame"
+                #out = np.copy(out[0:100, 0:100])
                 self._queue.put(out)
                 print "frame PUT"
 
@@ -132,6 +134,10 @@ class OurPiCameraAsync(BaseCamera):
         try:
             t0= time.time()
             g = self._queue.get(timeout=30)
+            if g is None:
+                g = self._queue.get(timeout=30)
+                self._queue.put(None)
+                
             print "time to get", time.time() - t0
             return g
         except Exception as e:
