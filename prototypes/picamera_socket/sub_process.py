@@ -129,7 +129,7 @@ class OurPiCameraAsync(BaseCamera):
     def _next_image(self):
 
         try:
-            return self._queue.get(timeout=2)
+            return self._queue.get(timeout=30)
         except Exception as e:
             raise PSVException("Could not get frame from camera\n%s", str(e))
 
@@ -174,6 +174,6 @@ for t,f in c:
     print t - t0
     t0 = t
     cv2.imshow("t",f)
-    cv2.waitKey(1000.0/2)
+    cv2.waitKey(int(1000.0/2))
 
 
