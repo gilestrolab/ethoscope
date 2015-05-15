@@ -9,6 +9,8 @@ from collections import deque
 import collections
 import copy
 from pysolovideo.utils.debug import PSVException
+from math import sqrt, log10
+
 class IntVariableBase(int):
     sql_data_type = "SMALLINT"
     header_name = None
@@ -275,9 +277,9 @@ class ObjectModel(object):
         # if np.isnan(instantaneous_speed):
         #     instantaneous_speed = 0
 
-        features = np.array([np.log10(cv2.contourArea(contour) + 1.0),
+        features = np.array([log10(cv2.contourArea(contour) + 1.0),
                             width + 1,
-                            ar,
+                            sqrt(ar),
                             #instantaneous_speed +1.0,
                             mean_col +1
                             # 1.0
@@ -373,14 +375,15 @@ class AdaptiveBGModel(BaseTracker):
     def __init__(self, roi, data=None):
 
         self._object_expected_size = 0.10 # proportion of the roi main axis
-        self._max_area = 10 * self._object_expected_size ** 2
+        self._max_area = 5 * self._object_expected_size ** 2
+        self._max_length = 5 * self._object_expected_size
         self._smooth_mode = deque()
         self._smooth_mode_tstamp = deque()
         self._smooth_mode_window_dt = 30 * 1000 #miliseconds
 
 
         self._bg_model = BackgroundModel()
-        self._max_m_log_lik = 2.
+        self._max_m_log_lik = 5.
         self._buff_grey = None
         self._buff_grey_blurred = None
         self._buff_fg = None
@@ -538,6 +541,12 @@ class AdaptiveBGModel(BaseTracker):
             raise NoPositionError
 
         (x,y) ,(w,h), angle  = cv2.minAreaRect(hull)
+
+        w_im = max(grey.shape)
+        if max(float(w)/w_im ,float(h)/w_im ) >  self._max_length:
+            print max(w,h)
+            self._bg_model.increase_learning_rate()
+            raise NoPositionError
 
         x_var = XPosVariable(int(x))
         y_var = YPosVariable(int(y))
