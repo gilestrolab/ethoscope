@@ -72,7 +72,8 @@ class OurPiCameraAsync(BaseCamera):
 
 
         im = self._queue.get(timeout=5)
-        self._frame = im
+
+        self._frame = cv2.cvtColor(im,cv2.COLOR_GRAY2BGR)
 
 
         if len(im.shape) < 2:
@@ -123,9 +124,10 @@ class OurPiCameraAsync(BaseCamera):
         try:
             t0= time.time()
             g = self._queue.get(timeout=30)
+            cv2.cvtColor(g,cv2.COLOR_GRAY2BGR,self._frame)
             print "time to get", time.time() - t0
             print "qs", self._queue.qsize()
-            return g
+            return self._frame
         except Exception as e:
             raise PSVException("Could not get frame from camera\n%s", str(e))
 
