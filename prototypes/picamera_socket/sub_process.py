@@ -12,7 +12,7 @@ import multiprocessing
 from pysolovideo.tracking.cameras import BaseCamera
 from pysolovideo.utils.debug import PSVException
 import time
-
+import cv2
 
 
 
@@ -173,7 +173,7 @@ class OurPiCameraAsync(BaseCamera):
 #
 c = OurPiCameraAsync(target_fps=20,target_resolution=(1280,960))
 t0 = 0
-import cv2
+
 for t,f in c:
     print t - t0
     t0 = t
