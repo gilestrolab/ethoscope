@@ -49,8 +49,9 @@ class PiFrameGrabber(multiprocessing.Process):
                     break
                 raw_capture.truncate(0)
                 out = np.copy(frame.array)
-                # print "putting frame"
+                print "putting frame"
                 self._queue.put(out)
+                print "frame PUT"
 
 
         finally:
@@ -167,7 +168,7 @@ class OurPiCameraAsync(BaseCamera):
 #         break
 # c.close()
 #
-c = OurPiCameraAsync(target_fps=6,target_resolution=(1280,960))
+c = OurPiCameraAsync(target_fps=20,target_resolution=(1280,960))
 t0 = 0
 import cv2
 for t,f in c:
