@@ -122,50 +122,14 @@ class OurPiCameraAsync(BaseCamera):
     def _next_image(self):
 
         try:
-            t0= time.time()
             g = self._queue.get(timeout=30)
             cv2.cvtColor(g,cv2.COLOR_GRAY2BGR,self._frame)
-            print "time to get", time.time() - t0
-            print "qs", self._queue.qsize()
             return self._frame
         except Exception as e:
             raise PSVException("Could not get frame from camera\n%s", str(e))
 
-
-#
-# class CameraStub(object):
-#     def __init__(self):
-#         self._stop = False
-#         self._queue = multiprocessing.Queue()
-#         self._p = PiFrameGrabber(self._queue)
-#         self._p.daemon = True
-#         self._p.start()
-#
-#
-#     def frame_iter(self):
-#         try:
-#             while not self._stop:
-#                 print "qs = ", self._queue.qsize()
-#                 o = self._queue.get(timeout=1)
-#                 yield o
-#         except:
-#             raise Exception("Could not get frame from camera")
-#     def close(self):
-#         self._stop = True
-#         self._queue.put(None)
-#         self._p.join(timeout=5)
-#
-#
-# c = CameraStub()
-# t0 = time.time()
-# for i in c.frame_iter():
-#     print i
-#     time.sleep(.5)
-#     if time.time() - t0 > 5:
-#         break
-# c.close()
-#
 c = OurPiCameraAsync(target_fps=20,target_resolution=(1280,960))
+
 t0 = 0
 try:
     for t,f in c:
