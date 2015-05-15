@@ -1,3 +1,5 @@
+from pip.utils import logging
+
 __author__ = 'quentin'
 
 
@@ -370,8 +372,9 @@ class OurPiCamera(BaseCamera):
 
 class PiFrameGrabber(multiprocessing.Process):
 
-    def __init__(self, target_fps, target_resolution, queue):
+    def __init__(self, target_fps, target_resolution, queue,stop_queue):
         self._queue = queue
+        self._stop_queue = queue
         self._target_fps = target_fps
         self._target_resolution = target_resolution
 
@@ -380,26 +383,23 @@ class PiFrameGrabber(multiprocessing.Process):
 
 
     def run(self):
-        try:
-            w,h = self._target_resolution
-            capture = PiCamera()
+        with  PiCamera() as capture:
             capture.resolution = self._target_resolution
 
             capture.framerate = self._target_fps
             raw_capture = PiRGBArray(capture, size=self._target_resolution)
 
             for frame in capture.capture_continuous(raw_capture, format="bgr", use_video_port=True):
+                if not self._stop_queue.empty():
+                    logging.info("The stop queue is not empty. Stop acquiring frames")
+                    break
                 raw_capture.truncate(0)
                 # out = np.copy(frame.array)
                 out = cv2.cvtColor(frame.array,cv2.COLOR_BGR2GRAY)
 
                 self._queue.put(out)
+        logging.info("Camera Frame grabber stopped acquisition cleanly")
 
-
-
-        finally:
-            logging.info("Closing Camera frame grabber thread")
-            capture.close()
 
 
 
@@ -417,7 +417,8 @@ class OurPiCameraAsync(BaseCamera):
 
 
         self._queue = multiprocessing.Queue(maxsize=2)
-        self._p = PiFrameGrabber(target_fps,target_resolution,self._queue)
+        self._stop_queue = multiprocessing.Queue(maxsize=1)
+        self._p = PiFrameGrabber(target_fps,target_resolution,self._queue,self._stop_queue )
         self._p.daemon = True
         self._p.start()
 
@@ -468,8 +469,13 @@ class OurPiCameraAsync(BaseCamera):
         return self._start_time
 
     def _close(self):
-        # self._queue.put(None)
-        self._p.join(timeout=5)
+        self._stop_queue.put(None)
+        logging.info("Joining grabbing process")
+        self._p.join()
+        logging.info("Stopping STOP queue")
+        self._stop_queue.close()
+        logging.info("Stopping queue")
+        self._queue.close()
 
     def _next_image(self):
 
