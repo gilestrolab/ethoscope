@@ -37,7 +37,7 @@ class PiFrameGrabber(multiprocessing.Process):
             raw_capture = PiRGBArray(capture, size=self._target_resolution)
 
             for frame in capture.capture_continuous(raw_capture, format="bgr", use_video_port=True):
-                print "getting frame"
+                # print "getting frame"
 
                 to_break = False
                 while not self._queue.empty():
@@ -49,7 +49,7 @@ class PiFrameGrabber(multiprocessing.Process):
                     break
                 raw_capture.truncate(0)
                 out = np.copy(frame.array)
-                print "putting frame"
+                # print "putting frame"
                 self._queue.put(out)
 
 
@@ -77,14 +77,10 @@ class OurPiCameraAsync(BaseCamera):
         self._p.start()
 
 
-        self._cap_it = self._frame_iter()
 
-        im = next(self._cap_it)
-
-        if im is None:
-            raise PSVException("Error whist retrieving video frame. Got None instead. Camera not plugged?")
-
+        im = self._queue.get(timeout=5)
         self._frame = im
+
 
         if len(im.shape) < 2:
             raise PSVException("The camera image is corrupted (less that 2 dimensions)")
@@ -102,9 +98,7 @@ class OurPiCameraAsync(BaseCamera):
         self._start_time = time.time()
         logging.info("Camera initialised")
 
-    def _warm_up(self):
-        logging.info("%s is warming up" % (str(self)))
-        time.sleep(1)
+
 
     def restart(self):
         self._frame_idx = 0
@@ -132,14 +126,12 @@ class OurPiCameraAsync(BaseCamera):
         self._queue.put(None)
         self._p.join(timeout=5)
 
-    def _frame_iter(self):
+    def _next_image(self):
+
         try:
-            while True:
-                o = self._queue.get(timeout=1)
-                self._frame_idx +=1
-                yield o
-        except:
-            raise Exception("Could not get frame from camera")
+            return self._queue.get(timeout=2)
+        except Exception as e:
+            raise PSVException("Could not get frame from camera\n%s", str(e))
 
 
 #
