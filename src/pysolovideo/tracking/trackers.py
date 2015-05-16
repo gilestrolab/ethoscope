@@ -374,9 +374,9 @@ class AdaptiveBGModel(BaseTracker):
 
     def __init__(self, roi, data=None):
 
-        self._object_expected_size = 0.10 # proportion of the roi main axis
-        self._max_area = 5 * self._object_expected_size ** 2
-        self._max_length = 5 * self._object_expected_size
+        self._object_expected_size = 0.05 # proportion of the roi main axis
+        self._max_area = (5 * self._object_expected_size) ** 2
+        # self._max_length = 5 * self._object_expected_size
         self._smooth_mode = deque()
         self._smooth_mode_tstamp = deque()
         self._smooth_mode_window_dt = 30 * 1000 #miliseconds
@@ -492,7 +492,13 @@ class AdaptiveBGModel(BaseTracker):
         n_fg_pix = np.count_nonzero(self._buff_fg)
         prop_fg_pix  = n_fg_pix / (1.0 * grey.shape[0] * grey.shape[1])
         is_ambiguous = False
+
         if  prop_fg_pix > self._max_area:
+
+            self._bg_model.increase_learning_rate()
+            raise NoPositionError
+
+        if  prop_fg_pix == 0:
             self._bg_model.increase_learning_rate()
             raise NoPositionError
 
@@ -542,10 +548,9 @@ class AdaptiveBGModel(BaseTracker):
 
         (x,y) ,(w,h), angle  = cv2.minAreaRect(hull)
 
-        w_im = max(grey.shape)
-        if max(float(w)/w_im ,float(h)/w_im ) >  self._max_length:
-            print max(w,h)
-            self._bg_model.increase_learning_rate()
+        h_im = min(grey.shape)
+        max_h = 2*h_im
+        if w>max_h or h>max_h:
             raise NoPositionError
 
         x_var = XPosVariable(int(x))
