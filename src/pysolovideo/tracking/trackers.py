@@ -11,7 +11,7 @@ from collections import deque
 import collections
 import copy
 from pysolovideo.utils.debug import PSVException
-from math import sqrt, log10
+from math import sqrt#, log10
 
 class IntVariableBase(int):
     sql_data_type = "SMALLINT"
@@ -284,7 +284,7 @@ class ObjectModel(object):
         # if np.isnan(instantaneous_speed):
         #     instantaneous_speed = 0
 
-        features = np.array([log10(cv2.contourArea(contour) + 1.0),
+        features = np.array([np.log10(cv2.contourArea(contour) + 1.0),
                             width + 1,
                             sqrt(ar),
                             #instantaneous_speed +1.0,

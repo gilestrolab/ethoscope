@@ -40,10 +40,7 @@ if __name__ == "__main__":
 
     option_dict = vars(options)
 
-    # logging.basicConfig(filename=_log_file, level=logging.INFO)
-
-
-
+    logging.basicConfig(level=logging.INFO)
 
 
     logging.info("Starting Monitor thread")
@@ -55,7 +52,6 @@ if __name__ == "__main__":
 
     logging.info("Initialising monitor")
     cam.restart()
-
 
     metadata = {
                              "machine_id": "None",
