@@ -156,9 +156,10 @@ if __name__ == '__main__':
             #fixme Put your working directories
             GIT_WORKING_DIR = "./"
 
+
         elif getpass.getuser() == "asterix":
             PSV_DIR = "/tmp/psv_data"
-            INPUT_VIDEO = '/data1/monitor_new_targets_short.avi'
+            INPUT_VIDEO = '/lud/validation_sleep_monitor/validation_2fps.mp4'
             GIT_WORKING_DIR = "/data1/todel/pySolo-Device"
 
         elif getpass.getuser() == "psv" or getpass.getuser() == "root":
@@ -171,14 +172,18 @@ if __name__ == '__main__':
 
 
     version = get_version(GIT_WORKING_DIR, branch)
-
     # fixme => the name should be hardcoded in a encrypted file? file.
     control = ControlThread(machine_id=machine_id, name=machine_name, version=version, video_file=INPUT_VIDEO,
-                            psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
+                             psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
+
 
     try:
+        print "yoyoma"
         run(api, host='0.0.0.0', port=port, server='cherrypy')
+        print "yoyoma"
+
     except Exception as e:
+
         logging.error(e)
         close(1)
     finally:
