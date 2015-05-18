@@ -78,20 +78,21 @@ class ControlThread(Thread):
                         "monitor_info": self._default_monitor_info
                         }
 
-        logging.basicConfig(filename=self._info["log_file"], level=logging.INFO)
-
-        logger = logging.getLogger()
-        logger.handlers[0].stream.close()
-        logger.removeHandler(logger.handlers[0])
-
-        file_handler = logging.FileHandler(self._info["log_file"])
-        file_handler.setLevel(logging.INFO)
-        formatter = logging.Formatter("%(asctime)s %(filename)s, %(lineno)d, %(funcName)s: %(message)s")
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
+        # logging.basicConfig(filename=self._info["log_file"], level=logging.INFO)
+        #
+        # logger = logging.getLogger()
+        # logger.handlers[0].stream.close()
+        # logger.removeHandler(logger.handlers[0])
+        #
+        # file_handler = logging.FileHandler(self._info["log_file"])
+        # file_handler.setLevel(logging.INFO)
+        # formatter = logging.Formatter("%(asctime)s %(filename)s, %(lineno)d, %(funcName)s: %(message)s")
+        # file_handler.setFormatter(formatter)
+        # logger.addHandler(file_handler)
 
         self._monit = None
         super(ControlThread, self).__init__()
+
 
     @property
     def info(self):
@@ -99,7 +100,7 @@ class ControlThread(Thread):
         return self._info
 
     def _update_info(self):
-
+        print "r"
         if self._monit is None:
             return
         t = self._monit.last_time_stamp
@@ -137,6 +138,7 @@ class ControlThread(Thread):
         self._last_info_frame_idx = frame_idx
 
     def run(self):
+
         try:
             self._info["status"] = "initialising"
             logging.info("Starting Monitor thread")
