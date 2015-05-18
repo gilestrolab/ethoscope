@@ -519,7 +519,6 @@ class SQLiteResultWriter(ResultWriter):
     def _create_table(self, name, fields, engine=None):
 
         fields = fields.replace("NOT NULL", "")
-        print fields
         command = "CREATE TABLE %s (%s)" % (name,fields)
         logging.info("Creating database table with: " + command)
         self._write_async_command(command)

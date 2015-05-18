@@ -56,6 +56,7 @@ if __name__ == "__main__":
     logging.info("Initialising monitor")
     cam.restart()
 
+
     metadata = {
                              "machine_id": "None",
                              "machine_name": "None",

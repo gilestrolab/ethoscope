@@ -1,3 +1,5 @@
+from mlt import mlt_log_set_level
+
 __author__ = 'quentin'
 
 import numpy as np
@@ -41,6 +43,11 @@ class PhiVariable(IntVariableBase):
 
 class DistanceIntVarBase(IntVariableBase):
     functional_type = "distance"
+
+class mLogLik(IntVariableBase):
+    header_name= "mlog_L_x1000"
+    functional_type = "proba"
+
 
 class WidthVariable(DistanceIntVarBase):
     header_name = "w"
@@ -226,6 +233,7 @@ class ObjectModel(object):
             return 0
 
         a = 1 / (stds* self._sqrt_2_pi)
+
         b = np.exp(- (features - means) ** 2  / (2 * stds ** 2))
 
         likelihoods =  a * b
@@ -234,7 +242,6 @@ class ObjectModel(object):
             return 0
 
         logls = np.sum(np.log10(likelihoods)) / len(likelihoods)
-
         return -1.0 * logls
 
 
@@ -383,7 +390,7 @@ class AdaptiveBGModel(BaseTracker):
 
 
         self._bg_model = BackgroundModel()
-        self._max_m_log_lik = 5.
+        self._max_m_log_lik = 4.
         self._buff_grey = None
         self._buff_grey_blurred = None
         self._buff_fg = None
@@ -548,17 +555,25 @@ class AdaptiveBGModel(BaseTracker):
 
         (x,y) ,(w,h), angle  = cv2.minAreaRect(hull)
 
+
+        if w < h:
+            angle -= 90
+            w,h = h,w
+
+        angle = angle % 180
+
+
         h_im = min(grey.shape)
         max_h = 2*h_im
         if w>max_h or h>max_h:
             raise NoPositionError
 
-        x_var = XPosVariable(int(x))
-        y_var = YPosVariable(int(y))
-        w_var = WidthVariable(int(w))
-        h_var = HeightVariable(int(h))
-        phi_var = PhiVariable(int(angle))
-
+        x_var = XPosVariable(int(round(x)))
+        y_var = YPosVariable(int(round(y)))
+        w_var = WidthVariable(int(round(w)))
+        h_var = HeightVariable(int(round(h)))
+        phi_var = PhiVariable(int(round(angle)))
+        mlogl =   mLogLik(int(distance*1000))
         self._buff_fg.fill(0)
 
         cv2.drawContours(self._buff_fg ,[hull],0, 1,-1)
@@ -573,24 +588,8 @@ class AdaptiveBGModel(BaseTracker):
             self._bg_model.decrease_learning_rate()
             self._bg_model.update(grey, t, self._buff_fg)
         self.fg_model.update(img, hull)
-        out = DataPoint([x_var, y_var, w_var, h_var, phi_var])
+
+        out = DataPoint([x_var, y_var, w_var, h_var, phi_var,mlogl])
+        # print self._roi.idx, out
         return out
-
-        # out = DataPoint([x_var, y_var])
-
-        # out_dic = {
-        #     'x':x_var, 'y':y,
-            # 'w':w, 'h':h,
-            # 'phi':angle,
-            # "is_inferred": False,
-            # "m_log_lik": distance
-        # }
-
-        # We can do this for DEBUGGING purposes
-        # feature_dic  = dict(zip(self.fg_model.features_header, features))
-        # out_dic = dict(out_dic.items() + feature_dic.items())
-
-        # return out_dic
-
-
 
