@@ -41,7 +41,7 @@ if __name__ == "__main__":
     if not user:
         raise Exception("A user (-u) should be specified")
 
-    lst = glob.glob(os.path.join(option_dict["input"],"*.mp4"))
+    lst = glob.glob(os.path.join(option_dict["input"],"*.avi"))
     random.shuffle(lst)
 
     instruction_array = cv2.imread(os.path.join(option_dict["input"],INSTRUCTION_FILE))
@@ -49,6 +49,8 @@ if __name__ == "__main__":
         raise Exception("The instruction image is not there")
     cv2.namedWindow("window")
     cv2.setMouseCallback("window", position)
+
+    print len(lst), "videos to annotate"
 
     while len(lst) > 0:
         f = lst[-1]
