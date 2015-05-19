@@ -51,6 +51,7 @@ if __name__ == "__main__":
     rois = roi_builder(cam)
 
     logging.info("Initialising monitor")
+
     cam.restart()
 
     metadata = {
@@ -69,7 +70,9 @@ if __name__ == "__main__":
     monit = Monitor(cam, AdaptiveBGModel, rois,
                     draw_every_n=option_dict["draw_every"],
                     draw_results=draw_frames,
-                    video_out=option_dict["result_video"])
+                    video_out=option_dict["result_video"],
+                    drop_each=10,
+                    )
 
 
     try:

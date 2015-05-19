@@ -39,7 +39,9 @@ class Monitor(object):
     def __init__(self, camera, tracker_class, rois = None, interactors=None,
                 draw_results=False, draw_every_n=1,
                 video_out = None,
-                max_duration=None):
+                max_duration=None,
+                drop_each=None
+                ):
         r"""
         Class to orchestrate the tracking of several object in separate regions of interest (ROIs) and interacting
 
@@ -60,6 +62,7 @@ class Monitor(object):
         self._camera = camera
 
         self._draw_results = draw_results
+        self._drop_each = drop_each
         # self._result_writer = result_writer
         self._last_frame_idx =0
         if self._draw_results:
@@ -165,6 +168,7 @@ class Monitor(object):
 
     def run(self, result_writer = None):
         vw = None
+
         try:
 
             if self._draw_results:
@@ -174,7 +178,11 @@ class Monitor(object):
 
             logging.info("Monitor starting a run")
             self._is_running = True
+
             for i,(t, frame) in enumerate(self._camera):
+                if self._drop_each is not None and i % self._drop_each != 0:
+                    continue
+
                 if self._force_stop:
                     logging.info("Monitor object stopped from external request")
                     break

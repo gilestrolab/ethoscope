@@ -64,8 +64,8 @@ class BaseCamera(object):
         return self._resolution[1]
 
     def next_time_image(self):
-        im = self._next_image()
         time = self._time_stamp()
+        im = self._next_image()
         self._frame_idx += 1
         return time, im
 
