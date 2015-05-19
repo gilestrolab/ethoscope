@@ -30,7 +30,6 @@ pacman -S base-devel git gcc-fortran rsync wget fping --noconfirm --needed
 pacman -S xorg-server xorg-utils xorg-server-utils xorg-xinit xf86-video-fbdev lxde slim --noconfirm --needed
 # utilities
 pacman -S ntp bash-completion --noconfirm --needed
-pacman -S raspberrypi-firmware{,-tools,-bootloader,-examples} --noconfirm --needed
 pacman -S dnsmasq --noconfirm --needed
 
 # preinstalling dependencies will save compiling time on python packages
@@ -138,28 +137,6 @@ echo 'Creating default user'
 pass=$(perl -e 'print crypt($ARGV[0], "password")' $PASSWORD)
 useradd -m -g users -G wheel -s /bin/bash  -p $pass $USER_NAME || echo 'user exists'
 
-echo 'exec startlxde' >> /home/$USER_NAME/.xinitrc
-chown $USER_NAME /home/$USER_NAME/.xinitrc
-
-############################################
-echo 'Generating boot config'
-
-echo 'start_file=start_x.elf' > /boot/config.txt
-echo 'fixup_file=fixup_x.dat' >> /boot/config.txt
-echo 'disable_camera_led=1' >> /boot/config.txt
-echo 'dtparam=i2c1=on' >> /boot/config.txt
-echo 'dtparam=i2c_arm=on' >> /boot/config.txt
-echo 'gpu_mem=256' >>  /boot/config.txt
-echo 'cma_lwm=' >>  /boot/config.txt
-echo 'cma_hwm=' >>  /boot/config.txt
-echo 'cma_offline_start=' >>  /boot/config.txt
-
-
-echo 'Setting permissions for using arduino'
-#SEE https://wiki.archlinux.org/index.php/arduino#Configuration
-gpasswd -a $USER_NAME uucp
-gpasswd -a $USER_NAME lock
-gpasswd -a $USER_NAME tty
 
 
 ###########################################################################################
@@ -172,50 +149,6 @@ device_id=$(cat /etc/machine-id)
 hostname='node'
 echo "Hostname is $hostname"
 hostnamectl set-hostname $hostname
-
-
-
-#### set the ssd
-echo "o
-n
-p
-1
-
-
-
-w
-" | fdisk /dev/sda
-
-mkfs.ext4 /dev/sda1
-mkdir -p $PSV_DATA_DIR
-chmod 744 $PSV_DATA_DIR -R
-mount /dev/sda1 $PSV_DATA_DIR
-cp /etc/fstab /etc/fstab-bak
-echo "/dev/sda1 $PSV_DATA_DIR ext4 defaults,rw,relatime,data=ordered 0 1" >> /etc/fstab
-
-
-
-echo 'Loading IC2'
-echo "ic2-bcm2708" > /etc/modules-load.d/ic2.conf
-echo "ic2-dev" > /etc/modules-load.d/.ic2.conf
-
-
-echo 'Loading clock'
-echo 'rtc-ds1307' > /etc/modules-load.d/clock.conf
-echo 'ds1307 0x68' > /sys/class/i2c-adapter/i2c-1/new_device
-echo 'setting date to clock'
-echo date
-hwclock -w
-
-#modprobe ic2-bcm2708
-#modprobe ic2-dev
-
-
-echo 'creating service to start clock on boot'
-cp ./clock.service /etc/systemd/system/clock.service
-systemctl daemon-reload
-systemctl enable clock.service
-systemctl start clock.service
 
 
 echo 'SUCESS, please reboot'
