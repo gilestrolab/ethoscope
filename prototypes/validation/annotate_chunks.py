@@ -21,8 +21,6 @@ def position(event, x, y, flags, param):
 
 
 
-
-
 if __name__ == "__main__":
 
     parser = optparse.OptionParser()
@@ -42,6 +40,8 @@ if __name__ == "__main__":
         raise Exception("A user (-u) should be specified")
 
     lst = glob.glob(os.path.join(option_dict["input"],"*.avi"))
+    random.seed(1)
+
     random.shuffle(lst)
 
     instruction_array = cv2.imread(os.path.join(option_dict["input"],INSTRUCTION_FILE))
