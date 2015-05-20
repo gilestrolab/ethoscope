@@ -1,5 +1,3 @@
-from pip.utils import logging
-
 __author__ = 'quentin'
 
 

@@ -1,5 +1,3 @@
-from test.test_set import cube
-
 __author__ = 'quentin'
 
 # from pysolovideo.utils.debug import PSVException
