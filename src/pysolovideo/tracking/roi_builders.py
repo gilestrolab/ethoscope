@@ -750,3 +750,38 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
             return 0
         return 1
 
+
+
+class IterativeYMaze(BaseROIBuilder):
+
+    def _rois_from_img(self,img):
+
+        grey = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+
+        kern = np.ones((51,51),np.uint8)
+        dil = cv2.dilate(grey, kern)
+        grey = dil - grey
+        _, binary = cv2.threshold(grey, 25,255, cv2.THRESH_BINARY_INV)
+
+        cv2.imshow("g",binary)
+        cv2.waitKey(-1)
+
+
+        contours, hiera = cv2.findContours(binary, cv.CV_RETR_EXTERNAL, cv.CV_CHAIN_APPROX_SIMPLE)
+
+        print len(contours)
+        rois = []
+        for c in contours:
+
+            print cv2.contourArea(c), cv2.arcLength(c,True)
+            #cv2.drawContours(tmp_mask, [c],0, 1)
+
+            # value = int(np.median(self._mask[tmp_mask > 0]))
+
+            # rois.append(ROI(c, value))
+
+        # return rois
+
+        # return [ROI(ct, value=val))]
+
+

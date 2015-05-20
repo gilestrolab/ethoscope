@@ -3,10 +3,10 @@ __author__ = 'quentin'
 from pysolovideo.tracking.cameras import MovieVirtualCamera
 
 # Build ROIs from greyscale image
-from pysolovideo.tracking.roi_builders import SleepMonitorWithTargetROIBuilder
+from pysolovideo.tracking.roi_builders import IterativeYMaze, DefaultROIBuilder
 
 # the robust self learning tracker
-from pysolovideo.tracking.trackers import AdaptiveBGModel
+from pysolovideo.tracking.trackers import AdaptiveBGModelOneObject
 
 # the standard monitor
 from pysolovideo.tracking.monitor import Monitor
@@ -47,7 +47,8 @@ if __name__ == "__main__":
 
     cam = MovieVirtualCamera(option_dict ["input"], use_wall_clock=False)
 
-    roi_builder = SleepMonitorWithTargetROIBuilder()
+    roi_builder = DefaultROIBuilder()
+    # roi_builder = IterativeYMaze()
     rois = roi_builder(cam)
 
     logging.info("Initialising monitor")
@@ -67,11 +68,10 @@ if __name__ == "__main__":
         draw_frames = True
 
 
-    monit = Monitor(cam, AdaptiveBGModel, rois,
+    monit = Monitor(cam, AdaptiveBGModelOneObject, rois,
                     draw_every_n=option_dict["draw_every"],
                     draw_results=draw_frames,
                     video_out=option_dict["result_video"],
-                    drop_each=10,
                     )
 
 

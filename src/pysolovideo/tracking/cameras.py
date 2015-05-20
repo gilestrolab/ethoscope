@@ -1,6 +1,5 @@
 __author__ = 'quentin'
 
-
 import cv2
 import time
 import logging
