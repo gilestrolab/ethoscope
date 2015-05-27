@@ -149,16 +149,10 @@ class Monitor(object):
             except KeyError:
                 continue
 
-            # if pos["has_interacted"]:
-            #     roi_colour = (0, 255,0)
-            # else:
-            #     roi_colour = (255,0 , 255)
-
-
-            if pos["is_inferred"]== True:
-                colour = (255,0,0)
+            if pos["has_interacted"]:
+                colour = (255, 0,0)
             else:
-                colour = (0,255,255)
+                colour = (0 ,0, 255)
 
 
             cv2.ellipse(frame_cp,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),black_colour,3,cv2.CV_AA)
@@ -180,6 +174,8 @@ class Monitor(object):
             self._is_running = True
 
             for i,(t, frame) in enumerate(self._camera):
+                if i % 100 == 0:
+                    print t/(3600*1e3)
                 if self._drop_each is not None and i % self._drop_each != 0:
                     continue
 
@@ -196,6 +192,7 @@ class Monitor(object):
                     vw = cv2.VideoWriter(self._video_out, cv2.cv.CV_FOURCC(*'DIVX'), 2, (frame.shape[1], frame.shape[0])) # fixme the 50 is arbitrary
 
                 for j,track_u in enumerate(self._unit_trackers):
+
                     data_row = track_u(t, frame)
                     if data_row is None:
                         self._last_positions[track_u.roi.idx] = None

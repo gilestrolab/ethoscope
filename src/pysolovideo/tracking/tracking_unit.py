@@ -57,6 +57,7 @@ class TrackingUnit(object):
             return
 
         interact, result = self._interactor()
+
         # TODO data_row should have some result
         data_row.append(interact)
 

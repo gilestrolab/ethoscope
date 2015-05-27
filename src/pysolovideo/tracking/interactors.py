@@ -8,6 +8,7 @@ from math import sqrt
 from pysolovideo.hardware_control.arduino_api import SleepDepriverInterface
 
 from pysolovideo.tracking.trackers import BoolVariableBase
+
 class HasInteractedVariable(BoolVariableBase):
     header_name = "has_interacted"
 
@@ -83,6 +84,55 @@ class SleepDepInteractor(BaseInteractorSync):
         return False, {"channel":self._channel}
 
 
+class IsMovingInteractor(BaseInteractorSync):
+    def __init__(self):
+
+        self._last_active = 0
+
+        self._speed_threshold = 0.020
+        self._xor_speed_threshold = 0.175
+        self._sleep_dt_threshold = 1000 * 60 * 5 * 1.
+    def _interact(self, **kwargs):
+        pass
+
+    def _run(self):
+        positions = self._tracker.positions
+        t = self._tracker.times
+
+        if len(positions ) <2 :
+            return HasInteractedVariable(False),{}
+
+        tail_m = positions[-1]
+        xy_m = complex(tail_m["x"] + 1j * tail_m["y"])
+
+        tail_mm = positions[-2]
+
+        xy_mm =complex(tail_mm["x"] + 1j * tail_mm["y"])
+        speed = abs(xy_m - xy_mm) /  self._tracker._roi.longest_axis
+        dt = (t[-1] - t[-2]) /1000.0
+        speed /=dt
+        xor_diff = tail_m["xor_diff_x1000"] / 1000.0
+
+        if  speed > self._speed_threshold or xor_diff > self._xor_speed_threshold :
+            self._last_active = t[-1]
+            return HasInteractedVariable(False), {}
+        return HasInteractedVariable(True), {}
+
+        # if self._tracker._roi.idx == 20:
+        #
+        #     p =  100 * (t[-1] - self._last_active )/ self._sleep_dt_threshold
+        #     if p >0:
+        #         print p
+        # if(t[-1] - self._last_active) < self._sleep_dt_threshold:
+        #
+        #
+        #     return HasInteractedVariable(False), {}
+        #
+        #
+        # return HasInteractedVariable(True), {}
+
+
+
 
 ###Prototyping below ###########################
 class BaseInteractor(object):
@@ -93,14 +143,17 @@ class BaseInteractor(object):
     _target = None
 
     def __call__(self):
+
         if self._tracker is None:
             raise ValueError("No tracker bound to this interactor. Use `bind_tracker()` methods")
 
         interact, result  = self._run()
+
         if interact:
             self._interact_async(result)
         result["interact"] = interact
-        return interact, result
+
+        return interact#, result
 
 
     def bind_tracker(self, tracker):
@@ -122,6 +175,7 @@ class BaseInteractor(object):
         self._subprocess = multiprocessing.Process(target=self._target, kwargs = kwargs)
 
         self._subprocess.start()
+
 
 
 
