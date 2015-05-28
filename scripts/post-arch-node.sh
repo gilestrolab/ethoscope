@@ -86,6 +86,8 @@ echo 'IP=dhcp' >> /etc/netctl/eth0
 
 cp ./node.service /etc/systemd/system/node.service
 
+cp ./mysql_backup.service /etc/systemd/system/mysql_backup.service
+
 
 #configuring dns server:
 echo 'interface=wlan0' >/etc/dnsmasq.conf
@@ -121,6 +123,9 @@ netctl start eth0
 #node service
 systemctl start node.service
 systemctl enable node.service
+
+systemctl start mysql_backup.service
+systemctl enable mysql_backup.service
 
 # Setting passwordless ssh, this is the content of id_rsa.pub used in git updates.
 #TODO do not use a relative path.
