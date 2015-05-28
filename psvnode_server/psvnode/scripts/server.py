@@ -7,22 +7,16 @@ import json
 
 import logging
 import traceback
-from psvnode.utils.acquisition import Acquisition
 from psvnode.utils.helpers import get_version
 from psvnode.utils.helpers import which
+from psvnode.utils.helpers import generate_new_device_map, update_dev_map_wrapped
 
-from netifaces import ifaddresses, AF_INET, AF_LINK
 from os import walk
 import optparse
 import zipfile
 import datetime
 import fnmatch
-
-
-import concurrent.futures as futures
-import concurrent
-
-from psvnode.utils.helpers import scan_one_device
+from netifaces import ifaddresses, AF_INET, AF_LINK
 
 
 
@@ -31,65 +25,10 @@ STATIC_DIR = "../../static"
 
 
 
-
 def update_device_map(id, what="data",type=None, port=9000, data=None):
-    """
-    Just a routine to format our GET urls. This improves readability whilst allowing us to change convention (e.g. port) without rewriting everything.
-
-    :param id: machine unique identifier
-    :param what: e.g. /data, /control
-    :param type: the type of request for POST
-    :param port:
-    :return:
-    """
-    global devices_map
-
-    ip = devices_map[id]["ip"]
-
-    request_url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
-
-    if type is not None:
-        request_url = request_url + "/" + type
-
-    req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
-
-    try:
-        f = urllib2.urlopen(req)
-        message = f.read()
-
-        if message:
-            data = json.loads(message)
-
-            if not id in devices_map:
-                logging.warning("Device %s is not in device map. Rescanning subnet..." % id)
-                scan_subnet()
-            try:
-                devices_map[id].update(data)
-                return data
-
-            except KeyError:
-                logging.error("Device %s is not detected" % id)
-                raise KeyError("Device %s is not detected" % id)
-
-    except urllib2.httplib.BadStatusLine:
-        logging.error('BadlineSatus, most probably due to update device and auto-reset')
-
-    except urllib2.URLError as e:
-        if hasattr(e, 'reason'):
-            logging.error('We failed to reach a server.')
-            logging.error('Reason: ', e.reason)
-        elif hasattr(e, 'code'):
-            logging.error('The server couldn\'t fulfill the request.')
-            logging.error('Error code: ', e.code)
-
-def get_subnet_ip(device="wlan0"):
-    try:
-        ip = ifaddresses(device)[AF_INET][0]["addr"]
-        return ".".join(ip.split(".")[0:3])
-    except ValueError:
-        raise ValueError("Device '%s' is not valid" % device)
-
-
+    global  devices_map
+    out = update_dev_map_wrapped(devices_map,id,what,type,port,data)
+    return out
 
 @app.get('/favicon.ico')
 def get_favicon():
@@ -112,71 +51,13 @@ def index():
 # API to connect with SM/SD
 #################################
 
+
+
 @app.get('/devices')
 def scan_subnet(ip_range=(2,253)):
     global devices_map
     try:
-
-        devices_map = {}
-
-
-        subnet_ip = get_subnet_ip(SUBNET_DEVICE)
-        logging.info("Scanning attached devices")
-
-
-        scanned = [ "%s.%i" % (subnet_ip, i) for i in range(2,253) ]
-        urls= ["http://%s" % str(s) for s in scanned]
-
-        # We can use a with statement to ensure threads are cleaned up promptly
-        with futures.ThreadPoolExecutor(max_workers=128) as executor:
-            # Start the load operations and mark each future with its URL
-
-            fs = [executor.submit(scan_one_device, url) for url in urls]
-            for f in concurrent.futures.as_completed(fs):
-
-                try:
-                    id, ip = f.result()
-                    if id is None:
-                        continue
-                    devices_map[id] = {"ip":ip}
-
-                except Exception as e:
-                    logging.error("Error whilst pinging url")
-                    logging.error(traceback.format_exc(e))
-
-
-
-
-        if len(devices_map) < 1:
-            logging.warning("No device detected")
-            return  devices_map
-
-        logging.info("Detected %i devices:\n%s" % (len(devices_map), str(devices_map.keys())))
-        # We can use a with statement to ensure threads are cleaned up promptly
-        with futures.ThreadPoolExecutor(max_workers=128) as executor:
-            # Start the load operations and mark each future with its URL
-            fs = {}
-            for id in devices_map.keys():
-                fs[executor.submit(update_device_map,id)] = id
-
-            for f in concurrent.futures.as_completed(fs):
-                id = fs[f]
-                try:
-                    data = f.result()
-                    devices_map[id].update(data)
-                except Exception as e:
-                    logging.error("Could not get data from device %s :" % id)
-                    logging.error(traceback.format_exc(e))
-
-
-
-        for k, device in devices_map.iteritems():
-            # if the device is running AND acquisition is not handled yet, we make a new process for it
-            if device['status'] == 'running':
-                if k not in acquisition.keys():
-                    acquisition[k]= Acquisition(device, result_main_dir=RESULTS_DIR)
-                    acquisition[k].start()
-
+        devices_map = generate_new_device_map(ip_range,SUBNET_DEVICE)
         return devices_map
     except Exception as e:
         logging.error("Unexpected exception when scanning for devices:")
@@ -200,7 +81,7 @@ def device(id):
 
 @app.post('/device/<id>/controls/<type_of_req>')
 def device(id, type_of_req):
-    global acquisition
+    # global acquisition
     try:
         post_data = request.body.read()
         update_device_map(id, "data")
@@ -209,8 +90,8 @@ def device(id, type_of_req):
         if type_of_req == 'start':
             if device_info['status'] == 'stopped':
                 update_device_map(id, "controls", type_of_req, data=post_data)
-                acquisition[id] = Acquisition(devices_map[id], result_main_dir=RESULTS_DIR)
-                acquisition[id].start()
+                # acquisition[id] = Acquisition(devices_map[id], result_main_dir=RESULTS_DIR)
+                # acquisition[id].start()
             else:
                 raise Exception("Cannot start, device %s status is `%s`" %  (id, device_info['status']))
 
@@ -231,11 +112,11 @@ def device(id, type_of_req):
 
 def stop_device(id, post_data):
     update_device_map(id, "controls", 'stop', data=post_data)
-    acquisition[id].stop()
-    logging.info("Joining process")
-    acquisition[id].join()
-    logging.info("Removing device %s from acquisition map" % id)
-    del acquisition[id]
+    # acquisition[id].stop()
+    # logging.info("Joining process")
+    # acquisition[id].join()
+    # logging.info("Removing device %s from acquisition map" % id)
+    # del acquisition[id]
 
 
 
@@ -401,7 +282,7 @@ def node_actions(req, device='eth0'):
         disk_free = df.communicate()[0]
         disk_usage = disk_free.split("\n")[1].split()
         ip = "No IP assigned, check cable"
-        MAC_addr = None
+
         addrs = ifaddresses(device)
         MAC_addr = addrs[AF_LINK][0]["addr"]
         try:
@@ -414,7 +295,8 @@ def node_actions(req, device='eth0'):
         return {'time':datetime.datetime.now().isoformat()}
     else:
         raise NotImplementedError()
-        return {'error':'Nothing here'}
+
+
 @app.post('/node-actions')
 def node_actions():
         action = request.json
@@ -485,12 +367,12 @@ def get_log(id):
 
 
 def close(exit_status=0):
-    logging.info("Joining acquisition processes")
-    for a in acquisition.values():
-        a.stop()
-        logging.info("Joining process")
-        a.join()
-        logging.info("Joined OK")
+    # logging.info("Joining acquisition processes")
+    # for a in acquisition.values():
+    #     a.stop()
+    #     logging.info("Joining process")
+    #     a.join()
+    #     logging.info("Joined OK")
 
     logging.info("Closing server")
     os._exit(exit_status)
@@ -541,12 +423,12 @@ if __name__ == '__main__':
 
     global devices_map
     global scanning_locked
-    global acquisition
+    # global acquisition
 
 
     scanning_locked = False
     devices_map = {}
-    acquisition = {}
+    # acquisition = {}
 
 
     scan_subnet()
@@ -580,3 +462,4 @@ if __name__ == '__main__':
         close(1)
     finally:
         close()
+

@@ -4,6 +4,11 @@ import json
 import  urllib2 as urllib2
 import subprocess
 import os
+import traceback
+import concurrent
+import concurrent.futures as futures
+from netifaces import ifaddresses, AF_INET
+import datetime
 
 def get_version(dir, branch):
     version = subprocess.Popen(['git', 'rev-parse', branch],
@@ -31,8 +36,6 @@ def which(program):
                 return exe_file
 
     return None
-
-
 
 
 
@@ -72,3 +75,130 @@ def scan_one_device(ip, timeout=1, port=9000, page="id"):
         raise e
 
     return None, ip
+
+
+def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, data=None):
+    """
+    Just a routine to format our GET urls. This improves readability whilst allowing us to change convention (e.g. port) without rewriting everything.
+
+    :param id: machine unique identifier
+    :param what: e.g. /data, /control
+    :param type: the type of request for POST
+    :param port:
+    :return:
+    """
+
+    ip = devices_map[id]["ip"]
+
+    request_url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
+
+    if type is not None:
+        request_url = request_url + "/" + type
+
+    req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
+
+    try:
+        f = urllib2.urlopen(req)
+        message = f.read()
+
+        if message:
+            data = json.loads(message)
+
+            if not id in devices_map:
+                logging.warning("Device %s is not in device map. Rescanning subnet..." % id)
+                generate_new_device_map()
+            try:
+                devices_map[id].update(data)
+                return data
+
+            except KeyError:
+                logging.error("Device %s is not detected" % id)
+                raise KeyError("Device %s is not detected" % id)
+
+    except urllib2.httplib.BadStatusLine:
+        logging.error('BadlineSatus, most probably due to update device and auto-reset')
+
+    except urllib2.URLError as e:
+        if hasattr(e, 'reason'):
+            logging.error('We failed to reach a server.')
+            logging.error('Reason: ', e.reason)
+        elif hasattr(e, 'code'):
+            logging.error('The server couldn\'t fulfill the request.')
+            logging.error('Error code: ', e.code)
+    return devices_map
+
+
+def get_subnet_ip(device="wlan0"):
+    try:
+        ip = ifaddresses(device)[AF_INET][0]["addr"]
+        return ".".join(ip.split(".")[0:3])
+    except ValueError:
+        raise ValueError("Device '%s' is not valid" % device)
+
+
+
+def make_backup_path(device, result_main_dir="/psv_results"):
+    date_time = datetime.datetime.fromtimestamp(int(device["time"]))
+
+    formated_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
+    device_id = device["id"]
+    device_name = device["name"]
+    file_name = "%s_%s.db" % (formated_time, device_id)
+
+    output_db_file = os.path.join(result_main_dir,
+                                        device_id,
+                                        device_name,
+                                        formated_time,
+                                        file_name
+                                        )
+    return output_db_file
+
+def generate_new_device_map(ip_range=(2,253),device="wlan0"):
+        devices_map = {}
+        subnet_ip = get_subnet_ip(device)
+        logging.info("Scanning attached devices")
+        scanned = [ "%s.%i" % (subnet_ip, i) for i in range(2,253) ]
+        urls= ["http://%s" % str(s) for s in scanned]
+
+        # We can use a with statement to ensure threads are cleaned up promptly
+        with futures.ThreadPoolExecutor(max_workers=128) as executor:
+            # Start the load operations and mark each future with its URL
+
+            fs = [executor.submit(scan_one_device, url) for url in urls]
+            for f in concurrent.futures.as_completed(fs):
+
+                try:
+                    id, ip = f.result()
+                    if id is None:
+                        continue
+                    devices_map[id] = {"ip":ip}
+
+                except Exception as e:
+                    logging.error("Error whilst pinging url")
+                    logging.error(traceback.format_exc(e))
+        if len(devices_map) < 1:
+            logging.warning("No device detected")
+            return  devices_map
+
+        logging.info("Detected %i devices:\n%s" % (len(devices_map), str(devices_map.keys())))
+        # We can use a with statement to ensure threads are cleaned up promptly
+        with futures.ThreadPoolExecutor(max_workers=128) as executor:
+            # Start the load operations and mark each future with its URL
+            fs = {}
+            for id in devices_map.keys():
+                fs[executor.submit(update_dev_map_wrapped,devices_map, id)] = id
+
+            for f in concurrent.futures.as_completed(fs):
+                id = fs[f]
+                try:
+                    data = f.result()
+                    devices_map[id].update(data)
+                except Exception as e:
+                    logging.error("Could not get data from device %s :" % id)
+                    logging.error(traceback.format_exc(e))
+
+        for d in devices_map.values():
+            d["backup_path"] = make_backup_path(d)
+
+        return devices_map
+
