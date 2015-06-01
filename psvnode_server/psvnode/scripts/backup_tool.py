@@ -44,12 +44,6 @@ class BackupClass(object):
         except Exception as e:
             logging.error(traceback.format_exc(e))
 
-
-
-
-
-
-
 def backup_job(device_info):
     backup_job = BackupClass(device_info)
     backup_job.run()

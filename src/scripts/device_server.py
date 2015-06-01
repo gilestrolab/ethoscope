@@ -150,8 +150,7 @@ if __name__ == '__main__':
         DURATION = 60*60 * 100
 
         if getpass.getuser() == "quentin":
-            INPUT_VIDEO = '/data/pysolo_video_samples/monitor_new_targets_short.avi'
-            # INPUT_VIDEO = '/data/pysolo_video_samples/monitor_new_targets_long.avi'
+            INPUT_VIDEO = '/data/psv_misc/tube_monitor_validation/tube_monitor_validation_raw.mp4'
             PSV_DIR = "/psv_data/results/"
             #fixme Put your working directories
             GIT_WORKING_DIR = "./"
@@ -178,9 +177,7 @@ if __name__ == '__main__':
 
 
     try:
-        print "yoyoma"
         run(api, host='0.0.0.0', port=port, server='cherrypy')
-        print "yoyoma"
 
     except Exception as e:
 
