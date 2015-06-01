@@ -311,7 +311,7 @@ class BackgroundModel(object):
     """
     A class to model background. It uses a dynamic running average and support arbitrary and heterogeneous frame rates
     """
-    def __init__(self, max_half_life=100. * 1000, min_half_life=1.* 1000, increment = 2):
+    def __init__(self, max_half_life=100. * 1000, min_half_life=1.* 1000, increment = 1.2):
         # the maximal half life of a pixel from background, in seconds
         self._max_half_life = float(max_half_life)
         # the minimal one
@@ -399,7 +399,7 @@ class AdaptiveBGModel(BaseTracker):
 
 
         self._bg_model = BackgroundModel()
-        self._max_m_log_lik = 4.
+        self._max_m_log_lik = 10.
         self._buff_grey = None
         self._buff_object = None
         self._buff_object_old = None
@@ -515,6 +515,7 @@ class AdaptiveBGModel(BaseTracker):
         cv2.subtract(grey, bg, self._buff_fg)
 
         cv2.threshold(self._buff_fg,30,255,cv2.THRESH_TOZERO, dst=self._buff_fg)
+
         cv2.bitwise_and(self._buff_fg_backup,self._buff_fg,dst=self._buff_fg_diff)
 
         sum_fg = cv2.countNonZero(self._buff_fg)
@@ -571,7 +572,16 @@ class AdaptiveBGModel(BaseTracker):
 
         if distance > self._max_m_log_lik:
             self._bg_model.increase_learning_rate()
+            if self._roi.idx==5:
+                print t,"BAD LIKELIHOOD", distance , self._max_m_log_lik
+
             raise NoPositionError
+
+
+
+
+
+
 
         (x,y) ,(w,h), angle  = cv2.minAreaRect(hull)
 

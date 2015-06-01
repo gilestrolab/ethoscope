@@ -732,8 +732,8 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
                 #
                 cv2.drawContours(img,[ct], -1, (255,0,0),3)
 
-                cv2.imshow("test", img)
-                cv2.waitKey(-1)
+                # cv2.imshow("test", img)
+                # cv2.waitKey(-1)
                 val += 1
 
         return rois
