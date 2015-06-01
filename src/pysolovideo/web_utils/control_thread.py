@@ -9,7 +9,7 @@ from pysolovideo.tracking.cameras import OurPiCameraAsync
 from pysolovideo.tracking.cameras import MovieVirtualCamera
 
 # Build ROIs from greyscale image
-from pysolovideo.tracking.roi_builders import SleepMonitorWithTargetROIBuilder
+from pysolovideo.tracking.roi_builders import SleepMonitorWithTargetROIBuilder,TubeMonitorWithTargetROIBuilder
 
 # the robust self learning tracker
 from pysolovideo.tracking.trackers import AdaptiveBGModel
@@ -36,6 +36,7 @@ class ControlThread(Thread):
                             "last_time_stamp":0,
                             "fps":0
                             }
+    _ROIBuilderClass = TubeMonitorWithTargetROIBuilder
 
     def __init__(self, machine_id, name, version, psv_dir, video_file=None, *args, **kwargs):
         self._monit_args = args
@@ -78,18 +79,6 @@ class ControlThread(Thread):
                         "monitor_info": self._default_monitor_info
                         }
 
-        # logging.basicConfig(filename=self._info["log_file"], level=logging.INFO)
-        #
-        # logger = logging.getLogger()
-        # logger.handlers[0].stream.close()
-        # logger.removeHandler(logger.handlers[0])
-        #
-        # file_handler = logging.FileHandler(self._info["log_file"])
-        # file_handler.setLevel(logging.INFO)
-        # formatter = logging.Formatter("%(asctime)s %(filename)s, %(lineno)d, %(funcName)s: %(message)s")
-        # file_handler.setFormatter(formatter)
-        # logger.addHandler(file_handler)
-
         self._monit = None
         super(ControlThread, self).__init__()
 
@@ -100,7 +89,6 @@ class ControlThread(Thread):
         return self._info
 
     def _update_info(self):
-        print "r"
         if self._monit is None:
             return
         t = self._monit.last_time_stamp
@@ -155,7 +143,7 @@ class ControlThread(Thread):
                     cam = MovieVirtualCamera(self._video_file, use_wall_clock=True)
 
                 logging.info("Building ROIs")
-                roi_builder = SleepMonitorWithTargetROIBuilder()
+                roi_builder = self._ROIBuilderClass()
                 rois = roi_builder(cam)
 
                 logging.info("Initialising monitor")
