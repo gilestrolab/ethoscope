@@ -89,8 +89,10 @@ class IsMovingInteractor(BaseInteractorSync):
 
         self._last_active = 0
 
-        self._speed_threshold = 0.020
-        self._xor_speed_threshold = 0.175
+        self._speed_threshold = 0.0025
+
+
+        # self._xor_speed_threshold = 0.175
         self._sleep_dt_threshold = 1000 * 60 * 5 * 1.
     def _interact(self, **kwargs):
         pass
@@ -103,17 +105,16 @@ class IsMovingInteractor(BaseInteractorSync):
             return HasInteractedVariable(False),{}
 
         tail_m = positions[-1]
-        xy_m = complex(tail_m["x"] + 1j * tail_m["y"])
+        dist = 10.0 ** (tail_m["xy_dist_1e6"]/1000.0)
 
-        tail_mm = positions[-2]
 
-        xy_mm =complex(tail_mm["x"] + 1j * tail_mm["y"])
-        speed = abs(xy_m - xy_mm) /  self._tracker._roi.longest_axis
-        dt = (t[-1] - t[-2]) /1000.0
-        speed /=dt
-        xor_diff = tail_m["xor_diff_x1000"] / 1000.0
 
-        if  speed > self._speed_threshold or xor_diff > self._xor_speed_threshold :
+        #speed = abs(xy_m - xy_mm) /  self._tracker._roi.longest_axis
+        #dt = (t[-1] - t[-2]) /1000.0
+        #speed /=dt
+        # xor_diff = tail_m["xor_diff_x1000"] / 1000.0
+
+        if  dist > self._speed_threshold:# or xor_diff > self._xor_speed_threshold :
             self._last_active = t[-1]
             return HasInteractedVariable(False), {}
         return HasInteractedVariable(True), {}
@@ -170,7 +171,7 @@ class BaseInteractor(object):
             return
 
         if self._target is None:
-            raise NotImplementedError("_target must ba a defined function")
+            return
 
         self._subprocess = multiprocessing.Process(target=self._target, kwargs = kwargs)
 
@@ -183,7 +184,8 @@ class DefaultInteractor(BaseInteractor):
 
     def _run(self):
         out = HasInteractedVariable(False), {}
-        return out
+        return out, {}
+
 
 #
 # def beep(freq):

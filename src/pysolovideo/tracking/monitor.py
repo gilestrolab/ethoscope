@@ -174,7 +174,7 @@ class Monitor(object):
             self._is_running = True
 
             for i,(t, frame) in enumerate(self._camera):
-                if i % 100 == 0:
+                if i % 1000 == 0:
                     print t/(3600*1e3)
                 if self._drop_each is not None and i % self._drop_each != 0:
                     continue
@@ -192,11 +192,11 @@ class Monitor(object):
                     vw = cv2.VideoWriter(self._video_out, cv2.cv.CV_FOURCC(*'DIVX'), 2, (frame.shape[1], frame.shape[0])) # fixme the 50 is arbitrary
 
                 for j,track_u in enumerate(self._unit_trackers):
-
                     data_row = track_u(t, frame)
                     if data_row is None:
                         self._last_positions[track_u.roi.idx] = None
                         continue
+
                     abs_pos = track_u.get_last_position(absolute=True)
 
                     # if abs_pos is not None:

@@ -3,13 +3,13 @@ __author__ = 'quentin'
 import numpy as np
 import cv2
 from pysolovideo.utils.img_proc import merge_blobs
-from pysolovideo.utils.debug import show
 from collections import deque
 
 import collections
 import copy
 from pysolovideo.utils.debug import PSVException
 from math import sqrt, log10
+from scipy import ndimage
 
 class IntVariableBase(int):
     sql_data_type = "SMALLINT"
@@ -39,6 +39,7 @@ class PhiVariable(IntVariableBase):
     header_name = "phi"
     functional_type = "angle"
 
+
 class DistanceIntVarBase(IntVariableBase):
     functional_type = "distance"
 
@@ -46,19 +47,16 @@ class mLogLik(IntVariableBase):
     header_name= "mlog_L_x1000"
     functional_type = "proba"
 
-class XorDiff(IntVariableBase):
-    header_name= "xor_diff_x1000"
-    functional_type = "float"
 
-class ShapeMatchI3(IntVariableBase):
-    header_name= "sm_i3_x1000"
-    functional_type = "float"
-class ShapeMatchI2(IntVariableBase):
-    header_name= "sm_i2_x1000"
-    functional_type = "float"
-class ShapeMatchI1(IntVariableBase):
-    header_name= "sm_i1_x1000"
-    functional_type = "float"
+class XYDistance(IntVariableBase):
+    header_name = "xy_dist_1e6"
+    functional_type = "relative_distance_1e6"
+
+
+class XorDistance(IntVariableBase):
+    header_name = "xor_dist"
+    functional_type = "relative_distance_1e3"
+
 
 
 class WidthVariable(DistanceIntVarBase):
@@ -77,10 +75,12 @@ class RelativeVariableBase(DistanceIntVarBase):
     def get_absolute_value(self, roi):
         raise NotImplementedError("Relative variable must implement a `get_absolute_value()` method")
 
+
 class XPosVariable(RelativeVariableBase):
     header_name = "x"
     def get_absolute_value(self, roi):
         out = int(self)
+
         ox, _ = roi.offset
         out += ox
         return XPosVariable(out)
@@ -378,9 +378,6 @@ class BackgroundModel(object):
         else:
             np.subtract(1, self._buff_alpha_matrix, self._buff_invert_alpha_mat)
 
-        # cv2.imshow("imt", img_t)
-        # cv2.imshow("bgm", self._bg_mean.astype(np.uint8))
-
         np.multiply(self._buff_alpha_matrix, img_t, self._buff_alpha_matrix)
         np.multiply(self._buff_invert_alpha_mat, self._bg_mean, self._buff_invert_alpha_mat)
         np.add(self._buff_alpha_matrix, self._buff_invert_alpha_mat, self._bg_mean)
@@ -395,7 +392,7 @@ class AdaptiveBGModel(BaseTracker):
         self._previous_shape=None
         self._object_expected_size = 0.05 # proportion of the roi main axis
         self._max_area = (5 * self._object_expected_size) ** 2
-        # self._max_length = 5 * self._object_expected_size
+
         self._smooth_mode = deque()
         self._smooth_mode_tstamp = deque()
         self._smooth_mode_window_dt = 30 * 1000 #miliseconds
@@ -409,12 +406,14 @@ class AdaptiveBGModel(BaseTracker):
         self._buff_grey_blurred = None
         self._buff_fg = None
         self._buff_convolved_mask = None
-        self._buff_xor = None
+        self._buff_fg_backup = None
+        self._buff_fg_diff = None
+        self._old_sum_fg = 0
 
         super(AdaptiveBGModel, self).__init__(roi, data)
 
     def _pre_process_input_minimal(self, img, mask, t, darker_fg=True):
-        blur_rad = int(self._object_expected_size * np.max(img.shape) / 2.5)
+        blur_rad = int(self._object_expected_size * np.max(img.shape) / 2.0)
 
         if blur_rad % 2 == 0:
             blur_rad += 1
@@ -425,7 +424,7 @@ class AdaptiveBGModel(BaseTracker):
                 mask = np.ones_like(self._buff_grey) * 255
 
         cv2.cvtColor(img,cv2.COLOR_BGR2GRAY, self._buff_grey)
-        cv2.GaussianBlur(self._buff_grey,(blur_rad,blur_rad),1.5, self._buff_grey)
+        cv2.GaussianBlur(self._buff_grey,(blur_rad,blur_rad),1.2, self._buff_grey)
         if darker_fg:
             cv2.subtract(255, self._buff_grey, self._buff_grey)
 
@@ -505,24 +504,28 @@ class AdaptiveBGModel(BaseTracker):
 
         if self._bg_model.bg_img is None:
             self._buff_fg = np.empty_like(grey)
-            self._buff_object_old = np.empty_like(grey)
             self._buff_object= np.empty_like(grey)
-            self._buff_xor = np.empty_like(grey)
+            self._buff_fg_backup = np.empty_like(grey)
+            self._buff_fg_diff = np.empty_like(grey)
+            self._old_pos = 0.0 +0.0j
+            self._old_sum_fg = 0
             raise NoPositionError
 
         bg = self._bg_model.bg_img.astype(np.uint8)
         cv2.subtract(grey, bg, self._buff_fg)
 
-        #fixme magic number
-        cv2.threshold(self._buff_fg,30,255,cv2.THRESH_BINARY, dst=self._buff_fg)
+        cv2.threshold(self._buff_fg,30,255,cv2.THRESH_TOZERO, dst=self._buff_fg)
+        cv2.bitwise_and(self._buff_fg_backup,self._buff_fg,dst=self._buff_fg_diff)
 
+        sum_fg = cv2.countNonZero(self._buff_fg)
+
+        self._buff_fg_backup = np.copy(self._buff_fg)
 
         n_fg_pix = np.count_nonzero(self._buff_fg)
         prop_fg_pix  = n_fg_pix / (1.0 * grey.shape[0] * grey.shape[1])
         is_ambiguous = False
 
         if  prop_fg_pix > self._max_area:
-
             self._bg_model.increase_learning_rate()
             raise NoPositionError
 
@@ -531,22 +534,15 @@ class AdaptiveBGModel(BaseTracker):
             raise NoPositionError
 
         contours,hierarchy = cv2.findContours(self._buff_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-
         contours = [cv2.approxPolyDP(c,1.2,True) for c in contours]
-
-
 
         if len(contours) == 0:
             self._bg_model.increase_learning_rate()
             raise NoPositionError
 
-
         elif len(contours) > 1:
             if not self.fg_model.is_ready:
                 raise NoPositionError
-
-
             # hulls = [cv2.convexHull( c) for c in contours]
             hulls = contours
             #hulls = merge_blobs(hulls)
@@ -564,16 +560,12 @@ class AdaptiveBGModel(BaseTracker):
 
             hull = hulls[good_clust]
             distance = all_distances[good_clust]
-            #features = cluster_features[good_clust]
-
-
         else:
-            # hull = cv2.convexHull(contours[0])
             hull = contours[0]
             if hull.shape[0] < 3:
                 self._bg_model.increase_learning_rate()
-
                 raise NoPositionError
+
             features = self.fg_model.compute_features(img, hull)
             distance = self.fg_model.distance(features)
 
@@ -581,46 +573,43 @@ class AdaptiveBGModel(BaseTracker):
             self._bg_model.increase_learning_rate()
             raise NoPositionError
 
-        # if hull.shape[0] > 4:
-        #     (x,y) ,(w,h), angle  = cv2.fitEllipse(hull)
-        # else:
         (x,y) ,(w,h), angle  = cv2.minAreaRect(hull)
-
 
         if w < h:
             angle -= 90
             w,h = h,w
-
         angle = angle % 180
 
-
         h_im = min(grey.shape)
+        w_im = max(grey.shape)
         max_h = 2*h_im
         if w>max_h or h>max_h:
             raise NoPositionError
 
-        self._buff_fg.fill(0)
-        self._buff_object.fill(0)
+        cv2.ellipse(self._buff_fg ,((x,y), (int(w*1.5),int(h*1.5)),angle),255,-1)
 
-        cv2.drawContours(self._buff_object ,[hull],0, 1,-1)
-        cv2.bitwise_xor(self._buff_object, self._buff_object_old,self._buff_xor)
-        xor_diff = cv2.countNonZero(self._buff_xor)/float(cv2.countNonZero(self._buff_object) + cv2.countNonZero(self._buff_object_old))
+        #todo center mass just on the ellipse area
+        cv2.bitwise_and(self._buff_fg_backup, self._buff_fg,self._buff_fg_backup)
+        y,x = ndimage.measurements.center_of_mass(self._buff_fg_backup)
 
-        if self._roi.idx==2:
-            cv2.imshow("dbg",127 * (self._buff_object + self._buff_object_old))
-            cv2.imshow("dbg2",(255-self._buff_grey))
+        pos = x +1.0j*y
+        pos /= w_im
 
-        self._buff_object_old= np.copy(self._buff_object)
+        xy_dist = round(log10(1./float(w_im) + abs(pos - self._old_pos))*1000)
+        #cv2.bitwise_and(self._buff_fg_diff,self._buff_fg,dst=self._buff_fg_diff)
+
+        sum_diff = cv2.countNonZero(self._buff_fg_diff)
+
+        xor_dist = (sum_fg  + self._old_sum_fg - 2*sum_diff)  / float(sum_fg  + self._old_sum_fg)
+        xor_dist *=1000.
 
 
-        hull = cv2.convexHull(hull)
-        cv2.drawContours(self._buff_fg ,[hull],0, 1,-1)
-
+        self._old_sum_fg = sum_fg
+        self._old_pos = pos
 
 
         if mask is not None:
             cv2.bitwise_and(self._buff_fg, mask,  self._buff_fg)
-
 
         if is_ambiguous:
             self._bg_model.increase_learning_rate()
@@ -631,17 +620,16 @@ class AdaptiveBGModel(BaseTracker):
 
         self.fg_model.update(img, hull)
 
-
         x_var = XPosVariable(int(round(x)))
         y_var = YPosVariable(int(round(y)))
+        distance = XYDistance(int(xy_dist))
+        xor_dist = XorDistance(int(xor_dist))
         w_var = WidthVariable(int(round(w)))
         h_var = HeightVariable(int(round(h)))
         phi_var = PhiVariable(int(round(angle)))
         mlogl =   mLogLik(int(distance*1000))
-        xor_diff =   XorDiff(int(xor_diff*1000))
 
-
-        out = DataPoint([x_var, y_var, w_var, h_var, phi_var,mlogl,xor_diff])
+        out = DataPoint([x_var, y_var, w_var, h_var, phi_var,mlogl,distance,xor_dist])
 
         self._previous_shape=np.copy(hull)
         return out
@@ -821,6 +809,7 @@ class AdaptiveBGModelOneObject(BaseTracker):
         w_var = WidthVariable(int(round(w)))
         h_var = HeightVariable(int(round(h)))
         phi_var = PhiVariable(int(round(angle)))
+
 
 
         self._buff_fg.fill(0)
