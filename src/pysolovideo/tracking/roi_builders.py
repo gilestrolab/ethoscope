@@ -527,6 +527,9 @@ class SleepDepROIBuilder(BaseROIBuilder):
         return rois
 
 
+
+
+
 class ImgMaskROIBuilder(BaseROIBuilder):
     """
     Initialised with an grey-scale image file.
@@ -555,11 +558,17 @@ class ImgMaskROIBuilder(BaseROIBuilder):
 
         return rois
 
-
-class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
-    _expected__min_target_dist = 10 # the minimal distance between two targets, in 'target diameter'
-
+class TargetGridROIBuilderBase(BaseROIBuilder):
     _adaptive_med_rad = 0.10
+    _expected__min_target_dist = 10 # the minimal distance between two targets, in 'target diameter'
+    _vertical_offset = None
+    _n_rows = None
+
+    def __init__(self):
+        if self._vertical_offset is None:
+            raise NotImplementedError("_vertical_offset attribute cannot be None")
+        if self._n_rows is None:
+            raise NotImplementedError("_n_rows attribute cannot be None")
 
     def _find_blobs(self, im, scoring_fun):
         grey= cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
@@ -574,13 +583,9 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
         score_map = np.zeros_like(bin)
         for t in range(0, 255,5):
             cv2.threshold(grey, t, 255,cv2.THRESH_BINARY_INV,bin)
-
-
             if np.count_nonzero(bin) > 0.7 * im.shape[0] * im.shape[1]:
                 continue
-
             contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
-
             bin.fill(0)
             for c in contours:
                 score = scoring_fun(c, im)
@@ -588,7 +593,6 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
                     cv2.drawContours(bin,[c],0,score,-1)
             cv2.add(bin, score_map,score_map)
         return score_map
-
 
 
 
@@ -687,31 +691,28 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
 
         rois = []
         val = 1
-        vertical_offset =  0.1/16.
 
-        # cv2.circle(img,tuple(ori),3,(255,255,0),-1)
-        # cv2.imshow("test", img)
-        # cv2.waitKey(-1)
 
         for left in (True,False):
-            for i in range(16):
-                y = -1 + float(i)/16.0
+            for i in range(self._n_rows):
+                fnrows = float(self._n_rows)
+                y = -1 + float(i)/fnrows
 
                 if left:
                     x = -1 + 0.
                 else:
                     x = -1 + 0.5 + 1/100.
 
-                pt1 = np.array([x,y + vertical_offset,0], dtype=np.float32)
-                pt2 = np.array([x,y + 1./16. - vertical_offset,0], dtype=np.float32)
+                pt1 = np.array([x,y + self._vertical_offset,0], dtype=np.float32)
+                pt2 = np.array([x,y + 1./fnrows - self._vertical_offset,0], dtype=np.float32)
 
                 if left:
                     x = -1 + 0.5 - 1/100.
                 else:
                     x = -1 + 1.0
 
-                pt4 = np.array([x,y+ vertical_offset,0], dtype=np.float32)
-                pt3 = np.array([x,y + 1./16. - vertical_offset,0], dtype=np.float32)
+                pt4 = np.array([x,y+ self._vertical_offset,0], dtype=np.float32)
+                pt3 = np.array([x,y + 1./fnrows - self._vertical_offset,0], dtype=np.float32)
 
 
                 pt1, pt2 = np.dot(wrap_mat, pt1),  np.dot(wrap_mat, pt2)
@@ -731,8 +732,8 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
                 #
                 cv2.drawContours(img,[ct], -1, (255,0,0),3)
 
-                # cv2.imshow("test", img)
-                # cv2.waitKey(-1)
+                cv2.imshow("test", img)
+                cv2.waitKey(-1)
                 val += 1
 
         return rois
@@ -749,6 +750,15 @@ class SleepMonitorWithTargetROIBuilder(BaseROIBuilder):
         if circul < .8: # fixme magic number
             return 0
         return 1
+
+class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilderBase):
+
+    _vertical_offset =  0.1/16.
+    _n_rows = 16
+
+class TubeMonitorWithTargetROIBuilder(TargetGridROIBuilderBase):
+    _vertical_offset =  .15/10.
+    _n_rows = 10
 
 
 
