@@ -142,7 +142,8 @@ def make_backup_path(device, result_main_dir="/psv_results"):
 
     try:
         com = "SELECT value from METADATA WHERE field = 'date_time'"
-        mysql_db = MySQLdb.connect( host=device["ip"],
+        raw_ip = os.path.basename(device["ip"]) #without http://
+        mysql_db = MySQLdb.connect( host=raw_ip,
                                     user="root",
                                     passwd="",
                                     db="psv_db")
