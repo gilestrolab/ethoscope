@@ -49,7 +49,7 @@ class mLogLik(IntVariableBase):
 
 
 class XYDistance(IntVariableBase):
-    header_name = "xy_dist_1e6"
+    header_name = "xy_dist_log10x1000"
     functional_type = "relative_distance_1e6"
 
 
