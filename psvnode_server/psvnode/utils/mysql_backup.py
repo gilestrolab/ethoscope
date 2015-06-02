@@ -37,6 +37,9 @@ class MySQLdbToSQlite(object):
         src = MySQLdb.connect(host=self._remote_host, user=self._remote_user,
                                          passwd=self._remote_pass, db=self._remote_db_name)
 
+        src = MySQLdb.connect(host="localhost", user="root",
+                                         passwd="", db="psv_db")
+
 
         self._dst_path=dst_path
         logging.info("Initializing local database static tables at %s" % self._dst_path)
@@ -101,6 +104,32 @@ class MySQLdbToSQlite(object):
 
         logging.info("Database mirroring initialised")
 
+    def _copy_table(self,table_name, src, dst, dump_in_csv=False):
+
+
+        src_cur = src.cursor()
+        dst_cur = dst.cursor()
+
+        src_command = "SHOW COLUMNS FROM %s " % table_name
+
+        src_cur.execute(src_command)
+        col_list = []
+        for c in src_cur:
+             col_list.append(" ".join(c[0:2]))
+
+        formated_cols_names = ", ".join(col_list)
+
+
+        try:
+            dst_command = "CREATE TABLE %s (%s)" % (table_name ,formated_cols_names)
+            dst_cur.execute(dst_command)
+
+        except sqlite3.OperationalError:
+            logging.info("Table %s exists, not copying it" % table_name)
+            return
+
+        self._replace_table(table_name, src, dst, dump_in_csv)
+
     def update_roi_tables(self):
         """
         Fetch new ROI tables and new data points in the remote and use them to update local db
@@ -158,32 +187,6 @@ class MySQLdbToSQlite(object):
             dst_cur.execute(dst_command)
         dst.commit()
 
-
-    def _copy_table(self,table_name, src, dst, dump_in_csv=False):
-
-
-        src_cur = src.cursor()
-        dst_cur = dst.cursor()
-
-        src_command = "SHOW COLUMNS FROM %s " % table_name
-
-        src_cur.execute(src_command)
-        col_list = []
-        for c in src_cur:
-             col_list.append(" ".join(c[0:2]))
-
-        formated_cols_names = ", ".join(col_list)
-
-
-        try:
-            dst_command = "CREATE TABLE %s (%s)" % (table_name ,formated_cols_names)
-            dst_cur.execute(dst_command)
-
-        except sqlite3.OperationalError:
-            logging.info("Table %s exists, not copying it" % table_name)
-            return
-
-        self._replace_table(table_name, src, dst, dump_in_csv)
 
     def _update_one_roi_table(self, table_name, src, dst, dump_in_csv=False):
         src_cur = src.cursor()

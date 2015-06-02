@@ -28,6 +28,8 @@ class BackupClass(object):
 
     def run(self):
         try:
+            if self._device_info["backup_path"] is None:
+                raise ValueError("backup path is None for device %s" % self._device_info["id"])
 
             mirror= MySQLdbToSQlite(self._device_info["backup_path"], self._db_credentials["name"],
                             remote_host=self._database_ip,

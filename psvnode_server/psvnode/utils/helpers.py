@@ -9,6 +9,7 @@ import concurrent
 import concurrent.futures as futures
 from netifaces import ifaddresses, AF_INET
 import datetime
+import MySQLdb
 
 def get_version(dir, branch):
     version = subprocess.Popen(['git', 'rev-parse', branch],
@@ -138,7 +139,27 @@ def get_subnet_ip(device="wlan0"):
 
 
 def make_backup_path(device, result_main_dir="/psv_results"):
-    date_time = datetime.datetime.fromtimestamp(int(device["time"]))
+
+    try:
+        com = "SELECT value from METADATA WHERE field = 'date_time'"
+        mysql_db = MySQLdb.connect( host=device["ip"],
+                                    user="root",
+                                    passwd="",
+                                    db="psv_db")
+        cur = mysql_db.cursor()
+        cur.execute(com)
+        query = [c for c in cur]
+        timestamp = float(query[0][0])
+        mysql_db.close()
+
+
+
+    except Exception as e:
+        logging.error("Could not generate backup path for device. Probably a MySQL issue")
+        logging.error(traceback.format_exc(e))
+        return None
+
+    date_time = datetime.datetime.fromtimestamp(timestamp)
 
     formated_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
     device_id = device["id"]
