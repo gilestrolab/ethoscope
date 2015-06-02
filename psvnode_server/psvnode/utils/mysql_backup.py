@@ -37,10 +37,6 @@ class MySQLdbToSQlite(object):
         src = MySQLdb.connect(host=self._remote_host, user=self._remote_user,
                                          passwd=self._remote_pass, db=self._remote_db_name)
 
-        src = MySQLdb.connect(host="localhost", user="root",
-                                         passwd="", db="psv_db")
-
-
         self._dst_path=dst_path
         logging.info("Initializing local database static tables at %s" % self._dst_path)
 
