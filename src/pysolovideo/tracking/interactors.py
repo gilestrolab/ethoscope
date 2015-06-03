@@ -105,7 +105,7 @@ class IsMovingInteractor(BaseInteractorSync):
             return HasInteractedVariable(False),{}
 
         tail_m = positions[-1]
-        dist = 10.0 ** (tail_m["xy_dist_1e6"]/1000.0)
+        dist = 10.0 ** (tail_m["xy_dist_log10x1000"]/1000.0)
 
 
 

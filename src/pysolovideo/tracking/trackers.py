@@ -606,6 +606,7 @@ class AdaptiveBGModel(BaseTracker):
         pos /= w_im
 
         xy_dist = round(log10(1./float(w_im) + abs(pos - self._old_pos))*1000)
+
         #cv2.bitwise_and(self._buff_fg_diff,self._buff_fg,dst=self._buff_fg_diff)
 
         sum_diff = cv2.countNonZero(self._buff_fg_diff)
