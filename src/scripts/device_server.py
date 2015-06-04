@@ -158,7 +158,7 @@ if __name__ == '__main__':
 
         elif getpass.getuser() == "asterix":
             PSV_DIR = "/tmp/psv_data"
-            INPUT_VIDEO = '/lud/validation_sleep_monitor/validation_2fps.mp4'
+            INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
             GIT_WORKING_DIR = "/data1/todel/pySolo-Device"
 
         elif getpass.getuser() == "psv" or getpass.getuser() == "root":

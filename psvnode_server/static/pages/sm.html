@@ -2,6 +2,7 @@
     <div class="jumbotron text-center" ng-cloak>
         <h1>Sleep Monitor {{device.name}}</h1>
         <p>Here you can perform actions and know the status of the device</p>
+
         <div class= "last_drawn_img">
         <img ng-if="device.status == 'running'"  ng-src="{{device.img}}" alt="" width="480"></img>
         </div>
@@ -14,7 +15,8 @@
         <div ng-if="device.status == 'running'">
             <p>Processing speed: {{device.monitor_info.fps}} FPS</p>
 
-            <!--<p>Your file will be saved as: "<b>TODO</b>"</p>-->
+            <p>Your file will be saved as: {{device.backup_path}}</p>
+            <p>Time since last backup: {{sm.elapsedtime(device.time_since_backup)}}</p>
 
         </div>
         <div id="starting" class="spinner" >
@@ -25,6 +27,8 @@
         <div ng-if="device.status == 'stopping'">
             <p>Stopping tracking...</p>
         </div>
+<div ng-if="device.status == 'stopped'">
+<p>Time since last experiment: {{sm.elapsedtime(device.time_since_backup)}}</p>        </div>
 
         <button class="btn btn-success btn-xl" ng-if="device.status == 'stopped'" ng-click="sm.start()">Start</button>
         <button class="btn btn-danger" ng-if="device.status == 'running'"  ng-click="sm.stop()">Stop</button>
@@ -132,4 +136,5 @@
     </div>
   </div>
 </div>
+
 

@@ -10,6 +10,7 @@ import traceback
 from psvnode.utils.helpers import get_version
 from psvnode.utils.helpers import which
 from psvnode.utils.helpers import generate_new_device_map, update_dev_map_wrapped
+from psvnode.utils.helpers import get_last_backup_time
 
 from os import walk
 import optparse
@@ -75,9 +76,11 @@ def get_devices_list():
 def device(id):
     try:
         update_device_map(id,what="data")
+        devices_map[id]["time_since_backup"] = get_last_backup_time(devices_map[id]["backup_path"])
         return devices_map[id]
     except Exception as e:
         return {'error':traceback.format_exc(e)}
+
 
 @app.post('/device/<id>/controls/<type_of_req>')
 def device(id, type_of_req):

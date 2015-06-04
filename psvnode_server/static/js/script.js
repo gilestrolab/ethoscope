@@ -90,6 +90,28 @@
 
             })
         };
+        $scope.elapsedtime = function(t){
+            // Calculate the number of days left
+            var days=Math.floor(t / 86400);
+            // After deducting the days calculate the number of hours left
+            var hours = Math.floor((t - (days * 86400 ))/3600)
+            // After days and hours , how many minutes are left
+            var minutes = Math.floor((t - (days * 86400 ) - (hours *3600 ))/60)
+            // Finally how many seconds left after removing days, hours and minutes.
+            var secs = Math.floor((t - (days * 86400 ) - (hours *3600 ) - (minutes*60)))
+
+            if (days>0){
+                var x =  days + " days, " + hours + "h, " + minutes + "min,  " + secs + "s ";
+            }else if ( days==0 && hours>0){
+                var x =   hours + "h, " + minutes + "min,  " + secs + "s ";
+            }else if(days==0 && hours==0 && minutes>0){
+                var x =  minutes + "min,  " + secs + "s ";
+            }else if(days==0 && hours==0 && minutes==0 && secs > 0){
+                var x =  secs + " s ";
+            }
+            return x;
+
+        };
 
         $scope.$on('$viewContentLoaded',$scope.get_devices);
 
