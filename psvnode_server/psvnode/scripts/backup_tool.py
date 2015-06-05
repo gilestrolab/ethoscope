@@ -91,7 +91,7 @@ if __name__ == '__main__':
                 continue
 
             logging.info("Starting backup")
-            dev_map = generate_new_device_map(device=SUBNET_DEVICE)
+            dev_map = generate_new_device_map(device=SUBNET_DEVICE,result_main_dir=RESULTS_DIR)
             pool_res =  pool.map(backup_job, dev_map.values())
             t0 = t1
 

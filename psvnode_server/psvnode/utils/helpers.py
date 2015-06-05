@@ -78,7 +78,7 @@ def scan_one_device(ip, timeout=1, port=9000, page="id"):
     return None, ip
 
 
-def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, data=None):
+def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, data=None,result_main_dir="/psv_results"):
     """
     Just a routine to format our GET urls. This improves readability whilst allowing us to change convention (e.g. port) without rewriting everything.
 
@@ -107,7 +107,7 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
 
             if not id in devices_map:
                 logging.warning("Device %s is not in device map. Rescanning subnet..." % id)
-                generate_new_device_map()
+                generate_new_device_map(result_main_dir=result_main_dir)
             try:
                 devices_map[id].update(data)
                 return data
@@ -138,7 +138,7 @@ def get_subnet_ip(device="wlan0"):
 
 
 
-def make_backup_path(device, result_main_dir="/data1/todel/psv_results"):#"/psv_results"):
+def make_backup_path(device, result_main_dir):
 
     try:
         com = "SELECT value from METADATA WHERE field = 'date_time'"
@@ -177,7 +177,7 @@ def make_backup_path(device, result_main_dir="/data1/todel/psv_results"):#"/psv_
                                         )
     return output_db_file
 
-def generate_new_device_map(ip_range=(2,253),device="wlan0"):
+def generate_new_device_map(ip_range=(2,253),device="wlan0", result_main_dir="/psv_results"):
         devices_map = {}
         subnet_ip = get_subnet_ip(device)
         logging.info("Scanning attached devices")
@@ -222,7 +222,7 @@ def generate_new_device_map(ip_range=(2,253),device="wlan0"):
                     logging.error(traceback.format_exc(e))
 
         for d in devices_map.values():
-            d["backup_path"] = make_backup_path(d)
+            d["backup_path"] = make_backup_path(d,result_main_dir)
             d["time_since_backup"] = get_last_backup_time(d["backup_path"])
 
         return devices_map
