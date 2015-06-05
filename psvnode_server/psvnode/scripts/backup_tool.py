@@ -16,11 +16,6 @@ class BackupClass(object):
             "user":"psv",
             "password":"psv"
         }
-
-
-    _delay_between_updates = 5 * 60 # seconds
-    _last_backup_timeout = 60*5 #seconds
-
     def __init__(self, device_info):
 
         self._device_info = device_info
@@ -71,7 +66,7 @@ if __name__ == '__main__':
         RESULTS_DIR = "/psv_results"
         SUBNET_DEVICE = b'wlan0'
         TICK = 1.0 #s
-        BACKUP_DT = 10 # 5min
+        BACKUP_DT = 5*60 # 5min
         if DEBUG:
             import getpass
             if getpass.getuser() == "quentin":
