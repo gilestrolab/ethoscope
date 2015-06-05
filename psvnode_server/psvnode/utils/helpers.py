@@ -8,7 +8,7 @@ import traceback
 import concurrent
 import concurrent.futures as futures
 from netifaces import ifaddresses, AF_INET
-import datetime
+import datetime, time
 import MySQLdb
 
 def get_version(dir, branch):
@@ -138,7 +138,7 @@ def get_subnet_ip(device="wlan0"):
 
 
 
-def make_backup_path(device, result_main_dir="/psv_results"):
+def make_backup_path(device, result_main_dir="/data1/todel/psv_results"):#"/psv_results"):
 
     try:
         com = "SELECT value from METADATA WHERE field = 'date_time'"
@@ -223,6 +223,15 @@ def generate_new_device_map(ip_range=(2,253),device="wlan0"):
 
         for d in devices_map.values():
             d["backup_path"] = make_backup_path(d)
+            d["time_since_backup"] = get_last_backup_time(d["backup_path"])
 
         return devices_map
 
+def get_last_backup_time(backup_path):
+    try:
+        time_since_last_backup = time.time() - os.path.getmtime(backup_path)
+        #time.strftime('', time_since_last_backup)
+        return time_since_last_backup
+    except Exception as e:
+        print e
+        return "No backup"
