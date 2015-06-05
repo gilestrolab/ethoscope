@@ -81,6 +81,12 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
             return x;
 
         };
+        $scope.sm.readable_url = function(url){
+            readable = url.split("/");
+            len = readable.length;
+            readable = ".../"+readable[len - 1];
+            return readable;
+        };
          $scope.sm.start_date_time = function(unix_timestamp){
             var date = new Date(unix_timestamp*1000);
             return date.toUTCString();

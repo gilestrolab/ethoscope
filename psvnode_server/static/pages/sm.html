@@ -15,7 +15,7 @@
         <div ng-if="device.status == 'running'">
             <p>Processing speed: {{device.monitor_info.fps}} FPS</p>
 
-            <p>Your file will be saved as: {{device.backup_path}}</p>
+            <p>Your file will be saved as: <a href="/download{{device.backup_path}}" target="_blank">{{sm.readable_url(device.backup_path)}}</a></p>
             <p>Time since last backup: {{sm.elapsedtime(device.time_since_backup)}}</p>
 
         </div>

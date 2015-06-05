@@ -35,7 +35,7 @@
                 </td>
                 <td><span ng-if="device.status == 'running'" class="fa fa-circle color-green"></span>
             <span ng-if="device.status == 'stopped'" class="fa fa-circle color-red"></span> {{device.status}}</td>
-                <td>{{elapsedtime(device.monitor_info.last_time_stamp)}}</td>
+                <td>{{elapsedtime(device.time)}}</td>
                 <td>{{elapsedtime(device.time_since_backup)}}</td>
                 <td>{{device.ip}}</td>
                 <td>{{device.id.substring(0,6)}}</td>
