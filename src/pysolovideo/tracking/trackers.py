@@ -194,8 +194,8 @@ class ObjectModel(object):
         #fixme this should be time, not number of points!
         self._features_header = [
             "fg_model_area",
-            "fg_model_width",
-            "fg_model_aspect_ratio",
+            "fg_model_height",
+            #"fg_model_aspect_ratio",
             "fg_model_mean_grey"
         ]
 
@@ -252,7 +252,7 @@ class ObjectModel(object):
 
         if np.any(likelihoods==0):
             return 0
-
+        #print features, means
         logls = np.sum(np.log10(likelihoods)) / len(likelihoods)
         return -1.0 * logls
 
@@ -297,8 +297,8 @@ class ObjectModel(object):
         #     instantaneous_speed = 0
 
         features = np.array([log10(cv2.contourArea(contour) + 1.0),
-                            width + 1,
-                            sqrt(ar),
+                            height + 1,
+                            #sqrt(ar),
                             #instantaneous_speed +1.0,
                             mean_col +1
                             # 1.0
@@ -399,7 +399,7 @@ class AdaptiveBGModel(BaseTracker):
 
 
         self._bg_model = BackgroundModel()
-        self._max_m_log_lik = 10.
+        self._max_m_log_lik = 6.
         self._buff_grey = None
         self._buff_object = None
         self._buff_object_old = None
@@ -424,9 +424,17 @@ class AdaptiveBGModel(BaseTracker):
                 mask = np.ones_like(self._buff_grey) * 255
 
         cv2.cvtColor(img,cv2.COLOR_BGR2GRAY, self._buff_grey)
+        # cv2.imshow("dbg",self._buff_grey)
         cv2.GaussianBlur(self._buff_grey,(blur_rad,blur_rad),1.2, self._buff_grey)
         if darker_fg:
             cv2.subtract(255, self._buff_grey, self._buff_grey)
+
+        #
+        mean = cv2.mean(self._buff_grey, mask)
+
+        scale = 128. / mean[0]
+
+        cv2.multiply(self._buff_grey, scale, dst = self._buff_grey)
 
 
         if mask is not None:
@@ -468,7 +476,6 @@ class AdaptiveBGModel(BaseTracker):
 
         mode = np.mean(list(self._smooth_mode))
         scale = 128. / mode
-
 
         # cv2.GaussianBlur(self._buff_grey,(5,5), 1.5,self._buff_grey)
 
@@ -514,7 +521,7 @@ class AdaptiveBGModel(BaseTracker):
         bg = self._bg_model.bg_img.astype(np.uint8)
         cv2.subtract(grey, bg, self._buff_fg)
 
-        cv2.threshold(self._buff_fg,30,255,cv2.THRESH_TOZERO, dst=self._buff_fg)
+        cv2.threshold(self._buff_fg,20,255,cv2.THRESH_TOZERO, dst=self._buff_fg)
 
         cv2.bitwise_and(self._buff_fg_backup,self._buff_fg,dst=self._buff_fg_diff)
 
@@ -572,11 +579,12 @@ class AdaptiveBGModel(BaseTracker):
 
         if distance > self._max_m_log_lik:
             self._bg_model.increase_learning_rate()
-            if self._roi.idx==5:
-                print t,"BAD LIKELIHOOD", distance , self._max_m_log_lik
+            #if self._roi.idx==5:
+            print "BAD LIKELIHOOD", t,self._roi.idx, distance , self._max_m_log_lik
+            # cv2.waitKey(-1)
 
             raise NoPositionError
-
+        #print "LIKELIHOOD", t,self._roi.idx, distance , self._max_m_log_lik
 
 
 

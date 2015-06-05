@@ -174,8 +174,8 @@ class Monitor(object):
             self._is_running = True
 
             for i,(t, frame) in enumerate(self._camera):
-                if i % 1000 == 0:
-                    print t/(3600*1e3)
+                # if i % 1000 == 0:
+                #     print t/(3600*1e3)
                 if self._drop_each is not None and i % self._drop_each != 0:
                     continue
 
