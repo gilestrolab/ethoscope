@@ -90,6 +90,10 @@
 
             })
         };
+        $scope.secToDate = function(secs){
+            d = new Date(secs*1000);
+            return d.toString();
+        };
         $scope.elapsedtime = function(t){
             // Calculate the number of days left
             var days=Math.floor(t / 86400);

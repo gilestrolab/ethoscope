@@ -23,6 +23,16 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
                             starting_tracking.appendChild(spStart.el);
                             $http.post('/device/'+device_id+'/controls/start', data={"time":Date.now() / 1000.})
                                  .success(function(data){$scope.device.status = data.status;});
+             $http.get('/devices').success(function(data){
+                    $http.get('/device/'+device_id+'/data').success(function(data){
+                        $scope.device = data;
+                    });
+
+                    $http.get('/device/'+device_id+'/ip').success(function(data){
+                        $scope.device.ip = data;
+                        device_ip = data;
+                    });
+            });
         };
 
         $scope.sm.stop = function(){
