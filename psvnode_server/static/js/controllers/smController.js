@@ -82,6 +82,8 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
 
         };
         $scope.sm.readable_url = function(url){
+                //start tooltips
+        $('[data-toggle="tooltip"]').tooltip()
             readable = url.split("/");
             len = readable.length;
             readable = ".../"+readable[len - 1];
@@ -91,6 +93,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
             var date = new Date(unix_timestamp*1000);
             return date.toUTCString();
         };
+
 
        var refresh = function(){
             $http.get('/device/'+device_id+'/data')
