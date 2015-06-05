@@ -196,7 +196,7 @@ class ControlThread(Thread):
         self._info["status"] = "stopped"
         self._info["time"] = time.time()
         self._info["error"] = error
-        self._info["monitor_infos"] = self._default_monitor_info
+        self._info["monitor_info"] = self._default_monitor_info
 
         if error is not None:
             logging.error("Monitor closed with an error:")

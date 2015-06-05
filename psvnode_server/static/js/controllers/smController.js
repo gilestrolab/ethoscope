@@ -23,6 +23,16 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
                             starting_tracking.appendChild(spStart.el);
                             $http.post('/device/'+device_id+'/controls/start', data={"time":Date.now() / 1000.})
                                  .success(function(data){$scope.device.status = data.status;});
+             $http.get('/devices').success(function(data){
+                    $http.get('/device/'+device_id+'/data').success(function(data){
+                        $scope.device = data;
+                    });
+
+                    $http.get('/device/'+device_id+'/ip').success(function(data){
+                        $scope.device.ip = data;
+                        device_ip = data;
+                    });
+            });
         };
 
         $scope.sm.stop = function(){
@@ -81,10 +91,19 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
             return x;
 
         };
+        $scope.sm.readable_url = function(url){
+                //start tooltips
+        $('[data-toggle="tooltip"]').tooltip()
+            readable = url.split("/");
+            len = readable.length;
+            readable = ".../"+readable[len - 1];
+            return readable;
+        };
          $scope.sm.start_date_time = function(unix_timestamp){
             var date = new Date(unix_timestamp*1000);
             return date.toUTCString();
         };
+
 
        var refresh = function(){
             $http.get('/device/'+device_id+'/data')
