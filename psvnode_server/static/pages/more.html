@@ -242,12 +242,32 @@
     </div>
 
 <div class="col-xs-12">
-<button class="btn btn-danger" ng-click="nodeManagement.action('poweroff')">Power off Node</button>
+
+    <button class="btn btn-danger" data-toggle="modal" data-target="#powerOffAlert">Power off Node</button>
     </div>
 
 </div>
 
-
+<!-- Modal power off -->
+<div class="modal fade" id="powerOffAlert" tabindex="-1" role="dialog" aria-labelledby="powerOffAlertLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Modal title</h4>
+      </div>
+      <div class="modal-body">
+       <p>Do you want to power off the Node?</p>
+       <p>You won't be able to connect to this website anymore.</p>
+       <p>To power on Node again, you need to physically push the ON button.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button class="btn btn-danger" ng-click="nodeManagement.action('poweroff')">Power off Node</button>
+      </div>
+    </div>
+  </div>
+</div>
 <script>
     (function(){
         console.log("table");
