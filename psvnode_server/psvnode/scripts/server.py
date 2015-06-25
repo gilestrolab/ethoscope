@@ -279,7 +279,7 @@ def download(what):
         return {'error':traceback.format_exc(e)}
 
 @app.get('/node/<req>')
-def node_actions(req, device='eth0'):
+def node_info(req, device='eth0'):
     if req == 'info':
         df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout=subprocess.PIPE)
         disk_free = df.communicate()[0]
@@ -305,7 +305,10 @@ def node_actions():
         action = request.json
         if action['action'] == 'poweroff':
             logging.info('User request a poweroff, shutting down system. Bye bye.')
+            #this does not poweroff the device
+            #Change on psv-package!
             close()
+            #poweroff = subprocess.Popen(['poweroff'], stdout=subprocess.PIPE)
         else:
             raise NotImplementedError()
 @app.post('/remove_files')
