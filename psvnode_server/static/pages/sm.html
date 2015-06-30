@@ -30,8 +30,8 @@
 <div ng-if="device.status == 'stopped'">
 <p>Time since last experiment: {{sm.elapsedtime(device.time_since_backup)}}</p>        </div>
 
-        <button class="btn btn-success btn-xl" ng-if="device.status == 'stopped'" ng-click="sm.start()">Start</button>
-        <button class="btn btn-danger" ng-if="device.status == 'running'"  ng-click="sm.stop()">Stop</button>
+        <button class="btn btn-success btn-xl" ng-if="device.status == 'stopped'"  data-toggle="modal" data-target="#startModal">Start</button>
+        <button class="btn btn-danger" ng-if="device.status == 'running'"  ng-click="sm.stop() ">Stop</button>
 
         <button class="btn btn-info disable" ng-if="device.status == 'stopping'"  ng-click="sm.alert('Please wait, system is stopping')">Stopping</button>
         <button class="btn btn-danger disable" ng-if="device.status == 'initialising'"  ng-click="sm.alert('Please wait, system is starting')">Starting</button>
@@ -122,7 +122,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="myModalLabel">Download Data</h4>
+        <h4 class="modal-title" id="downloadModalLabel">Download Data</h4>
       </div>
       <div class="modal-body">
           {{device}}
@@ -137,4 +137,24 @@
   </div>
 </div>
 
+<!-- Modal start tracking -->
+<div class="modal fade" id="startModal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="startModalLabel">Select tracking type</h4>
+      </div>
+      <div class="modal-body">
+          <div class="list-group">
+            <button type="button" class="list-group-item" ng-repeat="option in tracking.options" ng-click="sm.start(option)">{{option.name}}</button>
+          </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="sm.start()" data-toggle="modal">Start Tracking</button>
+      </div>
+    </div>
+  </div>
+</div>
 
