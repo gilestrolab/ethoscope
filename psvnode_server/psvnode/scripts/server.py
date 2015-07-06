@@ -5,6 +5,8 @@ import subprocess
 import socket
 import json
 
+import re
+
 import logging
 import traceback
 from psvnode.utils.helpers import get_version
@@ -276,17 +278,17 @@ def download(what):
 
     except Exception as e:
         logging.error(e)
-        return {'error':traceback.format_exc(e)}
+        return {'error': traceback.format_exc(e)}
 
 @app.get('/node/<req>')
-def node_info(req, device='eth0'):
+def node_info(req):#, device):
     if req == 'info':
         df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout=subprocess.PIPE)
         disk_free = df.communicate()[0]
         disk_usage = disk_free.split("\n")[1].split()
         ip = "No IP assigned, check cable"
 
-        addrs = ifaddresses(device)
+        addrs = ifaddresses(INTERNET_DEVICE)
         MAC_addr = addrs[AF_LINK][0]["addr"]
         try:
             ip = addrs[AF_INET][0]["addr"]
@@ -409,20 +411,34 @@ if __name__ == '__main__':
     GIT_BARE_REPO_DIR = "/var/pySolo-Video.git"
     GIT_WORKING_DIR = "/home/node/pySolo-Video"
 
-    SUBNET_DEVICE = b'wlan0'
+    #SUBNET_DEVICE = b'wlan0'
+    p1 = subprocess.Popen(["ip", "link", "show"], stdout=subprocess.PIPE)
+    network_devices, err = p1.communicate()
 
+    wireless = re.search(r'[0-9]: (wl.*):', network_devices)
+    if wireless is not None:
+        SUBNET_DEVICE = wireless.group(1)
+    else:
+        logging.error("Not Wireless adapter has been detected. It is necessary for connect to Devices.")
 
+    ethernet = re.search(r'[0-9]: (en.*):', network_devices)
+    if ethernet is not None:
+        INTERNET_DEVICE = ethernet.group(1)
+    else:
+        logging.info("Not ethernet adapter has been detected. It is necessary for connect to Internet.")
 
     if DEBUG:
         import getpass
         if getpass.getuser() == "quentin":
 
             SUBNET_DEVICE = b'enp3s0'
+            INTERNET_DEVICE = b'lo'
             #SUBNET_DEVICE = b'eno1'
             GIT_BARE_REPO_DIR = GIT_WORKING_DIR = "./"
 
         if getpass.getuser() == "asterix":
             SUBNET_DEVICE = b'lo'
+            INTERNET_DEVICE = b'eno1'
             RESULTS_DIR = "/data1/todel/psv_results"
             GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
             GIT_WORKING_DIR = "/data1/todel/pySolo-Node"
@@ -431,15 +447,11 @@ if __name__ == '__main__':
     global scanning_locked
     # global acquisition
 
-
     scanning_locked = False
     devices_map = {}
     # acquisition = {}
 
-
     scan_subnet()
-
-
 
     origin_version = get_version(GIT_BARE_REPO_DIR, branch)
     node_version = get_version(GIT_WORKING_DIR, branch)
@@ -453,7 +465,6 @@ if __name__ == '__main__':
 
         #run(app, host='0.0.0.0', port=PORT, debug=debug, server='cherrypy')
         run(app, host='0.0.0.0', port=PORT, debug=debug)
-
 
     except KeyboardInterrupt:
         logging.info("Stopping server cleanly")
