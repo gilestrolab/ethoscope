@@ -36,13 +36,14 @@ def controls(id, action):
             try:
                 if action == 'start':
 
-                    # Sync clocks with the node or master
+                    # getting the requested type of tracking
                     data = request.json
-                    t = float(data['time'])
+                    #TODO clean this, no needed now, node provices NTP service
+                    #t = float(data['time'])
                     #set time, given in seconds from javascript, used in seconds for date
                     # FIXME This is needed on PI
                     #set_time = call(['date', '-s', '@' + str(t)])
-                    date = datetime.fromtimestamp(t)
+                    #date = datetime.fromtimestamp(t)
                     # date_time = date.isoformat()
 
                     control = ControlThread(machine_id=machine_id, name=machine_name, version=version, video_file=INPUT_VIDEO,

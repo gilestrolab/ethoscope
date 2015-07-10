@@ -83,20 +83,25 @@
                 $scope.browse.download_url = '/download'+$scope.selected.files[0].name;
                 $scope.browse.show_download_panel = true;
             }else{
-                $('#downloadModal').modal('show');
                 $scope.browse.download_url ='';
+                var spinner= new Spinner(opts).spin();
+                var loadingContainer = document.getElementById('loading');
+                loadingContainer.appendChild(spinner.el);
                 $http.post('/request_download/files', data=$scope.selected)
                      .success(function(res){
-                        console.log(res);
                          $scope.browse.download_url = '/download'+res.url;
+                         spinner.stop();
+                         $scope.selected = {'files':[]};
+                         $('#downloadModal').modal('show');
+
                      })
             }
         };
         $scope.browse.remove_files = function(){
             $http.post('/remove_files', data=$scope.selected)
                  .success(function(res){
-                        console.log(res);
                         $('#deleteModal').modal('hide');
+                        $scope.selected = {'files':[]};
                         $scope.exec_option('browse');
                  });
             };
@@ -126,6 +131,9 @@
         $scope.check_update = function(){
             //check if there is a new version
             $scope.update={};
+            var spinner= new Spinner(opts).spin();
+            var loadingContainer = document.getElementById('loading');
+            loadingContainer.appendChild(spinner.el);
             $http.get("/update/check")
                  .success(function(res){
                     if(res.update.error){
@@ -144,18 +152,19 @@
                     $scope.origin = res.origin;
                     $scope.node = res.update.node;
                     $('#updateDevicesModal').modal('hide');
-
-
+                    spinner.stop();
             })
         };
         $scope.update_selected = function(devices_to_update){
-            console.log(devices_to_update);
             if (devices_to_update == 'all'){
                 devices_to_update=[]
                 for (key in $scope.attached_devices){
                     devices_to_update.push($scope.attached_devices[key]);
                 }
             }
+            var spinner= new Spinner(opts).spin();
+            var loadingContainer = document.getElementById('loading');
+            loadingContainer.appendChild(spinner.el);
             $http.post('/update', data = devices_to_update)
                  .success(function(data){
                     if (data.error){
@@ -165,15 +174,21 @@
                     $scope.update_waiting = true;
                     $timeout($scope.check_update, 15000);
                     $timeout(function(){$scope.update_waiting = false;}, 15000);
+                    $timeout(function(){spinner.stop();},1510);
             })
         };
          $scope.update_node = function(node){
+            var spinner= new Spinner(opts).spin();
+            var loadingContainer = document.getElementById('loading');
+            loadingContainer.appendChild(spinner.el);
             $http.post('/update', data =node);
             $('#updateNodeModal').modal('hide');
             $scope.update_result= data;
             $scope.update_waiting = true;
             $timeout($scope.check_update, 15000);
             $timeout(function(){$scope.update_waiting = false;}, 15000);
+            $timeout(function(){spinner.stop();},1510);
+
         };
 
 

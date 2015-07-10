@@ -18,10 +18,10 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
                 });
 
 
-        $scope.sm.start = function(){
+        $scope.sm.start = function(option){
                             spStart= new Spinner(opts).spin();
                             starting_tracking.appendChild(spStart.el);
-                            $http.post('/device/'+device_id+'/controls/start', data={"time":Date.now() / 1000.})
+                            $http.post('/device/'+device_id+'/controls/start', data=option)
                                  .success(function(data){$scope.device.status = data.status;});
              $http.get('/devices').success(function(data){
                     $http.get('/device/'+device_id+'/data').success(function(data){
@@ -117,9 +117,19 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
                     }
                  });
        }
+
+       //tracking selection
+        $scope.tracking={"options":{
+                            "32_arena":{name:"32_arena", kwargs:""},
+                            "20_tubes":{name:"20_tubes", kwargs:""},
+                            "72_wells":{name:"72_wells", kwargs:""},
+                            "custom":{name:"custom", kwargs:""}
+                        }};
+
+
         refresh_data = $interval(refresh, 3000);
-    //clear interval when scope is destroyed
-    $scope.$on("$destroy", function(){
+        //clear interval when scope is destroyed
+        $scope.$on("$destroy", function(){
         $interval.cancel(refresh_data);
         //clearInterval(refresh_data);
     });
