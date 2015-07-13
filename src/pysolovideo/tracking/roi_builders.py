@@ -108,7 +108,7 @@ class BaseROIBuilder(object):
 
         accum = []
         if isinstance(camera, np.ndarray):
-            accum = camera
+            accum = np.copy(camera)
 
         else:
             for i, (_, frame) in enumerate(camera):
@@ -165,10 +165,6 @@ class DefaultROIBuilder(BaseROIBuilder):
                 (   w - 1,    h - 1   ),
                 (   w - 1,    0       )]
         )]
-
-
-
-
 
 class SleepDepROIBuilder(BaseROIBuilder):
     _n_rois = 32
@@ -527,9 +523,6 @@ class SleepDepROIBuilder(BaseROIBuilder):
         return rois
 
 
-
-
-
 class ImgMaskROIBuilder(BaseROIBuilder):
     """
     Initialised with an grey-scale image file.
@@ -561,14 +554,41 @@ class ImgMaskROIBuilder(BaseROIBuilder):
 class TargetGridROIBuilderBase(BaseROIBuilder):
     _adaptive_med_rad = 0.10
     _expected__min_target_dist = 10 # the minimal distance between two targets, in 'target diameter'
-    _vertical_offset = None
+    _vertical_spacing = None
+    _horizontal_spacing = None # the distance between 3 consecutive rois (proportion of target diameter)
     _n_rows = None
+    _n_cols = None
+    _horizontal_margin_left = .75 # from the center of the target to the external border (positive value makes grid larger)
+    _vertical_margin_top = -1.0 # from the center of the target to the external border (positive value makes grid larger)
+    _horizontal_margin_right = _horizontal_margin_left # from the center of the target to the external border (positive value makes grid larger)
+    _vertical_margin_bottom = _vertical_margin_top # from the center of the target to the external border (positive value makes grid larger)
+
+
+
+        ############# sort/name points as:
+
+
+        #                            A
+        #                            |
+        #                            |
+        #                            |
+        # C------------------------- B
+
+    # roi sorting =
+    # 1 4 7
+    # 2 5 8
+    # 3 6 9
+
 
     def __init__(self):
-        if self._vertical_offset is None:
+        if self._vertical_spacing is None:
             raise NotImplementedError("_vertical_offset attribute cannot be None")
+        if self._horizontal_spacing is None:
+            raise NotImplementedError("_horizontal_offset attribute cannot be None")
         if self._n_rows is None:
             raise NotImplementedError("_n_rows attribute cannot be None")
+        if self._n_cols is None:
+            raise NotImplementedError("_n_cols attribute cannot be None")
 
     def _find_blobs(self, im, scoring_fun):
         grey= cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
@@ -594,7 +614,24 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
             cv2.add(bin, score_map,score_map)
         return score_map
 
+    def _add_margin_to_src_pts(self, pts, mean_diam):
 
+        sign_mat = np.array([
+            [+1, -1],
+            [+1, +1],
+            [-1, +1]
+
+        ])
+
+        margin = np.array([
+            [mean_diam * self._horizontal_margin_right, mean_diam * self._vertical_margin_top],
+            [mean_diam * self._horizontal_margin_right, mean_diam * self._vertical_margin_bottom],
+            [mean_diam * self._horizontal_margin_left, mean_diam * self._vertical_margin_bottom]
+        ])
+        margin  =  sign_mat * margin
+        pts = pts + margin.astype(pts.dtype)
+
+        return pts
 
     def dist_pts(self, pt1, pt2):
         x1 , y1  = pt1
@@ -603,12 +640,10 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
 
     def _rois_from_img(self,img):
 
-
         map = self._find_blobs(img, self._score_targets)
         bin = np.zeros_like(map)
 
         # as soon as we have three objects, we stop
-
         for t in range(0, 255,1):
             cv2.threshold(map, t, 255,cv2.THRESH_BINARY  ,bin)
             contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
@@ -626,23 +661,14 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
         if mean_sd/mean_diam > 0.10:
             raise PSVException("Too much variation in the diameter of the targets. Something must be wrong since all target should have the same size", img)
 
-
-
         src_points = []
         for c in contours:
             moms = cv2.moments(c)
             x , y = moms["m10"]/moms["m00"],  moms["m01"]/moms["m00"]
+
             src_points.append((x,y))
 
 
-        ############# sort/name points as:
-
-
-        #                            A
-        #                            |
-        #                            |
-        #                            |
-        # C------------------------- B
 
         a ,b, c = src_points
         pairs = [(a,b), (b,c), (a,c)]
@@ -668,16 +694,13 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
             if self.dist_pts(sp, sorted_b) > dist:
                 dist = self.dist_pts(sp, sorted_b)
                 sorted_c = sp
+
         # the remaining point is a
         sorted_a = [sp for sp in src_points if not sp is sorted_b and not sp is sorted_c][0]
 
         sorted_src_pts = np.array([sorted_a, sorted_b, sorted_c], dtype=np.float32)
 
-        sorted_src_pts += [
-                            [+mean_diam * .75 , +mean_diam * 1.],
-                            [+mean_diam*  .75, -mean_diam* 1.],
-                            [-mean_diam* .75, -mean_diam* 1.]
-                          ]
+        sorted_src_pts = self._add_margin_to_src_pts(sorted_src_pts,mean_diam)
 
         dst_points = np.array([(0,-1),
                                (0,0),
@@ -692,28 +715,35 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
         rois = []
         val = 1
 
+        fnrows = float(self._n_rows)
+        fncols = float(self._n_cols)
 
-        for left in (True,False):
+        for j in range(self._n_cols):
             for i in range(self._n_rows):
-                fnrows = float(self._n_rows)
+
                 y = -1 + float(i)/fnrows
+                x = -1 + float(j)/fncols
 
-                if left:
-                    x = -1 + 0.
-                else:
-                    x = -1 + 0.5 + 1/100.
 
-                pt1 = np.array([x,y + self._vertical_offset,0], dtype=np.float32)
-                pt2 = np.array([x,y + 1./fnrows - self._vertical_offset,0], dtype=np.float32)
+                pt1 = np.array([
+                                x + self._horizontal_spacing,
+                                y + self._vertical_spacing,0],
+                    dtype=np.float32)
 
-                if left:
-                    x = -1 + 0.5 - 1/100.
-                else:
-                    x = -1 + 1.0
+                pt2 = np.array([
+                                x + self._horizontal_spacing,
+                                y + 1./fnrows - self._vertical_spacing,0],
+                    dtype=np.float32)
 
-                pt4 = np.array([x,y+ self._vertical_offset,0], dtype=np.float32)
-                pt3 = np.array([x,y + 1./fnrows - self._vertical_offset,0], dtype=np.float32)
+                pt4 = np.array([
+                                x + 1./fncols - self._horizontal_spacing,
+                                y + self._vertical_spacing,0],
+                    dtype=np.float32)
 
+                pt3 = np.array([
+                                x + 1./fncols - self._horizontal_spacing,
+                                y + 1./fnrows - self._vertical_spacing,0],
+                   dtype=np.float32)
 
                 pt1, pt2 = np.dot(wrap_mat, pt1),  np.dot(wrap_mat, pt2)
                 pt3, pt4 = np.dot(wrap_mat, pt3),  np.dot(wrap_mat, pt4)
@@ -726,15 +756,56 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
                 pt3 = pt3.astype(np.int)
                 pt4 = pt4.astype(np.int)
 
-
                 ct = np.array([pt1,pt2, pt3, pt4]).reshape((1,4,2))
                 rois.append(ROI(ct, value=val))
-                #
-                cv2.drawContours(img,[ct], -1, (255,0,0),3)
 
-                # cv2.imshow("test", img)
-                # cv2.waitKey(-1)
+                cv2.drawContours(img,[ct], -1, (255,0,0),-1)
+                #cv2.imshow("test", img)
+                #cv2.waitKey(-1)
                 val += 1
+
+        # for left in (True,False):
+        #     for i in range(self._n_rows):
+        #
+        #         y = -1 + float(i)/fnrows
+        #
+        #         if left:
+        #             x = -1 + 0.
+        #         else:
+        #             x = -1 + 0.5 + 1/100.
+        #
+        #         pt1 = np.array([x,y + self._vertical_offset,0], dtype=np.float32)
+        #         pt2 = np.array([x,y + 1./fnrows - self._vertical_offset,0], dtype=np.float32)
+        #
+        #         if left:
+        #             x = -1 + 0.5 - 1/100.
+        #         else:
+        #             x = -1 + 1.0
+        #
+        #         pt4 = np.array([x,y+ self._vertical_offset,0], dtype=np.float32)
+        #         pt3 = np.array([x,y + 1./fnrows - self._vertical_offset,0], dtype=np.float32)
+        #
+        #
+        #         pt1, pt2 = np.dot(wrap_mat, pt1),  np.dot(wrap_mat, pt2)
+        #         pt3, pt4 = np.dot(wrap_mat, pt3),  np.dot(wrap_mat, pt4)
+        #         pt1 += origin
+        #         pt2 += origin
+        #         pt3 += origin
+        #         pt4 += origin
+        #         pt1 = pt1.astype(np.int)
+        #         pt2 = pt2.astype(np.int)
+        #         pt3 = pt3.astype(np.int)
+        #         pt4 = pt4.astype(np.int)
+        #
+        #
+        #         ct = np.array([pt1,pt2, pt3, pt4]).reshape((1,4,2))
+        #         rois.append(ROI(ct, value=val))
+        #         #
+        #         cv2.drawContours(img,[ct], -1, (255,0,0),3)
+        #
+        #         cv2.imshow("test", img)
+        #         cv2.waitKey(-1)
+        #         val += 1
 
         return rois
 
@@ -753,12 +824,18 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
 
 class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilderBase):
 
-    _vertical_offset =  0.1/16.
+    _vertical_spacing =  0.1/16.
+    _horizontal_spacing =  .1/100.
     _n_rows = 16
+    _n_cols = 2
 
 class TubeMonitorWithTargetROIBuilder(TargetGridROIBuilderBase):
-    _vertical_offset =  .15/10.
+    _vertical_spacing =  .15/10.
+    _horizontal_spacing =  .1/100.
     _n_rows = 10
+    _n_cols = 2
+    _horizontal_margin_left = .75 # from the center of the target to the external border (positive value makes grid larger)
+    _vertical_margin_top = -1.25 # from the center of the target to the external border (positive value makes grid larger)
 
 
 
