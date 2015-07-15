@@ -64,7 +64,17 @@ if __name__ == '__main__':
 
 
         RESULTS_DIR = "/psv_results"
-        SUBNET_DEVICE = b'wlan0'
+        #SUBNET_DEVICE = b'wlan0'
+
+        p1 = subprocess.Popen(["ip", "link", "show"], stdout=subprocess.PIPE)
+        network_devices, err = p1.communicate()
+
+        wireless = re.search(r'[0-9]: (wl.*):', network_devices)
+        if wireless is not None:
+            SUBNET_DEVICE = wireless.group(1)
+        else:
+            logging.error("Not Wireless adapter has been detected. It is necessary for connect to Devices.")
+
         TICK = 1.0 #s
         BACKUP_DT = 5*60 # 5min
         if DEBUG:
