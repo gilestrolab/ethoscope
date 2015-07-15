@@ -232,11 +232,11 @@ def check_update():
             update['error'] = 'No internet connection, check cable. Error: ', e
 
         #check if there is a new version on the repo
-        bare_update= subprocess.Popen(['git', 'fetch', '-v', 'origin', branch+':'+branch],
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE,
-                                      cwd=GIT_BARE_REPO_DIR,
-                                      )
+        bare_update = subprocess.Popen(['git', 'fetch', '-v', 'origin', branch+':'+branch],
+                                       stdout=subprocess.PIPE,
+                                       stderr=subprocess.PIPE,
+                                       cwd=GIT_BARE_REPO_DIR,
+                                       )
         response_from_fetch, error_from_fetch = bare_update.communicate()
         if response_from_fetch != '':
             logging.info(response_from_fetch)
