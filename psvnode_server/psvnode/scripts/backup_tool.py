@@ -10,6 +10,7 @@ import  multiprocessing
 import  traceback
 import os
 import subprocess
+import re
 
 class BackupClass(object):
     _db_credentials = {
