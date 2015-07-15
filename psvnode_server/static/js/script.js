@@ -81,7 +81,12 @@
         $scope.get_devices = function(){
             var spinner= new Spinner(opts).spin();
             var loadingContainer = document.getElementById('loading_devices');
-            loadingContainer.appendChild(spinner.el);
+            try {
+                loadingContainer.appendChild(spinner.el);
+            }
+            catch(err) {
+                console.log("no container");
+            }
             $scope.loading_devices = true;
             $http.get('/devices').success(function(data){
                 $scope.devices = data;

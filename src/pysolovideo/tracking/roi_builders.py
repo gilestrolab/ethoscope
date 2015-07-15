@@ -534,7 +534,7 @@ class ImgMaskROIBuilder(BaseROIBuilder):
     def __init__(self, mask_path):
         self._mask = cv2.imread(mask_path, cv2.CV_LOAD_IMAGE_GRAYSCALE)
 
-    def _rois_from_img(self,img):
+    def _rois_from_img(self):
         if len(self._mask.shape) == 3:
             self._mask = cv2.cvtColor(self._mask, cv2.COLOR_BGR2GRAY)
 
@@ -837,6 +837,13 @@ class TubeMonitorWithTargetROIBuilder(TargetGridROIBuilderBase):
     _horizontal_margin_left = .75 # from the center of the target to the external border (positive value makes grid larger)
     _vertical_margin_top = -1.25 # from the center of the target to the external border (positive value makes grid larger)
 
+class WellsMonitorWithTargetROIBuilder(TargetGridROIBuilderBase):
+    _vertical_spacing =  .15/10.
+    _horizontal_spacing =  .1/100.
+    _n_rows = 6
+    _n_cols = 12
+    _horizontal_margin_left = .75 # from the center of the target to the external border (positive value makes grid larger)
+    _vertical_margin_top = -1.25 # from the center of the target to the external border (positive value makes grid larger)
 
 
 class IterativeYMaze(BaseROIBuilder):
