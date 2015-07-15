@@ -838,12 +838,13 @@ class TubeMonitorWithTargetROIBuilder(TargetGridROIBuilderBase):
     _vertical_margin_top = -1.25 # from the center of the target to the external border (positive value makes grid larger)
 
 class WellsMonitorWithTargetROIBuilder(TargetGridROIBuilderBase):
-    _vertical_spacing =  .15/10.
-    _horizontal_spacing =  .1/100.
+    _vertical_spacing =  .9/100.
+    _horizontal_spacing =  .6/100.
     _n_rows = 6
     _n_cols = 12
-    _horizontal_margin_left = .75 # from the center of the target to the external border (positive value makes grid larger)
-    _vertical_margin_top = -1.25 # from the center of the target to the external border (positive value makes grid larger)
+    _horizontal_margin_left = 0.5 # from the center of the target to the external border (positive value makes grid larger)
+    _vertical_margin_top = -1.6 # from the center of the target to the external border (positive value makes grid larger)
+    _vertical_margin_bottom = -1.6
 
 
 class IterativeYMaze(BaseROIBuilder):

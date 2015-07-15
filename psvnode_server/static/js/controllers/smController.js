@@ -32,6 +32,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
                         $scope.device.ip = data;
                         device_ip = data;
                     });
+                 $("#startModal").modal('hide');
             });
         };
 
