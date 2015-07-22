@@ -1,4 +1,5 @@
 import picamera
+from threading import Thread
 
 class RecordVideo(Thread):
 
