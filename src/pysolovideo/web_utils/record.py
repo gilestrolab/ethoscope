@@ -8,7 +8,8 @@ class RecordVideo(Thread):
         self.camera.resolution = resolution
         self.camera.framerate = framerate
         self.name = name
-        self.psv_dir
+        self.psv_dir = PSV_DIR
+        super(ControlThread, self).__init__()
 
     def start(self):
         try:
