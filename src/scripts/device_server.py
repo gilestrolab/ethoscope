@@ -67,9 +67,11 @@ def controls(id, action):
                     return info(id)
 
                 elif action == 'start_record':
-                    record = RecordVideo()
-                    record.start()
-
+                    try:
+                        record = RecordVideo()
+                        record.start()
+                    except Exception as e:
+                        return {"error":e}
                 elif action == 'stop_record':
                     try:
                         if record is not None:

@@ -11,7 +11,7 @@ class RecordVideo(Thread):
         self.psv_dir = PSV_DIR
         super(RecordVideo, self).__init__()
 
-    def start(self):
+    def run(self):
         try:
             self.camera.start_recording(self.psv_dir + self.name + '.h264')
         except Exception as e:
