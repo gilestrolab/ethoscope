@@ -106,9 +106,11 @@ def device(id, type_of_req):
                 stop_device(id,post_data)
             else:
                 raise Exception("Cannot stop, device %s status is `%s`" %  (id, device_info['status']))
+        elif type_of_req == 'start_record':
+            update_device_map(id, 'controls', type='start_record')
         elif type_of_req == 'poweroff':
             if device_info['status'] == 'running':
-                stop_device(id,post_data)
+                stop_device(id, post_data)
             update_device_map(id, "controls", type_of_req, data=post_data)
 
     except Exception as e:
@@ -123,7 +125,27 @@ def stop_device(id, post_data):
     # logging.info("Removing device %s from acquisition map" % id)
     # del acquisition[id]
 
+@app.post('/device/<id>/log')
+def get_log(id):
+    try:
 
+        data = request.body.read()
+        data = json.loads(data)
+
+        # url  = format_post_get_url(id,"static",type=data["file_path"])
+        # req = urllib2.Request(url)
+        #TO DISCUSS @luis static files url not understood
+        req = urllib2.Request(url=devices_map[id]['ip']+':9000/static'+data["file_path"])
+
+        f = urllib2.urlopen(req)
+        result = {}
+        for i, line in enumerate(f):
+            result[i]=line
+
+        return result
+
+    except Exception as e:
+        return {'error':traceback.format_exc(e)}
 
 #################################
 # NODE Functions
@@ -351,27 +373,7 @@ def redirection_to_home(id):
 def redirection_to_more(action):
     return redirect('/#/more/'+action)
 
-@app.post('/device/<id>/log')
-def get_log(id):
-    try:
 
-        data = request.body.read()
-        data = json.loads(data)
-
-        # url  = format_post_get_url(id,"static",type=data["file_path"])
-        # req = urllib2.Request(url)
-        #TO DISCUSS @luis static files url not understood
-        req = urllib2.Request(url=devices_map[id]['ip']+':9000/static'+data["file_path"])
-
-        f = urllib2.urlopen(req)
-        result = {}
-        for i, line in enumerate(f):
-            result[i]=line
-
-        return result
-
-    except Exception as e:
-        return {'error':traceback.format_exc(e)}
 
 
 def close(exit_status=0):
@@ -463,8 +465,8 @@ if __name__ == '__main__':
 
     try:
 
-        #run(app, host='0.0.0.0', port=PORT, debug=debug, server='cherrypy')
-        run(app, host='0.0.0.0', port=PORT, debug=debug)
+        run(app, host='0.0.0.0', port=PORT, debug=debug, server='cherrypy')
+        #run(app, host='0.0.0.0', port=PORT, debug=debug)
 
     except KeyboardInterrupt:
         logging.info("Stopping server cleanly")

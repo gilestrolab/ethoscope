@@ -6,6 +6,7 @@ from optparse import OptionParser
 from bottle import *
 from pysolovideo.web_utils.control_thread import ControlThread
 from pysolovideo.web_utils.helpers import get_machine_info, get_version
+from pysolovideo.web_utils.record import RecordVideo
 from subprocess import call
 
 api = Bottle()
@@ -32,6 +33,7 @@ def name():
 @api.post('/controls/<id>/<action>')
 def controls(id, action):
     global control
+    global record
     if id == machine_id:
             try:
                 if action == 'start':
@@ -64,6 +66,18 @@ def controls(id, action):
                         call('poweroff')
                     return info(id)
 
+                elif action == 'start_record':
+                    record = RecordVideo()
+                    record.start()
+
+                elif action == 'stop_record':
+                    try:
+                        if record is not None:
+                            record.stop()
+                        else:
+                            logging.info("Can not stop video record. No video record started.")
+                    except Exception as e:
+                        logging.error("Exception on stopping record", e)
 
             except Exception as e:
                 return {'error': "Error setting up control thread"+str(e)}
