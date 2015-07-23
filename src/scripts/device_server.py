@@ -70,7 +70,7 @@ def controls(id, action):
                     try:
                         record = RecordVideo()
                         record.start()
-                        control.info['isRecording'] = True
+                        control.info['status'] = 'recording'
                         return info(id)
                     except Exception as e:
                         return {"error":e}
@@ -79,7 +79,7 @@ def controls(id, action):
                         if record is not None:
                             recording_file = record.stop()
                             record.join()
-                            control.info['isRecording'] = False
+                            control.info['status'] = 'stopped'
                             control.info['recording_file'] = recording_file
                             return info(id)
                         else:

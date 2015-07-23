@@ -130,7 +130,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
 
         $sm.start_recording = function(){
                 http.post('/device/'+device_id+'/controls/start_record', data=option)
-                    .success(function(data){$scope.device.isRecording = data.isRecording;});
+                    .success(function(data){$scope.device.status = data.status;});
         }
 
         $sm.stop_recording = function(){
@@ -138,7 +138,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
                     .success(function(data)
                              {
                                 $scope.device.recording_file = data.recording_file;
-                                $scope.device.isRecording = data.isRecording;
+                                $scope.device.status = data.status;
                                            });
         }
 
