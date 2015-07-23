@@ -126,7 +126,7 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
         elif hasattr(e, 'code'):
             logging.error('The server couldn\'t fulfill the request.')
             logging.error('Error code: '+ e.code)
-            
+
     return devices_map
 
 
