@@ -157,9 +157,9 @@
       <div class="modal-body">
           <div class="list-group">
             <p>Here you can start and stop recording a Video. You cannot do that while tracking.</p>
-              <h5 ng-if="device.status == recording">Device is now recording</h5>
+              <h5 ng-if="device.status == 'recording'">Device is now recording</h5>
           </div>
-          <div ng-if="device.status == stopped">
+          <div ng-if="device.status == 'stopped'">
           <a ng-href="{{device.ip}}:9000/static{{device.recording_file}}">Download the video</a>
           </div>
       </div>
