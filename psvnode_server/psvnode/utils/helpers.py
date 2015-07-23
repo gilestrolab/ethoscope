@@ -122,10 +122,11 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
     except urllib2.URLError as e:
         if hasattr(e, 'reason'):
             logging.error('We failed to reach a server.')
-            logging.error('Reason: ', e.reason)
+            logging.error('Reason: '+ e.reason)
         elif hasattr(e, 'code'):
             logging.error('The server couldn\'t fulfill the request.')
-            logging.error('Error code: ', e.code)
+            logging.error('Error code: '+ e.code)
+            
     return devices_map
 
 
