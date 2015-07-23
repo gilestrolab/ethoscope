@@ -106,8 +106,13 @@ def device(id, type_of_req):
                 stop_device(id,post_data)
             else:
                 raise Exception("Cannot stop, device %s status is `%s`" %  (id, device_info['status']))
-        elif type_of_req == 'start_record' or type_of_req == 'stop_record':
+        elif type_of_req == 'start_record':
             if device_info['status'] == 'stopped':
+                update_device_map(id, 'controls', type_of_req, data=post_data)
+            else:
+                raise Exception("Cannot %s recording, device %s status is %s"% (type_of_req, id, device_info['status']))
+        elif type_of_req == 'stop_record':
+            if device_info['status'] == 'recording':
                 update_device_map(id, 'controls', type_of_req, data=post_data)
             else:
                 raise Exception("Cannot %s recording, device %s status is %s"% (type_of_req, id, device_info['status']))
