@@ -11,7 +11,6 @@ class RecordVideo(Thread):
         self.camera.framerate = framerate
         self.save_dir = path.join(PSV_DIR, name)
 
-
     def run(self):
         try:
             self.camera.start_recording(self.save_dir + '.h264')
@@ -19,6 +18,8 @@ class RecordVideo(Thread):
             print (e)
 
     def stop(self):
-        self.camera.stop_recording()
-        self.camera.stop()
-
+        try:
+            self.camera.stop_recording()
+            self.camera.stop()
+        except Exception as e:
+            print (e)
