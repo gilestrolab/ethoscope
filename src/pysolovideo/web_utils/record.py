@@ -10,7 +10,7 @@ class RecordVideo(Thread):
         self.camera = picamera.PiCamera()
         self.camera.resolution = resolution
         self.camera.framerate = framerate
-        self.save_dir = path.join(PSV_DIR, name)
+        self.save_dir = path.join(PSV_DIR, name + '.h264')
 
     def run(self):
         try:
