@@ -129,12 +129,14 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
                         }};
 
         $scope.sm.start_recording = function(){
-                http.post('/device/'+device_id+'/controls/start_record', data=option)
-                    .success(function(data){$scope.device.status = data.status;});
+                http.post('/device/'+device_id+'/controls/start_record', data={})
+                    .success(function(data){
+                        $scope.device.status = data.status;
+                    });
         }
 
         $scope.sm.stop_recording = function(){
-                http.post('/device/'+device_id+'/controls/stop_record', data=option)
+                http.post('/device/'+device_id+'/controls/stop_record', data={})
                     .success(function(data)
                              {
                                 $scope.device.recording_file = data.recording_file;
