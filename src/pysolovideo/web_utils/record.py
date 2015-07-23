@@ -4,7 +4,7 @@ from threading import Thread
 
 class RecordVideo(Thread):
 
-    def __init__(self, resolution=(640,480), framerate=24, name="/myvideo",  PSV_DIR = "/psv_data/results"):
+    def __init__(self, resolution=(640,480), framerate=24, name="myvideo",  PSV_DIR = "/psv_data/results"):
         super(RecordVideo, self).__init__()
         self.camera = picamera.PiCamera()
         self.camera.resolution = resolution
@@ -20,4 +20,5 @@ class RecordVideo(Thread):
 
     def stop(self):
         self.camera.stop_recording()
+        self.camera.stop()
 

@@ -76,6 +76,8 @@ def controls(id, action):
                     try:
                         if record is not None:
                             record.stop()
+                            record.join()
+                            #record = None
                         else:
                             logging.info("Can not stop video record. No video record started.")
                     except Exception as e:
