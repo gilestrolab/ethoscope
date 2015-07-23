@@ -20,6 +20,6 @@ class RecordVideo(Thread):
     def stop(self):
         try:
             self.camera.stop_recording()
-            self.camera.stop()
+            self.camera.close()
         except Exception as e:
             print (e)
