@@ -1,6 +1,7 @@
 import picamera
 from os import path
 from threading import Thread
+import logging
 
 class RecordVideo(Thread):
 
@@ -15,11 +16,12 @@ class RecordVideo(Thread):
         try:
             self.camera.start_recording(self.save_dir + '.h264')
         except Exception as e:
-            print (e)
+            logging.error("Error or starting video record:"+e)
 
     def stop(self):
         try:
             self.camera.stop_recording()
             self.camera.close()
+            return self.save_dir
         except Exception as e:
-            print (e)
+            logging.error("Error stopping video record:"+e)

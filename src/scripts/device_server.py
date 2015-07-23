@@ -70,14 +70,18 @@ def controls(id, action):
                     try:
                         record = RecordVideo()
                         record.start()
+                        control.info['isRecording'] = True
+                        return info(id)
                     except Exception as e:
                         return {"error":e}
                 elif action == 'stop_record':
                     try:
                         if record is not None:
-                            record.stop()
+                            recording_file = record.stop()
                             record.join()
-                            #record = None
+                            control.info['isRecording'] = False
+                            control.info['recording_file'] = recording_file
+                            return info(id)
                         else:
                             logging.info("Can not stop video record. No video record started.")
                     except Exception as e:

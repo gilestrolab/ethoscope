@@ -81,7 +81,7 @@
         </table>
     </div>
 
-<div id="powerffAlert" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="powerOffAlertLabel" aria-hidden="true">
+<div id="powerOffAlert" class="modal fade" tabindex="-1" role="dialog" aria-labelledby="powerOffAlertLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-header">
             <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
@@ -151,10 +151,34 @@
           </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
         <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="sm.start()" data-toggle="modal">Start Tracking</button>
       </div>
     </div>
   </div>
 </div>
 
+<!-- Modal Record -->
+<div class="modal fade" id="recordModal" tabindex="-1" role="dialog" aria-labelledby="recordModal" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="startModalLabel">Video recording panel</h4>
+      </div>
+      <div class="modal-body">
+          <div class="list-group">
+            <p>Here you can start and stop recording a Video. You cannot do that while tracking.</p>
+              <h5 ng-if="device.isRecording == true">Device is now recording</h5>
+          </div>
+          <div ng-if="isRecording == false">
+          <a ng-href="{{device.ip}}:9000/static{{device.recording_file}}">Download the video</a>
+          </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped' && device.isRecording == false" ng-click="sm.stop_recording()">Stop Recording</button>
+        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped' && device.isRecording == false" ng-click="sm.start_recording()" data-toggle="modal">Start Recording</button>
+      </div>
+    </div>
+  </div>
+</div>

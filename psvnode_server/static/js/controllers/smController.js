@@ -19,6 +19,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
 
 
         $scope.sm.start = function(option){
+                            $("#startModal").modal('hide');
                             spStart= new Spinner(opts).spin();
                             starting_tracking.appendChild(spStart.el);
                             $http.post('/device/'+device_id+'/controls/start', data=option)
@@ -127,6 +128,19 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
                             "custom":{name:"custom", kwargs:""}
                         }};
 
+        $sm.start_recording = function(){
+                http.post('/device/'+device_id+'/controls/start_record', data=option)
+                    .success(function(data){$scope.device.isRecording = data.isRecording;});
+        }
+
+        $sm.stop_recording = function(){
+                http.post('/device/'+device_id+'/controls/stop_record', data=option)
+                    .success(function(data)
+                             {
+                                $scope.device.recording_file = data.recording_file;
+                                $scope.device.isRecording = data.isRecording;
+                                           });
+        }
 
         refresh_data = $interval(refresh, 3000);
         //clear interval when scope is destroyed
