@@ -160,7 +160,7 @@
               <h5 ng-if="device.status == 'recording'">Device is now recording</h5>
           </div>
           <div ng-if="device.status == 'stopped'">
-          <a ng-href="{{device.ip}}:9000/static{{device.recording_file}}">Download the video</a>
+          <a ng-href="{{device.ip}}:9000/download{{device.recording_file}} target="_blank"">Download the video</a>
           </div>
       </div>
       <div class="modal-footer">
