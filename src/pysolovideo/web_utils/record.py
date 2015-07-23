@@ -14,7 +14,7 @@ class RecordVideo(Thread):
 
     def run(self):
         try:
-            self.camera.start_recording(self.save_dir + '.h264')
+            self.camera.start_recording(self.save_dir)
         except Exception as e:
             logging.error("Error or starting video record:"+e)
 
