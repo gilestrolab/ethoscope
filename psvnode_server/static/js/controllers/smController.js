@@ -128,12 +128,12 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
                             "custom":{name:"custom", kwargs:""}
                         }};
 
-        $sm.start_recording = function(){
+        $scope.sm.start_recording = function(){
                 http.post('/device/'+device_id+'/controls/start_record', data=option)
                     .success(function(data){$scope.device.status = data.status;});
         }
 
-        $sm.stop_recording = function(){
+        $scope.sm.stop_recording = function(){
                 http.post('/device/'+device_id+'/controls/stop_record', data=option)
                     .success(function(data)
                              {
