@@ -41,7 +41,7 @@
 
         <a href="/#/more/browse" class="btn btn-info">Download Data</a>
         <button class="btn btn-info" ng-click="sm.log()">Log</button>
-        <button class="btn btn-info" ng-if="device.status == 'stopped'" data-toggle="modal" data-target="#recordModal">Recording Pannel</button>
+        <button class="btn btn-info" ng-if="device.status == 'stopped' || device.status == 'recording'" data-toggle="modal" data-target="#recordModal">Recording Pannel</button>
         <button class="btn btn-danger" data-toggle="modal" data-target="#powerOffAlert">Power off Device</button>
 
     </div>
@@ -157,9 +157,9 @@
       <div class="modal-body">
           <div class="list-group">
             <p>Here you can start and stop recording a Video. You cannot do that while tracking.</p>
-              <h5 ng-if="device.isRecording == true">Device is now recording</h5>
+              <h5 ng-if="device.status == recording">Device is now recording</h5>
           </div>
-          <div ng-if="isRecording == false">
+          <div ng-if="device.status == stopped">
           <a ng-href="{{device.ip}}:9000/static{{device.recording_file}}">Download the video</a>
           </div>
       </div>
