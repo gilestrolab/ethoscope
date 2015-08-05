@@ -1,0 +1,14 @@
+Instructions to change from ssh protocol to git protocol
+1. Node:
+1.1 start and enable git-daemon.socket (systemctl start git-daemon.socket)
+1.2 create directory /srv/git
+1.3 clone repo from source like this: git clone --bare -b $STABLE_BRANCH --single-branch https://github.com/gilestrolab/pySolo-Video.git /srv/git/pySolo-Video.git
+where $STABLE_BRANCH is psv-dev or psv-package, notice that now it is cloned on /srv/git/
+
+2.Devices:
+2.1 remove /home/psv/pySolo-Video
+2.2 clone new repo from node: git clone git://192.168.123.1/pySolo-Video
+
+With this git will use git protocol to connect to node, this protocol is read only by default. There is no security or passwords.
+
+
