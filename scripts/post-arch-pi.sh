@@ -216,7 +216,9 @@ cat /etc/mysql/my.cnf-bak | grep -v log-bin >  /etc/mysql/my.cnf
 echo 'Cloning from Node'
 
 # FIXME this needs a node in the network to set up the psv
-git clone node@192.169.123.1:/var/pySolo-Video.git /home/$USER_NAME/pySolo-Video
+#git clone node@192.169.123.1:/var/pySolo-Video.git /home/$USER_NAME/pySolo-Video
+
+git clone git://192.169.123.1:/srv/git/pySolo-Video.git /home/$USER_NAME/pySolo-Video
 
 
 # our software.
@@ -228,7 +230,8 @@ cd /home/psv/pySolo-Video/src
 pip2 install -e .
 
 
-
+# FIXME Omitting this.
+: <<'END'
 echo "copying var part"
 mkdir -p $PSV_DATA_DIR
 chmod 744 $PSV_DATA_DIR -R
@@ -269,4 +272,7 @@ mv var var.old
 mkdir /var
 umount /dev/sda1
 mount /dev/sda1 /var
+
+END
+
 echo 'SUCESS, please reboot'

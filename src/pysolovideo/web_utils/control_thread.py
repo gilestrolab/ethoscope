@@ -48,6 +48,7 @@ class ControlThread(Thread):
         self._last_info_frame_idx = 0
 
         # We wipe off previous data
+        # TODO Isn't it dangerous, if for some reason the server restarts and the node has no backup... we lose the data.
         shutil.rmtree(psv_dir, ignore_errors=True)
         try:
             os.makedirs(psv_dir)

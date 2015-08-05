@@ -45,7 +45,10 @@ pacman -S wpa_supplicant --noconfirm --needed
 
 
 #Create a Bare repository with only the production branch in node, it is on /var/
-git clone --bare -b $STABLE_BRANCH --single-branch https://github.com/gilestrolab/pySolo-Video.git /var/pySolo-Video.git
+#git clone --bare -b $STABLE_BRANCH --single-branch https://github.com/gilestrolab/pySolo-Video.git /var/pySolo-Video.git
+mkdir -p /srv/git
+git clone --bare -b $STABLE_BRANCH --single-branch https://github.com/gilestrolab/pySolo-Video.git /srv/git/pySolo-Video.git
+
 #Create a local working copy from the bare repo on node
 git clone /var/pySolo-Video.git /home/$USER_NAME/pySolo-Video
 
@@ -110,6 +113,9 @@ systemctl enable ntpd.service
 # Setting up ssh server
 systemctl enable sshd.service
 systemctl start sshd.service
+systemctl start git-daemon.socket
+systemctl enable git-daemon.socket
+
 #setting up wifi
 # FIXME this not work if not psv-wifi
 netctl start psv_wifi || echo 'No psv_wifi connection'
