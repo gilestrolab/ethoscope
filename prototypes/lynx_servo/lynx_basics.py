@@ -87,8 +87,10 @@ class SimpleLynxMotionInterface(object):
         return pulse
 
     def move_to_angle(self,idx,angle=0,time=1000):
+        if idx < 1:
+            raise Exception("idx must be greater or equal to one")
         pulse = self._angle_to_pulse(angle)
-        instruction = "#%i P%i T%i\r" % (idx,pulse,time)
+        instruction = "#%i P%i T%i\r" % (idx - 1,pulse,time)
         o = self._serial.write(instruction)
         return o
 
@@ -103,8 +105,14 @@ class SleepDepriver(SimpleLynxMotionInterface):
         time.sleep(dt/1000.0)
 
 logging.getLogger().setLevel(logging.INFO)
-sdep = SleepDepriver()
-print sdep.deprive(16)
+#stress test:
+
+sdep = SleepDepriver(port="/dev/ttyUSB0")
+
+while True:
+    for i in range(1,11):
+        sdep.deprive(i)
+    time.sleep(10)
 
 
 #
