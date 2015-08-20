@@ -23,5 +23,6 @@ If we experience no new critical issues over several weeks, we can merge `dev` t
 
 More doc to come
 
+In order to analyse the large amount of generated behavioural data, we are developing, [rethomics](https://github.com/gilestrolab/rethomics), a comprehensive `R` package.
 
 
