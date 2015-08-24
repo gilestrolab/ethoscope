@@ -49,7 +49,7 @@ def controls(id, action):
                     # date_time = date.isoformat()
 
                     control = ControlThread(machine_id=machine_id, name=machine_name, version=version, video_file=INPUT_VIDEO,
-                            psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
+                            ethogram_dir=ETHOGRAM_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
                     control.start()
                     return info(id)
 
@@ -146,6 +146,8 @@ if __name__ == '__main__':
     debug = option_dict["debug"]
     port = option_dict["port"]
     branch = option_dict["branch"]
+
+
     # import ConfigParser
     # config = ConfigParser.RawConfigParser(allow_no_value=True)
     # for loc in os.curdir, os.path.expanduser("~"), "/etc/ethoscope/", os.environ.get("PSV_DEV_SERV_CONF"):
@@ -158,8 +160,8 @@ if __name__ == '__main__':
     INPUT_VIDEO = None
     DURATION = None
     DRAW_RESULTS =False
-    PSV_DIR = "/psv_data/results"
-    GIT_WORKING_DIR = '/home/psv/pySolo-Video'
+    ETHOGRAM_DIR = "/ethoscope_data/results"
+    GIT_WORKING_DIR = '/home/ethoscope/ethoscope-git'
 
     MACHINE_ID_FILE = '/etc/machine-id'
     MACHINE_NAME_FILE = '/etc/machine-name'
@@ -174,19 +176,19 @@ if __name__ == '__main__':
 
         if getpass.getuser() == "quentin":
             INPUT_VIDEO = '/data/psv_misc/tube_monitor_validation/tube_monitor_validation_raw.mp4'
-            PSV_DIR = "/psv_data/results/"
+            ETHOGRAM_DIR = "/psv_data/results/"
             #fixme Put your working directories
             GIT_WORKING_DIR = "./"
 
 
         elif getpass.getuser() == "asterix":
-            PSV_DIR = "/tmp/psv_data"
+            ETHOGRAM_DIR = "/tmp/psv_data"
             INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
             GIT_WORKING_DIR = "/data1/todel/pySolo-Device"
 
         elif getpass.getuser() == "psv" or getpass.getuser() == "root":
             INPUT_VIDEO = "/data/monitor_new_targets_short.avi"
-            PSV_DIR = "/psv_data/results"
+            ETHOGRAM_DIR = "/psv_data/results"
             GIT_WORKING_DIR = "/home/psv/pySolo-Video"
         else:
             raise Exception("where is your debugging video?")
@@ -196,7 +198,7 @@ if __name__ == '__main__':
     version = get_version(GIT_WORKING_DIR, branch)
     # fixme => the name should be hardcoded in a encrypted file? file.
     control = ControlThread(machine_id=machine_id, name=machine_name, version=version, video_file=INPUT_VIDEO,
-                             psv_dir=PSV_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
+                             ethogram_dir=ETHOGRAM_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
 
 
     try:

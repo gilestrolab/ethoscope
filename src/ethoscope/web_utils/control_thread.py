@@ -38,7 +38,7 @@ class ControlThread(Thread):
                             }
     _ROIBuilderClass = WellsMonitorWithTargetROIBuilder
 
-    def __init__(self, machine_id, name, version, psv_dir, video_file=None, *args, **kwargs):
+    def __init__(self, machine_id, name, version, ethogram_dir, video_file=None, *args, **kwargs):
         self._monit_args = args
         self._monit_kwargs = kwargs
         self._metadata = None
@@ -49,9 +49,9 @@ class ControlThread(Thread):
 
         # We wipe off previous data
         # TODO Isn't it dangerous, if for some reason the server restarts and the node has no backup... we lose the data.
-        shutil.rmtree(psv_dir, ignore_errors=True)
+        shutil.rmtree(ethogram_dir, ignore_errors=True)
         try:
-            os.makedirs(psv_dir)
+            os.makedirs(ethogram_dir)
         except OSError:
             pass
 
@@ -69,8 +69,8 @@ class ControlThread(Thread):
         self._info = {  "status": "stopped",
                         "time": time.time(),
                         "error": None,
-                        "log_file": os.path.join(psv_dir, self._log_file),
-                        "dbg_img": os.path.join(psv_dir, self._dbg_img_file),
+                        "log_file": os.path.join(ethogram_dir, self._log_file),
+                        "dbg_img": os.path.join(ethogram_dir, self._dbg_img_file),
                         "last_drawn_img": os.path.join(self._tmp_dir, self._tmp_last_img_file),
                         "id": machine_id,
                         "name": name,

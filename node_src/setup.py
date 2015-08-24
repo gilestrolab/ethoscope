@@ -5,11 +5,11 @@ my docstring
 from distutils.core import setup
 
 setup(
-    name='psvnode',
+    name='ethoscope_node',
     version='trunk',
     author=['Quentin Geissmann', 'Giorgio Gilestro', 'Luis Garcia'],
     author_email=['quentin.geissmann13@imperial.ac.uk', 'g.gilestro@imperial.ac.uk', 'luis.garcia@polygonaltree.co.uk'],
-    packages=['psvnode'],
+    packages=['ethoscope_node'],
     url="https://github.com/gilestrolab/pySolo-Video",
     license="GPL3",
     description='todo',  #TODO
@@ -26,6 +26,7 @@ setup(
         "netifaces >= 0.10.4",
         "cherrypy >= 3.6.0",
         "eventlet >= 0.17.1",
-        "python-nmap >= 0.3.4"
+        "python-nmap >= 0.3.4",
+        "futures >= 3.0.3"
     ],
 )

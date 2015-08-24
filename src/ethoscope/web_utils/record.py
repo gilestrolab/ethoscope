@@ -1,7 +1,13 @@
-import picamera
 from os import path
 from threading import Thread
 import logging
+
+try:
+    import picamera
+except:
+    logging.warning("Could not load picamera module")
+
+
 
 class RecordVideo(Thread):
 

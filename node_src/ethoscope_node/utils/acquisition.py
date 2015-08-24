@@ -2,7 +2,7 @@ import time
 import datetime
 import logging
 import os
-from psvnode.utils.helpers import which
+from ethoscope_node.utils.helpers import which
 import multiprocessing
 import ctypes
 from mysql_backup import MySQLdbToSQlite, DBNotReadyError

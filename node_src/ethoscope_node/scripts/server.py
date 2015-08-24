@@ -9,10 +9,10 @@ import re
 
 import logging
 import traceback
-from psvnode.utils.helpers import get_version
-from psvnode.utils.helpers import which
-from psvnode.utils.helpers import generate_new_device_map, update_dev_map_wrapped
-from psvnode.utils.helpers import get_last_backup_time
+from ethoscope_node.utils.helpers import get_version
+from ethoscope_node.utils.helpers import which
+from ethoscope_node.utils.helpers import generate_new_device_map, update_dev_map_wrapped
+from ethoscope_node.utils.helpers import get_last_backup_time
 
 from os import walk
 import optparse
@@ -25,7 +25,6 @@ from netifaces import ifaddresses, AF_INET, AF_LINK
 
 app = Bottle()
 STATIC_DIR = "../../static"
-
 
 
 def update_device_map(id, what="data",type=None, port=9000, data=None):
@@ -409,7 +408,7 @@ if __name__ == '__main__':
     parser = optparse.OptionParser()
     parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-p", "--port", dest="port", default=80,help="port")
-    parser.add_option("-b", "--branch", dest="branch", default="psv-package",help="the branch to work from")
+    parser.add_option("-b", "--branch", dest="branch", default="dev",help="the branch to work from")
 
     (options, args) = parser.parse_args()
 
@@ -418,9 +417,9 @@ if __name__ == '__main__':
     PORT = option_dict["port"]
     branch = option_dict["branch"]
 
-    RESULTS_DIR = "/psv_results"
-    GIT_BARE_REPO_DIR = "/srv/git/pySolo-Video.git"
-    GIT_WORKING_DIR = "/home/node/pySolo-Video"
+    RESULTS_DIR = "/ethoscope_results"
+    GIT_BARE_REPO_DIR = "/srv/git/ethoscope-git"
+    GIT_WORKING_DIR = "/home/ethoscope/ethoscope-git"
 
     #SUBNET_DEVICE = b'wlan0'
     p1 = subprocess.Popen(["ip", "link", "show"], stdout=subprocess.PIPE)

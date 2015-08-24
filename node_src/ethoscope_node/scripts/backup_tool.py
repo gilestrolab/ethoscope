@@ -1,8 +1,8 @@
 __author__ = 'quentin'
 
 
-from psvnode.utils.helpers import generate_new_device_map
-from psvnode.utils.mysql_backup import MySQLdbToSQlite, DBNotReadyError
+from ethoscope_node.utils.helpers import generate_new_device_map
+from ethoscope_node.utils.mysql_backup import MySQLdbToSQlite, DBNotReadyError
 import logging
 import optparse
 import time
@@ -14,9 +14,9 @@ import re
 
 class BackupClass(object):
     _db_credentials = {
-            "name":"psv_db",
-            "user":"psv",
-            "password":"psv"
+            "name":"ethoscope_db",
+            "user":"ethoscope",
+            "password":"ethoscope"
         }
     def __init__(self, device_info):
 
@@ -65,7 +65,7 @@ if __name__ == '__main__':
         DEBUG = option_dict["debug"]
 
 
-        RESULTS_DIR = "/psv_results"
+        RESULTS_DIR = "/ethoscope_results"
         #SUBNET_DEVICE = b'wlan0'
 
         p1 = subprocess.Popen(["ip", "link", "show"], stdout=subprocess.PIPE)
