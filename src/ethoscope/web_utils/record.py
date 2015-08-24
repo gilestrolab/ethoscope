@@ -11,12 +11,12 @@ except:
 
 class RecordVideo(Thread):
 
-    def __init__(self, resolution=(640,480), framerate=24, name="myvideo",  PSV_DIR = "/psv_data/results"):
+    def __init__(self, resolution=(640,480), framerate=24, name="myvideo",  ETHOSCOPE_DIR = "/ethoscope_data/results"):
         super(RecordVideo, self).__init__()
         self.camera = picamera.PiCamera()
         self.camera.resolution = resolution
         self.camera.framerate = framerate
-        self.save_dir = path.join(PSV_DIR, name + '.h264')
+        self.save_dir = path.join(ETHOSCOPE_DIR, name + '.h264')
 
     def run(self):
         try:
