@@ -2,24 +2,24 @@ import tempfile
 import os
 import cv2
 from threading import Thread
-from pysolovideo.tracking.monitor import Monitor
+from ethoscope.tracking.monitor import Monitor
 
 # Interface to V4l
-from pysolovideo.tracking.cameras import OurPiCameraAsync
-from pysolovideo.tracking.cameras import MovieVirtualCamera
+from ethoscope.tracking.cameras import OurPiCameraAsync
+from ethoscope.tracking.cameras import MovieVirtualCamera
 
 # Build ROIs from greyscale image
-from pysolovideo.tracking.roi_builders import SleepMonitorWithTargetROIBuilder,TubeMonitorWithTargetROIBuilder, WellsMonitorWithTargetROIBuilder
+from ethoscope.tracking.roi_builders import SleepMonitorWithTargetROIBuilder,TubeMonitorWithTargetROIBuilder, WellsMonitorWithTargetROIBuilder
 
 # the robust self learning tracker
-from pysolovideo.tracking.trackers import AdaptiveBGModel
-from pysolovideo.utils.debug import PSVException
+from ethoscope.tracking.trackers import AdaptiveBGModel
+from ethoscope.utils.debug import EthoscopeException
 import shutil
 import logging
 import time
 
 import traceback
-from pysolovideo.utils.io import ResultWriter
+from ethoscope.utils.io import ResultWriter
 
 
 # http://localhost:9001/controls/3a92bcf229a34c4db2be733f6802094d/start
@@ -177,7 +177,7 @@ class ControlThread(Thread):
                 except:
                     pass
 
-        except PSVException as e:
+        except EthoscopeException as e:
             if e.img is not  None:
                 cv2.imwrite(self._info["dbg_img"], e.img)
             self.stop(traceback.format_exc(e))

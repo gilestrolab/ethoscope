@@ -5,8 +5,8 @@ __author__ = 'quentin'
 
 
 
-from pysolovideo.tracking.cameras import *
-from pysolovideo.tracking.trackers import AdaptiveMOGTracker
+from ethoscope.tracking.cameras import *
+from ethoscope.tracking.trackers import AdaptiveMOGTracker
 import cv2
 import cv
 import numpy as np

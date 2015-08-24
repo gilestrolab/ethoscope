@@ -5,10 +5,10 @@ __author__ = 'quentin'
 
 
 
-from pysolovideo.tracking.cameras import *
-from pysolovideo.tracking.trackers import AdaptiveBGModel
+from ethoscope.tracking.cameras import *
+from ethoscope.tracking.trackers import AdaptiveBGModel
 import cv2
-from pysolovideo.tracking.roi_builders import DefaultROIBuilder
+from ethoscope.tracking.roi_builders import DefaultROIBuilder
 
 # we start from a cropped video:
 cam = MovieVirtualCamera("/stk/pysolo_video_samples/singleDamTube1_150min_night.avi")

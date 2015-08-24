@@ -7,8 +7,8 @@ import cv2
 import time
 import logging
 import os
-from pysolovideo.utils.debug import PSVException
-from pysolovideo.tracking.cameras import BaseCamera
+from ethoscope.utils.debug import EthoscopeException
+from ethoscope.tracking.cameras import BaseCamera
 import multiprocessing
 try:
     from picamera.array import PiRGBArray
@@ -88,7 +88,7 @@ class OurPiCameraAsync(BaseCamera):
         w,h = target_resolution
 
         if not isinstance(target_fps, int):
-            raise PSVException("FPS must be an integer number")
+            raise EthoscopeException("FPS must be an integer number")
 
 
 
@@ -106,7 +106,7 @@ class OurPiCameraAsync(BaseCamera):
 
 
         if len(im.shape) < 2:
-            raise PSVException("The camera image is corrupted (less that 2 dimensions)")
+            raise EthoscopeException("The camera image is corrupted (less that 2 dimensions)")
 
         self._resolution = (im.shape[1], im.shape[0])
         if self._resolution != target_resolution:
@@ -175,7 +175,7 @@ class OurPiCameraAsync(BaseCamera):
             cv2.cvtColor(g,cv2.COLOR_GRAY2BGR,self._frame)
             return self._frame
         except Exception as e:
-            raise PSVException("Could not get frame from camera\n%s", str(e))
+            raise EthoscopeException("Could not get frame from camera\n%s", str(e))
 
 #
 while True:

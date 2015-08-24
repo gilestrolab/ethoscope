@@ -2,18 +2,18 @@ import tempfile
 import os
 import cv2
 from threading import Thread
-from pysolovideo.tracking.monitor import Monitor
+from ethoscope.tracking.monitor import Monitor
 
 # Interface to V4l
-from pysolovideo.tracking.cameras import V4L2Camera
-from pysolovideo.tracking.cameras import MovieVirtualCamera
+from ethoscope.tracking.cameras import V4L2Camera
+from ethoscope.tracking.cameras import MovieVirtualCamera
 
 # Build ROIs from greyscale image
-from pysolovideo.tracking.roi_builders import SleepMonitorWithTargetROIBuilder
+from ethoscope.tracking.roi_builders import SleepMonitorWithTargetROIBuilder
 
 # the robust self learning tracker
-from pysolovideo.tracking.trackers import AdaptiveBGModel
-from pysolovideo.utils.debug import PSVException
+from ethoscope.tracking.trackers import AdaptiveBGModel
+from ethoscope.utils.debug import EthoscopeException
 import shutil
 import logging
 import time
@@ -131,7 +131,7 @@ class ControlThread(Thread):
             logging.info("Stopping Monitor thread")
             self.stop()
 
-        except PSVException as e:
+        except EthoscopeException as e:
             if e.img is not  None:
                 cv2.imwrite(self._info["dbg_img"], e.img)
             self.stop(traceback.format_exc(e))
@@ -158,7 +158,7 @@ class ControlThread(Thread):
                      "date_time": self._info["time"],
                      "frame_width":cam.width,
                      "frame_height":cam.height,
-                      "psv_version": pkg_resources.get_distribution("pysolovideo").version
+                      "psv_version": pkg_resources.get_distribution("ethoscope").version
                       }
 
         self._monit = Monitor(cam,

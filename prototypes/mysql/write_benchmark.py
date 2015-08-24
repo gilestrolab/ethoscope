@@ -6,11 +6,11 @@ import time
 import shutil
 import random
 import tempfile
-from pysolovideo.tracking.roi_builders import ROI
-from pysolovideo.utils.io import ResultWriter#, SQLiteResultWriter
+from ethoscope.tracking.roi_builders import ROI
+from ethoscope.utils.io import ResultWriter#, SQLiteResultWriter
 
 
-from pysolovideo.tracking.trackers import DataPoint, BoolVariableBase, IntVariableBase, DistanceIntVarBase
+from ethoscope.tracking.trackers import DataPoint, BoolVariableBase, IntVariableBase, DistanceIntVarBase
 import logging
 import numpy as np
 

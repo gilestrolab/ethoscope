@@ -1,4 +1,4 @@
-from pysolovideo.tracking.roi_builders import TubeMonitorWithTargetROIBuilder
+from ethoscope.tracking.roi_builders import TubeMonitorWithTargetROIBuilder
 import cv2
 
 

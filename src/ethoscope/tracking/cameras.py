@@ -4,7 +4,7 @@ import cv2
 import time
 import logging
 import os
-from pysolovideo.utils.debug import PSVException
+from ethoscope.utils.debug import EthoscopeException
 import multiprocessing
 try:
     from picamera.array import PiRGBArray
@@ -35,7 +35,7 @@ class BaseCamera(object):
         while True:
             if self.is_last_frame() or not self.is_opened():
                 if not at_leat_one_frame:
-                    raise PSVException("Camera could not read the first frame")
+                    raise EthoscopeException("Camera could not read the first frame")
                 break
             t,out = self.next_time_image()
 
@@ -90,9 +90,9 @@ class MovieVirtualCamera(BaseCamera):
         self._use_wall_clock = use_wall_clock
 
         if not isinstance(path, str):
-            raise PSVException("path to video must be a string")
+            raise EthoscopeException("path to video must be a string")
         if not os.path.exists(path):
-            raise PSVException("'%s' does not exist. No such file" % path)
+            raise EthoscopeException("'%s' does not exist. No such file" % path)
 
         self.capture = cv2.VideoCapture(path)
         w = self.capture.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH)
@@ -163,10 +163,10 @@ class V4L2Camera(BaseCamera):
             self.capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, h)
 
         if not isinstance(target_fps, int):
-            raise PSVException("FPS must be an integer number")
+            raise EthoscopeException("FPS must be an integer number")
 
         if target_fps < 2:
-            raise PSVException("FPS must be at least 2")
+            raise EthoscopeException("FPS must be at least 2")
 
         self.capture.set(cv2.cv.CV_CAP_PROP_FPS, target_fps)
 
@@ -175,7 +175,7 @@ class V4L2Camera(BaseCamera):
 
         # preallocate image buffer => faster
         if im is None:
-            raise PSVException("Error whist retrieving video frame. Got None instead. Camera not plugged?")
+            raise EthoscopeException("Error whist retrieving video frame. Got None instead. Camera not plugged?")
 
         self._frame = im
 
@@ -261,7 +261,7 @@ class OurPiCamera(BaseCamera):
 
         self.capture.resolution = target_resolution
         if not isinstance(target_fps, int):
-            raise PSVException("FPS must be an integer number")
+            raise EthoscopeException("FPS must be an integer number")
         self.capture.framerate = target_fps
 
         self._raw_capture = PiRGBArray(self.capture, size=target_resolution)
@@ -274,14 +274,14 @@ class OurPiCamera(BaseCamera):
         im = next(self._cap_it)
 
         if im is None:
-            raise PSVException("Error whist retrieving video frame. Got None instead. Camera not plugged?")
+            raise EthoscopeException("Error whist retrieving video frame. Got None instead. Camera not plugged?")
 
         self._frame = im
 
 
 
         if len(im.shape) < 2:
-            raise PSVException("The camera image is corrupted (less that 2 dimensions)")
+            raise EthoscopeException("The camera image is corrupted (less that 2 dimensions)")
 
         self._resolution = (im.shape[1], im.shape[0])
         if self._resolution != target_resolution:
@@ -411,7 +411,7 @@ class OurPiCameraAsync(BaseCamera):
         w,h = target_resolution
 
         if not isinstance(target_fps, int):
-            raise PSVException("FPS must be an integer number")
+            raise EthoscopeException("FPS must be an integer number")
 
 
         self._queue = multiprocessing.Queue(maxsize=2)
@@ -428,7 +428,7 @@ class OurPiCameraAsync(BaseCamera):
 
 
         if len(im.shape) < 2:
-            raise PSVException("The camera image is corrupted (less that 2 dimensions)")
+            raise EthoscopeException("The camera image is corrupted (less that 2 dimensions)")
 
         self._resolution = (im.shape[1], im.shape[0])
         if self._resolution != target_resolution:
@@ -496,4 +496,4 @@ class OurPiCameraAsync(BaseCamera):
             cv2.cvtColor(g,cv2.COLOR_GRAY2BGR,self._frame)
             return self._frame
         except Exception as e:
-            raise PSVException("Could not get frame from camera\n%s", str(e))
+            raise EthoscopeException("Could not get frame from camera\n%s", str(e))

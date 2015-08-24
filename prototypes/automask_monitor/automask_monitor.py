@@ -1,4 +1,4 @@
-from pysolovideo.tracking.roi_builders import TargetGridROIBuilderBase
+from ethoscope.tracking.roi_builders import TargetGridROIBuilderBase
 import cv2
 
 class EightByEight(TargetGridROIBuilderBase):

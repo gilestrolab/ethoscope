@@ -4,7 +4,7 @@ __author__ = 'quentin'
 import numpy as np
 import cv2
 import cv
-from pysolovideo.utils.debug import PSVException
+from ethoscope.utils.debug import EthoscopeException
 
 # TODO use PSVException on sdep
 
@@ -94,10 +94,10 @@ class ROI(object):
         try:
             out = img[y : y + h, x : x +w]
         except:
-            raise PSVException("Error whilst slicing region of interest %s" % str(self.get_feature_dict()), img)
+            raise EthoscopeException("Error whilst slicing region of interest %s" % str(self.get_feature_dict()), img)
 
         if out.shape[0:2] != self._mask.shape:
-            raise PSVException("Error whilst slicing region of interest. Possibly, the region out of the image: %s" % str(self.get_feature_dict()), img )
+            raise EthoscopeException("Error whilst slicing region of interest. Possibly, the region out of the image: %s" % str(self.get_feature_dict()), img )
 
         return out, self._mask
 
@@ -649,7 +649,7 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
             contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
 
             if len(contours) <3:
-                raise PSVException("There should be three targets. Only %i objects have been found" % (len(contours)), img)
+                raise EthoscopeException("There should be three targets. Only %i objects have been found" % (len(contours)), img)
             if len(contours) == 3:
                 break
 
@@ -659,7 +659,7 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
         mean_sd = np.std(target_diams)
 
         if mean_sd/mean_diam > 0.10:
-            raise PSVException("Too much variation in the diameter of the targets. Something must be wrong since all target should have the same size", img)
+            raise EthoscopeException("Too much variation in the diameter of the targets. Something must be wrong since all target should have the same size", img)
 
         src_points = []
         for c in contours:

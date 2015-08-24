@@ -3,7 +3,7 @@ __author__ = 'quentin'
 
 
 import interactors
-from pysolovideo.tracking.trackers import DataPoint, RelativeVariableBase
+from ethoscope.tracking.trackers import DataPoint, RelativeVariableBase
 
 class TrackingUnit(object):
     def __init__(self, tracking_algo_class, roi, interactor=None):

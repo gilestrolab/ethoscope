@@ -7,8 +7,8 @@ except:
     logging.warning("Could not load picamera module")
 
 import multiprocessing
-from pysolovideo.tracking.cameras import BaseCamera
-from pysolovideo.utils.debug import PSVException
+from ethoscope.tracking.cameras import BaseCamera
+from ethoscope.utils.debug import EthoscopeException
 import time
 
 
@@ -83,7 +83,7 @@ class OurPiCamera(BaseCamera):
 
         self.capture.resolution = target_resolution
         if not isinstance(target_fps, int):
-            raise PSVException("FPS must be an integer number")
+            raise EthoscopeException("FPS must be an integer number")
 
         self.capture.framerate = target_fps
 
@@ -97,14 +97,14 @@ class OurPiCamera(BaseCamera):
         im = next(self._cap_it)
 
         if im is None:
-            raise PSVException("Error whist retrieving video frame. Got None instead. Camera not plugged?")
+            raise EthoscopeException("Error whist retrieving video frame. Got None instead. Camera not plugged?")
 
         self._frame = im
 
 
 
         if len(im.shape) < 2:
-            raise PSVException("The camera image is corrupted (less that 2 dimensions)")
+            raise EthoscopeException("The camera image is corrupted (less that 2 dimensions)")
 
         self._resolution = (im.shape[1], im.shape[0])
         if self._resolution != target_resolution:

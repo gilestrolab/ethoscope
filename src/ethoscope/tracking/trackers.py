@@ -2,12 +2,12 @@ __author__ = 'quentin'
 
 import numpy as np
 import cv2
-from pysolovideo.utils.img_proc import merge_blobs
+from ethoscope.utils.img_proc import merge_blobs
 from collections import deque
 
 import collections
 import copy
-from pysolovideo.utils.debug import PSVException
+from ethoscope.utils.debug import EthoscopeException
 from math import sqrt, log10
 from scipy import ndimage
 
@@ -345,7 +345,7 @@ class BackgroundModel(object):
     def update(self, img_t, t, fg_mask=None):
         dt = float(t - self.last_t)
         if dt < 0:
-            raise PSVException("Negative time interval between two consecutive frames")
+            raise EthoscopeException("Negative time interval between two consecutive frames")
 
         # clip the half life to possible value:
         self._current_half_life = np.clip(self._current_half_life, self._min_half_life, self._max_half_life)

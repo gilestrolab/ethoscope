@@ -3,7 +3,7 @@ __author__ = 'quentin'
 import cv2
 import numpy as np
 
-class PSVException(Exception):
+class EthoscopeException(Exception):
     def __init__(self,value, img=None):
         self.value = value
         if isinstance(img, np.ndarray):

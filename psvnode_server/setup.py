@@ -16,7 +16,7 @@ setup(
     long_description="TODO", # TODO open('README').read(),
     # data e.g. classifiers can be added as part of the package
     # TODO
-    # package_data={'pysolovideo': ['data/classifiers/*.pkl']},
+    # package_data={'ethoscope': ['data/classifiers/*.pkl']},
     # extras_require={
     #     'pipes': ['picamera>=1.8'],
     # },

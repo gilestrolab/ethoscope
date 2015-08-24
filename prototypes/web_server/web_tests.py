@@ -1,15 +1,15 @@
 __author__ = 'quentin'
 
 import time
-from pysolovideo.web_utils.control_thread import ControlThread
+from ethoscope.web_utils.control_thread import ControlThread
 # Build ROIs from greyscale image
-from pysolovideo.tracking.roi_builders import SleepMonitorWithTargetROIBuilder
-from pysolovideo.tracking.cameras import MovieVirtualCamera
+from ethoscope.tracking.roi_builders import SleepMonitorWithTargetROIBuilder
+from ethoscope.tracking.cameras import MovieVirtualCamera
 
 # the robust self learning tracker
-from pysolovideo.tracking.trackers import AdaptiveBGModel
+from ethoscope.tracking.trackers import AdaptiveBGModel
 
-from pysolovideo.tracking.interactors import SystemPlaySoundOnStop
+from ethoscope.tracking.interactors import SystemPlaySoundOnStop
 
 
 import cv2

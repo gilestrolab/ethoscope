@@ -3,9 +3,9 @@ __author__ = 'quentin'
 import cv2
 import numpy as np
 import itertools
-from pysolovideo.tracking.cameras import MovieVirtualCamera
-from pysolovideo.tracking.trackers import BaseTracker, NoPositionError
-from pysolovideo.tracking.roi_builders import DefaultROIBuilder
+from ethoscope.tracking.cameras import MovieVirtualCamera
+from ethoscope.tracking.trackers import BaseTracker, NoPositionError
+from ethoscope.tracking.roi_builders import DefaultROIBuilder
 cam = MovieVirtualCamera("/stk/pysolo_video_samples/representative_tube_fast.avi")
 # cam = MovieVirtualCamera("/stk/pysolo_video_samples/representative_tube.avi ")
 

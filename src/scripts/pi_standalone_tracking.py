@@ -1,16 +1,16 @@
 __author__ = 'quentin'
 
-from pysolovideo.tracking.cameras import OurPiCameraAsync
+from ethoscope.tracking.cameras import OurPiCameraAsync
 
 # Build ROIs from greyscale image
-from pysolovideo.tracking.roi_builders import SleepMonitorWithTargetROIBuilder
+from ethoscope.tracking.roi_builders import SleepMonitorWithTargetROIBuilder
 
 # the robust self learning tracker
-from pysolovideo.tracking.trackers import AdaptiveBGModel
+from ethoscope.tracking.trackers import AdaptiveBGModel
 
 # the standard monitor
-from pysolovideo.tracking.monitor import Monitor
-from pysolovideo.utils.io import SQLiteResultWriter
+from ethoscope.tracking.monitor import Monitor
+from ethoscope.utils.io import SQLiteResultWriter
 
 import pkg_resources
 import optparse

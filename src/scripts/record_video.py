@@ -1,8 +1,8 @@
 from __future__ import print_function
 from optparse import OptionParser
 
-# from pysolovideo.tracking.cameras import V4L2Camera
-from pysolovideo.tracking.cameras import OurPiCamera
+# from ethoscope.tracking.cameras import V4L2Camera
+from ethoscope.tracking.cameras import OurPiCamera
 import cv2
 import cv
 

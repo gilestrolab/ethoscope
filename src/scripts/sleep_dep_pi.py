@@ -1,12 +1,12 @@
 __author__ = 'quentin'
 
 
-from pysolovideo.tracking.cameras import V4L2Camera
-from pysolovideo.hardware_control.arduino_api import SleepDepriverInterface
-from pysolovideo.tracking.roi_builders import SleepDepROIBuilder
-from pysolovideo.tracking.interactors import SleepDepInteractor
-from pysolovideo.tracking.monitor import Monitor
-from pysolovideo.tracking.trackers import AdaptiveBGModel
+from ethoscope.tracking.cameras import V4L2Camera
+from ethoscope.hardware_control.arduino_api import SleepDepriverInterface
+from ethoscope.tracking.roi_builders import SleepDepROIBuilder
+from ethoscope.tracking.interactors import SleepDepInteractor
+from ethoscope.tracking.monitor import Monitor
+from ethoscope.tracking.trackers import AdaptiveBGModel
 
 
 

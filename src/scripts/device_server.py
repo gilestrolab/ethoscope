@@ -4,9 +4,9 @@ import logging
 import datetime
 from optparse import OptionParser
 from bottle import *
-from pysolovideo.web_utils.control_thread import ControlThread
-from pysolovideo.web_utils.helpers import get_machine_info, get_version
-from pysolovideo.web_utils.record import RecordVideo
+from ethoscope.web_utils.control_thread import ControlThread
+from ethoscope.web_utils.helpers import get_machine_info, get_version
+from ethoscope.web_utils.record import RecordVideo
 from subprocess import call
 
 api = Bottle()
@@ -148,7 +148,7 @@ if __name__ == '__main__':
     branch = option_dict["branch"]
     # import ConfigParser
     # config = ConfigParser.RawConfigParser(allow_no_value=True)
-    # for loc in os.curdir, os.path.expanduser("~"), "/etc/pysolovideo/", os.environ.get("PSV_DEV_SERV_CONF"):
+    # for loc in os.curdir, os.path.expanduser("~"), "/etc/ethoscope/", os.environ.get("PSV_DEV_SERV_CONF"):
     #     try:
     #         with open(os.path.join(loc,"device_server.conf")) as source:
     #             config.readfp(source)

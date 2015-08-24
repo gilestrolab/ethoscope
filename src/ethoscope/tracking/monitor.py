@@ -27,7 +27,7 @@ import logging
 import cv2
 from collections import deque
 import numpy as np
-from pysolovideo.utils.debug import PSVException
+from ethoscope.utils.debug import EthoscopeException
 
 
 # TODO

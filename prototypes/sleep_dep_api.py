@@ -1,6 +1,6 @@
 __author__ = 'quentin'
 
-from pysolovideo.hardware_control.arduino_api import SleepDepriverInterface
+from ethoscope.hardware_control.arduino_api import SleepDepriverInterface
 
 sdi = SleepDepriverInterface()
 

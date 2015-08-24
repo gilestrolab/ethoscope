@@ -5,9 +5,9 @@ import multiprocessing
 from subprocess import call
 from math import sqrt
 
-from pysolovideo.hardware_control.arduino_api import SleepDepriverInterface
+from ethoscope.hardware_control.arduino_api import SleepDepriverInterface
 
-from pysolovideo.tracking.trackers import BoolVariableBase
+from ethoscope.tracking.trackers import BoolVariableBase
 
 class HasInteractedVariable(BoolVariableBase):
     header_name = "has_interacted"

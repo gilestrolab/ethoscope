@@ -1,7 +1,7 @@
 __author__ = 'quentin'
 
 
-from pysolovideo.tracking.cameras import *
+from ethoscope.tracking.cameras import *
 import cv2
 
 

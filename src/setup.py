@@ -5,24 +5,24 @@ my docstring
 from distutils.core import setup
 
 setup(
-    name='pysolovideo',
+    name='ethoscope',
     version='trunk',
     author=['Quentin Geissmann', 'Giorgio Gilestro', 'Luis Garcia'],
     author_email= ['quentin.geissmann13@imperial.ac.uk','g.gilestro@imperial.ac.uk', 'luis.garcia@polygonaltree.co.uk'],
-    packages=['pysolovideo',
-               'pysolovideo.tracking',
-               'pysolovideo.utils',
-               'pysolovideo.web_utils',
-               'pysolovideo.hardware_control',
+    packages=['ethoscope',
+               'ethoscope.tracking',
+               'ethoscope.utils',
+               'ethoscope.web_utils',
+               'ethoscope.hardware_control',
               ],
-    url="https://github.com/gilestrolab/pySolo-Video",
+    url="https://github.com/gilestrolab/ethoscope",
     license="GPL3",
     description='todo', #TODO
     long_description=open('README').read(),
     scripts=['scripts/sleep_monitor_pi_automask.py', 'scripts/record_video.py'],
     # data e.g. classifiers can be added as part of the package
     # TODO
-    # package_data={'pysolovideo': ['data/classifiers/*.pkl']},
+    # package_data={'ethoscope': ['data/classifiers/*.pkl']},
     # extras_require={
     #     'pipes': ['picamera>=1.8'],
     # },

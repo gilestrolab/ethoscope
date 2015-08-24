@@ -3,18 +3,18 @@ __author__ = 'quentin'
 
 
 # Interface to V4l
-from pysolovideo.tracking.cameras import V4L2Camera
-from pysolovideo.tracking.cameras import MovieVirtualCamera
+from ethoscope.tracking.cameras import V4L2Camera
+from ethoscope.tracking.cameras import MovieVirtualCamera
 
 # Build ROIs from greyscale image
-from pysolovideo.tracking.roi_builders import SleepMonitorWithTargetROIBuilder
+from ethoscope.tracking.roi_builders import SleepMonitorWithTargetROIBuilder
 
 # the robust self learning tracker
-from pysolovideo.tracking.trackers import AdaptiveBGModel
+from ethoscope.tracking.trackers import AdaptiveBGModel
 
 # the standard monitor
-from pysolovideo.tracking.monitor import Monitor
-from pysolovideo.utils.io import ResultWriter
+from ethoscope.tracking.monitor import Monitor
+from ethoscope.utils.io import ResultWriter
 
 import pkg_resources
 import optparse
@@ -67,7 +67,7 @@ if __name__ == "__main__":
                  "date_time": "NA",
                  "frame_width":cam.width,
                  "frame_height":cam.height,
-                  "psv_version": pkg_resources.get_distribution("pysolovideo").version
+                  "psv_version": pkg_resources.get_distribution("ethoscope").version
                   }
 
     monit = Monitor(cam,

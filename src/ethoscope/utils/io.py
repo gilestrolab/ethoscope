@@ -1,6 +1,6 @@
 __author__ = 'quentin'
 
-# from pysolovideo.utils.debug import PSVException
+
 import time, datetime
 import traceback
 import logging
