@@ -5,6 +5,9 @@ import numpy as np
 import cv2
 import cv
 from ethoscope.utils.debug import EthoscopeException
+from ethoscope.utils.description import DescribedObject
+
+
 
 # TODO use PSVException on sdep
 
@@ -102,7 +105,7 @@ class ROI(object):
         return out, self._mask
 
 
-class BaseROIBuilder(object):
+class BaseROIBuilder(DescribedObject):
 
     def __call__(self, camera):
 
@@ -522,7 +525,6 @@ class SleepDepROIBuilder(BaseROIBuilder):
             raise Exception("Unknown error, the total number of ROIs is different from the target")
         return rois
 
-
 class ImgMaskROIBuilder(BaseROIBuilder):
     """
     Initialised with an grey-scale image file.
@@ -552,6 +554,7 @@ class ImgMaskROIBuilder(BaseROIBuilder):
         return rois
 
 class TargetGridROIBuilderBase(BaseROIBuilder):
+
     _adaptive_med_rad = 0.10
     _expected__min_target_dist = 10 # the minimal distance between two targets, in 'target diameter'
     _vertical_spacing = None
@@ -760,53 +763,7 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
                 rois.append(ROI(ct, value=val))
 
                 cv2.drawContours(img,[ct], -1, (255,0,0),-1)
-                #cv2.imshow("test", img)
-                #cv2.waitKey(-1)
                 val += 1
-
-        # for left in (True,False):
-        #     for i in range(self._n_rows):
-        #
-        #         y = -1 + float(i)/fnrows
-        #
-        #         if left:
-        #             x = -1 + 0.
-        #         else:
-        #             x = -1 + 0.5 + 1/100.
-        #
-        #         pt1 = np.array([x,y + self._vertical_offset,0], dtype=np.float32)
-        #         pt2 = np.array([x,y + 1./fnrows - self._vertical_offset,0], dtype=np.float32)
-        #
-        #         if left:
-        #             x = -1 + 0.5 - 1/100.
-        #         else:
-        #             x = -1 + 1.0
-        #
-        #         pt4 = np.array([x,y+ self._vertical_offset,0], dtype=np.float32)
-        #         pt3 = np.array([x,y + 1./fnrows - self._vertical_offset,0], dtype=np.float32)
-        #
-        #
-        #         pt1, pt2 = np.dot(wrap_mat, pt1),  np.dot(wrap_mat, pt2)
-        #         pt3, pt4 = np.dot(wrap_mat, pt3),  np.dot(wrap_mat, pt4)
-        #         pt1 += origin
-        #         pt2 += origin
-        #         pt3 += origin
-        #         pt4 += origin
-        #         pt1 = pt1.astype(np.int)
-        #         pt2 = pt2.astype(np.int)
-        #         pt3 = pt3.astype(np.int)
-        #         pt4 = pt4.astype(np.int)
-        #
-        #
-        #         ct = np.array([pt1,pt2, pt3, pt4]).reshape((1,4,2))
-        #         rois.append(ROI(ct, value=val))
-        #         #
-        #         cv2.drawContours(img,[ct], -1, (255,0,0),3)
-        #
-        #         cv2.imshow("test", img)
-        #         cv2.waitKey(-1)
-        #         val += 1
-
         return rois
 
     def _score_targets(self,contour, im):
@@ -822,6 +779,7 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
             return 0
         return 1
 
+
 class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilderBase):
 
     _vertical_spacing =  0.1/16.
@@ -830,12 +788,35 @@ class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilderBase):
     _n_cols = 2
 
 class TubeMonitorWithTargetROIBuilder(TargetGridROIBuilderBase):
+
+
     _vertical_spacing =  .15/10.
     _horizontal_spacing =  .1/100.
     _n_rows = 10
     _n_cols = 2
     _horizontal_margin_left = .75 # from the center of the target to the external border (positive value makes grid larger)
     _vertical_margin_top = -1.25 # from the center of the target to the external border (positive value makes grid larger)
+
+class TargetArenaTest(TargetGridROIBuilderBase):
+
+    _vertical_spacing =  .15/10.
+    _horizontal_spacing =  .1/100.
+    _horizontal_margin_left = .75 # from the center of the target to the external border (positive value makes grid larger)
+    _vertical_margin_top = -1.25 # from the center of the target to the external border (positive value makes grid larger)
+
+    description = {"overview": "The default sleep monitor arena with ten rows of two tubes.",
+                    "arguments": [
+                                    {"type": "int", "min": 1, "max": 64, "name": "n_cols", "description": "The number of columns","default":1},
+                                    {"type": "int", "min": 1, "max": 64, "name": "n_rows", "description": "The number of rows","default":1}
+                                   ]}
+
+
+    def __init__(self, n_cols, n_rows ):
+        self._n_rows = n_rows
+        self._n_cols = n_cols
+        super(TargetArenaTest, self).__init__()
+
+
 
 class WellsMonitorWithTargetROIBuilder(TargetGridROIBuilderBase):
     _vertical_spacing =  .9/100.

@@ -10,6 +10,7 @@ from ethoscope.tracking.cameras import MovieVirtualCamera
 
 # Build ROIs from greyscale image
 from ethoscope.tracking.roi_builders import SleepMonitorWithTargetROIBuilder,TubeMonitorWithTargetROIBuilder, WellsMonitorWithTargetROIBuilder
+from ethoscope.tracking.roi_builders  import TargetArenaTest
 
 # the robust self learning tracker
 from ethoscope.tracking.trackers import AdaptiveBGModel
@@ -27,6 +28,11 @@ from ethoscope.utils.io import ResultWriter
 
 
 class ControlThread(Thread):
+
+    _possible_roi_builder_classes = [TargetArenaTest]
+    _ROIBuilderClass = WellsMonitorWithTargetROIBuilder
+    _ROIBuilderClass_kwargs = {}
+
     _tmp_last_img_file = "last_img.jpg"
     _dbg_img_file = "dbg_img.png"
     _log_file = "ethoscope.log"
@@ -39,9 +45,44 @@ class ControlThread(Thread):
                             "last_time_stamp":0,
                             "fps":0
                             }
-    _ROIBuilderClass = WellsMonitorWithTargetROIBuilder
 
-    def __init__(self, machine_id, name, version, ethogram_dir, video_file=None, *args, **kwargs):
+    def get_user_options(self):
+
+        out = {}
+        out["roi_builder"] = []
+        for p in self._possible_roi_builder_classes:
+            d = p.__dict__["description"]
+            d["name"] = p.__name__
+            out["roi_builder"].append(d)
+
+        out["interactors"] = []
+        return out
+
+
+
+    def _parse_user_options(self,data):
+
+        if data is None:
+            return
+
+        data = {"roi_builder":{"name":"TargetArenaTest",
+                              "arguments":{"n_cols": 2, "n_rows": 4}},
+         "interactors":None
+        }
+
+        rb_data =  data["roi_builder"]
+
+        self._ROIBuilderClass = eval(rb_data["name"])
+        self._ROIBuilderClass_kwargs = rb_data["arguments"]
+
+        pass
+
+
+
+
+
+    def __init__(self, machine_id, name, version, ethogram_dir, video_file=None, data=None, *args, **kwargs):
+
         self._monit_args = args
         self._monit_kwargs = kwargs
         self._metadata = None
@@ -61,6 +102,7 @@ class ControlThread(Thread):
         #self._result_file = os.path.join(result_dir, self._result_db_name)
         self._video_file = video_file
 
+        # fixme this is becoming irrelevant
         if name.find('SM')==0:
             type_of_device = 'sm'
         elif name.find('SD')==0:
@@ -69,6 +111,7 @@ class ControlThread(Thread):
             type_of_device = 'sm'
 
         self._tmp_dir = tempfile.mkdtemp(prefix="ethoscope_")
+        #todo add 'data' -> how monitor was started to metadata
         self._info = {  "status": "stopped",
                         "time": time.time(),
                         "error": None,
@@ -84,6 +127,10 @@ class ControlThread(Thread):
                         }
 
         self._monit = None
+        # self.get_user_options()
+
+        self._parse_user_options(data)
+
         super(ControlThread, self).__init__()
 
 
@@ -147,7 +194,8 @@ class ControlThread(Thread):
                     cam = MovieVirtualCamera(self._video_file, use_wall_clock=True)
 
                 logging.info("Building ROIs")
-                roi_builder = self._ROIBuilderClass()
+
+                roi_builder = self._ROIBuilderClass(**self._ROIBuilderClass_kwargs)
                 rois = roi_builder(cam)
 
                 logging.info("Initialising monitor")

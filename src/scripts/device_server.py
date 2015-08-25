@@ -49,7 +49,7 @@ def controls(id, action):
                     # date_time = date.isoformat()
 
                     control = ControlThread(machine_id=machine_id, name=machine_name, version=version, video_file=INPUT_VIDEO,
-                            ethogram_dir=ETHOGRAM_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
+                            ethogram_dir=ETHOGRAM_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION, data=data)
                     control.start()
                     return info(id)
 
