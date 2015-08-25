@@ -78,7 +78,7 @@ def scan_one_device(ip, timeout=1, port=9000, page="id"):
     return None, ip
 
 
-def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, data=None,result_main_dir="/psv_results"):
+def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, data=None,result_main_dir="/ethoscope_results"):
     """
     Just a routine to format our GET urls. This improves readability whilst allowing us to change convention (e.g. port) without rewriting everything.
 
@@ -146,9 +146,9 @@ def make_backup_path(device, result_main_dir):
         raw_ip = os.path.basename(device["ip"]) #without http://
         mysql_db = MySQLdb.connect( host=raw_ip,
                                     #fixme import this info as a global var
-                                    user="psv",
-                                    passwd="psv",
-                                    db="psv_db")
+                                    user="ethoscope",
+                                    passwd="ethoscope",
+                                    db="ethoscope_db")
 
         cur = mysql_db.cursor()
         cur.execute(com)
@@ -178,7 +178,7 @@ def make_backup_path(device, result_main_dir):
                                         )
     return output_db_file
 
-def generate_new_device_map(ip_range=(2,253),device="wlan0", result_main_dir="/psv_results"):
+def generate_new_device_map(ip_range=(2,253),device="wlan0", result_main_dir="/ethoscope_results"):
         devices_map = {}
         subnet_ip = get_subnet_ip(device)
         logging.info("Scanning attached devices")

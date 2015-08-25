@@ -24,7 +24,7 @@ from netifaces import ifaddresses, AF_INET, AF_LINK
 
 
 app = Bottle()
-STATIC_DIR = "../../static"
+STATIC_DIR = "../static"
 
 
 def update_device_map(id, what="data",type=None, port=9000, data=None):
