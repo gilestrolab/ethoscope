@@ -10,6 +10,8 @@ import copy
 from ethoscope.utils.debug import EthoscopeException
 from math import sqrt, log10
 from scipy import ndimage
+from ethoscope.utils.description  import DescribedObject
+
 
 class IntVariableBase(int):
     sql_data_type = "SMALLINT"
@@ -111,7 +113,8 @@ class DataPoint(collections.OrderedDict):
 class NoPositionError(Exception):
     pass
 
-class BaseTracker(object):
+
+class BaseTracker(DescribedObject):
     # data_point = None
     def __init__(self, roi,data=None):
         self._positions = deque()
@@ -386,6 +389,9 @@ class BackgroundModel(object):
 
 
 class AdaptiveBGModel(BaseTracker):
+    description = {"overview": "The default tracker for fruit flies. One animal per ROI.",
+                    "arguments": []}
+
     fg_model = ObjectModel()
 
     def __init__(self, roi, data=None):

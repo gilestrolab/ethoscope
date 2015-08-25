@@ -31,17 +31,18 @@ from ethoscope.utils.debug import EthoscopeException
 
 
 # TODO
-# def psv_exception_checker_decorator(*args, **kwargs):
-#
+# move drawing to a "drawer" object
 
 class Monitor(object):
 
-    def __init__(self, camera, tracker_class, rois = None, interactors=None,
+    def __init__(self, camera, tracker_class,
+                 rois = None, interactors=None,
                 draw_results=False, draw_every_n=1,
                 video_out = None,
                 max_duration=None,
-                drop_each=None
-                ):
+                drop_each=None,
+                *args, **kwargs # extra arguments for the tracker objects
+                 ):
         r"""
         Class to orchestrate the tracking of several object in separate regions of interest (ROIs) and interacting
 
@@ -67,7 +68,7 @@ class Monitor(object):
         self._last_frame_idx =0
         if self._draw_results:
             import os
-            self._window_name = "psv_" + str(os.getpid())
+            self._window_name = "ethoscope_" + str(os.getpid())
 
         self.draw_every_n = draw_every_n
         if not max_duration is None:
@@ -84,33 +85,21 @@ class Monitor(object):
         self._last_time_stamp = 0
         self._is_running = False
 
-        # effective fps computation
-        # self._last_t = 0
-        # self._fps = 0
-        # self._time_diffs = []
 
         if rois is None:
-            raise NotImplementedError("rois must exist (not be None)")
-        #     rois = rbs.DefaultROIBuilder()(camera)
-        #
-        #
+            raise NotImplementedError("rois must exist (cannot be None)")
 
         if interactors is None:
-            self._unit_trackers = [TrackingUnit(tracker_class, r, None) for r in rois]
+            self._unit_trackers = [TrackingUnit(tracker_class, r, None, *args, **kwargs) for r in rois]
 
         elif len(interactors) == len(rois):
-            self._unit_trackers = [TrackingUnit(tracker_class, r, inter) for r, inter in zip(rois, interactors)]
+            self._unit_trackers = [TrackingUnit(tracker_class, r, inter, *args, **kwargs) for r, inter in zip(rois, interactors)]
         else:
             raise ValueError("You should have one interactor per ROI")
 
     @property
     def last_positions(self):
         return self._last_positions
-
-    # @property
-    # def fps(self):
-    #
-    #     return (self._last_frame_idx +1.0) / self._last_time_stamp
 
     @property
     def last_time_stamp(self):
@@ -133,7 +122,6 @@ class Monitor(object):
         frame_cp = frame.copy()
         positions = self._last_positions
         for track_u in self._unit_trackers:
-            # cv2.putText(frame_cp, str(track_u.roi.idx), track_u.roi.offset, cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,0))
             x,y = track_u.roi.offset
             y += track_u.roi.rectangle[3]/2
 

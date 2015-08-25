@@ -101,7 +101,6 @@ def info(id):
     else:
         return {'error': "Error on machine ID"}
 
-
 @api.post('/update/<id>')
 def update_system(id):
     if id == machine_id and control.info['status'] == 'stopped':

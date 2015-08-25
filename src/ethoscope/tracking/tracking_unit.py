@@ -6,9 +6,9 @@ import interactors
 from ethoscope.tracking.trackers import DataPoint, RelativeVariableBase
 
 class TrackingUnit(object):
-    def __init__(self, tracking_algo_class, roi, interactor=None):
+    def __init__(self, tracking_algo_class, roi, interactor=None, *args, **kwargs):
 
-        self._tracker = tracking_algo_class(roi)
+        self._tracker = tracking_algo_class(roi,*args, **kwargs)
         self._roi = roi
 
         if interactor is not None:

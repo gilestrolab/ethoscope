@@ -14,6 +14,7 @@ from ethoscope.tracking.roi_builders  import TargetArenaTest
 
 # the robust self learning tracker
 from ethoscope.tracking.trackers import AdaptiveBGModel
+from ethoscope.tracking.interactors import DefaultInteractor
 from ethoscope.utils.debug import EthoscopeException
 import shutil
 import logging
@@ -33,6 +34,14 @@ class ControlThread(Thread):
     _ROIBuilderClass = WellsMonitorWithTargetROIBuilder
     _ROIBuilderClass_kwargs = {}
 
+    _possible_tracker_classes = [AdaptiveBGModel]
+    _TrackerClass = WellsMonitorWithTargetROIBuilder
+    _TrackerClass_kwargs = {}
+
+    _possible_interactor_classes = [DefaultInteractor]
+    _InteractorClass = WellsMonitorWithTargetROIBuilder
+    _InteractorClass_kwargs = {}
+
     _tmp_last_img_file = "last_img.jpg"
     _dbg_img_file = "dbg_img.png"
     _log_file = "ethoscope.log"
@@ -46,8 +55,7 @@ class ControlThread(Thread):
                             "fps":0
                             }
 
-    def get_user_options(self):
-
+    def _get_user_options(self):
         out = {}
         out["roi_builder"] = []
         for p in self._possible_roi_builder_classes:
@@ -55,10 +63,18 @@ class ControlThread(Thread):
             d["name"] = p.__name__
             out["roi_builder"].append(d)
 
-        out["interactors"] = []
+        out["tracker"] = []
+        for p in self._possible_tracker_classes:
+            d = p.__dict__["description"]
+            d["name"] = p.__name__
+            out["tracker"].append(d)
+
+        out["interactor"] = []
+        for p in self._possible_interactor_classes:
+            d = p.__dict__["description"]
+            d["name"] = p.__name__
+            out["interactor"].append(d)
         return out
-
-
 
     def _parse_user_options(self,data):
 
@@ -67,17 +83,23 @@ class ControlThread(Thread):
 
         data = {"roi_builder":{"name":"TargetArenaTest",
                               "arguments":{"n_cols": 2, "n_rows": 4}},
-         "interactors":None
+                "tracker": {"name":"AdaptiveBGModel",
+                              "arguments":{}},
+                "interactor": {"name":"DefaultInteractor",
+                              "arguments":{}},
         }
 
         rb_data =  data["roi_builder"]
-
         self._ROIBuilderClass = eval(rb_data["name"])
         self._ROIBuilderClass_kwargs = rb_data["arguments"]
 
-        pass
+        tracker_data =  data["tracker"]
+        self._TrackerClass= eval(tracker_data["name"])
+        self._TrackerClass_kwargs = tracker_data["arguments"]
 
-
+        interactor_data =  data["interactor"]
+        self._InteractorClass= eval(interactor_data["name"])
+        self._InteractorClass_kwargs= interactor_data["arguments"]
 
 
 
@@ -92,7 +114,6 @@ class ControlThread(Thread):
         self._last_info_frame_idx = 0
 
         # We wipe off previous data
-        # TODO Isn't it dangerous, if for some reason the server restarts and the node has no backup... we lose the data.
         shutil.rmtree(ethogram_dir, ignore_errors=True)
         try:
             os.makedirs(ethogram_dir)
@@ -121,9 +142,11 @@ class ControlThread(Thread):
                         "id": machine_id,
                         "name": name,
                         "version": version,
+                        # type is obsolete. any device could be any type really
                         "type": type_of_device,
                         "db_name":self._db_credentials["name"],
-                        "monitor_info": self._default_monitor_info
+                        "monitor_info": self._default_monitor_info,
+                        "user_options": self._get_user_options()
                         }
 
         self._monit = None
@@ -201,6 +224,7 @@ class ControlThread(Thread):
                 logging.info("Initialising monitor")
                 cam.restart()
 
+                #todo add info about select options here
                 self._metadata = {
                              "machine_id": self._info["id"],
                              "machine_name": self._info["name"],
@@ -211,8 +235,14 @@ class ControlThread(Thread):
                               }
                 #the camera start time is the reference 0
                 self._info["time"] = cam.start_time
-                self._monit = Monitor(cam, AdaptiveBGModel, rois,
-                            *self._monit_args, **self._monit_kwargs)
+
+                interactors = [self._InteractorClass() for _ in rois]
+                kwargs = self._monit_kwargs.copy()
+                kwargs.update(self._TrackerClass_kwargs)
+
+                self._monit = Monitor(cam, self._TrackerClass, rois,
+                                      interactors=interactors,
+                                     *self._monit_args, **kwargs)
 
                 logging.info("Starting monitor")
 
@@ -259,3 +289,4 @@ class ControlThread(Thread):
     def __del__(self):
         self.stop()
         shutil.rmtree(self._tmp_dir, ignore_errors=True)
+
