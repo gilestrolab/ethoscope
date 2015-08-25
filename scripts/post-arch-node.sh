@@ -12,7 +12,7 @@ set -e # stop if any error happens
 
 export USER_NAME=node
 export PASSWORD=node
-export PSV_DATA_DIR=/psv_results
+export DATA_DIR=/psv_results
 export STABLE_BRANCH=psv-dev
 
 
@@ -192,11 +192,11 @@ w
 " | fdisk /dev/sda
 
 mkfs.ext4 /dev/sda1
-mkdir -p $PSV_DATA_DIR
-chmod 744 $PSV_DATA_DIR -R
-mount /dev/sda1 $PSV_DATA_DIR
+mkdir -p $DATA_DIR
+chmod 744 $DATA_DIR -R
+mount /dev/sda1 $DATA_DIR
 cp /etc/fstab /etc/fstab-bak
-echo "/dev/sda1 $PSV_DATA_DIR ext4 defaults,rw,relatime,data=ordered 0 1" >> /etc/fstab
+echo "/dev/sda1 $DATA_DIR ext4 defaults,rw,relatime,data=ordered 0 1" >> /etc/fstab
 
 
 

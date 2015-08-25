@@ -12,9 +12,11 @@ set -e # stop if any error happens
 
 export USER_NAME=node
 export PASSWORD=node
-export PSV_DATA_DIR=/psv_results
-export STABLE_BRANCH=psv-dev
-
+export DATA_DIR=/ethoscope_results
+export STABLE_BRANCH=master
+export UPSTREAM_GIT_REPO=https://github.com/gilestrolab/ethoscope.git
+export LOCAL_BARE_PATH=/srv/git/ethoscope.git
+export TARGET_GIT_INSTALL=/home/$USER_NAME/ethoscope-git
 
 ############# PACKAGES #########################
 echo 'Installing and updating packages'
@@ -45,19 +47,14 @@ pacman -S wpa_supplicant --noconfirm --needed
 
 
 #Create a Bare repository with only the production branch in node, it is on /var/
-#git clone --bare -b $STABLE_BRANCH --single-branch https://github.com/gilestrolab/pySolo-Video.git /var/pySolo-Video.git
+echo 'creating bare repo'
 mkdir -p /srv/git
-git clone --bare -b $STABLE_BRANCH --single-branch https://github.com/gilestrolab/pySolo-Video.git /srv/git/pySolo-Video.git
+git clone --bare -b $STABLE_BRANCH --single-branch $UPSTREAM_GIT_REPO $LOCAL_BARE_PATH
 
 #Create a local working copy from the bare repo on node
-git clone /var/pySolo-Video.git /home/$USER_NAME/pySolo-Video
-
-# our software.
-# TODO use AUR!
-echo 'Installing PSV package'
-#wget hthttp://stackoverflow.com/questions/758819/python-mysqldb-connection-problemstps://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
-#tar -xvf psv.tar.gz
-cd /home/$USER_NAME/pySolo-Video/psvnode_server
+echo 'Installing ethoscope package'
+git clone $LOCAL_BARE_PATH $TARGET_GIT_INSTALL
+cd $TARGET_GIT_INSTALL/psvnode_server
 pip2 install -e .
 cd -
 

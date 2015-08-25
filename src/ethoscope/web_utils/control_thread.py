@@ -29,8 +29,11 @@ from ethoscope.utils.io import ResultWriter
 class ControlThread(Thread):
     _tmp_last_img_file = "last_img.jpg"
     _dbg_img_file = "dbg_img.png"
-    _log_file = "psv.log"
-    _mysql_db_name = "psv_db"
+    _log_file = "ethoscope.log"
+    _db_credentials = {"name": "ethoscope_db",
+                      "user": "ethoscope",
+                      "password": "ethoscope"}
+
     _default_monitor_info =  {
                             "last_positions":None,
                             "last_time_stamp":0,
@@ -65,7 +68,7 @@ class ControlThread(Thread):
         else:
             type_of_device = 'sm'
 
-        self._tmp_dir = tempfile.mkdtemp(prefix="psv_")
+        self._tmp_dir = tempfile.mkdtemp(prefix="ethoscope_")
         self._info = {  "status": "stopped",
                         "time": time.time(),
                         "error": None,
@@ -76,7 +79,7 @@ class ControlThread(Thread):
                         "name": name,
                         "version": version,
                         "type": type_of_device,
-                        "db_name":self._mysql_db_name,
+                        "db_name":self._db_credentials["name"],
                         "monitor_info": self._default_monitor_info
                         }
 
@@ -165,7 +168,7 @@ class ControlThread(Thread):
 
                 logging.info("Starting monitor")
 
-                with ResultWriter(self._mysql_db_name ,rois, self._metadata) as rw:
+                with ResultWriter(self._db_credentials ,rois, self._metadata) as rw:
                     self._info["status"] = "running"
                     logging.info("Setting monitor status as running: '%s'" % self._info["status"] )
                     self._monit.run(rw)

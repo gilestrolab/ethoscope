@@ -4,7 +4,7 @@ Before=ntpd.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python2  /home/node/pySolo-Video/scripts/init_rc_clock.py
+ExecStart=/usr/bin/python2  /home/node/ethoscope-git/scripts/init_rc_clock.py
 RemainAfterExit=yes
 
 [Install]

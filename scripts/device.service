@@ -6,8 +6,8 @@ After=ntpd.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python2 /home/psv/pySolo-Video/src/scripts/device_server.py
-WorkingDirectory=/home/psv/pySolo-Video/src/scripts/
+WorkingDirectory=/home/ethoscope/ethoscope-git/src/scripts/
+ExecStart=/usr/bin/python2 /home/ethoscope/ethoscope-git/src/scripts/device_server.py
 RestartSec=5
 Restart=always
 

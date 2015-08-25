@@ -6,8 +6,8 @@ After=ntpd.service clock.service
 
 [Service]
 Type=simple
-WorkingDirectory=/home/node/pySolo-Video/psvnode_server/psvnode/scripts/
-ExecStart=/usr/bin/python2  /home/node/pySolo-Video/psvnode_server/psvnode/scripts/server.py --branch psv-dev
+WorkingDirectory=/home/node/ethoscope-git/node_src/scripts
+ExecStart=/usr/bin/python2  /home/node/ethoscope-git/node_src/scripts/server.py --branch dev
 RestartSec=5
 Restart=always
 

@@ -12,15 +12,15 @@ set -e # stop if any error happens
 
 export USER_NAME=psv
 export PASSWORD=psv
-export PSV_DATA_DIR=/psv_data
-export PSV_DB_NAME=psv_db
-
+export DATA_DIR=/ethoscope_data
+export DB_NAME=ethoscope_db
+export TARGET_GIT_INSTALL=/home/$USER_NAME/ethoscope-git
+export NODE_IP=192.169.123.1
+export BARE_GIT_LOCATION=/srv/git/ethoscope.git
 
 ############# PACKAGES #########################
 echo 'Installing and updating packages'
 
-# pacman-db-update
-# pacman-key --init
 pacman -Syu --noconfirm
 pacman -S base-devel git gcc-fortran rsync wget --noconfirm --needed
 ### Video capture related
@@ -54,7 +54,13 @@ echo 'ESSID=psv_wifi' >> /etc/netctl/psv_wifi
 # Prepend hexadecimal keys with \"
 # If your key starts with ", write it as '""<key>"'
 # See also: the section on special quoting rules in netctl.profile(5)
+
+#TODO set new password
 echo 'Key=PSV_WIFI_pIAEZF2s@jmKH' >> /etc/netctl/psv_wifi
+
+
+
+
 # Uncomment this if your ssid is hidden
 #echo 'Hidden=yes'
 
@@ -68,7 +74,7 @@ echo 'IP=dhcp' >> /etc/netctl/eth0
 
 #Updating ntp.conf
 
-echo 'server 192.169.123.1' > /etc/ntp.conf
+echo "server $BARE_GIT_LOCATION" > /etc/ntp.conf
 echo 'server 127.127.1.0' >> /etc/ntp.conf
 echo 'fudge 127.127.1.0 stratum 10' >> /etc/ntp.conf
 echo 'restrict default kod limited nomodify nopeer noquery notrap' >> /etc/ntp.conf
@@ -185,7 +191,7 @@ systemctl start mysqld.service
 systemctl enable mysqld.service
 
 ## not even useful:
-#mysql -u root -e "create database $PSV_DB_NAME";
+#mysql -u root -e "create database $DB_NAME";
 
 mysql -u root -e "CREATE USER \"$USER_NAME\"@'localhost' IDENTIFIED BY \"$PASSWORD\""
 mysql -u root -e "CREATE USER \"$USER_NAME\"@'%' IDENTIFIED BY \"$PASSWORD\""
@@ -212,29 +218,23 @@ cat /etc/mysql/my.cnf-bak | grep -v log-bin >  /etc/mysql/my.cnf
 ####################
 
 ##########
-#Create a local working copy from the bare repo on node (192.168.123.1)
+#Create a local working copy from the bare repo, located on node
 echo 'Cloning from Node'
 
 # FIXME this needs a node in the network to set up the psv
-#git clone node@192.169.123.1:/var/pySolo-Video.git /home/$USER_NAME/pySolo-Video
-
-git clone git://192.169.123.1:/srv/git/pySolo-Video.git /home/$USER_NAME/pySolo-Video
-
+git clone git://$NODE_IP:$BARE_GIT_LOCATION $TARGET_GIT_INSTALL
 
 # our software.
 # TODO use AUR!
-echo 'Installing PSV package'
-#wget https://github.com/gilestrolab/pySolo-Video/archive/psv_prerelease.tar.gz -O psv.tar.gz
-#tar -xvf psv.tar.gz
-cd /home/psv/pySolo-Video/src
+cd $TARGET_GIT_INSTALL/src
 pip2 install -e .
 
 
 # FIXME Omitting this.
 : <<'END'
 echo "copying var part"
-mkdir -p $PSV_DATA_DIR
-chmod 744 $PSV_DATA_DIR -R
+mkdir -p $DATA_DIR
+chmod 744 $DATA_DIR -R
 
 
 
@@ -256,12 +256,12 @@ w
 
 mkfs.ext4 /dev/sda1
 mkfs.ext4 /dev/sda2
-mkdir -p $PSV_DATA_DIR
-chmod 744 $PSV_DATA_DIR -R
-mount /dev/sda2 $PSV_DATA_DIR
+mkdir -p $DATA_DIR
+chmod 744 $DATA_DIR -R
+mount /dev/sda2 $DATA_DIR
 cp /etc/fstab /etc/fstab-bak
 echo "/dev/sda1 /var ext4 defaults,rw,relatime,data=ordered 0 1" >> /etc/fstab
-echo "/dev/sda2 $PSV_DATA_DIR ext4 defaults,rw,relatime,data=ordered 0 1" >> /etc/fstab
+echo "/dev/sda2 $DATA_DIR ext4 defaults,rw,relatime,data=ordered 0 1" >> /etc/fstab
 mkdir /mnt/var
 mount /dev/sda1 /mnt/var
 #init 1

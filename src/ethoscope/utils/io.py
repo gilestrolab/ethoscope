@@ -15,10 +15,10 @@ import os
 
 class AsyncMySQLWriter(multiprocessing.Process):
 
-    def __init__(self, db_name, queue):
-        self._db_name = db_name
-        self._db_user_name = "psv"
-        self._db_user_pass = "psv"
+    def __init__(self, db_credentials, queue):
+        self._db_name = db_credentials["name"]
+        self._db_user_name = db_credentials["user"]
+        self._db_user_pass = db_credentials["password"]
 
         self._queue = queue
         self._delete_my_sql_db()
@@ -269,9 +269,9 @@ class ResultWriter(object):
     # _flush_every_ns = 30 # flush every 10s of data
     _max_insert_string_len = 1000
     _async_writing_class = AsyncMySQLWriter
-    def __init__(self, db_name, rois, metadata=None, make_dam_like_table=True, take_frame_shots=False, *args, **kwargs):
+    def __init__(self, db_credentials, rois, metadata=None, make_dam_like_table=True, take_frame_shots=False, *args, **kwargs):
         self._queue = multiprocessing.JoinableQueue()
-        self._async_writer = self._async_writing_class(db_name, self._queue)
+        self._async_writer = self._async_writing_class(db_credentials, self._queue)
         self._async_writer.start()
 
         self._last_t, self._last_flush_t, self._last_dam_t = [0] * 3
