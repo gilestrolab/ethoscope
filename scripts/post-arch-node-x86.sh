@@ -13,9 +13,9 @@ set -e # stop if any error happens
 export USER_NAME=node
 export PASSWORD=node
 export DATA_DIR=/ethoscope_results
-export STABLE_BRANCH=master
+export STABLE_BRANCH=dev
 export UPSTREAM_GIT_REPO=https://github.com/gilestrolab/ethoscope.git
-export LOCAL_BARE_PATH=/srv/git/ethoscope.git
+export LOCAL_BARE_PATH=/srv/git/ethoscope-git
 export TARGET_GIT_INSTALL=/home/$USER_NAME/ethoscope-git
 
 ############# PACKAGES #########################
@@ -49,27 +49,27 @@ pacman -S wpa_supplicant --noconfirm --needed
 #Create a Bare repository with only the production branch in node, it is on /var/
 echo 'creating bare repo'
 mkdir -p /srv/git
-git clone --bare -b $STABLE_BRANCH --single-branch $UPSTREAM_GIT_REPO $LOCAL_BARE_PATH
+git clone --bare $UPSTREAM_GIT_REPO $LOCAL_BARE_PATH
 
 #Create a local working copy from the bare repo on node
 echo 'Installing ethoscope package'
 git clone $LOCAL_BARE_PATH $TARGET_GIT_INSTALL
-cd $TARGET_GIT_INSTALL/psvnode_server
+cd $TARGET_GIT_INSTALL/node-src
 pip2 install -e .
 cd -
 
 
 
-echo 'Description=psv wifi network' > /etc/netctl/psv_wifi
-echo 'Interface=wlan0' >> /etc/netctl/psv_wifi
-echo 'Connection=wireless' >> /etc/netctl/psv_wifi
-echo 'Security=wpa' >> /etc/netctl/psv_wifi
-echo 'IP=dhcp' >> /etc/netctl/psv_wifi
-echo 'ESSID=psv_wifi' >> /etc/netctl/psv_wifi
+echo 'Description=psv wifi network' > /etc/netctl/ethoscope_wifi
+echo 'Interface=wlan0' >> /etc/netctl/ethoscope_wifi
+echo 'Connection=wireless' >> /etc/netctl/ethoscope_wifi
+echo 'Security=wpa' >> /etc/netctl/ethoscope_wifi
+echo 'IP=dhcp' >> /etc/netctl/ethoscope_wifi
+echo 'ESSID=ETHOSCOPE_WIFI' >> /etc/netctl/ethoscope_wifi
 # Prepend hexadecimal keys with \"
 # If your key starts with ", write it as '""<key>"'
 # See also: the section on special quoting rules in netctl.profile(5)
-echo 'Key=PSV_WIFI_pIAEZF2s@jmKH' >> /etc/netctl/psv_wifi
+echo 'Key=ETHOSCOPE_1234' >> /etc/netctl/ethoscope_wifi
 # Uncomment this if your ssid is hidden
 #echo 'Hidden=yes'
 
@@ -82,7 +82,6 @@ echo 'IP=dhcp' >> /etc/netctl/eth0
 ######################################################################################
 
 #Creating service for device_server.py
-
 cp ./node.service /etc/systemd/system/node.service
 
 
@@ -115,8 +114,8 @@ systemctl enable git-daemon.socket
 
 #setting up wifi
 # FIXME this not work if not psv-wifi
-netctl start psv_wifi || echo 'No psv_wifi connection'
-netctl enable psv_wifi
+netctl start ethoscope_wifi || echo 'No ethoscope_wifi connection'
+netctl enable ethoscope_wifi
 netctl enable eth0
 netctl start eth0
 

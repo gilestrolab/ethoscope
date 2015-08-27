@@ -419,7 +419,7 @@ if __name__ == '__main__':
 
     RESULTS_DIR = "/ethoscope_results"
     GIT_BARE_REPO_DIR = "/srv/git/ethoscope-git"
-    GIT_WORKING_DIR = "/home/ethoscope/ethoscope-git"
+    GIT_WORKING_DIR = "/home/node/ethoscope-git"
 
     #SUBNET_DEVICE = b'wlan0'
     p1 = subprocess.Popen(["ip", "link", "show"], stdout=subprocess.PIPE)

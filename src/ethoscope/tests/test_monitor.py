@@ -1,34 +1,35 @@
 __author__ = 'quentin'
 
 from ethoscope.tracking.cameras import MovieVirtualCamera
-
-
-
-from ethoscope.tracking.roi_builders import TubeMonitorWithTargetROIBuilder
-
+from ethoscope.tracking.roi_builders import TargetGridROIBuilderBase
 from ethoscope.tracking.trackers import AdaptiveBGModel
-
-
 from ethoscope.tracking.monitor import Monitor
 from ethoscope.utils.io import SQLiteResultWriter
-
-
 import logging
 import unittest
 
-
-
-
-INPUT_VIDEO = "/data/sleep_dep_vid.mp4"
+INPUT_VIDEO = "/data/sleep_dep_vid_2fps.mp4"
 OUTPUT_VIDEO = "/data/sleep_dep_vid_annot.avi"
-OUTPUT_DB = "/data/sleep_dep_vid.db"
+OUTPUT_DB = "/home/quentin/Desktop/sleep_dep_vid_ok.db"
+
+class TestROIBuilder(TargetGridROIBuilderBase):
 
 
-class TestMySQL(unittest.TestCase):
+    _vertical_spacing =  .15/10.
+    _horizontal_spacing =  .025
+    _n_rows = 10
+    _n_cols = 2
+    _horizontal_margin_left = +1. # from the center of the target to the external border (positive value makes grid larger)
+    _horizontal_margin_right = +1. # from the center of the target to the external border (positive value makes grid larger)
+    _vertical_margin_top = -1.25 # from the center of the target to the external border (positive value makes grid larger)
+    _vertical_margin_bottom = -.5 # from the center of the target to the external border (positive value makes grid larger)
+
+
+class TestMonitor(unittest.TestCase):
     def test_all(self):
         cam = MovieVirtualCamera(INPUT_VIDEO, use_wall_clock=False)
 
-        roi_builder = TubeMonitorWithTargetROIBuilder()
+        roi_builder = TestROIBuilder()
         rois = roi_builder(cam)
 
         # logging.info("Initialising monitor")
@@ -50,8 +51,7 @@ class TestMySQL(unittest.TestCase):
         monit = Monitor(cam, AdaptiveBGModel, rois,
                         draw_every_n=1,
                         draw_results=draw_frames,
-                        video_out=OUTPUT_VIDEO,
-                        drop_each=10,
+                        video_out=OUTPUT_VIDEO
                         )
 
 
@@ -61,4 +61,3 @@ class TestMySQL(unittest.TestCase):
                 monit.run(rw)
         except KeyboardInterrupt:
             monit.stop()
-
