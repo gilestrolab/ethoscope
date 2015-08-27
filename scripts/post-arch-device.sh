@@ -10,13 +10,13 @@
 
 set -e # stop if any error happens
 
-export USER_NAME=psv
-export PASSWORD=psv
+export USER_NAME=ethoscope
+export PASSWORD=ethoscope
 export DATA_DIR=/ethoscope_data
 export DB_NAME=ethoscope_db
 export TARGET_GIT_INSTALL=/home/$USER_NAME/ethoscope-git
 export NODE_IP=192.169.123.1
-export BARE_GIT_LOCATION=/srv/git/ethoscope.git
+export BARE_GIT_LOCATION=/srv/git/ethoscope-git
 
 ############# PACKAGES #########################
 echo 'Installing and updating packages'
@@ -45,18 +45,18 @@ pacman -S wpa_supplicant --noconfirm --needed
 
 pip2 install 'picamera[array]'
 
-echo 'Description=psv wifi network' > /etc/netctl/psv_wifi
-echo 'Interface=wlan0' >> /etc/netctl/psv_wifi
-echo 'Connection=wireless' >> /etc/netctl/psv_wifi
-echo 'Security=wpa' >> /etc/netctl/psv_wifi
-echo 'IP=dhcp' >> /etc/netctl/psv_wifi
-echo 'ESSID=psv_wifi' >> /etc/netctl/psv_wifi
+echo 'Description=ethoscope_wifi network' > /etc/netctl/ethoscope_wifi
+echo 'Interface=wlan0' >> /etc/netctl/ethoscope_wifi
+echo 'Connection=wireless' >> /etc/netctl/ethoscope_wifi
+echo 'Security=wpa' >> /etc/netctl/ethoscope_wifi
+echo 'IP=dhcp' >> /etc/netctl/ethoscope_wifi
+echo 'ESSID=ethoscope_wifi' >> /etc/netctl/ethoscope_wifi
 # Prepend hexadecimal keys with \"
 # If your key starts with ", write it as '""<key>"'
 # See also: the section on special quoting rules in netctl.profile(5)
 
 #TODO set new password
-echo 'Key=PSV_WIFI_pIAEZF2s@jmKH' >> /etc/netctl/psv_wifi
+echo 'Key=ETHOSCOPE_1234' >> /etc/netctl/ethoscope_wifi
 
 
 
@@ -103,10 +103,10 @@ systemctl start fake-hwclock
 systemctl enable sshd.service
 systemctl start sshd.service
 #setting up wifi
-#Fixme this does not work if the pi is not connected to a psv_wifi
-#netctl start psv_wifi
-netctl enable psv_wifi
-netctl start psv_wifi
+#Fixme this does not work if the pi is not connected to a ethoscope_wifi
+
+netctl enable ethoscope_wifi
+netctl start ethoscope_wifi
 netctl enable eth0
 netctl start eth0
 
@@ -221,7 +221,7 @@ cat /etc/mysql/my.cnf-bak | grep -v log-bin >  /etc/mysql/my.cnf
 #Create a local working copy from the bare repo, located on node
 echo 'Cloning from Node'
 
-# FIXME this needs a node in the network to set up the psv
+# FIXME this needs a node in the network to set up the git
 git clone git://$NODE_IP:$BARE_GIT_LOCATION $TARGET_GIT_INSTALL
 
 # our software.
