@@ -50,7 +50,7 @@ echo 'Interface=wlan0' >> /etc/netctl/ethoscope_wifi
 echo 'Connection=wireless' >> /etc/netctl/ethoscope_wifi
 echo 'Security=wpa' >> /etc/netctl/ethoscope_wifi
 echo 'IP=dhcp' >> /etc/netctl/ethoscope_wifi
-echo 'ESSID=ethoscope_wifi' >> /etc/netctl/ethoscope_wifi
+echo 'ESSID=ETHOSCOPE_WIFI' >> /etc/netctl/ethoscope_wifi
 # Prepend hexadecimal keys with \"
 # If your key starts with ", write it as '""<key>"'
 # See also: the section on special quoting rules in netctl.profile(5)
@@ -90,6 +90,7 @@ cp ./device.service /etc/systemd/system/device.service
 
 systemctl daemon-reload
 ######################################################################################
+
 echo 'Enabling startuup deamons'
 
 systemctl disable systemd-networkd
@@ -229,50 +230,5 @@ git clone git://$NODE_IP:$BARE_GIT_LOCATION $TARGET_GIT_INSTALL
 cd $TARGET_GIT_INSTALL/src
 pip2 install -e .
 
-
-# FIXME Omitting this.
-: <<'END'
-echo "copying var part"
-mkdir -p $DATA_DIR
-chmod 744 $DATA_DIR -R
-
-
-
-#### set the ssd
-echo "o
-n
-p
-
-
-+14G
-
-n
-p
-
-
-
-w
-" | fdisk /dev/sda
-
-mkfs.ext4 /dev/sda1
-mkfs.ext4 /dev/sda2
-mkdir -p $DATA_DIR
-chmod 744 $DATA_DIR -R
-mount /dev/sda2 $DATA_DIR
-cp /etc/fstab /etc/fstab-bak
-echo "/dev/sda1 /var ext4 defaults,rw,relatime,data=ordered 0 1" >> /etc/fstab
-echo "/dev/sda2 $DATA_DIR ext4 defaults,rw,relatime,data=ordered 0 1" >> /etc/fstab
-mkdir /mnt/var
-mount /dev/sda1 /mnt/var
-#init 1
-cd /var
-cp -ax * /mnt/var
-cd /
-mv var var.old
-mkdir /var
-umount /dev/sda1
-mount /dev/sda1 /var
-
-END
 
 echo 'SUCESS, please reboot'
