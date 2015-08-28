@@ -149,7 +149,7 @@ if __name__ == '__main__':
 
     parser = OptionParser()
     #parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
-    parser.add_option("-r", "--run", dest="debug", default=False, help="Runs tracking directly", action="store_true")
+    parser.add_option("-r", "--run", dest="run", default=False, help="Runs tracking directly", action="store_true")
     parser.add_option("-d", "--draw", dest="draw", default=False, help="Draws real time tracking results on XOrg", action="store_true")
     parser.add_option("-i", "--input", dest="input", default=None, help="A video file to use as an input (alternative to real time camera)")
     parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
@@ -182,11 +182,13 @@ if __name__ == '__main__':
                             name=machine_name,
                             version=version,
                             video_file=option_dict["input"],
-                            ethogram_dir=option_dict["result_dir"],
+                            ethogram_dir=option_dict["results_dir"],
                             draw_results = option_dict["draw"],
                             max_duration=DURATION,
                             data=data)
 
+    if option_dict["run"]:
+        control.start()
 
     try:
         run(api, host='0.0.0.0', port=port, server='cherrypy')

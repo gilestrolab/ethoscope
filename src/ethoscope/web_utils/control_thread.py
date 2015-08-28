@@ -35,11 +35,11 @@ class ControlThread(Thread):
     _ROIBuilderClass_kwargs = {}
 
     _possible_tracker_classes = [AdaptiveBGModel]
-    _TrackerClass = WellsMonitorWithTargetROIBuilder
+    _TrackerClass = AdaptiveBGModel
     _TrackerClass_kwargs = {}
 
     _possible_interactor_classes = [DefaultInteractor]
-    _InteractorClass = WellsMonitorWithTargetROIBuilder
+    _InteractorClass = DefaultInteractor
     _InteractorClass_kwargs = {}
 
     _tmp_last_img_file = "last_img.jpg"
