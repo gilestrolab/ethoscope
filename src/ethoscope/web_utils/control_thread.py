@@ -81,13 +81,6 @@ class ControlThread(Thread):
         if data is None:
             return
 
-        data = {"roi_builder":{"name":"TargetArenaTest",
-                              "arguments":{"n_cols": 2, "n_rows": 4}},
-                "tracker": {"name":"AdaptiveBGModel",
-                              "arguments":{}},
-                "interactor": {"name":"DefaultInteractor",
-                              "arguments":{}},
-        }
 
         rb_data =  data["roi_builder"]
         self._ROIBuilderClass = eval(rb_data["name"])
