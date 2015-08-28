@@ -136,25 +136,6 @@ def close(exit_status=0):
 
 if __name__ == '__main__':
 
-    parser = OptionParser()
-    parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
-    parser.add_option("-p", "--port", dest="port", default=9000,help="port")
-    parser.add_option("-b", "--branch", dest="branch", default="psv-package",help="the branch to work from")
-    (options, args) = parser.parse_args()
-    option_dict = vars(options)
-    debug = option_dict["debug"]
-    port = option_dict["port"]
-    branch = option_dict["branch"]
-
-
-    # import ConfigParser
-    # config = ConfigParser.RawConfigParser(allow_no_value=True)
-    # for loc in os.curdir, os.path.expanduser("~"), "/etc/ethoscope/", os.environ.get("PSV_DEV_SERV_CONF"):
-    #     try:
-    #         with open(os.path.join(loc,"device_server.conf")) as source:
-    #             config.readfp(source)
-    #     except IOError:
-    #         pass
 
     INPUT_VIDEO = None
     DURATION = None
@@ -165,39 +146,46 @@ if __name__ == '__main__':
     MACHINE_ID_FILE = '/etc/machine-id'
     MACHINE_NAME_FILE = '/etc/machine-name'
 
+
+    parser = OptionParser()
+    #parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
+    parser.add_option("-r", "--run", dest="debug", default=False, help="Runs tracking directly", action="store_true")
+    parser.add_option("-d", "--draw", dest="draw", default=False, help="Draws real time tracking results on XOrg", action="store_true")
+    parser.add_option("-i", "--input", dest="input", default=None, help="A video file to use as an input (alternative to real time camera)")
+    parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
+    parser.add_option("-p", "--port", dest="port", default=9000,help="port")
+    parser.add_option("-b", "--branch", dest="branch", default="psv-package",help="the branch to work from")
+    parser.add_option("-e", "--results-dir", dest="results_dir", default=ETHOGRAM_DIR,help="Where temporary result files are stored")
+    parser.add_option("-g", "--git-dir", dest="git_dir", default=GIT_WORKING_DIR,help="Where is the target git located(for software update)")
+
+    (options, args) = parser.parse_args()
+    option_dict = vars(options)
+
+    port = option_dict["port"]
+    branch = option_dict["branch"]
+
+
     machine_id = get_machine_info(MACHINE_ID_FILE)
     machine_name = get_machine_info(MACHINE_NAME_FILE)
 
+    version = get_version(option_dict["git_dir"], branch)
 
-    if debug:
-        import getpass
-        DURATION = 60*60 * 100
-
-        if getpass.getuser() == "quentin":
-            INPUT_VIDEO = '/data/psv_misc/tube_monitor_validation/tube_monitor_validation_raw.mp4'
-            ETHOGRAM_DIR = "/psv_data/results/"
-            #fixme Put your working directories
-            GIT_WORKING_DIR = "./"
+    if option_dict["json"]:
+        import json
+        with open(option_dict["json"]) as f:
+            data = json.load(f.read())
+    else:
+        data = None
 
 
-        elif getpass.getuser() == "asterix":
-            ETHOGRAM_DIR = "/tmp/psv_data"
-            INPUT_VIDEO = '/data1/sleepMonitor_5days.avi'
-            GIT_WORKING_DIR = "/data1/todel/pySolo-Device"
-
-        elif getpass.getuser() == "psv" or getpass.getuser() == "root":
-            INPUT_VIDEO = "/data/monitor_new_targets_short.avi"
-            ETHOGRAM_DIR = "/psv_data/results"
-            GIT_WORKING_DIR = "/home/psv/pySolo-Video"
-        else:
-            raise Exception("where is your debugging video?")
-        DRAW_RESULTS = True
-
-
-    version = get_version(GIT_WORKING_DIR, branch)
-    # fixme => the name should be hardcoded in a encrypted file? file.
-    control = ControlThread(machine_id=machine_id, name=machine_name, version=version, video_file=INPUT_VIDEO,
-                             ethogram_dir=ETHOGRAM_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION)
+    control = ControlThread(machine_id=machine_id,
+                            name=machine_name,
+                            version=version,
+                            video_file=option_dict["input"],
+                            ethogram_dir=option_dict["result_dir"],
+                            draw_results = option_dict["draw"],
+                            max_duration=DURATION,
+                            data=data)
 
 
     try:
