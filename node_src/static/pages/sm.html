@@ -134,9 +134,22 @@
         <h4 class="modal-title" id="startModalLabel">Select tracking type</h4>
       </div>
       <div class="modal-body">
-          <div class="list-group">
-            <button type="button" class="list-group-item" ng-repeat="option in tracking.options" ng-click="sm.start(option)">{{option.name}}</button>
+          <form>
+          <div ng-repeat="(name,option) in user_options">
+            <h5>{{name}}</h5>
+              <ul>
+                <li ng-repeat="opt in option"><input type=radio name={{opt.name}} ng-model=tracker>
+                  {{opt.name}}: {{opt.overview}}
+                  <ul>
+                        <li ng-repeat="arg in opt.arguments">
+                            {{arg.description}}
+                            <input ng-if='arg != "description"' type=text name={{arg}} value={{arg.default}}>
+                        </li>
+                    </ul>
+                </li>
+              </ul>
           </div>
+              </form>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>

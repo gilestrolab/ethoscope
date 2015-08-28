@@ -450,8 +450,8 @@ if __name__ == '__main__':
             SUBNET_DEVICE = b'lo'
             INTERNET_DEVICE = b'eno1'
             RESULTS_DIR = "/data1/todel/psv_results"
-            GIT_BARE_REPO_DIR = "/data1/todel/pySolo-Video.git"
-            GIT_WORKING_DIR = "/data1/todel/pySolo-Node"
+            GIT_BARE_REPO_DIR = "/data1/todel/ethoscope.git"
+            GIT_WORKING_DIR = "/data1/todel/ethoscope"
 
     global devices_map
     global scanning_locked

@@ -10,6 +10,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
         var starting_tracking= document.getElementById('starting');
         $http.get('/device/'+device_id+'/data').success(function(data){
             $scope.device = data;
+            $scope.user_options= data.user_options;
         });
 
         $http.get('/device/'+device_id+'/ip').success(function(data){
@@ -27,6 +28,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
              $http.get('/devices').success(function(data){
                     $http.get('/device/'+device_id+'/data').success(function(data){
                         $scope.device = data;
+
                     });
 
                     $http.get('/device/'+device_id+'/ip').success(function(data){
