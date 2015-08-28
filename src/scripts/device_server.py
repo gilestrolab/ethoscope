@@ -173,7 +173,7 @@ if __name__ == '__main__':
     if option_dict["json"]:
         import json
         with open(option_dict["json"]) as f:
-            data = json.load(f.read())
+            data = json.loads(f.read())
     else:
         data = None
 

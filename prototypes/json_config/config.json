@@ -1,0 +1,8 @@
+
+{"roi_builder":{"name":"TargetArenaTest",
+                      "arguments":{"n_cols": 1, "n_rows": 1}},
+        "tracker": {"name":"AdaptiveBGModel",
+                      "arguments":{}},
+        "interactor": {"name":"DefaultInteractor",
+                      "arguments":{}}
+}
