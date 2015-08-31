@@ -273,7 +273,7 @@ class TargetArenaTest(TargetGridROIBuilderBase):
     def __init__(self, n_cols, n_rows, dummy_datetime, dummy_str, dummy_float ):
         self._n_rows = n_rows
         self._n_cols = n_cols
-        
+
         super(TargetArenaTest, self).__init__()
 
 

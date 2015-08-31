@@ -1,21 +1,22 @@
 import tempfile
 import os
-import cv2
 from threading import Thread
 import traceback
 import shutil
 import logging
 import time
 
+import cv2
+
+
 
 # Interface to V4l
 from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera
 # Build ROIs from greyscale image
 
-from ethoscope.rois.target_roi_builder import WellsMonitorWithTargetROIBuilder
 from ethoscope.rois.target_roi_builder import TargetArenaTest
 from ethoscope.core.monitor import Monitor
-from ethoscope.core.drawers import DefaultDrawer
+from ethoscope.drawers.drawers import DefaultDrawer
 
 # the robust self learning tracker
 from ethoscope.trackers.trackers import AdaptiveBGModel
