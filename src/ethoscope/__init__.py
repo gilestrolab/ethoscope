@@ -5,9 +5,13 @@ It should include description and links to the main modules,
 """
 
 
-import tracking
-import hardware_control
+import core
+import hardware
+import interactors
+import rois
+import trackers
 import utils
 import web_utils
+
 
 

@@ -20,14 +20,11 @@ gds gvdr
 
 __author__ = 'quentin'
 
-import roi_builders as rbs
-from tracking_unit import TrackingUnit
 
+from tracking_unit import TrackingUnit
 import logging
 import cv2
-from collections import deque
-import numpy as np
-from ethoscope.utils.debug import EthoscopeException
+
 
 
 # TODO

@@ -2,19 +2,19 @@ import tempfile
 import os
 import cv2
 from threading import Thread
-from ethoscope.tracking.monitor import Monitor
+
 
 # Interface to V4l
-from ethoscope.tracking.cameras import OurPiCameraAsync
-from ethoscope.tracking.cameras import MovieVirtualCamera
+from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera
 
 # Build ROIs from greyscale image
-from ethoscope.tracking.roi_builders import SleepMonitorWithTargetROIBuilder,TubeMonitorWithTargetROIBuilder, WellsMonitorWithTargetROIBuilder
-from ethoscope.tracking.roi_builders  import TargetArenaTest
+from ethoscope.rois.roi_builders import SleepMonitorWithTargetROIBuilder,TubeMonitorWithTargetROIBuilder, WellsMonitorWithTargetROIBuilder
+from ethoscope.rois.roi_builders import TargetArenaTest
+from ethoscope.core.monitor import Monitor
 
 # the robust self learning tracker
-from ethoscope.tracking.trackers import AdaptiveBGModel
-from ethoscope.tracking.interactors import DefaultInteractor
+from ethoscope.trackers.trackers import AdaptiveBGModel
+from ethoscope.interactors.interactors import DefaultInteractor
 from ethoscope.utils.debug import EthoscopeException
 import shutil
 import logging

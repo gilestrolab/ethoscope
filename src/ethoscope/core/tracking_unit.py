@@ -2,8 +2,9 @@ __author__ = 'quentin'
 
 
 
-import interactors
-from ethoscope.tracking.trackers import DataPoint, RelativeVariableBase
+
+from ethoscope.core.variables import DataPoint, RelativeVariableBase
+from ethoscope.interactors.interactors import DefaultInteractor
 
 class TrackingUnit(object):
     def __init__(self, tracking_algo_class, roi, interactor=None, *args, **kwargs):
@@ -14,7 +15,7 @@ class TrackingUnit(object):
         if interactor is not None:
             self._interactor= interactor
         else:
-            self._interactor = interactors.DefaultInteractor()
+            self._interactor = DefaultInteractor()
 
         self._interactor.bind_tracker(self._tracker)
 

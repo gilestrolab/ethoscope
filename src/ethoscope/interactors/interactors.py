@@ -7,8 +7,8 @@ from math import sqrt
 
 
 from ethoscope.utils.description import DescribedObject
+from ethoscope.core.variables import BoolVariableBase
 
-from ethoscope.tracking.trackers import BoolVariableBase
 
 class HasInteractedVariable(BoolVariableBase):
     header_name = "has_interacted"
@@ -49,7 +49,7 @@ class SleepDepInteractor(BaseInteractorSync):
         self._inactivity_time_threshold = 90 # s
 
     def _interact(self, **kwargs):
-        print "c=",self._channel
+        #print "c=",self._channel
         self._sleep_dep_interface.deprive(**kwargs)
 
     def _run(self):

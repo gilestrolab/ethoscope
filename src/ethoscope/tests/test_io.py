@@ -2,17 +2,16 @@ __author__ = 'quentin'
 
 
 import unittest
-import os
 import shutil
 import random
 import tempfile
-from ethoscope.tracking.roi_builders import ROI
-from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
-
-
-from ethoscope.tracking.trackers import DataPoint, BoolVariableBase, IntVariableBase, DistanceIntVarBase
 import logging
 import numpy as np
+
+from ethoscope.rois.roi_builders import ROI
+from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
+from ethoscope.core.variables import DataPoint, BoolVariableBase, IntVariableBase, DistanceIntVarBase
+
 class DummyBoolVariable(BoolVariableBase):
     header_name="dummy_bool"
 
