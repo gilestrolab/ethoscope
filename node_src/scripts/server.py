@@ -406,20 +406,25 @@ if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
 
     parser = optparse.OptionParser()
-    parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
+    #parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-p", "--port", dest="port", default=80,help="port")
-    parser.add_option("-b", "--branch", dest="branch", default="dev",help="the branch to work from")
+    parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
+    parser.add_option("-b", "--branch", dest="branch", default="psv-package",help="the branch to work from")
+    parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_results",help="Where temporary result files are stored")
+    parser.add_option("-g", "--git-dir", dest="git_dir", default="/home/node/ethoscope-git",help="Where is the target git located(for software update)")
+    parser.add_option("-B", "--git-bare-dir", dest="git_bare_dir", default="/srv/git/ethoscope-git",help="Where is the target git located(for software update)")
+    parser.add_option("-i", "--internet-adapter", dest="internet_adapter", default="",help="e.g. En0, adapter user to internet connection (updates)")
+    parser.add_option("-l", "--local-adapter", dest="local_adapter", default="",help="e.g. wlan0, adapter used for the local connection with devices")
 
     (options, args) = parser.parse_args()
 
     option_dict = vars(options)
-    DEBUG = option_dict["debug"]
     PORT = option_dict["port"]
     branch = option_dict["branch"]
 
-    RESULTS_DIR = "/ethoscope_results"
-    GIT_BARE_REPO_DIR = "/srv/git/ethoscope-git"
-    GIT_WORKING_DIR = "/home/node/ethoscope-git"
+    RESULTS_DIR = option_dict["results_dir"]
+    GIT_BARE_REPO_DIR = option_dict["git_bare_dir"]
+    GIT_WORKING_DIR = option_dict["git_dir"]
 
     #SUBNET_DEVICE = b'wlan0'
     p1 = subprocess.Popen(["ip", "link", "show"], stdout=subprocess.PIPE)
@@ -437,21 +442,11 @@ if __name__ == '__main__':
     else:
         logging.info("Not ethernet adapter has been detected. It is necessary for connect to Internet.")
 
-    if DEBUG:
-        import getpass
-        if getpass.getuser() == "quentin":
+    if option_dict["local_adapter"]!= "" :
+        SUBNET_DEVICE = option_dict["local_adapter"]
 
-            SUBNET_DEVICE = b'enp3s0'
-            INTERNET_DEVICE = b'lo'
-            #SUBNET_DEVICE = b'eno1'
-            GIT_BARE_REPO_DIR = GIT_WORKING_DIR = "./"
-
-        if getpass.getuser() == "asterix":
-            SUBNET_DEVICE = b'lo'
-            INTERNET_DEVICE = b'eno1'
-            RESULTS_DIR = "/data1/todel/psv_results"
-            GIT_BARE_REPO_DIR = "/data1/todel/ethoscope.git"
-            GIT_WORKING_DIR = "/data1/todel/ethoscope"
+    if  option_dict["internet_adapter"]!="":
+        INTERNET_DEVICE = option_dict["internet_adapter"]
 
     global devices_map
     global scanning_locked
@@ -490,3 +485,5 @@ if __name__ == '__main__':
     finally:
         close()
 
+
+# python server.py -p 8000 -g /Users/asterix/PolygonalTree/todel/ethoscope.git -B /Users/asterix/PolygonalTree/todel/ethoscope

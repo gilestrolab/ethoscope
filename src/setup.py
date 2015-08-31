@@ -19,7 +19,7 @@ setup(
     license="GPL3",
     description='todo', #TODO
     long_description=open('README').read(),
-    scripts=['scripts/sleep_monitor_pi_automask.py', 'scripts/record_video.py'],
+    scripts=[ 'scripts/record_video.py'],
     # data e.g. classifiers can be added as part of the package
     # TODO
     # package_data={'ethoscope': ['data/classifiers/*.pkl']},
