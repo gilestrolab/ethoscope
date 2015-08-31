@@ -417,10 +417,6 @@ class ResultWriter(object):
         logging.info("Creating database table with: " + command)
         self._write_async_command(command)
 
-#
-
-
-
 class AsyncSQLiteWriter(multiprocessing.Process):
     _pragmas = {"temp_store": "MEMORY",
                 "journal_mode": "OFF",
@@ -498,8 +494,6 @@ class AsyncSQLiteWriter(multiprocessing.Process):
             self._queue.close()
             if db is not None:
                 db.close()
-
-
 
 class Null(object):
     def __repr__(self):

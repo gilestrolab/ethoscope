@@ -30,8 +30,6 @@ class Monitor(object):
 
     def __init__(self, camera, tracker_class,
                  rois = None, interactors=None,
-        #        draw_results=False, draw_every_n=1,
-        #        video_out = None,
                 max_duration=None,
                 drop_each=None,
                 *args, **kwargs # extra arguments for the tracker objects
@@ -91,9 +89,6 @@ class Monitor(object):
     @property
     def last_frame_idx(self):
         return self._last_frame_idx
-    # @property
-    # def last_drawn_frame(self):
-    #     return self._draw_on_frame(self._frame_buffer)
 
     def stop(self):
         self._force_stop = True
@@ -104,8 +99,6 @@ class Monitor(object):
             self._is_running = True
 
             for i,(t, frame) in enumerate(self._camera):
-                # if i % 1000 == 0:
-                #     print t/(3600*1e3)
                 if self._drop_each is not None and i % self._drop_each != 0:
                     continue
 
@@ -118,8 +111,6 @@ class Monitor(object):
                 self._last_frameframe_idx = i
                 self._last_time_stamp = t
                 self._frame_buffer = frame
-                # if self._video_out is not None and vw is None:
-                #     vw = cv2.VideoWriter(self._video_out, cv2.cv.CV_FOURCC(*'DIVX'), 2, (frame.shape[1], frame.shape[0])) # fixme the 50 is arbitrary
 
                 for j,track_u in enumerate(self._unit_trackers):
                     data_row = track_u(t, frame)
@@ -140,15 +131,6 @@ class Monitor(object):
 
                 if not drawer is None:
                     drawer.draw(frame, self._last_positions, self._unit_trackers)
-                #
-                # if (self._draw_results and i % self.draw_every_n == 0) or not vw is None :
-                #     tmp = self._draw_on_frame(frame)
-                #     if (self._draw_results and i % self.draw_every_n == 0):
-                #         cv2.imshow(self._window_name, tmp)
-                #         cv2.waitKey(1)
-                #     if not vw is None:
-                #         vw.write(tmp)
-
                 self._last_t = t
 
         except Exception as e:
@@ -157,16 +139,6 @@ class Monitor(object):
 
         finally:
             self._is_running = False
-            # try:
-            #     #Fixme not working
-            #     cv2.waitKey(1)
-            #     cv2.destroyAllWindows()
-            #     cv2.waitKey(1)
-            # except:
-            #     pass
-
-            # if not vw is None:
-            #     vw.release()
             logging.info("Monitor closing")
 
 
