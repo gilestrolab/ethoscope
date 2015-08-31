@@ -11,6 +11,22 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
         $http.get('/device/'+device_id+'/data').success(function(data){
             $scope.device = data;
             $scope.user_options= data.user_options;
+            $scope.selected_options = {};
+            for (var k in data.user_options){
+                $scope.selected_options[k]={};
+                for (var i=0;i<data.user_options[k].length;i++){
+                    $scope.selected_options[k]['name']=data.user_options[k][i]['name'];
+                    $scope.selected_options[k]['arguments']={};
+                    for(var j=0;j<data.user_options[k][i]['arguments'].length; j++){
+                        console.log(j,data.user_options[k][i]['arguments'][j]['default']);
+                        $scope.selected_options[k]['arguments'][data.user_options[k][i]['arguments'][j]['name']]=data.user_options[k][i]['arguments'][j]['default'];
+                        console.log($scope.selected_options);
+                    
+                    }
+                }
+                
+            }         
+
         });
 
         $http.get('/device/'+device_id+'/ip').success(function(data){
@@ -20,6 +36,8 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
 
 
         $scope.sm.start = function(option){
+            console.log(option);
+            /*
                             $("#startModal").modal('hide');
                             spStart= new Spinner(opts).spin();
                             starting_tracking.appendChild(spStart.el);
@@ -37,6 +55,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
                     });
                  $("#startModal").modal('hide');
             });
+            */
         };
 
         $scope.sm.stop = function(){

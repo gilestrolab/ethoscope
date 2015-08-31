@@ -442,10 +442,10 @@ if __name__ == '__main__':
     else:
         logging.info("Not ethernet adapter has been detected. It is necessary for connect to Internet.")
 
-    if option_dict["local_adapter"]!= "" :
+    if option_dict["local_adapter"] != "":
         SUBNET_DEVICE = option_dict["local_adapter"]
 
-    if  option_dict["internet_adapter"]!="":
+    if option_dict["internet_adapter"] != "":
         INTERNET_DEVICE = option_dict["internet_adapter"]
 
     global devices_map

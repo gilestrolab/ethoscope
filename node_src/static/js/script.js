@@ -53,6 +53,7 @@
 
     // create the controller and inject Angular's $scope
     app.controller('mainController', function($scope, $http, $interval, $timeout) {
+        $scope.groupActions = {};
         $http.get('/node/time').success(function(data){
             console.log(data);
             t = new Date(data.time);
@@ -121,6 +122,43 @@
             return x;
 
         };
+        
+        $scope.groupActions.checkStart = function(selected_devices){
+            softwareVersion = ""; 
+            device_version = "";
+            checkVersionLoop: 
+            for (var i = 0; i< selected_devices.lenght(); i++){
+                    $http.get('/device/'+selected_devices[i]+'/data').success(function(data){device_version = data.version});
+                    if (i == 0) {
+                        softwareVersion = device_version;
+                    }
+                    if (softwareVersion != device_version){
+                        break checkVersionLoop;
+                    }
+            }
+        };
+                   
+        $scope.groupActions.start = function(){
+                            $("#startModal").modal('hide');
+                            spStart= new Spinner(opts).spin();
+                            starting_tracking.appendChild(spStart.el);
+                            $http.post('/device/'+device_id+'/controls/start', data=option)
+                                 .success(function(data){$scope.device.status = data.status;});
+             $http.get('/devices').success(function(data){
+                    $http.get('/device/'+device_id+'/data').success(function(data){
+                        $scope.device = data;
+
+                    });
+
+                    $http.get('/device/'+device_id+'/ip').success(function(data){
+                        $scope.device.ip = data;
+                        device_ip = data;
+                    });
+                 $("#startModal").modal('hide');
+            });
+        };
+        
+        
 
         $scope.$on('$viewContentLoaded',$scope.get_devices);
 

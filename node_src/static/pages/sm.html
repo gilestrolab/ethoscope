@@ -138,22 +138,25 @@
           <div ng-repeat="(name,option) in user_options">
             <h5>{{name}}</h5>
               <ul>
-                <li ng-repeat="opt in option"><input type=radio name={{opt.name}} ng-model=tracker>
-                  {{opt.name}}: {{opt.overview}}
+                <li ng-repeat="opt in option">
+                    <input type=radio name={{opt.name}} value={{opt.name}} ng-model="selected_options[name]['name']">
+                    {{opt.name}}: {{opt.overview}}
                   <ul>
                         <li ng-repeat="arg in opt.arguments">
                             {{arg.description}}
-                            <input ng-if='arg != "description"' type=text name={{arg}} value={{arg.default}}>
+                            <input ng-if="arg.type == 'number'" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options[name]['arguments'][arg.name]" >
+                            <input ng-if="arg.type == 'str'" type=text name={{arg.name}}  ng-model="selected_options[name]['arguments'][arg.name]"  >
+                            <input ng-if="arg.type == 'datetime'" type=datetime name={{arg.name}}  ng-model="selected_options[name]['arguments'][arg.name]"  >
                         </li>
                     </ul>
                 </li>
               </ul>
           </div>
-              </form>
+        </form>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
-        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="sm.start()" data-toggle="modal">Start Tracking</button>
+        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="sm.start(selected_options)" data-toggle="modal">Start Tracking</button>
       </div>
     </div>
   </div>

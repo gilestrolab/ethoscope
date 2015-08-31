@@ -24,7 +24,7 @@ setup(
     license="GPL3",
     description='todo', #TODO
     long_description=open('README').read(),
-    
+
     scripts=['scripts/device_server.py', 'scripts/record_video.py'],
 
     # data e.g. classifiers can be added as part of the package
