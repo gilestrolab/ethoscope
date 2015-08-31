@@ -45,8 +45,7 @@ class Monitor(object):
         :param rois: A list of region of interest.
         :param interactors: The class that will be used for analysing the position of the object and interacting with the system/hardware.
         :param result_writer: An optional result writer (directory name or ResultWriter)
-        :param draw_results: whether to draw the results of the tracking on a window (OpenCV frontend). This is mainly for debugging purposes and will result in using more resources.
-        :param draw_every_n: When `draw_results` is `True`, only draw   every `draw_every_n` frames. this can help to save some CPU time.
+
         :param video_out: An optional filename where to write the original frames annotated with the location of the ROIs and position of the objects.
           Note that this will use quite a lot of resources since it requires 1) drawing on the frames and 2) encoding the video in real time.
         :param max_duration: tracking stops when the elapsed time is greater
@@ -54,24 +53,15 @@ class Monitor(object):
         """
 
         self._camera = camera
-
-        self._draw_results = draw_results
         self._drop_each = drop_each
-        # self._result_writer = result_writer
+
         self._last_frame_idx =0
 
-
-
-        self.draw_every_n = draw_every_n
         if not max_duration is None:
             self._max_duration = max_duration * 1000 # in ms
         else:
             self._max_duration = None
-        
-        self._video_out = video_out
 
-
-        self._frame_buffer = None
         self._force_stop = False
         self._last_positions = {}
         self._last_time_stamp = 0
@@ -125,7 +115,7 @@ class Monitor(object):
                 elif (self._max_duration is not None and t > self._max_duration):
                     logging.info("Monitor object stopped by timeout")
                     break
-                self._last_frame_idx = i
+                self._last_frameframe_idx = i
                 self._last_time_stamp = t
                 self._frame_buffer = frame
                 # if self._video_out is not None and vw is None:
@@ -148,8 +138,8 @@ class Monitor(object):
                 if not result_writer is None:
                     result_writer.flush(t, frame)
 
-                if not result_writer is None:
-                    drawer.draw()
+                if not drawer is None:
+                    drawer.draw(frame, self._last_positions, self._unit_trackers)
                 #
                 # if (self._draw_results and i % self.draw_every_n == 0) or not vw is None :
                 #     tmp = self._draw_on_frame(frame)
