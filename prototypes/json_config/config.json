@@ -1,6 +1,12 @@
 
 {"roi_builder":{"name":"TargetArenaTest",
-                      "arguments":{"n_cols": 1, "n_rows": 1}},
+                      "arguments":{ "n_cols": 1,
+                                    "n_rows": 1,
+                                    "dummy_str":"yo man",
+                                    "dummy_float":3.11,
+                                    "dummy_datetime":1441036099
+                                  }
+                  },
         "tracker": {"name":"AdaptiveBGModel",
                       "arguments":{}},
         "interactor": {"name":"DefaultInteractor",

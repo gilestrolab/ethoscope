@@ -2,36 +2,31 @@ import tempfile
 import os
 import cv2
 from threading import Thread
-from ethoscope.tracking.monitor import Monitor
-
-# Interface to V4l
-from ethoscope.tracking.cameras import OurPiCameraAsync
-from ethoscope.tracking.cameras import MovieVirtualCamera
-
-# Build ROIs from greyscale image
-from ethoscope.tracking.roi_builders import SleepMonitorWithTargetROIBuilder,TubeMonitorWithTargetROIBuilder, WellsMonitorWithTargetROIBuilder
-from ethoscope.tracking.roi_builders  import TargetArenaTest
-
-# the robust self learning tracker
-from ethoscope.tracking.trackers import AdaptiveBGModel
-from ethoscope.tracking.interactors import DefaultInteractor
-from ethoscope.utils.debug import EthoscopeException
+import traceback
 import shutil
 import logging
 import time
 
-import traceback
+
+# Interface to V4l
+from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera
+# Build ROIs from greyscale image
+
+from ethoscope.rois.target_roi_builder import WellsMonitorWithTargetROIBuilder
+from ethoscope.rois.target_roi_builder import TargetArenaTest
+from ethoscope.core.monitor import Monitor
+
+# the robust self learning tracker
+from ethoscope.trackers.trackers import AdaptiveBGModel
+from ethoscope.interactors.interactors import DefaultInteractor
+from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import ResultWriter
-
-
-# http://localhost:9001/controls/3a92bcf229a34c4db2be733f6802094d/start
-# {"time": "372894738."}
 
 
 class ControlThread(Thread):
 
     _possible_roi_builder_classes = [TargetArenaTest]
-    _ROIBuilderClass = WellsMonitorWithTargetROIBuilder
+    _ROIBuilderClass = TargetArenaTest
     _ROIBuilderClass_kwargs = {}
 
     _possible_tracker_classes = [AdaptiveBGModel]
@@ -74,6 +69,7 @@ class ControlThread(Thread):
             d = p.__dict__["description"]
             d["name"] = p.__name__
             out["interactor"].append(d)
+
         return out
 
     def _parse_user_options(self,data):
@@ -83,6 +79,7 @@ class ControlThread(Thread):
 
 
         rb_data =  data["roi_builder"]
+
         self._ROIBuilderClass = eval(rb_data["name"])
         self._ROIBuilderClass_kwargs = rb_data["arguments"]
 

@@ -29,7 +29,7 @@ class TestMonitor(unittest.TestCase):
     def test_all(self):
         cam = MovieVirtualCamera(INPUT_VIDEO, use_wall_clock=False)
 
-        roi_builder = TestROIBuilder()
+        roi_builder = TestROIBuilder
         rois = roi_builder(cam)
 
         # logging.info("Initialising monitor")
