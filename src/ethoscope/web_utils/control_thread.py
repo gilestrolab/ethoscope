@@ -15,6 +15,7 @@ from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamer
 from ethoscope.rois.target_roi_builder import WellsMonitorWithTargetROIBuilder
 from ethoscope.rois.target_roi_builder import TargetArenaTest
 from ethoscope.core.monitor import Monitor
+from ethoscope.core.drawers import DefaultDrawer
 
 # the robust self learning tracker
 from ethoscope.trackers.trackers import AdaptiveBGModel
@@ -36,6 +37,8 @@ class ControlThread(Thread):
     _possible_interactor_classes = [DefaultInteractor]
     _InteractorClass = DefaultInteractor
     _InteractorClass_kwargs = {}
+
+    _DrawerClass = DefaultDrawer
 
     _tmp_last_img_file = "last_img.jpg"
     _dbg_img_file = "dbg_img.png"
@@ -140,9 +143,10 @@ class ControlThread(Thread):
                         }
 
         self._monit = None
-        # self.get_user_options()
+
 
         self._parse_user_options(data)
+        self._drawer = self._DrawerClass()
 
         super(ControlThread, self).__init__()
 
@@ -182,7 +186,7 @@ class ControlThread(Thread):
                             "fps": f
                             }
 
-        f = self._monit.last_drawn_frame
+        f = self._drawer.last_drawn_frame
         if not f is None:
             cv2.imwrite(self._info["last_drawn_img"], f)
 
