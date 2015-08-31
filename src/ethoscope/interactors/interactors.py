@@ -5,7 +5,7 @@ import multiprocessing
 from subprocess import call
 from math import sqrt
 
-from ethoscope.hardware_control.arduino_api import SleepDepriverInterface
+
 from ethoscope.utils.description import DescribedObject
 
 from ethoscope.tracking.trackers import BoolVariableBase
