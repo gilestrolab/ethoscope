@@ -2,11 +2,14 @@ import tempfile
 import os
 import cv2
 from threading import Thread
+import traceback
+import shutil
+import logging
+import time
 
 
 # Interface to V4l
 from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera
-
 # Build ROIs from greyscale image
 from ethoscope.rois.roi_builders import SleepMonitorWithTargetROIBuilder,TubeMonitorWithTargetROIBuilder, WellsMonitorWithTargetROIBuilder
 from ethoscope.rois.roi_builders import TargetArenaTest
@@ -16,16 +19,7 @@ from ethoscope.core.monitor import Monitor
 from ethoscope.trackers.trackers import AdaptiveBGModel
 from ethoscope.interactors.interactors import DefaultInteractor
 from ethoscope.utils.debug import EthoscopeException
-import shutil
-import logging
-import time
-
-import traceback
 from ethoscope.utils.io import ResultWriter
-
-
-# http://localhost:9001/controls/3a92bcf229a34c4db2be733f6802094d/start
-# {"time": "372894738."}
 
 
 class ControlThread(Thread):
