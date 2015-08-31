@@ -1,21 +1,22 @@
 import tempfile
 import os
-import cv2
 from threading import Thread
 import traceback
 import shutil
 import logging
 import time
 
+import cv2
+
+
 
 # Interface to V4l
 from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera
 # Build ROIs from greyscale image
 
-from ethoscope.rois.target_roi_builder import WellsMonitorWithTargetROIBuilder
 from ethoscope.rois.target_roi_builder import TargetArenaTest
 from ethoscope.core.monitor import Monitor
-from ethoscope.core.drawers import DefaultDrawer
+from ethoscope.drawers.drawers import DefaultDrawer
 
 # the robust self learning tracker
 from ethoscope.trackers.trackers import AdaptiveBGModel
@@ -52,6 +53,69 @@ class ControlThread(Thread):
                             "last_time_stamp":0,
                             "fps":0
                             }
+    def __init__(self, machine_id, name, version, ethogram_dir, video_file=None,
+                 video_out=None, draw_results=False, data=None, *args, **kwargs):
+
+        self._monit_args = args
+        self._monit_kwargs = kwargs
+        self._metadata = None
+        self._video_file = video_file
+        self._video_out = video_out
+        self._draw_results = draw_results
+
+        # for FPS computation
+        self._last_info_t_stamp = 0
+        self._last_info_frame_idx = 0
+
+        # We wipe off previous data
+        shutil.rmtree(ethogram_dir, ignore_errors=True)
+        try:
+            os.makedirs(ethogram_dir)
+        except OSError:
+            pass
+
+        #self._result_file = os.path.join(result_dir, self._result_db_name)
+
+
+        # fixme this is becoming irrelevant
+        if name.find('SM')==0:
+            type_of_device = 'sm'
+        elif name.find('SD')==0:
+            type_of_device = 'sd'
+        else:
+            type_of_device = 'sm'
+
+        self._tmp_dir = tempfile.mkdtemp(prefix="ethoscope_")
+        #todo add 'data' -> how monitor was started to metadata
+        self._info = {  "status": "stopped",
+                        "time": time.time(),
+                        "error": None,
+                        "log_file": os.path.join(ethogram_dir, self._log_file),
+                        "dbg_img": os.path.join(ethogram_dir, self._dbg_img_file),
+                        "last_drawn_img": os.path.join(self._tmp_dir, self._tmp_last_img_file),
+                        "id": machine_id,
+                        "name": name,
+                        "version": version,
+                        # type is obsolete. any device could be any type really
+                        "type": type_of_device,
+                        "db_name":self._db_credentials["name"],
+                        "monitor_info": self._default_monitor_info,
+                        "user_options": self._get_user_options()
+                        }
+        self._monit = None
+
+        self._parse_user_options(data)
+        self._drawer = self._DrawerClass(video_out=self._video_out,
+                                         draw_frames=self._draw_results)
+
+        super(ControlThread, self).__init__()
+
+
+
+    @property
+    def info(self):
+        self._update_info()
+        return self._info
 
     def _get_user_options(self):
         out = {}
@@ -80,7 +144,6 @@ class ControlThread(Thread):
         if data is None:
             return
 
-
         rb_data =  data["roi_builder"]
 
         self._ROIBuilderClass = eval(rb_data["name"])
@@ -94,67 +157,6 @@ class ControlThread(Thread):
         self._InteractorClass= eval(interactor_data["name"])
         self._InteractorClass_kwargs= interactor_data["arguments"]
 
-
-
-    def __init__(self, machine_id, name, version, ethogram_dir, video_file=None, data=None, *args, **kwargs):
-
-        self._monit_args = args
-        self._monit_kwargs = kwargs
-        self._metadata = None
-
-        # for FPS computation
-        self._last_info_t_stamp = 0
-        self._last_info_frame_idx = 0
-
-        # We wipe off previous data
-        shutil.rmtree(ethogram_dir, ignore_errors=True)
-        try:
-            os.makedirs(ethogram_dir)
-        except OSError:
-            pass
-
-        #self._result_file = os.path.join(result_dir, self._result_db_name)
-        self._video_file = video_file
-
-        # fixme this is becoming irrelevant
-        if name.find('SM')==0:
-            type_of_device = 'sm'
-        elif name.find('SD')==0:
-            type_of_device = 'sd'
-        else:
-            type_of_device = 'sm'
-
-        self._tmp_dir = tempfile.mkdtemp(prefix="ethoscope_")
-        #todo add 'data' -> how monitor was started to metadata
-        self._info = {  "status": "stopped",
-                        "time": time.time(),
-                        "error": None,
-                        "log_file": os.path.join(ethogram_dir, self._log_file),
-                        "dbg_img": os.path.join(ethogram_dir, self._dbg_img_file),
-                        "last_drawn_img": os.path.join(self._tmp_dir, self._tmp_last_img_file),
-                        "id": machine_id,
-                        "name": name,
-                        "version": version,
-                        # type is obsolete. any device could be any type really
-                        "type": type_of_device,
-                        "db_name":self._db_credentials["name"],
-                        "monitor_info": self._default_monitor_info,
-                        "user_options": self._get_user_options()
-                        }
-
-        self._monit = None
-
-
-        self._parse_user_options(data)
-        self._drawer = self._DrawerClass()
-
-        super(ControlThread, self).__init__()
-
-
-    @property
-    def info(self):
-        self._update_info()
-        return self._info
 
     def _update_info(self):
         if self._monit is None:
@@ -243,7 +245,7 @@ class ControlThread(Thread):
                 with ResultWriter(self._db_credentials ,rois, self._metadata) as rw:
                     self._info["status"] = "running"
                     logging.info("Setting monitor status as running: '%s'" % self._info["status"] )
-                    self._monit.run(rw)
+                    self._monit.run(rw,self._drawer)
                 logging.info("Stopping Monitor thread")
                 self.stop()
             finally:
