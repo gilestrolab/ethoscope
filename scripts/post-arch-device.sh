@@ -74,7 +74,7 @@ echo 'IP=dhcp' >> /etc/netctl/eth0
 
 #Updating ntp.conf
 
-echo "server $BARE_GIT_LOCATION" > /etc/ntp.conf
+echo "server $NODE_IP" > /etc/ntp.conf
 echo 'server 127.127.1.0' >> /etc/ntp.conf
 echo 'fudge 127.127.1.0 stratum 10' >> /etc/ntp.conf
 echo 'restrict default kod limited nomodify nopeer noquery notrap' >> /etc/ntp.conf
