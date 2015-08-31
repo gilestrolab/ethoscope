@@ -11,8 +11,9 @@ import time
 # Interface to V4l
 from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera
 # Build ROIs from greyscale image
-from ethoscope.rois.roi_builders import SleepMonitorWithTargetROIBuilder,TubeMonitorWithTargetROIBuilder, WellsMonitorWithTargetROIBuilder
-from ethoscope.rois.roi_builders import TargetArenaTest
+
+from ethoscope.rois.target_roi_builder import WellsMonitorWithTargetROIBuilder
+from ethoscope.rois.target_roi_builder import TargetArenaTest
 from ethoscope.core.monitor import Monitor
 
 # the robust self learning tracker
@@ -25,7 +26,7 @@ from ethoscope.utils.io import ResultWriter
 class ControlThread(Thread):
 
     _possible_roi_builder_classes = [TargetArenaTest]
-    _ROIBuilderClass = WellsMonitorWithTargetROIBuilder
+    _ROIBuilderClass = TargetArenaTest
     _ROIBuilderClass_kwargs = {}
 
     _possible_tracker_classes = [AdaptiveBGModel]
@@ -68,6 +69,7 @@ class ControlThread(Thread):
             d = p.__dict__["description"]
             d["name"] = p.__name__
             out["interactor"].append(d)
+
         return out
 
     def _parse_user_options(self,data):
@@ -77,6 +79,7 @@ class ControlThread(Thread):
 
 
         rb_data =  data["roi_builder"]
+
         self._ROIBuilderClass = eval(rb_data["name"])
         self._ROIBuilderClass_kwargs = rb_data["arguments"]
 
