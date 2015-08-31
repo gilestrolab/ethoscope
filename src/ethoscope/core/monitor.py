@@ -20,22 +20,18 @@ gds gvdr
 
 __author__ = 'quentin'
 
-
 from tracking_unit import TrackingUnit
 import logging
 import cv2
 
 
 
-# TODO
-# move drawing to a "drawer" object
-
 class Monitor(object):
 
     def __init__(self, camera, tracker_class,
                  rois = None, interactors=None,
-                draw_results=False, draw_every_n=1,
-                video_out = None,
+        #        draw_results=False, draw_every_n=1,
+        #        video_out = None,
                 max_duration=None,
                 drop_each=None,
                 *args, **kwargs # extra arguments for the tracker objects
@@ -49,8 +45,7 @@ class Monitor(object):
         :param rois: A list of region of interest.
         :param interactors: The class that will be used for analysing the position of the object and interacting with the system/hardware.
         :param result_writer: An optional result writer (directory name or ResultWriter)
-        :param draw_results: whether to draw the results of the tracking on a window (OpenCV frontend). This is mainly for debugging purposes and will result in using more resources.
-        :param draw_every_n: When `draw_results` is `True`, only draw   every `draw_every_n` frames. this can help to save some CPU time.
+
         :param video_out: An optional filename where to write the original frames annotated with the location of the ROIs and position of the objects.
           Note that this will use quite a lot of resources since it requires 1) drawing on the frames and 2) encoding the video in real time.
         :param max_duration: tracking stops when the elapsed time is greater
@@ -58,25 +53,15 @@ class Monitor(object):
         """
 
         self._camera = camera
-
-        self._draw_results = draw_results
         self._drop_each = drop_each
-        # self._result_writer = result_writer
-        self._last_frame_idx =0
-        if self._draw_results:
-            import os
-            self._window_name = "ethoscope_" + str(os.getpid())
 
-        self.draw_every_n = draw_every_n
+        self._last_frame_idx =0
+
         if not max_duration is None:
             self._max_duration = max_duration * 1000 # in ms
         else:
             self._max_duration = None
-        
-        self._video_out = video_out
 
-
-        self._frame_buffer = None
         self._force_stop = False
         self._last_positions = {}
         self._last_time_stamp = 0
@@ -106,55 +91,15 @@ class Monitor(object):
     @property
     def last_frame_idx(self):
         return self._last_frame_idx
-    @property
-    def last_drawn_frame(self):
-        return self._draw_on_frame(self._frame_buffer)
+    # @property
+    # def last_drawn_frame(self):
+    #     return self._draw_on_frame(self._frame_buffer)
 
     def stop(self):
         self._force_stop = True
 
-    def _draw_on_frame(self, frame):
-        if frame is None:
-            return
-        frame_cp = frame.copy()
-        positions = self._last_positions
-        for track_u in self._unit_trackers:
-            x,y = track_u.roi.offset
-            y += track_u.roi.rectangle[3]/2
-
-            cv2.putText(frame_cp, str(track_u.roi.idx), (x,y), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,0))
-            black_colour = (0, 0,0)
-            roi_colour = (0, 255,0)
-            cv2.drawContours(frame_cp,[track_u.roi.polygon],-1, black_colour, 3, cv2.CV_AA)
-            cv2.drawContours(frame_cp,[track_u.roi.polygon],-1, roi_colour, 1, cv2.CV_AA)
-            try:
-                pos = positions[track_u.roi.idx]
-                if pos is None:
-                    continue
-            except KeyError:
-                continue
-
-            if pos["has_interacted"]:
-                colour = (255, 0,0)
-            else:
-                colour = (0 ,0, 255)
-
-
-            cv2.ellipse(frame_cp,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),black_colour,3,cv2.CV_AA)
-            cv2.ellipse(frame_cp,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),colour,1,cv2.CV_AA)
-
-        return frame_cp
-
-    def run(self, result_writer = None):
-        vw = None
-
+    def run(self, result_writer = None, drawer = None):
         try:
-
-            if self._draw_results:
-                cv2.namedWindow(self._window_name, cv2.CV_WINDOW_AUTOSIZE)
-
-
-
             logging.info("Monitor starting a run")
             self._is_running = True
 
@@ -170,11 +115,11 @@ class Monitor(object):
                 elif (self._max_duration is not None and t > self._max_duration):
                     logging.info("Monitor object stopped by timeout")
                     break
-                self._last_frame_idx = i
+                self._last_frameframe_idx = i
                 self._last_time_stamp = t
                 self._frame_buffer = frame
-                if self._video_out is not None and vw is None:
-                    vw = cv2.VideoWriter(self._video_out, cv2.cv.CV_FOURCC(*'DIVX'), 2, (frame.shape[1], frame.shape[0])) # fixme the 50 is arbitrary
+                # if self._video_out is not None and vw is None:
+                #     vw = cv2.VideoWriter(self._video_out, cv2.cv.CV_FOURCC(*'DIVX'), 2, (frame.shape[1], frame.shape[0])) # fixme the 50 is arbitrary
 
                 for j,track_u in enumerate(self._unit_trackers):
                     data_row = track_u(t, frame)
@@ -193,14 +138,16 @@ class Monitor(object):
                 if not result_writer is None:
                     result_writer.flush(t, frame)
 
-                if (self._draw_results and i % self.draw_every_n == 0) or not vw is None :
-                    tmp = self._draw_on_frame(frame)
-                    if (self._draw_results and i % self.draw_every_n == 0):
-                        cv2.imshow(self._window_name, tmp)
-                        cv2.waitKey(1)
-
-                    if not vw is None:
-                        vw.write(tmp)
+                if not drawer is None:
+                    drawer.draw(frame, self._last_positions, self._unit_trackers)
+                #
+                # if (self._draw_results and i % self.draw_every_n == 0) or not vw is None :
+                #     tmp = self._draw_on_frame(frame)
+                #     if (self._draw_results and i % self.draw_every_n == 0):
+                #         cv2.imshow(self._window_name, tmp)
+                #         cv2.waitKey(1)
+                #     if not vw is None:
+                #         vw.write(tmp)
 
                 self._last_t = t
 
@@ -210,16 +157,16 @@ class Monitor(object):
 
         finally:
             self._is_running = False
-            try:
-                #Fixme not working
-                cv2.waitKey(1)
-                cv2.destroyAllWindows()
-                cv2.waitKey(1)
-            except:
-                pass
+            # try:
+            #     #Fixme not working
+            #     cv2.waitKey(1)
+            #     cv2.destroyAllWindows()
+            #     cv2.waitKey(1)
+            # except:
+            #     pass
 
-            if not vw is None:
-                vw.release()
+            # if not vw is None:
+            #     vw.release()
             logging.info("Monitor closing")
 
 

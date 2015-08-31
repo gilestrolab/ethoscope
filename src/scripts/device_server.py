@@ -152,6 +152,7 @@ if __name__ == '__main__':
     parser.add_option("-r", "--run", dest="run", default=False, help="Runs tracking directly", action="store_true")
     parser.add_option("-d", "--draw", dest="draw", default=False, help="Draws real time tracking results on XOrg", action="store_true")
     parser.add_option("-i", "--input", dest="input", default=None, help="A video file to use as an input (alternative to real time camera)")
+    parser.add_option("-o", "--video-out", dest="video_out", default=None, help="A video file to save an annotated video at")
     parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
     parser.add_option("-p", "--port", dest="port", default=9000,help="port")
     parser.add_option("-b", "--branch", dest="branch", default="psv-package",help="the branch to work from")
@@ -184,6 +185,7 @@ if __name__ == '__main__':
                             video_file=option_dict["input"],
                             ethogram_dir=option_dict["results_dir"],
                             draw_results = option_dict["draw"],
+                            video_out = option_dict["video_out"],
                             max_duration=DURATION,
                             data=data)
 
