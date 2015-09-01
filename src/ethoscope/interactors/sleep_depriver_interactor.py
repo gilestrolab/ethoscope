@@ -73,6 +73,7 @@ class SleepDepInteractor(IsMovingInteractor):
                  start_datetime=0,
                  end_datetime=sys.maxsize,
                   ):
+        print "min_inactive_time", min_inactive_time
         self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
         self._start_datetime= start_datetime
         self._end_datetime= end_datetime
