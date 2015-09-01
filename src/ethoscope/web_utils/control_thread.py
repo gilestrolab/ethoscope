@@ -60,6 +60,10 @@ class ControlThread(Thread):
         self._monit_args = args
         self._monit_kwargs = kwargs
         self._metadata = None
+
+        if video_file is not None:
+            self._monit_kwargs["drop_each"] = 10
+
         self._video_file = video_file
         self._video_out = video_out
         self._draw_results = draw_results
@@ -211,7 +215,8 @@ class ControlThread(Thread):
                 if self._video_file is None:
                     cam = OurPiCameraAsync( target_fps=20, target_resolution=(1280, 960))
                 else:
-                    cam = MovieVirtualCamera(self._video_file, use_wall_clock=True)
+                    #cam = MovieVirtualCamera(self._video_file, use_wall_clock=True)
+                    cam = MovieVirtualCamera(self._video_file, use_wall_clock=False)
 
                 logging.info("Building ROIs")
 

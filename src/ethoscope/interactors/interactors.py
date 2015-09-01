@@ -1,7 +1,6 @@
 __author__ = 'quentin'
 
 import multiprocessing
-
 from ethoscope.utils.description import DescribedObject
 from ethoscope.core.variables import BoolVariableBase
 

@@ -4,7 +4,7 @@ import serial
 from serial.tools import list_ports
 import time
 import logging
-
+import multiprocessing
 
 class NoValidPortError(serial.SerialException):
     pass
@@ -18,6 +18,8 @@ class SimpleLynxMotionInterface(object):
 
 
     def __init__(self, port=None):
+        logging.info("Connecting to Lynx motion serial port...")
+
         self._serial = None
         if port is None:
             self._port =  self._find_port()
@@ -29,18 +31,27 @@ class SimpleLynxMotionInterface(object):
         self._test_serial_connection()
 
     def _find_port(self):
-        all_ports = list_ports.comports()
+        all_port_tuples = list_ports.comports()
         logging.info("listing serial ports")
-        for ap, _, _  in all_ports:
+
+        all_ports = set()
+        for ap, _, _  in all_port_tuples:
+            all_ports |= {ap}
             logging.info("\t%s", str(ap))
-        for ap, _, _  in all_ports:
+
+        for ap in list(all_ports):
             logging.info("trying port %s", str(ap))
+
             try:
                 #here we use a recursive strategy to find the good port (ap).
                 SimpleLynxMotionInterface(ap)
                 return ap
             except (WrongSleepDepPortError, serial.SerialException):
+                warn_str = "Tried to use port %s. Failed." % ap
+                logging.warning(warn_str)
                 pass
+
+        logging.error("No valid port detected!. Possibly, device not plugged/detected.")
         raise NoValidPortError()
 
     def __del__(self):
@@ -63,13 +74,8 @@ class SimpleLynxMotionInterface(object):
 #             raise WrongSleepDepPortError
 # #
 #
-#     def deprive(self, channel):
-#         cmd = "M %i\n" % (channel)
-#         self._serial.write(cmd)
-#         logging.info("Sending command to SD: %s" % cmd)
 #
-#
-#
+
     def _angle_to_pulse(self,angle):
         min_a, min_p = self._min_angle_pulse
         max_a, max_p = self._max_angle_pulse
@@ -94,10 +100,67 @@ class SimpleLynxMotionInterface(object):
 
 
 
+
+
+
 class SleepDepriverInterface(SimpleLynxMotionInterface):
     def deprive(self,channel, dt=500):
         self.move_to_angle(channel, self._min_angle_pulse[0],dt)
         time.sleep(dt/1000.0)
         self.move_to_angle(channel, self._max_angle_pulse[0],dt)
         time.sleep(dt/1000.0)
+
+
+
+class AsyncSleepDepriverInterface(multiprocessing.Process):
+
+    def __init__(self,queue,*args, **kwargs):
+
+        self._queue = queue
+        self._sleep_dep_args = args
+        self._sleep_dep_kwargs = kwargs
+        super(AsyncSleepDepriverInterface,self).__init__()
+
+    def run(self):
+        do_run=True
+        try:
+            sleep_dep = SleepDepriverInterface(*self._sleep_dep_args, **self._sleep_dep_kwargs)
+            while do_run:
+                try:
+                    instruction_kwargs = self._queue.get()
+                    if (instruction_kwargs == 'DONE'):
+                        do_run=False
+                        continue
+                    sleep_dep.deprive(**instruction_kwargs)
+
+                except Exception as e:
+                    do_run=False
+                    logging.error("Unexpected error whist depriving. Instruction was: %s" % str(instruction_kwargs))
+                    logging.error(e)
+
+                finally:
+                    if self._queue.empty():
+                        #we sleep iff we have an empty queue. this way, we don't over use a cpu
+                        time.sleep(.1)
+
+        except KeyboardInterrupt as e:
+            logging.warning("Sleep depriver async process interrupted with KeyboardInterrupt")
+            raise e
+
+        except Exception as e:
+            logging.error("Sleep depriver  async process stopped with an exception")
+            raise e
+
+        finally:
+            logging.info("Closing async sleep depriver")
+            while not self._queue.empty():
+                self._queue.get()
+            self._queue.close()
+
+
+
+class FakeSleepDepriverInterface(SimpleLynxMotionInterface):
+    def deprive(self,channel, dt=500):
+        str = "depriving channel %i, with dt= %i", (channel,dt)
+        logging.warning(str)
 

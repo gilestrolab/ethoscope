@@ -1,16 +1,19 @@
-import numpy as np
+__author__ = 'quentin'
+
+
 from ethoscope.interactors.interactors import BaseInteractorSync, HasInteractedVariable
-from ethoscope.hardware.output.sleep_depriver import  SleepDepriverInterface
+from ethoscope.hardware.output.sleep_depriver import  AsyncSleepDepriverInterface
 import time
 import sys
+import multiprocessing
+import logging
 
-__author__ = 'quentin'
 
 
 class IsMovingInteractor(BaseInteractorSync):
 
-    def __init__(self, speed_threshold=0.0025):
-        self._speed_threshold = speed_threshold
+    def __init__(self, velocity_threshold=0.0060):
+        self._velocity_threshold = velocity_threshold
         self._last_active = 0
 
     def _interact(self, **kwargs):
@@ -18,15 +21,17 @@ class IsMovingInteractor(BaseInteractorSync):
 
     def _has_moved(self):
         positions = self._tracker.positions
-
+        times = self._tracker.times
 
         if len(positions ) <2 :
             return HasInteractedVariable(False),{}
 
         tail_m = positions[-1]
+        dt_s = abs(times[-1] - times[-2]) / 1000.0
         dist = 10.0 ** (tail_m["xy_dist_log10x1000"]/1000.0)
+        velocity = dist / dt_s
 
-        has_moved = (dist > self._speed_threshold)
+        has_moved = (velocity > self._velocity_threshold)
         return has_moved
 
     def _run(self):
@@ -40,34 +45,44 @@ class IsMovingInteractor(BaseInteractorSync):
 
 
 
+
+
+
+
 class SleepDepInteractor(IsMovingInteractor):
     description = {"overview": "An interactor to sleep deprive an animal using servo motor. See http://todo/fixme.html",
                     "arguments": [
-                                    {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_threshold", "description": "The minimal velocity that counts as movement","default":0.0025},
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_threshold", "description": "The minimal velocity that counts as movement","default":0.0060},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken","default":120},
                                     {"type": "datetime", "name": "start_datetime", "description": "When sleep deprivation is to be started","default":0},
                                     {"type": "datetime", "name": "end_datetime", "description": "When sleep deprivation is to be ended","default":sys.maxsize}
                                    ]}
+    _queue = multiprocessing.JoinableQueue()
+    _sleep_dep_interface = AsyncSleepDepriverInterface(queue = _queue, port="/dev/ttyUSB0") # fixme, auto port detection
+    _sleep_dep_interface.start()
+
+    _roi_to_channel = {
+            2:1,  4:2,  6:3,  8:4,  10:5,
+            11:6, 13:7, 15:8, 17:9, 19:10
+        }
+
 
     def __init__(self,
-                 velocity_threshold=0.0025,
+                 velocity_threshold=0.0060,
                  min_inactive_time=120, #s
                  start_datetime=0,
                  end_datetime=sys.maxsize,
                   ):
-        self._inactivity_time_threshold = min_inactive_time
-
+        self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
         self._start_datetime= start_datetime
         self._end_datetime= end_datetime
-
-        self._channel = self._tracker._roi.idx
-        #self._sleep_dep_interface = SleepDepriverInterface(velocity_threshold)
         self._t0 = None
 
         super(SleepDepInteractor, self).__init__(velocity_threshold)
 
     def _interact(self, **kwargs):
         #self._sleep_dep_interface.deprive(**kwargs)
+        self._queue.put(kwargs)
         pass
 
     def _check_time_range(self):
@@ -78,24 +93,46 @@ class SleepDepInteractor(IsMovingInteractor):
 
 
     def _run(self):
+        roi_id= self._tracker._roi.idx
+
+        try:
+            channel = self._roi_to_channel[roi_id]
+        except KeyError:
+            return HasInteractedVariable(False), {"channel":0}
+
         if self._check_time_range() is False:
-            return False, {"channel":self._channel}
+            return HasInteractedVariable(False), {"channel":channel}
 
         has_moved = self._has_moved()
+
         times = self._tracker.times
-        if has_moved:
-            now = times[-1]
-            if self._t0 is None:
-                self._t0 = now
-            else:
-                if(now - self._t0) > self._inactivity_time_threshold:
-                    self._t0 = None
-                    return True, {"channel":self._channel}
+        now = times[-1]
+
+        if self._t0 is None:
+            self._t0 = now
+
+        if not has_moved:
+            if float(now - self._t0) > self._inactivity_time_threshold_ms:
+                self._t0 = None
+
+                return HasInteractedVariable(True), {"channel":channel}
+
         else:
-            self._t0 = None
+            self._t0 = now
 
-        return False, {"channel":self._channel}
-
-
+        return HasInteractedVariable(False), {"channel":channel}
 
 
+
+
+
+    def __del__(self):
+        logging.info("Closing sleep depriver interface")
+
+        self._queue.put("DONE")
+
+        logging.info("Freeing queue")
+        self._queue.cancel_join_thread()
+        logging.info("Joining thread")
+        self._sleep_dep_interface.join()
+        logging.info("Joined OK")

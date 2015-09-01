@@ -158,6 +158,8 @@ if __name__ == '__main__':
     parser.add_option("-b", "--branch", dest="branch", default="psv-package",help="the branch to work from")
     parser.add_option("-e", "--results-dir", dest="results_dir", default=ETHOGRAM_DIR,help="Where temporary result files are stored")
     parser.add_option("-g", "--git-dir", dest="git_dir", default=GIT_WORKING_DIR,help="Where is the target git located(for software update)")
+    parser.add_option("-D", "--debug", dest="debug", default=False, help="Shows all logging messages", action="store_true")
+
 
     (options, args) = parser.parse_args()
     option_dict = vars(options)
@@ -189,11 +191,21 @@ if __name__ == '__main__':
                             max_duration=DURATION,
                             data=data)
 
+    if option_dict["debug"]:
+        #fixme
+        logging.basicConfig(level=logging.DEBUG)
+        logging.info("Logging using DEBUG SETTINGS")
+
+
+
     if option_dict["run"]:
         control.start()
 
+
     try:
-        run(api, host='0.0.0.0', port=port, server='cherrypy')
+        run(api, host='0.0.0.0', port=port, server='cherrypy',debug=option_dict["debug"])
+
+
 
     except Exception as e:
 

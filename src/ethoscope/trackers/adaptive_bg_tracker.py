@@ -408,12 +408,8 @@ class AdaptiveBGModel(BaseTracker):
 
         if distance > self._max_m_log_lik:
             self._bg_model.increase_learning_rate()
-            #if self._roi.idx==5:
-            print "BAD LIKELIHOOD", t,self._roi.idx, distance , self._max_m_log_lik
-            # cv2.waitKey(-1)
-
             raise NoPositionError
-        #print "LIKELIHOOD", t,self._roi.idx, distance , self._max_m_log_lik
+
 
 
 
