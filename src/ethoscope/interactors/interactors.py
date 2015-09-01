@@ -20,6 +20,7 @@ class BaseInteractorSync(DescribedObject):
         interact, result  = self._run()
         if interact:
             self._interact(**result)
+
         return interact, result
 
 
@@ -44,6 +45,7 @@ class BaseInteractorAsync(BaseInteractorSync):
         if self._tracker is None:
             raise ValueError("No tracker bound to this interactor. Use `bind_tracker()` methods")
         interact, result  = self._run()
+
         if interact:
             self._interact_async(result)
         result["interact"] = interact
@@ -66,6 +68,6 @@ class DefaultInteractor(BaseInteractorSync):
     description = {"overview": "The default sleep monitor arena with ten rows of two tubes.",
                     "arguments": []}
     def _run(self):
-        out = HasInteractedVariable(False), {}
+        out = HasInteractedVariable(False)
         return out, {}
 
