@@ -1,7 +1,7 @@
 
 {"roi_builder":{"name":"TargetArenaTest",
-                      "arguments":{ "n_cols": 6,
-                                    "n_rows": 6,
+                      "arguments":{ "n_cols": 2,
+                                    "n_rows": 10,
                                     "dummy_str":"yo man",
                                     "dummy_float":3.11,
                                     "dummy_datetime":1441036099
@@ -9,6 +9,10 @@
                   },
         "tracker": {"name":"AdaptiveBGModel",
                       "arguments":{}},
-        "interactor": {"name":"DefaultInteractor",
-                      "arguments":{}}
+        "interactor": {"name":"SleepDepInteractor",
+                       "arguments":{"velocity_threshold": 0.0025,
+                                    "min_inactive_time": 120,
+                                     "start_datetime":0,
+                                    "end_datetime":99999999999999}
+                                   }
 }

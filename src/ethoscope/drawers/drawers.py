@@ -12,7 +12,8 @@ class BaseDrawer(DescribedObject):
         self._draw_frames= draw_frames
         self._video_writer = None
         self._window_name = "ethoscope_" + str(os.getpid())
-        cv2.namedWindow(self._window_name, cv2.CV_WINDOW_AUTOSIZE)
+        if draw_frames:
+            cv2.namedWindow(self._window_name, cv2.CV_WINDOW_AUTOSIZE)
 
 
     def _annotate_frame(self,img, positions, tracking_units):
@@ -41,9 +42,10 @@ class BaseDrawer(DescribedObject):
         self._video_writer.write(self._last_drawn_frame)
 
     def __del__(self):
-        cv2.waitKey(1)
-        cv2.destroyAllWindows()
-        cv2.waitKey(1)
+        if self._draw_frames:
+            cv2.waitKey(1)
+            cv2.destroyAllWindows()
+            cv2.waitKey(1)
         if self._video_writer is not None:
             self._video_writer.release()
 
