@@ -108,7 +108,7 @@ class SleepDepriverInterface(SimpleLynxMotionInterface):
 
     def warm_up(self):
         for j in range(3):
-            for i in range(11):
+            for i in range(1,11):
                 self.deprive(i)
 
     def deprive(self,channel, dt=500):
