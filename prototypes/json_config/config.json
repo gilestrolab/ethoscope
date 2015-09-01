@@ -11,7 +11,7 @@
                       "arguments":{}},
         "interactor": {"name":"SleepDepInteractor",
                        "arguments":{"velocity_threshold": 0.0025,
-                                    "min_inactive_time": 120,
+                                    "min_inactive_time": 12,
                                      "start_datetime":0,
                                     "end_datetime":99999999999999}
                                    }

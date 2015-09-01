@@ -238,7 +238,7 @@ class ControlThread(Thread):
                 #the camera start time is the reference 0
                 self._info["time"] = cam.start_time
 
-                interactors = [self._InteractorClass() for _ in rois]
+                interactors = [self._InteractorClass(**self._InteractorClass_kwargs) for _ in rois]
                 kwargs = self._monit_kwargs.copy()
                 kwargs.update(self._TrackerClass_kwargs)
 
