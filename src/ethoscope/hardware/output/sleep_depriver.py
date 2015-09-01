@@ -30,6 +30,7 @@ class SimpleLynxMotionInterface(object):
         time.sleep(2)
         self._test_serial_connection()
 
+
     def _find_port(self):
         all_port_tuples = list_ports.comports()
         logging.info("listing serial ports")
@@ -104,6 +105,12 @@ class SimpleLynxMotionInterface(object):
 
 
 class SleepDepriverInterface(SimpleLynxMotionInterface):
+
+    def warm_up(self):
+        for j in range(3):
+            for i in range(11):
+                self.deprive(i)
+
     def deprive(self,channel, dt=500):
         self.move_to_angle(channel, self._min_angle_pulse[0],dt)
         time.sleep(dt/1000.0)
@@ -125,6 +132,8 @@ class AsyncSleepDepriverInterface(multiprocessing.Process):
         do_run=True
         try:
             sleep_dep = SleepDepriverInterface(*self._sleep_dep_args, **self._sleep_dep_kwargs)
+            sleep_dep.warm_up()
+
             while do_run:
                 try:
                     instruction_kwargs = self._queue.get()
