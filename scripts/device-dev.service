@@ -7,7 +7,7 @@ After=ntpd.service
 [Service]
 Type=simple
 WorkingDirectory=/home/ethoscope/ethoscope-git/src/scripts/
-ExecStart=/usr/bin/python2 /home/ethoscope/ethoscope-git/src/scripts/device_server.py --branch dev
+ExecStart=/usr/bin/python2 /home/ethoscope/ethoscope-git/src/scripts/device_server.py --branch dev -D
 RestartSec=5
 Restart=always
 
