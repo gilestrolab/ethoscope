@@ -20,19 +20,24 @@ class IsMovingInteractor(BaseInteractorSync):
         pass
 
     def _has_moved(self):
+        roi_id= self._tracker._roi.idx
+
         positions = self._tracker.positions
         times = self._tracker.times
 
         if len(positions ) <2 :
-            return HasInteractedVariable(False),{}
+            return False
 
         tail_m = positions[-1]
         dt_s = abs(times[-1] - times[-2]) / 1000.0
         dist = 10.0 ** (tail_m["xy_dist_log10x1000"]/1000.0)
         velocity = dist / dt_s
 
-        has_moved = (velocity > self._velocity_threshold)
-        return has_moved
+        if roi_id == 6:
+            print "velocity", velocity, "dist",dist,"dt_s",dt_s
+        if velocity > self._velocity_threshold:
+            return True
+        return False
 
     def _run(self):
         has_moved = self._has_moved()
@@ -73,7 +78,6 @@ class SleepDepInteractor(IsMovingInteractor):
                  start_datetime=0,
                  end_datetime=sys.maxsize,
                   ):
-        print "min_inactive_time", min_inactive_time
         self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
         self._start_datetime= start_datetime
         self._end_datetime= end_datetime
@@ -112,7 +116,7 @@ class SleepDepInteractor(IsMovingInteractor):
         if self._t0 is None:
             self._t0 = now
         #todel debug
-        if channel== 8:
+        if roi_id==6:
             print "t =", now - self._t0, "has_moved = ", has_moved
         if not has_moved:
             if float(now - self._t0) > self._inactivity_time_threshold_ms:
