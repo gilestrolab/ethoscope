@@ -17,13 +17,16 @@ class BaseTracker(DescribedObject):
         self._data = data
         self._roi = roi
         self._last_non_inferred_time = 0
+        self._last_time_point = 0
         self._max_history_length = 250 * 1000  # in milliseconds
+
         # self._max_history_length = 500   # in milliseconds
         # if self.data_point is None:
         #     raise NotImplementedError("Trackers must have a DataPoint object.")
 
     def __call__(self, t, img):
         sub_img, mask = self._roi(img)
+        self._last_time_point = t
         try:
 
             point = self._find_position(sub_img,mask,t)
@@ -77,7 +80,7 @@ class BaseTracker(DescribedObject):
 
     @property
     def last_time_point(self):
-        return self._last_non_inferred_time
+        return self._last_time_point
     @property
     def times(self):
         return self._times
