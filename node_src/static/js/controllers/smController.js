@@ -51,7 +51,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
                     });
                  $("#startModal").modal('hide');
             });
-            */
+
         };
 
         $scope.sm.stop = function(){
