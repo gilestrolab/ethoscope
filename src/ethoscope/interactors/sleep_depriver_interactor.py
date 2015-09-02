@@ -111,7 +111,9 @@ class SleepDepInteractor(IsMovingInteractor):
 
         if self._t0 is None:
             self._t0 = now
-
+        #todel debug
+        if channel== 8:
+            print "t =", now - self._t0, "has_moved = ", has_moved
         if not has_moved:
             if float(now - self._t0) > self._inactivity_time_threshold_ms:
                 self._t0 = None
