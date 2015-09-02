@@ -18,14 +18,14 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
                     $scope.selected_options[k]['name']=data.user_options[k][i]['name'];
                     $scope.selected_options[k]['arguments']={};
                     for(var j=0;j<data.user_options[k][i]['arguments'].length; j++){
-                        console.log(j,data.user_options[k][i]['arguments'][j]['default']);
+                        //console.log(j,data.user_options[k][i]['arguments'][j]['default']);
                         $scope.selected_options[k]['arguments'][data.user_options[k][i]['arguments'][j]['name']]=data.user_options[k][i]['arguments'][j]['default'];
-                        console.log($scope.selected_options);
-                    
+                        //console.log($scope.selected_options);
+
                     }
                 }
-                
-            }         
+
+            }
 
         });
 
@@ -36,19 +36,15 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
 
 
         $scope.sm.start = function(option){
-            console.log(option);
-            /*
-                            $("#startModal").modal('hide');
-                            spStart= new Spinner(opts).spin();
-                            starting_tracking.appendChild(spStart.el);
-                            $http.post('/device/'+device_id+'/controls/start', data=option)
-                                 .success(function(data){$scope.device.status = data.status;});
-             $http.get('/devices').success(function(data){
+            $("#startModal").modal('hide');
+            spStart= new Spinner(opts).spin();
+            starting_tracking.appendChild(spStart.el);
+            $http.post('/device/'+device_id+'/controls/start', data=option)
+                 .success(function(data){$scope.device.status = data.status;});
+            $http.get('/devices').success(function(data){
                     $http.get('/device/'+device_id+'/data').success(function(data){
                         $scope.device = data;
-
                     });
-
                     $http.get('/device/'+device_id+'/ip').success(function(data){
                         $scope.device.ip = data;
                         device_ip = data;
@@ -131,7 +127,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
        var refresh = function(){
             $http.get('/device/'+device_id+'/data')
                  .success(function(data){
-                console.log(data);
+
                     $scope.device= data;
                     $scope.device.img = device_ip+':9000/static'+$scope.device.last_drawn_img + '?' + new Date().getTime();
                     $scope.device.ip = device_ip;
