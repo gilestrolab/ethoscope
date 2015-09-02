@@ -29,6 +29,9 @@ class IsMovingInteractor(BaseInteractorSync):
             return False
 
         tail_m = positions[-1]
+        if tail_m is None:
+            return False
+
         dt_s = abs(times[-1] - times[-2]) / 1000.0
         dist = 10.0 ** (tail_m["xy_dist_log10x1000"]/1000.0)
         velocity = dist / dt_s
@@ -115,7 +118,7 @@ class SleepDepInteractor(IsMovingInteractor):
 
         if self._t0 is None:
             self._t0 = now
-        #todel debug
+
         if roi_id==6:
             print "t =", now - self._t0, "has_moved = ", has_moved
         if not has_moved:

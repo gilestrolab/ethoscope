@@ -51,13 +51,14 @@ class TrackingUnit(object):
 
 
     def __call__(self, t, img):
-
         data_row = self._tracker(t,img)
+
+
+        interact, result = self._interactor()
 
         if data_row is None:
             return
 
-        interact, result = self._interactor()
         # TODO data_row should have some result
         data_row.append(interact)
         return data_row
