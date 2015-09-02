@@ -23,14 +23,20 @@ class IsMovingInteractor(BaseInteractorSync):
         roi_id= self._tracker._roi.idx
 
         positions = self._tracker.positions
-        times = self._tracker.times
 
         if len(positions ) <2 :
             return False
-
         tail_m = positions[-1]
-        if tail_m is None:
+
+        times = self._tracker.times
+        last_time_for_position = times[-1]
+        last_time = self._tracker.last_time_point
+
+        # we assume no movement if the animal was not spotted
+        if last_time != last_time_for_position:
             return False
+
+
 
         dt_s = abs(times[-1] - times[-2]) / 1000.0
         dist = 10.0 ** (tail_m["xy_dist_log10x1000"]/1000.0)
@@ -101,6 +107,7 @@ class SleepDepInteractor(IsMovingInteractor):
 
 
     def _run(self):
+
         roi_id= self._tracker._roi.idx
 
         try:
@@ -113,8 +120,7 @@ class SleepDepInteractor(IsMovingInteractor):
 
         has_moved = self._has_moved()
 
-        times = self._tracker.times
-        now = times[-1]
+        now =  self._tracker.last_time_point
 
         if self._t0 is None:
             self._t0 = now

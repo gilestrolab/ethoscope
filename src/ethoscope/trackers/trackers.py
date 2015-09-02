@@ -76,6 +76,9 @@ class BaseTracker(DescribedObject):
         return self._positions[i][0]
 
     @property
+    def last_time_point(self):
+        return self._last_non_inferred_time
+    @property
     def times(self):
         return self._times
 
