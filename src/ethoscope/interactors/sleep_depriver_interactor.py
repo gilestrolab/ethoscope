@@ -43,7 +43,7 @@ class IsMovingInteractor(BaseInteractorSync):
         velocity = dist / dt_s
 
         if roi_id == 6:
-            print "velocity", velocity, "dist",dist,"dt_s",dt_s
+            print "velocity", velocity, "dist",dist,"dt_s",dt_s, "threshold",self._velocity_threshold
         if velocity > self._velocity_threshold:
             return True
         return False
@@ -109,7 +109,10 @@ class SleepDepInteractor(IsMovingInteractor):
     def _run(self):
 
         roi_id= self._tracker._roi.idx
-
+        now =  self._tracker.last_time_point
+        
+        if roi_id==6:
+            print "t =", now
         try:
             channel = self._roi_to_channel[roi_id]
         except KeyError:
@@ -120,7 +123,7 @@ class SleepDepInteractor(IsMovingInteractor):
 
         has_moved = self._has_moved()
 
-        now =  self._tracker.last_time_point
+
 
         if self._t0 is None:
             self._t0 = now
