@@ -70,8 +70,8 @@ class SleepDepInteractor(IsMovingInteractor):
                                     {"type": "datetime", "name": "end_datetime", "description": "When sleep deprivation is to be ended","default":sys.maxsize}
                                    ]}
     _queue = multiprocessing.JoinableQueue()
-    _sleep_dep_interface = AsyncSleepDepriverInterface(queue = _queue, port="/dev/ttyUSB0") # fixme, auto port detection
-    _sleep_dep_interface.start()
+    _sleep_dep_interface_list = [] # fake pointer
+
 
     _roi_to_channel = {
             2:1,  4:2,  6:3,  8:4,  10:5,
@@ -85,6 +85,12 @@ class SleepDepInteractor(IsMovingInteractor):
                  start_datetime=0,
                  end_datetime=sys.maxsize,
                   ):
+        if len(self._sleep_dep_interface_list) == 0:
+            # fixme, auto port detection
+            sleep_dep_interface = AsyncSleepDepriverInterface(queue = self._queue, port="/dev/ttyUSB0")
+            sleep_dep_interface.start()
+            self._sleep_dep_interface_list.append(sleep_dep_interface)
+
         self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
         self._start_datetime= start_datetime
         self._end_datetime= end_datetime
@@ -147,5 +153,5 @@ class SleepDepInteractor(IsMovingInteractor):
         logging.info("Freeing queue")
         self._queue.cancel_join_thread()
         logging.info("Joining thread")
-        self._sleep_dep_interface.join()
+        self._sleep_dep_interface_list[0].join()
         logging.info("Joined OK")
