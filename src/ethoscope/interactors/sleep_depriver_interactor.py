@@ -12,15 +12,16 @@ import logging
 
 class IsMovingInteractor(BaseInteractorSync):
 
-    def __init__(self, velocity_threshold=0.0060):
+    def __init__(self, hardware_interface, velocity_threshold=0.0060):
         self._velocity_threshold = velocity_threshold
         self._last_active = 0
+        super(IsMovingInteractor,self).__init__(hardware_interface)
+
 
     def _interact(self, **kwargs):
         pass
 
     def _has_moved(self):
-        roi_id= self._tracker._roi.idx
 
         positions = self._tracker.positions
 
@@ -69,10 +70,8 @@ class SleepDepInteractor(IsMovingInteractor):
                                     {"type": "datetime", "name": "start_datetime", "description": "When sleep deprivation is to be started","default":0},
                                     {"type": "datetime", "name": "end_datetime", "description": "When sleep deprivation is to be ended","default":sys.maxsize}
                                    ]}
-    _queue = multiprocessing.JoinableQueue()
-    _sleep_dep_interface_list = [] # fake pointer
 
-
+    _hardware_interface_class = AsyncSleepDepriverInterface
     _roi_to_channel = {
             2:1,  4:2,  6:3,  8:4,  10:5,
             11:6, 13:7, 15:8, 17:9, 19:10
@@ -80,27 +79,22 @@ class SleepDepInteractor(IsMovingInteractor):
 
 
     def __init__(self,
+                 hardware_interface,
                  velocity_threshold=0.0060,
                  min_inactive_time=120, #s
                  start_datetime=0,
                  end_datetime=sys.maxsize,
                   ):
-        if len(self._sleep_dep_interface_list) == 0:
-            # fixme, auto port detection
-            sleep_dep_interface = AsyncSleepDepriverInterface(queue = self._queue, port="/dev/ttyUSB0")
-            sleep_dep_interface.start()
-            self._sleep_dep_interface_list.append(sleep_dep_interface)
-
         self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
         self._start_datetime= start_datetime
         self._end_datetime= end_datetime
         self._t0 = None
 
-        super(SleepDepInteractor, self).__init__(velocity_threshold)
+        super(SleepDepInteractor, self).__init__(hardware_interface,velocity_threshold)
+
 
     def _interact(self, **kwargs):
-        #self._sleep_dep_interface.deprive(**kwargs)
-        self._queue.put(kwargs)
+        self._hardware_interface.interact(**kwargs)
         pass
 
     def _check_time_range(self):
@@ -143,16 +137,3 @@ class SleepDepInteractor(IsMovingInteractor):
 
 
 
-
-
-    def __del__(self):
-
-        if len(self._sleep_dep_interface_list) > 0:
-            logging.info("Closing sleep depriver interface")
-            self._queue.put("DONE")
-            logging.info("Freeing queue")
-            self._queue.cancel_join_thread()
-            logging.info("Joining thread")
-            sleep_dep_interface = self._sleep_dep_interface_list.pop()
-            sleep_dep_interface.join()
-            logging.info("Joined OK")

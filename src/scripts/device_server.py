@@ -11,6 +11,15 @@ from subprocess import call
 
 api = Bottle()
 
+
+
+VIDEO_FILE = None
+ETHOGRAM_DIR = None
+DRAW_RESULTS = None
+VIDEO_OUT = None
+DURATION = None
+
+
 @api.route('/static/<filepath:path>')
 def server_static(filepath):
     return static_file(filepath, root="/")
@@ -48,7 +57,7 @@ def controls(id, action):
                     #date = datetime.fromtimestamp(t)
                     # date_time = date.isoformat()
 
-                    control = ControlThread(machine_id=machine_id, name=machine_name, version=version, video_file=INPUT_VIDEO,
+                    control = ControlThread(machine_id=machine_id, name=machine_name, version=version, video_file=VIDEO_FILE,
                             ethogram_dir=ETHOGRAM_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION, data=data)
                     control.start()
                     return info(id)
@@ -136,10 +145,6 @@ def close(exit_status=0):
 
 if __name__ == '__main__':
 
-
-    INPUT_VIDEO = None
-    DURATION = None
-    DRAW_RESULTS =False
     ETHOGRAM_DIR = "/ethoscope_data/results"
     GIT_WORKING_DIR = '/home/ethoscope/ethoscope-git'
 
@@ -181,13 +186,19 @@ if __name__ == '__main__':
         data = None
 
 
+    VIDEO_FILE = option_dict["input"]
+    ETHOGRAM_DIR = option_dict["results_dir"]
+    DRAW_RESULTS = option_dict["draw"]
+    VIDEO_OUT = option_dict["video_out"]
+    DURATION = None#option_dict["duration"]
+
     control = ControlThread(machine_id=machine_id,
                             name=machine_name,
                             version=version,
                             video_file=option_dict["input"],
                             ethogram_dir=option_dict["results_dir"],
                             draw_results = option_dict["draw"],
-                            video_out = option_dict["video_out"],
+                            video_out = VIDEO_OUT,
                             max_duration=DURATION,
                             data=data)
 

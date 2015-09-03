@@ -11,6 +11,11 @@ class HasInteractedVariable(BoolVariableBase):
 
 class BaseInteractorSync(DescribedObject):
     _tracker = None
+    _hardware_interface_class = None
+
+    def __init__(self, hardware_interface):
+        self._hardware_interface = hardware_interface
+
 
     def __call__(self):
         if self._tracker is None:

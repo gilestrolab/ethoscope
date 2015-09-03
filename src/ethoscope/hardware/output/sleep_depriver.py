@@ -119,23 +119,58 @@ class SleepDepriverInterface(SimpleLynxMotionInterface):
 
 
 
-class AsyncSleepDepriverInterface(multiprocessing.Process):
 
-    def __init__(self,queue,*args, **kwargs):
 
+
+class HardwareInterfaceBase(object):
+    pass
+
+class AsyncSleepDepriverInterface(HardwareInterfaceBase):
+
+    def __init__(self,port="/dev/ttyUSB0"):
+        self._queue = multiprocessing.JoinableQueue()
+        print "to"
+        self._sleep_dep_interface = FakeSleepDepriverSubProcess(queue = self._queue, port=port) # fixme, auto port detection
+        self._sleep_dep_interface.start()
+
+
+    def interact(self, **kwargs):
+        self._queue.put(kwargs)
+
+
+    def _warm_up(self):
+        pass
+
+    def __del__(self):
+        logging.info("Closing sleep depriver interface")
+        self._queue.put("DONE")
+        logging.info("Freeing queue")
+        self._queue.cancel_join_thread()
+        logging.info("Joining thread")
+        self._sleep_dep_interface.join()
+        logging.info("Joined OK")
+
+
+
+class SleepDepriverSubProcess(multiprocessing.Process):
+    _DepriverClass = SleepDepriverInterface
+
+    def __init__(self,queue, fake=False, *args, **kwargs):
         self._queue = queue
         self._sleep_dep_args = args
         self._sleep_dep_kwargs = kwargs
-        super(AsyncSleepDepriverInterface,self).__init__()
+        super(SleepDepriverSubProcess,self).__init__()
 
     def run(self):
         do_run=True
         try:
-            sleep_dep = SleepDepriverInterface(*self._sleep_dep_args, **self._sleep_dep_kwargs)
+
+            sleep_dep = self._DepriverClass(*self._sleep_dep_args, **self._sleep_dep_kwargs)
             sleep_dep.warm_up()
 
             while do_run:
                 try:
+                    print "getting queue"
                     instruction_kwargs = self._queue.get()
                     if (instruction_kwargs == 'DONE'):
                         do_run=False
@@ -149,6 +184,7 @@ class AsyncSleepDepriverInterface(multiprocessing.Process):
 
                 finally:
                     if self._queue.empty():
+
                         #we sleep iff we have an empty queue. this way, we don't over use a cpu
                         time.sleep(.1)
 
@@ -168,8 +204,19 @@ class AsyncSleepDepriverInterface(multiprocessing.Process):
 
 
 
-class FakeSleepDepriverInterface(SimpleLynxMotionInterface):
+class FakeSleepDepriverInterface(SleepDepriverInterface):
+    def __init__(self,port):
+        pass
+
     def deprive(self,channel, dt=500):
-        str = "depriving channel %i, with dt= %i", (channel,dt)
-        logging.warning(str)
+        str = "depriving channel %i, with dt= %i" % (channel,dt)
+        time.sleep(1)
+        print str
+
+    def __del__(self):
+        pass
+
+class FakeSleepDepriverSubProcess(SleepDepriverSubProcess):
+    _DepriverClass = FakeSleepDepriverInterface
+
 
