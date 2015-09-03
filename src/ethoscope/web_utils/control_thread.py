@@ -14,7 +14,7 @@ import cv2
 from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera
 # Build ROIs from greyscale image
 
-from ethoscope.rois.target_roi_builder import TargetArenaTest
+from ethoscope.rois.target_roi_builder import OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder
 from ethoscope.core.monitor import Monitor
 from ethoscope.drawers.drawers import DefaultDrawer
 
@@ -28,8 +28,8 @@ from ethoscope.utils.io import ResultWriter
 
 class ControlThread(Thread):
 
-    _possible_roi_builder_classes = [TargetArenaTest]
-    _ROIBuilderClass = TargetArenaTest
+    _possible_roi_builder_classes = [TargetGridROIBuilder, OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder]
+    _ROIBuilderClass = SleepMonitorWithTargetROIBuilder
     _ROIBuilderClass_kwargs = {}
 
     _possible_tracker_classes = [AdaptiveBGModel]
