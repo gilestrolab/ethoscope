@@ -146,13 +146,13 @@ class SleepDepInteractor(IsMovingInteractor):
 
 
     def __del__(self):
-        logging.info("Closing sleep depriver interface")
 
-        self._queue.put("DONE")
-
-        logging.info("Freeing queue")
-        self._queue.cancel_join_thread()
-        logging.info("Joining thread")
-        sleep_dep_interface = self._sleep_dep_interface_list.pop()
-        sleep_dep_interface.join()
-        logging.info("Joined OK")
+        if len(self._sleep_dep_interface_list) > 0:
+            logging.info("Closing sleep depriver interface")
+            self._queue.put("DONE")
+            logging.info("Freeing queue")
+            self._queue.cancel_join_thread()
+            logging.info("Joining thread")
+            sleep_dep_interface = self._sleep_dep_interface_list.pop()
+            sleep_dep_interface.join()
+            logging.info("Joined OK")
