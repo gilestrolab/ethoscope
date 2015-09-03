@@ -1,10 +1,7 @@
 
-{"roi_builder":{"name":"TargetArenaTest",
+{"roi_builder":{"name":"TargetGridROIBuilder",
                       "arguments":{ "n_cols": 2,
-                                    "n_rows": 10,
-                                    "dummy_str":"yo man",
-                                    "dummy_float":3.11,
-                                    "dummy_datetime":1441036099
+                                    "n_rows": 10
                                   }
                   },
         "tracker": {"name":"AdaptiveBGModel",

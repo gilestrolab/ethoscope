@@ -204,8 +204,8 @@ class TargetGridROIBuilder(TargetGridROIBuilderBase):
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "horizontal_fill", "description": "The proportion of the grid space user by the roi, horizontally.","default":0.90},
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "left_margin", "description": "Same as horizontal_margin, but vertically.","default":0.90}
                                    ]}
-    def __init__(self, n_rows, n_cols, top_margin, bottom_margin,
-                 left_margin, right_margin, horizontal_fill, vertical_fill):
+    def __init__(self, n_rows=1, n_cols=1, top_margin=0, bottom_margin=0,
+                 left_margin=0, right_margin=0, horizontal_fill=.9, vertical_fill=.9):
         self._n_rows = n_rows
         self._n_cols = n_cols
         self._top_margin =  top_margin
