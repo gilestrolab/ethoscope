@@ -153,5 +153,6 @@ class SleepDepInteractor(IsMovingInteractor):
         logging.info("Freeing queue")
         self._queue.cancel_join_thread()
         logging.info("Joining thread")
-        self._sleep_dep_interface_list[0].join()
+        sleep_dep_interface = self._sleep_dep_interface_list.pop()
+        sleep_dep_interface.join()
         logging.info("Joined OK")
