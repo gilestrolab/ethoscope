@@ -185,7 +185,8 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
             mapped_rectangle -= shift
             ct = mapped_rectangle.reshape((1,4,2)).astype(np.int32)
             cv2.drawContours(img,[ct], -1, (255,0,0),1,cv2.CV_AA)
-            rois.append(ROI(ct, value=i+1))
+            rois.append(ROI(ct, idx=i+1))
+
             # cv2.imshow("dbg",img)
             # cv2.waitKey(0)
         return rois

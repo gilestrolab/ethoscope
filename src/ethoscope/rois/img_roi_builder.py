@@ -22,12 +22,12 @@ class ImgMaskROIBuilder(BaseROIBuilder):
         contours, hiera = cv2.findContours(np.copy(self._mask), cv.CV_RETR_EXTERNAL, cv.CV_CHAIN_APPROX_SIMPLE)
 
         rois = []
-        for c in contours:
+        for i,c in enumerate(contours):
             tmp_mask = np.zeros_like(self._mask)
             cv2.drawContours(tmp_mask, [c],0, 1)
 
             value = int(np.median(self._mask[tmp_mask > 0]))
 
-            rois.append(ROI(c, value))
+            rois.append(ROI(c, i+1, value))
 
         return rois

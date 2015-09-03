@@ -10,8 +10,8 @@ from ethoscope.utils.description import DescribedObject
 
 
 class ROI(object):
-    __global_idx = 1
-    def __init__(self, polygon, value=None, orientation = None, regions=None):
+
+    def __init__(self, polygon, idx, value=None, orientation = None, regions=None):
 
         # TODO if we do not need polygon, we can drop it
         self._polygon = np.array(polygon)
@@ -26,16 +26,12 @@ class ROI(object):
 
         self._rectangle = x,y,w,h
         # todo NOW! sort rois by value. if no values, left to right/ top to bottom!
+        self._idx = idx
 
-        self._idx = self.__global_idx
         if value is None:
             self._value = self._idx
         else:
             self._value = value
-
-        ROI.__global_idx +=1
-    def __del__(self):
-        ROI.__global_idx -=1
 
     @property
     def idx(self):
