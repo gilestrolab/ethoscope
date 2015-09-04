@@ -139,10 +139,10 @@
             <h5>{{name}}</h5>
               <ul>
                 <li ng-repeat="opt in option">
-                    <input type=radio name={{opt.name}} value={{opt.name}} ng-model="selected_options[name]['name']">
+                    <input type=radio name={{opt.name}} value={{opt.name}} ng-model="selected_options[name]['name']" ng-click="sm.update_user_options(name)">
                     {{opt.name}}: {{opt.overview}}
                   <ul>
-                        <li ng-repeat="arg in opt.arguments">
+                        <li ng-if="selected_options[name]['name']==opt.name" ng-repeat="arg in opt.arguments">
                             {{arg.description}}
                             <input ng-if="arg.type == 'number'" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options[name]['arguments'][arg.name]" >
                             <input ng-if="arg.type == 'str'" type=text name={{arg.name}}  ng-model="selected_options[name]['arguments'][arg.name]"  >
