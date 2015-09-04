@@ -25,9 +25,6 @@ class BaseDrawer(object):
 
     def draw(self,img, positions, tracking_units):
         self._last_drawn_frame = img.copy()
-        if not self._draw_frames and self._video_out is None:
-            return
-
 
         self._annotate_frame(self._last_drawn_frame, positions,tracking_units)
 
