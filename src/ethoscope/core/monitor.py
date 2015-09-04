@@ -30,8 +30,6 @@ class Monitor(object):
 
     def __init__(self, camera, tracker_class,
                  rois = None, interactors=None,
-                max_duration=None,
-                drop_each=None,
                 *args, **kwargs # extra arguments for the tracker objects
                  ):
         r"""
@@ -44,22 +42,12 @@ class Monitor(object):
         :param interactors: The class that will be used for analysing the position of the object and interacting with the system/hardware.
         :param result_writer: An optional result writer (directory name or ResultWriter)
 
-        :param video_out: An optional filename where to write the original frames annotated with the location of the ROIs and position of the objects.
-          Note that this will use quite a lot of resources since it requires 1) drawing on the frames and 2) encoding the video in real time.
         :param max_duration: tracking stops when the elapsed time is greater
         :type max_duration: float
         """
 
         self._camera = camera
-        self._drop_each = drop_each
-
         self._last_frame_idx =0
-
-        if not max_duration is None:
-            self._max_duration = max_duration * 1000 # in ms
-        else:
-            self._max_duration = None
-
         self._force_stop = False
         self._last_positions = {}
         self._last_time_stamp = 0
@@ -99,15 +87,11 @@ class Monitor(object):
             self._is_running = True
 
             for i,(t, frame) in enumerate(self._camera):
-                if self._drop_each is not None and i % self._drop_each != 0:
-                    continue
 
                 if self._force_stop:
                     logging.info("Monitor object stopped from external request")
                     break
-                elif (self._max_duration is not None and t > self._max_duration):
-                    logging.info("Monitor object stopped by timeout")
-                    break
+
                 self._last_frameframe_idx = i
                 self._last_time_stamp = t
                 self._frame_buffer = frame

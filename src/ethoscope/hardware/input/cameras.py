@@ -19,8 +19,9 @@ class BaseCamera(object):
     _resolution = None
     _frame_idx = 0
 
-    def __init__(self, *args, **kwargs):
-        pass
+    def __init__(self,drop_each=1, max_duration=None, *args, **kwargs):
+        self._drop_each = drop_each
+        self._max_duration = max_duration
 
     def __exit__(self):
         logging.info("Closing camera")
@@ -37,15 +38,21 @@ class BaseCamera(object):
                 if not at_leat_one_frame:
                     raise EthoscopeException("Camera could not read the first frame")
                 break
-            t,out = self.next_time_image()
 
+
+            t,out = self.next_time_image()
             if out is None:
                 break
             t_ms = int(1000*t)
-
-            yield t_ms,out
-
             at_leat_one_frame = True
+
+            if (self._frame_idx % self._drop_each) == 0:
+                yield t_ms,out
+
+            if self._max_duration is not None and t > self._max_duration:
+                break
+
+
 
 
     @property
@@ -84,11 +91,14 @@ class BaseCamera(object):
 class MovieVirtualCamera(BaseCamera):
 
 
-    def __init__(self, path, use_wall_clock = False,  *args, **kwargs ):
+    def __init__(self, path, use_wall_clock = False, *args, **kwargs ):
+
+
         #print "path", path
         self._frame_idx = 0
         self._path = path
         self._use_wall_clock = use_wall_clock
+
 
         if not (isinstance(path, str) or isinstance(path, unicode)):
             raise EthoscopeException("path to video must be a string")
@@ -106,7 +116,7 @@ class MovieVirtualCamera(BaseCamera):
 
         self._resolution = (int(w),int(h))
 
-        super(MovieVirtualCamera, self).__init__(path, *args, **kwargs)
+        super(MovieVirtualCamera, self).__init__(*args, **kwargs)
 
         # emulates v4l2 (real time camera) from video file
         if self._use_wall_clock:
@@ -126,7 +136,7 @@ class MovieVirtualCamera(BaseCamera):
         return True
 
     def restart(self):
-        self.__init__(self._path, self._use_wall_clock)
+        self.__init__(self._path, use_wall_clock=self._use_wall_clock, drop_each=self._drop_each, max_duration = self._max_duration)
 
 
     def _next_image(self):
