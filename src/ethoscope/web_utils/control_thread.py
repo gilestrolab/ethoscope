@@ -41,7 +41,7 @@ class ControlThread(Thread):
                         "possible_classes":[DefaultInteractor, FakeSleepDepInteractor, SleepDepInteractor],
                     },
         "drawer":{
-                        "possible_classes":[NullDrawer, DefaultDrawer],
+                        "possible_classes":[DefaultDrawer, NullDrawer],
                     },
         "camera":{
                         "possible_classes":[OurPiCameraAsync, MovieVirtualCamera],
