@@ -102,8 +102,8 @@ class SimpleLynxMotionConnection(object):
 
 class SleepDepriverConnection(SimpleLynxMotionConnection):
     def __init__(self,*args, **kwargs):
-        self.warm_up()
         super(SleepDepriverConnection,self).__init__(*args,**kwargs)
+        self.warm_up()
 
     def warm_up(self):
         for j in range(3):
