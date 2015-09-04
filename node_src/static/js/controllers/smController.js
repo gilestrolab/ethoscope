@@ -1,5 +1,20 @@
 (function(){
-    var app = angular.module('flyApp');
+var app = angular.module('flyApp');
+
+app.directive('tooltip', function(){
+    return {
+        restrict: 'A',
+        link: function(scope, element, attrs){
+            $(element).hover(function(){
+                // on mouseenter
+                $(element).tooltip('show');
+            }, function(){
+                // on mouseleave
+                $(element).tooltip('hide');
+            });
+        }
+    };
+});
 app.controller('smController', function($scope, $http, $routeParams, $interval, $timeout, $location)  {
         device_id = $routeParams.device_id;
         var device_ip;
@@ -24,6 +39,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
         });
 
 
+
         $http.get('/device/'+device_id+'/ip').success(function(data){
                     $scope.device.ip = data;
                     device_ip = data;
@@ -41,6 +57,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
                 }
             }
         }
+
 
         $scope.sm.start = function(option){
             $("#startModal").modal('hide');
@@ -176,4 +193,5 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
     });
 
     });
+
 })()
