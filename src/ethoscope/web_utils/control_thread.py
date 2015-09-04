@@ -22,6 +22,8 @@ from ethoscope.drawers.drawers import DefaultDrawer
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.interactors.interactors import DefaultInteractor
 from ethoscope.interactors.sleep_depriver_interactor import SleepDepInteractor
+from ethoscope.interactors.fake_sleep_dep_interactor import FakeSleepDepInteractor
+
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import ResultWriter
 
@@ -36,7 +38,7 @@ class ControlThread(Thread):
     _TrackerClass = AdaptiveBGModel
     _TrackerClass_kwargs = {}
 
-    _possible_interactor_classes = [DefaultInteractor, SleepDepInteractor]
+    _possible_interactor_classes = [DefaultInteractor, FakeSleepDepInteractor, SleepDepInteractor]
     _InteractorClass = DefaultInteractor
     _InteractorClass_kwargs = {}
 

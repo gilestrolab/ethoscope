@@ -1,22 +1,20 @@
 __author__ = 'quentin'
 
 
-from ethoscope.interactors.interactors import BaseInteractorSync, HasInteractedVariable
-from ethoscope.hardware.output.sleep_depriver import  AsyncSleepDepriverInterface
+from ethoscope.interactors.interactors import BaseInteractor, HasInteractedVariable
+from ethoscope.hardware.interfaces.interfaces import  DefaultInterface
+from ethoscope.hardware.interfaces.sleep_depriver_interface import SleepDepriverInterface
 import time
 import sys
-import multiprocessing
-import logging
 
 
-
-class IsMovingInteractor(BaseInteractorSync):
+class IsMovingInteractor(BaseInteractor):
+    _hardwareInterfaceClass = DefaultInterface
 
     def __init__(self, hardware_interface, velocity_threshold=0.0060):
         self._velocity_threshold = velocity_threshold
         self._last_active = 0
         super(IsMovingInteractor,self).__init__(hardware_interface)
-
 
     def _interact(self, **kwargs):
         pass
@@ -71,7 +69,7 @@ class SleepDepInteractor(IsMovingInteractor):
                                     {"type": "datetime", "name": "end_datetime", "description": "When sleep deprivation is to be ended","default":sys.maxsize}
                                    ]}
 
-    _hardware_interface_class = AsyncSleepDepriverInterface
+    _hardwareInterfaceClass = SleepDepriverInterface
     _roi_to_channel = {
             2:1,  4:2,  6:3,  8:4,  10:5,
             11:6, 13:7, 15:8, 17:9, 19:10
@@ -92,10 +90,6 @@ class SleepDepInteractor(IsMovingInteractor):
 
         super(SleepDepInteractor, self).__init__(hardware_interface,velocity_threshold)
 
-
-    def _interact(self, **kwargs):
-        self._hardware_interface.interact(**kwargs)
-        pass
 
     def _check_time_range(self):
         wall_clock_time = time.time()
