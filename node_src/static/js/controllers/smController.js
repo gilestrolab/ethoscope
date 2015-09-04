@@ -1,5 +1,20 @@
 (function(){
-    var app = angular.module('flyApp');
+var app = angular.module('flyApp');
+
+app.directive('tooltip', function(){
+    return {
+        restrict: 'A',
+        link: function(scope, element, attrs){
+            $(element).hover(function(){
+                // on mouseenter
+                $(element).tooltip('show');
+            }, function(){
+                // on mouseleave
+                $(element).tooltip('hide');
+            });
+        }
+    };
+});
 app.controller('smController', function($scope, $http, $routeParams, $interval, $timeout, $location)  {
         device_id = $routeParams.device_id;
         var device_ip;
@@ -14,25 +29,34 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
             $scope.selected_options = {};
             for (var k in data.user_options){
                 $scope.selected_options[k]={};
-                for (var i=0;i<data.user_options[k].length;i++){
-                    $scope.selected_options[k]['name']=data.user_options[k][i]['name'];
-                    $scope.selected_options[k]['arguments']={};
-                    for(var j=0;j<data.user_options[k][i]['arguments'].length; j++){
-                        //console.log(j,data.user_options[k][i]['arguments'][j]['default']);
-                        $scope.selected_options[k]['arguments'][data.user_options[k][i]['arguments'][j]['name']]=data.user_options[k][i]['arguments'][j]['default'];
-                        //console.log($scope.selected_options);
-
-                    }
+                $scope.selected_options[k]['name']=data.user_options[k][0]['name'];
+                $scope.selected_options[k]['arguments']={};
+                for(var j=0;j<data.user_options[k][0]['arguments'].length; j++){
+                        $scope.selected_options[k]['arguments'][data.user_options[k][0]['arguments'][j]['name']]=data.user_options[k][0]['arguments'][j]['default'];
                 }
-
             }
 
         });
+
+
 
         $http.get('/device/'+device_id+'/ip').success(function(data){
                     $scope.device.ip = data;
                     device_ip = data;
                 });
+
+        $scope.sm.update_user_options = function(name){
+            data=$scope.device;
+            for (var i=0;i<data.user_options[name].length;i++){
+                if (data.user_options[name][i]['name']== $scope.selected_options[name]['name']){
+                    $scope.selected_options[name]['arguments']={};
+                    for(var j=0;j<data.user_options[name][i]['arguments'].length; j++){
+                        $scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']]=data.user_options[name][i]['arguments'][j]['default'];
+
+                    }
+                }
+            }
+        }
 
 
         $scope.sm.start = function(option){
@@ -169,4 +193,5 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
     });
 
     });
+
 })()

@@ -39,3 +39,7 @@
 .intro{
     margin: 1em;
 }
+
+.option-list li{
+list-style: none;
+}
