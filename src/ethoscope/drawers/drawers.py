@@ -14,7 +14,7 @@ class BaseDrawer(object):
         self._window_name = "ethoscope_" + str(os.getpid())
         if draw_frames:
             cv2.namedWindow(self._window_name, cv2.CV_WINDOW_AUTOSIZE)
-
+        self._last_drawn_frame = None
 
     def _annotate_frame(self,img, positions, tracking_units):
         raise NotImplementedError
