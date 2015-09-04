@@ -92,7 +92,7 @@ class Monitor(object):
                     logging.info("Monitor object stopped from external request")
                     break
 
-                self._last_frameframe_idx = i
+                self._last_frame_idx = i
                 self._last_time_stamp = t
                 self._frame_buffer = frame
 

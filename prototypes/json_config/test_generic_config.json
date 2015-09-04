@@ -11,5 +11,6 @@
         "drawer": {"name":"DefaultDrawer",
                       "arguments":{"draw_frames":true, "video_out":"/tmp/test.avi"}},
         "camera": {"name":"MovieVirtualCamera",
-                      "arguments":{"path":"/data/psv_misc/tube_monitor_validation/tube_monitor_validation_raw.mp4"}}
+                      "arguments":{"path":"/data/psv_misc/tube_monitor_validation/tube_monitor_validation_raw.mp4",
+                                   "drop_each":10}}
      }
