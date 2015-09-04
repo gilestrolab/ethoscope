@@ -98,12 +98,6 @@ class SimpleLynxMotionInterface(object):
         o = self._serial.write(instruction)
         return o
 
-
-
-
-
-
-
 class SleepDepriverInterface(SimpleLynxMotionInterface):
 
     def warm_up(self):
@@ -117,11 +111,6 @@ class SleepDepriverInterface(SimpleLynxMotionInterface):
         self.move_to_angle(channel, self._max_angle_pulse[0],dt)
         time.sleep(dt/1000.0)
 
-
-
-
-
-
 class HardwareInterfaceBase(object):
     pass
 
@@ -129,17 +118,12 @@ class AsyncSleepDepriverInterface(HardwareInterfaceBase):
 
     def __init__(self,port="/dev/ttyUSB0"):
         self._queue = multiprocessing.JoinableQueue()
-        print "to"
         self._sleep_dep_interface = FakeSleepDepriverSubProcess(queue = self._queue, port=port) # fixme, auto port detection
         self._sleep_dep_interface.start()
 
 
     def interact(self, **kwargs):
         self._queue.put(kwargs)
-
-
-    def _warm_up(self):
-        pass
 
     def __del__(self):
         logging.info("Closing sleep depriver interface")
@@ -170,7 +154,6 @@ class SleepDepriverSubProcess(multiprocessing.Process):
 
             while do_run:
                 try:
-                    print "getting queue"
                     instruction_kwargs = self._queue.get()
                     if (instruction_kwargs == 'DONE'):
                         do_run=False

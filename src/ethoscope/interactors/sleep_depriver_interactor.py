@@ -33,7 +33,6 @@ class IsMovingInteractor(BaseInteractor):
             return False
 
 
-
         dt_s = abs(times[-1] - times[-2]) / 1000.0
         dist = 10.0 ** (tail_m["xy_dist_log10x1000"]/1000.0)
         velocity = dist / dt_s
@@ -49,12 +48,6 @@ class IsMovingInteractor(BaseInteractor):
             self._last_active = t[-1]
             return HasInteractedVariable(False), {}
         return HasInteractedVariable(True), {}
-
-
-
-
-
-
 
 
 class SleepDepInteractor(IsMovingInteractor):
@@ -87,7 +80,6 @@ class SleepDepInteractor(IsMovingInteractor):
 
         super(SleepDepInteractor, self).__init__(hardware_interface,velocity_threshold)
 
-
     def _check_time_range(self):
         wall_clock_time = time.time()
         if self._end_datetime > wall_clock_time > self._start_datetime:
@@ -109,8 +101,6 @@ class SleepDepInteractor(IsMovingInteractor):
             return HasInteractedVariable(False), {"channel":channel}
 
         has_moved = self._has_moved()
-
-
 
         if self._t0 is None:
             self._t0 = now
