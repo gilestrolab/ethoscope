@@ -55,7 +55,7 @@ class NullDrawer(BaseDrawer):
     def __init__(self):
         super(NullDrawer,self).__init__(video_out=None, draw_frames=False)
     def _annotate_frame(self,img, positions, tracking_units):
-        return
+        return img.copy()
 
 
 class DefaultDrawer(BaseDrawer):
