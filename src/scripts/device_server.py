@@ -58,7 +58,7 @@ def controls(id, action):
                     # date_time = date.isoformat()
 
                     control = ControlThread(machine_id=machine_id, name=machine_name, version=version, video_file=VIDEO_FILE,
-                            ethogram_dir=ETHOGRAM_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION, data=data)
+                            ethoscope_dir=ETHOGRAM_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION, data=data)
                     control.start()
                     return info(id)
 
@@ -188,18 +188,11 @@ if __name__ == '__main__':
 
     VIDEO_FILE = option_dict["input"]
     ETHOGRAM_DIR = option_dict["results_dir"]
-    DRAW_RESULTS = option_dict["draw"]
-    VIDEO_OUT = option_dict["video_out"]
-    DURATION = None#option_dict["duration"]
 
     control = ControlThread(machine_id=machine_id,
                             name=machine_name,
                             version=version,
-                            video_file=option_dict["input"],
-                            ethogram_dir=option_dict["results_dir"],
-                            draw_results = option_dict["draw"],
-                            video_out = VIDEO_OUT,
-                            max_duration=DURATION,
+                            ethoscope_dir=option_dict["results_dir"],
                             data=data)
 
     if option_dict["debug"]:
