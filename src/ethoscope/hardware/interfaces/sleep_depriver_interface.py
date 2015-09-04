@@ -128,13 +128,11 @@ class SleepDepriverSubProcess(multiprocessing.Process):
 
             while do_run:
                 try:
-                    print "getting queue"
                     instruction_kwargs = self._queue.get()
                     if (instruction_kwargs == 'DONE'):
                         do_run=False
                         continue
                     sleep_dep.deprive(**instruction_kwargs)
-
                 except Exception as e:
                     do_run=False
                     logging.error("Unexpected error whist depriving. Instruction was: %s" % str(instruction_kwargs))

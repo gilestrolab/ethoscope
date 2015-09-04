@@ -240,13 +240,9 @@ class ControlThread(Thread):
                 #the camera start time is the reference 0
                 self._info["time"] = cam.start_time
 
-                HardWareInterfaceClass =  self._InteractorClass.__dict__["_hardware_interface_class"]
-                print "HardWareInterfaceClass"
-                print HardWareInterfaceClass
-                hardware_interface = HardWareInterfaceClass()
+                HardWareInterfaceClass =  self._InteractorClass.__dict__["_hardwareInterfaceClass"]
 
-                print "hardware_interfec"
-                print hardware_interface
+                hardware_interface = HardWareInterfaceClass()
                 interactors = [self._InteractorClass(hardware_interface ,**self._InteractorClass_kwargs) for _ in rois]
                 kwargs = self._monit_kwargs.copy()
                 kwargs.update(self._TrackerClass_kwargs)

@@ -16,9 +16,6 @@ class IsMovingInteractor(BaseInteractor):
         self._last_active = 0
         super(IsMovingInteractor,self).__init__(hardware_interface)
 
-    def _interact(self, **kwargs):
-        pass
-
     def _has_moved(self):
 
         positions = self._tracker.positions

@@ -1,7 +1,8 @@
 __author__ = 'quentin'
 
-from sleep_depriver_interactor import SleepDepInteractor
+from sleep_depriver_interactor import SleepDepInteractor, HasInteractedVariable
 from ethoscope.hardware.interfaces.fake_sleep_dep_interface import FakeSleepDepriverInterface
+import sys
 
 class FakeSleepDepInteractor(SleepDepInteractor):
     description = {"overview": "A dummy interactor that simply print messages instead of moving tubes. For development only",
@@ -12,6 +13,8 @@ class FakeSleepDepInteractor(SleepDepInteractor):
                                     {"type": "datetime", "name": "end_datetime", "description": "When sleep deprivation is to be ended","default":sys.maxsize}
                                    ]}
     _hardwareInterfaceClass = FakeSleepDepriverInterface
-    
+
+
+
 
 
