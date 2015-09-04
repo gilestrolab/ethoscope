@@ -405,7 +405,7 @@ class PiFrameGrabber(multiprocessing.Process):
 
 class OurPiCameraAsync(BaseCamera):
 
-    def __init__(self, target_fps=10, target_resolution=(960,720), *args, **kwargs):
+    def __init__(self, target_fps=20, target_resolution=(1280, 960), *args, **kwargs):
 
         logging.info("Initialising camera")
         w,h = target_resolution

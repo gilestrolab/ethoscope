@@ -14,7 +14,8 @@ import cv2
 from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera
 # Build ROIs from greyscale image
 
-from ethoscope.rois.target_roi_builder import OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder
+from ethoscope.rois.target_roi_builder import  OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder
+from ethoscope.rois.roi_builders import  DefaultROIBuilder
 from ethoscope.core.monitor import Monitor
 from ethoscope.drawers.drawers import DefaultDrawer
 
@@ -25,24 +26,48 @@ from ethoscope.interactors.sleep_depriver_interactor import SleepDepInteractor
 from ethoscope.interactors.fake_sleep_dep_interactor import FakeSleepDepInteractor
 
 from ethoscope.utils.debug import EthoscopeException
-from ethoscope.utils.io import ResultWriter
+from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
 
 
 class ControlThread(Thread):
+    _option_dict = {
+        "roi_builder":{
+                "possible_classes":[DefaultROIBuilder, TargetGridROIBuilder, OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder],
+            },
+        "tracker":{
+                "possible_classes":[AdaptiveBGModel],
+            },
+        "interactor":{
+                        "possible_classes":[DefaultInteractor, FakeSleepDepInteractor, SleepDepInteractor],
+                    },
+        "drawer":{
+                        "possible_classes":[DefaultDrawer],
+                    },
+        "camera":{
+                        "possible_classes":[OurPiCameraAsync, MovieVirtualCamera],
+                    },
+        "result_writer":{
+                        "possible_classes":[ResultWriter, SQLiteResultWriter],
+                }
+     }
+    for k in _option_dict:
+        _option_dict[k]["class"] =_option_dict[k]["possible_classes"][0]
+        _option_dict[k]["kwargs"] ={}
 
-    _possible_roi_builder_classes = [TargetGridROIBuilder, OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder]
-    _ROIBuilderClass = SleepMonitorWithTargetROIBuilder
-    _ROIBuilderClass_kwargs = {}
+    #
+    # _possible_roi_builder_classes = [TargetGridROIBuilder, OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder]
+    # _ROIBuilderClass = SleepMonitorWithTargetROIBuilder
+    # _ROIBuilderClass_kwargs = {}
+    #
+    # _possible_tracker_classes = [AdaptiveBGModel]
+    # _TrackerClass = AdaptiveBGModel
+    # _TrackerClass_kwargs = {}
+    #
+    # _possible_interactor_classes = [DefaultInteractor, FakeSleepDepInteractor, SleepDepInteractor]
+    # _InteractorClass = DefaultInteractor
+    # _InteractorClass_kwargs = {}
 
-    _possible_tracker_classes = [AdaptiveBGModel]
-    _TrackerClass = AdaptiveBGModel
-    _TrackerClass_kwargs = {}
-
-    _possible_interactor_classes = [DefaultInteractor, FakeSleepDepInteractor, SleepDepInteractor]
-    _InteractorClass = DefaultInteractor
-    _InteractorClass_kwargs = {}
-
-    _DrawerClass = DefaultDrawer
+    # _DrawerClass = DefaultDrawer
 
     _tmp_last_img_file = "last_img.jpg"
     _dbg_img_file = "dbg_img.png"
@@ -126,43 +151,39 @@ class ControlThread(Thread):
 
     def _get_user_options(self):
         out = {}
-        out["roi_builder"] = []
-        for p in self._possible_roi_builder_classes:
-            d = p.__dict__["description"]
-            d["name"] = p.__name__
-            out["roi_builder"].append(d)
+        for key, value in self._option_dict.iteritems():
+            out[key] = []
+            for p in value["possible_classes"]:
+                d = p.__dict__["description"]
+                d["name"] = p.__name__
+                out[key].append(d)
 
-        out["tracker"] = []
-        for p in self._possible_tracker_classes:
-            d = p.__dict__["description"]
-            d["name"] = p.__name__
-            out["tracker"].append(d)
-
-        out["interactor"] = []
-        for p in self._possible_interactor_classes:
-            d = p.__dict__["description"]
-            d["name"] = p.__name__
-            out["interactor"].append(d)
-
+        print out
         return out
 
-    def _parse_user_options(self,data):
+    def _parse_one_user_option(self,field, data):
 
+        try:
+            subdata = data[field]
+        except KeyError:
+            logging.warning("No field %s, using default" % field)
+            return None, {}
+
+        Class = eval(subdata["name"])
+        kwargs = subdata["arguments"]
+
+        return Class, kwargs
+
+
+    def _parse_user_options(self,data):
         if data is None:
             return
-
-        rb_data =  data["roi_builder"]
-
-        self._ROIBuilderClass = eval(rb_data["name"])
-        self._ROIBuilderClass_kwargs = rb_data["arguments"]
-
-        tracker_data =  data["tracker"]
-        self._TrackerClass= eval(tracker_data["name"])
-        self._TrackerClass_kwargs = tracker_data["arguments"]
-
-        interactor_data =  data["interactor"]
-        self._InteractorClass= eval(interactor_data["name"])
-        self._InteractorClass_kwargs= interactor_data["arguments"]
+        for key, value in self._option_dict.iteritems():
+            Class, kwargs = self._parse_one_user_option(key, data)
+            # when no field is present in the JSON config, we get the default class
+            if Class is None:
+                _option_dict[key]["class"] =_option_dict[key]["possible_classes"][0]
+                _option_dict[key]["kwargs"] = {}
 
 
     def _update_info(self):
@@ -214,15 +235,27 @@ class ControlThread(Thread):
             self._last_info_t_stamp = 0
             self._last_info_frame_idx = 0
             try:
-                if self._video_file is None:
-                    cam = OurPiCameraAsync( target_fps=20, target_resolution=(1280, 960))
-                else:
-                    #cam = MovieVirtualCamera(self._video_file, use_wall_clock=True)
-                    cam = MovieVirtualCamera(self._video_file, use_wall_clock=False)
+                CameraClass = self._option_dict["camera"]["class"]
+                camera_kwargs = self._option_dict["camera"]["kwargs"]
 
-                logging.info("Building ROIs")
+                ROIBuilderClass= self._option_dict["roi_builder"]["class"]
+                roi_builder_kwargs = self._option_dict["roi_builder"]["kwargs"]
 
-                roi_builder = self._ROIBuilderClass(**self._ROIBuilderClass_kwargs)
+                InteractorClass= self._option_dict["interactor"]["class"]
+                interactor_kwargs = self._option_dict["interactor"]["kwargs"]
+                HardWareInterfaceClass =  InteractorClass.__dict__["_hardwareInterfaceClass"]
+
+                TrackerClass= self._option_dict["tracker"]["class"]
+                tracker_kwargs = self._option_dict["tracker"]["kwargs"]
+
+                ResultWriterClass = self._option_dict["result_writer"]["class"]
+                result_writer_kwargs = self._option_dict["result_writer"]["kwargs"]
+
+
+                cam = CameraClass(**camera_kwargs)
+
+
+                roi_builder = ROIBuilderClass(**roi_builder_kwargs)
                 rois = roi_builder(cam)
 
                 logging.info("Initialising monitor")
@@ -240,19 +273,20 @@ class ControlThread(Thread):
                 #the camera start time is the reference 0
                 self._info["time"] = cam.start_time
 
-                HardWareInterfaceClass =  self._InteractorClass.__dict__["_hardwareInterfaceClass"]
+
 
                 hardware_interface = HardWareInterfaceClass()
-                interactors = [self._InteractorClass(hardware_interface ,**self._InteractorClass_kwargs) for _ in rois]
+                interactors = [InteractorClass(hardware_interface ,**interactor_kwargs) for _ in rois]
                 kwargs = self._monit_kwargs.copy()
-                kwargs.update(self._TrackerClass_kwargs)
+                kwargs.update(tracker_kwargs)
 
-                self._monit = Monitor(cam, self._TrackerClass, rois,
+                self._monit = Monitor(cam, TrackerClass, rois,
                                       interactors=interactors,
                                      *self._monit_args, **kwargs)
 
                 logging.info("Starting monitor")
 
+                #fixme
                 with ResultWriter(self._db_credentials ,rois, self._metadata) as rw:
                     self._info["status"] = "running"
                     logging.info("Setting monitor status as running: '%s'" % self._info["status"] )
