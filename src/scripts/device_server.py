@@ -13,7 +13,7 @@ api = Bottle()
 
 
 
-VIDEO_FILE = None
+json_data = {}
 ETHOGRAM_DIR = None
 DRAW_RESULTS = None
 VIDEO_OUT = None
@@ -57,8 +57,13 @@ def controls(id, action):
                     #date = datetime.fromtimestamp(t)
                     # date_time = date.isoformat()
 
-                    control = ControlThread(machine_id=machine_id, name=machine_name, version=version,
-                                            ethoscope_dir=ETHOGRAM_DIR, data=data)
+                    json_data.update(data)
+                    control = ControlThread(machine_id=machine_id,
+                            name=machine_name,
+                            version=version,
+                            ethoscope_dir=ETHOGRAM_DIR,
+                            data=json_data)
+                    
                     control.start()
                     return info(id)
 
@@ -155,9 +160,6 @@ if __name__ == '__main__':
     parser = OptionParser()
     #parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-r", "--run", dest="run", default=False, help="Runs tracking directly", action="store_true")
-    parser.add_option("-d", "--draw", dest="draw", default=False, help="Draws real time tracking results on XOrg", action="store_true")
-    parser.add_option("-i", "--input", dest="input", default=None, help="A video file to use as an input (alternative to real time camera)")
-    parser.add_option("-o", "--video-out", dest="video_out", default=None, help="A video file to save an annotated video at")
     parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
     parser.add_option("-p", "--port", dest="port", default=9000,help="port")
     parser.add_option("-b", "--branch", dest="branch", default="psv-package",help="the branch to work from")
@@ -181,19 +183,17 @@ if __name__ == '__main__':
     if option_dict["json"]:
         import json
         with open(option_dict["json"]) as f:
-            data = json.loads(f.read())
+            json_data= json.loads(f.read())
     else:
         data = None
 
-
-    VIDEO_FILE = option_dict["input"]
     ETHOGRAM_DIR = option_dict["results_dir"]
 
     control = ControlThread(machine_id=machine_id,
                             name=machine_name,
                             version=version,
-                            ethoscope_dir=option_dict["results_dir"],
-                            data=data)
+                            ethoscope_dir=ETHOGRAM_DIR,
+                            data=json_data)
 
     if option_dict["debug"]:
         #fixme

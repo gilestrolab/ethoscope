@@ -4,7 +4,7 @@ import cv2
 from ethoscope.utils.description import DescribedObject
 import os
 
-class BaseDrawer(DescribedObject):
+class BaseDrawer(object):
     _out_fps = 2
 
     def __init__(self, video_out=None, draw_frames=True):
@@ -24,6 +24,9 @@ class BaseDrawer(DescribedObject):
         return self._last_drawn_frame
 
     def draw(self,img, positions, tracking_units):
+        if not self._draw_frames and self._video_out is None:
+            return
+
         self._last_drawn_frame = img.copy()
         self._annotate_frame(self._last_drawn_frame, positions,tracking_units)
 
@@ -31,7 +34,6 @@ class BaseDrawer(DescribedObject):
             cv2.imshow(self._window_name, self._last_drawn_frame )
             cv2.waitKey(1)
 
-        # the next part of thew function is only for video writing purposes
         if self._video_out is None:
             return
 
@@ -50,6 +52,8 @@ class BaseDrawer(DescribedObject):
             self._video_writer.release()
 
 class NullDrawer(BaseDrawer):
+    def __init__(self):
+        super(NullDrawer,self).__init__(video_out=None, draw_frames=False)
     def _annotate_frame(self,img, positions, tracking_units):
         return
 

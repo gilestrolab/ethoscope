@@ -85,11 +85,12 @@ class MovieVirtualCamera(BaseCamera):
 
 
     def __init__(self, path, use_wall_clock = False,  *args, **kwargs ):
+        #print "path", path
         self._frame_idx = 0
         self._path = path
         self._use_wall_clock = use_wall_clock
 
-        if not isinstance(path, str):
+        if not (isinstance(path, str) or isinstance(path, unicode)):
             raise EthoscopeException("path to video must be a string")
         if not os.path.exists(path):
             raise EthoscopeException("'%s' does not exist. No such file" % path)

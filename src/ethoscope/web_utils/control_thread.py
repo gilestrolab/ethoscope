@@ -17,7 +17,7 @@ from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamer
 from ethoscope.rois.target_roi_builder import  OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder
 from ethoscope.rois.roi_builders import  DefaultROIBuilder
 from ethoscope.core.monitor import Monitor
-from ethoscope.drawers.drawers import DefaultDrawer
+from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
 
 # the robust self learning tracker
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
@@ -41,7 +41,7 @@ class ControlThread(Thread):
                         "possible_classes":[DefaultInteractor, FakeSleepDepInteractor, SleepDepInteractor],
                     },
         "drawer":{
-                        "possible_classes":[DefaultDrawer],
+                        "possible_classes":[NullDrawer, DefaultDrawer],
                     },
         "camera":{
                         "possible_classes":[OurPiCameraAsync, MovieVirtualCamera],
@@ -87,13 +87,6 @@ class ControlThread(Thread):
         self._monit_kwargs = kwargs
         self._metadata = None
 
-        if video_file is not None:
-            self._monit_kwargs["drop_each"] = 10
-
-        self._video_file = video_file
-        self._video_out = video_out
-        self._draw_results = draw_results
-
         # for FPS computation
         self._last_info_t_stamp = 0
         self._last_info_frame_idx = 0
@@ -129,7 +122,7 @@ class ControlThread(Thread):
         DrawerClass = self._option_dict["drawer"]["class"]
         drawer_kwargs = self._option_dict["drawer"]["kwargs"]
 
-        self._drawer = DrawerClass(drawer_kwargs)
+        self._drawer = DrawerClass(**drawer_kwargs)
         super(ControlThread, self).__init__()
 
 
@@ -143,12 +136,20 @@ class ControlThread(Thread):
         for key, value in self._option_dict.iteritems():
             out[key] = []
             for p in value["possible_classes"]:
-                d = p.__dict__["description"]
+                try:
+                    d = p.__dict__["description"]
+                except KeyError:
+                    continue
+
                 d["name"] = p.__name__
                 out[key].append(d)
+        out_currated = {}
 
-        print out
-        return out
+        for key, value in out.iteritems():
+            if len(value) >0:
+                out_currated[key] = value
+
+        return out_currated
 
     def _parse_one_user_option(self,field, data):
 
@@ -165,14 +166,23 @@ class ControlThread(Thread):
 
 
     def _parse_user_options(self,data):
+
         if data is None:
             return
-        for key, value in self._option_dict.iteritems():
+        for key in self._option_dict.iterkeys():
+
             Class, kwargs = self._parse_one_user_option(key, data)
             # when no field is present in the JSON config, we get the default class
+
             if Class is None:
-                self._option_dict[key]["class"] =_option_dict[key]["possible_classes"][0]
+
+                self._option_dict[key]["class"] = self._option_dict[key]["possible_classes"][0]
                 self._option_dict[key]["kwargs"] = {}
+                continue
+
+            self._option_dict[key]["class"] = Class
+            self._option_dict[key]["kwargs"] = kwargs
+
 
 
     def _update_info(self):
@@ -225,6 +235,7 @@ class ControlThread(Thread):
             self._last_info_frame_idx = 0
             try:
                 CameraClass = self._option_dict["camera"]["class"]
+
                 camera_kwargs = self._option_dict["camera"]["kwargs"]
 
                 ROIBuilderClass= self._option_dict["roi_builder"]["class"]

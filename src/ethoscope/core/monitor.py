@@ -23,7 +23,7 @@ __author__ = 'quentin'
 from tracking_unit import TrackingUnit
 import logging
 import cv2
-
+import traceback
 
 
 class Monitor(object):
@@ -134,7 +134,7 @@ class Monitor(object):
                 self._last_t = t
 
         except Exception as e:
-            logging.info("Monitor closing with an exception: '%s'" % str(e))
+            logging.error("Monitor closing with an exception: '%s'" % traceback.format_exc(e))
             raise e
 
         finally:
