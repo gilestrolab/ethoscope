@@ -57,8 +57,8 @@ def controls(id, action):
                     #date = datetime.fromtimestamp(t)
                     # date_time = date.isoformat()
 
-                    control = ControlThread(machine_id=machine_id, name=machine_name, version=version, video_file=VIDEO_FILE,
-                            ethoscope_dir=ETHOGRAM_DIR, draw_results = DRAW_RESULTS, max_duration=DURATION, data=data)
+                    control = ControlThread(machine_id=machine_id, name=machine_name, version=version,
+                                            ethoscope_dir=ETHOGRAM_DIR, data=data)
                     control.start()
                     return info(id)
 
