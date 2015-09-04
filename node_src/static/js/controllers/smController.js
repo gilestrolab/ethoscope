@@ -43,8 +43,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
         }
 
         $scope.sm.start = function(option){
-            console.log(option);
-            /*$("#startModal").modal('hide');
+            $("#startModal").modal('hide');
             spStart= new Spinner(opts).spin();
             starting_tracking.appendChild(spStart.el);
             $http.post('/device/'+device_id+'/controls/start', data=option)
@@ -58,7 +57,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
                         device_ip = data;
                     });
                  $("#startModal").modal('hide');
-            });*/
+            });
 
         };
 
