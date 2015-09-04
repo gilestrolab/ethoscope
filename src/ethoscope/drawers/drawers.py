@@ -24,10 +24,11 @@ class BaseDrawer(object):
         return self._last_drawn_frame
 
     def draw(self,img, positions, tracking_units):
+        self._last_drawn_frame = img.copy()
         if not self._draw_frames and self._video_out is None:
             return
 
-        self._last_drawn_frame = img.copy()
+
         self._annotate_frame(self._last_drawn_frame, positions,tracking_units)
 
         if self._draw_frames:
@@ -55,7 +56,7 @@ class NullDrawer(BaseDrawer):
     def __init__(self):
         super(NullDrawer,self).__init__(video_out=None, draw_frames=False)
     def _annotate_frame(self,img, positions, tracking_units):
-        return img.copy()
+        pass
 
 
 class DefaultDrawer(BaseDrawer):
