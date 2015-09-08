@@ -28,4 +28,4 @@ In order to analyse the large amount of generated behavioural data, we are devel
 License
 ---------------
 
-Ethoscope source code is licensed under the **GPL3** (see [license file](LICENCE)).
+Ethoscope source code is licensed under the **GPL3** (see [license file](LICENSE)).
