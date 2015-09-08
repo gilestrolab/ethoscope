@@ -15,8 +15,10 @@ export PASSWORD=node
 export DATA_DIR=/ethoscope_results
 export STABLE_BRANCH=dev
 export UPSTREAM_GIT_REPO=https://github.com/gilestrolab/ethoscope.git
-export LOCAL_BARE_PATH=/srv/git/ethoscope-git
+export LOCAL_BARE_PATH=/srv/git/ethoscope.git
 export TARGET_GIT_INSTALL=/home/$USER_NAME/ethoscope-git
+export NODE_IP=192.169.123.1
+
 
 ############# PACKAGES #########################
 echo 'Installing and updating packages'
@@ -87,12 +89,12 @@ cp ./node.service /etc/systemd/system/node.service
 
 #configuring dns server:
 echo 'interface=wlan0' >/etc/dnsmasq.conf
-echo 'dhcp-option = 6,192.169.123.1' >> /etc/dnsmasq.conf
+echo 'dhcp-option = 6,$NODE_IP' >> /etc/dnsmasq.conf
 echo 'no-hosts' >> /etc/dnsmasq.conf
 echo 'addn-hosts=/etc/host.dnsmasq' >> /etc/dnsmasq.conf
 #domain=polygonaltreenetwork.com,192.169.123.0/24
 
-echo '192.169.123.1    node' >> /etc/hosts.dnsmasq
+echo '$NODE_IP    node' >> /etc/hosts.dnsmasq
 
 
 systemctl daemon-reload

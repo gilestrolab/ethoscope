@@ -16,8 +16,17 @@ export DATA_DIR=/ethoscope_data
 export DB_NAME=ethoscope_db
 export TARGET_GIT_INSTALL=/home/$USER_NAME/ethoscope-git
 export NODE_IP=192.169.123.1
-export BARE_GIT_LOCATION=/srv/git/ethoscope-git
+export BARE_GIT_NAME=ethoscope.git
 
+
+
+USER_NAME=ethoscope
+PASSWORD=ethoscope
+DATA_DIR=/ethoscope_data
+DB_NAME=ethoscope_db
+TARGET_GIT_INSTALL=/home/$USER_NAME/ethoscope-git
+NODE_IP=192.169.123.1
+BARE_GIT_NAME=ethoscope.git
 ############# PACKAGES #########################
 echo 'Installing and updating packages'
 
@@ -223,7 +232,7 @@ cat /etc/mysql/my.cnf-bak | grep -v log-bin >  /etc/mysql/my.cnf
 echo 'Cloning from Node'
 
 # FIXME this needs a node in the network to set up the git
-git clone git://$NODE_IP:$BARE_GIT_LOCATION $TARGET_GIT_INSTALL
+git clone git://$NODE_IP/$BARE_GIT_NAME $TARGET_GIT_INSTALL
 
 # our software.
 # TODO use AUR!
