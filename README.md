@@ -25,6 +25,11 @@ More doc to come
 
 In order to analyse the large amount of generated behavioural data, we are developing, [rethomics](https://github.com/gilestrolab/rethomics), a comprehensive `R` package.
 
+Documentation
+---------------
+
+The documentation of the API lives on our [github page](http://gilestrolab.github.io/ethoscope/).
+
 License
 ---------------
 
