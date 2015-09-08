@@ -36,14 +36,11 @@ class Monitor(object):
         Class to orchestrate the tracking of several object in separate regions of interest (ROIs) and interacting
 
         :param camera: a camera object responsible of acquiring frames and associated time stamps.
-        :type camera: :class:`~pysolovideo.tracking.cameras.BaseCamera`
-        :param tracker_class: The class that will be used for tracking. It must inherit from ``
+        :type camera: :class:`~ethoscope.hardware.input.cameras.BaseCamera`
+        :param tracker_class: The class that will be used for tracking. It must inherit from `~ethoscope.trackers.trackers.BaseTracker`
+        :type tracker: class
         :param rois: A list of region of interest.
-        :param interactors: The class that will be used for analysing the position of the object and interacting with the system/hardware.
-        :param result_writer: An optional result writer (directory name or ResultWriter)
-
-        :param max_duration: tracking stops when the elapsed time is greater
-        :type max_duration: float
+        :param interactors: The class that will be used to analyse the position of the object and interact with the system/hardware.
         """
 
         self._camera = camera
