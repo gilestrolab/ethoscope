@@ -11,7 +11,6 @@ Subpackages
     ethoscope.hardware
     ethoscope.interactors
     ethoscope.rois
-    ethoscope.tests
     ethoscope.trackers
     ethoscope.utils
     ethoscope.web_utils

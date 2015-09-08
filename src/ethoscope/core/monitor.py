@@ -1,28 +1,7 @@
-r"""
-=====================
-Monitor
-=====================
-
-this module does ...
-
-
---------------
-subsection 1
---------------
-ewsf s
-gtfrdegbvtsd
-gds gvdr
-#
-#
-# >>> test
-# >>> voila
-"""
-
 __author__ = 'quentin'
 
 from tracking_unit import TrackingUnit
 import logging
-import cv2
 import traceback
 
 
@@ -33,13 +12,21 @@ class Monitor(object):
                 *args, **kwargs # extra arguments for the tracker objects
                  ):
         r"""
-        Class to orchestrate the tracking of several object in separate regions of interest (ROIs) and interacting
+        Class to orchestrate the tracking of multiple objects. It is orchestrates, in order, the following actions:
+
+         * Requesting raw frames (delegated to :class:`~ethoscope.hardware.input.cameras.BaseCamera`)
+         * Cutting frame portions according to the ROI layout (delegated to :class:`~ethoscope.core.tracking_unit.TrackingUnit`).
+         * Detecting animals and computing their positions and other variables (delegated to :class:`~ethoscope.trackers.trackers.BaseTracker`).
+         * Using computed variables to interact physically with the animals (delegated to :class:`~ethoscope.rois.roi_builders.ROI`).
+         * Drawing results on a frame, optionally saving video (delegated to :class:`~ethoscope.drawers.drawers.BaseDrawer`).
+         * Saving the result of tracking in a database (delegated to :class:`~ethoscope.utils.io.ResultWriter`).
 
         :param camera: a camera object responsible of acquiring frames and associated time stamps.
         :type camera: :class:`~ethoscope.hardware.input.cameras.BaseCamera`
-        :param tracker_class: The class that will be used for tracking. It must inherit from `~ethoscope.trackers.trackers.BaseTracker`
-        :type tracker: class
+        :param tracker_class: The class that will be used for tracking. It must inherit from :class:`~ethoscope.trackers.trackers.BaseTracker`
+        :type tracker_class: class
         :param rois: A list of region of interest.
+        :type rois: list(:class:`~ethoscope.rois.roi_builders.ROI`)
         :param interactors: The class that will be used to analyse the position of the object and interact with the system/hardware.
         """
 
@@ -64,21 +51,45 @@ class Monitor(object):
 
     @property
     def last_positions(self):
+        """
+        :return: The last positions (and other recorded variables) of all detected animals
+        :rtype: dict
+        """
         return self._last_positions
 
     @property
     def last_time_stamp(self):
+        """
+        :return: The time, in seconds, since monitoring started running. It will be 0 if the monitor is not running yet.
+        :rtype: float
+        """
         time_from_start = self._last_time_stamp / 1e3
         return time_from_start
 
     @property
     def last_frame_idx(self):
+        """
+        :return: The number of the last acquired frame.
+        :rtype: int
+        """
         return self._last_frame_idx
 
     def stop(self):
+        """
+        Interrupts the `run` method. This is meant to be called by another thread to stop monitoring.
+        """
         self._force_stop = True
 
     def run(self, result_writer = None, drawer = None):
+        """
+        Runs the monitor indefinitely.
+
+        :param result_writer: A result writer used to control how data are saved. `None` means no results will be saved.
+        :type result_writer: :class:`~ethoscope.utils.io.ResultWriter`
+        :param drawer: A drawer to plot the data on frames, display frames and/or save videos. `None` means none of the aforementioned actions will performed.
+        :type drawer: :class:`~ethoscope.drawers.drawers.BaseDrawer`
+        """
+
         try:
             logging.info("Monitor starting a run")
             self._is_running = True
@@ -121,5 +132,6 @@ class Monitor(object):
         finally:
             self._is_running = False
             logging.info("Monitor closing")
+
 
 

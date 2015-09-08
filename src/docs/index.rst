@@ -21,7 +21,11 @@ Submodules
 .. toctree::
 
 
-   ethoscope.core
+    ethoscope.core
+    ethoscope.rois
+    ethoscope.trackers
+    ethoscope.interactors
+
 
 
 
