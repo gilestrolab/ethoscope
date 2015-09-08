@@ -10,7 +10,7 @@ class DBNotReadyError(Exception):
     pass
 
 class MySQLdbToSQlite(object):
-    _max_n_rows_to_insert = 1000
+    _max_n_rows_to_insert = 10000
 
     def     __init__(self, dst_path, remote_db_name="psv_db", remote_host="localhost", remote_user="root", remote_pass="", overwrite=False):
         """

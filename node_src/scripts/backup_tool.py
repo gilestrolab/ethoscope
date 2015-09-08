@@ -89,18 +89,26 @@ if __name__ == '__main__':
                 SUBNET_DEVICE = b'lo'
                 RESULTS_DIR = "/data1/todel/psv_results"
         t0 = time.time()
-        pool = multiprocessing.Pool(3)
-        while True:
-            time.sleep(TICK)
-            t1 = time.time()
+        t1 = t0 + BACKUP_DT
 
+
+        while True:
             if t1 - t0 < BACKUP_DT:
+                t1 = time.time()
+                time.sleep(TICK)
                 continue
 
             logging.info("Starting backup")
+            pool = multiprocessing.Pool(3)
             dev_map = generate_new_device_map(device=SUBNET_DEVICE,result_main_dir=RESULTS_DIR)
             pool_res =  pool.map(backup_job, dev_map.values())
+            pool.close()
+            pool.join()
+            t1 = time.time()
+            logging.info("Starting finished at t=%i" % t1)
+
             t0 = t1
+
 
     except Exception as e:
         logging.error(traceback.format_exc(e))
