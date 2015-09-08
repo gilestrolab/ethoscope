@@ -338,7 +338,6 @@ def node_actions():
         if action['action'] == 'poweroff':
             logging.info('User request a poweroff, shutting down system. Bye bye.')
             #this does not poweroff the device
-            #Change on psv-package!
             close()
             #poweroff = subprocess.Popen(['poweroff'], stdout=subprocess.PIPE)
         else:
@@ -409,7 +408,7 @@ if __name__ == '__main__':
     #parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-p", "--port", dest="port", default=80,help="port")
     parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
-    parser.add_option("-b", "--branch", dest="branch", default="psv-package",help="the branch to work from")
+    parser.add_option("-b", "--branch", dest="branch", default="master",help="the branch to work from")
     parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_results",help="Where temporary result files are stored")
     parser.add_option("-g", "--git-dir", dest="git_dir", default="/home/node/ethoscope-git",help="Where is the target git located(for software update)")
     parser.add_option("-B", "--git-bare-dir", dest="git_bare_dir", default="/srv/git/ethoscope-git",help="Where is the target git located(for software update)")
