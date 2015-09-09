@@ -229,14 +229,14 @@ class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilder):
     description = {"overview": "The default sleep monitor arena with ten rows of two tubes.",
                     "arguments": []}
 
-    _n_rows = 10
-    _n_cols = 2
-    _top_margin =  6.99 / 111.00
-    _horizontal_fill = .9
-    _vertical_fill = .7
+    # _n_rows = 10
+    # _n_cols = 2
+    # _top_margin =  6.99 / 111.00
+    # _horizontal_fill = .9
+    # _vertical_fill = .7
 
     def __init__(self):
-        super(SleepMonitorWithTargetROIBuilder, self).__init__(n_rows=2,
+        super(SleepMonitorWithTargetROIBuilder, self).__init__(n_rows=10,
                                                                n_cols=2,
                                                                top_margin=6.99 / 111.00,
                                                                bottom_margin =6.99 / 111.00,
