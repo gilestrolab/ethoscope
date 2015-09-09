@@ -17,17 +17,21 @@ class Monitor(object):
          * Requesting raw frames (delegated to :class:`~ethoscope.hardware.input.cameras.BaseCamera`)
          * Cutting frame portions according to the ROI layout (delegated to :class:`~ethoscope.core.tracking_unit.TrackingUnit`).
          * Detecting animals and computing their positions and other variables (delegated to :class:`~ethoscope.trackers.trackers.BaseTracker`).
-         * Using computed variables to interact physically with the animals (delegated to :class:`~ethoscope.rois.roi_builders.ROI`).
+         * Using computed variables to interact physically with the animals (delegated to :class:`~ethoscope.interactors.interactors.BaseInteractor`).
          * Drawing results on a frame, optionally saving video (delegated to :class:`~ethoscope.drawers.drawers.BaseDrawer`).
          * Saving the result of tracking in a database (delegated to :class:`~ethoscope.utils.io.ResultWriter`).
 
         :param camera: a camera object responsible of acquiring frames and associated time stamps.
         :type camera: :class:`~ethoscope.hardware.input.cameras.BaseCamera`
-        :param tracker_class: The class that will be used for tracking. It must inherit from :class:`~ethoscope.trackers.trackers.BaseTracker`
+        :param tracker_class: The algorithm that will be used for tracking. It must inherit from :class:`~ethoscope.trackers.trackers.BaseTracker`
         :type tracker_class: class
         :param rois: A list of region of interest.
         :type rois: list(:class:`~ethoscope.rois.roi_builders.ROI`)
         :param interactors: The class that will be used to analyse the position of the object and interact with the system/hardware.
+        :type interactors: list(`~ethoscope.interactors.interactors.BaseInteractor`
+        :param args: additional arguments passed to the tracking algorithm
+        :param kwargs: additional keyword arguments passed to the tracking algorithm
+
         """
 
         self._camera = camera
@@ -105,7 +109,7 @@ class Monitor(object):
                 self._frame_buffer = frame
 
                 for j,track_u in enumerate(self._unit_trackers):
-                    data_row = track_u(t, frame)
+                    data_row = track_u.track(t, frame)
                     if data_row is None:
                         self._last_positions[track_u.roi.idx] = None
                         continue
