@@ -26,7 +26,7 @@ class Monitor(object):
         :param tracker_class: The algorithm that will be used for tracking. It must inherit from :class:`~ethoscope.trackers.trackers.BaseTracker`
         :type tracker_class: class
         :param rois: A list of region of interest.
-        :type rois: list(:class:`~ethoscope.core.roi..ROI`)
+        :type rois: list(:class:`~ethoscope.core.roi.ROI`)
         :param interactors: The class that will be used to analyse the position of the object and interact with the system/hardware.
         :type interactors: list(:class:`~ethoscope.interactors.interactors.BaseInteractor`
         :param args: additional arguments passed to the tracking algorithm

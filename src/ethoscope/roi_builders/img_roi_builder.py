@@ -7,16 +7,22 @@ from ethoscope.core.roi import ROI
 
 class ImgMaskROIBuilder(BaseROIBuilder):
     """
-    Initialised with an grey-scale image file.
+    Class to build rois from greyscale image file.
     Each continuous region is used as a ROI.
-    The colour of the ROI determines it's index
+    The greyscale value inside the ROI determines it's value.
+
+    IMAGE HERE
+
     """
 
 
     def __init__(self, mask_path):
         self._mask = cv2.imread(mask_path, cv2.CV_LOAD_IMAGE_GRAYSCALE)
+        super(ImgMaskROIBuilder,self).__init__()
 
-    def _rois_from_img(self):
+
+    def _rois_from_img(self, img):
+
         if len(self._mask.shape) == 3:
             self._mask = cv2.cvtColor(self._mask, cv2.COLOR_BGR2GRAY)
 

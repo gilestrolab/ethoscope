@@ -9,14 +9,28 @@ from ethoscope.utils.description import DescribedObject
 
 class BaseROIBuilder(DescribedObject):
 
-    def __call__(self, camera):
+    def __init__(self):
+        """
+        Template to design ROIBuilders. Subclasses must implement a ``_rois_from_img`` method.
+        """
+        pass
+
+    def build(self, input):
+        """
+        Uses an input (image or camera) to build ROIs.
+        When a camera is used, several frames are acquired and averaged to build a reference image.
+
+        :param input: Either a camera object, or an image.
+        :type input: :class:`~ethoscope.hardware.input.camera.BaseCamera` or :class:`~numpy.ndarray`
+        :return: list(:class:`~ethoscope.core.roi.ROI`)
+        """
 
         accum = []
-        if isinstance(camera, np.ndarray):
-            accum = np.copy(camera)
+        if isinstance(input, np.ndarray):
+            accum = np.copy(input)
 
         else:
-            for i, (_, frame) in enumerate(camera):
+            for i, (_, frame) in enumerate(input):
                 accum.append(frame)
                 if i  >= 5:
                     break
@@ -26,8 +40,8 @@ class BaseROIBuilder(DescribedObject):
 
             rois = self._rois_from_img(accum)
         except Exception as e:
-            if not isinstance(camera, np.ndarray):
-                del camera
+            if not isinstance(input, np.ndarray):
+                del input
             raise e
 
         rois_w_no_value = [r for r in rois if r.value is None]
@@ -61,6 +75,12 @@ class BaseROIBuilder(DescribedObject):
 
 class DefaultROIBuilder(BaseROIBuilder):
 
+
+    """
+    The default ROI builder. It simply defines the entire image as a unique ROI.
+    """
+
+
     def _rois_from_img(self,img):
         h, w = img.shape[0],img.shape[1]
         return[
@@ -69,5 +89,5 @@ class DefaultROIBuilder(BaseROIBuilder):
                 (   0,        h -1    ),
                 (   w - 1,    h - 1   ),
                 (   w - 1,    0       )]
-        )]
+            , idx=1)]
 

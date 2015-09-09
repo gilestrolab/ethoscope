@@ -8,7 +8,8 @@ from ethoscope.core.roi import ROI
 from ethoscope.utils.debug import EthoscopeException
 import itertools
 
-class TargetGridROIBuilderBase(BaseROIBuilder):
+
+class TargetGridROIBuilder(BaseROIBuilder):
 
     _adaptive_med_rad = 0.10
     _expected__min_target_dist = 10 # the minimal distance between two targets, in 'target diameter'
@@ -21,31 +22,59 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
     _horizontal_fill = 1
     _vertical_fill = None
 
+    description = {"overview": "A flexible ROI builder that allows users to select parameters for the ROI layout."
+                               "Lengths are relative to the distance between the two bottom targets (width)",
+                    "arguments": [
+                                    {"type": "number", "min": 1, "max": 16, "step":1, "name": "n_cols", "description": "The number of columns","default":1},
+                                    {"type": "number", "min": 1, "max": 16, "step":1, "name": "n_rows", "description": "The number of rows","default":1},
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "top_margin", "description": "The vertical distance between the middle of the top ROIs and the middle of the top target.","default":0.0},
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "bottom_margin", "description": "Same as top_margin, but for the bottom.","default":0.0},
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "right_margin", "description": "Same as top_margin, but for the right.","default":0.0},
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "left_margin", "description": "Same as top_margin, but for the left.","default":0.0},
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "horizontal_fill", "description": "The proportion of the grid space user by the roi, horizontally.","default":0.90},
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "left_margin", "description": "Same as horizontal_margin, but vertically.","default":0.90}
+                                   ]}
+    def __init__(self, n_rows=1, n_cols=1, top_margin=0, bottom_margin=0,
+                 left_margin=0, right_margin=0, horizontal_fill=.9, vertical_fill=.9):
+        """
+        This roi builder uses three black cirles drawn on the arena (targets) to align a grid layout:
+        IMAGE HERE
 
-        ############# sort/name points as:
+        :param n_rows: The number of rows in the grid
+        :type n_rows: int
+        :param n_cols: The number of columns
+        :type n_cols: int
+        :param top_margin: The vertical distance between the middle of the top ROIs and the middle of the top target
+        :type top_margin: float
+        :param bottom_margin: same as top_margin, but for the bottom.
+        :type bottom_margin: float
+        :param left_margin: same as top_margin, but for the left side.
+        :type left_margin:float
+        :param right_margin: same as top_margin, but for the right side.
+        :type right_margin: float
+        :param horizontal_fill: The proportion of the grid space user by the roi, horizontally (between 0 and 1).
+        :type horizontal_fill: float
+        :param vertical_fill: same as vertical_fill, but horizontally
+        :type vertical_fill: float
 
+        """
 
-        #                            A
-        #                            |
-        #                            |
-        #                            |
-        # C------------------------- B
+        self._n_rows = n_rows
+        self._n_cols = n_cols
+        self._top_margin =  top_margin
+        self._bottom_margin = bottom_margin
+        self._left_margin = left_margin
+        self._right_margin = right_margin
+        self._horizontal_fill = horizontal_fill
+        self._vertical_fill = vertical_fill
+        # if self._vertical_fill is None:
+        #     self._vertical_fill = self._horizontal_fill
+        # if self._right_margin is None:
+        #     self._right_margin = self._left_margin
+        # if self._bottom_margin is None:
+        #     self._bottom_margin = self._top_margin
 
-    # roi sorting =
-    # 1 4 7
-    # 2 5 8
-    # 3 6 9
-
-    def __init__(self):
-        if self._vertical_fill is None:
-            self._vertical_fill = self._horizontal_fill
-        if self._right_margin is None:
-            self._right_margin = self._left_margin
-        if self._bottom_margin is None:
-            self._bottom_margin = self._top_margin
-
-        super(TargetGridROIBuilderBase,self).__init__()
-
+        super(TargetGridROIBuilder,self).__init__()
 
     def _find_blobs(self, im, scoring_fun):
         grey= cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
@@ -92,7 +121,7 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
         return rectangles
 
 
-    def dist_pts(self, pt1, pt2):
+    def _points_distance(self, pt1, pt2):
         x1 , y1  = pt1
         x2 , y2  = pt2
         return np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
@@ -123,7 +152,6 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
                 raise EthoscopeException("There should be three targets. Only %i objects have been found" % (len(contours)), img)
             if len(contours) == 3:
                 break
-        # cv2.imshow("map",map); cv2.waitKey(-1)
 
         target_diams = [cv2.boundingRect(c)[2] for c in contours]
 
@@ -142,7 +170,7 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
         a ,b, c = src_points
         pairs = [(a,b), (b,c), (a,c)]
 
-        dists = [self.dist_pts(*p) for p in pairs]
+        dists = [self._points_distance(*p) for p in pairs]
         # that is the AC pair
         hypo_vertices = pairs[np.argmax(dists)]
 
@@ -157,8 +185,8 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
             if sorted_b is sp:
                 continue
             # b-c is the largest distance, so we can infer what point is c
-            if self.dist_pts(sp, sorted_b) > dist:
-                dist = self.dist_pts(sp, sorted_b)
+            if self._points_distance(sp, sorted_b) > dist:
+                dist = self._points_distance(sp, sorted_b)
                 sorted_c = sp
 
         # the remaining point is a
@@ -192,43 +220,38 @@ class TargetGridROIBuilderBase(BaseROIBuilder):
             # cv2.waitKey(0)
         return rois
 
-class TargetGridROIBuilder(TargetGridROIBuilderBase):
 
-    description = {"overview": "A flexible ROI builder that allows users to select parameters for the ROI layout."
-                               "Lengths are relative to the distance between the two bottom targets (width)",
-                    "arguments": [
-                                    {"type": "number", "min": 1, "max": 16, "step":1, "name": "n_cols", "description": "The number of columns","default":1},
-                                    {"type": "number", "min": 1, "max": 16, "step":1, "name": "n_rows", "description": "The number of rows","default":1},
-                                    {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "top_margin", "description": "The vertical distance between the middle of the top ROIs and the middle of the top target.","default":0.0},
-                                    {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "bottom_margin", "description": "Same as top_margin, but for the bottom.","default":0.0},
-                                    {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "right_margin", "description": "Same as top_margin, but for the right.","default":0.0},
-                                    {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "left_margin", "description": "Same as top_margin, but for the left.","default":0.0},
-                                    {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "horizontal_fill", "description": "The proportion of the grid space user by the roi, horizontally.","default":0.90},
-                                    {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "left_margin", "description": "Same as horizontal_margin, but vertically.","default":0.90}
-                                   ]}
-    def __init__(self, n_rows=1, n_cols=1, top_margin=0, bottom_margin=0,
-                 left_margin=0, right_margin=0, horizontal_fill=.9, vertical_fill=.9):
-        self._n_rows = n_rows
-        self._n_cols = n_cols
-        self._top_margin =  top_margin
-        self._bottom_margin = bottom_margin
-        self._left_margin = left_margin
-        self._right_margin = right_margin
-        self._horizontal_fill = horizontal_fill
-        self._vertical_fill = vertical_fill
+class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilder):
 
-        super(TargetGridROIBuilder,self).__init__()
-
-class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilderBase):
+    """
+    Class to build ROIs for a two-columns, ten-rows for the  `sleep monitor tube holder arena <todo>`_
+    """
     description = {"overview": "The default sleep monitor arena with ten rows of two tubes.",
                     "arguments": []}
+
     _n_rows = 10
     _n_cols = 2
     _top_margin =  6.99 / 111.00
     _horizontal_fill = .9
     _vertical_fill = .7
 
-class OlfactionAssayROIBuilder(TargetGridROIBuilderBase):
+    def __init__(self):
+        super(SleepMonitorWithTargetROIBuilder, self).__init__(n_rows=2,
+                                                               n_cols=2,
+                                                               top_margin=6.99 / 111.00,
+                                                               bottom_margin =6.99 / 111.00,
+                                                               horizontal_fill = .9,
+                                                               vertical_fill= .7
+                                                               )
+
+
+
+class OlfactionAssayROIBuilder(TargetGridROIBuilder):
+
+    """
+    Class to build ROIs for a one-columns, ten-rows for the  `olfactory response arena <todo>`_
+    """
+
     description = {"overview": "The default odor assay  roi layout with ten rows of single tubes.",
                     "arguments": []}
     _n_rows = 10
