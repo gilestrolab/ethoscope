@@ -22,9 +22,10 @@ Submodules
 
 
     ethoscope.core
-    ethoscope.rois
+    ethoscope.roi_builders
     ethoscope.trackers
     ethoscope.interactors
+    ethoscope.drawers
 
 
 

@@ -18,10 +18,29 @@ ethoscope.core.tracking_unit module
     :undoc-members:
     :show-inheritance:
 
+
+ethoscope.core.roi module
+-------------------------
+
+.. automodule:: ethoscope.core.roi
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
 ethoscope.core.variables module
 -------------------------------
 
 .. automodule:: ethoscope.core.variables
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+ethoscope.core.data_point module
+--------------------------------
+
+.. automodule:: ethoscope.core.data_point
     :members:
     :undoc-members:
     :show-inheritance:
