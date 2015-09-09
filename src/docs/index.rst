@@ -20,7 +20,6 @@ Submodules
 ----------
 .. toctree::
 
-
     ethoscope.core
     ethoscope.roi_builders
     ethoscope.trackers

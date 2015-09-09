@@ -1,5 +1,15 @@
-ethoscope.rois package
-======================
+ethoscope.roi_builder package
+=============================
+
+
+Module contents
+---------------
+
+.. automodule:: ethoscope.roi_builders
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 
 
 ethoscope.roi_builders.roi_builders module
@@ -9,6 +19,7 @@ ethoscope.roi_builders.roi_builders module
     :members:
     :undoc-members:
     :show-inheritance:
+
 
 
 ethoscope.roi_builders.img_roi_builder module
@@ -27,11 +38,3 @@ ethoscope.roi_builders.target_roi_builder module
     :undoc-members:
     :show-inheritance:
 
-
-Module contents
----------------
-
-.. automodule:: ethoscope.roi_builders
-    :members:
-    :undoc-members:
-    :show-inheritance:

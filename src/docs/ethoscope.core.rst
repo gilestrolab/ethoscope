@@ -2,6 +2,16 @@ ethoscope.core package
 ======================
 
 
+Module contents
+---------------
+
+.. automodule:: ethoscope.core
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+
 ethoscope.core.monitor module
 -----------------------------
 
@@ -45,11 +55,3 @@ ethoscope.core.data_point module
     :undoc-members:
     :show-inheritance:
 
-
-Module contents
----------------
-
-.. automodule:: ethoscope.core
-    :members:
-    :undoc-members:
-    :show-inheritance:
