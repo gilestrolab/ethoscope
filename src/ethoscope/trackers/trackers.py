@@ -25,7 +25,7 @@ class BaseTracker(DescribedObject):
         #     raise NotImplementedError("Trackers must have a DataPoint object.")
 
     def __call__(self, t, img):
-        sub_img, mask = self._roi(img)
+        sub_img, mask = self._roi.apply(img)
         self._last_time_point = t
         try:
 

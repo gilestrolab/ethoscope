@@ -12,7 +12,7 @@ class Monitor(object):
                 *args, **kwargs # extra arguments for the tracker objects
                  ):
         r"""
-        Class to orchestrate the tracking of multiple objects. It is orchestrates, in order, the following actions:
+        Class to orchestrate the tracking of multiple objects. It is performs, in order, the following actions:
 
          * Requesting raw frames (delegated to :class:`~ethoscope.hardware.input.cameras.BaseCamera`)
          * Cutting frame portions according to the ROI layout (delegated to :class:`~ethoscope.core.tracking_unit.TrackingUnit`).
@@ -26,9 +26,9 @@ class Monitor(object):
         :param tracker_class: The algorithm that will be used for tracking. It must inherit from :class:`~ethoscope.trackers.trackers.BaseTracker`
         :type tracker_class: class
         :param rois: A list of region of interest.
-        :type rois: list(:class:`~ethoscope.rois.roi_builders.ROI`)
+        :type rois: list(:class:`~ethoscope.core.roi..ROI`)
         :param interactors: The class that will be used to analyse the position of the object and interact with the system/hardware.
-        :type interactors: list(`~ethoscope.interactors.interactors.BaseInteractor`
+        :type interactors: list(:class:`~ethoscope.interactors.interactors.BaseInteractor`
         :param args: additional arguments passed to the tracking algorithm
         :param kwargs: additional keyword arguments passed to the tracking algorithm
 

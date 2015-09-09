@@ -8,7 +8,7 @@ It should include description and links to the main modules,
 import core
 import hardware
 import interactors
-import rois
+import roi_builders
 import trackers
 import utils
 import web_utils

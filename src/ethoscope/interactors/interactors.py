@@ -1,12 +1,12 @@
 __author__ = 'quentin'
 
 from ethoscope.utils.description import DescribedObject
-from ethoscope.core.variables import BoolVariableBase
+from ethoscope.core.variables import BaseBoolVariable
 from ethoscope.hardware.interfaces.interfaces import DefaultInterface
 
 
 
-class HasInteractedVariable(BoolVariableBase):
+class HasInteractedVariable(BaseBoolVariable):
     header_name = "has_interacted"
 
 
@@ -46,4 +46,5 @@ class DefaultInteractor(BaseInteractor):
     def _run(self):
         out = HasInteractedVariable(False)
         return out, {}
+
 

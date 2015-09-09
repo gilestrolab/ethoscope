@@ -1,7 +1,8 @@
 from collections import deque
 import cv2
 import numpy as np
-from ethoscope.core.variables import XPosVariable, YPosVariable, WidthVariable, HeightVariable, PhiVariable, DataPoint
+from ethoscope.core.variables import XPosVariable, YPosVariable, WidthVariable, HeightVariable, PhiVariable
+from ethoscope.core.data_point import DataPoint
 from ethoscope.trackers.adaptive_bg_tracker import BackgroundModel
 from ethoscope.trackers.trackers import BaseTracker, NoPositionError
 from ethoscope.utils.img_proc import merge_blobs

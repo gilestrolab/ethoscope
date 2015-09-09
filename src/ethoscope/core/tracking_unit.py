@@ -3,7 +3,8 @@ __author__ = 'quentin'
 
 
 
-from ethoscope.core.variables import DataPoint, BaseRelativeVariable
+from ethoscope.core.variables import BaseRelativeVariable
+from ethoscope.core.data_point import DataPoint
 from ethoscope.interactors.interactors import DefaultInteractor
 
 
@@ -49,7 +50,7 @@ class TrackingUnit(object):
     def roi(self):
         """
         :return: A reference to the roi used by this `TrackingUnit`
-        :rtype: :class:`~ethoscope.rois.roi_builders.ROI`
+        :rtype: :class:`~ethoscope.core.roi.ROI`
         """
         return self._roi
 
@@ -59,7 +60,7 @@ class TrackingUnit(object):
 
         :param absolute: Whether the position should be relative to the top left corner of the raw frame (`true`), or to the top left of the used ROI (`false`).
         :return: A container with the last variable recorded for this roi.
-        :rtype:  :class:`~ethoscope.core.variables.DataPoint`
+        :rtype:  :class:`~ethoscope.core.data_point.DataPoint`
         """
 
         if len(self._tracker.positions) < 1:
@@ -92,7 +93,7 @@ class TrackingUnit(object):
         :param img: the entire frame to analyse
         :type img: :class:`~numpy.ndarray`
         :return: The resulting data point
-        :rtype:  :class:`~ethoscope.core.variables.DataPoint`
+        :rtype:  :class:`~ethoscope.core.data_point.DataPoint`
         """
         data_row = self._tracker(t,img)
         interact, result = self._interactor()

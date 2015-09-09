@@ -8,24 +8,26 @@ import tempfile
 import logging
 import numpy as np
 
-from ethoscope.rois.roi_builders import ROI
+from ethoscope.core.roi import ROI
 from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
-from ethoscope.core.variables import DataPoint, BoolVariableBase, IntVariableBase, DistanceIntVarBase
+from ethoscope.core.variables import BaseBoolVariable, BaseIntVariable, BaseDistanceIntVar
+from ethoscope.core.data_point import DataPoint
 
-class DummyBoolVariable(BoolVariableBase):
+
+class DummyBoolVariable(BaseBoolVariable):
     header_name="dummy_bool"
 
-class DummyIntVariable(IntVariableBase):
+class DummyIntVariable(BaseIntVariable):
     functional_type = "dum_type"
     header_name="dummy_int"
 
-class DummyDistVariable(DistanceIntVarBase):
+class DummyDistVariable(BaseDistanceIntVar):
     header_name="dummy_dist_int"
 
-class XVar(DistanceIntVarBase):
+class XVar(BaseDistanceIntVar):
     header_name="x"
 
-class YVar(DistanceIntVarBase):
+class YVar(BaseDistanceIntVar):
     header_name="y"
 
 class RandomResultGenerator(object):
