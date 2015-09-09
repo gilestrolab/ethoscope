@@ -2,8 +2,8 @@ __author__ = 'quentin'
 
 import cv2
 import numpy as np
-from ethoscope.rois.roi_builders import BaseROIBuilder
-from ethoscope.rois.roi_builders import ROI
+from ethoscope.roi_builders.roi_builders import BaseROIBuilder
+from ethoscope.core.roi import ROI
 import itertools
 
 
