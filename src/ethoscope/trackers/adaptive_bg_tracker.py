@@ -1,3 +1,6 @@
+
+__author__ = 'quentin'
+
 from collections import deque
 from math import log10
 import cv2
@@ -8,8 +11,6 @@ from ethoscope.core.variables import XPosVariable, YPosVariable, XYDistance, Xor
 from ethoscope.core.data_point import DataPoint
 from ethoscope.trackers.trackers import BaseTracker, NoPositionError
 from ethoscope.utils.debug import EthoscopeException
-
-__author__ = 'quentin'
 
 
 class ObjectModel(object):
@@ -219,6 +220,14 @@ class AdaptiveBGModel(BaseTracker):
     fg_model = ObjectModel()
 
     def __init__(self, roi, data=None):
+        """
+        An adaptive background subtraction model to find position of one animal in one roi.
+
+        TODO more description here
+        :param roi:
+        :param data:
+        :return:
+        """
         self._previous_shape=None
         self._object_expected_size = 0.05 # proportion of the roi main axis
         self._max_area = (5 * self._object_expected_size) ** 2
@@ -410,11 +419,6 @@ class AdaptiveBGModel(BaseTracker):
         if distance > self._max_m_log_lik:
             self._bg_model.increase_learning_rate()
             raise NoPositionError
-
-
-
-
-
 
 
         (x,y) ,(w,h), angle  = cv2.minAreaRect(hull)
