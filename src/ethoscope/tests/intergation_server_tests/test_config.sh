@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+set -e # stop if any error happens
 
 
 GIT_REPO="/home/quentin/comput/ethoscope-git/"
@@ -7,7 +8,14 @@ SERVER_SCRIPT="../../../scripts/device_server.py"
 
 #config_file=test_generic_config.json
 #config_file="test_sleep_monit_arena.json"
-config_file="test_fake_sleep_dep.json"
 
+for config_file in $(ls test_*.json)
+do
+echo "TESTING $config_file"
 python $SERVER_SCRIPT -g $GIT_REPO -j $config_file -r
+done
+
+echo "all test successful (by some miracle)!"
+
+
 
