@@ -66,3 +66,5 @@ docs/_build/
 *.pstats
 *.pdf
 
+*.mp4
+*.avi
