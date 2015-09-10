@@ -21,7 +21,7 @@ class TrackingUnit(object):
         :type tracker_class: class
         :param roi: A region of interest.
         :type roi: :class:`~ethoscope.rois.roi_builders.ROI`.
-        :param interactor: an object used to pysically interact with the detected animal.
+        :param interactor: an object used to physically interact with the detected animal.
         :type interactor: :class:`~ethoscope.interactors.interactors.BaseInteractor`.
         :param args: additional arguments passed to the tracking algorithm.
         :param kwargs: additional keyword arguments passed to the tracking algorithm.
@@ -95,7 +95,7 @@ class TrackingUnit(object):
         :return: The resulting data point
         :rtype:  :class:`~ethoscope.core.data_point.DataPoint`
         """
-        data_row = self._tracker(t,img)
+        data_row = self._tracker.track(t,img)
         interact, result = self._interactor()
         if data_row is None:
             return

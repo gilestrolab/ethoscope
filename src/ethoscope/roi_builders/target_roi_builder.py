@@ -37,26 +37,26 @@ class TargetGridROIBuilder(BaseROIBuilder):
     def __init__(self, n_rows=1, n_cols=1, top_margin=0, bottom_margin=0,
                  left_margin=0, right_margin=0, horizontal_fill=.9, vertical_fill=.9):
         """
-        This roi builder uses three black cirles drawn on the arena (targets) to align a grid layout:
+        This roi builder uses three black circles drawn on the arena (targets) to align a grid layout:
+
         IMAGE HERE
 
-        :param n_rows: The number of rows in the grid
+        :param n_rows: The number of rows in the grid.
         :type n_rows: int
-        :param n_cols: The number of columns
+        :param n_cols: The number of columns.
         :type n_cols: int
         :param top_margin: The vertical distance between the middle of the top ROIs and the middle of the top target
         :type top_margin: float
         :param bottom_margin: same as top_margin, but for the bottom.
         :type bottom_margin: float
         :param left_margin: same as top_margin, but for the left side.
-        :type left_margin:float
+        :type left_margin: float
         :param right_margin: same as top_margin, but for the right side.
         :type right_margin: float
         :param horizontal_fill: The proportion of the grid space user by the roi, horizontally (between 0 and 1).
         :type horizontal_fill: float
-        :param vertical_fill: same as vertical_fill, but horizontally
+        :param vertical_fill: same as vertical_fill, but horizontally.
         :type vertical_fill: float
-
         """
 
         self._n_rows = n_rows
@@ -223,19 +223,15 @@ class TargetGridROIBuilder(BaseROIBuilder):
 
 class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilder):
 
-    """
-    Class to build ROIs for a two-columns, ten-rows for the  `sleep monitor tube holder arena <todo>`_
-    """
     description = {"overview": "The default sleep monitor arena with ten rows of two tubes.",
                     "arguments": []}
 
-    # _n_rows = 10
-    # _n_cols = 2
-    # _top_margin =  6.99 / 111.00
-    # _horizontal_fill = .9
-    # _vertical_fill = .7
-
     def __init__(self):
+        """
+        Class to build ROIs for a two-columns, ten-rows for the
+        """
+        #`sleep monitor tube holder arena <todo>`_
+
         super(SleepMonitorWithTargetROIBuilder, self).__init__(n_rows=10,
                                                                n_cols=2,
                                                                top_margin=6.99 / 111.00,
@@ -247,15 +243,19 @@ class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilder):
 
 
 class OlfactionAssayROIBuilder(TargetGridROIBuilder):
-
-    """
-    Class to build ROIs for a one-columns, ten-rows for the  `olfactory response arena <todo>`_
-    """
-
     description = {"overview": "The default odor assay  roi layout with ten rows of single tubes.",
                     "arguments": []}
-    _n_rows = 10
-    _n_cols = 1
-    _top_margin =  6.99 / 111.00
-    _horizontal_fill = .9
-    _vertical_fill = .7
+    def __init__(self):
+        """
+        Class to build ROIs for a one-columns, ten-rows for the
+        """
+        #`olfactory response arena <todo>`_
+
+        super(OlfactionAssayROIBuilder, self).__init__(n_rows=10,
+                                                               n_cols=1,
+                                                               top_margin=6.99 / 111.00,
+                                                               bottom_margin =6.99 / 111.00,
+                                                               horizontal_fill = .9,
+                                                               vertical_fill= .7
+                                                               )
+

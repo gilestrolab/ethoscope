@@ -7,11 +7,25 @@ from ethoscope.core.variables import *
 
 
 class NoPositionError(Exception):
+    """
+    Used to abort tracking. When it is raised within the ``_find_position`` method, data is inferred from previous position.
+    """
     pass
 
 class BaseTracker(DescribedObject):
     # data_point = None
     def __init__(self, roi,data=None):
+        """
+        Template class for video trackers.
+        A video tracker locate animal in a ROI.
+        Derived class must implement the ``_find_position`` method.
+
+        :param roi: The Region Of Interest the the tracker will use to locate the animal.
+        :type roi: :class:`~ethoscope.rois.roi_builders.ROI`
+        :param data: An optional data set. For instance, it can be used for pre-trained algorithms
+
+        :return:
+        """
         self._positions = deque()
         self._times =deque()
         self._data = data
@@ -24,7 +38,18 @@ class BaseTracker(DescribedObject):
         # if self.data_point is None:
         #     raise NotImplementedError("Trackers must have a DataPoint object.")
 
-    def __call__(self, t, img):
+    def track(self, t, img):
+        """
+        Locate the animal in a image, at a given time.
+
+        :param t: time in ms
+        :type t: int
+        :param img: the whole frame.
+        :type img: :class:`~numpy.ndarray`
+        :return: The position of the animal at time ``t``
+        :rtype: :class:`~ethoscope.core.data_point.DataPoint`
+        """
+
         sub_img, mask = self._roi.apply(img)
         self._last_time_point = t
         try:
@@ -73,6 +98,10 @@ class BaseTracker(DescribedObject):
 
     @property
     def positions(self):
+        """
+        :return: The last few positions found by the tracker. Positions are kept for a certain duration defined by the ``_max_history_length `` attribute.
+        :rtype: :class:`~collection.deque`
+        """
         return self._positions
 
     def xy_pos(self, i):
@@ -80,9 +109,18 @@ class BaseTracker(DescribedObject):
 
     @property
     def last_time_point(self):
+        """
+        :return: The last time point inputed to the tracker. This is updated even when position is inferred/no animal is found
+        :rtype: int
+        """
         return self._last_time_point
+
     @property
     def times(self):
+        """
+        :return: The last few time points corresponding to :class:`~ethoscope.trackers.trackers.BaseTracker.positions`.
+        :rtype: :class:`~collection.deque`
+        """
         return self._times
 
     def _find_position(self,img, mask,t):

@@ -1,21 +1,11 @@
 ethoscope.trackers package
 ==========================
 
-Submodules
-----------
 
-ethoscope.trackers.adaptive_bg_tracker module
----------------------------------------------
+Module contents
+---------------
 
-.. automodule:: ethoscope.trackers.adaptive_bg_tracker
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-ethoscope.trackers.single_roi_tracker module
---------------------------------------------
-
-.. automodule:: ethoscope.trackers.single_roi_tracker
+.. automodule:: ethoscope.trackers
     :members:
     :undoc-members:
     :show-inheritance:
@@ -29,10 +19,21 @@ ethoscope.trackers.trackers module
     :show-inheritance:
 
 
-Module contents
----------------
+ethoscope.trackers.single_roi_tracker module
+--------------------------------------------
 
-.. automodule:: ethoscope.trackers
+.. automodule:: ethoscope.trackers.single_roi_tracker
     :members:
     :undoc-members:
     :show-inheritance:
+
+
+ethoscope.trackers.adaptive_bg_tracker module
+---------------------------------------------
+
+.. automodule:: ethoscope.trackers.adaptive_bg_tracker
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
