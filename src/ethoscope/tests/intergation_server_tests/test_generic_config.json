@@ -1,6 +1,9 @@
 
-{"roi_builder":{"name":"SleepMonitorWithTargetROIBuilder",
-                      "arguments":{}},
+{"roi_builder":{"name":"TargetGridROIBuilder",
+                      "arguments":{ "n_cols": 2 ,
+                                    "n_rows": 10
+                                  }
+                  },
         "tracker": {"name":"AdaptiveBGModel",
                       "arguments":{}},
         "interactor": {"name":"DefaultInteractor",
