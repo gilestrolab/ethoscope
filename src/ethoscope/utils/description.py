@@ -58,5 +58,11 @@ __author__ = 'quentin'
 #
 
 class DescribedObject(object):
-    description = None
+    _description = None
+
+    @property
+    def description(self):
+        return self._description
+
+
 

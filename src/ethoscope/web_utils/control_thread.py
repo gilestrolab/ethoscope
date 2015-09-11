@@ -121,7 +121,6 @@ class ControlThread(Thread):
 
         DrawerClass = self._option_dict["drawer"]["class"]
         drawer_kwargs = self._option_dict["drawer"]["kwargs"]
-
         self._drawer = DrawerClass(**drawer_kwargs)
         super(ControlThread, self).__init__()
 
@@ -137,7 +136,7 @@ class ControlThread(Thread):
             out[key] = []
             for p in value["possible_classes"]:
                 try:
-                    d = p.__dict__["description"]
+                    d = p.__dict__["_description"]
                 except KeyError:
                     continue
 
@@ -293,6 +292,7 @@ class ControlThread(Thread):
                     self._monit.run(rw,self._drawer)
                 logging.info("Stopping Monitor thread")
                 self.stop()
+
             finally:
                 try:
                     cam._close()

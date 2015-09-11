@@ -96,7 +96,7 @@ class TrackingUnit(object):
         :rtype:  :class:`~ethoscope.core.data_point.DataPoint`
         """
         data_row = self._tracker.track(t,img)
-        interact, result = self._interactor()
+        interact, result = self._interactor.apply()
         if data_row is None:
             return
 

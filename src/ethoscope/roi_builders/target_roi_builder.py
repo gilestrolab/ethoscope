@@ -22,7 +22,7 @@ class TargetGridROIBuilder(BaseROIBuilder):
     _horizontal_fill = 1
     _vertical_fill = None
 
-    description = {"overview": "A flexible ROI builder that allows users to select parameters for the ROI layout."
+    _description = {"overview": "A flexible ROI builder that allows users to select parameters for the ROI layout."
                                "Lengths are relative to the distance between the two bottom targets (width)",
                     "arguments": [
                                     {"type": "number", "min": 1, "max": 16, "step":1, "name": "n_cols", "description": "The number of columns","default":1},
@@ -223,7 +223,7 @@ class TargetGridROIBuilder(BaseROIBuilder):
 
 class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilder):
 
-    description = {"overview": "The default sleep monitor arena with ten rows of two tubes.",
+    _description = {"overview": "The default sleep monitor arena with ten rows of two tubes.",
                     "arguments": []}
 
     def __init__(self):
@@ -243,7 +243,7 @@ class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilder):
 
 
 class OlfactionAssayROIBuilder(TargetGridROIBuilder):
-    description = {"overview": "The default odor assay  roi layout with ten rows of single tubes.",
+    _description = {"overview": "The default odor assay  roi layout with ten rows of single tubes.",
                     "arguments": []}
     def __init__(self):
         """

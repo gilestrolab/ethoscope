@@ -8,5 +8,5 @@
         "drawer": {"name":"DefaultDrawer",
                       "arguments":{"draw_frames":true}},
         "camera": {"name":"MovieVirtualCamera",
-                      "arguments":{"path":"/data/sleep_dep_vid_2fps.mp4"}}
+                      "arguments":{"path":"./test_video.mp4"}}
 }

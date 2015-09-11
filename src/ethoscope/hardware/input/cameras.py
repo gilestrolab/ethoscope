@@ -20,6 +20,16 @@ class BaseCamera(object):
     _frame_idx = 0
 
     def __init__(self,drop_each=1, max_duration=None, *args, **kwargs):
+        """
+        The template class to generate and use video streams.
+
+
+        :param drop_each: keep only ``1/`drop_each`'th frame
+        :param max_duration: stop the video stream if ``t > max_duration`` (in seconds).
+        :param args: additional arguments
+        :param kwargs: additional keyword arguments
+        :return:
+        """
         self._drop_each = drop_each
         self._max_duration = max_duration
 
@@ -28,6 +38,12 @@ class BaseCamera(object):
         self._close()
 
     def __iter__(self):
+        """
+        Iterate thought consecutive frames of this camera.
+
+        :return: the time (in ms) and a frame (numpy array).
+        :rtype: (int, :class:`~numpy.ndarray`)
+        """
 
         # We ensure timestamps and frame index are set to 0
 
@@ -40,7 +56,7 @@ class BaseCamera(object):
                 break
 
 
-            t,out = self.next_time_image()
+            t,out = self._next_time_image()
             if out is None:
                 break
             t_ms = int(1000*t)
@@ -57,17 +73,30 @@ class BaseCamera(object):
 
     @property
     def resolution(self):
+        """
+
+        :return: The resolution of the camera W x H.
+        :rtype: (int, int)
+        """
         return self._resolution
 
     @property
     def width(self):
+        """
+        :return: the width of the returned frames
+        :rtype: int
+        """
         return self._resolution[0]
 
     @property
     def height(self):
+        """
+        :return: the height of the returned frames
+        :rtype: int
+        """
         return self._resolution[1]
 
-    def next_time_image(self):
+    def _next_time_image(self):
         time = self._time_stamp()
         im = self._next_image()
         self._frame_idx += 1
@@ -77,22 +106,39 @@ class BaseCamera(object):
 
     def is_last_frame(self):
         raise NotImplementedError
+
     def _next_image(self):
         raise NotImplementedError
+
     def _time_stamp(self):
         raise NotImplementedError
+
     def is_opened(self):
         raise NotImplementedError
+
     def restart(self):
+        """
+        Restarts a camera (also resets time).
+        :return:
+        """
         raise NotImplementedError
 
 
 
 class MovieVirtualCamera(BaseCamera):
 
-
     def __init__(self, path, use_wall_clock = False, *args, **kwargs ):
+        """
+        Class to acquire frames from a video file.
 
+        :param path: the path of the video file
+        :type  path: str
+        :param use_wall_clock: whether to use the real time from the machine (True) or from the video file (False).
+            The former can be useful for prototyping.
+        :type use_wall_clock:bool
+        :param args: additional arguments
+        :param kwargs: additional keyword arguments
+        """
 
         #print "path", path
         self._frame_idx = 0
@@ -162,6 +208,18 @@ class MovieVirtualCamera(BaseCamera):
 
 class V4L2Camera(BaseCamera):
     def __init__(self,device, target_fps=5, target_resolution=(960,720), *args, **kwargs):
+        """
+        class to acquire stream from a video for linux compatible device (v4l2).
+
+        :param device: The index of the device, or its path.
+        :type device: int or str
+        :param target_fps: the desired number of frames par second (FPS)
+        :type target_fps: int
+        :param target_fps: the desired resolution (W x H)
+        :param target_resolution: (int,int)
+        :param args: additional arguments
+        :param kwargs: additional keyword arguments
+        """
         self.capture = cv2.VideoCapture(device)
         self._warm_up()
 
@@ -265,6 +323,7 @@ class V4L2Camera(BaseCamera):
 class OurPiCamera(BaseCamera):
 
     def __init__(self, target_fps=10, target_resolution=(960,720), *args, **kwargs):
+
 
         logging.info("Initialising camera")
         w,h = target_resolution
@@ -378,6 +437,9 @@ class OurPiCamera(BaseCamera):
 
         return self._frame
 class PiFrameGrabber(multiprocessing.Process):
+    """
+    Class to grab frames from pi camera. Designed to be used within :class:`~ethoscope.hardware.camreras.camreras.OurPiCameraAsync `
+    """
 
     def __init__(self, target_fps, target_resolution, queue,stop_queue):
         self._queue = queue
@@ -417,6 +479,18 @@ class PiFrameGrabber(multiprocessing.Process):
 class OurPiCameraAsync(BaseCamera):
 
     def __init__(self, target_fps=20, target_resolution=(1280, 960), *args, **kwargs):
+
+        """
+        Class to acquire frames from the raspberry pi camera asynchronously.
+        At the moment, frames are greyscale images.
+
+        :param target_fps: the desired number of frames par second (FPS)
+        :type target_fps: int
+        :param target_fps: the desired resolution (W x H)
+        :param target_resolution: (int,int)
+        :param args: additional arguments
+        :param kwargs: additional keyword arguments
+        """
 
         logging.info("Initialising camera")
         w,h = target_resolution

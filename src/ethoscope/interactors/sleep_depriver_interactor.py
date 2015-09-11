@@ -12,6 +12,12 @@ class IsMovingInteractor(BaseInteractor):
     _hardwareInterfaceClass = DefaultInterface
 
     def __init__(self, hardware_interface, velocity_threshold=0.0060):
+        """
+        class implementing an interactor that decides whether an animal has moved though does nothing   accordingly.
+        :param hardware_interface: a default hardware interface object
+        :param velocity_threshold: Up to which velocity an animal is considered to be immobile
+        :type velocity_threshold: float
+        """
         self._velocity_threshold = velocity_threshold
         self._last_active = 0
         super(IsMovingInteractor,self).__init__(hardware_interface)
@@ -41,7 +47,7 @@ class IsMovingInteractor(BaseInteractor):
             return True
         return False
 
-    def _run(self):
+    def _decide(self):
         has_moved = self._has_moved()
         t = self._tracker.times
         if  has_moved:# or xor_diff > self._xor_speed_threshold :
@@ -51,7 +57,7 @@ class IsMovingInteractor(BaseInteractor):
 
 
 class SleepDepInteractor(IsMovingInteractor):
-    description = {"overview": "An interactor to sleep deprive an animal using servo motor. See http://todo/fixme.html",
+    _description = {"overview": "An interactor to sleep deprive an animal using servo motor. See http://todo/fixme.html",
                     "arguments": [
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_threshold", "description": "The minimal velocity that counts as movement","default":0.0060},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken","default":120},
@@ -73,6 +79,22 @@ class SleepDepInteractor(IsMovingInteractor):
                  start_datetime=0,
                  end_datetime=sys.maxsize,
                   ):
+        """
+        A interactor to control a sleep depriver module
+
+        :param hardware_interface: the sleep depriver module hardware interface
+        :type hardware_interface: :class:`~ethoscope.hardawre.interfaces.sleep_depriver_interface.SleepDepriverInterface`
+        :param velocity_threshold:
+        :type velocity_threshold: float
+        :param min_inactive_time: the minimal time without motion after which an animal should be disturbed (in seconds)
+        :type min_inactive_time: float
+        :param start_datetime: The unix time stamp of the start of the experiment
+        :type start_datetime: int
+        :param end_datetime: The unix time stamp of the end of the experiment
+        :type end_datetime: int
+        :return:
+        """
+
         self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
         self._start_datetime= start_datetime
         self._end_datetime= end_datetime
@@ -87,7 +109,7 @@ class SleepDepInteractor(IsMovingInteractor):
         return False
 
 
-    def _run(self):
+    def _decide(self):
 
         roi_id= self._tracker._roi.idx
         now =  self._tracker.last_time_point

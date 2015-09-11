@@ -8,7 +8,7 @@ class FakeSleepDepriverConnection(object):
 
     def deprive(self,channel, dt=500):
         str = "depriving channel %i, with dt= %i" % (channel,dt)
-        time.sleep(1)
+        time.sleep(.1)
         print str
 
     def __del__(self):

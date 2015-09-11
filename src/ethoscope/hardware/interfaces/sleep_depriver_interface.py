@@ -14,12 +14,20 @@ class WrongSleepDepPortError(serial.SerialException):
     pass
 
 class SimpleLynxMotionConnection(object):
+
     _baud = 115200
     _min_angle_pulse = (0.,800.)
     _max_angle_pulse = (150.,2400.)
 
 
     def __init__(self, port=None):
+        """
+        Class to connect and abstract the Lynx Motion servo controller.
+
+        :param port: the serial port to use. Automatic detection if ``None``.
+        """
+
+
         logging.info("Connecting to Lynx motion serial port...")
 
         self._serial = None
@@ -93,6 +101,18 @@ class SimpleLynxMotionConnection(object):
         return pulse
 
     def move_to_angle(self,idx,angle=0.,time=1000):
+        """
+        Move a given servo to a given angle in a given time.
+
+        :param idx: the number of the servo to be moved
+        :type idx: int
+        :param angle: the angle (between 0 and 180) to move to
+        :type angle: int
+        :param time: the time it takes to go from the original angle to the new one (in ms)
+        :type time: int
+        :return:
+        """
+
         if idx < 1:
             raise Exception("idx must be greater or equal to one")
         pulse = self._angle_to_pulse(angle)
@@ -100,17 +120,35 @@ class SimpleLynxMotionConnection(object):
         o = self._serial.write(instruction)
         return o
 
+
 class SleepDepriverConnection(SimpleLynxMotionConnection):
     def __init__(self,*args, **kwargs):
+        """
+        Class to connect to the sleep depriver module.
+
+        :param args: additional arguments to be passed to the base class
+        :param kwargs: additional keyword arguments to be passed to the base class
+        """
         super(SleepDepriverConnection,self).__init__(*args,**kwargs)
         self.warm_up()
 
     def warm_up(self):
+        """
+        Warm up the module. That is move each tube three times in order to check setup and that no servo has failed.
+        """
         for j in range(3):
             for i in range(1,11):
                 self.deprive(i)
 
     def deprive(self,channel, dt=500):
+        """
+        Sleep deprive an animal by rotating its tube.
+
+        :param channel: The chanel to use (i.e. the number of the servo)
+        :typechannel: int
+        :param dt: The time it takes to go from 0 to 180 degrees (inms)
+        :type dt: int
+        """
         self.move_to_angle(channel, self._min_angle_pulse[0],dt)
         time.sleep(dt/1000.0)
         self.move_to_angle(channel, self._max_angle_pulse[0],dt)
@@ -119,7 +157,17 @@ class SleepDepriverConnection(SimpleLynxMotionConnection):
 class SleepDepriverSubProcess(multiprocessing.Process):
     _DepriverConnectionClass = SleepDepriverConnection
 
-    def __init__(self,queue, fake=False, *args, **kwargs):
+    def __init__(self,queue,  *args, **kwargs):
+        """
+        Class to run delegate sleep deprivation connection (:class:`~ethoscope.hardware.interfaces.sleep_depriver_interface.SleepDepriverConnection`).
+        To a parallel process. This way, the execution of the sleep depriver connection instructions are non-blocking.
+
+        :param queue: A multiprocessing queue to pass instructions.
+        :type queue: :class:`~multiprocessing.JoinableQueue`
+        :param args: additional arguments
+        :param kwargs: additional keyword arguments
+        :return:
+        """
         self._queue = queue
         self._sleep_dep_args = args
         self._sleep_dep_kwargs = kwargs
@@ -163,8 +211,15 @@ class SleepDepriverSubProcess(multiprocessing.Process):
 
 
 class SleepDepriverInterface(BaseInterface):
+
     _SubProcessClass = SleepDepriverSubProcess
     def __init__(self,port="/dev/ttyUSB0"):
+        """
+        Class implementing the interface to the sleep depriver module, which rotate tubes to sleep deprive animals.
+
+        :param port: the serial port on which the device is plugged. If ``None`` automatic port detection is attempted.
+        :type port: str or None
+        """
         self._queue = multiprocessing.JoinableQueue()
         self._sleep_dep_interface = self._SubProcessClass(queue = self._queue, port=port) # fixme, auto port detection
         self._sleep_dep_interface.start()

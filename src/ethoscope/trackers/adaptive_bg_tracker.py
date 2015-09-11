@@ -214,7 +214,7 @@ class BackgroundModel(object):
 
 
 class AdaptiveBGModel(BaseTracker):
-    description = {"overview": "The default tracker for fruit flies. One animal per ROI.",
+    _description = {"overview": "The default tracker for fruit flies. One animal per ROI.",
                     "arguments": []}
 
     fg_model = ObjectModel()
