@@ -24,7 +24,7 @@ class BaseCamera(object):
         The template class to generate and use video streams.
 
 
-        :param drop_each: keep only ``1/`drop_each`'th frame
+        :param drop_each: keep only ``1/drop_each``'th frame
         :param max_duration: stop the video stream if ``t > max_duration`` (in seconds).
         :param args: additional arguments
         :param kwargs: additional keyword arguments
@@ -132,12 +132,12 @@ class MovieVirtualCamera(BaseCamera):
         Class to acquire frames from a video file.
 
         :param path: the path of the video file
-        :type  path: str
-        :param use_wall_clock: whether to use the real time from the machine (True) or from the video file (False).
+        :type path: str
+        :param use_wall_clock: whether to use the real time from the machine (True) or from the video file (False).\
             The former can be useful for prototyping.
-        :type use_wall_clock:bool
-        :param args: additional arguments
-        :param kwargs: additional keyword arguments
+        :type use_wall_clock: bool
+        :param args: additional arguments.
+        :param kwargs: additional keyword arguments.
         """
 
         #print "path", path
@@ -438,7 +438,7 @@ class OurPiCamera(BaseCamera):
         return self._frame
 class PiFrameGrabber(multiprocessing.Process):
     """
-    Class to grab frames from pi camera. Designed to be used within :class:`~ethoscope.hardware.camreras.camreras.OurPiCameraAsync `
+    Class to grab frames from pi camera. Designed to be used within :class:`~ethoscope.hardware.camreras.camreras.OurPiCameraAsync`
     """
 
     def __init__(self, target_fps, target_resolution, queue,stop_queue):

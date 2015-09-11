@@ -11,7 +11,6 @@ Module contents
     :show-inheritance:
 
 
-
 ethoscope.roi_builders.roi_builders module
 ------------------------------------------
 
@@ -19,7 +18,6 @@ ethoscope.roi_builders.roi_builders module
     :members:
     :undoc-members:
     :show-inheritance:
-
 
 
 ethoscope.roi_builders.img_roi_builder module

@@ -1,13 +1,11 @@
 ethoscope.interactors package
 =============================
 
-Submodules
-----------
 
-ethoscope.interactors.fake_sleep_dep_interactor module
-------------------------------------------------------
+Module contents
+---------------
 
-.. automodule:: ethoscope.interactors.fake_sleep_dep_interactor
+.. automodule:: ethoscope.interactors
     :members:
     :undoc-members:
     :show-inheritance:
@@ -28,11 +26,11 @@ ethoscope.interactors.sleep_depriver_interactor module
     :undoc-members:
     :show-inheritance:
 
+ethoscope.interactors.fake_sleep_dep_interactor module
+------------------------------------------------------
 
-Module contents
----------------
-
-.. automodule:: ethoscope.interactors
+.. automodule:: ethoscope.interactors.fake_sleep_dep_interactor
     :members:
     :undoc-members:
     :show-inheritance:
+

@@ -1,8 +1,15 @@
 ethoscope.utils package
 =======================
 
-Submodules
-----------
+
+Module contents
+---------------
+
+.. automodule:: ethoscope.utils
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 
 ethoscope.utils.debug module
 ----------------------------
@@ -36,11 +43,3 @@ ethoscope.utils.io module
     :undoc-members:
     :show-inheritance:
 
-
-Module contents
----------------
-
-.. automodule:: ethoscope.utils
-    :members:
-    :undoc-members:
-    :show-inheritance:
