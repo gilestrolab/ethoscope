@@ -51,12 +51,6 @@ class XYDistance(BaseIntVariable):
     functional_type = "relative_distance_1e6"
 
 
-class XorDistance(BaseIntVariable):
-    header_name = "xor_dist"
-    functional_type = "relative_distance_1e3"
-
-
-
 class WidthVariable(BaseDistanceIntVar):
     header_name = "w"
 

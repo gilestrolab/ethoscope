@@ -12,7 +12,7 @@ SERVER_SCRIPT="../../../scripts/device_server.py"
 for config_file in $(ls test_*.json)
 do
 echo "TESTING $config_file"
-python $SERVER_SCRIPT -g $GIT_REPO -j $config_file -r -D
+time python $SERVER_SCRIPT -g $GIT_REPO -j $config_file -r -D -s
 done
 
 echo "all test successful (by some miracle)!"

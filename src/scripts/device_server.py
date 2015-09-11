@@ -1,7 +1,6 @@
 __author__ = 'luis'
 
 import logging
-import datetime
 from optparse import OptionParser
 from bottle import *
 from ethoscope.web_utils.control_thread import ControlThread
@@ -160,6 +159,7 @@ if __name__ == '__main__':
     parser = OptionParser()
     #parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-r", "--run", dest="run", default=False, help="Runs tracking directly", action="store_true")
+    parser.add_option("-s", "--stop-after-run", dest="stop_after_run", default=False, help="When -r, stops immediately after. otherwise, server waits", action="store_true")
     parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
     parser.add_option("-p", "--port", dest="port", default=9000,help="port")
     parser.add_option("-b", "--branch", dest="branch", default="psv-package",help="the branch to work from")
@@ -201,9 +201,14 @@ if __name__ == '__main__':
         logging.info("Logging using DEBUG SETTINGS")
 
 
+    #fixme
+    if option_dict["stop_after_run"]:
+         control.set_evanescent(True) # kill program after first run
 
     if option_dict["run"]:
         control.start()
+
+
 
 
     try:

@@ -6,8 +6,7 @@ from math import log10
 import cv2
 import numpy as np
 from scipy import ndimage
-from ethoscope.core.variables import XPosVariable, YPosVariable, XYDistance, XorDistance, WidthVariable, HeightVariable, \
-    PhiVariable, mLogLik
+from ethoscope.core.variables import XPosVariable, YPosVariable, XYDistance, WidthVariable, HeightVariable, PhiVariable
 from ethoscope.core.data_point import DataPoint
 from ethoscope.trackers.trackers import BaseTracker, NoPositionError
 from ethoscope.utils.debug import EthoscopeException
