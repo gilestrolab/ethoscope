@@ -352,9 +352,9 @@ class AdaptiveBGModel(BaseTracker):
             self._buff_fg = np.empty_like(grey)
             self._buff_object= np.empty_like(grey)
             self._buff_fg_backup = np.empty_like(grey)
-            self._buff_fg_diff = np.empty_like(grey)
+  #          self._buff_fg_diff = np.empty_like(grey)
             self._old_pos = 0.0 +0.0j
-            self._old_sum_fg = 0
+   #         self._old_sum_fg = 0
             raise NoPositionError
 
         bg = self._bg_model.bg_img.astype(np.uint8)
@@ -362,9 +362,8 @@ class AdaptiveBGModel(BaseTracker):
 
         cv2.threshold(self._buff_fg,20,255,cv2.THRESH_TOZERO, dst=self._buff_fg)
 
-        cv2.bitwise_and(self._buff_fg_backup,self._buff_fg,dst=self._buff_fg_diff)
-
-        sum_fg = cv2.countNonZero(self._buff_fg)
+        # cv2.bitwise_and(self._buff_fg_backup,self._buff_fg,dst=self._buff_fg_diff)
+        # sum_fg = cv2.countNonZero(self._buff_fg)
 
         self._buff_fg_backup = np.copy(self._buff_fg)
 
@@ -438,6 +437,7 @@ class AdaptiveBGModel(BaseTracker):
 
         #todo center mass just on the ellipse area
         cv2.bitwise_and(self._buff_fg_backup, self._buff_fg,self._buff_fg_backup)
+
         y,x = ndimage.measurements.center_of_mass(self._buff_fg_backup)
 
         pos = x +1.0j*y
@@ -445,15 +445,11 @@ class AdaptiveBGModel(BaseTracker):
 
         xy_dist = round(log10(1./float(w_im) + abs(pos - self._old_pos))*1000)
 
-        #cv2.bitwise_and(self._buff_fg_diff,self._buff_fg,dst=self._buff_fg_diff)
-
-        sum_diff = cv2.countNonZero(self._buff_fg_diff)
-
-        xor_dist = (sum_fg  + self._old_sum_fg - 2*sum_diff)  / float(sum_fg  + self._old_sum_fg)
-        xor_dist *=1000.
-
-
-        self._old_sum_fg = sum_fg
+        # cv2.bitwise_and(self._buff_fg_diff,self._buff_fg,dst=self._buff_fg_diff)
+        # sum_diff = cv2.countNonZero(self._buff_fg_diff)
+        # xor_dist = (sum_fg  + self._old_sum_fg - 2*sum_diff)  / float(sum_fg  + self._old_sum_fg)
+        # xor_dist *=1000.
+        # self._old_sum_fg = sum_fg
         self._old_pos = pos
 
 
@@ -472,13 +468,18 @@ class AdaptiveBGModel(BaseTracker):
         x_var = XPosVariable(int(round(x)))
         y_var = YPosVariable(int(round(y)))
         distance = XYDistance(int(xy_dist))
-        xor_dist = XorDistance(int(xor_dist))
+        #xor_dist = XorDistance(int(xor_dist))
         w_var = WidthVariable(int(round(w)))
         h_var = HeightVariable(int(round(h)))
         phi_var = PhiVariable(int(round(angle)))
-        mlogl =   mLogLik(int(distance*1000))
+        # mlogl =   mLogLik(int(distance*1000))
 
-        out = DataPoint([x_var, y_var, w_var, h_var, phi_var,mlogl,distance,xor_dist])
+        out = DataPoint([x_var, y_var, w_var, h_var,
+                         phi_var,
+                         #mlogl,
+                         distance,
+                         #xor_dist
+                         ])
 
         self._previous_shape=np.copy(hull)
         return out
