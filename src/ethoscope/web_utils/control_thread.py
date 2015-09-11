@@ -30,6 +30,7 @@ from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
 
 
 class ControlThread(Thread):
+    _evanescent = False
     _option_dict = {
         "roi_builder":{
                 "possible_classes":[DefaultROIBuilder, TargetGridROIBuilder, OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder],
@@ -307,6 +308,11 @@ class ControlThread(Thread):
         except Exception as e:
             self.stop(traceback.format_exc(e))
 
+        #for testing pusposes
+        if self._evanescent:
+            import os
+            os._exit(0)
+
 
     def stop(self, error=None):
         self._info["status"] = "stopping"
@@ -331,4 +337,7 @@ class ControlThread(Thread):
     def __del__(self):
         self.stop()
         shutil.rmtree(self._tmp_dir, ignore_errors=True)
+
+    def set_evanescent(self, value=True):
+        self._evanescent = value
 
