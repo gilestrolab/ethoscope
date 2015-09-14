@@ -311,6 +311,8 @@ class ControlThread(Thread):
         #for testing pusposes
         if self._evanescent:
             import os
+            del self._drawer
+            self.stop()
             os._exit(0)
 
 
