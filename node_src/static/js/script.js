@@ -20,22 +20,13 @@
                 templateUrl : '/static/pages/home.html',
                 controller  : 'mainController'
             })
-            .when('/list/:device_type', {
-                templateUrl : '/static/pages/list.html',
-                controller  : 'listController'
-            })
 
             // route for the sleep monitor page
-            .when('/sm/:device_id', {
-                templateUrl : '/static/pages/sm.html',
-                controller  : 'smController'
+            .when('/ethoscope/:device_id', {
+                templateUrl : '/static/pages/ethoscope.html',
+                controller  : 'ethoscopeController'
             })
 
-            // route for the sleep depriver page
-            .when('/sd/:device_id', {
-                templateUrl : '/static/pages/sd.html',
-                controller  : 'sdController'
-            })
             // route for the management page
             .when('/more/:option', {
                 templateUrl : '/static/pages/more.html',
@@ -127,7 +118,7 @@
             softwareVersion = ""; 
             device_version = "";
             checkVersionLoop: 
-            for (var i = 0; i< selected_devices.lenght(); i++){
+            for (var i = 0; i< selected_devices.length(); i++){
                     $http.get('/device/'+selected_devices[i]+'/data').success(function(data){device_version = data.version});
                     if (i == 0) {
                         softwareVersion = device_version;
@@ -164,49 +155,5 @@
 
     });
 
-
-    app.controller('listController', function($scope, $http, $routeParams, $interval)  {
-        $scope.req_device_type = $routeParams.device_type;
-        if ($scope.req_device_type == "sm"){
-            $scope.device_type = "Sleep Monitor";
-        }else if ($scope.req_device_type == 'sd'){
-            $scope.device_type = "Sleep Deprivator";
-        };
-
-        //$http.get('/devices_list').success(function(data){
-        //    $scope.devices = data;
-        //})
-
-        $scope.get_devices_list = function(){
-            list=[];
-            var spinner= new Spinner(opts).spin();
-            var loadingContainer = document.getElementById('loading_devices');
-            loadingContainer.appendChild(spinner.el);
-            $scope.loading_devices = true;
-            $http.get('/devices').success(function(data){
-                for (device in data){
-                    if (data[device].type == $scope.req_device_type){
-                        list.push(data[device]);
-                    }
-                }
-                $scope.devices = list;
-                spinner.stop();
-                $scope.loading_devices = false;
-
-
-            })
-        }
- $scope.$on('$viewContentLoaded',$scope.get_devices_list);
-    });
-
-
-    app.controller('sdController',  function($scope, $http,$routeParams)  {
-
-        // create a message to display in our view
-        $scope.message = 'Everyone come and see how good I look!';
-        $http.get('/device/'+device_id+'/all').success(function(data){
-            $scope.device = data;
-        });
-    });
 }
 )()

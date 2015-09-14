@@ -8,15 +8,15 @@
         </div>
         <div ng-if="device.status == 'running'">
 
-            <p><span class="fa fa-clock-o"></span> Started on {{sm.start_date_time(device.time)}}
-                (i.e. {{sm.elapsedtime(device.monitor_info.last_time_stamp)}}ago)</p>
+            <p><span class="fa fa-clock-o"></span> Started on {{ethoscope.start_date_time(device.time)}}
+                (i.e. {{ethoscope.elapsedtime(device.monitor_info.last_time_stamp)}}ago)</p>
         </div>
 
         <div ng-if="device.status == 'running'">
             <p>Processing speed: {{device.monitor_info.fps}} FPS</p>
 
-            <p>Your file will be saved as: <a href="/download{{device.backup_path}}" target="_blank" data-toggle="tooltip" data-placement="top" title="{{device.backup_path}}">{{sm.readable_url(device.backup_path)}}</a></p>
-            <p>Time since last backup: {{sm.elapsedtime(device.time_since_backup)}}</p>
+            <p>Your file will be saved as: <a href="/download{{device.backup_path}}" target="_blank" data-toggle="tooltip" data-placement="top" title="{{device.backup_path}}">{{ethoscope.readable_url(device.backup_path)}}</a></p>
+            <p>Time since last backup: {{ethoscope.elapsedtime(device.time_since_backup)}}</p>
 
         </div>
         <div ng-if="device.status == 'recording'">
@@ -31,16 +31,16 @@
             <p>Stopping tracking...</p>
         </div>
 <div ng-if="device.status == 'stopped'">
-<p>Time since last experiment: {{sm.elapsedtime(device.time_since_backup)}}</p>        </div>
+<p>Time since last experiment: {{ethoscope.elapsedtime(device.time_since_backup)}}</p>        </div>
 
         <button class="btn btn-success btn-xl" ng-if="device.status == 'stopped'"  data-toggle="modal" data-target="#startModal">Start</button>
-        <button class="btn btn-danger" ng-if="device.status == 'running'"  ng-click="sm.stop() ">Stop</button>
+        <button class="btn btn-danger" ng-if="device.status == 'running'"  ng-click="ethoscope.stop() ">Stop</button>
 
-        <button class="btn btn-info disable" ng-if="device.status == 'stopping'"  ng-click="sm.alert('Please wait, system is stopping')">Stopping</button>
-        <button class="btn btn-danger disable" ng-if="device.status == 'initialising'"  ng-click="sm.alert('Please wait, system is starting')">Starting</button>
+        <button class="btn btn-info disable" ng-if="device.status == 'stopping'"  ng-click="ethoscope.alert('Please wait, system is stopping')">Stopping</button>
+        <button class="btn btn-danger disable" ng-if="device.status == 'initialising'"  ng-click="ethoscope.alert('Please wait, system is starting')">Starting</button>
 
         <a href="/#/more/browse" class="btn btn-info">Download Data</a>
-        <button class="btn btn-info" ng-click="sm.log()">Log</button>
+        <button class="btn btn-info" ng-click="ethoscope.log()">Log</button>
         <button class="btn btn-info" ng-if="device.status == 'stopped' || device.status == 'recording'" data-toggle="modal" data-target="#recordModal">Recording Pannel</button>
         <button class="btn btn-danger" data-toggle="modal" data-target="#powerOffAlert">Power off Device</button>
 
@@ -98,7 +98,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">No</button>
-        <button type="button" class="btn btn-primary" ng-click="sm.poweroff()" data-dismiss="modal">Yes</button>
+        <button type="button" class="btn btn-primary" ng-click="ethoscope.poweroff()" data-dismiss="modal">Yes</button>
       </div>
     </div>
   </div>
@@ -119,7 +119,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-primary" ng-click="sm.poweroff()">Download All</button>
+        <button type="button" class="btn btn-primary" ng-click="ethoscope.poweroff()">Download All</button>
       </div>
     </div>
   </div>
@@ -139,7 +139,7 @@
             <h4>{{name}}</h4>
               <ul class="option-list">
                 <li ng-repeat="opt in option">
-                    <input type=radio name={{opt.name}} value={{opt.name}} ng-model="selected_options[name]['name']" ng-click="sm.update_user_options(name)">
+                    <input type=radio name={{opt.name}} value={{opt.name}} ng-model="selected_options[name]['name']" ng-click="ethoscope.update_user_options(name)">
                     <strong data-toggle="tooltip" data-placement="top" title=" {{opt.overview}}" ng-init="description[opt.name] = false">{{opt.name}}</strong> <a href=""  ng-click="description[opt.name] = true" ng-if="description[opt.name]==false"> <icon class="fa fa-plus-square-o"> </icon></a>
                     <a href="" ng-click="description[opt.name] = false" ng-if="description[opt.name]==true"> <icon class="fa fa-minus-square-o"> </icon></a>
                     <div ng-if="description[opt.name] == true">
@@ -161,7 +161,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
-        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="sm.start(selected_options)" data-toggle="modal">Start Tracking</button>
+        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start(selected_options)" data-toggle="modal">Start Tracking</button>
       </div>
     </div>
   </div>
@@ -185,8 +185,8 @@
           </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-default" ng-if="device.status == 'recording'" ng-click="sm.stop_recording()">Stop Recording</button>
-        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="sm.start_recording()" data-toggle="modal">Start Recording</button>
+        <button type="button" class="btn btn-default" ng-if="device.status == 'recording'" ng-click="ethoscope.stop_recording()">Stop Recording</button>
+        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_recording()" data-toggle="modal">Start Recording</button>
       </div>
     </div>
   </div>

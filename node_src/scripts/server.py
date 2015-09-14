@@ -367,9 +367,9 @@ def redirection_to_home(type):
 @app.get('/more')
 def redirection_to_home():
     return redirect('/#/more/')
-@app.get('/sm/<id>')
+@app.get('/ethoscope/<id>')
 def redirection_to_home(id):
-    return redirect('/#/sm/'+id)
+    return redirect('/#/ethoscope/'+id)
 @app.get('/device/<id>/ip')
 def redirection_to_home(id):
     if len(devices_map) > 0:

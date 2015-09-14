@@ -15,7 +15,6 @@
 
 <table class="table table-striped" ng-cloak>
             <thead>
-            <th>Type</th>
             <th>Name</th>
             <th>Status</th>
             <th>Since</th>
@@ -26,10 +25,8 @@
             </thead>
             <tbody>
             <tr ng-repeat="device in devices">
-                <td ng-if="device.type == 'sm'">Sleep Monitor</td>
-                <td ng-if="device.type == 'sd'">Sleep Deprivator</td>
                 <td>
-                    <a ng-href="/#sm/{{device.id}}" target="_blank">
+                    <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
                     <span class="fa fa-circle-o"></span><span> {{device.name}}</span>
                     </a>
                 </td>
@@ -48,6 +45,7 @@
 
 
 <!-- Modal start tracking -->
+<!--FIXME-->
 <div class="modal fade" id="startModal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -78,7 +76,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
-        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="sm.start()" data-toggle="modal">Start Tracking</button>
+        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start()" data-toggle="modal">Start Tracking</button>
       </div>
     </div>
   </div>
