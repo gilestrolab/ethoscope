@@ -172,7 +172,8 @@ class BackgroundModel(object):
     def update(self, img_t, t, fg_mask=None):
         dt = float(t - self.last_t)
         if dt < 0:
-            raise EthoscopeException("Negative time interval between two consecutive frames")
+            # raise EthoscopeException("Negative time interval between two consecutive frames")
+            raise NoPositionError("Negative time interval between two consecutive frames")
 
         # clip the half life to possible value:
         self._current_half_life = np.clip(self._current_half_life, self._min_half_life, self._max_half_life)
