@@ -26,16 +26,11 @@
             })
 
             // route for the sleep monitor page
-            .when('/sm/:device_id', {
-                templateUrl : '/static/pages/sm.html',
-                controller  : 'smController'
+            .when('/ethoscope/:device_id', {
+                templateUrl : '/static/pages/index.html',
+                controller  : 'ethoscopeController'
             })
 
-            // route for the sleep depriver page
-            .when('/sd/:device_id', {
-                templateUrl : '/static/pages/sd.html',
-                controller  : 'sdController'
-            })
             // route for the management page
             .when('/more/:option', {
                 templateUrl : '/static/pages/more.html',

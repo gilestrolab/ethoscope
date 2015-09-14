@@ -15,11 +15,11 @@ app.directive('tooltip', function(){
         }
     };
 });
-app.controller('smController', function($scope, $http, $routeParams, $interval, $timeout, $location)  {
+app.controller('ethoscopeController', function($scope, $http, $routeParams, $interval, $timeout, $location)  {
         device_id = $routeParams.device_id;
         var device_ip;
         $scope.device = {};
-        $scope.sm = {};
+        $scope.ethoscope = {};
         var refresh_data = false;
         var spStart= new Spinner(opts).spin();
         var starting_tracking= document.getElementById('starting');
@@ -45,7 +45,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
                     device_ip = data;
                 });
 
-        $scope.sm.update_user_options = function(name){
+        $scope.ethoscope.update_user_options = function(name){
             data=$scope.device;
             for (var i=0;i<data.user_options[name].length;i++){
                 if (data.user_options[name][i]['name']== $scope.selected_options[name]['name']){
@@ -59,7 +59,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
         }
 
 
-        $scope.sm.start = function(option){
+        $scope.ethoscope.start = function(option){
             $("#startModal").modal('hide');
             spStart= new Spinner(opts).spin();
             starting_tracking.appendChild(spStart.el);
@@ -78,18 +78,18 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
 
         };
 
-        $scope.sm.stop = function(){
+        $scope.ethoscope.stop = function(){
                             $http.post('/device/'+device_id+'/controls/stop', data={})
                             .success(function(data){
                                 $scope.device.status = data.status;
                             });
         };
 
-        $scope.sm.download = function(){
+        $scope.ethoscope.download = function(){
             $http.get($scope.device.ip+':9000/static'+$scope.result_files);
         };
 
-        $scope.sm.log = function(){
+        $scope.ethoscope.log = function(){
             var log_file_path = ''
             if ($scope.showLog == false){
                 log_file_path = $scope.device.log_file;
@@ -103,16 +103,16 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
             }
         };
 
-        $scope.sm.poweroff = function(){
+        $scope.ethoscope.poweroff = function(){
                 $http.post('/device/'+device_id+'/controls/poweroff', data={})
                      .success(function(data){
                         $location.path( "/" );
                 })
         };
 
-        $scope.sm.alert= function(message){alert(message);};
+        $scope.ethoscope.alert= function(message){alert(message);};
 
-        $scope.sm.elapsedtime = function(t){
+        $scope.ethoscope.elapsedtime = function(t){
             // Calculate the number of days left
             var days=Math.floor(t / 86400);
             // After deducting the days calculate the number of hours left
@@ -134,7 +134,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
             return x;
 
         };
-        $scope.sm.readable_url = function(url){
+        $scope.ethoscope.readable_url = function(url){
                 //start tooltips
         $('[data-toggle="tooltip"]').tooltip()
             readable = url.split("/");
@@ -142,7 +142,7 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
             readable = ".../"+readable[len - 1];
             return readable;
         };
-         $scope.sm.start_date_time = function(unix_timestamp){
+         $scope.ethoscope.start_date_time = function(unix_timestamp){
             var date = new Date(unix_timestamp*1000);
             return date.toUTCString();
         };
@@ -169,14 +169,14 @@ app.controller('smController', function($scope, $http, $routeParams, $interval, 
                             "custom":{name:"custom", kwargs:""}
                         }};
 
-        $scope.sm.start_recording = function(){
+        $scope.ethoscope.start_recording = function(){
                 $http.post('/device/'+device_id+'/controls/start_record', data={})
                     .success(function(data){
                         $scope.device.status = data.status;
                     });
         }
 
-        $scope.sm.stop_recording = function(){
+        $scope.ethoscope.stop_recording = function(){
                 $http.post('/device/'+device_id+'/controls/stop_record', data={})
                     .success(function(data)
                              {
