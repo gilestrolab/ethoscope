@@ -39,7 +39,7 @@
         <button class="btn btn-info disable" ng-if="device.status == 'stopping'"  ng-click="ethoscope.alert('Please wait, system is stopping')">Stopping</button>
         <button class="btn btn-danger disable" ng-if="device.status == 'initialising'"  ng-click="ethoscope.alert('Please wait, system is starting')">Starting</button>
 
-        <a href="/#/more/browse" class="btn btn-info">Download Data</a>
+        <!--<a href="/#/more/browse" class="btn btn-info">Download Data</a>-->
         <button class="btn btn-info" ng-click="ethoscope.log()">Log</button>
         <button class="btn btn-info" ng-if="device.status == 'stopped' || device.status == 'recording'" data-toggle="modal" data-target="#recordModal">Recording Pannel</button>
         <button class="btn btn-danger" data-toggle="modal" data-target="#powerOffAlert">Power off Device</button>
@@ -91,10 +91,10 @@
     <div class="modal-content">
       <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="myModalLabel">Modal title</h4>
+        <h4 class="modal-title" id="myModalLabel">Powering Off!</h4>
       </div>
       <div class="modal-body">
-       <p>Do you want to power off the Device {{device.name}}? Any running acquisition will be ended.</p>
+       <p>Do you really want to power off the device “{{device.name}}”? Any ongoing acquisition will be ended.</p>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">No</button>
