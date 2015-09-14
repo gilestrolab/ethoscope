@@ -110,8 +110,6 @@ class ControlThread(Thread):
                         "id": machine_id,
                         "name": name,
                         "version": version,
-                        # type is obsolete. any device could be any type really
-                        "type": "sd",
                         "db_name":self._db_credentials["name"],
                         "monitor_info": self._default_monitor_info,
                         "user_options": self._get_user_options()

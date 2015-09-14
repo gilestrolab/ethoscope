@@ -1,14 +1,14 @@
 <!-- home.html -->
     <div class="jumbotron text-center" ng-cloak>
         <h1>Device List</h1>
-        <div class="intro">Scan the network to dectect connected devices</div>
+        <div class="intro">Scan the network to detect connected ethoscopes</div>
 
         <button class=" btn btn-default" ng-click="get_devices()">Scan Network for Devices</button>
 
         <div  id="loading_devices" class="spinner"></div>
         <div id="node-info" class="intro">
-            <p><span class="fa fa-clock-o"></span> Node Time: {{time}}</p>
-            <p><span class="fa fa-clock-o"></span> Your Time: {{localtime}}</p>
+            <p><span class="fa fa-clock-o"></span> Time on the platform: {{time}}</p>
+            <p><span class="fa fa-clock-o"></span> Time on your machine: {{localtime}}</p>
         </div>
 
     </div>
@@ -45,6 +45,7 @@
 
 
 <!-- Modal start tracking -->
+<!--FIXME-->
 <div class="modal fade" id="startModal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
