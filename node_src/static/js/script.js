@@ -119,7 +119,7 @@
             device_version = "";
             checkVersionLoop: 
             for (var i = 0; i< selected_devices.length(); i++){
-                    $http.get('/device/'+selected_devices[i]+'/data').success(function(data){device_version = data.version});
+                    $http.get('/device/'+selected_devices[i]+'/data').success(function(data){device_version = data.version.id});
                     if (i == 0) {
                         softwareVersion = device_version;
                     }

@@ -15,7 +15,7 @@ def get_machine_info(path):
             info = f.readline().rstrip()
         return info
     except Exception as e:
-        log.error(traceback.format_exc(e))
+        log.warning(traceback.format_exc(e))
         return 'Debug-'+str(random.randint(1,100))
 
 
@@ -25,4 +25,14 @@ def get_version(dir, branch):
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
     stdout,stderr = version.communicate()
-    return stdout.strip('\n')
+    commit_id = stdout.strip('\n')
+
+    version_date = subprocess.Popen(['git', 'show', '-s', '--format=%ci'] ,
+                                   cwd=dir,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
+    stdout,stderr = version_date.communicate()
+
+    commit_date = stdout.strip('\n')
+
+    return {"id":commit_id, "date":commit_date}

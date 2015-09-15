@@ -142,7 +142,7 @@
                         }
                     }
                     for (dev in res.attached_devices){
-                        if (dev.version != res.origin.version){
+                        if (dev.version.id != res.origin.version.id){
                             $scope.update_text = "There is a new version and some devices need to be updated";
                             break;
                         }

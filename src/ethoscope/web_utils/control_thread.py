@@ -109,7 +109,8 @@ class ControlThread(Thread):
                         "last_drawn_img": os.path.join(self._tmp_dir, self._tmp_last_img_file),
                         "id": machine_id,
                         "name": name,
-                        "version": version,
+                        "version_id": version["id"],
+                        "version_date": version["date"],
                         "db_name":self._db_credentials["name"],
                         "monitor_info": self._default_monitor_info,
                         "user_options": self._get_user_options()
@@ -266,7 +267,7 @@ class ControlThread(Thread):
                              "date_time": cam.start_time, #the camera start time is the reference 0
                              "frame_width":cam.width,
                              "frame_height":cam.height,
-                             "version": self._info["version"]
+                             "version": self._info["version"]["id"]
                               }
                 #the camera start time is the reference 0
                 self._info["time"] = cam.start_time

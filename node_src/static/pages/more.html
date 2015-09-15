@@ -92,15 +92,15 @@
     <div ng-if="update.error">
         <h3>Error details: {{update.error}}</h3>
     </div>
-    <h3>Upstream version: {{origin.version}}</h3>
-    <h3>Node version: {{node.version}}</h3>
+    <h3>Upstream version: {{origin.version.id}} ({{origin.version.date}})</h3>
+    <h3>Node version: {{node.version.id}} ({{node.version.date}})</h3>
 
     <h4>{{update_text}}</h4>
     <div >
         <!--<h2>The following devices will be updated.</h2>-->
         <button class="btn btn-success" ng-click="update_selected('all')" data-toggle="modal" data-target="#updateDevicesModal">Update All Devices</button>
         <button class="btn btn-default" ng-click="update_selected(devices_to_update_selected)" data-toggle="modal" data-target="#updateDevicesModal">Update Selected</button>
-        <button ng-if="node.version != origin.version" class="btn btn-primary" data-toggle="modal" data-target="#updateNodeModal" >Update Node</button>
+        <button ng-if="node.version.id != origin.version.id" class="btn btn-primary" data-toggle="modal" data-target="#updateNodeModal" >Update Node</button>
 
         <table class="table table-striped" >
             <thead>
@@ -152,7 +152,7 @@
 
                     </td>
                 </tr>
-                <tr class="warning" ng-if="d.version != origin.version && d.status == 'stopped'">
+                <tr class="warning" ng-if="d.version != origin.version.id && d.status == 'stopped'">
                     <td>
                     <a href="#/sm/{{d.id}}" target=_blank ng-if="d.name != 'Node'">
                     <span class="fa fa-circle-o"></span><span> {{d.name}}</span>
