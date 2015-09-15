@@ -109,8 +109,7 @@ class ControlThread(Thread):
                         "last_drawn_img": os.path.join(self._tmp_dir, self._tmp_last_img_file),
                         "id": machine_id,
                         "name": name,
-                        "version_id": version["id"],
-                        "version_date": version["date"],
+                        "version": version,
                         "db_name":self._db_credentials["name"],
                         "monitor_info": self._default_monitor_info,
                         "user_options": self._get_user_options()
