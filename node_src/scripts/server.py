@@ -433,13 +433,13 @@ if __name__ == '__main__':
     if wireless is not None:
         SUBNET_DEVICE = wireless.group(1)
     else:
-        logging.error("Not Wireless adapter has been detected. It is necessary for connect to Devices.")
+        logging.error("Not Wireless adapter has been detected. It is necessary to connect to Devices.")
 
     ethernet = re.search(r'[0-9]: (en.*):', network_devices)
     if ethernet is not None:
         INTERNET_DEVICE = ethernet.group(1)
     else:
-        logging.info("Not ethernet adapter has been detected. It is necessary for connect to Internet.")
+        logging.info("Not ethernet adapter has been detected. It is necessary to connect to the internet.")
 
     if option_dict["local_adapter"] != "":
         SUBNET_DEVICE = option_dict["local_adapter"]
