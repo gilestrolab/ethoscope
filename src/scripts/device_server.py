@@ -45,17 +45,7 @@ def controls(id, action):
     if id == machine_id:
             try:
                 if action == 'start':
-
-                    # getting the requested type of tracking
                     data = request.json
-                    #TODO clean this, no needed now, node provices NTP service
-                    #t = float(data['time'])
-                    #set time, given in seconds from javascript, used in seconds for date
-                    # FIXME This is needed on PI
-                    #set_time = call(['date', '-s', '@' + str(t)])
-                    #date = datetime.fromtimestamp(t)
-                    # date_time = date.isoformat()
-
                     json_data.update(data)
                     control = ControlThread(machine_id=machine_id,
                             name=machine_name,
@@ -114,27 +104,6 @@ def info(id):
     else:
         return {'error': "Error on machine ID"}
 
-@api.post('/update/<id>')
-def update_system(id):
-    if id == machine_id and control.info['status'] == 'stopped':
-        try:
-            device_update = subprocess.Popen(['git', 'pull'],
-                                             cwd=GIT_WORKING_DIR,
-                                             stdout=subprocess.PIPE,
-                                             stderr=subprocess.PIPE)
-            stdout, stderr = device_update.communicate()
-            if stderr != '':
-                logging.error("Error on update:"+stderr)
-            if stdout != '':
-                logging.info("Update result:"+stdout)
-            logging.info("Restarting script now. Systemd should restart script")
-            close()
-
-        except Exception as e:
-            return {'error':e, 'updated':False}
-    else:
-        return {'error': 'Error on machine ID or not Stopped'}
-
 
 def close(exit_status=0):
     global control
@@ -150,21 +119,17 @@ def close(exit_status=0):
 if __name__ == '__main__':
 
     ETHOGRAM_DIR = "/ethoscope_data/results"
-    GIT_WORKING_DIR = '/home/ethoscope/ethoscope-git'
 
     MACHINE_ID_FILE = '/etc/machine-id'
     MACHINE_NAME_FILE = '/etc/machine-name'
 
 
     parser = OptionParser()
-    #parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-r", "--run", dest="run", default=False, help="Runs tracking directly", action="store_true")
     parser.add_option("-s", "--stop-after-run", dest="stop_after_run", default=False, help="When -r, stops immediately after. otherwise, server waits", action="store_true")
     parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
     parser.add_option("-p", "--port", dest="port", default=9000,help="port")
-    parser.add_option("-b", "--branch", dest="branch", default="psv-package",help="the branch to work from")
     parser.add_option("-e", "--results-dir", dest="results_dir", default=ETHOGRAM_DIR,help="Where temporary result files are stored")
-    parser.add_option("-g", "--git-dir", dest="git_dir", default=GIT_WORKING_DIR,help="Where is the target git located(for software update)")
     parser.add_option("-D", "--debug", dest="debug", default=False, help="Shows all logging messages", action="store_true")
 
 
@@ -172,13 +137,13 @@ if __name__ == '__main__':
     option_dict = vars(options)
 
     port = option_dict["port"]
-    branch = option_dict["branch"]
+
 
 
     machine_id = get_machine_info(MACHINE_ID_FILE)
     machine_name = get_machine_info(MACHINE_NAME_FILE)
 
-    version = get_version(option_dict["git_dir"], branch)
+    version = "TODO"
 
     if option_dict["json"]:
         import json
@@ -208,16 +173,10 @@ if __name__ == '__main__':
     if option_dict["run"]:
         control.start()
 
-
-
-
     try:
         run(api, host='0.0.0.0', port=port, server='cherrypy',debug=option_dict["debug"])
 
-
-
     except Exception as e:
-
         logging.error(e)
         close(1)
     finally:

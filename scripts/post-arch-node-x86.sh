@@ -16,7 +16,7 @@ export DATA_DIR=/ethoscope_results
 export STABLE_BRANCH=dev
 export UPSTREAM_GIT_REPO=https://github.com/gilestrolab/ethoscope.git
 export LOCAL_BARE_PATH=/srv/git/ethoscope.git
-export TARGET_GIT_INSTALL=/home/$USER_NAME/ethoscope-git
+export TARGET_GIT_INSTALL=/opt/ethoscope-git
 export NODE_IP=192.169.123.1
 
 

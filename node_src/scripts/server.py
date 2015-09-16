@@ -4,13 +4,9 @@ import urllib2
 import subprocess
 import socket
 import json
-
 import re
-
 import logging
 import traceback
-from ethoscope_node.utils.helpers import get_version
-from ethoscope_node.utils.helpers import which
 from ethoscope_node.utils.helpers import generate_new_device_map, update_dev_map_wrapped
 from ethoscope_node.utils.helpers import get_last_backup_time
 
@@ -85,7 +81,6 @@ def device(id):
 
 @app.post('/device/<id>/controls/<type_of_req>')
 def device(id, type_of_req):
-    # global acquisition
     try:
         post_data = request.body.read()
         update_device_map(id, "data")
@@ -94,8 +89,6 @@ def device(id, type_of_req):
         if type_of_req == 'start':
             if device_info['status'] == 'stopped':
                 update_device_map(id, "controls", type_of_req, data=post_data)
-                # acquisition[id] = Acquisition(devices_map[id], result_main_dir=RESULTS_DIR)
-                # acquisition[id].start()
             else:
                 raise Exception("Cannot start, device %s status is `%s`" %  (id, device_info['status']))
 
@@ -127,11 +120,6 @@ def device(id, type_of_req):
 
 def stop_device(id, post_data):
     update_device_map(id, "controls", 'stop', data=post_data)
-    # acquisition[id].stop()
-    # logging.info("Joining process")
-    # acquisition[id].join()
-    # logging.info("Removing device %s from acquisition map" % id)
-    # del acquisition[id]
 
 @app.post('/device/<id>/log')
 def get_log(id):
@@ -140,8 +128,6 @@ def get_log(id):
         data = request.body.read()
         data = json.loads(data)
 
-        # url  = format_post_get_url(id,"static",type=data["file_path"])
-        # req = urllib2.Request(url)
         #TO DISCUSS @luis static files url not understood
         req = urllib2.Request(url=devices_map[id]['ip']+':9000/static'+data["file_path"])
 
@@ -158,9 +144,7 @@ def get_log(id):
 #################################
 # NODE Functions
 #################################
-@app.get('/node/status')
-def node_status():
-    return {'is_updated': is_updated}
+
 
 #Browse, delete and download files from node
 
@@ -209,80 +193,6 @@ def browse(folder):
     except Exception as e:
         return {'error': traceback.format_exc(e)}
 
-@app.post('/update')
-def update_systems():
-    devices_to_update = request.json
-    try:
-        restart_node = False
-        for d in devices_to_update:
-            if d['name'] == 'Node':
-                #update node
-                node_update = subprocess.Popen(['git', 'pull'],
-                                                cwd=GIT_WORKING_DIR,
-                                                stdout=subprocess.PIPE,
-                                                stderr=subprocess.PIPE)
-                response_from_fetch, error_from_fetch = node_update.communicate()
-                if response_from_fetch != '':
-                    logging.info(response_from_fetch)
-                if error_from_fetch != '':
-                    logging.error(error_from_fetch)
-                restart_node = True
-
-            else:
-                update_device_map(d['id'], what="update", data='update')
-
-    except Exception as e:
-        return {'error':traceback.format_exc(e)}
-
-    if restart_node is True:
-        try:
-            # stop acquisition thread
-            logging.info("Stopping server. Should be restarted automatically by systemd")
-            close()
-        except KeyboardInterrupt as k:
-            raise k
-        except Exception as e:
-            return {'error':traceback.format_exc(e)}
-
-@app.get('/update/check')
-def check_update():
-    global devices_map
-    update = {}
-    try:
-        #check internet connection
-        try:
-            #fixme ping is simply not used here!
-            if not which("fping"):
-                raise Exception("fping not available")
-            ping = os.system(" fping %s -t 50  > /dev/null 2>&1 " % '8.8.8.8')
-        except Exception as e:
-            ping = 0
-            logging.error("Could not ping. Assuming 'alive'")
-            logging.error(traceback.format_exc(e))
-            update['error'] = 'No internet connection, check cable. Error: ', e
-
-        #check if there is a new version on the repo
-        bare_update = subprocess.Popen(['git', 'fetch', '-v', 'origin', branch+':'+branch],
-                                       stdout=subprocess.PIPE,
-                                       stderr=subprocess.PIPE,
-                                       cwd=GIT_BARE_REPO_DIR,
-                                       )
-        response_from_fetch, error_from_fetch = bare_update.communicate()
-        if response_from_fetch != '':
-            logging.info(response_from_fetch)
-        if error_from_fetch != '':
-            logging.error(error_from_fetch)
-            update['error'] = error_from_fetch
-        #check version
-        origin_version = get_version(GIT_BARE_REPO_DIR, branch)
-        
-        origin = {'version': origin_version, 'name': 'Origin'}
-        devices_map = scan_subnet()
-        update.update({'node': {'version': node_version, 'status': 'ON','name': 'Node', 'id':'Node'}})
-        return {'update': update, 'attached_devices': devices_map, 'origin': origin}
-    except Exception as e:
-        logging.error(traceback.format_exc(e))
-        return {'update':{'error':traceback.format_exc(e)}}
 
 
 
@@ -380,17 +290,7 @@ def redirection_to_home(id):
 def redirection_to_more(action):
     return redirect('/#/more/'+action)
 
-
-
-
 def close(exit_status=0):
-    # logging.info("Joining acquisition processes")
-    # for a in acquisition.values():
-    #     a.stop()
-    #     logging.info("Joining process")
-    #     a.join()
-    #     logging.info("Joined OK")
-
     logging.info("Closing server")
     os._exit(exit_status)
     
@@ -405,13 +305,10 @@ if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
 
     parser = optparse.OptionParser()
-    #parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
+    parser.add_option("-D", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-p", "--port", dest="port", default=80,help="port")
     parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
-    parser.add_option("-b", "--branch", dest="branch", default="master",help="the branch to work from")
     parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_results",help="Where temporary result files are stored")
-    parser.add_option("-g", "--git-dir", dest="git_dir", default="/home/node/ethoscope-git",help="Where is the target git located(for software update)")
-    parser.add_option("-B", "--git-bare-dir", dest="git_bare_dir", default="/srv/git/ethoscope-git",help="Where is the target git located(for software update)")
     parser.add_option("-i", "--internet-adapter", dest="internet_adapter", default="",help="e.g. En0, adapter user to internet connection (updates)")
     parser.add_option("-l", "--local-adapter", dest="local_adapter", default="",help="e.g. wlan0, adapter used for the local connection with devices")
 
@@ -419,11 +316,10 @@ if __name__ == '__main__':
 
     option_dict = vars(options)
     PORT = option_dict["port"]
-    branch = option_dict["branch"]
+    debug = option_dict["branch"]
 
     RESULTS_DIR = option_dict["results_dir"]
-    GIT_BARE_REPO_DIR = option_dict["git_bare_dir"]
-    GIT_WORKING_DIR = option_dict["git_dir"]
+
 
     #SUBNET_DEVICE = b'wlan0'
     p1 = subprocess.Popen(["ip", "link", "show"], stdout=subprocess.PIPE)
@@ -449,26 +345,15 @@ if __name__ == '__main__':
 
     global devices_map
     global scanning_locked
-    # global acquisition
+
 
     scanning_locked = False
     devices_map = {}
-    # acquisition = {}
-
     scan_subnet()
 
-    origin_version = get_version(GIT_BARE_REPO_DIR, branch)
-    node_version = get_version(GIT_WORKING_DIR, branch)
-
-    if origin_version != node_version:
-        is_updated = False
-    else:
-        is_updated = True
 
     try:
-
         run(app, host='0.0.0.0', port=PORT, debug=debug, server='cherrypy')
-        #run(app, host='0.0.0.0', port=PORT, debug=debug)
 
     except KeyboardInterrupt:
         logging.info("Stopping server cleanly")
@@ -483,6 +368,3 @@ if __name__ == '__main__':
         close(1)
     finally:
         close()
-
-
-# python server.py -p 8000 -g /Users/asterix/PolygonalTree/todel/ethoscope.git -B /Users/asterix/PolygonalTree/todel/ethoscope

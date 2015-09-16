@@ -11,24 +11,24 @@ from netifaces import ifaddresses, AF_INET
 import datetime, time
 import MySQLdb
 
-
-def get_version(dir, branch):
-    version = subprocess.Popen(['git', 'rev-parse', branch] ,
-                                   cwd=dir,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
-    stdout,stderr = version.communicate()
-    commit_id = stdout.strip('\n')
-
-    version_date = subprocess.Popen(['git', 'show', '-s', '--format=%ci'] ,
-                                   cwd=dir,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
-    stdout,stderr = version_date.communicate()
-
-    commit_date = stdout.strip('\n')
-
-    return {"id":commit_id, "date":commit_date}
+#
+# def get_version(dir, branch):
+#     version = subprocess.Popen(['git', 'rev-parse', branch] ,
+#                                    cwd=dir,
+#                                    stdout=subprocess.PIPE,
+#                                    stderr=subprocess.PIPE)
+#     stdout,stderr = version.communicate()
+#     commit_id = stdout.strip('\n')
+#
+#     version_date = subprocess.Popen(['git', 'show', '-s', '--format=%ci'] ,
+#                                    cwd=dir,
+#                                    stdout=subprocess.PIPE,
+#                                    stderr=subprocess.PIPE)
+#     stdout,stderr = version_date.communicate()
+#
+#     commit_date = stdout.strip('\n')
+#
+#     return {"id":commit_id, "date":commit_date}
 
 def which(program):
     # verbatim from

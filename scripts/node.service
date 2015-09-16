@@ -6,8 +6,8 @@ After=ntpd.service
 
 [Service]
 Type=simple
-WorkingDirectory=/home/node/ethoscope-git/node_src/scripts
-ExecStart=/usr/bin/python2  /home/node/ethoscope-git/node_src/scripts/server.py
+WorkingDirectory=/opt/ethoscope-git/node_src/scripts
+ExecStart=/usr/bin/python2  /opt/ethoscope-git/node_src/scripts/server.py
 RestartSec=5
 Restart=always
 

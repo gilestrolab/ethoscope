@@ -1,7 +1,3 @@
-"""
-my docstring
-
-"""
 from distutils.core import setup
 
 setup(
@@ -27,6 +23,7 @@ setup(
         "cherrypy >= 3.6.0",
         "eventlet >= 0.17.1",
         "python-nmap >= 0.3.4",
-        "futures >= 3.0.3"
+        "futures >= 3.0.3",
+        "GitPython >=1.0.1",
     ],
 )

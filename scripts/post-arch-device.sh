@@ -14,7 +14,7 @@ export USER_NAME=ethoscope
 export PASSWORD=ethoscope
 export DATA_DIR=/ethoscope_data
 export DB_NAME=ethoscope_db
-export TARGET_GIT_INSTALL=/home/$USER_NAME/ethoscope-git
+export TARGET_GIT_INSTALL=/opt/ethoscope-git
 export NODE_IP=192.169.123.1
 export BARE_GIT_NAME=ethoscope.git
 
