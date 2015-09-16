@@ -1,7 +1,7 @@
 [Unit]
 Description=Pysolovideo node server
-Wants=ntpd.service clock.service
-After=ntpd.service clock.service
+Wants=ntpd.service
+After=ntpd.service
 
 
 [Service]
