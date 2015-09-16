@@ -15,7 +15,7 @@ setup(
                'ethoscope.hardware.input',
                'ethoscope.hardware.interfaces',
                'ethoscope.interactors',
-               'ethoscope.rois',
+               'ethoscope.roi_builders',
                'ethoscope.trackers',
                'ethoscope.utils',
                'ethoscope.web_utils'
