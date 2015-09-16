@@ -13,7 +13,7 @@ setup(
                'ethoscope.core',
                'ethoscope.hardware',
                'ethoscope.hardware.input',
-               'ethoscope.hardware.output',
+               'ethoscope.hardware.interfaces',
                'ethoscope.interactors',
                'ethoscope.rois',
                'ethoscope.trackers',
