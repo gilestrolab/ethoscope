@@ -143,17 +143,6 @@ echo 'Generating boot config'
 echo 'start_file=start_x.elf' > /boot/config.txt
 echo 'fixup_file=fixup_x.dat' >> /boot/config.txt
 echo 'disable_camera_led=1' >> /boot/config.txt
-#gpu_mem_512=64
-#gpu_mem_256=64
-
-
-###Turbo #FIXME NOT needed for piv2.0
-#echo 'arm_freq=1000' >> /boot/config.txt
-#echo 'core_freq=500' >> /boot/config.txt
-#echo 'sdram_freq=500' >> /boot/config.txt
-#echo 'over_voltage=6' >> /boot/config.txt
-
-### TODO test, is that enough?
 echo 'gpu_mem=256' >>  /boot/config.txt
 echo 'cma_lwm=' >>  /boot/config.txt
 echo 'cma_hwm=' >>  /boot/config.txt
@@ -205,17 +194,6 @@ cp /etc/mysql/my.cnf  /etc/mysql/my.cnf-bak
 # remove log-bin lines
 cat /etc/mysql/my.cnf-bak | grep -v log-bin >  /etc/mysql/my.cnf
 
-###############mysql -u root -e "SET GLOBAL expire_logs_days = 2"
-#partitions stuff
-# make partition system
-#cd /mnt/
-#mkdir sda_var pi_var
-#mount /dev/sda2 /mnt/sda_var
-#mount /dev/mmXXX  /mnt/pi_var
-#cp -ax /mnt/pi_var/* /mnt/sda_var
-#echo "" >> /etc/fstab
-
-####################
 
 ##########
 #Create a local working copy from the bare repo, located on node
