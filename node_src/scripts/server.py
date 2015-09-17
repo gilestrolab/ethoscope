@@ -316,7 +316,7 @@ if __name__ == '__main__':
 
     option_dict = vars(options)
     PORT = option_dict["port"]
-    debug = option_dict["branch"]
+    debug = option_dict["debug"]
 
     RESULTS_DIR = option_dict["results_dir"]
 
