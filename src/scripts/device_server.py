@@ -145,6 +145,7 @@ if __name__ == '__main__':
 
     version = get_version()
 
+
     if option_dict["json"]:
         import json
         with open(option_dict["json"]) as f:

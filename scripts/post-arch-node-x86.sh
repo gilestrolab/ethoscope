@@ -46,8 +46,6 @@ pacman -S mariadb --noconfirm --needed
 #pacman -S netctl
 pacman -S wpa_supplicant --noconfirm --needed
 
-
-
 #Create a Bare repository with only the production branch in node, it is on /var/
 echo 'creating bare repo'
 mkdir -p /srv/git
@@ -56,10 +54,10 @@ git clone --bare $UPSTREAM_GIT_REPO $LOCAL_BARE_PATH
 #Create a local working copy from the bare repo on node
 echo 'Installing ethoscope package'
 git clone $LOCAL_BARE_PATH $TARGET_GIT_INSTALL
+
 cd $TARGET_GIT_INSTALL/node-src
 pip2 install -e .
 cd -
-
 
 
 echo 'Description=psv wifi network' > /etc/netctl/ethoscope_wifi

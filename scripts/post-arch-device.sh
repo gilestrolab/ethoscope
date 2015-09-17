@@ -121,7 +121,7 @@ netctl enable eth0
 netctl start eth0
 
 #device service
-systemctl start device.service
+
 systemctl enable device.service
 
 
