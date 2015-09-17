@@ -9,30 +9,13 @@ import urllib2
 from optparse import OptionParser
 
 import updater
+from helpers import *
 
 
 app = Bottle()
 STATIC_DIR = "./static"
 
-######################
-# Helpers
-######################
 
-class UnexpectedAction(Exception):
-    pass
-class NotNode(Exception):
-    pass
-def get_commit_version(commit):
-    return {"id":str(commit),
-            "date":datetime.datetime.utcfromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
-                    }
-def assert_node():
-    if not is_node:
-        raise NotNode("This device is not a node.")
-
-def close(exit_status=0):
-    logging.info("Closing server")
-    os._exit(exit_status)
 
 ##################
 # Bottle framework
@@ -56,7 +39,7 @@ def index():
 # All devices and node:
 ###########################
 
-@app.get('/self_device/<action>')
+@app.get('/device/<action>')
 def device(action):
     """
     Control update state/ get info about a node or device
@@ -77,11 +60,17 @@ def device(action):
                     "local_commit":get_commit_version(local_commit),
                     "origin_commit":get_commit_version(origin_commit)
                     }
+        if action == 'active_branch':
+            return {"active_branch": str(ethoscope_updater.active_branch())}
+        if action == 'available_branches':
+            return {"available_branches": str(ethoscope_updater.available_branches())}
+
+
         if action == 'update':
             ethoscope_updater.update_active_branch()
             # daemon_port = 80 or 9000
             #todo send a signal to restart device (0.0.0.0:daemon_port)
-
+            return {}
         else:
             raise UnexpectedAction()
 
@@ -95,6 +84,12 @@ def change_branch(action):
     #todo
     data = request.json
 
+@app.get('/id')
+def name():
+    try:
+        return {"id": device_id}
+    except Exception as e:
+        return {'error':traceback.format_exc(e)}
 
 
 ###############################
@@ -106,24 +101,27 @@ def change_branch(action):
 @app.get('/bare/<action>')
 def bare(action):
     try:
-        assert_node()
+        assert_node(is_node)
         if action == 'update':
-            bare_repo.update_all_visible_branches()
+            #out format looks like  {branch:up_to_date}. e.g. out["dev"]=True
+            out = bare_repo_updater.update_all_visible_branches()
+            return out
         elif action == 'discover_branches':
-            bare_repo.discover_branches()
+            out = bare_repo_updater.discover_branches()
+            return out
         else:
-            raise Exception("Unexpected action.")
-        return {}
+            raise UnexpectedAction()
+
 
     except Exception as e:
         logging.error(traceback.format_exc(e))
         return {'error': traceback.format_exc(e)}
 
 @app.get('/devices')
-def scan_subnet(ip_range=(2,253)):
+def scan_subnet(ip_range=(1,253)):
     try:
-        assert_node()
-        devices_map = make_device_map(ip_range,SUBNET_DEVICE)
+        assert_node(is_node)
+        devices_map = generate_new_device_map(ip_range,SUBNET_DEVICE)
         return devices_map
     except Exception as e:
         logging.error("Unexpected exception when scanning for devices:")
@@ -149,33 +147,48 @@ def scan_subnet(ip_range=(2,253)):
 if __name__ == '__main__':
 
     parser = OptionParser()
-    parser.add_option("-l", "--local-repo", dest="local_repo", help="route to local repository to update")
+    parser.add_option("-g", "--git-local-repo", dest="local_repo", help="route to local repository to update")
     # when no bare repo path is declares. we are in a device else, we are on a node
     parser.add_option("-b", "--bare-repo", dest="bare_repo", default=None, help="route to bare repository")
-    parser.add_option("-ip", "--node-ip", dest="node_ip", help="Ip of the node in the local network")
-    parser.add_option("-p", "--port", dest="port", help="the port to run the server on")
+    parser.add_option("-i", "--node-ip", dest="node_ip", help="Ip of the node in the local network")
+    parser.add_option("-p", "--port", default=8888, dest="port", help="the port to run the server on")
 
     (options, args) = parser.parse_args()
 
     option_dict = vars(options)
     local_repo = option_dict["local_repo"]
+    if not local_repo:
+        raise Exception("Where is the git wd to update?. use -g")
+
     bare_repo = option_dict["bare_repo"]
     node_ip = option_dict["node_ip"]
     port = option_dict["port"]
 
 
+    MACHINE_ID_FILE = '/etc/machine-id'
+    MACHINE_NAME_FILE = '/etc/machine-name'
+
+    p1 = subprocess.Popen(["ip", "link", "show"], stdout=subprocess.PIPE)
+    network_devices, err = p1.communicate()
+
+    wireless = re.search(r'[0-9]: (wl.*):', network_devices)
+    if wireless is not None:
+        SUBNET_DEVICE = wireless.group(1)
+    else:
+        logging.error("Not Wireless adapter has been detected. It is necessary to connect to Devices.")
 
 
-    ethoscope_updater = updater.BaseUpdater(local_repo)
+    ethoscope_updater = updater.DeviceUpdater(local_repo)
 
     if bare_repo is not None:
         bare_repo_updater = updater.BareRepoUpdater(bare_repo)
         is_node = True
+        device_id = "Node"
+
     else:
         bare_repo_updater = None
         is_node = False
-
-
+        device_id = get_machine_info(MACHINE_ID_FILE)
 
     try:
         run(app, host='0.0.0.0', port=port, debug=debug, server='cherrypy')
