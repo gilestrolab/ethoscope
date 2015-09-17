@@ -154,6 +154,7 @@ if __name__ == '__main__':
 
     ETHOGRAM_DIR = option_dict["results_dir"]
 
+
     control = ControlThread(machine_id=machine_id,
                             name=machine_name,
                             version=version,
