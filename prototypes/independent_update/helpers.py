@@ -10,14 +10,17 @@ import traceback
 import random
 
 
-import concurrent
-import concurrent.futures as futures
+
 
 try:
     from netifaces import ifaddresses, AF_INET, AF_LINK
 except:
     logging.warning("Could not load netifaces. This is needed for node stuff")
-
+try:
+    import concurrent
+    import concurrent.futures as futures
+except:
+    logging.warning("Could not load concurrent. This is needed for node stuff")
 
 class UnexpectedAction(Exception):
     pass
