@@ -152,7 +152,7 @@ def generate_new_device_map(ip_range=(2,253),device="wlan0", result_main_dir="/e
         devices_map = {}
         subnet_ip = get_subnet_ip(device)
         logging.info("Scanning attached devices")
-        scanned = [ "%s.%i" % (subnet_ip, i) for i in range(1,253) ]
+        scanned = [ "%s.%i" % (subnet_ip, i) for i in range(*ip_range) ]
         urls= ["http://%s" % str(s) for s in scanned]
 
         # We can use a with statement to ensure threads are cleaned up promptly
