@@ -143,7 +143,7 @@ if __name__ == '__main__':
     machine_id = get_machine_info(MACHINE_ID_FILE)
     machine_name = get_machine_info(MACHINE_NAME_FILE)
 
-    version = "TODO"
+    version = get_version()
 
     if option_dict["json"]:
         import json
