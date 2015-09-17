@@ -118,7 +118,7 @@ def bare(action):
         return {'error': traceback.format_exc(e)}
 
 @app.get('/devices')
-def scan_subnet(ip_range=(1,253)):
+def scan_subnet(ip_range=(2,253)):
     try:
         assert_node(is_node)
         devices_map = generate_new_device_map(ip_range,SUBNET_DEVICE)
@@ -199,7 +199,7 @@ if __name__ == '__main__':
 
     except socket.error as e:
         logging.error(traceback.format_exc(e))
-        logging.error("Port %i is probably not accessible for you. Maybe use another one e.g.`-p 8000`" % PORT)
+        logging.error("Port %i is probably not accessible for you. Maybe use another one e.g.`-p 8000`" % port)
 
     except Exception as e:
         logging.error(traceback.format_exc(e))

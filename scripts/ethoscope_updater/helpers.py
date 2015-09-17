@@ -154,7 +154,7 @@ def get_subnet_ip(device="wlan0"):
 
 
 
-def generate_new_device_map(ip_range=(1,253),device="wlan0"):
+def generate_new_device_map(ip_range=(2,253),device="wlan0"):
         devices_map = {}
         subnet_ip = get_subnet_ip(device)
         logging.info("Scanning attached devices")
