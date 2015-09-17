@@ -121,14 +121,17 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
 
     except urllib2.httplib.BadStatusLine:
         logging.error('BadlineSatus, most probably due to update device and auto-reset')
+        raise e
 
     except urllib2.URLError as e:
         if hasattr(e, 'reason'):
             logging.error('We failed to reach a server.')
-            logging.error('Reason: '+ e.reason)
+            logging.error('Reason: '+ str(e.reason))
+            raise e
         elif hasattr(e, 'code'):
             logging.error('The server couldn\'t fulfill the request.')
-            logging.error('Error code: '+ e.code)
+            logging.error('Error code: '+ str(e.code))
+            raise e
 
     return devices_map
 
@@ -142,11 +145,11 @@ def get_subnet_ip(device="wlan0"):
 
 
 
-def generate_new_device_map(ip_range=(2,253),device="wlan0"):
+def generate_new_device_map(ip_range=(1,253),device="wlan0"):
         devices_map = {}
         subnet_ip = get_subnet_ip(device)
         logging.info("Scanning attached devices")
-        scanned = [ "%s.%i" % (subnet_ip, i) for i in range(1,253) ]
+        scanned = [ "%s.%i" % (subnet_ip, i) for i in range(*ip_range) ]
         urls= ["http://%s" % str(s) for s in scanned]
 
         # We can use a with statement to ensure threads are cleaned up promptly
@@ -160,7 +163,8 @@ def generate_new_device_map(ip_range=(2,253),device="wlan0"):
                     id, ip = f.result()
                     if id is None:
                         continue
-                    devices_map[id] = {"ip":ip}
+                    devices_map[id] = {"ip":ip, "status": "Software broken"}
+
 
                 except Exception as e:
                     logging.error("Error whilst pinging url")
@@ -170,22 +174,23 @@ def generate_new_device_map(ip_range=(2,253),device="wlan0"):
             return  devices_map
 
         logging.info("Detected %i devices:\n%s" % (len(devices_map), str(devices_map.keys())))
-        print devices_map
+
 
         # We can use a with statement to ensure threads are cleaned up promptly
-        # with futures.ThreadPoolExecutor(max_workers=128) as executor:
-        #     # Start the load operations and mark each future with its URL
-        #     fs = {}
-        #     for id in devices_map.keys():
-        #         fs[executor.submit(update_dev_map_wrapped,devices_map, id)] = id
-        #
-        #     for f in concurrent.futures.as_completed(fs):
-        #         id = fs[f]
-        #         try:
-        #             data = f.result()
-        #             devices_map[id].update(data)
-        #         except Exception as e:
-        #             logging.error("Could not get data from device %s :" % id)
-        #             logging.error(traceback.format_exc(e))
+        with futures.ThreadPoolExecutor(max_workers=128) as executor:
+            # Start the load operations and mark each future with its URL
+            fs = {}
+            for id in devices_map.keys():
+                fs[executor.submit(update_dev_map_wrapped,devices_map, id)] = id
+
+            for f in concurrent.futures.as_completed(fs):
+                id = fs[f]
+                try:
+                    data = f.result()
+                    devices_map[id].update(data)
+                except Exception as e:
+                    logging.error("Could not get data from device %s :" % id)
+                    logging.error(traceback.format_exc(e))
+        print devices_map
 
         return devices_map

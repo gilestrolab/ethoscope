@@ -26,11 +26,13 @@ def get_commit_version(commit):
                     }
 def get_version():
     wd = os.getcwd()
+
     while wd != "/":
         try:
             repo = git.Repo(wd)
             commit = repo.commit()
-            get_commit_version(commit)
+            return get_commit_version(commit)
+
         except git.InvalidGitRepositoryError:
             wd = os.path.dirname(wd)
     raise Exception("Not in a git Tree")
