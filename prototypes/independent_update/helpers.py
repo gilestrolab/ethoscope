@@ -8,10 +8,16 @@ import urllib2
 import json
 import traceback
 import random
-from netifaces import ifaddresses, AF_INET, AF_LINK
+
 
 import concurrent
 import concurrent.futures as futures
+
+try:
+    from netifaces import ifaddresses, AF_INET, AF_LINK
+except:
+    logging.warning("Could not load netifaces. This is needed for node stuff")
+
 
 class UnexpectedAction(Exception):
     pass
