@@ -82,7 +82,8 @@ echo 'IP=dhcp' >> /etc/netctl/eth0
 ######################################################################################
 
 #Creating service for device_server.py
-cp ./node.service /etc/systemd/system/node.service
+cp ./ethoscope_node.service /etc/systemd/system/ethoscope_node.service
+cp ./ethoscope_backup.service /etc/systemd/system/ethoscope_backup.service
 
 
 #configuring dns server:
@@ -120,10 +121,9 @@ netctl enable eth0
 netctl start eth0
 
 #node service
-systemctl start node.service
-systemctl enable node.service
-
-
+systemctl start ethoscope_node.service
+systemctl enable ethoscope_node.service
+systemctl enable ethoscope_backup.service
 
 ##########################################################################################
 # add password without stoping
@@ -151,3 +151,4 @@ echo 'SUCESS, please reboot'
 
 
 
+#todo set up update daemon

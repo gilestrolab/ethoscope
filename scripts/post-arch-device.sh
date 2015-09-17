@@ -93,9 +93,9 @@ echo 'driftfile /var/lib/ntp/ntp.drift' >> /etc/ntp.conf
 
 ######################################################################################
 
-#Creating service for device_server.py
 
-cp ./device.service /etc/systemd/system/device.service
+
+cp ./ethoscope_device.service /etc/systemd/system/ethoscope_device.service
 
 systemctl daemon-reload
 ######################################################################################
@@ -121,9 +121,6 @@ netctl enable eth0
 netctl start eth0
 
 #device service
-
-systemctl enable device.service
-
 
 #TODO s: locale/TIMEZONE/keyboard ...
 
@@ -206,6 +203,9 @@ git clone git://$NODE_IP/$BARE_GIT_NAME $TARGET_GIT_INSTALL
 # TODO use AUR!
 cd $TARGET_GIT_INSTALL/src
 pip2 install -e .
+systemctl enable ethoscope_device.service
 
 
 echo 'SUCESS, please reboot'
+
+#todo set up update daemon
