@@ -137,16 +137,6 @@ useradd -m -g users -G wheel -s /bin/bash  -p $pass $USER_NAME || echo 'warning:
 echo 'exec startlxde' >> /home/$USER_NAME/.xinitrc
 chown $USER_NAME /home/$USER_NAME/.xinitrc
 
-# Setting passwordless ssh, this is the content of id_rsa (private Key on node).
-mkdir -p /home/$USER_NAME/.ssh
-#TODO do not use a relative path.
-cp ./ssh_keys/id_rsa /home/$USER_NAME/.ssh/id_rsa
-chmod 600 /home/$USER_NAME/.ssh/id_rsa
-# copy to root keys as well!!
-mkdir -p /root/.ssh
-cp ./ssh_keys/id_rsa /root/.ssh/id_rsa
-chmod 600 /root/.ssh/id_rsa
-
 ############################################
 echo 'Generating boot config'
 
