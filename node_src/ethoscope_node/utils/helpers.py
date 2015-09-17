@@ -11,50 +11,9 @@ from netifaces import ifaddresses, AF_INET
 import datetime, time
 import MySQLdb
 
-#
-# def get_version(dir, branch):
-#     version = subprocess.Popen(['git', 'rev-parse', branch] ,
-#                                    cwd=dir,
-#                                    stdout=subprocess.PIPE,
-#                                    stderr=subprocess.PIPE)
-#     stdout,stderr = version.communicate()
-#     commit_id = stdout.strip('\n')
-#
-#     version_date = subprocess.Popen(['git', 'show', '-s', '--format=%ci'] ,
-#                                    cwd=dir,
-#                                    stdout=subprocess.PIPE,
-#                                    stderr=subprocess.PIPE)
-#     stdout,stderr = version_date.communicate()
-#
-#     commit_date = stdout.strip('\n')
-#
-#     return {"id":commit_id, "date":commit_date}
 
-def which(program):
-    # verbatim from
-    # http://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
-    def is_exe(fpath):
-        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
-
-    fpath, fname = os.path.split(program)
-    if fpath:
-        if is_exe(program):
-            return program
-    else:
-        for path in os.environ["PATH"].split(os.pathsep):
-            path = path.strip('"')
-            exe_file = os.path.join(path, program)
-            if is_exe(exe_file):
-                return exe_file
-
-    return None
-
-
-
-def scan_one_device(ip, timeout=1, port=9000, page="id"):
+def scan_one_device(ip, timeout=2, port=9000, page="id"):
     """
-
-
     :param url: the url to parse
     :param timeout: the timeout of the url request
     :param port: the port to request
@@ -242,8 +201,7 @@ def generate_new_device_map(ip_range=(2,253),device="wlan0", result_main_dir="/e
 def get_last_backup_time(backup_path):
     try:
         time_since_last_backup = time.time() - os.path.getmtime(backup_path)
-        #time.strftime('', time_since_last_backup)
+
         return time_since_last_backup
-    except Exception as e:
-        print e
+    except Exception:
         return "No backup"

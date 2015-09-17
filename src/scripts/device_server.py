@@ -28,7 +28,6 @@ def server_static(filepath):
     return static_file(filepath, root="/", download=filepath)
 
 
-# fixme all this info should be in control.info
 @api.get('/id')
 def name():
     global control
