@@ -121,9 +121,9 @@ class BareRepoUpdater(object):
 #
 #
 # #
-updater = DeviceUpdater("/tmp/dummy_repo")
-active_branch = updater.active_branch()
-print updater._origin.refs[str(active_branch)].commit
+# updater = DeviceUpdater("/tmp/dummy_repo")
+# active_branch = updater.active_branch()
+# print updater._origin.refs[str(active_branch)].commit
 
 
 #print updater.available_branches()
