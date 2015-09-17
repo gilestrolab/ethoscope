@@ -16,6 +16,7 @@ export DATA_DIR=/ethoscope_results
 export STABLE_BRANCH=master
 export UPSTREAM_GIT_REPO=https://github.com/gilestrolab/ethoscope.git
 export LOCAL_BARE_PATH=/srv/git/ethoscope.git
+export TARGET_UPDATER_DIR=/opt/ethoscope_updater
 export TARGET_GIT_INSTALL=/opt/ethoscope-git
 export NODE_IP=192.169.123.1
 
@@ -58,6 +59,8 @@ git clone $LOCAL_BARE_PATH $TARGET_GIT_INSTALL
 cd $TARGET_GIT_INSTALL/node-src
 pip2 install -e .
 cd -
+
+
 
 
 echo 'Description=psv wifi network' > /etc/netctl/ethoscope_wifi
@@ -149,6 +152,12 @@ hostnamectl set-hostname $hostname
 echo 'SUCESS, please reboot'
 
 
+cp $TARGET_GIT_INSTALL/$UPDATER_LOCATION_IN_GIT $TARGET_UPDATER_DIR -r
+cd $TARGET_UPDATER_DIR
+cp ethoscope_update.service /etc/systemd/system/ethoscope_update.service
+
+systemctl daemon-reload
+systemctl enable ethoscope_updater.service
 
 
 #todo set up update daemon

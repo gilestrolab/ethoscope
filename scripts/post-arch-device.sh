@@ -15,18 +15,14 @@ export PASSWORD=ethoscope
 export DATA_DIR=/ethoscope_data
 export DB_NAME=ethoscope_db
 export TARGET_GIT_INSTALL=/opt/ethoscope-git
+export UPDATER_LOCATION_IN_GIT=scripts/ethoscope_updater
+export TARGET_UPDATER_DIR=/opt/ethoscope_updater
 export NODE_IP=192.169.123.1
 export BARE_GIT_NAME=ethoscope.git
 
 
 
-USER_NAME=ethoscope
-PASSWORD=ethoscope
-DATA_DIR=/ethoscope_data
-DB_NAME=ethoscope_db
-TARGET_GIT_INSTALL=/home/$USER_NAME/ethoscope-git
-NODE_IP=192.169.123.1
-BARE_GIT_NAME=ethoscope.git
+
 ############# PACKAGES #########################
 echo 'Installing and updating packages'
 
@@ -94,10 +90,9 @@ echo 'driftfile /var/lib/ntp/ntp.drift' >> /etc/ntp.conf
 ######################################################################################
 
 
-
 cp ./ethoscope_device.service /etc/systemd/system/ethoscope_device.service
 
-systemctl daemon-reload
+
 ######################################################################################
 
 echo 'Enabling startuup deamons'
@@ -203,8 +198,18 @@ git clone git://$NODE_IP/$BARE_GIT_NAME $TARGET_GIT_INSTALL
 # TODO use AUR!
 cd $TARGET_GIT_INSTALL/src
 pip2 install -e .
-systemctl enable ethoscope_device.service
 
+
+
+
+
+cp $TARGET_GIT_INSTALL/$UPDATER_LOCATION_IN_GIT $TARGET_UPDATER_DIR -r
+cd $TARGET_UPDATER_DIR
+cp ethoscope_update.service /etc/systemd/system/ethoscope_update.service
+
+systemctl daemon-reload
+systemctl enable ethoscope_device.service
+systemctl enable ethoscope_updater.service
 
 echo 'SUCESS, please reboot'
 
