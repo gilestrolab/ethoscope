@@ -65,7 +65,6 @@ def device(action):
     :return:
     """
     try:
-        assert_node()
         if action == 'check-update':
             local_commit, origin_commit = ethoscope_updater.get_local_and_origin_commits()
             up_to_date = local_commit == origin_commit
@@ -123,6 +122,7 @@ def bare(action):
 @app.get('/devices')
 def scan_subnet(ip_range=(2,253)):
     try:
+        assert_node()
         devices_map = make_device_map(ip_range,SUBNET_DEVICE)
         return devices_map
     except Exception as e:
