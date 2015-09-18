@@ -18,7 +18,9 @@ export UPSTREAM_GIT_REPO=https://github.com/gilestrolab/ethoscope.git
 export LOCAL_BARE_PATH=/srv/git/ethoscope.git
 export TARGET_UPDATER_DIR=/opt/ethoscope_updater
 export TARGET_GIT_INSTALL=/opt/ethoscope-git
+export UPDATER_LOCATION_IN_GIT=scripts/ethoscope_updater
 export NODE_IP=192.169.123.1
+
 
 
 ############# PACKAGES #########################
@@ -56,7 +58,7 @@ git clone --bare $UPSTREAM_GIT_REPO $LOCAL_BARE_PATH
 echo 'Installing ethoscope package'
 git clone $LOCAL_BARE_PATH $TARGET_GIT_INSTALL
 
-cd $TARGET_GIT_INSTALL/node-src
+cd $TARGET_GIT_INSTALL/node_src
 pip2 install -e .
 cd -
 
@@ -123,6 +125,7 @@ netctl enable ethoscope_wifi
 netctl enable eth0
 netctl start eth0
 
+
 #node service
 systemctl start ethoscope_node.service
 systemctl enable ethoscope_node.service
@@ -149,15 +152,12 @@ echo "Hostname is $hostname"
 hostnamectl set-hostname $hostname
 
 
-echo 'SUCESS, please reboot'
-
-
 cp $TARGET_GIT_INSTALL/$UPDATER_LOCATION_IN_GIT $TARGET_UPDATER_DIR -r
 cd $TARGET_UPDATER_DIR
-cp ethoscope_update.service /etc/systemd/system/ethoscope_update.service
+cp ethoscope_update_node.service /etc/systemd/system/ethoscope_update_node.service
 
 systemctl daemon-reload
-systemctl enable ethoscope_updater.service
+systemctl enable ethoscope_update_node.service
 
 
 #todo set up update daemon
