@@ -121,13 +121,20 @@ netctl start eth0
 
 ##########################################################################################
 # add password without stoping
-echo 'Creating default user'
+#echo 'Creating default user'
+#
+#pass=$(perl -e 'print crypt($ARGV[0], "password")' $PASSWORD)
+#useradd -m -g users -G wheel -s /bin/bash  -p $pass $USER_NAME || echo 'warning: user exists'
+#
+#echo 'exec startlxde' >> /home/$USER_NAME/.xinitrc
+#chown $USER_NAME /home/$USER_NAME/.xinitrc
+#echo 'Setting permissions for using arduino'
+##SEE https://wiki.archlinux.org/index.php/arduino#Configuration
+#gpasswd -a $USER_NAME uucp
+#gpasswd -a $USER_NAME lock
+#gpasswd -a $USER_NAME tty
 
-pass=$(perl -e 'print crypt($ARGV[0], "password")' $PASSWORD)
-useradd -m -g users -G wheel -s /bin/bash  -p $pass $USER_NAME || echo 'warning: user exists'
 
-echo 'exec startlxde' >> /home/$USER_NAME/.xinitrc
-chown $USER_NAME /home/$USER_NAME/.xinitrc
 
 ############################################
 echo 'Generating boot config'
@@ -146,12 +153,6 @@ echo 'Loading bcm2835 module'
 #to use the camera through v4l2
 # modprobe bcm2835-v4l2
 echo "bcm2835-v4l2" > /etc/modules-load.d/picamera.conf
-
-echo 'Setting permissions for using arduino'
-#SEE https://wiki.archlinux.org/index.php/arduino#Configuration
-gpasswd -a $USER_NAME uucp
-gpasswd -a $USER_NAME lock
-gpasswd -a $USER_NAME tty
 
 
 ###########################################################################################
@@ -195,13 +196,8 @@ echo 'Cloning from Node'
 git clone git://$NODE_IP/$BARE_GIT_NAME $TARGET_GIT_INSTALL
 
 # our software.
-# TODO use AUR!
 cd $TARGET_GIT_INSTALL/src
 pip2 install -e .
-
-
-
-
 
 cp $TARGET_GIT_INSTALL/$UPDATER_LOCATION_IN_GIT $TARGET_UPDATER_DIR -r
 cd $TARGET_UPDATER_DIR
