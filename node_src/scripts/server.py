@@ -324,30 +324,29 @@ if __name__ == '__main__':
     #SUBNET_DEVICE = b'wlan0'
     p1 = subprocess.Popen(["ip", "link", "show"], stdout=subprocess.PIPE)
     network_devices, err = p1.communicate()
-
     wireless = re.search(r'[0-9]: (wl.*):', network_devices)
-    if wireless is not None:
-        SUBNET_DEVICE = wireless.group(1)
-    else:
-        logging.error("Not Wireless adapter has been detected. It is necessary to connect to Devices.")
-
     ethernet = re.search(r'[0-9]: (en.*):', network_devices)
-    if ethernet is not None:
-        INTERNET_DEVICE = ethernet.group(1)
-    else:
-        logging.info("Not ethernet adapter has been detected. It is necessary to connect to the internet.")
 
     if option_dict["local_adapter"] != "":
         SUBNET_DEVICE = option_dict["local_adapter"]
 
+    elif wireless is not None:
+        SUBNET_DEVICE = wireless.group(1)
+    else:
+        logging.error("Not Wireless adapter has been detected. It is necessary to connect to Devices.")
+        raise Exception("Not Wireless adapter has been detected. It is necessary to connect to Devices.")
+
+
+
     if option_dict["internet_adapter"] != "":
         INTERNET_DEVICE = option_dict["internet_adapter"]
+    elif ethernet is not None:
+        INTERNET_DEVICE = ethernet.group(1)
+    else:
+        logging.warning("Not ethernet adapter has been detected. It is necessary to connect to the internet.")
 
     global devices_map
-    global scanning_locked
 
-
-    scanning_locked = False
     devices_map = {}
     scan_subnet()
 
