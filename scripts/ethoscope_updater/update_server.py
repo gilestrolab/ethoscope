@@ -48,7 +48,7 @@ def device(action):
     :return:
     """
     try:
-        if action == 'check-update':
+        if action == 'check_update':
             local_commit, origin_commit = ethoscope_updater.get_local_and_origin_commits()
             up_to_date = local_commit == origin_commit
 
@@ -67,10 +67,13 @@ def device(action):
 
 
         if action == 'update':
+            old_commit, _= ethoscope_updater.get_local_and_origin_commits()
             ethoscope_updater.update_active_branch()
-            # daemon_port = 80 or 9000
-            #todo send a signal to restart device (0.0.0.0:daemon_port)
-            return {}
+            new_commit, _= ethoscope_updater.get_local_and_origin_commits()
+
+            return {"old_commit":get_commit_version(old_commit),
+                    "new_commit":get_commit_version(new_commit)
+                    }
         else:
             raise UnexpectedAction()
 
