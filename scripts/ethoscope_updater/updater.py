@@ -91,7 +91,7 @@ class BareRepoUpdater(object):
             try:
                 key = str(b)
                 out[key]=False
-                self.update_branch("b")
+                self.update_branch(b)
                 out[key]=True
             except GitCommandError as e:
                 logging.error(traceback.format_exc(e))
