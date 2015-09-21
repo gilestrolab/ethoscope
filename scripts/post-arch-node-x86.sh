@@ -92,13 +92,13 @@ cp ./ethoscope_backup.service /etc/systemd/system/ethoscope_backup.service
 
 
 #configuring dns server:
-echo 'interface=wlan0' >/etc/dnsmasq.conf
-echo 'dhcp-option = 6,$NODE_IP' >> /etc/dnsmasq.conf
-echo 'no-hosts' >> /etc/dnsmasq.conf
-echo 'addn-hosts=/etc/host.dnsmasq' >> /etc/dnsmasq.conf
+echo "interface=wlan0" >/etc/dnsmasq.conf
+echo "dhcp-option = 6,$NODE_IP" >> /etc/dnsmasq.conf
+echo "no-hosts" >> /etc/dnsmasq.conf
+echo "addn-hosts=/etc/host.dnsmasq" >> /etc/dnsmasq.conf
 #domain=polygonaltreenetwork.com,192.169.123.0/24
 
-echo '$NODE_IP    node' >> /etc/hosts.dnsmasq
+echo "$NODE_IP    node" >> /etc/hosts.dnsmasq
 
 
 systemctl daemon-reload
