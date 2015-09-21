@@ -91,11 +91,17 @@ class BareRepoUpdater(object):
             try:
                 key = str(b)
                 out[key]=False
-                self._origin.fetch(b)
+                self.update_branch("b")
                 out[key]=True
             except GitCommandError as e:
                 logging.error(traceback.format_exc(e))
         return out
+
+    def update_branch(self,b):
+        if not isinstance(b,str):
+            b = str(b)
+        fetch_msg = "%s:%s", (b,b)
+        self._working_repo.git.fetch("origin",fetch_msg)
 
 
     def discover_branches(self):
@@ -104,7 +110,7 @@ class BareRepoUpdater(object):
         :return:
         """
         try:
-            self._working_repo.git.fetch("origin","*:*")
+            self.update_branch("*")
         except GitCommandError as e:
             logging.error(traceback.format_exc(e))
 
