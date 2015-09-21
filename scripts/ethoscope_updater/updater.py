@@ -91,7 +91,7 @@ class BareRepoUpdater(object):
             try:
                 key = str(b)
                 out[key]=False
-                self.update_branch("b")
+                self.update_branch(b)
                 out[key]=True
             except GitCommandError as e:
                 logging.error(traceback.format_exc(e))
@@ -100,7 +100,7 @@ class BareRepoUpdater(object):
     def update_branch(self,b):
         if not isinstance(b,str):
             b = str(b)
-        fetch_msg = "%s:%s", (b,b)
+        fetch_msg = "%s:%s" % (b,b)
         self._working_repo.git.fetch("origin",fetch_msg)
 
 
