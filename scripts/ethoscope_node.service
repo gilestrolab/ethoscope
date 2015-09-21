@@ -1,5 +1,5 @@
 [Unit]
-Description=Pysolovideo node server
+Description=Ethoscope node server
 Wants=ntpd.service
 After=ntpd.service
 

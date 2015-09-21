@@ -1,5 +1,9 @@
+
 [Unit]
-Description=Power-off gpu
+Description=autorepair mysql
+Wants=mysqld.service
+After= mysqld.service
+
 
 [Service]
 Type=oneshot
