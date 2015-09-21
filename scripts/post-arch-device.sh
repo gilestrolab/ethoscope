@@ -201,11 +201,14 @@ pip2 install -e .
 
 cp $TARGET_GIT_INSTALL/$UPDATER_LOCATION_IN_GIT $TARGET_UPDATER_DIR -r
 cd $TARGET_UPDATER_DIR
+
 cp ethoscope_update.service /etc/systemd/system/ethoscope_update.service
+cp clean_mysql.service /etc/systemd/system/clean_mysql.service
 
 systemctl daemon-reload
 systemctl enable ethoscope_device.service
 systemctl enable ethoscope_updater.service
+systemctl enable clean_mysql.service
 
 echo 'SUCESS, please reboot'
 

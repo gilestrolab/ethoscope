@@ -1,7 +1,7 @@
 [Unit]
 Description=Pysolovideo device server
 Wants=ntpd.service mysqld.service
-After=ntpd.service
+After=ntpd.service clean_mysql.service
 
 
 [Service]

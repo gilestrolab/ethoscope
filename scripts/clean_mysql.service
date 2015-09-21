@@ -1,0 +1,11 @@
+[Unit]
+Description=Power-off gpu
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/ethoscope-git/node_src/scripts/
+ExecStart=/usr/bin/mysqlcheck -A --auto-repair
+
+
+[Install]
+WantedBy=multi-user.target
