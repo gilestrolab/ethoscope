@@ -100,7 +100,7 @@ class BareRepoUpdater(object):
     def update_branch(self,b):
         if not isinstance(b,str):
             b = str(b)
-        fetch_msg = "%s:%s", (b,b)
+        fetch_msg = "%s:%s" % (b,b)
         self._working_repo.git.fetch("origin",fetch_msg)
 
 
