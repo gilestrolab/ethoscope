@@ -1,5 +1,5 @@
 [Unit]
-Description=Pysolovideo device server
+Description=Ethoscope device server
 Wants=ntpd.service mysqld.service
 After=ntpd.service clean_mysql.service
 
