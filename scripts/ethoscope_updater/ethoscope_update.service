@@ -1,5 +1,5 @@
 [Unit]
-Description=Pysolovideo node server
+Description=Ethoscope update server for device
 Wants=ntpd.service clock.service
 After=ntpd.service clock.service
 

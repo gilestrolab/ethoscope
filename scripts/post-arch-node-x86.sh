@@ -20,7 +20,7 @@ export TARGET_UPDATER_DIR=/opt/ethoscope_updater
 export TARGET_GIT_INSTALL=/opt/ethoscope-git
 export UPDATER_LOCATION_IN_GIT=scripts/ethoscope_updater
 export NODE_IP=192.169.123.1
-
+export WL_INTERFACE=wlan0
 
 
 ############# PACKAGES #########################
@@ -66,7 +66,7 @@ cd -
 
 
 echo 'Description=psv wifi network' > /etc/netctl/ethoscope_wifi
-echo 'Interface=wlan0' >> /etc/netctl/ethoscope_wifi
+echo "Interface=$WL_INTERFACE" >> /etc/netctl/ethoscope_wifi
 echo 'Connection=wireless' >> /etc/netctl/ethoscope_wifi
 echo 'Security=wpa' >> /etc/netctl/ethoscope_wifi
 echo 'IP=dhcp' >> /etc/netctl/ethoscope_wifi
@@ -92,7 +92,7 @@ cp ./ethoscope_backup.service /etc/systemd/system/ethoscope_backup.service
 
 
 #configuring dns server:
-echo "interface=wlan0" >/etc/dnsmasq.conf
+echo "interface=$WL_INTERFACE" >/etc/dnsmasq.conf
 echo "dhcp-option = 6,$NODE_IP" >> /etc/dnsmasq.conf
 echo "no-hosts" >> /etc/dnsmasq.conf
 echo "addn-hosts=/etc/host.dnsmasq" >> /etc/dnsmasq.conf

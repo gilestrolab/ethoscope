@@ -222,36 +222,46 @@ def download(what):
 
 @app.get('/node/<req>')
 def node_info(req):#, device):
-    if req == 'info':
-        df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout=subprocess.PIPE)
-        disk_free = df.communicate()[0]
-        disk_usage = disk_free.split("\n")[1].split()
-        ip = "No IP assigned, check cable"
+    try:
+        if req == 'info':
+            df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout=subprocess.PIPE)
+            disk_free = df.communicate()[0]
+            disk_usage = disk_free.split("\n")[1].split()
+            ip = "No IP assigned, check cable"
 
-        addrs = ifaddresses(INTERNET_DEVICE)
-        MAC_addr = addrs[AF_LINK][0]["addr"]
-        try:
-            ip = addrs[AF_INET][0]["addr"]
-        except Exception as e:
-            logging.error(e)
+            addrs = ifaddresses(INTERNET_DEVICE)
+            MAC_addr = addrs[AF_LINK][0]["addr"]
+            try:
+                ip = addrs[AF_INET][0]["addr"]
+            except Exception as e:
+                logging.error(e)
 
-        return {'disk_usage': disk_usage, 'MAC_addr': MAC_addr, 'ip': ip}
-    if req == 'time':
-        return {'time':datetime.datetime.now().isoformat()}
-    else:
-        raise NotImplementedError()
-
+            return {'disk_usage': disk_usage, 'MAC_addr': MAC_addr, 'ip': ip}
+        if req == 'time':
+            return {'time':datetime.datetime.now().isoformat()}
+        else:
+            raise NotImplementedError()
+    except Exception as e:
+        logging.error(e)
+        return {'error': traceback.format_exc(e)}
 
 @app.post('/node-actions')
 def node_actions():
+    try:
         action = request.json
         if action['action'] == 'poweroff':
             logging.info('User request a poweroff, shutting down system. Bye bye.')
-            #this does not poweroff the device
+
             close()
             #poweroff = subprocess.Popen(['poweroff'], stdout=subprocess.PIPE)
+        elif action['action'] == 'close':
+            close()
         else:
             raise NotImplementedError()
+    except Exception as e:
+        logging.error(e)
+        return {'error': traceback.format_exc(e)}
+
 @app.post('/remove_files')
 def remove_files():
     try:
@@ -268,7 +278,7 @@ def remove_files():
         return {'result': res}
     except Exception as e:
         logging.error(e)
-        return {'error':e}
+        return {'error': traceback.format_exc(e)}
 
 
 @app.get('/list/<type>')
