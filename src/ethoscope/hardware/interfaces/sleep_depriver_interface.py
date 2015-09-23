@@ -16,8 +16,14 @@ class WrongSleepDepPortError(serial.SerialException):
 class SimpleLynxMotionConnection(object):
 
     _baud = 115200
-    _min_angle_pulse = (0.,800.)
-    _max_angle_pulse = (150.,2400.)
+
+    # digital servos
+    #_min_angle_pulse = (0.,800.)
+    #_max_angle_pulse = (150.,2400.)
+
+    # blue old school servo
+    _min_angle_pulse = (0.,535.)
+    _max_angle_pulse = (180.,2500.)
 
 
     def __init__(self, port=None):

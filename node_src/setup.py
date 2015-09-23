@@ -6,7 +6,7 @@ setup(
     author=['Quentin Geissmann', 'Giorgio Gilestro', 'Luis Garcia'],
     author_email=['quentin.geissmann13@imperial.ac.uk', 'g.gilestro@imperial.ac.uk', 'luis.garcia@polygonaltree.co.uk'],
     packages=['ethoscope_node'],
-    url="https://github.com/gilestrolab/pySolo-Video",
+    url="https://github.com/gilestrolab/ethoscope",
     license="GPL3",
     description='todo',  #TODO
     long_description="TODO", # TODO open('README').read(),
