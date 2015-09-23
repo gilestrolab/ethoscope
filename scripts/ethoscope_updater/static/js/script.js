@@ -14,6 +14,8 @@
     app.controller('mainController', function($scope, $http, $interval, $timeout) {
         $scope.system = {};
         $scope.system.isUpdated = false;
+        $scope.node ={};
+        $scope.devices={};
         $scope.groupActions={};
         var spinner= new Spinner(opts).spin();
         var loadingContainer = document.getElementById('loading_devices');
@@ -30,14 +32,22 @@
                 console.log($scope.system.isUpdated);
             }
             spinner.stop();
-             $scope.spinner = false;
+            $scope.spinner = false;
             $scope.spinner_text = null;
 
         });
         $http.get('/devices').success(function(data){
+            console.log(data);
             $scope.devices = data;
         });
-
+        $http.get('/device/check_update').success(function(data){
+            console.log(data);
+            $scope.node.check_update = data;
+        });
+        $http.get('/device/active_branch').success(function(data){
+            console.log(data);
+            $scope.node.active_branch = data.active_branch;
+        });
         
         //Scan for SM or SD connected.
         $scope.get_devices = function(){
