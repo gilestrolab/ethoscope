@@ -1,0 +1,144 @@
+<!-- index.html -->
+    <!DOCTYPE html>
+    <html ng-app="updater">
+    <head>
+        <meta charset="utf-8">
+        <base href="/">
+      <!-- SCROLLS -->
+      <!-- load bootstrap and fontawesome via CDN -->
+      <link rel="stylesheet" href="/static/css/bootstrap.min.css" />
+      <link rel="stylesheet" href="/static/css/font-awesome.min.css" />
+        <link rel="stylesheet" href="/static/css/main.css" />
+
+
+    </head>
+    <body ng-controller="mainController">
+
+        <!-- HEADER AND NAVBAR -->
+        <header>
+            <nav class="navbar navbar-default">
+            <div class="container">
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="/">Ethoscope Updater</a>
+                </div>
+
+                <ul class="nav navbar-nav navbar-right">
+                    <li><a href=""><i class="fa fa-cog"></i> Help</a></li>
+                </ul>
+            </div>
+            </nav>
+        </header>
+
+        <!-- MAIN CONTENT AND INJECTED VIEWS -->
+        <div id="main" class="container">
+            <!-- home.html -->
+    <div class="jumbotron text-center" ng-cloak>
+        <h3>Updater</h3>
+        <div class="intro">Manage your connected devices</div>
+        
+        <div  id="loading_devices" class="spinner"><h2>{{spinner_text}}</h2></div>
+        <h4>Status:</h4>
+        <div class="intro" ng-repeat="(branch,status) in system.status">
+            <span class="fa fa-code-fork"></span><strong> {{branch}}: </strong>
+                <span ng-if="status == true">Up to date</span>
+                <span ng-if="status == false">Update available</span>
+        </div>
+        <div id="error" ng-if="system.error != null">
+            <p>{{system.error}}</p>
+        </div>
+        <button class="btn btn-success btn-xl" >Update</button>
+        <button class="btn btn-default" >Restart</button>
+        <button class="btn btn-default" >Sw.Branch</button>
+
+        <button class="btn btn-info disable" ng-if="device.status == 'stopping'"  ng-click="ethoscope.alert('Please wait, system is stopping')">Stopping</button>
+
+    </div>
+
+<table class="table table-striped" ng-cloak>
+            <thead>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Version</th>
+            <th>ip</th>
+            <th>id</th>
+            <th><center>Select</center></th>
+            </thead>
+            <tbody>
+            <tr ng-repeat="device in devices">
+                <td>
+                    <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
+                    <span class="fa fa-circle-o"></span><span> {{device.name}}</span>
+                    </a>
+                </td>
+                <td><span ng-if="device.status == 'running'" class="fa fa-circle color-green"></span>
+            <span ng-if="device.status == 'stopped'" class="fa fa-circle color-red"></span> {{device.status}}</td>
+                <td>{{}}</td>
+                <td>{{device.ip}}</td>
+                <td>{{device.id.substring(0,6)}}</td>
+                <td><center>
+                    <input type="checkbox" checklist-model="devices_selected" checklist-value="device"></center>
+                </td>
+            </tr>
+            </tbody>
+    </table>
+
+
+<!-- Modal start tracking -->
+<!--FIXME-->
+<div class="modal fade" id="startModal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="startModalLabel">Select tracking type</h4>
+      </div>
+      <div class="modal-body">
+          <form>
+          <div ng-repeat="(name,option) in user_options">
+            <h5>{{name}}</h5>
+              <ul>
+                <li ng-repeat="opt in option">
+                    <input type=radio name={{opt.name}}>
+                    {{opt.name}}: {{opt.overview}}
+                  <ul>
+                        <li ng-repeat="arg in opt.arguments">
+                            {{arg.description}}
+                            <input ng-if="arg.type == 'number'" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}} value={{arg.default}} ngmodel="user_options.{{opt.name}}.{{arg.name}}" >
+                            <input ng-if="arg.type == 'text'" type=text name={{arg.name}} value={{arg.default}} ngmodel="user_options.{{opt.name}}.{{arg.name}}">
+                            <input ng-if="arg.type == 'datetime'" type=datetime name={{arg.name}} value={{arg.default}} ngmodel="user_options.{{opt.name}}.{{arg.name}}">
+                        </li>
+                    </ul>
+                </li>
+              </ul>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
+        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start()" data-toggle="modal">Start Tracking</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+        </div>
+
+    <!--JS-->
+
+    <!-- load angular and angular route via CDN -->
+    <script src="static/js/vendor/angular.min.js"></script>
+    <script src="static/js/vendor/angular-route.min.js"></script>
+    <script src="static/js/vendor/spinner.js"></script>
+    <script src="static/js/vendor/jquery.min.js"></script>
+    <script src="static/js/vendor/bootstrap.min.js"></script>
+    <script src="/static/js/script.js"></script>
+    <script src="/static/js/vendor/dataTables/jquery.dataTables.js"></script>
+    <script src="/static/js/vendor/dataTables/dataTables.bootstrap.js"></script>
+    <script src="static/js/directives/checkboxes.js"></script>
+
+
+
+    </body>
+    </html>
+
+
