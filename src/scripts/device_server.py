@@ -1,6 +1,7 @@
 __author__ = 'luis'
 
 import logging
+import traceback
 from optparse import OptionParser
 from bottle import *
 from ethoscope.web_utils.control_thread import ControlThread
@@ -10,14 +11,12 @@ from subprocess import call
 
 api = Bottle()
 
-
-
 json_data = {}
 ETHOGRAM_DIR = None
-DRAW_RESULTS = None
-VIDEO_OUT = None
-DURATION = None
 
+
+class WrongMachineID(Exception):
+    pass
 
 @api.route('/static/<filepath:path>')
 def server_static(filepath):
@@ -30,77 +29,78 @@ def server_static(filepath):
 
 @api.get('/id')
 def name():
-    global control
     try:
         return {"id": control.info["id"]}
-
     except Exception as e:
-        return {'error':e}
+        return {'error':traceback.format_exc(e)}
 
 @api.post('/controls/<id>/<action>')
 def controls(id, action):
     global control
     global record
-    if id == machine_id:
-            try:
-                if action == 'start':
-                    data = request.json
-                    json_data.update(data)
-                    control = ControlThread(machine_id=machine_id,
-                            name=machine_name,
-                            version=version,
-                            ethoscope_dir=ETHOGRAM_DIR,
-                            data=json_data)
-                    
-                    control.start()
-                    return info(id)
+    try:
+        if id != machine_id:
+            raise Exception("Wrong machine ID")
 
-                elif action == 'stop' or action == 'poweroff':
-                    if control.info['status'] == 'running':
-                        control.stop()
-                        control.join()
-                        logging.info("Stopping monitor")
+        if action == 'start':
+            data = request.json
+            json_data.update(data)
+            control = ControlThread(machine_id=machine_id,
+                    name=machine_name,
+                    version=version,
+                    ethoscope_dir=ETHOGRAM_DIR,
+                    data=json_data)
 
-                    if action == 'poweroff':
-                        logging.info("Stopping monitor due to poweroff request")
-                        logging.info("Powering off Device.")
-                        # fixme, this is non blocking, is it ? maybe we should do something else
-                        call('poweroff')
-                    return info(id)
+            control.start()
+            return info(id)
 
-                elif action == 'start_record':
-                    try:
-                        record = RecordVideo()
-                        record.start()
-                        control.info['status'] = 'recording'
-                        return info(id)
-                    except Exception as e:
-                        return {"error":e}
-                elif action == 'stop_record':
-                    try:
-                        if record is not None:
-                            recording_file = record.stop()
-                            record.join()
-                            control.info['status'] = 'stopped'
-                            control.info['recording_file'] = recording_file
-                            return info(id)
-                        else:
-                            logging.info("Can not stop video record. No video record started.")
-                    except Exception as e:
-                        logging.error("Exception on stopping record", e)
+        elif action in ['stop', 'close', 'poweroff']:
+            if control.info['status'] == 'running':
+                logging.info("Stopping monitor")
+                control.stop()
+                control.join()
+                logging.info("Monitor stopped")
 
-            except Exception as e:
-                return {'error': "Error setting up control thread"+str(e)}
+            if action == 'close':
+                close()
 
-    else:
-        return {'error': "Error on machine ID"}
+            if action == 'poweroff':
+                logging.info("Stopping monitor due to poweroff request")
+                logging.info("Powering off Device.")
+                call('poweroff')
+            return info(id)
+
+        elif action == 'start_record':
+
+            record = RecordVideo()
+            record.start()
+            control.info['status'] = 'recording'
+            return info(id)
+
+        elif action == 'stop_record':
+
+            if record is not None:
+                recording_file = record.stop()
+                record.join()
+                control.info['status'] = 'stopped'
+                control.info['recording_file'] = recording_file
+                return info(id)
+            else:
+                logging.warning("Can not stop video record. No video record started.")
+
+
+    except Exception as e:
+        return {'error':traceback.format_exc(e)}
+
 
 
 @api.get('/data/<id>')
 def info(id):
-    if id == machine_id:
+    try:
+        if machine_id != id:
+            raise WrongMachineID
         return control.info
-    else:
+    except Exception as e:
         return {'error': "Error on machine ID"}
 
 
@@ -111,17 +111,14 @@ def close(exit_status=0):
         control.join()
         control=None
     else:
-
         control = None
     os._exit(exit_status)
 
 if __name__ == '__main__':
 
     ETHOGRAM_DIR = "/ethoscope_data/results"
-
     MACHINE_ID_FILE = '/etc/machine-id'
     MACHINE_NAME_FILE = '/etc/machine-name'
-
 
     parser = OptionParser()
     parser.add_option("-r", "--run", dest="run", default=False, help="Runs tracking directly", action="store_true")
@@ -134,10 +131,7 @@ if __name__ == '__main__':
 
     (options, args) = parser.parse_args()
     option_dict = vars(options)
-
     port = option_dict["port"]
-
-
 
     machine_id = get_machine_info(MACHINE_ID_FILE)
     machine_name = get_machine_info(MACHINE_NAME_FILE)
@@ -154,7 +148,6 @@ if __name__ == '__main__':
 
     ETHOGRAM_DIR = option_dict["results_dir"]
 
-
     control = ControlThread(machine_id=machine_id,
                             name=machine_name,
                             version=version,
@@ -162,12 +155,9 @@ if __name__ == '__main__':
                             data=json_data)
 
     if option_dict["debug"]:
-        #fixme
         logging.basicConfig(level=logging.DEBUG)
         logging.info("Logging using DEBUG SETTINGS")
 
-
-    #fixme
     if option_dict["stop_after_run"]:
          control.set_evanescent(True) # kill program after first run
 
@@ -176,12 +166,13 @@ if __name__ == '__main__':
 
     try:
         run(api, host='0.0.0.0', port=port, server='cherrypy',debug=option_dict["debug"])
-
     except Exception as e:
         logging.error(e)
         close(1)
     finally:
         close()
+
+
 
 
 
