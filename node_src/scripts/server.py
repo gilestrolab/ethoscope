@@ -247,9 +247,11 @@ def node_actions():
         action = request.json
         if action['action'] == 'poweroff':
             logging.info('User request a poweroff, shutting down system. Bye bye.')
-            #this does not poweroff the device
+
             close()
             #poweroff = subprocess.Popen(['poweroff'], stdout=subprocess.PIPE)
+        elif action['action'] == 'close':
+            close()
         else:
             raise NotImplementedError()
 @app.post('/remove_files')
