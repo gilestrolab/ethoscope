@@ -183,7 +183,7 @@ class BaseStaticSleepDepInteractor(BaseInteractor):
 
 
 class SystematicSleepDepInteractor(BaseStaticSleepDepInteractor):
-
+    _hardwareInterfaceClass = SleepDepriverInterface
     _description = {"overview": "An interactor to sleep deprive an animal using servo motor. See http://todo/fixme.html",
                     "arguments": [
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "dt", "description": "The time between two consecutive stimulation (in s)","default":120},
