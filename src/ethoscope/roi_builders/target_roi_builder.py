@@ -234,9 +234,11 @@ class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilder):
 
         super(SleepMonitorWithTargetROIBuilder, self).__init__(n_rows=10,
                                                                n_cols=2,
-                                                               top_margin=6.99 / 111.00,
-                                                               bottom_margin =6.99 / 111.00,
-                                                               horizontal_fill = .9,
+                                                               top_margin= 6.99 / 111.00,
+                                                               bottom_margin = 6.99 / 111.00,
+                                                               left_margin = -.033,
+                                                               right_margin = -.033,
+                                                               horizontal_fill = .975,
                                                                vertical_fill= .7
                                                                )
 
