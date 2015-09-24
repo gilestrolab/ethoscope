@@ -1,0 +1,15 @@
+
+
+{"roi_builder":{"name":"SleepMonitorWithTargetROIBuilder",
+                      "arguments":{}},
+        "tracker": {"name":"AdaptiveBGModel",
+                      "arguments":{}},
+        "interactor": {"name":"FakeSystematicSleepDepInteractor",
+                       "arguments":{ "dt": 20,
+                                     "start_datetime":0,
+                                     "end_datetime":99999999999999}},
+        "drawer": {"name":"DefaultDrawer",
+                      "arguments":{"draw_frames":true}},
+        "camera": {"name":"MovieVirtualCamera",
+                      "arguments":{"path":"./test_video.mp4"}}
+}
