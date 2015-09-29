@@ -39,8 +39,8 @@ def index():
 # All devices and node:
 ###########################
 
-@app.get('/device/<action>')
-def device(action):
+@app.get('/device/<action>/<id>')
+def device(action,id):
     """
     Control update state/ get info about a node or device
 
@@ -177,6 +177,7 @@ if __name__ == '__main__':
     wireless = re.search(r'[0-9]: (wl.*):', network_devices)
     if wireless is not None:
         SUBNET_DEVICE = wireless.group(1)
+        #SUBNET_DEVICE = "lo"
     else:
         logging.error("Not Wireless adapter has been detected. It is necessary to connect to Devices.")
 

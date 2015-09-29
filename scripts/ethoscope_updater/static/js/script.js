@@ -9,7 +9,7 @@
             return result;
         };
     });
-    
+
     // create the controller and inject Angular's $scope
     app.controller('mainController', function($scope, $http, $interval, $timeout) {
         $scope.system = {};
@@ -31,24 +31,43 @@
                 $scope.system.status = data;
                 console.log($scope.system.isUpdated);
             }
-            spinner.stop();
-            $scope.spinner = false;
-            $scope.spinner_text = null;
 
         });
         $http.get('/devices').success(function(data){
-            console.log(data);
+
             $scope.devices = data;
+            //$scope.node.info= data.Node;
+
+            /*//Recovering update and check version for each device detected
+            for (id in $scope.devices){
+            ip = $scope.devices[id].ip;
+            console.log(ip);
+            //device version
+            $http.get(ip+':8888/device/check_update').success(function(data){
+                $scope.devices[id].check_update = data;
+            });
+            //active branch
+            $http.get(ip+':8888/device/active_branch').success(function(data){
+                $scope.devices[id].active_branch = data;
+            });
+
+        };*/
+
+            //slower method is the one that has to stop the spinner
+            spinner.stop();
+            $scope.spinner = false;
+            $scope.spinner_text = null;
+            console.log($scope.devices);
         });
-        $http.get('/device/check_update').success(function(data){
+        $http.get('/device/check_update/node').success(function(data){
             console.log(data);
             $scope.node.check_update = data;
         });
-        $http.get('/device/active_branch').success(function(data){
+        $http.get('/device/active_branch/node').success(function(data){
             console.log(data);
             $scope.node.active_branch = data.active_branch;
         });
-        
+
         //Scan for SM or SD connected.
         $scope.get_devices = function(){
             var spinner= new Spinner(opts).spin();
@@ -91,11 +110,11 @@
             return x;
 
         };
-        
+
         $scope.groupActions.checkStart = function(selected_devices){
-            softwareVersion = ""; 
+            softwareVersion = "";
             device_version = "";
-            checkVersionLoop: 
+            checkVersionLoop:
             for (var i = 0; i< selected_devices.length(); i++){
                     $http.get('/device/'+selected_devices[i]+'/data').success(function(data){device_version = data.version.id});
                     if (i == 0) {
@@ -106,7 +125,7 @@
                     }
             }
         };
-                   
+
         $scope.groupActions.start = function(){
                             $("#startModal").modal('hide');
                             spStart= new Spinner(opts).spin();
@@ -126,7 +145,7 @@
                  $("#startModal").modal('hide');
             });
         };
-        
+
         /// Updates - Functions
         $scope.devices_to_update_selected = [];
 
