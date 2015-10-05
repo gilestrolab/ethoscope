@@ -48,7 +48,7 @@ def scan_one_device(ip, timeout=2, port=9000, page="id"):
     return None, ip
 
 
-def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, data=None,result_main_dir="/ethoscope_results"):
+def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, data=None,result_main_dir="/ethoscope_results",timeout=5):
     """
     Just a routine to format our GET urls. This improves readability whilst allowing us to change convention (e.g. port) without rewriting everything.
 
@@ -69,7 +69,7 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
     req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
 
     try:
-        f = urllib2.urlopen(req)
+        f = urllib2.urlopen(req,timeout=timeout)
         message = f.read()
 
         if message:
@@ -92,12 +92,12 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
     except urllib2.URLError as e:
         if hasattr(e, 'reason'):
             logging.error('We failed to reach a server.')
-            logging.error('Reason: '+ e.reason)
+            logging.error('Reason: '+ str(e.reason))
         elif hasattr(e, 'code'):
-            logging.error('The server couldn\'t fulfill the request.')
-            logging.error('Error code: '+ e.code)
+            logging.error('The server could not fulfill the request.')
+            logging.error('Error code: '+ str(e.code))
 
-    return devices_map
+    # return devices_map
 
 
 def get_subnet_ip(device="wlan0"):
@@ -190,7 +190,8 @@ def generate_new_device_map(ip_range=(2,253),device="wlan0", result_main_dir="/e
                 id = fs[f]
                 try:
                     data = f.result()
-                    devices_map[id].update(data)
+                    if data:
+                        devices_map[id].update(data)
                 except Exception as e:
                     logging.error("Could not get data from device %s :" % id)
                     logging.error(traceback.format_exc(e))
