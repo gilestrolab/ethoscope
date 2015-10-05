@@ -45,7 +45,7 @@ pacman -S fake-hwclock --noconfirm --needed
 
 #setup Wifi dongle
 #pacman -S netctl
-pacman -S wpa_supplicant --noconfirm --needed
+pacman -S wpa_supplicant ifplugd wpa_actiond --noconfirm --needed
 
 
 pip2 install 'picamera[array]'
@@ -112,9 +112,18 @@ systemctl start sshd.service
 
 netctl enable ethoscope_wifi
 netctl start ethoscope_wifi
+systemctl enable netctl-ifplugd@ethoscope_wifi.service
+systemctl start netctl-ifplugd@ethoscope_wifi.service
+systemctl enable netctl-auto@ethoscope_wifi.service
+systemctl start netctl-auto@ethoscope_wifi.service
+
+
 netctl enable eth0
 netctl start eth0
-
+systemctl enable netctl-ifplugd@eth0.service
+systemctl start netctl-ifplugd@eth0.service
+systemctl enable netctl-auto@eth0.service
+systemctl start netctl-auto@eth0.service
 #device service
 
 #TODO s: locale/TIMEZONE/keyboard ...
