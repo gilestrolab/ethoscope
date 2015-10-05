@@ -207,7 +207,9 @@ def generate_new_device_map(ip_range=(2,253),device="wlan0", result_main_dir="/e
 
             for f in concurrent.futures.as_completed(fs):
                 try:
-                    path, id= f.result()
+                    id = fs[f]
+                    path = f.result()
+
                     devices_map[id]["backup_path"] = path
 
                 except Exception as e:
@@ -215,15 +217,14 @@ def generate_new_device_map(ip_range=(2,253),device="wlan0", result_main_dir="/e
                     logging.error(traceback.format_exc(e))
 
         for d in devices_map.values():
-            # d["backup_path"] = make_backup_path(d,result_main_dir)
-            d["time_since_backup"] = get_last_backup_time(d["backup_path"])
-        #
-        logging.info("Backup path generated")
+            d["time_since_backup"] = get_last_backup_time(d)
 
+        logging.info("Backup path generated")
         return devices_map
 
-def get_last_backup_time(backup_path):
+def get_last_backup_time(device):
     try:
+        backup_path = device["backup_path"]
         time_since_last_backup = time.time() - os.path.getmtime(backup_path)
 
         return time_since_last_backup
