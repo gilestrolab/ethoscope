@@ -109,7 +109,7 @@ def get_subnet_ip(device="wlan0"):
 
 
 
-def make_backup_path(device, result_main_dir):
+def make_backup_path(device, result_main_dir, timeout=10):
 
     try:
         com = "SELECT value from METADATA WHERE field = 'date_time'"
@@ -118,7 +118,8 @@ def make_backup_path(device, result_main_dir):
                                     #fixme import this info as a global var
                                     user="ethoscope",
                                     passwd="ethoscope",
-                                    db="ethoscope_db")
+                                    db="ethoscope_db",
+                                    connect_timeout=timeout)
 
         cur = mysql_db.cursor()
         cur.execute(com)
@@ -175,8 +176,10 @@ def generate_new_device_map(ip_range=(2,253),device="wlan0", result_main_dir="/e
             logging.warning("No device detected")
             return  devices_map
 
-        logging.info("Detected %i devices:\n%s" % (len(devices_map), str(devices_map.keys())))
+        all_devices = sorted(devices_map.keys())
+        logging.info("Detected %i devices:\n%s" % (len(devices_map), str(all_devices)))
         # We can use a with statement to ensure threads are cleaned up promptly
+
         with futures.ThreadPoolExecutor(max_workers=128) as executor:
             # Start the load operations and mark each future with its URL
             fs = {}
@@ -192,9 +195,30 @@ def generate_new_device_map(ip_range=(2,253),device="wlan0", result_main_dir="/e
                     logging.error("Could not get data from device %s :" % id)
                     logging.error(traceback.format_exc(e))
 
+        logging.info("Getting backup path for all devices")
+
+ # We can use a with statement to ensure threads are cleaned up promptly
+        with futures.ThreadPoolExecutor(max_workers=128) as executor:
+            # Start the load operations and mark each future with its URL
+            fs = {}
+            for id in devices_map.keys():
+                device = devices_map[id]
+                fs[executor.submit(make_backup_path, device,result_main_dir)] = id
+
+            for f in concurrent.futures.as_completed(fs):
+                try:
+                    path, id= f.result()
+                    devices_map[id]["backup_path"] = path
+
+                except Exception as e:
+                    logging.error("Error whilst getting backup path for %s" % id)
+                    logging.error(traceback.format_exc(e))
+
         for d in devices_map.values():
-            d["backup_path"] = make_backup_path(d,result_main_dir)
+            # d["backup_path"] = make_backup_path(d,result_main_dir)
             d["time_since_backup"] = get_last_backup_time(d["backup_path"])
+        #
+        logging.info("Backup path generated")
 
         return devices_map
 
