@@ -127,26 +127,26 @@ def make_backup_path(device, result_main_dir, timeout=10):
         timestamp = float(query[0][0])
         mysql_db.close()
 
+        date_time = datetime.datetime.fromtimestamp(timestamp)
 
+        formated_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
+        device_id = device["id"]
+        device_name = device["name"]
+        file_name = "%s_%s.db" % (formated_time, device_id)
+
+        output_db_file = os.path.join(result_main_dir,
+                                            device_id,
+                                            device_name,
+                                            formated_time,
+                                            file_name
+                                            )
 
     except Exception as e:
         logging.error("Could not generate backup path for device. Probably a MySQL issue")
         logging.error(traceback.format_exc(e))
         return None
 
-    date_time = datetime.datetime.fromtimestamp(timestamp)
 
-    formated_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
-    device_id = device["id"]
-    device_name = device["name"]
-    file_name = "%s_%s.db" % (formated_time, device_id)
-
-    output_db_file = os.path.join(result_main_dir,
-                                        device_id,
-                                        device_name,
-                                        formated_time,
-                                        file_name
-                                        )
     return output_db_file
 
 def generate_new_device_map(ip_range=(2,128),device="wlan0", result_main_dir="/ethoscope_results"):
