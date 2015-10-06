@@ -227,3 +227,90 @@ class SystematicSleepDepInteractor(BaseStaticSleepDepInteractor):
         return HasInteractedVariable(False), {"channel":channel}
 
 
+
+
+
+class ExperimentalSleepDepInteractor(IsMovingInteractor):
+    _description = {"overview": "An interactor to sleep deprive an animal using servo motor. See http://todo/fixme.html",
+                    "arguments": [
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_threshold", "description": "The minimal velocity that counts as movement","default":0.0060},
+                                    {"type": "datetime", "name": "start_datetime", "description": "When sleep deprivation is to be started","default":0},
+                                    {"type": "datetime", "name": "end_datetime", "description": "When sleep deprivation is to be ended","default":sys.maxsize}
+                                   ]}
+
+    _hardwareInterfaceClass = SleepDepriverInterface
+    _roi_to_channel = {
+            1:1,  3:2,  5:3,  7:4,  9:5,
+            10:6, 12:7, 14:8, 16:9, 18:10
+        }
+
+    def __init__(self,
+                 hardware_interface,
+                 velocity_threshold=0.0060,
+                 start_datetime=0,
+                 end_datetime=sys.maxsize,
+                  ):
+        """
+        A interactor to control a sleep depriver module
+
+        :param hardware_interface: the sleep depriver module hardware interface
+        :type hardware_interface: :class:`~ethoscope.hardawre.interfaces.sleep_depriver_interface.SleepDepriverInterface`
+        :param velocity_threshold:
+        :type velocity_threshold: float
+        :param start_datetime: The unix time stamp of the start of the experiment
+        :type start_datetime: int
+        :param end_datetime: The unix time stamp of the end of the experiment
+        :type end_datetime: int
+        :return:
+        """
+
+
+
+        self._start_datetime= start_datetime
+        self._end_datetime= end_datetime
+        self._t0 = None
+
+        super(ExperimentalSleepDepInteractor, self).__init__(hardware_interface,velocity_threshold)
+
+    def _check_time_range(self):
+        wall_clock_time = time.time()
+        if self._end_datetime > wall_clock_time > self._start_datetime:
+            return True
+        return False
+
+
+    def _decide(self):
+
+        roi_id= self._tracker._roi.idx
+
+
+        now =  self._tracker.last_time_point
+
+        try:
+            channel = self._roi_to_channel[roi_id]
+        except KeyError:
+            return HasInteractedVariable(False), {"channel":0}
+
+        # this is where the magic happens. According to the channel, we wait different times.
+        inactivity_time_threshold_ms = round(3 * channel ** 1.7) * 10 * 1000
+
+
+        if self._check_time_range() is False:
+            return HasInteractedVariable(False), {"channel":channel}
+
+        has_moved = self._has_moved()
+
+        if self._t0 is None:
+            self._t0 = now
+
+        if not has_moved:
+            if float(now - self._t0) > inactivity_time_threshold_ms:
+                self._t0 = None
+
+                return HasInteractedVariable(True), {"channel":channel}
+
+        else:
+            self._t0 = now
+
+        return HasInteractedVariable(False), {"channel":channel}
+

@@ -22,7 +22,7 @@ from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
 # the robust self learning tracker
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.interactors.interactors import DefaultInteractor
-from ethoscope.interactors.sleep_depriver_interactor import SleepDepInteractor, SystematicSleepDepInteractor
+from ethoscope.interactors.sleep_depriver_interactor import SleepDepInteractor, SystematicSleepDepInteractor, ExperimentalSleepDepInteractor
 from ethoscope.interactors.fake_sleep_dep_interactor import FakeSleepDepInteractor, FakeSystematicSleepDepInteractor
 
 from ethoscope.utils.debug import EthoscopeException
@@ -39,7 +39,11 @@ class ControlThread(Thread):
                 "possible_classes":[AdaptiveBGModel],
             },
         "interactor":{
-                        "possible_classes":[DefaultInteractor,SleepDepInteractor, SystematicSleepDepInteractor, FakeSleepDepInteractor, FakeSystematicSleepDepInteractor],
+                        "possible_classes":[DefaultInteractor,SleepDepInteractor,
+                                            SystematicSleepDepInteractor,
+                                            ExperimentalSleepDepInteractor,
+                                            FakeSleepDepInteractor,
+                                            FakeSystematicSleepDepInteractor],
                     },
         "drawer":{
                         "possible_classes":[DefaultDrawer, NullDrawer],
