@@ -50,18 +50,19 @@ pacman -S wpa_supplicant ifplugd wpa_actiond --noconfirm --needed
 
 pip2 install 'picamera[array]'
 
-echo 'Description=ethoscope_wifi network' > /etc/netctl/ethoscope_wifi
-echo 'Interface=wlan0' >> /etc/netctl/ethoscope_wifi
-echo 'Connection=wireless' >> /etc/netctl/ethoscope_wifi
-echo 'Security=wpa' >> /etc/netctl/ethoscope_wifi
-echo 'IP=dhcp' >> /etc/netctl/ethoscope_wifi
-echo 'ESSID=ETHOSCOPE_WIFI' >> /etc/netctl/ethoscope_wifi
+echo 'Description=ethoscope_wifi network' > /etc/netctl/wlan0
+echo 'Interface=wlan0' >> /etc/netctl/wlan0
+echo 'Connection=wireless' >> /etc/netctl/wlan0
+echo 'Security=wpa' >> /etc/netctl/wlan0
+echo 'IP=dhcp' >> /etc/netctl/wlan0
+echo 'TimeoutDHCP=60' >> /etc/netctl/wlan0
+echo 'ESSID=ETHOSCOPE_WIFI' >> /etc/netctl/wlan0
 # Prepend hexadecimal keys with \"
 # If your key starts with ", write it as '""<key>"'
 # See also: the section on special quoting rules in netctl.profile(5)
 
 #TODO set new password
-echo 'Key=ETHOSCOPE_1234' >> /etc/netctl/ethoscope_wifi
+echo 'Key=ETHOSCOPE_1234' >> /etc/netctl/wlan0
 
 
 
@@ -110,20 +111,22 @@ systemctl start sshd.service
 #setting up wifi
 #Fixme this does not work if the pi is not connected to a ethoscope_wifi
 
-netctl enable ethoscope_wifi
-netctl start ethoscope_wifi
-systemctl enable netctl-ifplugd@ethoscope_wifi.service
-systemctl start netctl-ifplugd@ethoscope_wifi.service
-systemctl enable netctl-auto@ethoscope_wifi.service
-systemctl start netctl-auto@ethoscope_wifi.service
+
+
+netctl-auto enable wlan0
+netctl-auto start wlan0
+systemctl enable netctl-auto@wlan0.service
+systemctl start netctl-auto@wlan0.service
+systemctl enable netctl-ifplugd@wlan0.service
+systemctl start netctl-ifplugd@wlan0.service
 
 
 netctl enable eth0
 netctl start eth0
+systemctl enable netctl@eth0.service
+systemctl start netctl@eth0.service
 systemctl enable netctl-ifplugd@eth0.service
 systemctl start netctl-ifplugd@eth0.service
-systemctl enable netctl-auto@eth0.service
-systemctl start netctl-auto@eth0.service
 #device service
 
 #TODO s: locale/TIMEZONE/keyboard ...
