@@ -149,7 +149,7 @@ def make_backup_path(device, result_main_dir, timeout=10):
                                         )
     return output_db_file
 
-def generate_new_device_map(ip_range=(2,253),device="wlan0", result_main_dir="/ethoscope_results"):
+def generate_new_device_map(ip_range=(2,128),device="wlan0", result_main_dir="/ethoscope_results"):
         devices_map = {}
         subnet_ip = get_subnet_ip(device)
         logging.info("Scanning attached devices")
@@ -210,11 +210,11 @@ def generate_new_device_map(ip_range=(2,253),device="wlan0", result_main_dir="/e
                 try:
                     id = fs[f]
                     path = f.result()
-
-                    devices_map[id]["backup_path"] = path
+                    if path:
+                        devices_map[id]["backup_path"] = path
 
                 except Exception as e:
-                    logging.error("Error whilst getting backup path for %s" % id)
+                    logging.error("Error whilst getting backup path for device")
                     logging.error(traceback.format_exc(e))
 
         for d in devices_map.values():
