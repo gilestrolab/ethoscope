@@ -17,9 +17,9 @@
         $scope.node ={};
         $scope.devices={};
         $scope.groupActions={};
-        var spinner= new Spinner(opts).spin();
+        $scope.spinner= new Spinner(opts).spin();
         var loadingContainer = document.getElementById('loading_devices');
-        loadingContainer.appendChild(spinner.el);
+        loadingContainer.appendChild($scope.spinner.el);
         $scope.spinner_text = 'Fetching, please wait...';
         $http.get('/bare/update').success(function(data){
             console.log(data);
@@ -36,25 +36,9 @@
         $http.get('/devices').success(function(data){
 
             $scope.devices = data;
-            //$scope.node.info= data.Node;
-
-            /*//Recovering update and check version for each device detected
-            for (id in $scope.devices){
-            ip = $scope.devices[id].ip;
-            console.log(ip);
-            //device version
-            $http.get(ip+':8888/device/check_update').success(function(data){
-                $scope.devices[id].check_update = data;
-            });
-            //active branch
-            $http.get(ip+':8888/device/active_branch').success(function(data){
-                $scope.devices[id].active_branch = data;
-            });
-
-        };*/
 
             //slower method is the one that has to stop the spinner
-            spinner.stop();
+            $scope.spinner.stop();
             $scope.spinner = false;
             $scope.spinner_text = null;
             console.log($scope.devices);
@@ -67,27 +51,70 @@
             console.log(data);
             $scope.node.active_branch = data.active_branch;
         });
-
-        //Scan for SM or SD connected.
-        $scope.get_devices = function(){
-            var spinner= new Spinner(opts).spin();
-            var loadingContainer = document.getElementById('loading_devices');
-            try {
-                loadingContainer.appendChild(spinner.el);
-            }
-            catch(err) {
-                console.log("no container");
-            }
+        
+        //Update
+        $scope.devices_to_update_selected = [];
+        
+        $scope.pre_update = function(devices_to_update){
+            var error = false;
+            spin("start");
+            //check if all of the selected devices are stopped
             $http.get('/devices').success(function(data){
-                $scope.devices = data;
-                spinner.stop();
-                $scope.loading_devices = false;
+                for (device in devices_to_update){
+                    if (device.status == "running"){
+                        $scope.system.error="One or more selected devices are running and cannot be updated, check selection"
+                        error = true;
+                        break;
+                    }
+                };
+                if (!error){
+                    //open modal
+                    $("#updateModal").modal('show');
+                    //stop spin
+                    spin("stop");
+                }
+            });
+        };
+        $scope.update = function(devices_to_update){
+            //close modal
+             $("#updateModal").modal('hide');
+            //start spin
+            spin("start");
+            data = {"devices_to_update":devices_to_update}
+            $http.post('/update_list', data = data)
+                 .success(function(data){
+                    if (data.error){
+                        $scope.update.error = data.error;
+                    }
+                    $scope.update_result= data;
+/*                    $scope.update_waiting = true;
+                    $timeout($scope.check_update, 15000);
+                    $timeout(function(){$scope.update_waiting = false;}, 15000);
+                    $timeout(function(){spinner.stop();},15100);*/
+                    spin("stop");
+                    console.log(data);
+
             })
         };
+        
+        //HELPERS
         $scope.secToDate = function(secs){
             d = new Date(secs*1000);
             return d.toString();
         };
+        
+        spin = function(action){
+        if (action=="start"){
+             $scope.spinner= new Spinner(opts).spin();
+            var loadingContainer = document.getElementById('loading_devices');
+            loadingContainer.appendChild($scope.spinner.el);
+        }else if (action=="stop"){
+             $scope.spinner.stop();
+             $scope.spinner = false;
+        }
+        };
+        
+        
         $scope.elapsedtime = function(t){
             // Calculate the number of days left
             var days=Math.floor(t / 86400);

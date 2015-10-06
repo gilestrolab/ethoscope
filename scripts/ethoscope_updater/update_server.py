@@ -132,6 +132,20 @@ def scan_subnet(ip_range=(2,253)):
         return {'error': traceback.format_exc(e)}
 
 
+@app.post('/update_list')
+def update_list():
+    try:
+        responses = []
+        data = request.json
+        for device in data["devices_to_update"]:
+            response = updates_api_wrapper(device['ip'], device['id'], what='device/update')
+            responses.append(response)
+        return {'response':responses}
+    except Exception as e:
+        logging.error("Unexpected exception when updating devices:")
+        logging.error(traceback.format_exc(e))
+        return {'error': traceback.format_exc(e)}
+
 
 
 #
@@ -176,11 +190,10 @@ if __name__ == '__main__':
 
     wireless = re.search(r'[0-9]: (wl.*):', network_devices)
     if wireless is not None:
-        SUBNET_DEVICE = wireless.group(1)
-        #SUBNET_DEVICE = "lo"
+        #SUBNET_DEVICE = wireless.group(1)
+        SUBNET_DEVICE = "lo"
     else:
         logging.error("Not Wireless adapter has been detected. It is necessary to connect to Devices.")
-
 
     ethoscope_updater = updater.DeviceUpdater(local_repo)
 
