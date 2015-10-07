@@ -195,8 +195,8 @@ if __name__ == '__main__':
 
     wireless = re.search(r'[0-9]: (wl.*):', network_devices)
     if wireless is not None:
-        #SUBNET_DEVICE = wireless.group(1)
-        SUBNET_DEVICE = "lo"
+        SUBNET_DEVICE = wireless.group(1)
+
     else:
         logging.error("Not Wireless adapter has been detected. It is necessary to connect to Devices.")
 

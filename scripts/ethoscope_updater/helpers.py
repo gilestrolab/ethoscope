@@ -109,7 +109,7 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
         request_url = request_url + "/" + type
 
     req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
-    print request_url
+    logging.info("requesting %s" % request_url)
     try:
         f = urllib2.urlopen(req)
         message = f.read()
@@ -231,7 +231,6 @@ def generate_new_device_map(ip_range=(2,253),device="wlan0"):
                     logging.error("Could not get data from device %s :" % id)
                     logging.error(traceback.format_exc(e))
 
-        print devices_map
 
         return devices_map
 
