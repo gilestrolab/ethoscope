@@ -74,6 +74,11 @@ def device(action,id):
             return {"old_commit":get_commit_version(old_commit),
                     "new_commit":get_commit_version(new_commit)
                     }
+        if action == "restart_daemon":
+            if is_node:
+                reload_node_daemon()
+            else:
+                reload_device_daemon()
         else:
             raise UnexpectedAction()
 

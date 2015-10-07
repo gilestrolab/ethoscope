@@ -8,7 +8,7 @@ import urllib2
 import json
 import traceback
 import random
-
+import subprocess
 
 
 
@@ -266,3 +266,14 @@ def updates_api_wrapper(ip,id, what="check_update",type=None, port=8888, data=No
             raise e
 
     return response
+
+
+
+def _reload_daemon(name):
+    subprocess.call(["systemctl","restart", name])
+
+def reload_node_daemon():
+    _reload_daemon("ethoscope_node")
+
+def reload_device_daemon():
+    _reload_daemon("ethoscope_device")
