@@ -38,7 +38,7 @@
 
         <div  id="loading_devices" class="spinner"><h2>{{spinner_text}}</h2></div>
         <h4>Status:</h4>
-        <div class="intro" ng-repeat="(branch,status) in system.status">
+        <div class="intro">
             <span class="fa fa-code-fork"></span><strong> {{node.active_branch}}: </strong>
                 <span ng-if="system.status[node.active_branch] == true">Up to date</span>
                 <span ng-if="system.status[node.active_branch] == false">Update available</span>
