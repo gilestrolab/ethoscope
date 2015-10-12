@@ -194,7 +194,7 @@ def generate_new_device_map(ip_range=(2,128),device="wlan0", result_main_dir="/e
                     if data:
                         devices_map[id].update(data)
                         #we ensure id is in device fields
-                        device_map["id"] = id
+                        devices_map["id"] = id
                 except Exception as e:
                     logging.error("Could not get data from device %s :" % id)
                     logging.error(traceback.format_exc(e))
