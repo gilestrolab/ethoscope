@@ -87,10 +87,6 @@
                         $scope.update.error = data.error;
                     }
                     $scope.update_result= data;
-/*                    $scope.update_waiting = true;
-                    $timeout($scope.check_update, 15000);
-                    $timeout(function(){$scope.update_waiting = false;}, 15000);
-                    $timeout(function(){spinner.stop();},15100);*/
                     spin("stop");
                     console.log(data);
 

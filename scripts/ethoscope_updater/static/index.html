@@ -39,17 +39,20 @@
         <div  id="loading_devices" class="spinner"><h2>{{spinner_text}}</h2></div>
         <h4>Status:</h4>
         <div class="intro" ng-repeat="(branch,status) in system.status">
-            <span class="fa fa-code-fork"></span><strong> {{branch}}: </strong>
-                <span ng-if="status == true">Up to date</span>
-                <span ng-if="status == false">Update available</span>
+            <span class="fa fa-code-fork"></span><strong> {{node.active_branch}}: </strong>
+                <span ng-if="system.status[node.active_branch] == true">Up to date</span>
+                <span ng-if="system.status[node.active_branch] == false">Update available</span>
         </div>
         <div id="error" ng-if="system.error != null">
             <p>{{system.error}}</p>
         </div>
-        <button class="btn btn-success btn-xl" ng-click="pre_update(devices_to_update_selected)" >Update</button>
+     </div>
+    <div class="jumbotron table-background" ng-cloak>
+        <h3>Select some devices to perform the actions below:</h3>
+        <button class="btn btn-success btn-xl" ng-click="pre_update(devices_to_update_selected)">Update</button>
         <button class="btn btn-default" >Restart</button>
         <button class="btn btn-default" >Sw.Branch</button>
-    </div>
+    <hr>
 
 <table class="table table-striped" ng-cloak>
             <thead>
@@ -64,7 +67,7 @@
             <tr>
                 <td>
                     <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
-                   <span ng-if="node.check_update.up_to_date==false" class="fa fa-circle colour-red"></span> <span ng-if="node.check_update.up_to_date==true" class="fa fa-circle colour-green"></span><span> {{node.info.name}}</span>
+                   <span ng-if="node.check_update.up_to_date==false" class="fa fa-circle color-red"></span> <span ng-if="node.check_update.up_to_date==true" class="fa fa-circle color-green"></span><span> {{node.info.name}}<span ng-if="node.check_update.up_to_date==false" > [Outdated]</span> <span ng-if="node.check_update.up_to_date==true" >[Up to Date]</span></span>
                     </a>
                 </td>
                 <td>{{node.info.status}}</td>
@@ -80,8 +83,8 @@
 
                 <td>
                     <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
-                    <span ng-if="device.up_to_date==false" class="fa fa-circle colour-red"></span> <span ng-if="device.up_to_date==true" class="fa fa-circle colour-green"></span>
-                        <span> {{device.name}}</span>
+                    <span ng-if="device.up_to_date==false" class="fa fa-circle color-red"></span> <span ng-if="device.up_to_date==true" class="fa fa-circle color-green"></span>
+                        <span> {{device.name}}<span ng-if="node.check_update.up_to_date==false" > [Outdated]</span> <span ng-if="node.check_update.up_to_date==true" >[Up to Date]</span></span>
                     </a>
                 </td>
                 <td> {{device.status}}</td>
@@ -95,9 +98,9 @@
             </tbody>
     </table>
 
+</div>
 
-<!-- Modal start tracking -->
-<!--FIXME-->
+<!-- Modal update modal -->
 <div class="modal fade" id="updateModal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -133,6 +136,7 @@
             </tbody>
     </table>
         </div>
+    </div>
       <div class="modal-footer">
           <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
         <button ng-click="update(devices_to_update_selected)" target="_blank" type="button" class="btn btn-primary">Update</button>
@@ -141,7 +145,6 @@
   </div>
 </div>
 
-        </div>
 
     <!--JS-->
 

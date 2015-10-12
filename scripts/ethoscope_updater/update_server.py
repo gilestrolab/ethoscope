@@ -119,8 +119,7 @@ def bare(action):
             return out
         else:
             raise UnexpectedAction()
-
-
+        
     except Exception as e:
         logging.error(traceback.format_exc(e))
         return {'error': traceback.format_exc(e)}
@@ -144,6 +143,9 @@ def update_list():
         data = request.json
         for device in data["devices_to_update"]:
             response = updates_api_wrapper(device['ip'], device['id'], what='device/update')
+            responses.append(response)
+        for device in data["devices_to_update"]:
+            response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
             responses.append(response)
         return {'response':responses}
     except Exception as e:
