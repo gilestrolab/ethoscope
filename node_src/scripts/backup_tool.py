@@ -99,7 +99,7 @@ if __name__ == '__main__':
                 continue
 
             logging.info("Starting backup")
-            pool = multiprocessing.Pool(3)
+            pool = multiprocessing.Pool(4)
             logging.info("Generating device map")
             dev_map = generate_new_device_map(device=SUBNET_DEVICE,result_main_dir=RESULTS_DIR)
             logging.info("Regenerated device map")
