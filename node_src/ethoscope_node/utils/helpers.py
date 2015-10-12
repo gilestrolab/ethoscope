@@ -110,7 +110,7 @@ def get_subnet_ip(device="wlan0"):
 
 
 
-def make_backup_path(device, result_main_dir, timeout=10):
+def make_backup_path(device, result_main_dir, timeout=15):
 
     try:
         com = "SELECT value from METADATA WHERE field = 'date_time'"

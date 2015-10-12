@@ -36,7 +36,7 @@ class MySQLdbToSQlite(object):
 
         src = MySQLdb.connect(host=self._remote_host, user=self._remote_user,
                                          passwd=self._remote_pass, db=self._remote_db_name,
-                              connect_timeout= 30)
+                              connect_timeout= 45)
 
 
         self._dst_path=dst_path
