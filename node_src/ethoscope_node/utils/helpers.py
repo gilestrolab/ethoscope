@@ -168,7 +168,7 @@ def generate_new_device_map(ip_range=(2,128),device="wlan0", result_main_dir="/e
                     id, ip = f.result()
                     if id is None:
                         continue
-                    devices_map[id] = {"ip":ip}
+                    devices_map[id] = {"ip":ip, "id"=id}
 
                 except Exception as e:
                     logging.error("Error whilst pinging url")
@@ -193,8 +193,6 @@ def generate_new_device_map(ip_range=(2,128),device="wlan0", result_main_dir="/e
                     data = f.result()
                     if data:
                         devices_map[id].update(data)
-                        #we ensure id is in device fields
-                        devices_map["id"] = id
                 except Exception as e:
                     logging.error("Could not get data from device %s :" % id)
                     logging.error(traceback.format_exc(e))
