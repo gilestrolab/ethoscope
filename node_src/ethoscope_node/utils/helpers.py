@@ -12,7 +12,7 @@ import datetime, time
 import MySQLdb
 
 
-def scan_one_device(ip, timeout=2, port=9000, page="id"):
+def scan_one_device(ip, timeout=5, port=9000, page="id"):
     """
     :param url: the url to parse
     :param timeout: the timeout of the url request
@@ -48,7 +48,8 @@ def scan_one_device(ip, timeout=2, port=9000, page="id"):
     return None, ip
 
 
-def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, data=None,result_main_dir="/ethoscope_results",timeout=5):
+def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, data=None,
+                           result_main_dir="/ethoscope_results",timeout=5):
     """
     Just a routine to format our GET urls. This improves readability whilst allowing us to change convention (e.g. port) without rewriting everything.
 
@@ -192,6 +193,8 @@ def generate_new_device_map(ip_range=(2,128),device="wlan0", result_main_dir="/e
                     data = f.result()
                     if data:
                         devices_map[id].update(data)
+                        #we ensure id is in device fields
+                        device_map["id"] = id
                 except Exception as e:
                     logging.error("Could not get data from device %s :" % id)
                     logging.error(traceback.format_exc(e))
