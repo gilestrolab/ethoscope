@@ -12,7 +12,7 @@ import datetime, time
 import MySQLdb
 
 
-def scan_one_device(ip, timeout=5, port=9000, page="id"):
+def scan_one_device(ip, timeout=10, port=9000, page="id"):
     """
     :param url: the url to parse
     :param timeout: the timeout of the url request
@@ -78,7 +78,7 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
 
             if not id in devices_map:
                 logging.warning("Device %s is not in device map. Rescanning subnet..." % id)
-                generate_new_device_map(result_main_dir=result_main_dir)
+                devices_map = generate_new_device_map(result_main_dir=result_main_dir)
             try:
                 devices_map[id].update(data)
                 return data
@@ -110,7 +110,7 @@ def get_subnet_ip(device="wlan0"):
 
 
 
-def make_backup_path(device, result_main_dir, timeout=15):
+def make_backup_path(device, result_main_dir, timeout=30):
 
     try:
         com = "SELECT value from METADATA WHERE field = 'date_time'"
@@ -196,6 +196,7 @@ def generate_new_device_map(ip_range=(2,128),device="wlan0", result_main_dir="/e
                 except Exception as e:
                     logging.error("Could not get data from device %s :" % id)
                     logging.error(traceback.format_exc(e))
+                    del devices_map[id]
 
         logging.info("Getting backup path for all devices")
 

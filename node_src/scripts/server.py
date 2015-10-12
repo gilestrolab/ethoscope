@@ -55,8 +55,14 @@ def index():
 def scan_subnet(ip_range=(2,253)):
     global devices_map
     try:
-        devices_map = generate_new_device_map(ip_range,SUBNET_DEVICE)
+        devices_map_tmp = generate_new_device_map(ip_range,SUBNET_DEVICE)
+        for k in devices_map_tmp.keys():
+            if k in devices_map:
+                devices_map[k].update(devices_map_tmp[k])
+            else:
+                devices_map[k] = devices_map_tmp[k]
         return devices_map
+    
     except Exception as e:
         logging.error("Unexpected exception when scanning for devices:")
         logging.error(traceback.format_exc(e))
@@ -73,7 +79,6 @@ def get_devices_list():
 def device(id):
     try:
         update_device_map(id,what="data")
-        devices_map[id]["time_since_backup"] = get_last_backup_time(devices_map[id]["backup_path"])
         return devices_map[id]
     except Exception as e:
         return {'error':traceback.format_exc(e)}
