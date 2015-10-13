@@ -63,12 +63,12 @@ def scan_one_device(ip, timeout=5, port=9000, page="id"):
             return (resp['id'],ip)
         except ValueError:
             logging.error("Could not parse response from %s as JSON object" % url )
-            raise ScanException("Could not parse Json object")
+            raise Exception("Could not parse Json object")
     except urllib2.URLError as e:
         raise ScanException(str(e))
     except Exception as e:
         logging.error("Unexpected error whilst scanning url: %s" % url )
-        raise ScanException(str(e))
+        raise Exception(str(e))
 
 
 
@@ -192,6 +192,8 @@ def generate_new_device_map(ip_range=(2,64),device="wlan0", result_main_dir="/et
                     id, ip = f.result()
                     devices_map[id] = {"ip":ip, "id":id}
 
+                except ScanException as e:
+                    pass
                 except Exception as e:
                     logging.error("Error whilst pinging url")
                     logging.error(traceback.format_exc(e))
