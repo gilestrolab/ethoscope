@@ -64,7 +64,7 @@ def scan_one_device(ip, timeout=5, port=9000, page="id"):
         except ValueError:
             logging.error("Could not parse response from %s as JSON object" % url )
             raise ScanException("Could not parse Json object")
-    except urllib2.URLError:
+    except urllib2.URLError as e:
         raise ScanException(str(e))
     except Exception as e:
         logging.error("Unexpected error whilst scanning url: %s" % url )
