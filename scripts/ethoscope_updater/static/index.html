@@ -50,8 +50,8 @@
     <div class="jumbotron table-background" ng-cloak>
         <h3>Select some devices to perform the actions below:</h3>
         <button class="btn btn-success btn-xl" ng-click="pre_update(devices_to_update_selected)">Update</button>
-        <button class="btn btn-default" >Restart</button>
-        <button class="btn btn-default" >Sw.Branch</button>
+        <button class="btn btn-default" ng-click="pre_restart(devices_to_update_selected)">Restart</button>
+        <button class="btn btn-default" ng-click="pre_swBranch(devices_to_update_selected)">Sw.Branch</button>
     <hr>
 
 <table class="table table-striped" ng-cloak>
@@ -67,14 +67,14 @@
             <tr>
                 <td>
                     <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
-                   <span ng-if="node.check_update.up_to_date==false" class="fa fa-circle color-red"></span> <span ng-if="node.check_update.up_to_date==true" class="fa fa-circle color-green"></span><span> {{node.info.name}}<span ng-if="node.check_update.up_to_date==false" > [Outdated]</span> <span ng-if="node.check_update.up_to_date==true" >[Up to Date]</span></span>
+                   <span ng-if="node.check_update.up_to_date==false" class="fa fa-circle color-red"></span> <span ng-if="node.check_update.up_to_date==true" class="fa fa-circle color-green"></span><span> Node <span ng-if="node.check_update.up_to_date==false" > [Outdated]</span> <span ng-if="node.check_update.up_to_date==true" >[Up to Date]</span></span>
                     </a>
                 </td>
                 <td>{{node.info.status}}</td>
                 <td>[{{node.active_branch}}] {{node.check_update.local_commit.id.substring(0,6)}}...
                     ({{node.check_update.local_commit.date}})</td>
                 <td>{{node.info.ip}}</td>
-                <td>{{node.info.id.substring(0,6)}}</td>
+                <td>N/A<!--{{node.info.id.substring(0,6)}}--></td>
                 <td><center>
                     <input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="node"></center>
                 </td>
@@ -97,7 +97,8 @@
             </tr>
             </tbody>
     </table>
-
+{{node}}
+{{devices}}
 </div>
 
 <!-- Modal update modal -->
@@ -136,7 +137,6 @@
             </tbody>
     </table>
         </div>
-    </div>
       <div class="modal-footer">
           <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
         <button ng-click="update(devices_to_update_selected)" target="_blank" type="button" class="btn btn-primary">Update</button>
@@ -145,7 +145,97 @@
   </div>
 </div>
 
+        <!-- Modal update modal -->
+<div class="modal fade" id="updateModal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+          Update devices
+      </div>
+      <div class="modal-body">
+          This devices are going to be updated. Do not disconnect them.
+            <table class="table table-striped" ng-cloak>
+            <thead>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Software Version</th>
+            <th>ip</th>
+            <th>id</th>
+            <th><center>Select</center></th>
+            </thead>
+            <tbody>
+            
+            <tr ng-repeat="(id,device) in devices_to_update_selected">
 
+                <td>
+                    <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
+                    <span ng-if="device.up_to_date==false" class="fa fa-circle colour-red"></span> <span ng-if="device.up_to_date==true" class="fa fa-circle colour-green"></span>
+                        <span> {{device.name}}</span>
+                    </a>
+                </td>
+                <td> {{device.status}}</td>
+                <td>[{{device.active_branch}}] {{device.version.id.substring(0,6)}}... ({{device.version.date}})</td>
+                <td>{{device.ip}}</td>
+                <td>{{device.id.substring(0,6)}}</td>
+            </tr>
+            </tbody>
+    </table>
+        </div>
+      <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <button ng-click="update(devices_to_update_selected)" target="_blank" type="button" class="btn btn-primary">Update</button>
+      </div>
+    </div>
+  </div>
+</div>
+        
+<!-- Modal swBranch modal -->
+<div class="modal fade" id="swBranchModal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+          Switch branch for devices
+      </div>
+      <div class="modal-body">
+          Select branch to switch selected devices:
+          <select name="branch_to_switch" ng-model="branch_to_switch">
+            <option ng-repeat="(key, name) in system.status" value="{{key}}">{{key}}</option>
+          </select>
+          <table class="table table-striped" ng-cloak>
+            <thead>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Software Version</th>
+            <th>ip</th>
+            <th>id</th>
+            <th><center>Select</center></th>
+            </thead>
+            <tbody>
+            
+            <tr ng-repeat="(id,device) in devices_to_update_selected">
+
+                <td>
+                    <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
+                    <span ng-if="device.up_to_date==false" class="fa fa-circle colour-red"></span> <span ng-if="device.up_to_date==true" class="fa fa-circle colour-green"></span>
+                        <span> {{device.name}}</span>
+                    </a>
+                </td>
+                <td> {{device.status}}</td>
+                <td>[{{device.active_branch}}] {{device.version.id.substring(0,6)}}... ({{device.version.date}})</td>
+                <td>{{device.ip}}</td>
+                <td>{{device.id.substring(0,6)}}</td>
+            </tr>
+            </tbody>
+    </table>
+        </div>
+    
+      <div class="modal-footer">
+          <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <button ng-click="update(devices_to_update_selected)" target="_blank" type="button" class="btn btn-primary">Update</button>
+      </div>
+    </div>
+  </div>
+</div>
     <!--JS-->
 
     <!-- load angular and angular route via CDN -->

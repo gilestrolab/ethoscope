@@ -51,29 +51,24 @@
             console.log(data);
             $scope.node.active_branch = data.active_branch;
         });
+        //aADD A call to node/info
+        $http.get('http://localhost:8000/node/info').success(function(data){
+            console.log(data);
+            $scope.node.info=data;
+        });
         
         //Update
         $scope.devices_to_update_selected = [];
         
         $scope.pre_update = function(devices_to_update){
-            var error = false;
             spin("start");
-            //check if all of the selected devices are stopped
-            $http.get('/devices').success(function(data){
-                for (device in devices_to_update){
-                    if (device.status == "running"){
-                        $scope.system.error="One or more selected devices are running and cannot be updated, check selection"
-                        error = true;
-                        break;
-                    }
-                };
+           error = check_devices_state(devices_to_update, "running");
                 if (!error){
                     //open modal
                     $("#updateModal").modal('show');
                     //stop spin
                     spin("stop");
                 }
-            });
         };
         $scope.update = function(devices_to_update){
             //close modal
@@ -81,7 +76,7 @@
             //start spin
             spin("start");
             data = {"devices_to_update":devices_to_update}
-            $http.post('/update_list', data = data)
+            $http.post('/group/update', data = data)
                  .success(function(data){
                     if (data.error){
                         $scope.update.error = data.error;
@@ -93,6 +88,48 @@
             })
         };
         
+        
+        $scope.pre_restart = function(devices_to_restart){
+            error = check_devices_state(devices_to_restart, "running");
+              if (!error){
+                    //open modal
+                    $("#updateModal").modal('show');
+                    //stop spin
+                    spin("stop");
+                }
+        }
+        $scope.restart = function(devices_to_restart){
+            
+        }
+        
+        $scope.pre_swBranch = function(devices_to_switch){
+            spin("start");
+            error = check_devices_state(devices_to_switch, "running");
+                if (!error){
+                    //open modal
+                    $("#swBranchModal").modal('show');
+                    //stop spin
+                    spin("stop");
+                }
+        };
+        
+        $scope.swBranch = function(devices_to_switch){
+            //close modal
+             $("#swBranchModal").modal('hide');
+            //start spin
+            spin("start");
+            data = {"devices":devices_to_switch}
+            $http.post('/group/swBranch', data = data)
+                 .success(function(data){
+                    if (data.error){
+                        $scope.update.error = data.error;
+                    }
+                    $scope.update_result= data;
+                    spin("stop");
+                    console.log(data);
+
+            })
+        }
         //HELPERS
         $scope.secToDate = function(secs){
             d = new Date(secs*1000);
@@ -110,6 +147,20 @@
         }
         };
         
+        check_devices_state = function(devices, state){
+            var error = false;
+            //check if all of the selected devices are stopped
+            $http.get('/devices').success(function(data){
+                for (device in devices){
+                    if (device.status == state){
+                        $scope.system.error="One or more selected devices are "+state+" and cannot be updated, check selection"
+                        error = true;
+                        break;
+                    }
+                };
+                return error;
+            });
+        };
         
         $scope.elapsedtime = function(t){
             // Calculate the number of days left

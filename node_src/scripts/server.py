@@ -45,6 +45,17 @@ def index():
     return static_file('index.html', root=STATIC_DIR)
 
 
+@app.hook('after_request')
+def enable_cors():
+    """
+    You need to add some headers to each request.
+    Don't use the wildcard '*' for Access-Control-Allow-Origin in production.
+    """
+    response.headers['Access-Control-Allow-Origin'] = 'http://localhost:8888'
+    response.headers['Access-Control-Allow-Methods'] = 'PUT, GET, POST, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Origin, Accept, Content-Type, X-Requested-With, X-CSRF-Token'
+
+
 #################################
 # API to connect with SM/SD
 #################################
@@ -82,7 +93,6 @@ def device(id):
         return devices_map[id]
     except Exception as e:
         return {'error':traceback.format_exc(e)}
-
 
 @app.post('/device/<id>/controls/<type_of_req>')
 def device(id, type_of_req):
@@ -231,12 +241,14 @@ def node_info(req):#, device):
         if req == 'info':
             df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout=subprocess.PIPE)
             disk_free = df.communicate()[0]
-            disk_usage = disk_free.split("\n")[1].split()
+            disk_usage = RESULTS_DIR+" Not Found on disk"
             ip = "No IP assigned, check cable"
-
-            addrs = ifaddresses(INTERNET_DEVICE)
-            MAC_addr = addrs[AF_LINK][0]["addr"]
+            MAC_addr = "Not detected"
             try:
+                disk_usage = disk_free.split("\n")[1].split()
+                addrs = ifaddresses(INTERNET_DEVICE)
+                MAC_addr = addrs[AF_LINK][0]["addr"]
+
                 ip = addrs[AF_INET][0]["addr"]
             except Exception as e:
                 logging.error(e)
