@@ -10,9 +10,36 @@ import concurrent.futures as futures
 from netifaces import ifaddresses, AF_INET
 import datetime, time
 import MySQLdb
+from functools import wraps
 
 
-def scan_one_device(ip, timeout=10, port=9000, page="id"):
+
+def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
+    """Retry calling the decorated function using an exponential backoff.
+
+    http://www.saltycrane.com/blog/2009/11/trying-out-retry-decorator-python/
+    original from: http://wiki.python.org/moin/PythonDecoratorLibrary#Retry
+    """
+    def deco_retry(f):
+        @wraps(f)
+        def f_retry(*args, **kwargs):
+            mtries, mdelay = tries, delay
+            while mtries > 1:
+                try:
+                    return f(*args, **kwargs)
+                except ExceptionToCheck, e:
+                    time.sleep(mdelay)
+                    mtries -= 1
+                    mdelay *= backoff
+            return f(*args, **kwargs)
+        return f_retry
+    return deco_retry
+
+class ScanException(Exception):
+    pass
+
+@retry(ScanException, tries=5,delay=1, backoff=1)
+def scan_one_device(ip, timeout=2, port=9000, page="id"):
     """
     :param url: the url to parse
     :param timeout: the timeout of the url request
@@ -30,22 +57,18 @@ def scan_one_device(ip, timeout=10, port=9000, page="id"):
 
         if not message:
             logging.error("URL error whist scanning url: %s. No message back." % url )
-            raise urllib2.URLError("No message back")
+            raise ScanException("No message back")
         try:
             resp = json.loads(message)
             return (resp['id'],ip)
         except ValueError:
             logging.error("Could not parse response from %s as JSON object" % url )
-
-    except urllib2.URLError:
-        pass
-        # logging.error("URL error whist scanning url: %s. Server down?" % url )
+            raise ScanException("Could not parse Json object")
 
     except Exception as e:
         logging.error("Unexpected error whilst scanning url: %s" % url )
-        raise e
+        raise ScanException(str(e))
 
-    return None, ip
 
 
 def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, data=None,
@@ -166,13 +189,12 @@ def generate_new_device_map(ip_range=(2,64),device="wlan0", result_main_dir="/et
 
                 try:
                     id, ip = f.result()
-                    if id is None:
-                        continue
                     devices_map[id] = {"ip":ip, "id":id}
 
                 except Exception as e:
                     logging.error("Error whilst pinging url")
                     logging.error(traceback.format_exc(e))
+
         if len(devices_map) < 1:
             logging.warning("No device detected")
             return  devices_map
