@@ -150,7 +150,7 @@ def make_backup_path(device, result_main_dir, timeout=30):
 
     return output_db_file
 
-def generate_new_device_map(ip_range=(2,128),device="wlan0", result_main_dir="/ethoscope_results"):
+def generate_new_device_map(ip_range=(2,64),device="wlan0", result_main_dir="/ethoscope_results"):
         devices_map = {}
         subnet_ip = get_subnet_ip(device)
         logging.info("Scanning attached devices")
@@ -158,7 +158,7 @@ def generate_new_device_map(ip_range=(2,128),device="wlan0", result_main_dir="/e
         urls= ["http://%s" % str(s) for s in scanned]
 
         # We can use a with statement to ensure threads are cleaned up promptly
-        with futures.ThreadPoolExecutor(max_workers=128) as executor:
+        with futures.ThreadPoolExecutor(max_workers=64) as executor:
             # Start the load operations and mark each future with its URL
 
             fs = [executor.submit(scan_one_device, url) for url in urls]
@@ -181,18 +181,20 @@ def generate_new_device_map(ip_range=(2,128),device="wlan0", result_main_dir="/e
         logging.info("Detected %i devices:\n%s" % (len(devices_map), str(all_devices)))
         # We can use a with statement to ensure threads are cleaned up promptly
 
-        with futures.ThreadPoolExecutor(max_workers=128) as executor:
+        with futures.ThreadPoolExecutor(max_workers=5) as executor:
             # Start the load operations and mark each future with its URL
             fs = {}
             for id in devices_map.keys():
                 fs[executor.submit(update_dev_map_wrapped,devices_map, id)] = id
 
             for f in concurrent.futures.as_completed(fs):
-                id = fs[f]
                 try:
+                    id = fs[f]
                     data = f.result()
-                    if data:
-                        devices_map[id].update(data)
+                    if not data:
+                        raise Exception("Unexpected error, could not get data from device")
+                    devices_map[id].update(data)
+
                 except Exception as e:
                     logging.error("Could not get data from device %s :" % id)
                     logging.error(traceback.format_exc(e))
@@ -201,7 +203,7 @@ def generate_new_device_map(ip_range=(2,128),device="wlan0", result_main_dir="/e
         logging.info("Getting backup path for all devices")
 
  # We can use a with statement to ensure threads are cleaned up promptly
-        with futures.ThreadPoolExecutor(max_workers=128) as executor:
+        with futures.ThreadPoolExecutor(max_workers=64) as executor:
             # Start the load operations and mark each future with its URL
             fs = {}
             for id in devices_map.keys():
