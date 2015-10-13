@@ -70,10 +70,10 @@
                    <span ng-if="node.check_update.up_to_date==false" class="fa fa-circle color-red"></span> <span ng-if="node.check_update.up_to_date==true" class="fa fa-circle color-green"></span><span> Node <span ng-if="node.check_update.up_to_date==false" > [Outdated]</span> <span ng-if="node.check_update.up_to_date==true" >[Up to Date]</span></span>
                     </a>
                 </td>
-                <td>{{node.info.status}}</td>
+                <td>{{node.status}}</td>
                 <td>[{{node.active_branch}}] {{node.check_update.local_commit.id.substring(0,6)}}...
                     ({{node.check_update.local_commit.date}})</td>
-                <td>{{node.info.ip}}</td>
+                <td>{{node.ip}}</td>
                 <td>N/A<!--{{node.info.id.substring(0,6)}}--></td>
                 <td><center>
                     <input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="node"></center>
@@ -97,8 +97,7 @@
             </tr>
             </tbody>
     </table>
-{{node}}
-{{devices}}
+
 </div>
 
 <!-- Modal update modal -->
@@ -145,15 +144,15 @@
   </div>
 </div>
 
-        <!-- Modal update modal -->
-<div class="modal fade" id="updateModal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
+        <!-- Modal restart modal -->
+<div class="modal fade" id="restartModal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-          Update devices
+          Restart devices
       </div>
       <div class="modal-body">
-          This devices are going to be updated. Do not disconnect them.
+          The following devices are going to be restarted.
             <table class="table table-striped" ng-cloak>
             <thead>
             <th>Name</th>
@@ -183,7 +182,7 @@
         </div>
       <div class="modal-footer">
           <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-        <button ng-click="update(devices_to_update_selected)" target="_blank" type="button" class="btn btn-primary">Update</button>
+        <button ng-click="restart(devices_to_update_selected)" target="_blank" type="button" class="btn btn-primary">restart</button>
       </div>
     </div>
   </div>
@@ -231,7 +230,7 @@
     
       <div class="modal-footer">
           <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-        <button ng-click="update(devices_to_update_selected)" target="_blank" type="button" class="btn btn-primary">Update</button>
+        <button ng-click="swBranch(devices_to_update_selected)" target="_blank" type="button" class="btn btn-primary">Switch</button>
       </div>
     </div>
   </div>

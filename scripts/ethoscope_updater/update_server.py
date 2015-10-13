@@ -85,11 +85,20 @@ def device(action,id):
         return {'error': traceback.format_exc(e)}
 
 
-@app.post('/self/change_branch/')
-def change_branch(action):
+@app.post('/device/<action>/<id>')
+def change_branch(action, id):
     #todo
-    data = request.json
+    try:
+        data = request.json
+        branch = data['new_branch']
+        if action == 'change_branch':
+            ethoscope_updater.change_branch(branch)
 
+        return {"new_branch": branch}
+
+    except Exception as e:
+        logging.error(traceback.format_exc(e))
+        return {'error': traceback.format_exc(e)}
 @app.get('/id')
 def name():
     try:
@@ -148,7 +157,8 @@ def group(what):
                 responses.append(response)
         elif what == "swBranch":
             for device in data["devices"]:
-                response = updates_api_wrapper(device['ip'], device['id'], what='device/change_branch')
+                response = updates_api_wrapper(device['ip'], device['id'], what='device/change_branch',
+                                               data={'new_branch': device['new_branch']})
                 responses.append(response)
             for device in data["devices"]:
                 response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')

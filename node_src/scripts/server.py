@@ -244,16 +244,20 @@ def node_info(req):#, device):
             disk_usage = RESULTS_DIR+" Not Found on disk"
             ip = "No IP assigned, check cable"
             MAC_addr = "Not detected"
+            local_ip = ""
             try:
                 disk_usage = disk_free.split("\n")[1].split()
                 addrs = ifaddresses(INTERNET_DEVICE)
                 MAC_addr = addrs[AF_LINK][0]["addr"]
 
                 ip = addrs[AF_INET][0]["addr"]
+                local_addrs = ifaddresses(SUBNET_DEVICE)
+                local_ip = local_addrs[AF_INET][0]["addr"]
             except Exception as e:
                 logging.error(e)
 
-            return {'disk_usage': disk_usage, 'MAC_addr': MAC_addr, 'ip': ip}
+            return {'disk_usage': disk_usage, 'MAC_addr': MAC_addr, 'ip': ip,
+                    'local_ip':local_ip}
         if req == 'time':
             return {'time':datetime.datetime.now().isoformat()}
         else:
