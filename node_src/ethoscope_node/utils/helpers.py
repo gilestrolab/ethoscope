@@ -38,7 +38,7 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
 class ScanException(Exception):
     pass
 
-@retry(ScanException, tries=3,delay=5, backoff=1)
+@retry(ScanException, tries=2,delay=5, backoff=1)
 def scan_one_device(ip, timeout=5, port=9000, page="id"):
     """
     :param url: the url to parse
@@ -64,7 +64,8 @@ def scan_one_device(ip, timeout=5, port=9000, page="id"):
         except ValueError:
             logging.error("Could not parse response from %s as JSON object" % url )
             raise ScanException("Could not parse Json object")
-
+    except urllib2.URLError:
+        raise ScanException(str(e))
     except Exception as e:
         logging.error("Unexpected error whilst scanning url: %s" % url )
         raise ScanException(str(e))
