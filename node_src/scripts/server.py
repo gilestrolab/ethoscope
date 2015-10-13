@@ -63,7 +63,7 @@ def enable_cors():
 
 
 @app.get('/devices')
-def scan_subnet(ip_range=(2,253)):
+def scan_subnet(ip_range=(2,64)):
     global devices_map
     try:
         devices_map_tmp = generate_new_device_map(ip_range,SUBNET_DEVICE)
