@@ -17,6 +17,7 @@
         $scope.node ={};
         $scope.devices={};
         $scope.groupActions={};
+        $scope.branch_to_switch= null;
         $scope.spinner= new Spinner(opts).spin();
         var loadingContainer = document.getElementById('loading_devices');
         loadingContainer.appendChild($scope.spinner.el);
@@ -44,17 +45,19 @@
             console.log($scope.devices);
         });
         $http.get('/device/check_update/node').success(function(data){
-            console.log(data);
+           
             $scope.node.check_update = data;
         });
         $http.get('/device/active_branch/node').success(function(data){
-            console.log(data);
+            
             $scope.node.active_branch = data.active_branch;
         });
         //aADD A call to node/info
         $http.get('http://localhost:8000/node/info').success(function(data){
-            console.log(data);
+           
             $scope.node.info=data;
+            //hardcoded node info (FIXME!!)
+            $scope.node.ip = data.local_ip;
         });
         
         //Update
@@ -83,23 +86,37 @@
                     }
                     $scope.update_result= data;
                     spin("stop");
-                    console.log(data);
 
             })
         };
         
         
         $scope.pre_restart = function(devices_to_restart){
+             spin("start");
             error = check_devices_state(devices_to_restart, "running");
               if (!error){
                     //open modal
-                    $("#updateModal").modal('show');
+                    $("#restartModal").modal('show');
                     //stop spin
                     spin("stop");
                 }
         }
         $scope.restart = function(devices_to_restart){
+            //close modal
+             $("#restartModal").modal('hide');
+            //start spin
+            spin("start");
             
+            data = {"devices":devices_to_restart}
+            $http.post('/group/restart', data = data)
+                 .success(function(data){
+                    if (data.error){
+                        $scope.update.error = data.error;
+                    }
+                    $scope.update_result= data;
+                    spin("stop");
+
+            })
         }
         
         $scope.pre_swBranch = function(devices_to_switch){
@@ -118,7 +135,11 @@
              $("#swBranchModal").modal('hide');
             //start spin
             spin("start");
+            for (device in devices_to_switch){
+                device['new_branch'] = $scope.branch_to_switch;
+            }
             data = {"devices":devices_to_switch}
+            console.log(data);
             $http.post('/group/swBranch', data = data)
                  .success(function(data){
                     if (data.error){
@@ -126,7 +147,6 @@
                     }
                     $scope.update_result= data;
                     spin("stop");
-                    console.log(data);
 
             })
         }
