@@ -136,10 +136,9 @@
             //start spin
             spin("start");
             for (device in devices_to_switch){
-                device['new_branch'] = $scope.branch_to_switch;
+                devices_to_switch[device]['new_branch'] = $scope.branch_to_switch;
             }
             data = {"devices":devices_to_switch}
-            console.log(data);
             $http.post('/group/swBranch', data = data)
                  .success(function(data){
                     if (data.error){

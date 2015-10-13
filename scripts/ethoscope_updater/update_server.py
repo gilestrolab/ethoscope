@@ -90,8 +90,9 @@ def change_branch(action, id):
     #todo
     try:
         data = request.json
+        branch = data['new_branch']
         if action == 'change_branch':
-            ethoscope_updater.switch_branch()
+            ethoscope_updater.change_branch(branch)
 
         return {"new_branch": branch}
 
