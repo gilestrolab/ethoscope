@@ -15,7 +15,10 @@
 .color-red{
     color: red;
 }
-
+.table-background{
+    background-color: white;
+    border: 1px  solid #ccc;
+}
 
 .last_drawn_img{
     margin-bottom: 1em;

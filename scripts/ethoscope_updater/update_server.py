@@ -15,8 +15,6 @@ from helpers import *
 app = Bottle()
 STATIC_DIR = "./static"
 
-
-
 ##################
 # Bottle framework
 ##################
@@ -120,7 +118,6 @@ def bare(action):
         else:
             raise UnexpectedAction()
 
-
     except Exception as e:
         logging.error(traceback.format_exc(e))
         return {'error': traceback.format_exc(e)}
@@ -137,14 +134,29 @@ def scan_subnet(ip_range=(2,253)):
         return {'error': traceback.format_exc(e)}
 
 
-@app.post('/update_list')
-def update_list():
+@app.post('/group/<what>')
+def group(what):
     try:
         responses = []
         data = request.json
-        for device in data["devices_to_update"]:
-            response = updates_api_wrapper(device['ip'], device['id'], what='device/update')
-            responses.append(response)
+        if what == "update":
+            for device in data["devices"]:
+                response = updates_api_wrapper(device['ip'], device['id'], what='device/update')
+                responses.append(response)
+            for device in data["devices"]:
+                response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
+                responses.append(response)
+        elif what == "swBranch":
+            for device in data["devices"]:
+                response = updates_api_wrapper(device['ip'], device['id'], what='device/change_branch')
+                responses.append(response)
+            for device in data["devices"]:
+                response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
+                responses.append(response)
+        elif what == "restart":
+            for device in data["devices"]:
+                response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
+                responses.append(response)
         return {'response':responses}
     except Exception as e:
         logging.error("Unexpected exception when updating devices:")
