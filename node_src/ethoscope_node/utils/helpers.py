@@ -64,12 +64,11 @@ def scan_one_device(ip, timeout=3, port=9000, page="id"):
             return (resp['id'],ip)
         except ValueError:
             logging.error("Could not parse response from %s as JSON object" % url )
-            raise Exception("Could not parse Json object")
+            raise ScanException("Could not parse Json object")
     except urllib2.URLError as e:
         raise ScanException(str(e))
     except Exception as e:
-        logging.error("Unexpected error whilst scanning url: %s" % url )
-        raise Exception(str(e))
+        raise ScanException("Unexpected error" + str(e))
 
 
 
@@ -118,7 +117,7 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
         raise ScanException(str(e))
 
     except Exception as e:
-        logging.error("Unexpected error whilst scanning url: %s" % url )
+        logging.error("Unexpected error whilst scanning url: %s" % request_url)
         raise Exception(str(e))
 
     # except urllib2.httplib.BadStatusLine:
