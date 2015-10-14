@@ -257,7 +257,9 @@ class OlfactionAssayROIBuilder(TargetGridROIBuilder):
                                                                n_cols=1,
                                                                top_margin=6.99 / 111.00,
                                                                bottom_margin =6.99 / 111.00,
-                                                               horizontal_fill = .9,
+                                                               left_margin = -.033,
+                                                               right_margin = -.033,
+                                                               horizontal_fill = .975,
                                                                vertical_fill= .7
                                                                )
 
