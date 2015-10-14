@@ -38,8 +38,8 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
 class ScanException(Exception):
     pass
 
-@retry(ScanException, tries=5,delay=1, backoff=1)
-def scan_one_device(ip, timeout=2, port=9000, page="id"):
+@retry(ScanException, tries=2,delay=1, backoff=1)
+def scan_one_device(ip, timeout=4, port=9000, page="id"):
     """
     :param url: the url to parse
     :param timeout: the timeout of the url request
@@ -71,6 +71,7 @@ def scan_one_device(ip, timeout=2, port=9000, page="id"):
 
 
 
+@retry(ScanException, tries=5,delay=1, backoff=1)
 def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, data=None,
                            result_main_dir="/ethoscope_results",timeout=5):
     """
@@ -103,23 +104,28 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
                 logging.warning("Device %s is not in device map. Rescanning subnet..." % id)
                 devices_map = generate_new_device_map(result_main_dir=result_main_dir)
             try:
+                if data is None:
+                    raise Exception("No data in JSON")
                 devices_map[id].update(data)
                 return data
 
             except KeyError:
                 logging.error("Device %s is not detected" % id)
                 raise KeyError("Device %s is not detected" % id)
-
-    except urllib2.httplib.BadStatusLine:
-        logging.error('BadlineSatus, most probably due to update device and auto-reset')
-
-    except urllib2.URLError as e:
-        if hasattr(e, 'reason'):
-            logging.error('We failed to reach a server.')
-            logging.error('Reason: '+ str(e.reason))
-        elif hasattr(e, 'code'):
-            logging.error('The server could not fulfill the request.')
-            logging.error('Error code: '+ str(e.code))
+    except:
+        raise ScanException()
+    # except urllib2.httplib.BadStatusLine:
+    #     logging.error('BadlineSatus, most probably due to update device and auto-reset')
+    #
+    # except urllib2.URLError as e:
+    #     raise
+    #     if hasattr(e, 'reason'):
+    #         logging.error('We failed to reach a server.')
+    #         logging.error('Reason: '+ str(e.reason))
+    #     elif hasattr(e, 'code'):
+    #         logging.error('The server could not fulfill the request.')
+    #         logging.error('Error code: '+ str(e.code))
+    #
 
     # return devices_map
 
@@ -176,7 +182,11 @@ def make_backup_path(device, result_main_dir, timeout=30):
 def generate_new_device_map(ip_range=(2,64),device="wlan0", result_main_dir="/ethoscope_results"):
         devices_map = {}
         subnet_ip = get_subnet_ip(device)
+
+        t0 = time.time()
+
         logging.info("Scanning attached devices")
+
         scanned = [ "%s.%i" % (subnet_ip, i) for i in range(*ip_range) ]
         urls= ["http://%s" % str(s) for s in scanned]
 
@@ -200,7 +210,7 @@ def generate_new_device_map(ip_range=(2,64),device="wlan0", result_main_dir="/et
             return  devices_map
 
         all_devices = sorted(devices_map.keys())
-        logging.info("Detected %i devices:\n%s" % (len(devices_map), str(all_devices)))
+        logging.info("DEVICE ID -> Detected %i devices in %i seconds:\n%s" % (len(devices_map),time.time() - t0, str(all_devices)))
         # We can use a with statement to ensure threads are cleaned up promptly
 
         with futures.ThreadPoolExecutor(max_workers=5) as executor:
@@ -213,16 +223,15 @@ def generate_new_device_map(ip_range=(2,64),device="wlan0", result_main_dir="/et
                 try:
                     id = fs[f]
                     data = f.result()
-                    if not data:
-                        raise Exception("Unexpected error, could not get data from device")
                     devices_map[id].update(data)
 
                 except Exception as e:
                     logging.error("Could not get data from device %s :" % id)
                     logging.error(traceback.format_exc(e))
                     del devices_map[id]
+        all_devices = sorted(devices_map.keys())
+        logging.info("DEVICE INFO -> Detected %i devices in %i seconds:\n%s" % (len(devices_map),time.time() - t0, str(all_devices)))
 
-        logging.info("Getting backup path for all devices")
 
  # We can use a with statement to ensure threads are cleaned up promptly
         with futures.ThreadPoolExecutor(max_workers=64) as executor:
@@ -243,17 +252,20 @@ def generate_new_device_map(ip_range=(2,64),device="wlan0", result_main_dir="/et
                     logging.error("Error whilst getting backup path for device")
                     logging.error(traceback.format_exc(e))
 
+
         for d in devices_map.values():
             d["time_since_backup"] = get_last_backup_time(d)
 
-        logging.info("Backup path generated")
+
+        all_devices = sorted(devices_map.keys())
+        logging.info("BACKUP_PATH -> Detected %i devices in %i seconds:\n%s" % (len(devices_map),time.time() - t0, str(all_devices)))
+
         return devices_map
 
 def get_last_backup_time(device):
     try:
         backup_path = device["backup_path"]
         time_since_last_backup = time.time() - os.path.getmtime(backup_path)
-
         return time_since_last_backup
     except Exception:
         return "No backup"
