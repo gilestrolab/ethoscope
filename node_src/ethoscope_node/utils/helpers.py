@@ -38,8 +38,9 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
 class ScanException(Exception):
     pass
 
-@retry(ScanException, tries=2,delay=1, backoff=1)
-def scan_one_device(ip, timeout=4, port=9000, page="id"):
+
+@retry(ScanException, tries=3,delay=1, backoff=1)
+def scan_one_device(ip, timeout=3, port=9000, page="id"):
     """
     :param url: the url to parse
     :param timeout: the timeout of the url request
@@ -63,15 +64,16 @@ def scan_one_device(ip, timeout=4, port=9000, page="id"):
             return (resp['id'],ip)
         except ValueError:
             logging.error("Could not parse response from %s as JSON object" % url )
-            raise ScanException("Could not parse Json object")
-
+            raise Exception("Could not parse Json object")
+    except urllib2.URLError as e:
+        raise ScanException(str(e))
     except Exception as e:
         logging.error("Unexpected error whilst scanning url: %s" % url )
-        raise ScanException(str(e))
+        raise Exception(str(e))
 
 
 
-@retry(ScanException, tries=5,delay=1, backoff=1)
+@retry(ScanException, tries=3,delay=3, backoff=1)
 def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, data=None,
                            result_main_dir="/ethoscope_results",timeout=5):
     """
@@ -112,8 +114,13 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
             except KeyError:
                 logging.error("Device %s is not detected" % id)
                 raise KeyError("Device %s is not detected" % id)
-    except:
-        raise ScanException()
+    except urllib2.URLError as e:
+        raise ScanException(str(e))
+
+    except Exception as e:
+        logging.error("Unexpected error whilst scanning url: %s" % url )
+        raise Exception(str(e))
+
     # except urllib2.httplib.BadStatusLine:
     #     logging.error('BadlineSatus, most probably due to update device and auto-reset')
     #
@@ -175,8 +182,6 @@ def make_backup_path(device, result_main_dir, timeout=30):
         logging.error("Could not generate backup path for device. Probably a MySQL issue")
         logging.error(traceback.format_exc(e))
         return None
-
-
     return output_db_file
 
 def generate_new_device_map(ip_range=(2,64),device="wlan0", result_main_dir="/ethoscope_results"):
@@ -201,6 +206,8 @@ def generate_new_device_map(ip_range=(2,64),device="wlan0", result_main_dir="/et
                     id, ip = f.result()
                     devices_map[id] = {"ip":ip, "id":id}
 
+                except ScanException as e:
+                    pass
                 except Exception as e:
                     logging.error("Error whilst pinging url")
                     logging.error(traceback.format_exc(e))
