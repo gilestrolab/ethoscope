@@ -246,7 +246,7 @@ def updates_api_wrapper(ip,id, what="check_update",type=None, port=8888, data=No
 
     req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
 
-    print request_url
+    logging.info("requesting %s" %request_url)
 
     try:
         f = urllib2.urlopen(req)

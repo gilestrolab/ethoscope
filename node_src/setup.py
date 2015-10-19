@@ -25,5 +25,6 @@ setup(
         "python-nmap >= 0.3.4",
         "futures >= 3.0.3",
         "GitPython >=1.0.1",
+        "bjoern >= 1.4.2",
     ],
 )

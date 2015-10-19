@@ -37,5 +37,6 @@ setup(
         "cherrypy >= 3.6.0",
         "scipy >= 0.15.1",
         "GitPython >=1.0.1",
+        "bjoern >= 1.4.2",
     ],
 )

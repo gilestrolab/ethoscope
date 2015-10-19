@@ -48,6 +48,7 @@ pacman -S mariadb --noconfirm --needed
 #setup Wifi dongle
 #pacman -S netctl
 pacman -S wpa_supplicant --noconfirm --needed
+pacman -S libev --noconfirm --needed
 
 #Create a Bare repository with only the production branch in node, it is on /var/
 echo 'creating bare repo'

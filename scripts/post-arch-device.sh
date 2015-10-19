@@ -46,7 +46,7 @@ pacman -S fake-hwclock --noconfirm --needed
 #setup Wifi dongle
 #pacman -S netctl
 pacman -S wpa_supplicant ifplugd wpa_actiond --noconfirm --needed
-
+pacman -S libev --noconfirm --needed
 
 pip2 install 'picamera[array]'
 

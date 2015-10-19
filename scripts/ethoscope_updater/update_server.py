@@ -148,16 +148,15 @@ def group(what):
     try:
         responses = []
         data = request.json
-
-        # quick patch #fixme
+        print data
+        if what == "update":
+            # quick patch #fixme
         # "devices_to_update" should not exist. the field should be "devices"
 
-
-        if what == "update":
-            try:
-                data["devices"] = data["devices_to_update"]
-            except KeyError:
-                pass
+            # try:
+            #     data["devices"] = data["devices_to_update"]
+            # except KeyError:
+            #     pass
 
             for device in data["devices"]:
                 response = updates_api_wrapper(device['ip'], device['id'], what='device/update')
@@ -200,7 +199,9 @@ def group(what):
 
 if __name__ == '__main__':
 
+    logging.getLogger().setLevel(logging.INFO)
     parser = OptionParser()
+
     parser.add_option("-g", "--git-local-repo", dest="local_repo", help="route to local repository to update")
     # when no bare repo path is declares. we are in a device else, we are on a node
     parser.add_option("-b", "--bare-repo", dest="bare_repo", default=None, help="route to bare repository")
