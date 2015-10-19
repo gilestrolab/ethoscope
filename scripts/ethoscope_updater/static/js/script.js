@@ -35,7 +35,7 @@
 
         });
         $http.get('/devices').success(function(data){
-
+            check_error(data);
             $scope.devices = data;
 
             //slower method is the one that has to stop the spinner
@@ -45,16 +45,16 @@
             console.log($scope.devices);
         });
         $http.get('/device/check_update/node').success(function(data){
-           
+           check_error(data);
             $scope.node.check_update = data;
         });
         $http.get('/device/active_branch/node').success(function(data){
-            
+            check_error(data);
             $scope.node.active_branch = data.active_branch;
         });
         //aADD A call to node/info
         $http.get('http://localhost:8000/node/info').success(function(data){
-           
+           check_error(data);
             $scope.node.info=data;
             //hardcoded node info (FIXME!!)
             $scope.node.ip = data.local_ip;
@@ -78,12 +78,10 @@
              $("#updateModal").modal('hide');
             //start spin
             spin("start");
-            data = {"devices_to_update":devices_to_update}
+            data = {"devices":devices_to_update}
             $http.post('/group/update', data = data)
                  .success(function(data){
-                    if (data.error){
-                        $scope.update.error = data.error;
-                    }
+                    check_error(data);
                     $scope.update_result= data;
                     spin("stop");
 
@@ -110,9 +108,7 @@
             data = {"devices":devices_to_restart}
             $http.post('/group/restart', data = data)
                  .success(function(data){
-                    if (data.error){
-                        $scope.update.error = data.error;
-                    }
+                    check_error(data);
                     $scope.update_result= data;
                     spin("stop");
 
@@ -141,9 +137,7 @@
             data = {"devices":devices_to_switch}
             $http.post('/group/swBranch', data = data)
                  .success(function(data){
-                    if (data.error){
-                        $scope.update.error = data.error;
-                    }
+                    check_error(data);
                     $scope.update_result= data;
                     spin("stop");
 
@@ -180,6 +174,11 @@
                 return error;
             });
         };
+        
+        check_error = function(data){
+            if ('error' in data){
+                $scope.system.error= data.error;
+        }
         
         $scope.elapsedtime = function(t){
             // Calculate the number of days left
