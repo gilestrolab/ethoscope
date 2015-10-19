@@ -222,6 +222,13 @@ systemctl enable ethoscope_device.service
 systemctl enable ethoscope_updater.service
 systemctl enable clean_mysql.service
 
+
+
+#manual intervention =
+# from http://www.martinglover.co.uk/speed-up-mysql-queries
+#Add in the below line of code under the [mysqld] section:
+# skip-name-resolve
+
 echo 'SUCESS, please reboot'
 
 #todo set up update daemon

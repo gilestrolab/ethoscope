@@ -122,10 +122,10 @@ class Monitor(object):
                     if not result_writer is None:
                         result_writer.write(t,track_u.roi, data_row)
 
-                if not result_writer is None:
+                if result_writer is not None:
                     result_writer.flush(t, frame)
 
-                if not drawer is None:
+                if drawer is not None:
                     drawer.draw(frame, self._last_positions, self._unit_trackers)
                 self._last_t = t
 

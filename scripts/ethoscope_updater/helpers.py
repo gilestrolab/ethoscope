@@ -108,8 +108,11 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
     if type is not None:
         request_url = request_url + "/" + type
 
+
     req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
+
     logging.info("requesting %s" % request_url)
+
     try:
         f = urllib2.urlopen(req)
         message = f.read()
@@ -128,7 +131,7 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
                 logging.error("Device %s is not detected" % id)
                 raise KeyError("Device %s is not detected" % id)
 
-    except urllib2.httplib.BadStatusLine:
+    except urllib2.httplib.BadStatusLine as e:
         logging.error('BadlineSatus, most probably due to update device and auto-reset')
         raise e
 
@@ -243,6 +246,8 @@ def updates_api_wrapper(ip,id, what="check_update",type=None, port=8888, data=No
 
     req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
 
+    print request_url
+
     try:
         f = urllib2.urlopen(req)
         message = f.read()
@@ -250,7 +255,7 @@ def updates_api_wrapper(ip,id, what="check_update",type=None, port=8888, data=No
         if message:
             response = json.loads(message)
 
-    except urllib2.httplib.BadStatusLine:
+    except urllib2.httplib.BadStatusLine as e:
         logging.error('BadlineSatus, most probably due to update device and auto-reset')
         raise e
 

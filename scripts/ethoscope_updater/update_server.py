@@ -148,7 +148,17 @@ def group(what):
     try:
         responses = []
         data = request.json
+
+        # quick patch #fixme
+        # "devices_to_update" should not exist. the field should be "devices"
+
+
         if what == "update":
+            try:
+                data["devices"] = data["devices_to_update"]
+            except KeyError:
+                pass
+
             for device in data["devices"]:
                 response = updates_api_wrapper(device['ip'], device['id'], what='device/update')
                 responses.append(response)
