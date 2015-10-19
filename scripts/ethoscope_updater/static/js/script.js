@@ -178,7 +178,8 @@
         check_error = function(data){
             if ('error' in data){
                 $scope.system.error= data.error;
-        }
+            }
+        };
         
         $scope.elapsedtime = function(t){
             // Calculate the number of days left
