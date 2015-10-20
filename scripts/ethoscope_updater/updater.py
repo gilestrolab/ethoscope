@@ -22,7 +22,7 @@ class DeviceUpdater(object):
         Gets the id of the local head and the origin's.
         returned object are Commits, not strings. their unix TS can be access through``.committed_date``.
         """
-        #self._origin.fetch()
+        self._origin.fetch()
         local_commit = self._working_repo.commit()
         active_branch = self._working_repo.active_branch
         origin_commit = self._origin.refs[str(active_branch)].commit

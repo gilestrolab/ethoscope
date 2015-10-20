@@ -21,14 +21,17 @@ STATIC_DIR = "./static"
 
 @app.get('/favicon.ico')
 def get_favicon():
+    assert_node(is_node)
     return server_static(STATIC_DIR+'/img/favicon.ico')
 
 @app.route('/static/<filepath:path>')
 def server_static(filepath):
+    assert_node(is_node)
     return static_file(filepath, root=STATIC_DIR)
 
 @app.route('/')
 def index():
+    assert_node(is_node)
     return static_file('index.html', root=STATIC_DIR)
 
 
