@@ -175,7 +175,7 @@ def generate_new_device_map(ip_range=(2,253),device="wlan0"):
                     id, ip = f.result()
                     if id is None:
                         continue
-                    devices_map[id] = {"ip":ip, "status": "Software broken"}
+                    devices_map[id] = {"ip":ip, "status": "Software broken", "id":id}
 
 
                 except Exception as e:
