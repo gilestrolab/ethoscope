@@ -131,6 +131,27 @@ def bare(action):
         logging.error(traceback.format_exc(e))
         return {'error': traceback.format_exc(e)}
 
+
+
+@app.get('/node_info')
+def node_info():#, device):
+    try:
+        assert_node(is_node)
+
+        local_addrs = ifaddresses(SUBNET_DEVICE)
+        local_ip = local_addrs[AF_INET][0]["addr"]
+
+        return {'ip': local_ip,
+                'status': "NA",
+                "id": "node"}
+
+    except Exception as e:
+        logging.error(e)
+        return {'error': traceback.format_exc(e)}
+
+
+
+
 @app.get('/devices')
 def scan_subnet(ip_range=(2,253)):
     try:
@@ -143,21 +164,13 @@ def scan_subnet(ip_range=(2,253)):
         return {'error': traceback.format_exc(e)}
 
 
+
 @app.post('/group/<what>')
 def group(what):
     try:
         responses = []
         data = request.json
-        print data
         if what == "update":
-            # quick patch #fixme
-        # "devices_to_update" should not exist. the field should be "devices"
-
-            # try:
-            #     data["devices"] = data["devices_to_update"]
-            # except KeyError:
-            #     pass
-
             for device in data["devices"]:
                 response = updates_api_wrapper(device['ip'], device['id'], what='device/update')
                 responses.append(response)
