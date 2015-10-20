@@ -29,3 +29,4 @@ for i in range(1,s):
     cv2.ellipse(im,((x,y),(w,h),angle),color=(i*5 %200) + 55)
     cv2.imshow("i",im)
     cv2.waitKey(-1)
+# 
