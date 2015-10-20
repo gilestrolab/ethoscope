@@ -141,7 +141,7 @@ def node_info():#, device):
         local_addrs = ifaddresses(SUBNET_DEVICE)
         local_ip = local_addrs[AF_INET][0]["addr"]
 
-        return {'ip': local_ip,
+        return {'ip': "http://" + local_ip,
                 'status': "NA",
                 "id": "node"}
 
