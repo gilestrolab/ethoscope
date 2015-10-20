@@ -1,5 +1,5 @@
 (function(){
-    var moreController = function($scope, $http, $timeout, $routeParams){
+    var moreController = function($scope, $http, $timeout, $routeParams, $window){
 
         $scope.selected = {'files':[]};
         $scope.selected_all = false;
@@ -9,11 +9,6 @@
                             color:"alert alert-info",
                             opt: "browse"
                             },
-                          {name:"Update System",
-                           icon:"fa fa-refresh",
-                           color:"alert alert-warning",
-                           opt:"update",
-                          },
                           {name:"Manage Node",
                            icon:"fa fa-cog",
                            color:"alert alert-success",
@@ -29,9 +24,6 @@
             switch(opt){
                 case "browse":
                     $scope.browse();
-                    break;
-                case "update":
-                    $scope.check_update();
                     break;
                 case "nodeManage":
                     get_node_info();
