@@ -175,6 +175,7 @@
             var error = false;
             //check if all of the selected devices are stopped
 //            $http.get('/devices').success(function(data){
+                $scope.system.modal_error = "";
                 if(devices.length == 0){
                     $scope.system.modal_error = "No device selected. Please tick some boxes!";
                     return true;
