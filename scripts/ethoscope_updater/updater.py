@@ -22,7 +22,7 @@ class DeviceUpdater(object):
         Gets the id of the local head and the origin's.
         returned object are Commits, not strings. their unix TS can be access through``.committed_date``.
         """
-        self._origin.fetch()
+        #self._origin.fetch()
         local_commit = self._working_repo.commit()
         active_branch = self._working_repo.active_branch
         origin_commit = self._origin.refs[str(active_branch)].commit
@@ -87,14 +87,21 @@ class BareRepoUpdater(object):
         """
         branches = self._working_repo.branches
         out = {}
+
+        one_success = False
         for b in branches:
+
             try:
                 key = str(b)
                 out[key]=False
                 self.update_branch(b)
                 out[key]=True
+                one_success = True
             except GitCommandError as e:
                 logging.error(traceback.format_exc(e))
+
+        if not one_success:
+            raise Exception("Could not update any branch. Are you connected to internet?")
         return out
 
     def update_branch(self,b):

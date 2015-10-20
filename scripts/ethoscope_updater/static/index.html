@@ -33,16 +33,11 @@
         <div id="main" class="container">
             <!-- home.html -->
     <div class="jumbotron text-center" ng-cloak>
-        <h3>Updater</h3>
-        <div class="intro">Manage your connected devices</div>
+        <h3>Available version</h3>
+        <div class="intro"><span class = "fa fa-code-fork"></span> <b>[{{node.active_branch}}]</b>, {{node.check_update.origin_commit.id.substring(0,6)}}... ({{node.check_update.origin_commit.date}})</div>
 
         <div  id="loading_devices" class="spinner"><h2>{{spinner_text}}</h2></div>
-        <h4>Status:</h4>
-        <div class="intro">
-            <span class="fa fa-code-fork"></span><strong> {{node.active_branch}}: </strong>
-                <span ng-if="system.status[node.active_branch] == true">Up to date</span>
-                <span ng-if="system.status[node.active_branch] == false">Update available</span>
-        </div>
+
         <div id="error" ng-if="system.error != null">
             <p>{{system.error}}</p>
         </div>
@@ -54,7 +49,8 @@
         <button class="btn btn-default" ng-click="pre_swBranch(devices_to_update_selected)">Switch Branch</button>
     <hr>
 
-<table class="table table-striped" ng-cloak>
+    <div  id="scanning_devices" class="spinner_scan"></div>
+    <table class="table table-striped" ng-cloak>
             <thead>
             <th>Name</th>
             <th>Status</th>

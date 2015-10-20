@@ -53,3 +53,9 @@ background-color: white;
 }
 .spinner{
 }
+
+#scanning_devices{
+position: relative;
+}
+.spinner_scan{
+}
