@@ -67,15 +67,28 @@ def scan_subnet(ip_range=(2,64)):
     global devices_map
     try:
         devices_map_tmp = generate_new_device_map(ip_range,SUBNET_DEVICE)
-        for k in devices_map_tmp.keys():
+        detected_devices = devices_map_tmp.keys()
+        for k in detected_devices:
             if k in devices_map:
                 devices_map[k].update(devices_map_tmp[k])
             else:
+                logging.info("new device detected %s" % k)
                 devices_map[k] = devices_map_tmp[k]
+
+
+
+        for k in devices_map.keys():
+             if k not in detected_devices:
+                 logging.warning("Device %s not detected when scanning" % k)
+                 devices_map[k]["status"] = "not detected"
+
+
+
         return devices_map
+
     
     except Exception as e:
-        logging.error("Unexpected exception when scanning for devices:")
+        logging.error("Unexpected exception whilst scanning devices:")
         logging.error(traceback.format_exc(e))
 
 
