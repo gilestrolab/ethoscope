@@ -383,7 +383,7 @@ if __name__ == '__main__':
 
 
     try:
-        run(app, host='0.0.0.0', port=PORT, debug=debug, server='cherrypy', fast=True)
+        run(app, host='0.0.0.0', port=PORT, debug=debug, server='cherrypy')
 
     except KeyboardInterrupt:
         logging.info("Stopping server cleanly")

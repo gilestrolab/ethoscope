@@ -165,7 +165,7 @@ if __name__ == '__main__':
         control.start()
 
     try:
-        run(api, host='0.0.0.0', port=port, server='cherrypy',debug=option_dict["debug"], fast =True)
+        run(api, host='0.0.0.0', port=port, server='cherrypy',debug=option_dict["debug"])
     except Exception as e:
         logging.error(e)
         close(1)
