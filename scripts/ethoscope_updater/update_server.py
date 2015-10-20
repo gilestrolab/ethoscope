@@ -179,8 +179,9 @@ def group(what):
                 responses.append(response)
         elif what == "swBranch":
             for device in data["devices"]:
+                data_one_dev = {'new_branch': device['new_branch']}
                 response = updates_api_wrapper(device['ip'], device['id'], what='device/change_branch',
-                                               data={'new_branch': device['new_branch']})
+                                               data=data_one_dev)
                 responses.append(response)
             for device in data["devices"]:
                 response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')

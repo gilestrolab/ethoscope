@@ -237,12 +237,14 @@ def generate_new_device_map(ip_range=(2,253),device="wlan0"):
 
         return devices_map
 
-def updates_api_wrapper(ip,id, what="check_update",type=None, port=8888, data=None,):
+def updates_api_wrapper(ip,id, what="check_update",type=None, port=8888, data=None):
     response = ''
     request_url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
 
-    if type is not None:
-        request_url = request_url + "/" + type
+    # if type is not None:
+    #     request_url = request_url + "/" + type
+    if data is not None:
+        data= json.dumps(data)
 
     req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
 
