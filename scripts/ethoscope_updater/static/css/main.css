@@ -1,0 +1,61 @@
+
+
+/* ==========================================================================
+   Author's custom styles
+   ========================================================================== */
+
+.log{
+    margin: 0px;
+    padding: 0px;
+}
+
+.color-green{
+    color: green;
+}
+.color-red{
+    color: red;
+}
+.table-background{
+    background-color: white;
+    border: 1px  solid #ccc;
+}
+
+.last_drawn_img{
+    margin-bottom: 1em;
+}
+
+
+.option{
+    text-align: center;
+    margin-right: 2em;
+}
+
+.device-list{
+    margin-right: 2em;
+}
+.file-list{
+    list-style: none;
+}
+.right{
+    float:right;
+}
+.intro{
+    margin: 1em;
+}
+
+.option-list li{
+list-style: none;
+}
+#loading_devices{
+position: relative;
+background-color: white; 
+
+}
+.spinner{
+}
+
+#scanning_devices{
+position: relative;
+}
+.spinner_scan{
+}
