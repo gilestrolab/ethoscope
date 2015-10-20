@@ -84,7 +84,7 @@
                 <td>
                     <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
                     <span ng-if="device.up_to_date==false" class="fa fa-circle color-red"></span> <span ng-if="device.up_to_date==true" class="fa fa-circle color-green"></span>
-                        <span> {{device.name}}<span ng-if="device.check_update.up_to_date==false" > [Outdated]</span> <span ng-if="device.check_update.up_to_date==true" >[Up to Date]</span></span>
+                        <span> {{device.name}}<span ng-if="device.up_to_date==false" > [Outdated]</span> <span ng-if="device.up_to_date==true" >[Up to Date]</span></span>
                     </a>
                 </td>
                 <td> {{device.status}}</td>
