@@ -11,14 +11,14 @@
     });
 
     // create the controller and inject Angular's $scope
-    app.controller('mainController', function($scope, $http, $interval, $timeout) {
+    app.controller('mainController', function($scope, $window, $http, $interval, $timeout) {
         $scope.system = {};
         $scope.system.isUpdated = false;
         $scope.node ={};
         $scope.devices={};
         $scope.groupActions={};
         $scope.branch_to_switch= null;
-
+        $scope.system.modal_error = "";
         $scope.spinner= new Spinner(opts).spin();
         var loadingContainer = document.getElementById('loading_devices');
         loadingContainer.appendChild($scope.spinner.el);
@@ -74,14 +74,11 @@
         $scope.devices_to_update_selected = [];
         
         $scope.pre_update = function(devices_to_update){
-            spin("start");
+           spin("start");
            error = check_devices_state(devices_to_update, "running");
-                if (!error){
-                    //open modal
-                    $("#updateModal").modal('show');
-                    //stop spin
-                    spin("stop");
-                }
+           $("#updateModal").modal('show');
+            spin("stop");
+
         };
         $scope.update = function(devices_to_update){
             //close modal
@@ -94,6 +91,7 @@
                     check_error(data);
                     $scope.update_result= data;
                     spin("stop");
+                    $window.location.reload();
 
             })
         };
@@ -102,12 +100,13 @@
         $scope.pre_restart = function(devices_to_restart){
              spin("start");
             error = check_devices_state(devices_to_restart, "running");
-              if (!error){
-                    //open modal
-                    $("#restartModal").modal('show');
-                    //stop spin
-                    spin("stop");
-                }
+
+            //open modal
+            $("#restartModal").modal('show');
+            //stop spin
+            spin("stop");
+
+
         }
         $scope.restart = function(devices_to_restart){
             //close modal
@@ -121,6 +120,7 @@
                     check_error(data);
                     $scope.update_result= data;
                     spin("stop");
+                    $window.location.reload();
 
             })
         }
@@ -128,12 +128,12 @@
         $scope.pre_swBranch = function(devices_to_switch){
             spin("start");
             error = check_devices_state(devices_to_switch, "running");
-                if (!error){
-                    //open modal
-                    $("#swBranchModal").modal('show');
-                    //stop spin
-                    spin("stop");
-                }
+
+            //open modal
+            $("#swBranchModal").modal('show');
+            //stop spin
+            spin("stop");
+
         };
         
         $scope.swBranch = function(devices_to_switch){
@@ -150,6 +150,7 @@
                     check_error(data);
                     $scope.update_result= data;
                     spin("stop");
+                    $window.location.reload();
 
             })
         }
@@ -173,16 +174,21 @@
         check_devices_state = function(devices, state){
             var error = false;
             //check if all of the selected devices are stopped
-            $http.get('/devices').success(function(data){
+//            $http.get('/devices').success(function(data){
+                if(devices.length == 0){
+                    $scope.system.modal_error = "No device selected. Please tick some boxes!";
+                    return true;
+                }
+
                 for (device in devices){
                     if (device.status == state){
                         $scope.system.error="One or more selected devices are "+state+" and cannot be updated, check selection"
-                        error = true;
-                        break;
+                        return true;
+
                     }
                 };
-                return error;
-            });
+                return false;
+//            });
         };
         
         check_error = function(data){

@@ -104,7 +104,6 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
     ip = devices_map[id]["ip"]
 
     request_url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
-
     if type is not None:
         request_url = request_url + "/" + type
 
