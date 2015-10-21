@@ -16,7 +16,14 @@
         $scope.system.isUpdated = false;
         $scope.node ={};
         $scope.devices={};
-        $scope.groupActions={};
+        $scope.devices_to_update_selected = [];
+        $scope.selected_devices = [];
+        $scope.modal={title:'title',
+                      info:'Some info',
+                      action_text:'action_text',
+                      action:'action',
+                     };
+        
         $scope.branch_to_switch= null;
         $scope.system.modal_error = "";
         $scope.spinner= new Spinner(opts).spin();
@@ -70,90 +77,72 @@
             $scope.node.id= data.id;
         });
         
-        //Update
-        $scope.devices_to_update_selected = [];
+        //modal controller
         
-        $scope.pre_update = function(devices_to_update){
-           spin("start");
-           error = check_devices_state(devices_to_update, "running");
-           $("#updateModal").modal('show');
-            spin("stop");
-
-        };
-        $scope.update = function(devices_to_update){
-            //close modal
-             $("#updateModal").modal('hide');
-            //start spin
+        $scope.activate_modal = function(devices, action){
             spin("start");
-            data = {"devices":devices_to_update}
-            $http.post('/group/update', data = data)
-                 .success(function(data){
-                    check_error(data);
-                    $scope.update_result= data;
-                    spin("stop");
-                    $window.location.reload();
-
-            })
-        };
-        
-        
-        $scope.pre_restart = function(devices_to_restart){
-             spin("start");
-            error = check_devices_state(devices_to_restart, "running");
-
-            //open modal
-            $("#restartModal").modal('show');
-            //stop spin
-            spin("stop");
-
-
-        }
-        $scope.restart = function(devices_to_restart){
-            //close modal
-             $("#restartModal").modal('hide');
-            //start spin
-            spin("start");
-            
-            data = {"devices":devices_to_restart}
-            $http.post('/group/restart', data = data)
-                 .success(function(data){
-                    check_error(data);
-                    $scope.update_result= data;
-                    spin("stop");
-                    $window.location.reload();
-
-            })
-        }
-        
-        $scope.pre_swBranch = function(devices_to_switch){
-            spin("start");
-            error = check_devices_state(devices_to_switch, "running");
-
-            //open modal
-            $("#swBranchModal").modal('show');
-            //stop spin
-            spin("stop");
-
-        };
-        
-        $scope.swBranch = function(devices_to_switch){
-            //close modal
-             $("#swBranchModal").modal('hide');
-            //start spin
-            spin("start");
-            for (device in devices_to_switch){
-                devices_to_switch[device]['new_branch'] = $scope.branch_to_switch;
+            error = check_devices_state(devices, "running");
+            switch(action){
+                case 'update':
+                    $scope.modal={
+                        title: 'Update devices',
+                        info:'This devices are going to be updated. Do not disconnect them.',
+                        action_text:'Update',
+                        action:'update',
+                    }
+                    break;
+                case 'restart':
+                    $scope.modal={
+                        title: 'Restart devices',
+                        info:'The following devices are going to be restarted.',
+                        action_text:'Restart',
+                        action:'restart',
+                    }
+                    break;
+                case 'swBranch':
+                    $scope.modal={
+                        title: 'Switch Branch devices',
+                        info:'Select branch to switch selected devices:',
+                        action_text:'Switch Branch',
+                        action:'swBranch',
+                    }
+                    break;
             }
-            data = {"devices":devices_to_switch}
-            $http.post('/group/swBranch', data = data)
-                 .success(function(data){
-                    check_error(data);
-                    $scope.update_result= data;
-                    spin("stop");
-                    $window.location.reload();
-
-            })
+            $("#Modal").modal('show');
+            spin("stop");
         }
+        
+        $scope.modal_action = function(devices,action){
+            $("#Modal").modal('hide');
+            spin("start");
+            switch(action){
+                case 'update':
+                    url = '/group/update';
+                    break;
+                case 'restart':
+                    url = '/group/restart';
+                    break;
+                case 'swBranch':
+                    for (device in devices){
+                    devices[device]['new_branch'] = $scope.branch_to_switch;
+                    }
+                    url = '/group/swBranch';
+                    
+                    break;
+            }
+            data = {"devices":devices};
+            $http.post(url, data = data)
+                    .success(function(data){
+                        var error = check_error(data);
+                        $scope.update_result= data;
+                        spin("stop");
+                        if (!error){
+                            $window.location.reload();
+                        }
+            });
+        }
+        
+        
         //HELPERS
         $scope.secToDate = function(secs){
             d = new Date(secs*1000);
@@ -192,46 +181,10 @@
         check_error = function(data){
             if ('error' in data){
                 $scope.system.error= data.error;
+                return true;
             }
+            return false;
         };
-        
-
-        $scope.groupActions.checkStart = function(selected_devices){
-            softwareVersion = "";
-            device_version = "";
-            checkVersionLoop:
-            for (var i = 0; i< selected_devices.length(); i++){
-                    $http.get('/device/'+selected_devices[i]+'/data').success(function(data){device_version = data.version.id});
-                    if (i == 0) {
-                        softwareVersion = device_version;
-                    }
-                    if (softwareVersion != device_version){
-                        break checkVersionLoop;
-                    }
-            }
-        };
-
-        $scope.groupActions.start = function(){
-                            $("#startModal").modal('hide');
-                            spStart= new Spinner(opts).spin();
-                            starting_tracking.appendChild(spStart.el);
-                            $http.post('/device/'+device_id+'/controls/start', data=option)
-                                 .success(function(data){$scope.device.status = data.status;});
-             $http.get('/devices').success(function(data){
-                    $http.get('/device/'+device_id+'/data').success(function(data){
-                        $scope.device = data;
-
-                    });
-
-                    $http.get('/device/'+device_id+'/ip').success(function(data){
-                        $scope.device.ip = data;
-                        device_ip = data;
-                    });
-                 $("#startModal").modal('hide');
-            });
-        };
-
-
 
     });
 
