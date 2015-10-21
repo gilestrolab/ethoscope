@@ -173,8 +173,6 @@
         
         check_devices_state = function(devices, state){
             var error = false;
-            //check if all of the selected devices are stopped
-//            $http.get('/devices').success(function(data){
                 $scope.system.modal_error = "";
                 if(devices.length == 0){
                     $scope.system.modal_error = "No device selected. Please tick some boxes!";
@@ -189,7 +187,6 @@
                     }
                 };
                 return false;
-//            });
         };
         
         check_error = function(data){
@@ -234,90 +231,7 @@
             });
         };
 
-        /// Updates - Functions
-        $scope.devices_to_update_selected = [];
 
-//        $scope.check_update = function(){
-//            //check if there is a new version
-//            $scope.update={};
-//            var spinner= new Spinner(opts).spin();
-//            var loadingContainer = document.getElementById('loading');
-//            loadingContainer.appendChild(spinner.el);
-//            $http.get("/update/check")
-//                 .success(function(res){
-//                    if(res.update.error){
-//                        if(res.update.error.indexOf('up to date')<0){
-//                            $scope.update.error = res.update.error;
-//                        }
-//                    }
-//                    for (dev in res.attached_devices){
-//                        if (dev.version != res.origin.version){
-//                            $scope.update_text = "There is a new version and some devices need to be updated";
-//                            break;
-//                        }
-//                    }
-//
-//                    $scope.attached_devices=res.attached_devices;
-//                    $scope.origin = res.origin;
-//                    $scope.node = res.update.node;
-//                    $('#updateDevicesModal').modal('hide');
-//                    spinner.stop();
-//            })
-//        };
-//        $scope.update_selected = function(devices_to_update){
-//            if (devices_to_update == 'all'){
-//                devices_to_update=[]
-//                for (key in $scope.attached_devices){
-//                    devices_to_update.push($scope.attached_devices[key]);
-//                }
-//            }
-//            var spinner= new Spinner(opts).spin();
-//            var loadingContainer = document.getElementById('loading');
-//            loadingContainer.appendChild(spinner.el);
-//            $http.post('/update', data = devices_to_update)
-//                 .success(function(data){
-//                    if (data.error){
-//                        $scope.update.error = data.error;
-//                    }
-//                    $scope.update_result= data;
-//                    $scope.update_waiting = true;
-//                    $timeout($scope.check_update, 15000);
-//                    $timeout(function(){$scope.update_waiting = false;}, 15000);
-//                    $timeout(function(){spinner.stop();},15100);
-//            })
-//        };
-//         $scope.update_node = function(node){
-//            var spinner= new Spinner(opts).spin();
-//            var loadingContainer = document.getElementById('loading');
-//            loadingContainer.appendChild(spinner.el);
-//            $http.post('/update', data =node);
-//            $('#updateNodeModal').modal('hide');
-//            $scope.update_result= data;
-//            $scope.update_waiting = true;
-//            $timeout($scope.check_update, 15000);
-//            $timeout(function(){$scope.update_waiting = false;}, 15000);
-//            $timeout(function(){spinner.stop();},15100);
-//
-//        };
-//
-
-///// Node Management update
-//        $scope.nodeManagement = {};
-//        var get_node_info = function(){
-//            $http.get('/node/info').success(function(res){
-//                $scope.nodeManagement.info = res;
-//            })
-//        }
-//        $scope.nodeManagement.time = new Date();
-//        $scope.nodeManagement.time = $scope.nodeManagement.time.toString();
-//        $scope.nodeManagement.action = function(action){
-//               $http.post('/node-actions', data = {'action':action})
-//               .success(function(res){
-//                $scope.nodeManagement[action]=res;
-//               });
-//        };
-
-        //$scope.$on('$viewContentLoaded',$scope.get_devices);
 
     });
 
