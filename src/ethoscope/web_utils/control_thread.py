@@ -22,8 +22,8 @@ from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
 # the robust self learning tracker
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.interactors.interactors import DefaultInteractor
-from ethoscope.interactors.sleep_depriver_interactor import SleepDepInteractor
-from ethoscope.interactors.fake_sleep_dep_interactor import FakeSleepDepInteractor
+from ethoscope.interactors.sleep_depriver_interactor import SleepDepInteractor, SystematicSleepDepInteractor, ExperimentalSleepDepInteractor
+from ethoscope.interactors.fake_sleep_dep_interactor import FakeSleepDepInteractor, FakeSystematicSleepDepInteractor
 
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
@@ -33,13 +33,17 @@ class ControlThread(Thread):
     _evanescent = False
     _option_dict = {
         "roi_builder":{
-                "possible_classes":[DefaultROIBuilder, TargetGridROIBuilder, OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder],
+                "possible_classes":[DefaultROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder, OlfactionAssayROIBuilder],
             },
         "tracker":{
                 "possible_classes":[AdaptiveBGModel],
             },
         "interactor":{
-                        "possible_classes":[DefaultInteractor, FakeSleepDepInteractor, SleepDepInteractor],
+                        "possible_classes":[DefaultInteractor,SleepDepInteractor,
+                                            SystematicSleepDepInteractor,
+                                            ExperimentalSleepDepInteractor,
+                                            FakeSleepDepInteractor,
+                                            FakeSystematicSleepDepInteractor],
                     },
         "drawer":{
                         "possible_classes":[DefaultDrawer, NullDrawer],

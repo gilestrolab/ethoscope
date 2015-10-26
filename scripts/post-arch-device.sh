@@ -14,19 +14,15 @@ export USER_NAME=ethoscope
 export PASSWORD=ethoscope
 export DATA_DIR=/ethoscope_data
 export DB_NAME=ethoscope_db
-export TARGET_GIT_INSTALL=/home/$USER_NAME/ethoscope-git
+export TARGET_GIT_INSTALL=/opt/ethoscope-git
+export UPDATER_LOCATION_IN_GIT=scripts/ethoscope_updater
+export TARGET_UPDATER_DIR=/opt/ethoscope_updater
 export NODE_IP=192.169.123.1
 export BARE_GIT_NAME=ethoscope.git
 
 
 
-USER_NAME=ethoscope
-PASSWORD=ethoscope
-DATA_DIR=/ethoscope_data
-DB_NAME=ethoscope_db
-TARGET_GIT_INSTALL=/home/$USER_NAME/ethoscope-git
-NODE_IP=192.169.123.1
-BARE_GIT_NAME=ethoscope.git
+
 ############# PACKAGES #########################
 echo 'Installing and updating packages'
 
@@ -49,23 +45,24 @@ pacman -S fake-hwclock --noconfirm --needed
 
 #setup Wifi dongle
 #pacman -S netctl
-pacman -S wpa_supplicant --noconfirm --needed
-
+pacman -S wpa_supplicant ifplugd wpa_actiond --noconfirm --needed
+pacman -S libev --noconfirm --needed
 
 pip2 install 'picamera[array]'
 
-echo 'Description=ethoscope_wifi network' > /etc/netctl/ethoscope_wifi
-echo 'Interface=wlan0' >> /etc/netctl/ethoscope_wifi
-echo 'Connection=wireless' >> /etc/netctl/ethoscope_wifi
-echo 'Security=wpa' >> /etc/netctl/ethoscope_wifi
-echo 'IP=dhcp' >> /etc/netctl/ethoscope_wifi
-echo 'ESSID=ETHOSCOPE_WIFI' >> /etc/netctl/ethoscope_wifi
+echo 'Description=ethoscope_wifi network' > /etc/netctl/wlan0
+echo 'Interface=wlan0' >> /etc/netctl/wlan0
+echo 'Connection=wireless' >> /etc/netctl/wlan0
+echo 'Security=wpa' >> /etc/netctl/wlan0
+echo 'IP=dhcp' >> /etc/netctl/wlan0
+echo 'TimeoutDHCP=60' >> /etc/netctl/wlan0
+echo 'ESSID=ETHOSCOPE_WIFI' >> /etc/netctl/wlan0
 # Prepend hexadecimal keys with \"
 # If your key starts with ", write it as '""<key>"'
 # See also: the section on special quoting rules in netctl.profile(5)
 
 #TODO set new password
-echo 'Key=ETHOSCOPE_1234' >> /etc/netctl/ethoscope_wifi
+echo 'Key=ETHOSCOPE_1234' >> /etc/netctl/wlan0
 
 
 
@@ -93,11 +90,10 @@ echo 'driftfile /var/lib/ntp/ntp.drift' >> /etc/ntp.conf
 
 ######################################################################################
 
-#Creating service for device_server.py
 
-cp ./device.service /etc/systemd/system/device.service
+cp ./ethoscope_device.service /etc/systemd/system/ethoscope_device.service
 
-systemctl daemon-reload
+
 ######################################################################################
 
 echo 'Enabling startuup deamons'
@@ -115,37 +111,42 @@ systemctl start sshd.service
 #setting up wifi
 #Fixme this does not work if the pi is not connected to a ethoscope_wifi
 
-netctl enable ethoscope_wifi
-netctl start ethoscope_wifi
+
+
+netctl-auto enable wlan0
+netctl-auto start wlan0
+systemctl enable netctl-auto@wlan0.service
+systemctl start netctl-auto@wlan0.service
+systemctl enable netctl-ifplugd@wlan0.service
+systemctl start netctl-ifplugd@wlan0.service
+
+
 netctl enable eth0
 netctl start eth0
-
+systemctl enable netctl@eth0.service
+systemctl start netctl@eth0.service
+systemctl enable netctl-ifplugd@eth0.service
+systemctl start netctl-ifplugd@eth0.service
 #device service
-systemctl start device.service
-systemctl enable device.service
-
 
 #TODO s: locale/TIMEZONE/keyboard ...
 
 ##########################################################################################
 # add password without stoping
-echo 'Creating default user'
+#echo 'Creating default user'
+#
+#pass=$(perl -e 'print crypt($ARGV[0], "password")' $PASSWORD)
+#useradd -m -g users -G wheel -s /bin/bash  -p $pass $USER_NAME || echo 'warning: user exists'
+#
+#echo 'exec startlxde' >> /home/$USER_NAME/.xinitrc
+#chown $USER_NAME /home/$USER_NAME/.xinitrc
+#echo 'Setting permissions for using arduino'
+##SEE https://wiki.archlinux.org/index.php/arduino#Configuration
+#gpasswd -a $USER_NAME uucp
+#gpasswd -a $USER_NAME lock
+#gpasswd -a $USER_NAME tty
 
-pass=$(perl -e 'print crypt($ARGV[0], "password")' $PASSWORD)
-useradd -m -g users -G wheel -s /bin/bash  -p $pass $USER_NAME || echo 'warning: user exists'
 
-echo 'exec startlxde' >> /home/$USER_NAME/.xinitrc
-chown $USER_NAME /home/$USER_NAME/.xinitrc
-
-# Setting passwordless ssh, this is the content of id_rsa (private Key on node).
-mkdir -p /home/$USER_NAME/.ssh
-#TODO do not use a relative path.
-cp ./ssh_keys/id_rsa /home/$USER_NAME/.ssh/id_rsa
-chmod 600 /home/$USER_NAME/.ssh/id_rsa
-# copy to root keys as well!!
-mkdir -p /root/.ssh
-cp ./ssh_keys/id_rsa /root/.ssh/id_rsa
-chmod 600 /root/.ssh/id_rsa
 
 ############################################
 echo 'Generating boot config'
@@ -153,17 +154,6 @@ echo 'Generating boot config'
 echo 'start_file=start_x.elf' > /boot/config.txt
 echo 'fixup_file=fixup_x.dat' >> /boot/config.txt
 echo 'disable_camera_led=1' >> /boot/config.txt
-#gpu_mem_512=64
-#gpu_mem_256=64
-
-
-###Turbo #FIXME NOT needed for piv2.0
-#echo 'arm_freq=1000' >> /boot/config.txt
-#echo 'core_freq=500' >> /boot/config.txt
-#echo 'sdram_freq=500' >> /boot/config.txt
-#echo 'over_voltage=6' >> /boot/config.txt
-
-### TODO test, is that enough?
 echo 'gpu_mem=256' >>  /boot/config.txt
 echo 'cma_lwm=' >>  /boot/config.txt
 echo 'cma_hwm=' >>  /boot/config.txt
@@ -175,12 +165,6 @@ echo 'Loading bcm2835 module'
 #to use the camera through v4l2
 # modprobe bcm2835-v4l2
 echo "bcm2835-v4l2" > /etc/modules-load.d/picamera.conf
-
-echo 'Setting permissions for using arduino'
-#SEE https://wiki.archlinux.org/index.php/arduino#Configuration
-gpasswd -a $USER_NAME uucp
-gpasswd -a $USER_NAME lock
-gpasswd -a $USER_NAME tty
 
 
 ###########################################################################################
@@ -215,17 +199,6 @@ cp /etc/mysql/my.cnf  /etc/mysql/my.cnf-bak
 # remove log-bin lines
 cat /etc/mysql/my.cnf-bak | grep -v log-bin >  /etc/mysql/my.cnf
 
-###############mysql -u root -e "SET GLOBAL expire_logs_days = 2"
-#partitions stuff
-# make partition system
-#cd /mnt/
-#mkdir sda_var pi_var
-#mount /dev/sda2 /mnt/sda_var
-#mount /dev/mmXXX  /mnt/pi_var
-#cp -ax /mnt/pi_var/* /mnt/sda_var
-#echo "" >> /etc/fstab
-
-####################
 
 ##########
 #Create a local working copy from the bare repo, located on node
@@ -235,9 +208,27 @@ echo 'Cloning from Node'
 git clone git://$NODE_IP/$BARE_GIT_NAME $TARGET_GIT_INSTALL
 
 # our software.
-# TODO use AUR!
 cd $TARGET_GIT_INSTALL/src
 pip2 install -e .
 
+cp $TARGET_GIT_INSTALL/$UPDATER_LOCATION_IN_GIT $TARGET_UPDATER_DIR -r
+cd $TARGET_UPDATER_DIR
+
+cp ethoscope_update.service /etc/systemd/system/ethoscope_update.service
+cp clean_mysql.service /etc/systemd/system/clean_mysql.service
+
+systemctl daemon-reload
+systemctl enable ethoscope_device.service
+systemctl enable ethoscope_updater.service
+systemctl enable clean_mysql.service
+
+
+
+#manual intervention =
+# from http://www.martinglover.co.uk/speed-up-mysql-queries
+#Add in the below line of code under the [mysqld] section:
+# skip-name-resolve
 
 echo 'SUCESS, please reboot'
+
+#todo set up update daemon

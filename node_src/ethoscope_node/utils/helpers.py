@@ -10,51 +10,38 @@ import concurrent.futures as futures
 from netifaces import ifaddresses, AF_INET
 import datetime, time
 import MySQLdb
-
-
-def get_version(dir, branch):
-    version = subprocess.Popen(['git', 'rev-parse', branch] ,
-                                   cwd=dir,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
-    stdout,stderr = version.communicate()
-    commit_id = stdout.strip('\n')
-
-    version_date = subprocess.Popen(['git', 'show', '-s', '--format=%ci'] ,
-                                   cwd=dir,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
-    stdout,stderr = version_date.communicate()
-
-    commit_date = stdout.strip('\n')
-
-    return {"id":commit_id, "date":commit_date}
-
-def which(program):
-    # verbatim from
-    # http://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
-    def is_exe(fpath):
-        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
-
-    fpath, fname = os.path.split(program)
-    if fpath:
-        if is_exe(program):
-            return program
-    else:
-        for path in os.environ["PATH"].split(os.pathsep):
-            path = path.strip('"')
-            exe_file = os.path.join(path, program)
-            if is_exe(exe_file):
-                return exe_file
-
-    return None
+from functools import wraps
 
 
 
-def scan_one_device(ip, timeout=1, port=9000, page="id"):
+def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
+    """Retry calling the decorated function using an exponential backoff.
+
+    http://www.saltycrane.com/blog/2009/11/trying-out-retry-decorator-python/
+    original from: http://wiki.python.org/moin/PythonDecoratorLibrary#Retry
     """
+    def deco_retry(f):
+        @wraps(f)
+        def f_retry(*args, **kwargs):
+            mtries, mdelay = tries, delay
+            while mtries > 1:
+                try:
+                    return f(*args, **kwargs)
+                except ExceptionToCheck, e:
+                    time.sleep(mdelay)
+                    mtries -= 1
+                    mdelay *= backoff
+            return f(*args, **kwargs)
+        return f_retry
+    return deco_retry
+
+class ScanException(Exception):
+    pass
 
 
+@retry(ScanException, tries=3,delay=1, backoff=1)
+def scan_one_device(ip, timeout=3, port=9000, page="id"):
+    """
     :param url: the url to parse
     :param timeout: the timeout of the url request
     :param port: the port to request
@@ -71,25 +58,23 @@ def scan_one_device(ip, timeout=1, port=9000, page="id"):
 
         if not message:
             logging.error("URL error whist scanning url: %s. No message back." % url )
-            raise urllib2.URLError("No message back")
+            raise ScanException("No message back")
         try:
             resp = json.loads(message)
             return (resp['id'],ip)
         except ValueError:
             logging.error("Could not parse response from %s as JSON object" % url )
-
-    except urllib2.URLError:
-        pass
-        # logging.error("URL error whist scanning url: %s. Server down?" % url )
-
+            raise ScanException("Could not parse Json object")
+    except urllib2.URLError as e:
+        raise ScanException(str(e))
     except Exception as e:
-        logging.error("Unexpected error whilst scanning url: %s" % url )
-        raise e
-
-    return None, ip
+        raise ScanException("Unexpected error" + str(e))
 
 
-def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, data=None,result_main_dir="/ethoscope_results"):
+
+@retry(ScanException, tries=3,delay=3, backoff=1)
+def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, data=None,
+                           result_main_dir="/ethoscope_results",timeout=5):
     """
     Just a routine to format our GET urls. This improves readability whilst allowing us to change convention (e.g. port) without rewriting everything.
 
@@ -110,7 +95,7 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
     req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
 
     try:
-        f = urllib2.urlopen(req)
+        f = urllib2.urlopen(req,timeout=timeout)
         message = f.read()
 
         if message:
@@ -118,27 +103,37 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
 
             if not id in devices_map:
                 logging.warning("Device %s is not in device map. Rescanning subnet..." % id)
-                generate_new_device_map(result_main_dir=result_main_dir)
+                devices_map = generate_new_device_map(result_main_dir=result_main_dir)
             try:
+                if data is None:
+                    raise Exception("No data in JSON")
                 devices_map[id].update(data)
                 return data
 
             except KeyError:
                 logging.error("Device %s is not detected" % id)
                 raise KeyError("Device %s is not detected" % id)
-
-    except urllib2.httplib.BadStatusLine:
-        logging.error('BadlineSatus, most probably due to update device and auto-reset')
-
     except urllib2.URLError as e:
-        if hasattr(e, 'reason'):
-            logging.error('We failed to reach a server.')
-            logging.error('Reason: '+ e.reason)
-        elif hasattr(e, 'code'):
-            logging.error('The server couldn\'t fulfill the request.')
-            logging.error('Error code: '+ e.code)
+        raise ScanException(str(e))
 
-    return devices_map
+    except Exception as e:
+        logging.error("Unexpected error whilst scanning url: %s" % request_url)
+        raise Exception(str(e))
+
+    # except urllib2.httplib.BadStatusLine:
+    #     logging.error('BadlineSatus, most probably due to update device and auto-reset')
+    #
+    # except urllib2.URLError as e:
+    #     raise
+    #     if hasattr(e, 'reason'):
+    #         logging.error('We failed to reach a server.')
+    #         logging.error('Reason: '+ str(e.reason))
+    #     elif hasattr(e, 'code'):
+    #         logging.error('The server could not fulfill the request.')
+    #         logging.error('Error code: '+ str(e.code))
+    #
+
+    # return devices_map
 
 
 def get_subnet_ip(device="wlan0"):
@@ -150,7 +145,7 @@ def get_subnet_ip(device="wlan0"):
 
 
 
-def make_backup_path(device, result_main_dir):
+def make_backup_path(device, result_main_dir, timeout=30):
 
     try:
         com = "SELECT value from METADATA WHERE field = 'date_time'"
@@ -159,7 +154,8 @@ def make_backup_path(device, result_main_dir):
                                     #fixme import this info as a global var
                                     user="ethoscope",
                                     passwd="ethoscope",
-                                    db="ethoscope_db")
+                                    db="ethoscope_db",
+                                    connect_timeout=timeout)
 
         cur = mysql_db.cursor()
         cur.execute(com)
@@ -167,37 +163,39 @@ def make_backup_path(device, result_main_dir):
         timestamp = float(query[0][0])
         mysql_db.close()
 
+        date_time = datetime.datetime.fromtimestamp(timestamp)
 
+        formated_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
+        device_id = device["id"]
+        device_name = device["name"]
+        file_name = "%s_%s.db" % (formated_time, device_id)
+
+        output_db_file = os.path.join(result_main_dir,
+                                            device_id,
+                                            device_name,
+                                            formated_time,
+                                            file_name
+                                            )
 
     except Exception as e:
         logging.error("Could not generate backup path for device. Probably a MySQL issue")
         logging.error(traceback.format_exc(e))
         return None
-
-    date_time = datetime.datetime.fromtimestamp(timestamp)
-
-    formated_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
-    device_id = device["id"]
-    device_name = device["name"]
-    file_name = "%s_%s.db" % (formated_time, device_id)
-
-    output_db_file = os.path.join(result_main_dir,
-                                        device_id,
-                                        device_name,
-                                        formated_time,
-                                        file_name
-                                        )
     return output_db_file
 
-def generate_new_device_map(ip_range=(2,253),device="wlan0", result_main_dir="/ethoscope_results"):
+def generate_new_device_map(ip_range=(2,64),device="wlan0", result_main_dir="/ethoscope_results"):
         devices_map = {}
         subnet_ip = get_subnet_ip(device)
+
+        t0 = time.time()
+
         logging.info("Scanning attached devices")
-        scanned = [ "%s.%i" % (subnet_ip, i) for i in range(1,253) ]
+
+        scanned = [ "%s.%i" % (subnet_ip, i) for i in range(*ip_range) ]
         urls= ["http://%s" % str(s) for s in scanned]
 
         # We can use a with statement to ensure threads are cleaned up promptly
-        with futures.ThreadPoolExecutor(max_workers=128) as executor:
+        with futures.ThreadPoolExecutor(max_workers=64) as executor:
             # Start the load operations and mark each future with its URL
 
             fs = [executor.submit(scan_one_device, url) for url in urls]
@@ -205,45 +203,75 @@ def generate_new_device_map(ip_range=(2,253),device="wlan0", result_main_dir="/e
 
                 try:
                     id, ip = f.result()
-                    if id is None:
-                        continue
-                    devices_map[id] = {"ip":ip}
+                    devices_map[id] = {"ip":ip, "id":id}
 
+                except ScanException as e:
+                    pass
                 except Exception as e:
                     logging.error("Error whilst pinging url")
                     logging.error(traceback.format_exc(e))
+
         if len(devices_map) < 1:
             logging.warning("No device detected")
             return  devices_map
 
-        logging.info("Detected %i devices:\n%s" % (len(devices_map), str(devices_map.keys())))
+        all_devices = sorted(devices_map.keys())
+        logging.info("DEVICE ID -> Detected %i devices in %i seconds:\n%s" % (len(devices_map),time.time() - t0, str(all_devices)))
         # We can use a with statement to ensure threads are cleaned up promptly
-        with futures.ThreadPoolExecutor(max_workers=128) as executor:
+
+        with futures.ThreadPoolExecutor(max_workers=5) as executor:
             # Start the load operations and mark each future with its URL
             fs = {}
             for id in devices_map.keys():
                 fs[executor.submit(update_dev_map_wrapped,devices_map, id)] = id
 
             for f in concurrent.futures.as_completed(fs):
-                id = fs[f]
                 try:
+                    id = fs[f]
                     data = f.result()
                     devices_map[id].update(data)
+
                 except Exception as e:
                     logging.error("Could not get data from device %s :" % id)
                     logging.error(traceback.format_exc(e))
+                    del devices_map[id]
+        all_devices = sorted(devices_map.keys())
+        logging.info("DEVICE INFO -> Detected %i devices in %i seconds:\n%s" % (len(devices_map),time.time() - t0, str(all_devices)))
+
+
+ # We can use a with statement to ensure threads are cleaned up promptly
+        with futures.ThreadPoolExecutor(max_workers=64) as executor:
+            # Start the load operations and mark each future with its URL
+            fs = {}
+            for id in devices_map.keys():
+                device = devices_map[id]
+                fs[executor.submit(make_backup_path, device,result_main_dir)] = id
+
+            for f in concurrent.futures.as_completed(fs):
+                try:
+                    id = fs[f]
+                    path = f.result()
+                    if path:
+                        devices_map[id]["backup_path"] = path
+
+                except Exception as e:
+                    logging.error("Error whilst getting backup path for device")
+                    logging.error(traceback.format_exc(e))
+
 
         for d in devices_map.values():
-            d["backup_path"] = make_backup_path(d,result_main_dir)
-            d["time_since_backup"] = get_last_backup_time(d["backup_path"])
+            d["time_since_backup"] = get_last_backup_time(d)
+
+
+        all_devices = sorted(devices_map.keys())
+        logging.info("BACKUP_PATH -> Detected %i devices in %i seconds:\n%s" % (len(devices_map),time.time() - t0, str(all_devices)))
 
         return devices_map
 
-def get_last_backup_time(backup_path):
+def get_last_backup_time(device):
     try:
+        backup_path = device["backup_path"]
         time_since_last_backup = time.time() - os.path.getmtime(backup_path)
-        #time.strftime('', time_since_last_backup)
         return time_since_last_backup
-    except Exception as e:
-        print e
+    except Exception:
         return "No backup"

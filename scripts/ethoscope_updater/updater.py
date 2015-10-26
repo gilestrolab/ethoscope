@@ -8,13 +8,10 @@ import traceback
 
 
 
-class BaseUpdater(object):
-
-    _daemon = None
+class DeviceUpdater(object):
 
     def __init__(self,
                  git_working_dir):
-
         self._git_working_dir = git_working_dir
         self._working_repo = Repo(git_working_dir)
         self._origin = self._working_repo.remotes.origin
@@ -25,7 +22,7 @@ class BaseUpdater(object):
         Gets the id of the local head and the origin's.
         returned object are Commits, not strings. their unix TS can be access through``.committed_date``.
         """
-
+        self._origin.fetch()
         local_commit = self._working_repo.commit()
         active_branch = self._working_repo.active_branch
         origin_commit = self._origin.refs[str(active_branch)].commit
@@ -45,6 +42,9 @@ class BaseUpdater(object):
             msg = "Update failed. Local is at %s" % str(c_local)
             logging.error(msg)
             raise Exception(msg)
+
+    def active_branch(self):
+        return self._working_repo.active_branch
 
     def available_branches(self):
         """
@@ -66,16 +66,6 @@ class BaseUpdater(object):
         self._origin.fetch()
         self._working_repo.git.checkout(branch)
 
-    def restart_daemon(self):
-        # TODO
-        # I am not sure this class should actually deal with restarting any daemon. this should be handled by the parent bottle server
-        pass
-
-
-class DeviceUpdater(BaseUpdater):
-    _daemon = "device.service"
-    pass
-
 
 class BareRepoUpdater(object):
     """
@@ -96,13 +86,29 @@ class BareRepoUpdater(object):
         :return:
         """
         branches = self._working_repo.branches
+        out = {}
 
+        one_success = False
         for b in branches:
+
             try:
-                self._origin.fetch(b)
+                key = str(b)
+                out[key]=False
+                self.update_branch(b)
+                out[key]=True
+                one_success = True
             except GitCommandError as e:
                 logging.error(traceback.format_exc(e))
 
+        if not one_success:
+            raise Exception("Could not update any branch. Are you connected to internet?")
+        return out
+
+    def update_branch(self,b):
+        if not isinstance(b,str):
+            b = str(b)
+        fetch_msg = "%s:%s" % (b,b)
+        self._working_repo.git.fetch("origin",fetch_msg)
 
 
     def discover_branches(self):
@@ -111,10 +117,11 @@ class BareRepoUpdater(object):
         :return:
         """
         try:
-            self._working_repo.git.fetch("origin","*:*")
+            self.update_branch("*")
         except GitCommandError as e:
             logging.error(traceback.format_exc(e))
 
+        return self.update_all_visible_branches()
 
 
 
@@ -124,11 +131,15 @@ class BareRepoUpdater(object):
 # bare_updater.discover_branches()
 # bare_updater.update_all_visible_branches()
 #
+#
+#
+# #
+# updater = DeviceUpdater("/tmp/dummy_repo")
+# active_branch = updater.active_branch()
+# print updater._origin.refs[str(active_branch)].commit
 
 
-#
-updater = DeviceUpdater("/tmp/dummy_repo")
-print updater.available_branches()
-updater.change_branch("another_branch")
-updater.update_active_branch()
-#
+#print updater.available_branches()
+#updater.change_branch("another_branch")
+#updater.update_active_branch()
+# #

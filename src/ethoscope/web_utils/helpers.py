@@ -3,36 +3,41 @@ import subprocess
 import random
 import logging
 import traceback
+import git
+import datetime
+import os
 
 def get_machine_info(path):
     """
     Reads the machine NAME file and returns the value.
     """
-    log = logging.Logger("dummy")
     try:
-
         with open(path,'r') as f:
             info = f.readline().rstrip()
         return info
     except Exception as e:
-        log.warning(traceback.format_exc(e))
+        logging.warning(traceback.format_exc(e))
         return 'Debug-'+str(random.randint(1,100))
 
 
-def get_version(dir, branch):
-    version = subprocess.Popen(['git', 'rev-parse', branch] ,
-                                   cwd=dir,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
-    stdout,stderr = version.communicate()
-    commit_id = stdout.strip('\n')
+def get_commit_version(commit):
+    return {"id":str(commit),
+            "date":datetime.datetime.utcfromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
+                    }
+def get_version():
+    wd = os.getcwd()
 
-    version_date = subprocess.Popen(['git', 'show', '-s', '--format=%ci'] ,
-                                   cwd=dir,
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
-    stdout,stderr = version_date.communicate()
+    while wd != "/":
+        try:
+            repo = git.Repo(wd)
+            commit = repo.commit()
+            return get_commit_version(commit)
 
-    commit_date = stdout.strip('\n')
+        except git.InvalidGitRepositoryError:
+            wd = os.path.dirname(wd)
+    raise Exception("Not in a git Tree")
 
-    return {"id":commit_id, "date":commit_date}
+
+
+
+

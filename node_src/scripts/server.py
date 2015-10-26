@@ -4,13 +4,9 @@ import urllib2
 import subprocess
 import socket
 import json
-
 import re
-
 import logging
 import traceback
-from ethoscope_node.utils.helpers import get_version
-from ethoscope_node.utils.helpers import which
 from ethoscope_node.utils.helpers import generate_new_device_map, update_dev_map_wrapped
 from ethoscope_node.utils.helpers import get_last_backup_time
 
@@ -29,8 +25,8 @@ STATIC_DIR = "../static"
 
 def update_device_map(id, what="data",type=None, port=9000, data=None):
     global  devices_map
-    out = update_dev_map_wrapped(devices_map,id,what,type,port,data,result_main_dir=RESULTS_DIR )
-    return out
+    update_dev_map_wrapped(devices_map,id,what,type,port,data,result_main_dir=RESULTS_DIR )
+
 
 @app.get('/favicon.ico')
 def get_favicon():
@@ -49,6 +45,17 @@ def index():
     return static_file('index.html', root=STATIC_DIR)
 
 
+@app.hook('after_request')
+def enable_cors():
+    """
+    You need to add some headers to each request.
+    Don't use the wildcard '*' for Access-Control-Allow-Origin in production.
+    """
+    response.headers['Access-Control-Allow-Origin'] = 'http://localhost:8888'
+    response.headers['Access-Control-Allow-Methods'] = 'PUT, GET, POST, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Origin, Accept, Content-Type, X-Requested-With, X-CSRF-Token'
+
+
 #################################
 # API to connect with SM/SD
 #################################
@@ -56,13 +63,32 @@ def index():
 
 
 @app.get('/devices')
-def scan_subnet(ip_range=(2,253)):
+def scan_subnet(ip_range=(2,64)):
     global devices_map
     try:
-        devices_map = generate_new_device_map(ip_range,SUBNET_DEVICE)
+        devices_map_tmp = generate_new_device_map(ip_range,SUBNET_DEVICE)
+        detected_devices = devices_map_tmp.keys()
+        for k in detected_devices:
+            if k in devices_map:
+                devices_map[k].update(devices_map_tmp[k])
+            else:
+                logging.info("new device detected %s" % k)
+                devices_map[k] = devices_map_tmp[k]
+
+
+
+        for k in devices_map.keys():
+             if k not in detected_devices:
+                 logging.warning("Device %s not detected when scanning" % k)
+                 devices_map[k]["status"] = "not detected"
+
+
+
         return devices_map
+
+    
     except Exception as e:
-        logging.error("Unexpected exception when scanning for devices:")
+        logging.error("Unexpected exception whilst scanning devices:")
         logging.error(traceback.format_exc(e))
 
 
@@ -77,15 +103,12 @@ def get_devices_list():
 def device(id):
     try:
         update_device_map(id,what="data")
-        devices_map[id]["time_since_backup"] = get_last_backup_time(devices_map[id]["backup_path"])
         return devices_map[id]
     except Exception as e:
         return {'error':traceback.format_exc(e)}
 
-
 @app.post('/device/<id>/controls/<type_of_req>')
 def device(id, type_of_req):
-    # global acquisition
     try:
         post_data = request.body.read()
         update_device_map(id, "data")
@@ -94,8 +117,6 @@ def device(id, type_of_req):
         if type_of_req == 'start':
             if device_info['status'] == 'stopped':
                 update_device_map(id, "controls", type_of_req, data=post_data)
-                # acquisition[id] = Acquisition(devices_map[id], result_main_dir=RESULTS_DIR)
-                # acquisition[id].start()
             else:
                 raise Exception("Cannot start, device %s status is `%s`" %  (id, device_info['status']))
 
@@ -127,11 +148,6 @@ def device(id, type_of_req):
 
 def stop_device(id, post_data):
     update_device_map(id, "controls", 'stop', data=post_data)
-    # acquisition[id].stop()
-    # logging.info("Joining process")
-    # acquisition[id].join()
-    # logging.info("Removing device %s from acquisition map" % id)
-    # del acquisition[id]
 
 @app.post('/device/<id>/log')
 def get_log(id):
@@ -140,8 +156,6 @@ def get_log(id):
         data = request.body.read()
         data = json.loads(data)
 
-        # url  = format_post_get_url(id,"static",type=data["file_path"])
-        # req = urllib2.Request(url)
         #TO DISCUSS @luis static files url not understood
         req = urllib2.Request(url=devices_map[id]['ip']+':9000/static'+data["file_path"])
 
@@ -158,9 +172,7 @@ def get_log(id):
 #################################
 # NODE Functions
 #################################
-@app.get('/node/status')
-def node_status():
-    return {'is_updated': is_updated}
+
 
 #Browse, delete and download files from node
 
@@ -209,80 +221,6 @@ def browse(folder):
     except Exception as e:
         return {'error': traceback.format_exc(e)}
 
-@app.post('/update')
-def update_systems():
-    devices_to_update = request.json
-    try:
-        restart_node = False
-        for d in devices_to_update:
-            if d['name'] == 'Node':
-                #update node
-                node_update = subprocess.Popen(['git', 'pull'],
-                                                cwd=GIT_WORKING_DIR,
-                                                stdout=subprocess.PIPE,
-                                                stderr=subprocess.PIPE)
-                response_from_fetch, error_from_fetch = node_update.communicate()
-                if response_from_fetch != '':
-                    logging.info(response_from_fetch)
-                if error_from_fetch != '':
-                    logging.error(error_from_fetch)
-                restart_node = True
-
-            else:
-                update_device_map(d['id'], what="update", data='update')
-
-    except Exception as e:
-        return {'error':traceback.format_exc(e)}
-
-    if restart_node is True:
-        try:
-            # stop acquisition thread
-            logging.info("Stopping server. Should be restarted automatically by systemd")
-            close()
-        except KeyboardInterrupt as k:
-            raise k
-        except Exception as e:
-            return {'error':traceback.format_exc(e)}
-
-@app.get('/update/check')
-def check_update():
-    global devices_map
-    update = {}
-    try:
-        #check internet connection
-        try:
-            #fixme ping is simply not used here!
-            if not which("fping"):
-                raise Exception("fping not available")
-            ping = os.system(" fping %s -t 50  > /dev/null 2>&1 " % '8.8.8.8')
-        except Exception as e:
-            ping = 0
-            logging.error("Could not ping. Assuming 'alive'")
-            logging.error(traceback.format_exc(e))
-            update['error'] = 'No internet connection, check cable. Error: ', e
-
-        #check if there is a new version on the repo
-        bare_update = subprocess.Popen(['git', 'fetch', '-v', 'origin', branch+':'+branch],
-                                       stdout=subprocess.PIPE,
-                                       stderr=subprocess.PIPE,
-                                       cwd=GIT_BARE_REPO_DIR,
-                                       )
-        response_from_fetch, error_from_fetch = bare_update.communicate()
-        if response_from_fetch != '':
-            logging.info(response_from_fetch)
-        if error_from_fetch != '':
-            logging.error(error_from_fetch)
-            update['error'] = error_from_fetch
-        #check version
-        origin_version = get_version(GIT_BARE_REPO_DIR, branch)
-        
-        origin = {'version': origin_version, 'name': 'Origin'}
-        devices_map = scan_subnet()
-        update.update({'node': {'version': node_version, 'status': 'ON','name': 'Node', 'id':'Node'}})
-        return {'update': update, 'attached_devices': devices_map, 'origin': origin}
-    except Exception as e:
-        logging.error(traceback.format_exc(e))
-        return {'update':{'error':traceback.format_exc(e)}}
 
 
 
@@ -312,36 +250,52 @@ def download(what):
 
 @app.get('/node/<req>')
 def node_info(req):#, device):
-    if req == 'info':
-        df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout=subprocess.PIPE)
-        disk_free = df.communicate()[0]
-        disk_usage = disk_free.split("\n")[1].split()
-        ip = "No IP assigned, check cable"
+    try:
+        if req == 'info':
+            df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout=subprocess.PIPE)
+            disk_free = df.communicate()[0]
+            disk_usage = RESULTS_DIR+" Not Found on disk"
+            ip = "No IP assigned, check cable"
+            MAC_addr = "Not detected"
+            local_ip = ""
+            try:
+                disk_usage = disk_free.split("\n")[1].split()
+                addrs = ifaddresses(INTERNET_DEVICE)
+                MAC_addr = addrs[AF_LINK][0]["addr"]
 
-        addrs = ifaddresses(INTERNET_DEVICE)
-        MAC_addr = addrs[AF_LINK][0]["addr"]
-        try:
-            ip = addrs[AF_INET][0]["addr"]
-        except Exception as e:
-            logging.error(e)
+                ip = addrs[AF_INET][0]["addr"]
+                local_addrs = ifaddresses(SUBNET_DEVICE)
+                local_ip = local_addrs[AF_INET][0]["addr"]
+            except Exception as e:
+                logging.error(e)
 
-        return {'disk_usage': disk_usage, 'MAC_addr': MAC_addr, 'ip': ip}
-    if req == 'time':
-        return {'time':datetime.datetime.now().isoformat()}
-    else:
-        raise NotImplementedError()
-
+            return {'disk_usage': disk_usage, 'MAC_addr': MAC_addr, 'ip': ip,
+                    'local_ip':local_ip}
+        if req == 'time':
+            return {'time':datetime.datetime.now().isoformat()}
+        else:
+            raise NotImplementedError()
+    except Exception as e:
+        logging.error(e)
+        return {'error': traceback.format_exc(e)}
 
 @app.post('/node-actions')
 def node_actions():
+    try:
         action = request.json
         if action['action'] == 'poweroff':
             logging.info('User request a poweroff, shutting down system. Bye bye.')
-            #this does not poweroff the device
+
             close()
             #poweroff = subprocess.Popen(['poweroff'], stdout=subprocess.PIPE)
+        elif action['action'] == 'close':
+            close()
         else:
             raise NotImplementedError()
+    except Exception as e:
+        logging.error(e)
+        return {'error': traceback.format_exc(e)}
+
 @app.post('/remove_files')
 def remove_files():
     try:
@@ -358,7 +312,7 @@ def remove_files():
         return {'result': res}
     except Exception as e:
         logging.error(e)
-        return {'error':e}
+        return {'error': traceback.format_exc(e)}
 
 
 @app.get('/list/<type>')
@@ -380,17 +334,7 @@ def redirection_to_home(id):
 def redirection_to_more(action):
     return redirect('/#/more/'+action)
 
-
-
-
 def close(exit_status=0):
-    # logging.info("Joining acquisition processes")
-    # for a in acquisition.values():
-    #     a.stop()
-    #     logging.info("Joining process")
-    #     a.join()
-    #     logging.info("Joined OK")
-
     logging.info("Closing server")
     os._exit(exit_status)
     
@@ -405,13 +349,10 @@ if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
 
     parser = optparse.OptionParser()
-    #parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
+    parser.add_option("-D", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-p", "--port", dest="port", default=80,help="port")
     parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
-    parser.add_option("-b", "--branch", dest="branch", default="master",help="the branch to work from")
     parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_results",help="Where temporary result files are stored")
-    parser.add_option("-g", "--git-dir", dest="git_dir", default="/home/node/ethoscope-git",help="Where is the target git located(for software update)")
-    parser.add_option("-B", "--git-bare-dir", dest="git_bare_dir", default="/srv/git/ethoscope-git",help="Where is the target git located(for software update)")
     parser.add_option("-i", "--internet-adapter", dest="internet_adapter", default="",help="e.g. En0, adapter user to internet connection (updates)")
     parser.add_option("-l", "--local-adapter", dest="local_adapter", default="",help="e.g. wlan0, adapter used for the local connection with devices")
 
@@ -419,56 +360,43 @@ if __name__ == '__main__':
 
     option_dict = vars(options)
     PORT = option_dict["port"]
-    branch = option_dict["branch"]
+    debug = option_dict["debug"]
 
     RESULTS_DIR = option_dict["results_dir"]
-    GIT_BARE_REPO_DIR = option_dict["git_bare_dir"]
-    GIT_WORKING_DIR = option_dict["git_dir"]
+
 
     #SUBNET_DEVICE = b'wlan0'
     p1 = subprocess.Popen(["ip", "link", "show"], stdout=subprocess.PIPE)
     network_devices, err = p1.communicate()
-
     wireless = re.search(r'[0-9]: (wl.*):', network_devices)
-    if wireless is not None:
-        SUBNET_DEVICE = wireless.group(1)
-    else:
-        logging.error("Not Wireless adapter has been detected. It is necessary to connect to Devices.")
-
     ethernet = re.search(r'[0-9]: (en.*):', network_devices)
-    if ethernet is not None:
-        INTERNET_DEVICE = ethernet.group(1)
-    else:
-        logging.info("Not ethernet adapter has been detected. It is necessary to connect to the internet.")
 
     if option_dict["local_adapter"] != "":
         SUBNET_DEVICE = option_dict["local_adapter"]
 
+    elif wireless is not None:
+        SUBNET_DEVICE = wireless.group(1)
+    else:
+        logging.error("Not Wireless adapter has been detected. It is necessary to connect to Devices.")
+        raise Exception("Not Wireless adapter has been detected. It is necessary to connect to Devices.")
+
+
+
     if option_dict["internet_adapter"] != "":
         INTERNET_DEVICE = option_dict["internet_adapter"]
+    elif ethernet is not None:
+        INTERNET_DEVICE = ethernet.group(1)
+    else:
+        logging.warning("Not ethernet adapter has been detected. It is necessary to connect to the internet.")
 
     global devices_map
-    global scanning_locked
-    # global acquisition
 
-    scanning_locked = False
     devices_map = {}
-    # acquisition = {}
-
     scan_subnet()
 
-    origin_version = get_version(GIT_BARE_REPO_DIR, branch)
-    node_version = get_version(GIT_WORKING_DIR, branch)
-
-    if origin_version != node_version:
-        is_updated = False
-    else:
-        is_updated = True
 
     try:
-
         run(app, host='0.0.0.0', port=PORT, debug=debug, server='cherrypy')
-        #run(app, host='0.0.0.0', port=PORT, debug=debug)
 
     except KeyboardInterrupt:
         logging.info("Stopping server cleanly")
@@ -483,6 +411,3 @@ if __name__ == '__main__':
         close(1)
     finally:
         close()
-
-
-# python server.py -p 8000 -g /Users/asterix/PolygonalTree/todel/ethoscope.git -B /Users/asterix/PolygonalTree/todel/ethoscope

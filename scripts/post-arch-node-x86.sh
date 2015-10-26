@@ -13,11 +13,14 @@ set -e # stop if any error happens
 export USER_NAME=node
 export PASSWORD=node
 export DATA_DIR=/ethoscope_results
-export STABLE_BRANCH=dev
+export STABLE_BRANCH=master
 export UPSTREAM_GIT_REPO=https://github.com/gilestrolab/ethoscope.git
 export LOCAL_BARE_PATH=/srv/git/ethoscope.git
-export TARGET_GIT_INSTALL=/home/$USER_NAME/ethoscope-git
+export TARGET_UPDATER_DIR=/opt/ethoscope_updater
+export TARGET_GIT_INSTALL=/opt/ethoscope-git
+export UPDATER_LOCATION_IN_GIT=scripts/ethoscope_updater
 export NODE_IP=192.169.123.1
+export WL_INTERFACE=wlan0
 
 
 ############# PACKAGES #########################
@@ -45,8 +48,7 @@ pacman -S mariadb --noconfirm --needed
 #setup Wifi dongle
 #pacman -S netctl
 pacman -S wpa_supplicant --noconfirm --needed
-
-
+pacman -S libev --noconfirm --needed
 
 #Create a Bare repository with only the production branch in node, it is on /var/
 echo 'creating bare repo'
@@ -56,14 +58,16 @@ git clone --bare $UPSTREAM_GIT_REPO $LOCAL_BARE_PATH
 #Create a local working copy from the bare repo on node
 echo 'Installing ethoscope package'
 git clone $LOCAL_BARE_PATH $TARGET_GIT_INSTALL
-cd $TARGET_GIT_INSTALL/node-src
+
+cd $TARGET_GIT_INSTALL/node_src
 pip2 install -e .
 cd -
 
 
 
+
 echo 'Description=psv wifi network' > /etc/netctl/ethoscope_wifi
-echo 'Interface=wlan0' >> /etc/netctl/ethoscope_wifi
+echo "Interface=$WL_INTERFACE" >> /etc/netctl/ethoscope_wifi
 echo 'Connection=wireless' >> /etc/netctl/ethoscope_wifi
 echo 'Security=wpa' >> /etc/netctl/ethoscope_wifi
 echo 'IP=dhcp' >> /etc/netctl/ethoscope_wifi
@@ -84,17 +88,18 @@ echo 'IP=dhcp' >> /etc/netctl/eth0
 ######################################################################################
 
 #Creating service for device_server.py
-cp ./node.service /etc/systemd/system/node.service
+cp ./ethoscope_node.service /etc/systemd/system/ethoscope_node.service
+cp ./ethoscope_backup.service /etc/systemd/system/ethoscope_backup.service
 
 
 #configuring dns server:
-echo 'interface=wlan0' >/etc/dnsmasq.conf
-echo 'dhcp-option = 6,$NODE_IP' >> /etc/dnsmasq.conf
-echo 'no-hosts' >> /etc/dnsmasq.conf
-echo 'addn-hosts=/etc/host.dnsmasq' >> /etc/dnsmasq.conf
+echo "interface=$WL_INTERFACE" >/etc/dnsmasq.conf
+echo "dhcp-option = 6,$NODE_IP" >> /etc/dnsmasq.conf
+echo "no-hosts" >> /etc/dnsmasq.conf
+echo "addn-hosts=/etc/host.dnsmasq" >> /etc/dnsmasq.conf
 #domain=polygonaltreenetwork.com,192.169.123.0/24
 
-echo '$NODE_IP    node' >> /etc/hosts.dnsmasq
+echo "$NODE_IP    node" >> /etc/hosts.dnsmasq
 
 
 systemctl daemon-reload
@@ -121,18 +126,11 @@ netctl enable ethoscope_wifi
 netctl enable eth0
 netctl start eth0
 
+
 #node service
-systemctl start node.service
-systemctl enable node.service
-
-# Setting passwordless ssh, this is the content of id_rsa.pub used in git updates.
-#TODO do not use a relative path.
-mkdir -p /home/$USER_NAME/.ssh
-echo 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKXjWAfHrJ/HAPO3d4vu5s5+Xxw5NDKX1a8rqx3amo0WO7wWe0m2uv+rnJuH7xvWCKMOGlv9jgj1vSSNcuMT30tzioHqRf/k7scUXFPoWxvxTZtqXizZwKe93mfOvCC5Ni5zLtUyMqycnLPGP2K1Rf0Xvx/WLP94bcxXyTaGtftvTcAIC53Kll1XgyHSxsh1ou7rTXt57V0/1wnWqOGH1Y+AMqUkBEKjU2QUZyYoUaVSfwBwSpIi8tvH/Ng5aEH6BGs4cqDnXUBWpdDD6JdR5NxhqYK0lcpWltBlSz8RFvoOKpyQ/0vs5ysNPgX/N4eaHWhECRFD5oNkNXIUBRpe3/ psv@polygonaltree.com
-' >> /home/$USER_NAME/.ssh/authorized_keys
-
-
-#TODOs: locale/TIMEZONE/keyboard ...
+systemctl start ethoscope_node.service
+systemctl enable ethoscope_node.service
+systemctl enable ethoscope_backup.service
 
 ##########################################################################################
 # add password without stoping
@@ -155,8 +153,12 @@ echo "Hostname is $hostname"
 hostnamectl set-hostname $hostname
 
 
-echo 'SUCESS, please reboot'
+cp $TARGET_GIT_INSTALL/$UPDATER_LOCATION_IN_GIT $TARGET_UPDATER_DIR -r
+cd $TARGET_UPDATER_DIR
+cp ethoscope_update_node.service /etc/systemd/system/ethoscope_update_node.service
+
+systemctl daemon-reload
+systemctl enable ethoscope_update_node.service
 
 
-
-
+#todo set up update daemon

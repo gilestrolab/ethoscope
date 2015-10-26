@@ -44,9 +44,9 @@
      </div>
     <div class="jumbotron table-background" ng-cloak>
         <h3>Select some devices to perform the actions below:</h3>
-        <button class="btn btn-success btn-xl" ng-click="pre_update(devices_to_update_selected)">Update</button>
-        <button class="btn btn-default" ng-click="pre_restart(devices_to_update_selected)">Restart</button>
-        <button class="btn btn-default" ng-click="pre_swBranch(devices_to_update_selected)">Switch Branch</button>
+        <button class="btn btn-success btn-xl" ng-click="activate_modal(selected_devices, 'update')">Update</button>
+        <button class="btn btn-default" ng-click="activate_modal(selected_devices, 'restart')">Restart</button>
+        <button class="btn btn-default" ng-click="activate_modal(selected_devices, 'swBranch')">Switch Branch</button>
     <hr>
 
     <div  id="scanning_devices" class="spinner_scan"></div>
@@ -72,7 +72,7 @@
                 <td>{{node.ip}}</td>
                 <td>N/A<!--{{node.info.id.substring(0,6)}}--></td>
                 <td><center>
-                    <input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="node"></center>
+                    <input type="checkbox" checklist-model="selected_devices" checklist-value="node"></center>
                 </td>
             </tr>
             <tr ng-repeat="(id,device) in devices">
@@ -88,7 +88,7 @@
                 <td>{{device.ip}}</td>
                 <td>{{device.id.substring(0,6)}}</td>
                 <td><center>
-                    <input type="checkbox" checklist-model="devices_to_update_selected" checklist-value="device"></center>
+                    <input type="checkbox" checklist-model="selected_devices" checklist-value="device"></center>
                 </td>
             </tr>
             </tbody>
@@ -96,118 +96,33 @@
 
 </div>
 
-<!-- Modal update modal -->
-<div class="modal fade" id="updateModal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
+<!--Modal-->
+<div class="modal fade" id="Modal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-          Update devices
+          {{modal.title}}
       </div>
-      <div class="modal-body">
-          This devices are going to be updated. Do not disconnect them.
-            <table class="table table-striped" ng-cloak>
-            <thead>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Software Version</th>
-            <th>ip</th>
-            <th>id</th>
-            <th><center>Select</center></th>
-            </thead>
-            <tbody>
-            
-            <tr ng-repeat="(id,device) in devices_to_update_selected">
-
-                <td>
-                    <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
-                    <span ng-if="device.up_to_date==false" class="fa fa-circle colour-red"></span> <span ng-if="device.up_to_date==true" class="fa fa-circle colour-green"></span>
-                        <span> {{device.name}}</span>
-                    </a>
-                </td>
-                <td> {{device.status}}</td>
-                <td>[{{device.active_branch}}] {{device.version.id.substring(0,6)}}... ({{device.version.date}})</td>
-                <td>{{device.ip}}</td>
-                <td>{{device.id.substring(0,6)}}</td>
-            </tr>
-            </tbody>
-    </table>
+        <div class = "model-body" ng-if="system.modal_error != ''">
+            <h3>{{system.modal_error}}</h3>
         </div>
-      <div class="modal-footer">
-          <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-        <button ng-click="update(devices_to_update_selected)" target="_blank" type="button" class="btn btn-primary">Update</button>
-      </div>
-    </div>
-  </div>
-</div>
 
-        <!-- Modal restart modal -->
-<div class="modal fade" id="restartModal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-          Restart devices
-      </div>
-      <div class="modal-body">
-          The following devices are going to be restarted.
-            <table class="table table-striped" ng-cloak>
-            <thead>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Software Version</th>
-            <th>ip</th>
-            <th>id</th>
-            <th><center>Select</center></th>
-            </thead>
-            <tbody>
-            
-            <tr ng-repeat="(id,device) in devices_to_update_selected">
-
-                <td>
-                    <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
-                    <span ng-if="device.up_to_date==false" class="fa fa-circle colour-red"></span> <span ng-if="device.up_to_date==true" class="fa fa-circle colour-green"></span>
-                        <span> {{device.name}}</span>
-                    </a>
-                </td>
-                <td> {{device.status}}</td>
-                <td>[{{device.active_branch}}] {{device.version.id.substring(0,6)}}... ({{device.version.date}})</td>
-                <td>{{device.ip}}</td>
-                <td>{{device.id.substring(0,6)}}</td>
-            </tr>
-            </tbody>
-    </table>
-        </div>
-      <div class="modal-footer">
-          <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-        <button ng-click="restart(devices_to_update_selected)" target="_blank" type="button" class="btn btn-primary">restart</button>
-      </div>
-    </div>
-  </div>
-</div>
-        
-<!-- Modal swBranch modal -->
-<div class="modal fade" id="swBranchModal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-          Switch branch for devices
-      </div>
-      <div class="modal-body">
-          Select branch to switch selected devices:
-          <select name="branch_to_switch" ng-model="branch_to_switch">
-            <option ng-repeat="(key, name) in system.status" value="{{key}}">{{key}}</option>
+      <div class="modal-body " ng-if="system.modal_error == ''">
+          {{modal.info}}
+          <select ng-if="modal.action=='swBranch'" name="branch_to_switch" ng-model="branch_to_switch">
+              <option ng-repeat="(key, name) in system.status" value="{{key}}">{{key}}</option>
           </select>
-          <table class="table table-striped" ng-cloak>
+            <table class="table table-striped" ng-cloak>
             <thead>
             <th>Name</th>
             <th>Status</th>
             <th>Software Version</th>
             <th>ip</th>
             <th>id</th>
-            <th><center>Select</center></th>
             </thead>
             <tbody>
             
-            <tr ng-repeat="(id,device) in devices_to_update_selected">
+            <tr ng-repeat="(id,device) in selected_devices">
 
                 <td>
                     <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
@@ -223,14 +138,15 @@
             </tbody>
     </table>
         </div>
-    
       <div class="modal-footer">
           <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-        <button ng-click="swBranch(devices_to_update_selected)" target="_blank" type="button" class="btn btn-primary">Switch</button>
+        <button ng-click="modal_action(selected_devices, modal.action)" target="_blank" type="button" class="btn btn-primary"  ng-if="system.modal_error == ''">{{modal.action_text}}</button>
       </div>
     </div>
   </div>
-</div>
+</div>            
+            
+
     <!--JS-->
 
     <!-- load angular and angular route via CDN -->

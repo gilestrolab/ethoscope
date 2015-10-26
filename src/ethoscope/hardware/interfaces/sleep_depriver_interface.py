@@ -16,8 +16,14 @@ class WrongSleepDepPortError(serial.SerialException):
 class SimpleLynxMotionConnection(object):
 
     _baud = 115200
-    _min_angle_pulse = (0.,800.)
-    _max_angle_pulse = (150.,2400.)
+
+    # digital servos
+    #_min_angle_pulse = (0.,800.)
+    #_max_angle_pulse = (150.,2400.)
+
+    # blue old school servo
+    _min_angle_pulse = (0.,500.)
+    _max_angle_pulse = (180.,2500.)
 
 
     def __init__(self, port=None):
@@ -140,7 +146,7 @@ class SleepDepriverConnection(SimpleLynxMotionConnection):
             for i in range(1,11):
                 self.deprive(i)
 
-    def deprive(self,channel, dt=500):
+    def deprive(self,channel, dt=500,margin=5):
         """
         Sleep deprive an animal by rotating its tube.
 
@@ -148,11 +154,14 @@ class SleepDepriverConnection(SimpleLynxMotionConnection):
         :typechannel: int
         :param dt: The time it takes to go from 0 to 180 degrees (inms)
         :type dt: int
+        :param margin: the number of degree to pad rotation. eg 5 -> rotation from 5 -> 175
+        :type dt: int
         """
-        self.move_to_angle(channel, self._min_angle_pulse[0],dt)
+        self.move_to_angle(channel, self._max_angle_pulse[0] - margin,dt)
         time.sleep(dt/1000.0)
-        self.move_to_angle(channel, self._max_angle_pulse[0],dt)
+        self.move_to_angle(channel, self._min_angle_pulse[0] + margin,dt)
         time.sleep(dt/1000.0)
+
 
 class SleepDepriverSubProcess(multiprocessing.Process):
     _DepriverConnectionClass = SleepDepriverConnection

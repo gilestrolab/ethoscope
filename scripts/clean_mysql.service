@@ -1,0 +1,15 @@
+
+[Unit]
+Description=autorepair mysql
+Wants=mysqld.service
+After= mysqld.service
+
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/ethoscope-git/node_src/scripts/
+ExecStart=/usr/bin/mysqlcheck -A --auto-repair
+
+
+[Install]
+WantedBy=multi-user.target
