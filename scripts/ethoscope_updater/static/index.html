@@ -109,7 +109,7 @@
 
       <div class="modal-body " ng-if="system.modal_error == ''">
           {{modal.info}}
-          <select ng-if="modal.action=='swBranch'" name="branch_to_switch" ng-model="branch_to_switch">
+          <select ng-show="modal.action=='swBranch'" name="branch_to_switch" ng-model="branch_to_switch">
               <option ng-repeat="(key, name) in system.status" value="{{key}}">{{key}}</option>
           </select>
             <table class="table table-striped" ng-cloak>
