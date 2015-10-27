@@ -124,7 +124,7 @@
                     break;
                 case 'swBranch':
                     for (device in devices){
-                    devices[device]['new_branch'] = $scope.branch_to_switch;
+                    devices[device]['new_branch'] = $scope.modal.branch_to_switch;
                     }
                     url = '/group/swBranch';
                     
