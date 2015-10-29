@@ -68,9 +68,8 @@ class SleepDepInteractor(IsMovingInteractor):
     _hardwareInterfaceClass = SleepDepriverInterface
     _roi_to_channel = {
             1:1,  3:2,  5:3,  7:4,  9:5,
-            10:6, 12:7, 14:8, 16:9, 18:10
+            12:6, 14:7, 16:8, 18:9, 20:10
         }
-
     def __init__(self,
                  hardware_interface,
                  velocity_threshold=0.0060,
@@ -145,7 +144,7 @@ class BaseStaticSleepDepInteractor(BaseInteractor):
     _hardwareInterfaceClass = SleepDepriverInterface
     _roi_to_channel = {
             1:1,  3:2,  5:3,  7:4,  9:5,
-            10:6, 12:7, 14:8, 16:9, 18:10
+            12:6, 14:7, 16:8, 18:9, 20:10
         }
     def __init__(self,
                  hardware_interface,
@@ -241,7 +240,7 @@ class ExperimentalSleepDepInteractor(IsMovingInteractor):
     _hardwareInterfaceClass = SleepDepriverInterface
     _roi_to_channel = {
             1:1,  3:2,  5:3,  7:4,  9:5,
-            10:6, 12:7, 14:8, 16:9, 18:10
+            12:6, 14:7, 16:8, 18:9, 20:10
         }
 
     def __init__(self,
