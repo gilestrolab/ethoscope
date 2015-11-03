@@ -2,6 +2,8 @@ __author__ = 'quentin'
 
 from sleep_depriver_interactor import SleepDepInteractor, SystematicSleepDepInteractor
 from ethoscope.hardware.interfaces.fake_sleep_dep_interface import FakeSleepDepriverInterface
+from ethoscope.interactors.interactors import  HasInteractedVariable
+import time
 import sys
 
 class FakeSleepDepInteractor(SleepDepInteractor):
@@ -38,6 +40,30 @@ class FakeSystematicSleepDepInteractor(SystematicSleepDepInteractor):
                                    ]}
 
 
+    def _decide(self):
+        roi_id= self._tracker._roi.idx
+        now =  self._tracker.last_time_point
+
+        try:
+            channel = self._roi_to_channel[roi_id]
+        except KeyError:
+            if roi_id==1:
+                print "KE"
+            return HasInteractedVariable(False), {"channel":0}
+
+        if self._check_time_range() is False:
+            if roi_id==1:
+                print "out of time",time.time(), self._start_datetime, self._end_datetime
+
+            return HasInteractedVariable(False), {"channel":channel}
+
+        if float(now - self._t0) > self._dt:
+                self._t0 = now # reset timer and deprive
+                if roi_id==1:
+                    print "INTERACTING"
+                return HasInteractedVariable(True), {"channel":channel}
+
+        return HasInteractedVariable(False), {"channel":channel}
 
     _hardwareInterfaceClass = FakeSleepDepriverInterface
 

@@ -171,6 +171,7 @@ class ControlThread(Thread):
 
         if data is None:
             return
+        #FIXME DEBUG
         logging.warning("Starting control thread with data:")
         logging.warning(str(data))
         for key in self._option_dict.iterkeys():
