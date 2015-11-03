@@ -39,6 +39,17 @@ class FakeSystematicSleepDepInteractor(SystematicSleepDepInteractor):
                                     {"type": "datetime", "name": "end_datetime", "description": "When sleep deprivation is to be ended","default":sys.maxsize}
                                    ]}
 
+    def _check_time_range(self):
+        wall_clock_time = time.time()
+        if self._end_datetime > wall_clock_time > self._start_datetime:
+            if self._tracker._roi.idx ==1:
+                print "in range", wall_clock_time, self._start_datetime, self._end_datetime
+            return True
+
+        if self._tracker._roi.idx == 1:
+            print "failed check", wall_clock_time, self._start_datetime, self._end_datetime
+        return False
+
 
     def _decide(self):
         roi_id= self._tracker._roi.idx
