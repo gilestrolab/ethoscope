@@ -171,6 +171,8 @@ class ControlThread(Thread):
 
         if data is None:
             return
+        logging.info("Starting control thread with data:")
+        logging.info(str(data))
         for key in self._option_dict.iterkeys():
 
             Class, kwargs = self._parse_one_user_option(key, data)
