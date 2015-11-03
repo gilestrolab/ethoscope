@@ -40,7 +40,7 @@ class FakeSystematicSleepDepInteractor(SystematicSleepDepInteractor):
                                    ]}
 
     def _check_time_range(self):
-        wall_clock_time = time.time()
+        wall_clock_time = int(time.time())
         if  wall_clock_time < self._end_datetime:
             if self._tracker._roi.idx ==1:
                 print " smaller than end time"
