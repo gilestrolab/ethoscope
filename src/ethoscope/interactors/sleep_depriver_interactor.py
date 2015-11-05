@@ -94,13 +94,14 @@ class SleepDepInteractor(IsMovingInteractor):
         """
 
         self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
-        self._start_datetime= start_datetime
-        self._end_datetime= end_datetime
+        self._start_datetime = int(start_datetime)
+        self._end_datetime = int(end_datetime)
         self._t0 = None
 
         super(SleepDepInteractor, self).__init__(hardware_interface,velocity_threshold)
 
     def _check_time_range(self):
+
         wall_clock_time = time.time()
         if self._end_datetime > wall_clock_time > self._start_datetime:
             return True
@@ -265,8 +266,8 @@ class ExperimentalSleepDepInteractor(IsMovingInteractor):
 
 
 
-        self._start_datetime= start_datetime
-        self._end_datetime= end_datetime
+        self._start_datetime = int(start_datetime)
+        self._end_datetime = int(end_datetime)
         self._t0 = None
 
         super(ExperimentalSleepDepInteractor, self).__init__(hardware_interface,velocity_threshold)
