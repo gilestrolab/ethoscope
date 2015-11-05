@@ -42,7 +42,6 @@ class ControlThread(Thread):
                         "possible_classes":[DefaultInteractor,SleepDepInteractor,
                                             SystematicSleepDepInteractor,
                                             ExperimentalSleepDepInteractor,
-                                            FakeSleepDepInteractor,
                                             FakeSystematicSleepDepInteractor],
                     },
         "drawer":{
@@ -174,6 +173,7 @@ class ControlThread(Thread):
         #FIXME DEBUG
         logging.warning("Starting control thread with data:")
         logging.warning(str(data))
+
         for key in self._option_dict.iterkeys():
 
             Class, kwargs = self._parse_one_user_option(key, data)
@@ -313,7 +313,7 @@ class ControlThread(Thread):
         except Exception as e:
             self.stop(traceback.format_exc(e))
 
-        #for testing pusposes
+        #for testing purposes
         if self._evanescent:
             import os
             del self._drawer
