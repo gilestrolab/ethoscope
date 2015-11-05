@@ -291,7 +291,7 @@ class ExperimentalSleepDepInteractor(IsMovingInteractor):
             return HasInteractedVariable(False), {"channel":0}
 
         # this is where the magic happens. According to the channel, we wait different times.
-        inactivity_time_threshold_ms = round(3 * channel ** 1.7) * 10 * 1000
+        inactivity_time_threshold_ms = round( channel ** 1.7) * 20 * 1000
 
 
         if self._check_time_range() is False:
