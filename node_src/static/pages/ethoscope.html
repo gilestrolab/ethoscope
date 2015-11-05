@@ -150,7 +150,7 @@
                             {{arg.description}}
                             <input ng-if="arg.type == 'number'" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options[name]['arguments'][arg.name]" >
                             <input ng-if="arg.type == 'str'" type=text name={{arg.name}}  ng-model="selected_options[name]['arguments'][arg.name]"  >
-                            <input ng-if="arg.type == 'datetime'" type=number name={{arg.name}}  ng-model="selected_options[name]['arguments'][arg.name]">
+                            <input ng-if="arg.type == 'datetime'" type=number name={{arg.name}}  ng-model="selected_options[name]['arguments'][arg.name]" step=1>
                         </li>
                     </ul>
                 </li>

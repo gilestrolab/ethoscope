@@ -164,8 +164,8 @@ class BaseStaticSleepDepInteractor(BaseInteractor):
         :return:
         """
 
-        self._start_datetime= start_datetime
-        self._end_datetime= end_datetime
+        self._start_datetime= int(start_datetime)
+        self._end_datetime= int(end_datetime)
 
 
         #super(RandomSleepDepInteractor, self).__init__(hardware_interface,velocity_threshold)
@@ -225,9 +225,6 @@ class SystematicSleepDepInteractor(BaseStaticSleepDepInteractor):
                 return HasInteractedVariable(True), {"channel":channel}
 
         return HasInteractedVariable(False), {"channel":channel}
-
-
-
 
 
 class ExperimentalSleepDepInteractor(IsMovingInteractor):
