@@ -11,7 +11,7 @@ Hardware
 
 Devices
 --------
-Devices are enhanced raspeberry pi micro-computers with a camera and a wireless dongle.
+Devices are enhanced Raspeberry Pi micro-computers with a camera and a wireless dongle.
 Animals lay on individual regions of an experimental arena (typically 3d printed).
 Each device is a *standalone* video tracker that will preform video acquisition, real-time tracking, and data saving.
 
@@ -57,7 +57,7 @@ IMAGE HERE
 Local tracking example
 =======================
 A very simple example of how to use the API to perform local tracking.
-If you want to run this code yourself, you can download the `test video <http://git>`_.
+If you want to run this code yourself, you can download the `test video <http://gilestrolab.github.io/ethoscope/data/test_video.mp4>`_.
 
 >>> # We import all the bricks from ethoscope package
 >>> from ethoscope.core.monitor import Monitor
