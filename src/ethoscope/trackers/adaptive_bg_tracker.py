@@ -10,6 +10,7 @@ from ethoscope.core.variables import XPosVariable, YPosVariable, XYDistance, Wid
 from ethoscope.core.data_point import DataPoint
 from ethoscope.trackers.trackers import BaseTracker, NoPositionError
 from ethoscope.utils.debug import EthoscopeException
+import logging
 
 
 class ObjectModel(object):
@@ -35,6 +36,10 @@ class ObjectModel(object):
         self._mask_img_buff = None
         self._img_buff_shape = np.array([0,0])
 
+        self._last_updated_time = 0
+        # If the model is not updated for this duration, it is reset. Patches #39
+        self._max_unupdated_duration = 1 *  60 * 1000.0 #ms
+
     @property
     def is_ready(self):
         return self._is_ready
@@ -43,8 +48,8 @@ class ObjectModel(object):
         return self._features_header
 
 
-    def update(self, img, contour):
-
+    def update(self, img, contour,time):
+        self._last_updated_time = time
         self._ring_buff[self._ring_buff_idx] = self.compute_features(img,contour)
 
         self._ring_buff_idx += 1
@@ -56,7 +61,13 @@ class ObjectModel(object):
 
         return self._ring_buff[self._ring_buff_idx]
 
-    def distance(self, features):
+    def distance(self, features,time):
+        print (time - self._last_updated_time) / 60000
+        if time - self._last_updated_time > self._max_unupdated_duration:
+            logging.warning("FG model not updated for too long. Resetting.")
+            self.__init__(self._history_length)
+            return 0
+
         if not self._is_ready:
             last_row = self._ring_buff_idx + 1
         else:
@@ -401,7 +412,7 @@ class AdaptiveBGModel(BaseTracker):
             elif len(hulls) > 1:
                 is_ambiguous = True
             cluster_features = [self.fg_model.compute_features(img, h) for h in hulls]
-            all_distances = [self.fg_model.distance(cf) for cf in cluster_features]
+            all_distances = [self.fg_model.distance(cf,t) for cf in cluster_features]
             good_clust = np.argmin(all_distances)
 
             hull = hulls[good_clust]
@@ -413,7 +424,7 @@ class AdaptiveBGModel(BaseTracker):
                 raise NoPositionError
 
             features = self.fg_model.compute_features(img, hull)
-            distance = self.fg_model.distance(features)
+            distance = self.fg_model.distance(features,t)
 
         if distance > self._max_m_log_lik:
             self._bg_model.increase_learning_rate()
@@ -463,7 +474,7 @@ class AdaptiveBGModel(BaseTracker):
             self._bg_model.decrease_learning_rate()
             self._bg_model.update(grey, t, self._buff_fg)
 
-        self.fg_model.update(img, hull)
+        self.fg_model.update(img, hull,t)
 
         x_var = XPosVariable(int(round(x)))
         y_var = YPosVariable(int(round(y)))
