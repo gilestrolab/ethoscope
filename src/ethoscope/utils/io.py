@@ -174,11 +174,10 @@ class ImgToMySQLHelper(object):
         if tick == self._last_tick:
             return
 
-        cv2.imwrite(self._tmp_file, img)
+        cv2.imwrite(self._tmp_file, img, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
 
         bstring = open(self._tmp_file, "rb").read()
         cmd = 'INSERT INTO ' + self._table_name + '(id,t,img) VALUES(%s,%s,%s)'
-        #'INSERT INTO IMG_SNPSHOTS(id,t,img) VALUES (%s)'
 
         args = (0, int(t), bstring)
 
