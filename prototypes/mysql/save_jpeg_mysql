@@ -1,0 +1,38 @@
+import MySQLdb
+import sys
+import base64
+import cStringIO
+import shutil
+import cv2
+
+db = MySQLdb.connect(user='root', passwd='mysql',
+                              host='localhost',
+                              db='testdb')
+
+cursor=db.cursor()
+
+## write
+# image = cv2.imread('test.jpg')
+# blob_value = open('test.jpg', 'rb').read()
+# sql = 'INSERT INTO img(images) VALUES(%s)'
+# args = (blob_value, )
+
+# cursor.execute(sql,args)
+
+
+## read
+sql1='select * from img'
+db.commit()
+cursor.execute(sql1)
+data = cursor.fetchall()
+print type(data[0][0])
+file_like = cStringIO.StringIO(data[0][0])
+out_file = open("mysql_output.jpg", "wb")
+file_like.seek(0)
+shutil.copyfileobj(file_like, out_file)
+#
+
+#img=PIL.Image.open(file_like)
+#img.show()
+
+db.close()
