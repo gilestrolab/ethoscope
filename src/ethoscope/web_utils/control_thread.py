@@ -292,7 +292,7 @@ class ControlThread(Thread):
                 logging.info("Starting monitor")
 
                 #fixme
-                with ResultWriter(self._db_credentials ,rois, self._metadata) as rw:
+                with ResultWriter(self._db_credentials, rois, self._metadata, take_frame_shots=True) as rw:
                     self._info["status"] = "running"
                     logging.info("Setting monitor status as running: '%s'" % self._info["status"] )
                     self._monit.run(rw,self._drawer)
