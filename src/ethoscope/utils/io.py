@@ -144,7 +144,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
 class ImgToMySQLHelper(object):
     _table_name = "IMG_SNAPSHOTS"
-    def __init__(self, period=600.0):
+    def __init__(self, period=300.0):
         """
         :param period: how often snapshots are saved, in seconds
         :return:
@@ -174,7 +174,7 @@ class ImgToMySQLHelper(object):
         if tick == self._last_tick:
             return
 
-        cv2.imwrite(self._tmp_file, img, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
+        cv2.imwrite(self._tmp_file, img, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
 
         bstring = open(self._tmp_file, "rb").read()
         cmd = 'INSERT INTO ' + self._table_name + '(id,t,img) VALUES(%s,%s,%s)'
