@@ -224,11 +224,14 @@ systemctl enable clean_mysql.service
 
 
 
+# Disable power management
+echo 'options 8192cu rtw_power_mgnt=0' > /etc/modprobe.d/8192cu.conf
+
 #manual intervention =
 # from http://www.martinglover.co.uk/speed-up-mysql-queries
 #Add in the below line of code under the [mysqld] section:
 # skip-name-resolve
 
-echo 'SUCESS, please reboot'
+echo 'SUCCESS, please reboot'
 
 #todo set up update daemon
