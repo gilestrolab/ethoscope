@@ -101,13 +101,15 @@ if __name__ == '__main__':
                 continue
 
             logging.info("Starting backup")
-            if safe ==T:
+            logging.info("Generating device map")
+            dev_map = generate_new_device_map(device=SUBNET_DEVICE,result_main_dir=RESULTS_DIR)
+            logging.info("Regenerated device map")
+            
+            if safe ==True:
                 map(backup_job, dev_map.values())
             else:
                 pool = multiprocessing.Pool(4)
-                logging.info("Generating device map")
-                dev_map = generate_new_device_map(device=SUBNET_DEVICE,result_main_dir=RESULTS_DIR)
-                logging.info("Regenerated device map")
+
                 pool_res =  pool.map(backup_job, dev_map.values())
                 logging.info("Pool mapped")
                 pool.close()
