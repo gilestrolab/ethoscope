@@ -25,6 +25,9 @@ class BackupClass(object):
 
     def run(self):
         try:
+            if "backup_path" not in self._device_info:
+                raise KeyError("Could not obtain device backup path for %s" % self._device_info["id"])
+
             if self._device_info["backup_path"] is None:
                 raise ValueError("backup path is None for device %s" % self._device_info["id"])
 
@@ -57,12 +60,14 @@ if __name__ == '__main__':
 
         parser = optparse.OptionParser()
         parser.add_option("-d", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
+        parser.add_option("-s", "--safe", dest="safe", default=False,help="Set Safe mode ON", action="store_true")
 
 
         (options, args) = parser.parse_args()
 
         option_dict = vars(options)
         DEBUG = option_dict["debug"]
+        safe= option_dict["safe"]
 
 
         RESULTS_DIR = "/ethoscope_results"
@@ -99,20 +104,24 @@ if __name__ == '__main__':
                 continue
 
             logging.info("Starting backup")
-            pool = multiprocessing.Pool(4)
             logging.info("Generating device map")
             dev_map = generate_new_device_map(device=SUBNET_DEVICE,result_main_dir=RESULTS_DIR)
             logging.info("Regenerated device map")
-            pool_res =  pool.map(backup_job, dev_map.values())
-            logging.info("Pool mapped")
-            pool.close()
-            logging.info("Joining now")
-            pool.join()
+
+            if safe ==True:
+                map(backup_job, dev_map.values())
+            else:
+                pool = multiprocessing.Pool(4)
+
+                pool_res =  pool.map(backup_job, dev_map.values())
+                logging.info("Pool mapped")
+                pool.close()
+                logging.info("Joining now")
+                pool.join()
+
             t1 = time.time()
             logging.info("Backup finished at t=%i" % t1)
-
             t0 = t1
-
 
     except Exception as e:
         logging.error(traceback.format_exc(e))
