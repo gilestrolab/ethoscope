@@ -25,6 +25,9 @@ class BackupClass(object):
 
     def run(self):
         try:
+            if "backup_path" not in self._device_info:
+                raise KeyError("Could not obtain device backup path for %s" % self._device_info["id"])
+
             if self._device_info["backup_path"] is None:
                 raise ValueError("backup path is None for device %s" % self._device_info["id"])
 
@@ -104,7 +107,7 @@ if __name__ == '__main__':
             logging.info("Generating device map")
             dev_map = generate_new_device_map(device=SUBNET_DEVICE,result_main_dir=RESULTS_DIR)
             logging.info("Regenerated device map")
-            
+
             if safe ==True:
                 map(backup_job, dev_map.values())
             else:
