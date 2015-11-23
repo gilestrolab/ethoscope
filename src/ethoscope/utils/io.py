@@ -101,14 +101,22 @@ class AsyncMySQLWriter(multiprocessing.Process):
                     if (msg == 'DONE'):
                         do_run=False
                         continue
+
+                    command, args = msg
+
+
                     c = db.cursor()
-                    c.execute(msg)
+                    if args is None:
+                        c.execute(command)
+                    else:
+                        c.execute(command, args)
+
                     db.commit()
 
                 except:
-                    do_run=False
+                    do_run = False
                     try:
-                        logging.error("Failed to run mysql command:\n%s" % msg)
+                        logging.error("Failed to run mysql command:\n%s" % command)
                     except:
                         logging.error("Did not retrieve queue value")
 
@@ -136,10 +144,16 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
 class ImgToMySQLHelper(object):
     _table_name = "IMG_SNAPSHOTS"
-    def __init__(self, period = 60.0):
+    def __init__(self, period=300.0):
+        """
+        :param period: how often snapshots are saved, in seconds
+        :return:
+        """
+
         self._period = period
         self._last_tick = 0
-        self._tmp_file = tempfile.mktemp(prefix="psv_", suffix=".jpg")
+        self._tmp_file = tempfile.mktemp(prefix="ethoscope_", suffix=".jpg")
+
     def __del__(self):
         try:
             os.remove(self._tmp_file)
@@ -148,20 +162,32 @@ class ImgToMySQLHelper(object):
 
 
     def flush(self, t, img):
+        """
+
+        :param t: the time since start of the experiment, in ms
+        :param img: an array representing an image.
+        :type img: np.ndarray
+        :return:
+        """
+
         tick = int(round((t/1000.0)/self._period))
         if tick == self._last_tick:
             return
-        cv2.imwrite(self._tmp_file, img)
+
+        cv2.imwrite(self._tmp_file, img, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
+
         bstring = open(self._tmp_file, "rb").read()
-        cmd = "INSERT INTO %s VALUES %s" % (self._table_name, str((0, int(t), bstring)))
+        cmd = 'INSERT INTO ' + self._table_name + '(id,t,img) VALUES(%s,%s,%s)'
+
+        args = (0, int(t), bstring)
 
         self._last_tick = tick
 
-        return cmd
+        return cmd, args
 
 class DAMFileHelper(object):
 
-    def __init__(self, period=60.0,n_rois=32):
+    def __init__(self, period=60.0, n_rois=32):
         self._period = period
 
 
@@ -227,7 +253,7 @@ class DAMFileHelper(object):
         return command
 
 
-    def flush(self,t):
+    def flush(self, t):
 
         out =  OrderedDict()
         tick = int(round((t/1000.0)/self._period))
@@ -345,10 +371,11 @@ class ResultWriter(object):
             out = self._dam_file_helper.flush(t)
             for c in out:
                 self._write_async_command(c)
+
         if self._shot_saver is not None and img is not None:
-            c = self._shot_saver.flush(t,img)
-            if c is not None:
-                self._write_async_command(c)
+            c_args = self._shot_saver.flush(t, img)
+            if c_args is not None:
+                self._write_async_command(*c_args)
 
         for k, v in self._insert_dict.iteritems():
             if len(v) > self._max_insert_string_len:
@@ -356,7 +383,7 @@ class ResultWriter(object):
                 self._insert_dict[k] = ""
         return False
 
-    def _add(self,t, roi, data_row):
+    def _add(self, t, roi, data_row):
         t = int(round(t))
         roi_id = roi.idx
         tp = (0, t) + tuple(data_row.values())
@@ -407,10 +434,10 @@ class ResultWriter(object):
     def close(self):
         pass
 
-    def _write_async_command(self, command):
+    def _write_async_command(self, command, args=None):
         if not self._async_writer.is_alive():
             raise Exception("Async database writer has stopped unexpectedly")
-        self._queue.put(command)
+        self._queue.put((command, args))
 
     def _create_table(self, name, fields, engine="MyISAM"):
         command = "CREATE TABLE %s (%s) ENGINE %s KEY_BLOCK_SIZE=16" % (name, fields, engine)
@@ -425,8 +452,6 @@ class AsyncSQLiteWriter(multiprocessing.Process):
     def __init__(self, db_name, queue):
         self._db_name = db_name
         self._queue = queue
-
-
 
         super(AsyncSQLiteWriter,self).__init__()
         try:

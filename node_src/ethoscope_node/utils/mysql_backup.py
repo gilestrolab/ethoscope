@@ -4,7 +4,7 @@ import MySQLdb
 import sqlite3
 import os
 import logging
-
+import traceback
 
 class DBNotReadyError(Exception):
     pass
@@ -12,7 +12,12 @@ class DBNotReadyError(Exception):
 class MySQLdbToSQlite(object):
     _max_n_rows_to_insert = 10000
 
-    def     __init__(self, dst_path, remote_db_name="psv_db", remote_host="localhost", remote_user="root", remote_pass="", overwrite=False):
+    def     __init__(self, dst_path,
+                            remote_db_name="ethoscope_db",
+                            remote_host="localhost",
+                            remote_user="ethoscope",
+                            remote_pass="ethoscope",
+                            overwrite=False):
         """
 
         A class to backup remote psv MySQL data base into a local sqlite3 one.
@@ -36,7 +41,7 @@ class MySQLdbToSQlite(object):
 
         src = MySQLdb.connect(host=self._remote_host, user=self._remote_user,
                                          passwd=self._remote_pass, db=self._remote_db_name,
-                              connect_timeout= 45)
+                                        connect_timeout= 45)
 
 
         self._dst_path=dst_path
@@ -125,8 +130,10 @@ class MySQLdbToSQlite(object):
         except sqlite3.OperationalError:
             logging.info("Table %s exists, not copying it" % table_name)
             return
-
-        self._replace_table(table_name, src, dst, dump_in_csv)
+        if table_name == "IMG_SNAPSHOTS":
+            self._replace_img_snapshot_table(table_name, src, dst)
+        else:
+            self._replace_table(table_name, src, dst, dump_in_csv)
 
     def update_roi_tables(self):
         """
@@ -151,6 +158,13 @@ class MySQLdbToSQlite(object):
 
 
             self._update_one_roi_table("CSV_DAM_ACTIVITY", src, dst, dump_in_csv=True)
+
+            try:
+                self._update_img_snapshot_table("IMG_SNAPSHOTS", src, dst)
+
+            except Exception as e:
+                logging.error("Cannot mirror snapshots. Probably no snapshot table")
+                logging.error(e)
 
 
     def _replace_table(self,table_name, src, dst, dump_in_csv=False):
@@ -232,6 +246,43 @@ class MySQLdbToSQlite(object):
         dst.commit()
 
 
+    def _update_img_snapshot_table(self, table_name, src, dst):
 
+        src_cur = src.cursor()
+        dst_cur = dst.cursor()
+
+        try:
+            dst_command= "SELECT id FROM %s ORDER BY id DESC LIMIT 1" % table_name
+            dst_cur.execute(dst_command)
+        except (sqlite3.OperationalError, MySQLdb.ProgrammingError):
+            logging.warning("Local table %s appears empty. Rebuilding it from source" % table_name)
+            self._replace_img_snapshot_table(table_name, src, dst)
+            return
+
+        last_id_in_dst = 0
+        for c in dst_cur:
+            last_id_in_dst = c[0]
+        src_command = "SELECT id,t,img FROM %s WHERE id > %d" % (table_name, last_id_in_dst)
+        src_cur.execute(src_command)
+
+
+        for sc in src_cur:
+            id,t,img = sc
+            command = "INSERT INTO %s (id,t,img) VALUES(?,?,?);" % table_name
+            dst_cur.execute(command, [id,t,sqlite3.Binary(img)])
+            dst.commit()
+
+    def _replace_img_snapshot_table(self,table_name, src, dst):
+        src_cur = src.cursor()
+        dst_cur = dst.cursor()
+
+        src_command = "SELECT id,t,img FROM %s" % table_name
+        src_cur.execute(src_command)
+
+        for sc in src_cur:
+            id,t,img = sc
+            command = "INSERT INTO %s (id,t,img) VALUES(?,?,?);" % table_name
+            dst_cur.execute(command, [id,t,sqlite3.Binary(img)])
+            dst.commit()
 
 

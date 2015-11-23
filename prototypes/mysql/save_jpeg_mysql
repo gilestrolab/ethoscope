@@ -10,27 +10,36 @@ db = MySQLdb.connect(user='root', passwd='mysql',
                               db='testdb')
 
 cursor=db.cursor()
-
-## write
+#
+# # write
 # image = cv2.imread('test.jpg')
 # blob_value = open('test.jpg', 'rb').read()
-# sql = 'INSERT INTO img(images) VALUES(%s)'
-# args = (blob_value, )
-
+# sql = 'INSERT INTO img(t,images) VALUES(%s,%s)'
+# args = (33, blob_value)
 # cursor.execute(sql,args)
+# db.commit()
+#
+#
+#
+#
+#
+#
 
 
 ## read
-sql1='select * from img'
+sql1='select t,images from img'
 db.commit()
 cursor.execute(sql1)
 data = cursor.fetchall()
-print type(data[0][0])
-file_like = cStringIO.StringIO(data[0][0])
+
+print data[0][0],# data[0][1][0:10]
+
+file_like = cStringIO.StringIO(data[0][1])
 out_file = open("mysql_output.jpg", "wb")
 file_like.seek(0)
 shutil.copyfileobj(file_like, out_file)
 #
+
 
 #img=PIL.Image.open(file_like)
 #img.show()
