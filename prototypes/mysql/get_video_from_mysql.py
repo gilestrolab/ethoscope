@@ -6,8 +6,8 @@ import shutil
 import cv2
 
 
-
-with sqlite3.connect("/tmp/test.db", check_same_thread=False) as conn:
+file = "/ethoscope_results/0001eeee10184bb39b0754e75cef7900/ETHOSCOPE_BENCH/2015-11-23_18-15-23/2015-11-23_18-15-23_0001eeee10184bb39b0754e75cef7900.db"
+with sqlite3.connect(file, check_same_thread=False) as conn:
     cursor = conn.cursor()
 
 
