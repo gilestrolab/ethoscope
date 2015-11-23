@@ -62,7 +62,6 @@ class ObjectModel(object):
         return self._ring_buff[self._ring_buff_idx]
 
     def distance(self, features,time):
-        print (time - self._last_updated_time) / 60000
         if time - self._last_updated_time > self._max_unupdated_duration:
             logging.warning("FG model not updated for too long. Resetting.")
             self.__init__(self._history_length)
