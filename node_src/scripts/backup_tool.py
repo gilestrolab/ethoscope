@@ -53,7 +53,7 @@ def backup_job(device_info):
     logging.info("Running backup for device  %s" % device_info["id"])
     backup_job.run()
     
-    logging.info("Backup done for for device  %s" % self._device_info["id"])
+    logging.info("Backup done for for device  %s" % device_info["id"])
 
 
 if __name__ == '__main__':
