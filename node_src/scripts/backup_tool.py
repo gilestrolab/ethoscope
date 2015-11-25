@@ -47,8 +47,13 @@ class BackupClass(object):
             logging.error(traceback.format_exc(e))
 
 def backup_job(device_info):
+    logging.info("Initiating backup for device  %s" % self._device_info["id"])
     backup_job = BackupClass(device_info)
+    
+    logging.info("Running backup for device  %s" % self._device_info["id"])
     backup_job.run()
+    
+    logging.info("Backup done for for device  %s" % self._device_info["id"])
 
 
 if __name__ == '__main__':
