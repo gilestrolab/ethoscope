@@ -1,0 +1,1211 @@
+# on device 001
+
+-- Logs begin at Thu 1970-01-01 00:00:06 UTC, end at Sat 2015-11-28 12:28:13 UTC. --
+Nov 28 00:00:14 e001 systemd[1]: Starting Update man-db cache...
+Nov 28 00:00:14 e001 systemd[1]: Starting Rotate log files...
+Nov 28 00:00:14 e001 systemd[1]: Starting Verify integrity of password and group files...
+Nov 28 00:00:14 e001 systemd[1]: Started Rotate log files.
+Nov 28 00:00:14 e001 systemd[1]: Started Verify integrity of password and group files.
+Nov 28 00:01:55 e001 python2[335]: *** Error in `/usr/bin/python2': double free or corruption (!prev): 0x62800018 ***
+Nov 28 00:01:55 e001 python2[335]: ======= Backtrace: =========
+Nov 28 00:01:55 e001 python2[335]: /usr/lib/libc.so.6(+0x66914)[0x76ccc914]
+Nov 28 00:01:55 e001 python2[335]: /usr/lib/libc.so.6(+0x6cc40)[0x76cd2c40]
+Nov 28 00:01:55 e001 python2[335]: /usr/lib/libc.so.6(+0x6d5d0)[0x76cd35d0]
+Nov 28 00:01:55 e001 python2[335]: ======= Memory map: ========
+Nov 28 00:01:55 e001 python2[335]: 54b07000-54b08000 r-xp 00000000 b3:02 289631     /usr/bin/python2.7
+Nov 28 00:01:55 e001 python2[335]: 54b17000-54b18000 r--p 00000000 b3:02 289631     /usr/bin/python2.7
+Nov 28 00:01:55 e001 python2[335]: 54b18000-54b19000 rw-p 00001000 b3:02 289631     /usr/bin/python2.7
+Nov 28 00:01:55 e001 python2[335]: 55c3b000-5633e000 rw-p 00000000 00:00 0          [heap]
+Nov 28 00:01:55 e001 python2[335]: 622f6000-6267b000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 62800000-62831000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 62831000-62900000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 62a00000-62b00000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 62b00000-62c00000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 62c00000-62cfc000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 62cfc000-62d00000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 62d00000-62e00000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 62e00000-62efd000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 62efd000-62f00000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 62f00000-63000000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63000000-630f9000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 630f9000-63100000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63100000-63300000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63300000-633fb000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 633fb000-63400000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63400000-63500000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63500000-635fc000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 635fc000-63600000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63600000-63700000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63700000-637f1000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 637f1000-63800000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63800000-638f9000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 638f9000-63900000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63900000-639e1000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 639e1000-63a00000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63a00000-63ae1000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63ae1000-63b00000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63b00000-63bf9000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63bf9000-63c00000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63c00000-63ce1000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63ce1000-63d00000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63d00000-63dfa000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63dfa000-63e00000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63e00000-63ef9000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63ef9000-63f00000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63f00000-63f01000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 63f01000-64700000 rw-p 00000000 00:00 0          [stack:446]
+Nov 28 00:01:55 e001 python2[335]: 64700000-647ea000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 647ea000-64800000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 64800000-648e1000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 648e1000-64900000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 64900000-649f9000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 649f9000-64a00000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 64a00000-64ae1000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 64ae1000-64b00000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 64b2e000-64bee000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 64bee000-64bef000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 64bef000-64dee000 rw-p 00000000 00:00 0          [stack:440]
+Nov 28 00:01:55 e001 python2[335]: 64dee000-64def000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 64def000-64fee000 rw-p 00000000 00:00 0          [stack:439]
+Nov 28 00:01:55 e001 python2[335]: 64fee000-64fef000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 64fef000-65793000 rw-p 00000000 00:00 0          [stack:438]
+Nov 28 00:01:55 e001 python2[335]: 657c0000-65900000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 65900000-65901000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 65901000-66100000 rw-p 00000000 00:00 0          [stack:423]
+Nov 28 00:01:55 e001 python2[335]: 66100000-66101000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 66101000-66900000 rw-p 00000000 00:00 0          [stack:397]
+Nov 28 00:01:55 e001 python2[335]: 66900000-66901000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 66901000-67100000 rw-p 00000000 00:00 0          [stack:395]
+Nov 28 00:01:55 e001 python2[335]: 67100000-67101000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 67101000-67900000 rw-p 00000000 00:00 0          [stack:394]
+Nov 28 00:01:55 e001 python2[335]: 67900000-67901000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 67901000-68100000 rw-p 00000000 00:00 0          [stack:393]
+Nov 28 00:01:55 e001 python2[335]: 68100000-68121000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 68121000-68200000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 68200000-68226000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 68226000-68300000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 68300000-68301000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 68301000-68b00000 rw-p 00000000 00:00 0          [stack:392]
+Nov 28 00:01:55 e001 python2[335]: 68b00000-68b01000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 68b01000-69300000 rw-p 00000000 00:00 0          [stack:391]
+Nov 28 00:01:55 e001 python2[335]: 69300000-69321000 rw-p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 69321000-69400000 ---p 00000000 00:00 0
+Nov 28 00:01:55 e001 python2[335]: 69400000-694fe000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 694fe000-69500000 ---p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 69500000-69501000 ---p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 69501000-69d00000 rw-p 00000000 00:00 0          [stack:390]
+Nov 28 00:01:56 e001 python2[335]: 69d00000-69d01000 ---p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 69d01000-6a500000 rw-p 00000000 00:00 0          [stack:389]
+Nov 28 00:01:56 e001 python2[335]: 6a500000-6a521000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 6a521000-6a600000 ---p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 6a600000-6a621000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 6a621000-6a700000 ---p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 6a700000-6a701000 ---p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 6a701000-6af00000 rw-p 00000000 00:00 0          [stack:388]
+Nov 28 00:01:56 e001 python2[335]: 6af00000-6af30000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 6af30000-6b000000 ---p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 6b00d000-6b018000 r-xp 00000000 b3:02 289012     /usr/lib/libtbbmalloc.so.2
+Nov 28 00:01:56 e001 python2[335]: 6b018000-6b027000 ---p 0000b000 b3:02 289012     /usr/lib/libtbbmalloc.so.2
+Nov 28 00:01:56 e001 python2[335]: 6b027000-6b028000 r--p 0000a000 b3:02 289012     /usr/lib/libtbbmalloc.so.2
+Nov 28 00:01:56 e001 python2[335]: 6b028000-6b029000 rw-p 0000b000 b3:02 289012     /usr/lib/libtbbmalloc.so.2
+Nov 28 00:01:56 e001 python2[335]: 6b029000-6b03a000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 6b03a000-6b03b000 ---p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 6b03b000-6b93a000 rw-p 00000000 00:00 0          [stack:387]
+Nov 28 00:01:56 e001 python2[335]: 6b93a000-6b976000 r--s 00000000 b3:02 1308620    /opt/ethoscope-git/.git/objects/pack/pack-c776e7641e8b63075e51de8f1ae35eddce765ce0.idx
+Nov 28 00:01:56 e001 python2[335]: 6b976000-6f8b1000 r--s 00000000 b3:02 1308619    /opt/ethoscope-git/.git/objects/pack/pack-c776e7641e8b63075e51de8f1ae35eddce765ce0.pack
+Nov 28 00:01:56 e001 python2[335]: 6f8b1000-6faf2000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 6faf2000-6faf6000 r-xp 00000000 b3:02 662839     /usr/lib/python2.7/site-packages/gitdb/_perf.so
+Nov 28 00:01:56 e001 python2[335]: 6faf6000-6fb05000 ---p 00004000 b3:02 662839     /usr/lib/python2.7/site-packages/gitdb/_perf.so
+Nov 28 00:01:56 e001 python2[335]: 6fb05000-6fb06000 r--p 00003000 b3:02 662839     /usr/lib/python2.7/site-packages/gitdb/_perf.so
+Nov 28 00:01:56 e001 python2[335]: 6fb06000-6fb07000 rw-p 00004000 b3:02 662839     /usr/lib/python2.7/site-packages/gitdb/_perf.so
+Nov 28 00:01:56 e001 python2[335]: 6fb07000-6fb0b000 r-xp 00000000 b3:02 402305     /usr/lib/python2.7/lib-dynload/zlib.so
+Nov 28 00:01:56 e001 python2[335]: 6fb0b000-6fb1a000 ---p 00004000 b3:02 402305     /usr/lib/python2.7/lib-dynload/zlib.so
+Nov 28 00:01:56 e001 python2[335]: 6fb1a000-6fb1b000 r--p 00003000 b3:02 402305     /usr/lib/python2.7/lib-dynload/zlib.so
+Nov 28 00:01:56 e001 python2[335]: 6fb1b000-6fb1c000 rw-p 00004000 b3:02 402305     /usr/lib/python2.7/lib-dynload/zlib.so
+Nov 28 00:01:56 e001 python2[335]: 6fb1c000-6fb20000 r-xp 00000000 b3:02 402323     /usr/lib/python2.7/lib-dynload/mmap.so
+Nov 28 00:01:56 e001 python2[335]: 6fb20000-6fb2f000 ---p 00004000 b3:02 402323     /usr/lib/python2.7/lib-dynload/mmap.so
+Nov 28 00:01:56 e001 python2[335]: 6fb2f000-6fb30000 r--p 00003000 b3:02 402323     /usr/lib/python2.7/lib-dynload/mmap.so
+Nov 28 00:01:56 e001 python2[335]: 6fb30000-6fb31000 rw-p 00004000 b3:02 402323     /usr/lib/python2.7/lib-dynload/mmap.so
+Nov 28 00:01:56 e001 python2[335]: 6fb31000-6fb71000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 6fb71000-6fbac000 r-xp 00000000 b3:02 923717     /usr/lib/python2.7/site-packages/scipy/ndimage/_ni_label.so
+Nov 28 00:01:56 e001 python2[335]: 6fbac000-6fbbb000 ---p 0003b000 b3:02 923717     /usr/lib/python2.7/site-packages/scipy/ndimage/_ni_label.so
+Nov 28 00:01:56 e001 python2[335]: 6fbbb000-6fbbc000 r--p 0003a000 b3:02 923717     /usr/lib/python2.7/site-packages/scipy/ndimage/_ni_label.so
+Nov 28 00:01:56 e001 python2[335]: 6fbbc000-6fbbf000 rw-p 0003b000 b3:02 923717     /usr/lib/python2.7/site-packages/scipy/ndimage/_ni_label.so
+Nov 28 00:01:56 e001 python2[335]: 6fbbf000-6fbde000 r-xp 00000000 b3:02 924920     /usr/lib/python2.7/site-packages/scipy/integrate/lsoda.so
+Nov 28 00:01:56 e001 python2[335]: 6fbde000-6fbed000 ---p 0001f000 b3:02 924920     /usr/lib/python2.7/site-packages/scipy/integrate/lsoda.so
+Nov 28 00:01:56 e001 python2[335]: 6fbed000-6fbee000 rw-p 0001e000 b3:02 924920     /usr/lib/python2.7/site-packages/scipy/integrate/lsoda.so
+Nov 28 00:01:56 e001 python2[335]: 6fbee000-6fbef000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 6fbef000-6fc00000 r-xp 00000000 b3:02 924915     /usr/lib/python2.7/site-packages/scipy/integrate/_dop.so
+Nov 28 00:01:56 e001 python2[335]: 6fc00000-6fc0f000 ---p 00011000 b3:02 924915     /usr/lib/python2.7/site-packages/scipy/integrate/_dop.so
+Nov 28 00:01:56 e001 python2[335]: 6fc0f000-6fc11000 rw-p 00010000 b3:02 924915     /usr/lib/python2.7/site-packages/scipy/integrate/_dop.so
+Nov 28 00:01:56 e001 python2[335]: 6fc11000-6fc34000 r-xp 00000000 b3:02 924913     /usr/lib/python2.7/site-packages/scipy/integrate/vode.so
+Nov 28 00:01:56 e001 python2[335]: 6fc34000-6fc44000 ---p 00023000 b3:02 924913     /usr/lib/python2.7/site-packages/scipy/integrate/vode.so
+Nov 28 00:01:56 e001 python2[335]: 6fc44000-6fc46000 rw-p 00023000 b3:02 924913     /usr/lib/python2.7/site-packages/scipy/integrate/vode.so
+Nov 28 00:01:56 e001 python2[335]: 6fc46000-6fc5c000 r-xp 00000000 b3:02 924935     /usr/lib/python2.7/site-packages/scipy/integrate/_quadpack.so
+Nov 28 00:01:56 e001 python2[335]: 6fc5c000-6fc6b000 ---p 00016000 b3:02 924935     /usr/lib/python2.7/site-packages/scipy/integrate/_quadpack.so
+Nov 28 00:01:56 e001 python2[335]: 6fc6b000-6fc6c000 rw-p 00015000 b3:02 924935     /usr/lib/python2.7/site-packages/scipy/integrate/_quadpack.so
+Nov 28 00:01:56 e001 python2[335]: 6fc6c000-6fc88000 r-xp 00000000 b3:02 924919     /usr/lib/python2.7/site-packages/scipy/integrate/_odepack.so
+Nov 28 00:01:56 e001 python2[335]: 6fc88000-6fc98000 ---p 0001c000 b3:02 924919     /usr/lib/python2.7/site-packages/scipy/integrate/_odepack.so
+Nov 28 00:01:56 e001 python2[335]: 6fc98000-6fc99000 rw-p 0001c000 b3:02 924919     /usr/lib/python2.7/site-packages/scipy/integrate/_odepack.so
+Nov 28 00:01:56 e001 python2[335]: 6fc99000-6fca7000 r-xp 00000000 b3:02 924817     /usr/lib/python2.7/site-packages/scipy/special/_ellip_harm_2.so
+Nov 28 00:01:56 e001 python2[335]: 6fca7000-6fcb7000 ---p 0000e000 b3:02 924817     /usr/lib/python2.7/site-packages/scipy/special/_ellip_harm_2.so
+Nov 28 00:01:56 e001 python2[335]: 6fcb7000-6fcb8000 rw-p 0000e000 b3:02 924817     /usr/lib/python2.7/site-packages/scipy/special/_ellip_harm_2.so
+Nov 28 00:01:56 e001 python2[335]: 6fcb8000-6fcf8000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 6fcf8000-6fd6c000 r-xp 00000000 b3:02 923788     /usr/lib/python2.7/site-packages/scipy/linalg/cython_lapack.so
+Nov 28 00:01:56 e001 python2[335]: 6fd6c000-6fd7b000 ---p 00074000 b3:02 923788     /usr/lib/python2.7/site-packages/scipy/linalg/cython_lapack.so
+Nov 28 00:01:56 e001 python2[335]: 6fd7b000-6fd80000 rw-p 00073000 b3:02 923788     /usr/lib/python2.7/site-packages/scipy/linalg/cython_lapack.so
+Nov 28 00:01:56 e001 python2[335]: 6fd80000-6fda9000 r-xp 00000000 b3:02 923768     /usr/lib/python2.7/site-packages/scipy/linalg/cython_blas.so
+Nov 28 00:01:56 e001 python2[335]: 6fda9000-6fdb8000 ---p 00029000 b3:02 923768     /usr/lib/python2.7/site-packages/scipy/linalg/cython_blas.so
+Nov 28 00:01:56 e001 python2[335]: 6fdb8000-6fdbb000 rw-p 00028000 b3:02 923768     /usr/lib/python2.7/site-packages/scipy/linalg/cython_blas.so
+Nov 28 00:01:56 e001 python2[335]: 6fdbb000-6fdf2000 r-xp 00000000 b3:02 923822     /usr/lib/python2.7/site-packages/scipy/linalg/_decomp_update.so
+Nov 28 00:01:56 e001 python2[335]: 6fdf2000-6fe01000 ---p 00037000 b3:02 923822     /usr/lib/python2.7/site-packages/scipy/linalg/_decomp_update.so
+Nov 28 00:01:56 e001 python2[335]: 6fe01000-6fe02000 r--p 00036000 b3:02 923822     /usr/lib/python2.7/site-packages/scipy/linalg/_decomp_update.so
+Nov 28 00:01:56 e001 python2[335]: 6fe02000-6fe0b000 rw-p 00037000 b3:02 923822     /usr/lib/python2.7/site-packages/scipy/linalg/_decomp_update.so
+Nov 28 00:01:56 e001 python2[335]: 6fe0b000-6fe34000 r-xp 00000000 b3:02 923846     /usr/lib/python2.7/site-packages/scipy/linalg/_solve_toeplitz.so
+Nov 28 00:01:56 e001 python2[335]: 6fe34000-6fe43000 ---p 00029000 b3:02 923846     /usr/lib/python2.7/site-packages/scipy/linalg/_solve_toeplitz.so
+Nov 28 00:01:56 e001 python2[335]: 6fe43000-6fe44000 r--p 00028000 b3:02 923846     /usr/lib/python2.7/site-packages/scipy/linalg/_solve_toeplitz.so
+Nov 28 00:01:56 e001 python2[335]: 6fe44000-6fe47000 rw-p 00029000 b3:02 923846     /usr/lib/python2.7/site-packages/scipy/linalg/_solve_toeplitz.so
+Nov 28 00:01:56 e001 python2[335]: 6fe47000-6fe52000 r-xp 00000000 b3:02 923832     /usr/lib/python2.7/site-packages/scipy/linalg/_flinalg.so
+Nov 28 00:01:56 e001 python2[335]: 6fe52000-6fe62000 ---p 0000b000 b3:02 923832     /usr/lib/python2.7/site-packages/scipy/linalg/_flinalg.so
+Nov 28 00:01:56 e001 python2[335]: 6fe62000-6fe64000 rw-p 0000b000 b3:02 923832     /usr/lib/python2.7/site-packages/scipy/linalg/_flinalg.so
+Nov 28 00:01:56 e001 python2[335]: 6fe64000-6fea4000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 6fea4000-6ff25000 r-xp 00000000 b3:02 923820     /usr/lib/python2.7/site-packages/scipy/linalg/_flapack.so
+Nov 28 00:01:56 e001 python2[335]: 6ff25000-6ff35000 ---p 00081000 b3:02 923820     /usr/lib/python2.7/site-packages/scipy/linalg/_flapack.so
+Nov 28 00:01:56 e001 python2[335]: 6ff35000-6ff61000 rw-p 00081000 b3:02 923820     /usr/lib/python2.7/site-packages/scipy/linalg/_flapack.so
+Nov 28 00:01:56 e001 python2[335]: 6ff61000-6ffa2000 r-xp 00000000 b3:02 923751     /usr/lib/python2.7/site-packages/scipy/linalg/_fblas.so
+Nov 28 00:01:56 e001 python2[335]: 6ffa2000-6ffb1000 ---p 00041000 b3:02 923751     /usr/lib/python2.7/site-packages/scipy/linalg/_fblas.so
+Nov 28 00:01:56 e001 python2[335]: 6ffb1000-6ffc4000 rw-p 00040000 b3:02 923751     /usr/lib/python2.7/site-packages/scipy/linalg/_fblas.so
+Nov 28 00:01:56 e001 python2[335]: 6ffc4000-70043000 r-xp 00000000 b3:02 924801     /usr/lib/python2.7/site-packages/scipy/special/specfun.so
+Nov 28 00:01:56 e001 python2[335]: 70043000-70052000 ---p 0007f000 b3:02 924801     /usr/lib/python2.7/site-packages/scipy/special/specfun.so
+Nov 28 00:01:56 e001 python2[335]: 70052000-70057000 rw-p 0007e000 b3:02 924801     /usr/lib/python2.7/site-packages/scipy/special/specfun.so
+Nov 28 00:01:56 e001 python2[335]: 70057000-70066000 r-xp 00000000 b3:02 924802     /usr/lib/python2.7/site-packages/scipy/special/_ufuncs_cxx.so
+Nov 28 00:01:56 e001 python2[335]: 70066000-70075000 ---p 0000f000 b3:02 924802     /usr/lib/python2.7/site-packages/scipy/special/_ufuncs_cxx.so
+Nov 28 00:01:56 e001 python2[335]: 70075000-70076000 r--p 0000e000 b3:02 924802     /usr/lib/python2.7/site-packages/scipy/special/_ufuncs_cxx.so
+Nov 28 00:01:56 e001 python2[335]: 70076000-70077000 rw-p 0000f000 b3:02 924802     /usr/lib/python2.7/site-packages/scipy/special/_ufuncs_cxx.so
+Nov 28 00:01:56 e001 python2[335]: 70077000-7014f000 r-xp 00000000 b3:02 924796     /usr/lib/python2.7/site-packages/scipy/special/_ufuncs.so
+Nov 28 00:01:56 e001 python2[335]: 7014f000-7015e000 ---p 000d8000 b3:02 924796     /usr/lib/python2.7/site-packages/scipy/special/_ufuncs.so
+Nov 28 00:01:56 e001 python2[335]: 7015e000-70170000 rw-p 000d7000 b3:02 924796     /usr/lib/python2.7/site-packages/scipy/special/_ufuncs.so
+Nov 28 00:01:56 e001 python2[335]: 70170000-70173000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 70173000-7018b000 r-xp 00000000 b3:02 923723     /usr/lib/python2.7/site-packages/scipy/ndimage/_nd_image.so
+Nov 28 00:01:56 e001 python2[335]: 7018b000-7019a000 ---p 00018000 b3:02 923723     /usr/lib/python2.7/site-packages/scipy/ndimage/_nd_image.so
+Nov 28 00:01:56 e001 python2[335]: 7019a000-7019b000 r--p 00017000 b3:02 923723     /usr/lib/python2.7/site-packages/scipy/ndimage/_nd_image.so
+Nov 28 00:01:56 e001 python2[335]: 7019b000-7019c000 rw-p 00018000 b3:02 923723     /usr/lib/python2.7/site-packages/scipy/ndimage/_nd_image.so
+Nov 28 00:01:56 e001 python2[335]: 7019c000-7021c000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 7021c000-7022f000 r-xp 00000000 b3:02 1308587    /opt/vc/lib/libbcm_host.so
+Nov 28 00:01:56 e001 python2[335]: 7022f000-70236000 ---p 00013000 b3:02 1308587    /opt/vc/lib/libbcm_host.so
+Nov 28 00:01:56 e001 python2[335]: 70236000-70237000 rw-p 00012000 b3:02 1308587    /opt/vc/lib/libbcm_host.so
+Nov 28 00:01:56 e001 python2[335]: 70237000-702ba000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 702ba000-702c3000 r-xp 00000000 b3:02 1308588    /opt/vc/lib/libvcos.so
+Nov 28 00:01:56 e001 python2[335]: 702c3000-702cb000 ---p 00009000 b3:02 1308588    /opt/vc/lib/libvcos.so
+Nov 28 00:01:56 e001 python2[335]: 702cb000-702cc000 rw-p 00009000 b3:02 1308588    /opt/vc/lib/libvcos.so
+Nov 28 00:01:56 e001 python2[335]: 702cc000-702dd000 r-xp 00000000 b3:02 1309520    /opt/vc/lib/libcontainers.so
+Nov 28 00:01:56 e001 python2[335]: 702dd000-702e4000 ---p 00011000 b3:02 1309520    /opt/vc/lib/libcontainers.so
+Nov 28 00:01:56 e001 python2[335]: 702e4000-702e5000 rw-p 00010000 b3:02 1309520    /opt/vc/lib/libcontainers.so
+Nov 28 00:01:56 e001 python2[335]: 702e5000-702f4000 r-xp 00000000 b3:02 1309519    /opt/vc/lib/libmmal_util.so
+Nov 28 00:01:56 e001 python2[335]: 702f4000-702fc000 ---p 0000f000 b3:02 1309519    /opt/vc/lib/libmmal_util.so
+Nov 28 00:01:56 e001 python2[335]: 702fc000-702fd000 rw-p 0000f000 b3:02 1309519    /opt/vc/lib/libmmal_util.so
+Nov 28 00:01:56 e001 python2[335]: 702fd000-7030b000 r-xp 00000000 b3:02 1308586    /opt/vc/lib/libmmal_core.so
+Nov 28 00:01:56 e001 python2[335]: 7030b000-70313000 ---p 0000e000 b3:02 1308586    /opt/vc/lib/libmmal_core.so
+Nov 28 00:01:56 e001 python2[335]: 70313000-70314000 rw-p 0000e000 b3:02 1308586    /opt/vc/lib/libmmal_core.so
+Nov 28 00:01:56 e001 python2[335]: 70314000-70318000 r-xp 00000000 b3:02 1308601    /opt/vc/lib/libvcsm.so
+Nov 28 00:01:56 e001 python2[335]: 70318000-7031f000 ---p 00004000 b3:02 1308601    /opt/vc/lib/libvcsm.so
+Nov 28 00:01:56 e001 python2[335]: 7031f000-70320000 rw-p 00003000 b3:02 1308601    /opt/vc/lib/libvcsm.so
+Nov 28 00:01:56 e001 python2[335]: 70320000-70326000 r-xp 00000000 b3:02 1308598    /opt/vc/lib/libvchiq_arm.so
+Nov 28 00:01:56 e001 python2[335]: 70326000-7032d000 ---p 00006000 b3:02 1308598    /opt/vc/lib/libvchiq_arm.so
+Nov 28 00:01:56 e001 python2[335]: 7032d000-7032e000 rw-p 00005000 b3:02 1308598    /opt/vc/lib/libvchiq_arm.so
+Nov 28 00:01:56 e001 python2[335]: 7032e000-7033a000 r-xp 00000000 b3:02 1308591    /opt/vc/lib/libmmal_components.so
+Nov 28 00:01:56 e001 python2[335]: 7033a000-70341000 ---p 0000c000 b3:02 1308591    /opt/vc/lib/libmmal_components.so
+Nov 28 00:01:56 e001 python2[335]: 70341000-70342000 rw-p 0000b000 b3:02 1308591    /opt/vc/lib/libmmal_components.so
+Nov 28 00:01:56 e001 python2[335]: 70342000-7034a000 r-xp 00000000 b3:02 1308599    /opt/vc/lib/libmmal_vc_client.so
+Nov 28 00:01:56 e001 python2[335]: 7034a000-7034b000 rw-p 00008000 b3:02 1308599    /opt/vc/lib/libmmal_vc_client.so
+Nov 28 00:01:56 e001 python2[335]: 7034b000-7034d000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 7034d000-7034f000 r-xp 00000000 b3:02 1309516    /opt/vc/lib/libmmal.so
+Nov 28 00:01:56 e001 python2[335]: 7034f000-70356000 ---p 00002000 b3:02 1309516    /opt/vc/lib/libmmal.so
+Nov 28 00:01:56 e001 python2[335]: 70356000-70357000 rw-p 00001000 b3:02 1309516    /opt/vc/lib/libmmal.so
+Nov 28 00:01:56 e001 python2[335]: 7035a000-7035d000 r-xp 00000000 b3:02 402333     /usr/lib/python2.7/lib-dynload/termios.so
+Nov 28 00:01:56 e001 python2[335]: 7035d000-7036c000 ---p 00003000 b3:02 402333     /usr/lib/python2.7/lib-dynload/termios.so
+Nov 28 00:01:56 e001 python2[335]: 7036c000-7036d000 r--p 00002000 b3:02 402333     /usr/lib/python2.7/lib-dynload/termios.so
+Nov 28 00:01:56 e001 python2[335]: 7036d000-7036f000 rw-p 00003000 b3:02 402333     /usr/lib/python2.7/lib-dynload/termios.so
+Nov 28 00:01:56 e001 python2[335]: 7036f000-703ef000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 703ef000-7044f000 r-xp 00000000 b3:02 660157     /usr/lib/python2.7/site-packages/numpy/random/mtrand.so
+Nov 28 00:01:56 e001 python2[335]: 7044f000-7045e000 ---p 00060000 b3:02 660157     /usr/lib/python2.7/site-packages/numpy/random/mtrand.so
+Nov 28 00:01:56 e001 python2[335]: 7045e000-7045f000 r--p 0005f000 b3:02 660157     /usr/lib/python2.7/site-packages/numpy/random/mtrand.so
+Nov 28 00:01:56 e001 python2[335]: 7045f000-70496000 rw-p 00060000 b3:02 660157     /usr/lib/python2.7/site-packages/numpy/random/mtrand.so
+Nov 28 00:01:56 e001 python2[335]: 70496000-704d6000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 704d6000-704de000 r-xp 00000000 b3:02 788457     /usr/lib/python2.7/site-packages/numpy/fft/fftpack_lite.so
+Nov 28 00:01:56 e001 python2[335]: 704de000-704ed000 ---p 00008000 b3:02 788457     /usr/lib/python2.7/site-packages/numpy/fft/fftpack_lite.so
+Nov 28 00:01:56 e001 python2[335]: 704ed000-704ee000 r--p 00007000 b3:02 788457     /usr/lib/python2.7/site-packages/numpy/fft/fftpack_lite.so
+Nov 28 00:01:56 e001 python2[335]: 704ee000-704ef000 rw-p 00008000 b3:02 788457     /usr/lib/python2.7/site-packages/numpy/fft/fftpack_lite.so
+Nov 28 00:01:56 e001 python2[335]: 704ef000-7052f000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 7052f000-70545000 r-xp 00000000 b3:02 661374     /usr/lib/python2.7/site-packages/numpy/linalg/_umath_linalg.so
+Nov 28 00:01:56 e001 python2[335]: 70545000-70554000 ---p 00016000 b3:02 661374     /usr/lib/python2.7/site-packages/numpy/linalg/_umath_linalg.so
+Nov 28 00:01:56 e001 python2[335]: 70554000-70555000 r--p 00015000 b3:02 661374     /usr/lib/python2.7/site-packages/numpy/linalg/_umath_linalg.so
+Nov 28 00:01:56 e001 python2[335]: 70555000-70556000 rw-p 00016000 b3:02 661374     /usr/lib/python2.7/site-packages/numpy/linalg/_umath_linalg.so
+Nov 28 00:01:56 e001 python2[335]: 70556000-709f4000 r-xp 00000000 b3:02 292570     /usr/lib/liblapack.so.3.6.0
+Nov 28 00:01:56 e001 python2[335]: 709f4000-70a03000 ---p 0049e000 b3:02 292570     /usr/lib/liblapack.so.3.6.0
+Nov 28 00:01:56 e001 python2[335]: 70a03000-70a04000 r--p 0049d000 b3:02 292570     /usr/lib/liblapack.so.3.6.0
+Nov 28 00:01:56 e001 python2[335]: 70a04000-70a06000 rw-p 0049e000 b3:02 292570     /usr/lib/liblapack.so.3.6.0
+Nov 28 00:01:56 e001 python2[335]: 70a06000-70a50000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 70a56000-70a57000 r-xp 00000000 b3:02 402307     /usr/lib/python2.7/lib-dynload/future_builtins.so
+Nov 28 00:01:56 e001 python2[335]: 70a57000-70a66000 ---p 00001000 b3:02 402307     /usr/lib/python2.7/lib-dynload/future_builtins.so
+Nov 28 00:01:56 e001 python2[335]: 70a66000-70a67000 r--p 00000000 b3:02 402307     /usr/lib/python2.7/lib-dynload/future_builtins.so
+Nov 28 00:01:56 e001 python2[335]: 70a67000-70a68000 rw-p 00001000 b3:02 402307     /usr/lib/python2.7/lib-dynload/future_builtins.so
+Nov 28 00:01:56 e001 python2[335]: 70a68000-70a6b000 r-xp 00000000 b3:02 661381     /usr/lib/python2.7/site-packages/numpy/linalg/lapack_lite.so
+Nov 28 00:01:56 e001 python2[335]: 70a6b000-70a7a000 ---p 00003000 b3:02 661381     /usr/lib/python2.7/site-packages/numpy/linalg/lapack_lite.so
+Nov 28 00:01:56 e001 python2[335]: 70a7a000-70a7b000 r--p 00002000 b3:02 661381     /usr/lib/python2.7/site-packages/numpy/linalg/lapack_lite.so
+Nov 28 00:01:56 e001 python2[335]: 70a7b000-70a7c000 rw-p 00003000 b3:02 661381     /usr/lib/python2.7/site-packages/numpy/linalg/lapack_lite.so
+Nov 28 00:01:56 e001 python2[335]: 70a7c000-70b3c000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 70b3c000-70b51000 r-xp 00000000 b3:02 402318     /usr/lib/python2.7/lib-dynload/_ctypes.so
+Nov 28 00:01:56 e001 python2[335]: 70b51000-70b60000 ---p 00015000 b3:02 402318     /usr/lib/python2.7/lib-dynload/_ctypes.so
+Nov 28 00:01:56 e001 python2[335]: 70b60000-70b61000 r--p 00014000 b3:02 402318     /usr/lib/python2.7/lib-dynload/_ctypes.so
+Nov 28 00:01:56 e001 python2[335]: 70b61000-70b63000 rw-p 00015000 b3:02 402318     /usr/lib/python2.7/lib-dynload/_ctypes.so
+Nov 28 00:01:56 e001 python2[335]: 70b63000-70ba3000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 70ba3000-70c16000 r-xp 00000000 b3:02 922778     /usr/lib/python2.7/site-packages/numpy/core/umath.so
+Nov 28 00:01:56 e001 python2[335]: 70c16000-70c25000 ---p 00073000 b3:02 922778     /usr/lib/python2.7/site-packages/numpy/core/umath.so
+Nov 28 00:01:56 e001 python2[335]: 70c25000-70c26000 r--p 00072000 b3:02 922778     /usr/lib/python2.7/site-packages/numpy/core/umath.so
+Nov 28 00:01:56 e001 python2[335]: 70c26000-70c29000 rw-p 00073000 b3:02 922778     /usr/lib/python2.7/site-packages/numpy/core/umath.so
+Nov 28 00:01:56 e001 python2[335]: 70c29000-70c2b000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 70c2b000-70ccb000 r-xp 00000000 b3:02 280356     /usr/lib/libgfortran.so.3.0.0
+Nov 28 00:01:56 e001 python2[335]: 70ccb000-70ccc000 rw-p 000a0000 b3:02 280356     /usr/lib/libgfortran.so.3.0.0
+Nov 28 00:01:56 e001 python2[335]: 70ccc000-70d0f000 r-xp 00000000 b3:02 291910     /usr/lib/libblas.so.3.6.0
+Nov 28 00:01:56 e001 python2[335]: 70d0f000-70d1e000 ---p 00043000 b3:02 291910     /usr/lib/libblas.so.3.6.0
+Nov 28 00:01:56 e001 python2[335]: 70d1e000-70d1f000 r--p 00042000 b3:02 291910     /usr/lib/libblas.so.3.6.0
+Nov 28 00:01:56 e001 python2[335]: 70d1f000-70d20000 rw-p 00043000 b3:02 291910     /usr/lib/libblas.so.3.6.0
+Nov 28 00:01:56 e001 python2[335]: 70d20000-70d33000 r-xp 00000000 b3:02 291297     /usr/lib/libcblas.so
+Nov 28 00:01:56 e001 python2[335]: 70d33000-70d42000 ---p 00013000 b3:02 291297     /usr/lib/libcblas.so
+Nov 28 00:01:56 e001 python2[335]: 70d42000-70d43000 r--p 00012000 b3:02 291297     /usr/lib/libcblas.so
+Nov 28 00:01:56 e001 python2[335]: 70d43000-70d44000 rw-p 00013000 b3:02 291297     /usr/lib/libcblas.so
+Nov 28 00:01:56 e001 python2[335]: 70d44000-70e62000 r-xp 00000000 b3:02 922746     /usr/lib/python2.7/site-packages/numpy/core/multiarray.so
+Nov 28 00:01:56 e001 python2[335]: 70e62000-70e72000 ---p 0011e000 b3:02 922746     /usr/lib/python2.7/site-packages/numpy/core/multiarray.so
+Nov 28 00:01:56 e001 python2[335]: 70e72000-70e73000 r--p 0011e000 b3:02 922746     /usr/lib/python2.7/site-packages/numpy/core/multiarray.so
+Nov 28 00:01:56 e001 python2[335]: 70e73000-70e7a000 rw-p 0011f000 b3:02 922746     /usr/lib/python2.7/site-packages/numpy/core/multiarray.so
+Nov 28 00:01:56 e001 python2[335]: 70e7a000-70e83000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 70e83000-70e84000 ---p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 70e84000-71683000 rw-p 00000000 00:00 0          [stack:339]
+Nov 28 00:01:56 e001 python2[335]: 71683000-71687000 r-xp 00000000 b3:02 280197     /usr/lib/libattr.so.1.1.0
+Nov 28 00:01:56 e001 python2[335]: 71687000-7168e000 ---p 00004000 b3:02 280197     /usr/lib/libattr.so.1.1.0
+Nov 28 00:01:56 e001 python2[335]: 7168e000-7168f000 rw-p 00003000 b3:02 280197     /usr/lib/libattr.so.1.1.0
+Nov 28 00:01:56 e001 python2[335]: 7168f000-716ac000 r-xp 00000000 b3:02 280311     /usr/lib/libgomp.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 716ac000-716bb000 ---p 0001d000 b3:02 280311     /usr/lib/libgomp.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 716bb000-716bc000 rw-p 0001c000 b3:02 280311     /usr/lib/libgomp.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 716bc000-716bf000 r-xp 00000000 b3:02 280236     /usr/lib/libcap.so.2.24
+Nov 28 00:01:56 e001 python2[335]: 716bf000-716c6000 ---p 00003000 b3:02 280236     /usr/lib/libcap.so.2.24
+Nov 28 00:01:56 e001 python2[335]: 716c6000-716c7000 rw-p 00002000 b3:02 280236     /usr/lib/libcap.so.2.24
+Nov 28 00:01:56 e001 python2[335]: 716c7000-716ca000 r-xp 00000000 b3:02 287166     /usr/lib/libuuid.so.1.3.0
+Nov 28 00:01:56 e001 python2[335]: 716ca000-716d9000 ---p 00003000 b3:02 287166     /usr/lib/libuuid.so.1.3.0
+Nov 28 00:01:56 e001 python2[335]: 716d9000-716da000 r--p 00002000 b3:02 287166     /usr/lib/libuuid.so.1.3.0
+Nov 28 00:01:56 e001 python2[335]: 716da000-716db000 rw-p 00003000 b3:02 287166     /usr/lib/libuuid.so.1.3.0
+Nov 28 00:01:56 e001 python2[335]: 716db000-716e5000 r-xp 00000000 b3:02 287301     /usr/lib/libwayland-server.so.0.1.0
+Nov 28 00:01:56 e001 python2[335]: 716e5000-716f5000 ---p 0000a000 b3:02 287301     /usr/lib/libwayland-server.so.0.1.0
+Nov 28 00:01:56 e001 python2[335]: 716f5000-716f6000 r--p 0000a000 b3:02 287301     /usr/lib/libwayland-server.so.0.1.0
+Nov 28 00:01:56 e001 python2[335]: 716f6000-716f7000 rw-p 0000b000 b3:02 287301     /usr/lib/libwayland-server.so.0.1.0
+Nov 28 00:01:56 e001 python2[335]: 716f7000-716ff000 r-xp 00000000 b3:02 287296     /usr/lib/libwayland-client.so.0.3.0
+Nov 28 00:01:56 e001 python2[335]: 716ff000-7170e000 ---p 00008000 b3:02 287296     /usr/lib/libwayland-client.so.0.3.0
+Nov 28 00:01:56 e001 python2[335]: 7170e000-7170f000 r--p 00007000 b3:02 287296     /usr/lib/libwayland-client.so.0.3.0
+Nov 28 00:01:56 e001 python2[335]: 7170f000-71710000 rw-p 00008000 b3:02 287296     /usr/lib/libwayland-client.so.0.3.0
+Nov 28 00:01:56 e001 python2[335]: 71710000-7171a000 r-xp 00000000 b3:02 287465     /usr/lib/libgbm.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 7171a000-71729000 ---p 0000a000 b3:02 287465     /usr/lib/libgbm.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 71729000-7172a000 r--p 00009000 b3:02 287465     /usr/lib/libgbm.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 7172a000-7172b000 rw-p 0000a000 b3:02 287465     /usr/lib/libgbm.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 7172b000-7174a000 r-xp 00000000 b3:02 286543     /usr/lib/libgraphite2.so.3.0.1
+Nov 28 00:01:56 e001 python2[335]: 7174a000-7175a000 ---p 0001f000 b3:02 286543     /usr/lib/libgraphite2.so.3.0.1
+Nov 28 00:01:56 e001 python2[335]: 7175a000-7175b000 r--p 0001f000 b3:02 286543     /usr/lib/libgraphite2.so.3.0.1
+Nov 28 00:01:56 e001 python2[335]: 7175b000-7175c000 rw-p 00020000 b3:02 286543     /usr/lib/libgraphite2.so.3.0.1
+Nov 28 00:01:56 e001 python2[335]: 7175c000-71760000 r-xp 00000000 b3:02 288321     /usr/lib/libdatrie.so.1.3.2
+Nov 28 00:01:56 e001 python2[335]: 71760000-7176f000 ---p 00004000 b3:02 288321     /usr/lib/libdatrie.so.1.3.2
+Nov 28 00:01:56 e001 python2[335]: 7176f000-71770000 r--p 00003000 b3:02 288321     /usr/lib/libdatrie.so.1.3.2
+Nov 28 00:01:56 e001 python2[335]: 71770000-71771000 rw-p 00004000 b3:02 288321     /usr/lib/libdatrie.so.1.3.2
+Nov 28 00:01:56 e001 python2[335]: 71771000-7179b000 r-xp 00000000 b3:02 280317     /usr/lib/libhogweed.so.4.1
+Nov 28 00:01:56 e001 python2[335]: 7179b000-717ab000 ---p 0002a000 b3:02 280317     /usr/lib/libhogweed.so.4.1
+Nov 28 00:01:56 e001 python2[335]: 717ab000-717ac000 r--p 0002a000 b3:02 280317     /usr/lib/libhogweed.so.4.1
+Nov 28 00:01:56 e001 python2[335]: 717ac000-717ad000 rw-p 0002b000 b3:02 280317     /usr/lib/libhogweed.so.4.1
+Nov 28 00:01:56 e001 python2[335]: 717ad000-717e3000 r-xp 00000000 b3:02 280079     /usr/lib/libnettle.so.6.1
+Nov 28 00:01:56 e001 python2[335]: 717e3000-717f3000 ---p 00036000 b3:02 280079     /usr/lib/libnettle.so.6.1
+Nov 28 00:01:56 e001 python2[335]: 717f3000-717f4000 r--p 00036000 b3:02 280079     /usr/lib/libnettle.so.6.1
+Nov 28 00:01:56 e001 python2[335]: 717f4000-717f5000 rw-p 00037000 b3:02 280079     /usr/lib/libnettle.so.6.1
+Nov 28 00:01:56 e001 python2[335]: 717f5000-71804000 r-xp 00000000 b3:02 266965     /usr/lib/libtasn1.so.6.5.1
+Nov 28 00:01:56 e001 python2[335]: 71804000-71813000 ---p 0000f000 b3:02 266965     /usr/lib/libtasn1.so.6.5.1
+Nov 28 00:01:56 e001 python2[335]: 71813000-71814000 r--p 0000e000 b3:02 266965     /usr/lib/libtasn1.so.6.5.1
+Nov 28 00:01:56 e001 python2[335]: 71814000-71815000 rw-p 0000f000 b3:02 266965     /usr/lib/libtasn1.so.6.5.1
+Nov 28 00:01:56 e001 python2[335]: 71815000-7185a000 r-xp 00000000 b3:02 281391     /usr/lib/libp11-kit.so.0.1.0
+Nov 28 00:01:56 e001 python2[335]: 7185a000-71869000 ---p 00045000 b3:02 281391     /usr/lib/libp11-kit.so.0.1.0
+Nov 28 00:01:56 e001 python2[335]: 71869000-7186e000 r--p 00044000 b3:02 281391     /usr/lib/libp11-kit.so.0.1.0
+Nov 28 00:01:56 e001 python2[335]: 7186e000-7186f000 rw-p 00049000 b3:02 281391     /usr/lib/libp11-kit.so.0.1.0
+Nov 28 00:01:56 e001 python2[335]: 7186f000-71994000 r-xp 00000000 b3:02 286866     /usr/lib/libxml2.so.2.9.2
+Nov 28 00:01:56 e001 python2[335]: 71994000-7199c000 ---p 00125000 b3:02 286866     /usr/lib/libxml2.so.2.9.2
+Nov 28 00:01:56 e001 python2[335]: 7199c000-719a0000 r--p 00125000 b3:02 286866     /usr/lib/libxml2.so.2.9.2
+Nov 28 00:01:56 e001 python2[335]: 719a0000-719a1000 rw-p 00129000 b3:02 286866     /usr/lib/libxml2.so.2.9.2
+Nov 28 00:01:56 e001 python2[335]: 719a1000-719a2000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 719a2000-71a07000 r-xp 00000000 b3:02 287743     /usr/lib/liborc-0.4.so.0.23.0
+Nov 28 00:01:56 e001 python2[335]: 71a07000-71a17000 ---p 00065000 b3:02 287743     /usr/lib/liborc-0.4.so.0.23.0
+Nov 28 00:01:56 e001 python2[335]: 71a17000-71a18000 r--p 00065000 b3:02 287743     /usr/lib/liborc-0.4.so.0.23.0
+Nov 28 00:01:56 e001 python2[335]: 71a18000-71a1b000 rw-p 00066000 b3:02 287743     /usr/lib/liborc-0.4.so.0.23.0
+Nov 28 00:01:56 e001 python2[335]: 71a1b000-71a1f000 r-xp 00000000 b3:02 287000     /usr/lib/libogg.so.0.8.2
+Nov 28 00:01:56 e001 python2[335]: 71a1f000-71a26000 ---p 00004000 b3:02 287000     /usr/lib/libogg.so.0.8.2
+Nov 28 00:01:56 e001 python2[335]: 71a26000-71a27000 r--p 00003000 b3:02 287000     /usr/lib/libogg.so.0.8.2
+Nov 28 00:01:56 e001 python2[335]: 71a27000-71a28000 rw-p 00004000 b3:02 287000     /usr/lib/libogg.so.0.8.2
+Nov 28 00:01:56 e001 python2[335]: 71a28000-71a46000 r-xp 00000000 b3:02 287131     /usr/lib/libsoxr.so.0.1.1
+Nov 28 00:01:56 e001 python2[335]: 71a46000-71a56000 ---p 0001e000 b3:02 287131     /usr/lib/libsoxr.so.0.1.1
+Nov 28 00:01:56 e001 python2[335]: 71a56000-71a57000 r--p 0001e000 b3:02 287131     /usr/lib/libsoxr.so.0.1.1
+Nov 28 00:01:56 e001 python2[335]: 71a57000-71a58000 rw-p 0001f000 b3:02 287131     /usr/lib/libsoxr.so.0.1.1
+Nov 28 00:01:56 e001 python2[335]: 71a58000-71a8d000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 71a8d000-71aa8000 r-xp 00000000 b3:02 294062     /usr/lib/libudev.so.1.6.4
+Nov 28 00:01:56 e001 python2[335]: 71aa8000-71ab8000 ---p 0001b000 b3:02 294062     /usr/lib/libudev.so.1.6.4
+Nov 28 00:01:56 e001 python2[335]: 71ab8000-71ab9000 r--p 0001b000 b3:02 294062     /usr/lib/libudev.so.1.6.4
+Nov 28 00:01:56 e001 python2[335]: 71ab9000-71aba000 rw-p 0001c000 b3:02 294062     /usr/lib/libudev.so.1.6.4
+Nov 28 00:01:56 e001 python2[335]: 71aba000-71acd000 r-xp 00000000 b3:02 286993     /usr/lib/libICE.so.6.3.0
+Nov 28 00:01:56 e001 python2[335]: 71acd000-71ad4000 ---p 00013000 b3:02 286993     /usr/lib/libICE.so.6.3.0
+Nov 28 00:01:56 e001 python2[335]: 71ad4000-71ad5000 r--p 00012000 b3:02 286993     /usr/lib/libICE.so.6.3.0
+Nov 28 00:01:56 e001 python2[335]: 71ad5000-71ad6000 rw-p 00013000 b3:02 286993     /usr/lib/libICE.so.6.3.0
+Nov 28 00:01:56 e001 python2[335]: 71ad6000-71ad8000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 71ad8000-71ade000 r-xp 00000000 b3:02 286997     /usr/lib/libSM.so.6.0.1
+Nov 28 00:01:56 e001 python2[335]: 71ade000-71ae5000 ---p 00006000 b3:02 286997     /usr/lib/libSM.so.6.0.1
+Nov 28 00:01:56 e001 python2[335]: 71ae5000-71ae6000 rw-p 00005000 b3:02 286997     /usr/lib/libSM.so.6.0.1
+Nov 28 00:01:56 e001 python2[335]: 71ae6000-71ae8000 r-xp 00000000 b3:02 283214     /usr/lib/libxcb-shm.so.0.0.0
+Nov 28 00:01:56 e001 python2[335]: 71ae8000-71af7000 ---p 00002000 b3:02 283214     /usr/lib/libxcb-shm.so.0.0.0
+Nov 28 00:01:56 e001 python2[335]: 71af7000-71af8000 r--p 00001000 b3:02 283214     /usr/lib/libxcb-shm.so.0.0.0
+Nov 28 00:01:56 e001 python2[335]: 71af8000-71af9000 rw-p 00002000 b3:02 283214     /usr/lib/libxcb-shm.so.0.0.0
+Nov 28 00:01:56 e001 python2[335]: 71af9000-71b17000 r-xp 00000000 b3:02 526506     /usr/lib/mesa/libEGL.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 71b17000-71b27000 ---p 0001e000 b3:02 526506     /usr/lib/mesa/libEGL.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 71b27000-71b28000 r--p 0001e000 b3:02 526506     /usr/lib/mesa/libEGL.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 71b28000-71b29000 rw-p 0001f000 b3:02 526506     /usr/lib/mesa/libEGL.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 71b29000-71b8a000 r-xp 00000000 b3:02 288328     /usr/lib/libpixman-1.so.0.32.8
+Nov 28 00:01:56 e001 python2[335]: 71b8a000-71b99000 ---p 00061000 b3:02 288328     /usr/lib/libpixman-1.so.0.32.8
+Nov 28 00:01:56 e001 python2[335]: 71b99000-71b9d000 r--p 00060000 b3:02 288328     /usr/lib/libpixman-1.so.0.32.8
+Nov 28 00:01:56 e001 python2[335]: 71b9d000-71b9e000 rw-p 00064000 b3:02 288328     /usr/lib/libpixman-1.so.0.32.8
+Nov 28 00:01:56 e001 python2[335]: 71b9e000-71bf3000 r-xp 00000000 b3:02 286558     /usr/lib/libharfbuzz.so.0.10100.0
+Nov 28 00:01:56 e001 python2[335]: 71bf3000-71c03000 ---p 00055000 b3:02 286558     /usr/lib/libharfbuzz.so.0.10100.0
+Nov 28 00:01:56 e001 python2[335]: 71c03000-71c04000 r--p 00055000 b3:02 286558     /usr/lib/libharfbuzz.so.0.10100.0
+Nov 28 00:01:56 e001 python2[335]: 71c04000-71c05000 rw-p 00056000 b3:02 286558     /usr/lib/libharfbuzz.so.0.10100.0
+Nov 28 00:01:56 e001 python2[335]: 71c05000-71c06000 r-xp 00000000 b3:02 279656     /usr/lib/libgthread-2.0.so.0.4600.2
+Nov 28 00:01:56 e001 python2[335]: 71c06000-71c15000 ---p 00001000 b3:02 279656     /usr/lib/libgthread-2.0.so.0.4600.2
+Nov 28 00:01:56 e001 python2[335]: 71c15000-71c16000 r--p 00000000 b3:02 279656     /usr/lib/libgthread-2.0.so.0.4600.2
+Nov 28 00:01:56 e001 python2[335]: 71c16000-71c17000 rw-p 00001000 b3:02 279656     /usr/lib/libgthread-2.0.so.0.4600.2
+Nov 28 00:01:56 e001 python2[335]: 71c17000-71c1e000 r-xp 00000000 b3:02 288324     /usr/lib/libthai.so.0.2.2
+Nov 28 00:01:56 e001 python2[335]: 71c1e000-71c2d000 ---p 00007000 b3:02 288324     /usr/lib/libthai.so.0.2.2
+Nov 28 00:01:56 e001 python2[335]: 71c2d000-71c2e000 r--p 00006000 b3:02 288324     /usr/lib/libthai.so.0.2.2
+Nov 28 00:01:56 e001 python2[335]: 71c2e000-71c2f000 rw-p 00007000 b3:02 288324     /usr/lib/libthai.so.0.2.2
+Nov 28 00:01:56 e001 python2[335]: 71c2f000-71c33000 r-xp 00000000 b3:02 283188     /usr/lib/libXdmcp.so.6.0.0
+Nov 28 00:01:56 e001 python2[335]: 71c33000-71c42000 ---p 00004000 b3:02 283188     /usr/lib/libXdmcp.so.6.0.0
+Nov 28 00:01:56 e001 python2[335]: 71c42000-71c43000 r--p 00003000 b3:02 283188     /usr/lib/libXdmcp.so.6.0.0
+Nov 28 00:01:56 e001 python2[335]: 71c43000-71c44000 rw-p 00004000 b3:02 283188     /usr/lib/libXdmcp.so.6.0.0
+Nov 28 00:01:56 e001 python2[335]: 71c44000-71c46000 r-xp 00000000 b3:02 283193     /usr/lib/libXau.so.6.0.0
+Nov 28 00:01:56 e001 python2[335]: 71c46000-71c4d000 ---p 00002000 b3:02 283193     /usr/lib/libXau.so.6.0.0
+Nov 28 00:01:56 e001 python2[335]: 71c4d000-71c4e000 rw-p 00001000 b3:02 283193     /usr/lib/libXau.so.6.0.0
+Nov 28 00:01:56 e001 python2[335]: 71c4e000-71c5e000 r-xp 00000000 b3:02 279934     /usr/lib/libbz2.so.1.0.6
+Nov 28 00:01:56 e001 python2[335]: 71c5e000-71c5f000 rw-p 00010000 b3:02 279934     /usr/lib/libbz2.so.1.0.6
+Nov 28 00:01:56 e001 python2[335]: 71c5f000-71d5e000 r-xp 00000000 b3:02 262326     /usr/lib/libgnutls.so.30.4.0
+Nov 28 00:01:56 e001 python2[335]: 71d5e000-71d6e000 ---p 000ff000 b3:02 262326     /usr/lib/libgnutls.so.30.4.0
+Nov 28 00:01:56 e001 python2[335]: 71d6e000-71d74000 r--p 000ff000 b3:02 262326     /usr/lib/libgnutls.so.30.4.0
+Nov 28 00:01:56 e001 python2[335]: 71d74000-71d76000 rw-p 00105000 b3:02 262326     /usr/lib/libgnutls.so.30.4.0
+Nov 28 00:01:56 e001 python2[335]: 71d76000-71db1000 r-xp 00000000 b3:02 286877     /usr/lib/libbluray.so.1.9.1
+Nov 28 00:01:56 e001 python2[335]: 71db1000-71dc1000 ---p 0003b000 b3:02 286877     /usr/lib/libbluray.so.1.9.1
+Nov 28 00:01:56 e001 python2[335]: 71dc1000-71dc2000 r--p 0003b000 b3:02 286877     /usr/lib/libbluray.so.1.9.1
+Nov 28 00:01:56 e001 python2[335]: 71dc2000-71dc3000 rw-p 0003c000 b3:02 286877     /usr/lib/libbluray.so.1.9.1
+Nov 28 00:01:56 e001 python2[335]: 71dc3000-71e07000 r-xp 00000000 b3:02 286883     /usr/lib/libmodplug.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 71e07000-71e0e000 ---p 00044000 b3:02 286883     /usr/lib/libmodplug.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 71e0e000-71e0f000 r--p 00043000 b3:02 286883     /usr/lib/libmodplug.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 71e0f000-71e10000 rw-p 00044000 b3:02 286883     /usr/lib/libmodplug.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 71e10000-71f4f000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 71f4f000-71fb3000 r-xp 00000000 b3:02 287141     /usr/lib/libssh.so.4.4.0
+Nov 28 00:01:56 e001 python2[335]: 71fb3000-71fc2000 ---p 00064000 b3:02 287141     /usr/lib/libssh.so.4.4.0
+Nov 28 00:01:56 e001 python2[335]: 71fc2000-71fc3000 r--p 00063000 b3:02 287141     /usr/lib/libssh.so.4.4.0
+Nov 28 00:01:56 e001 python2[335]: 71fc3000-71fc4000 rw-p 00064000 b3:02 287141     /usr/lib/libssh.so.4.4.0
+Nov 28 00:01:56 e001 python2[335]: 71fc4000-72022000 r-xp 00000000 b3:02 280062     /usr/lib/libgmp.so.10.3.0
+Nov 28 00:01:56 e001 python2[335]: 72022000-72031000 ---p 0005e000 b3:02 280062     /usr/lib/libgmp.so.10.3.0
+Nov 28 00:01:56 e001 python2[335]: 72031000-72032000 r--p 0005d000 b3:02 280062     /usr/lib/libgmp.so.10.3.0
+Nov 28 00:01:56 e001 python2[335]: 72032000-72033000 rw-p 0005e000 b3:02 280062     /usr/lib/libgmp.so.10.3.0
+Nov 28 00:01:56 e001 python2[335]: 72033000-7203c000 r-xp 00000000 b3:02 286826     /usr/lib/libgsm.so.1.0.13
+Nov 28 00:01:56 e001 python2[335]: 7203c000-72043000 ---p 00009000 b3:02 286826     /usr/lib/libgsm.so.1.0.13
+Nov 28 00:01:56 e001 python2[335]: 72043000-72044000 rw-p 00008000 b3:02 286826     /usr/lib/libgsm.so.1.0.13
+Nov 28 00:01:56 e001 python2[335]: 72044000-7207e000 r-xp 00000000 b3:02 286832     /usr/lib/libmp3lame.so.0.0.0
+Nov 28 00:01:56 e001 python2[335]: 7207e000-7208d000 ---p 0003a000 b3:02 286832     /usr/lib/libmp3lame.so.0.0.0
+Nov 28 00:01:56 e001 python2[335]: 7208d000-7208e000 r--p 00039000 b3:02 286832     /usr/lib/libmp3lame.so.0.0.0
+Nov 28 00:01:56 e001 python2[335]: 7208e000-7208f000 rw-p 0003a000 b3:02 286832     /usr/lib/libmp3lame.so.0.0.0
+Nov 28 00:01:56 e001 python2[335]: 7208f000-720bc000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 720bc000-720de000 r-xp 00000000 b3:02 287711     /usr/lib/libopencore-amrnb.so.0.0.3
+Nov 28 00:01:56 e001 python2[335]: 720de000-720e6000 ---p 00022000 b3:02 287711     /usr/lib/libopencore-amrnb.so.0.0.3
+Nov 28 00:01:56 e001 python2[335]: 720e6000-720e7000 r--p 00022000 b3:02 287711     /usr/lib/libopencore-amrnb.so.0.0.3
+Nov 28 00:01:56 e001 python2[335]: 720e7000-720e8000 rw-p 00023000 b3:02 287711     /usr/lib/libopencore-amrnb.so.0.0.3
+Nov 28 00:01:56 e001 python2[335]: 720e8000-720f8000 r-xp 00000000 b3:02 287709     /usr/lib/libopencore-amrwb.so.0.0.3
+Nov 28 00:01:56 e001 python2[335]: 720f8000-720ff000 ---p 00010000 b3:02 287709     /usr/lib/libopencore-amrwb.so.0.0.3
+Nov 28 00:01:56 e001 python2[335]: 720ff000-72100000 r--p 0000f000 b3:02 287709     /usr/lib/libopencore-amrwb.so.0.0.3
+Nov 28 00:01:56 e001 python2[335]: 72100000-72101000 rw-p 00010000 b3:02 287709     /usr/lib/libopencore-amrwb.so.0.0.3
+Nov 28 00:01:56 e001 python2[335]: 72101000-72120000 r-xp 00000000 b3:02 287721     /usr/lib/libopenjpeg.so.1.5.2
+Nov 28 00:01:56 e001 python2[335]: 72120000-72128000 ---p 0001f000 b3:02 287721     /usr/lib/libopenjpeg.so.1.5.2
+Nov 28 00:01:56 e001 python2[335]: 72128000-72129000 r--p 0001f000 b3:02 287721     /usr/lib/libopenjpeg.so.1.5.2
+Nov 28 00:01:56 e001 python2[335]: 72129000-7212a000 rw-p 00020000 b3:02 287721     /usr/lib/libopenjpeg.so.1.5.2
+Nov 28 00:01:56 e001 python2[335]: 7212a000-7216a000 r-xp 00000000 b3:02 287732     /usr/lib/libopus.so.0.5.0
+Nov 28 00:01:56 e001 python2[335]: 7216a000-72171000 ---p 00040000 b3:02 287732     /usr/lib/libopus.so.0.5.0
+Nov 28 00:01:56 e001 python2[335]: 72171000-72172000 r--p 0003f000 b3:02 287732     /usr/lib/libopus.so.0.5.0
+Nov 28 00:01:56 e001 python2[335]: 72172000-72173000 rw-p 00040000 b3:02 287732     /usr/lib/libopus.so.0.5.0
+Nov 28 00:01:56 e001 python2[335]: 72173000-72219000 r-xp 00000000 b3:02 287746     /usr/lib/libschroedinger-1.0.so.0.11.0
+Nov 28 00:01:56 e001 python2[335]: 72219000-72220000 ---p 000a6000 b3:02 287746     /usr/lib/libschroedinger-1.0.so.0.11.0
+Nov 28 00:01:56 e001 python2[335]: 72220000-72223000 rw-p 000a5000 b3:02 287746     /usr/lib/libschroedinger-1.0.so.0.11.0
+Nov 28 00:01:56 e001 python2[335]: 72223000-72235000 r-xp 00000000 b3:02 287944     /usr/lib/libspeex.so.1.5.0
+Nov 28 00:01:56 e001 python2[335]: 72235000-72245000 ---p 00012000 b3:02 287944     /usr/lib/libspeex.so.1.5.0
+Nov 28 00:01:56 e001 python2[335]: 72245000-72246000 r--p 00012000 b3:02 287944     /usr/lib/libspeex.so.1.5.0
+Nov 28 00:01:56 e001 python2[335]: 72246000-72247000 rw-p 00013000 b3:02 287944     /usr/lib/libspeex.so.1.5.0
+Nov 28 00:01:56 e001 python2[335]: 72247000-7225d000 r-xp 00000000 b3:02 287149     /usr/lib/libtheoradec.so.1.1.4
+Nov 28 00:01:56 e001 python2[335]: 7225d000-72264000 ---p 00016000 b3:02 287149     /usr/lib/libtheoradec.so.1.1.4
+Nov 28 00:01:56 e001 python2[335]: 72264000-72265000 rw-p 00015000 b3:02 287149     /usr/lib/libtheoradec.so.1.1.4
+Nov 28 00:01:56 e001 python2[335]: 72265000-722a0000 r-xp 00000000 b3:02 287147     /usr/lib/libtheoraenc.so.1.1.2
+Nov 28 00:01:56 e001 python2[335]: 722a0000-722a7000 ---p 0003b000 b3:02 287147     /usr/lib/libtheoraenc.so.1.1.2
+Nov 28 00:01:56 e001 python2[335]: 722a7000-722a8000 rw-p 0003a000 b3:02 287147     /usr/lib/libtheoraenc.so.1.1.2
+Nov 28 00:01:56 e001 python2[335]: 722a8000-722ce000 r-xp 00000000 b3:02 287042     /usr/lib/libvorbis.so.0.4.8
+Nov 28 00:01:56 e001 python2[335]: 722ce000-722de000 ---p 00026000 b3:02 287042     /usr/lib/libvorbis.so.0.4.8
+Nov 28 00:01:56 e001 python2[335]: 722de000-722df000 r--p 00026000 b3:02 287042     /usr/lib/libvorbis.so.0.4.8
+Nov 28 00:01:56 e001 python2[335]: 722df000-722e0000 rw-p 00027000 b3:02 287042     /usr/lib/libvorbis.so.0.4.8
+Nov 28 00:01:56 e001 python2[335]: 722e0000-72355000 r-xp 00000000 b3:02 287044     /usr/lib/libvorbisenc.so.2.0.11
+Nov 28 00:01:56 e001 python2[335]: 72355000-72365000 ---p 00075000 b3:02 287044     /usr/lib/libvorbisenc.so.2.0.11
+Nov 28 00:01:56 e001 python2[335]: 72365000-72371000 r--p 00075000 b3:02 287044     /usr/lib/libvorbisenc.so.2.0.11
+Nov 28 00:01:56 e001 python2[335]: 72371000-72372000 rw-p 00081000 b3:02 287044     /usr/lib/libvorbisenc.so.2.0.11
+Nov 28 00:01:56 e001 python2[335]: 72372000-724a4000 r-xp 00000000 b3:02 288179     /usr/lib/libvpx.so.3.0.0
+Nov 28 00:01:56 e001 python2[335]: 724a4000-724b3000 ---p 00132000 b3:02 288179     /usr/lib/libvpx.so.3.0.0
+Nov 28 00:01:56 e001 python2[335]: 724b3000-724b4000 r--p 00131000 b3:02 288179     /usr/lib/libvpx.so.3.0.0
+Nov 28 00:01:56 e001 python2[335]: 724b4000-724b5000 rw-p 00132000 b3:02 288179     /usr/lib/libvpx.so.3.0.0
+Nov 28 00:01:56 e001 python2[335]: 724b5000-724b8000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 724b8000-724fe000 r-xp 00000000 b3:02 287679     /usr/lib/libwebp.so.5.0.4
+Nov 28 00:01:56 e001 python2[335]: 724fe000-7250d000 ---p 00046000 b3:02 287679     /usr/lib/libwebp.so.5.0.4
+Nov 28 00:01:56 e001 python2[335]: 7250d000-7250e000 r--p 00045000 b3:02 287679     /usr/lib/libwebp.so.5.0.4
+Nov 28 00:01:56 e001 python2[335]: 7250e000-7250f000 rw-p 00046000 b3:02 287679     /usr/lib/libwebp.so.5.0.4
+Nov 28 00:01:56 e001 python2[335]: 7250f000-725c2000 r-xp 00000000 b3:02 288182     /usr/lib/libx264.so.148
+Nov 28 00:01:56 e001 python2[335]: 725c2000-725d1000 ---p 000b3000 b3:02 288182     /usr/lib/libx264.so.148
+Nov 28 00:01:56 e001 python2[335]: 725d1000-725d2000 r--p 000b2000 b3:02 288182     /usr/lib/libx264.so.148
+Nov 28 00:01:56 e001 python2[335]: 725d2000-725d3000 rw-p 000b3000 b3:02 288182     /usr/lib/libx264.so.148
+Nov 28 00:01:56 e001 python2[335]: 725d3000-7264e000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 7264e000-72735000 r-xp 00000000 b3:02 288189     /usr/lib/libx265.so.68
+Nov 28 00:01:56 e001 python2[335]: 72735000-72744000 ---p 000e7000 b3:02 288189     /usr/lib/libx265.so.68
+Nov 28 00:01:56 e001 python2[335]: 72744000-72745000 r--p 000e6000 b3:02 288189     /usr/lib/libx265.so.68
+Nov 28 00:01:56 e001 python2[335]: 72745000-72746000 rw-p 000e7000 b3:02 288189     /usr/lib/libx265.so.68
+Nov 28 00:01:56 e001 python2[335]: 72746000-72749000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 72749000-727b8000 r-xp 00000000 b3:02 288172     /usr/lib/libxvidcore.so.4.3
+Nov 28 00:01:56 e001 python2[335]: 727b8000-727c7000 ---p 0006f000 b3:02 288172     /usr/lib/libxvidcore.so.4.3
+Nov 28 00:01:56 e001 python2[335]: 727c7000-727c8000 r--p 0006e000 b3:02 288172     /usr/lib/libxvidcore.so.4.3
+Nov 28 00:01:56 e001 python2[335]: 727c8000-727c9000 rw-p 0006f000 b3:02 288172     /usr/lib/libxvidcore.so.4.3
+Nov 28 00:01:56 e001 python2[335]: 727c9000-7283b000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 7283b000-72853000 r-xp 00000000 b3:02 287502     /usr/lib/libva.so.1.3800.0
+Nov 28 00:01:56 e001 python2[335]: 72853000-72862000 ---p 00018000 b3:02 287502     /usr/lib/libva.so.1.3800.0
+Nov 28 00:01:56 e001 python2[335]: 72862000-72863000 r--p 00017000 b3:02 287502     /usr/lib/libva.so.1.3800.0
+Nov 28 00:01:56 e001 python2[335]: 72863000-72864000 rw-p 00018000 b3:02 287502     /usr/lib/libva.so.1.3800.0
+Nov 28 00:01:56 e001 python2[335]: 72864000-72874000 r-xp 00000000 b3:02 288229     /usr/lib/libswresample.so.1.2.101
+Nov 28 00:01:56 e001 python2[335]: 72874000-72883000 ---p 00010000 b3:02 288229     /usr/lib/libswresample.so.1.2.101
+Nov 28 00:01:56 e001 python2[335]: 72883000-72885000 r--p 0000f000 b3:02 288229     /usr/lib/libswresample.so.1.2.101
+Nov 28 00:01:56 e001 python2[335]: 72885000-72886000 rw-p 00011000 b3:02 288229     /usr/lib/libswresample.so.1.2.101
+Nov 28 00:01:56 e001 python2[335]: 72886000-728a7000 r-xp 00000000 b3:02 287977     /usr/lib/libv4lconvert.so.0.0.0
+Nov 28 00:01:56 e001 python2[335]: 728a7000-728b6000 ---p 00021000 b3:02 287977     /usr/lib/libv4lconvert.so.0.0.0
+Nov 28 00:01:56 e001 python2[335]: 728b6000-728b8000 r--p 00020000 b3:02 287977     /usr/lib/libv4lconvert.so.0.0.0
+Nov 28 00:01:56 e001 python2[335]: 728b8000-728b9000 rw-p 00022000 b3:02 287977     /usr/lib/libv4lconvert.so.0.0.0
+Nov 28 00:01:56 e001 python2[335]: 728b9000-7290b000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 7290b000-7291e000 r-xp 00000000 b3:02 279930     /usr/lib/libnsl-2.22.so
+Nov 28 00:01:56 e001 python2[335]: 7291e000-7292d000 ---p 00013000 b3:02 279930     /usr/lib/libnsl-2.22.so
+Nov 28 00:01:56 e001 python2[335]: 7292d000-7292e000 r--p 00012000 b3:02 279930     /usr/lib/libnsl-2.22.so
+Nov 28 00:01:56 e001 python2[335]: 7292e000-7292f000 rw-p 00013000 b3:02 279930     /usr/lib/libnsl-2.22.so
+Nov 28 00:01:56 e001 python2[335]: 7292f000-72931000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 72931000-72944000 r-xp 00000000 b3:02 280134     /usr/lib/libresolv-2.22.so
+Nov 28 00:01:56 e001 python2[335]: 72944000-72953000 ---p 00013000 b3:02 280134     /usr/lib/libresolv-2.22.so
+Nov 28 00:01:56 e001 python2[335]: 72953000-72954000 r--p 00012000 b3:02 280134     /usr/lib/libresolv-2.22.so
+Nov 28 00:01:56 e001 python2[335]: 72954000-72955000 rw-p 00013000 b3:02 280134     /usr/lib/libresolv-2.22.so
+Nov 28 00:01:56 e001 python2[335]: 72955000-72957000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 72957000-7296a000 r-xp 00000000 b3:02 280474     /usr/lib/libusb-1.0.so.0.1.0
+Nov 28 00:01:56 e001 python2[335]: 7296a000-7297a000 ---p 00013000 b3:02 280474     /usr/lib/libusb-1.0.so.0.1.0
+Nov 28 00:01:56 e001 python2[335]: 7297a000-7297b000 r--p 00013000 b3:02 280474     /usr/lib/libusb-1.0.so.0.1.0
+Nov 28 00:01:56 e001 python2[335]: 7297b000-7297c000 rw-p 00014000 b3:02 280474     /usr/lib/libusb-1.0.so.0.1.0
+Nov 28 00:01:56 e001 python2[335]: 7297c000-72987000 r-xp 00000000 b3:02 288285     /usr/lib/libraw1394.so.11.1.0
+Nov 28 00:01:56 e001 python2[335]: 72987000-72996000 ---p 0000b000 b3:02 288285     /usr/lib/libraw1394.so.11.1.0
+Nov 28 00:01:56 e001 python2[335]: 72996000-72997000 r--p 0000a000 b3:02 288285     /usr/lib/libraw1394.so.11.1.0
+Nov 28 00:01:56 e001 python2[335]: 72997000-72998000 rw-p 0000b000 b3:02 288285     /usr/lib/libraw1394.so.11.1.0
+Nov 28 00:01:56 e001 python2[335]: 72998000-72a29000 r-xp 00000000 b3:02 286566     /usr/lib/libfreetype.so.6.12.1
+Nov 28 00:01:56 e001 python2[335]: 72a29000-72a38000 ---p 00091000 b3:02 286566     /usr/lib/libfreetype.so.6.12.1
+Nov 28 00:01:56 e001 python2[335]: 72a38000-72a3c000 r--p 00090000 b3:02 286566     /usr/lib/libfreetype.so.6.12.1
+Nov 28 00:01:56 e001 python2[335]: 72a3c000-72a3d000 rw-p 00094000 b3:02 286566     /usr/lib/libfreetype.so.6.12.1
+Nov 28 00:01:56 e001 python2[335]: 72a3d000-72a58000 r-xp 00000000 b3:02 288994     /usr/lib/libpangox-1.0.so.0.0.0
+Nov 28 00:01:56 e001 python2[335]: 72a58000-72a5f000 ---p 0001b000 b3:02 288994     /usr/lib/libpangox-1.0.so.0.0.0
+Nov 28 00:01:56 e001 python2[335]: 72a5f000-72a60000 r--p 0001a000 b3:02 288994     /usr/lib/libpangox-1.0.so.0.0.0
+Nov 28 00:01:56 e001 python2[335]: 72a60000-72a61000 rw-p 0001b000 b3:02 288994     /usr/lib/libpangox-1.0.so.0.0.0
+Nov 28 00:01:56 e001 python2[335]: 72a61000-72aac000 r-xp 00000000 b3:02 288713     /usr/lib/libXt.so.6.0.0
+Nov 28 00:01:56 e001 python2[335]: 72aac000-72abc000 ---p 0004b000 b3:02 288713     /usr/lib/libXt.so.6.0.0
+Nov 28 00:01:56 e001 python2[335]: 72abc000-72abd000 r--p 0004b000 b3:02 288713     /usr/lib/libXt.so.6.0.0
+Nov 28 00:01:56 e001 python2[335]: 72abd000-72ac0000 rw-p 0004c000 b3:02 288713     /usr/lib/libXt.so.6.0.0
+Nov 28 00:01:56 e001 python2[335]: 72ac0000-72ad4000 r-xp 00000000 b3:02 288985     /usr/lib/libXmu.so.6.2.0
+Nov 28 00:01:56 e001 python2[335]: 72ad4000-72adb000 ---p 00014000 b3:02 288985     /usr/lib/libXmu.so.6.2.0
+Nov 28 00:01:56 e001 python2[335]: 72adb000-72adc000 rw-p 00013000 b3:02 288985     /usr/lib/libXmu.so.6.2.0
+Nov 28 00:01:56 e001 python2[335]: 72adc000-72b43000 r-xp 00000000 b3:02 288710     /usr/lib/libGLU.so.1.3.1
+Nov 28 00:01:56 e001 python2[335]: 72b43000-72b4b000 ---p 00067000 b3:02 288710     /usr/lib/libGLU.so.1.3.1
+Nov 28 00:01:56 e001 python2[335]: 72b4b000-72b4c000 r--p 00067000 b3:02 288710     /usr/lib/libGLU.so.1.3.1
+Nov 28 00:01:56 e001 python2[335]: 72b4c000-72b4d000 rw-p 00068000 b3:02 288710     /usr/lib/libGLU.so.1.3.1
+Nov 28 00:01:56 e001 python2[335]: 72b4d000-72bb1000 r-xp 00000000 b3:02 267866     /usr/lib/libpcre.so.1.2.5
+Nov 28 00:01:56 e001 python2[335]: 72bb1000-72bc0000 ---p 00064000 b3:02 267866     /usr/lib/libpcre.so.1.2.5
+Nov 28 00:01:56 e001 python2[335]: 72bc0000-72bc1000 r--p 00063000 b3:02 267866     /usr/lib/libpcre.so.1.2.5
+Nov 28 00:01:56 e001 python2[335]: 72bc1000-72bc2000 rw-p 00064000 b3:02 267866     /usr/lib/libpcre.so.1.2.5
+Nov 28 00:01:56 e001 python2[335]: 72bc2000-72bc9000 r-xp 00000000 b3:02 279995     /usr/lib/libffi.so.6.0.4
+Nov 28 00:01:56 e001 python2[335]: 72bc9000-72bd0000 ---p 00007000 b3:02 279995     /usr/lib/libffi.so.6.0.4
+Nov 28 00:01:56 e001 python2[335]: 72bd0000-72bd1000 r--p 00006000 b3:02 279995     /usr/lib/libffi.so.6.0.4
+Nov 28 00:01:56 e001 python2[335]: 72bd1000-72bd2000 rw-p 00007000 b3:02 279995     /usr/lib/libffi.so.6.0.4
+Nov 28 00:01:56 e001 python2[335]: 72bd2000-72bd4000 r-xp 00000000 b3:02 288470     /usr/lib/libXcomposite.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 72bd4000-72bdb000 ---p 00002000 b3:02 288470     /usr/lib/libXcomposite.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 72bdb000-72bdc000 r--p 00001000 b3:02 288470     /usr/lib/libXcomposite.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 72bdc000-72bdd000 rw-p 00002000 b3:02 288470     /usr/lib/libXcomposite.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 72bdd000-72be5000 r-xp 00000000 b3:02 288432     /usr/lib/libXcursor.so.1.0.2
+Nov 28 00:01:56 e001 python2[335]: 72be5000-72bec000 ---p 00008000 b3:02 288432     /usr/lib/libXcursor.so.1.0.2
+Nov 28 00:01:56 e001 python2[335]: 72bec000-72bed000 r--p 00007000 b3:02 288432     /usr/lib/libXcursor.so.1.0.2
+Nov 28 00:01:56 e001 python2[335]: 72bed000-72bee000 rw-p 00008000 b3:02 288432     /usr/lib/libXcursor.so.1.0.2
+Nov 28 00:01:56 e001 python2[335]: 72bee000-72bf6000 r-xp 00000000 b3:02 288438     /usr/lib/libXrandr.so.2.2.0
+Nov 28 00:01:56 e001 python2[335]: 72bf6000-72c05000 ---p 00008000 b3:02 288438     /usr/lib/libXrandr.so.2.2.0
+Nov 28 00:01:56 e001 python2[335]: 72c05000-72c06000 r--p 00007000 b3:02 288438     /usr/lib/libXrandr.so.2.2.0
+Nov 28 00:01:56 e001 python2[335]: 72c06000-72c07000 rw-p 00008000 b3:02 288438     /usr/lib/libXrandr.so.2.2.0
+Nov 28 00:01:56 e001 python2[335]: 72c07000-72c13000 r-xp 00000000 b3:02 286893     /usr/lib/libXi.so.6.1.0
+Nov 28 00:01:56 e001 python2[335]: 72c13000-72c22000 ---p 0000c000 b3:02 286893     /usr/lib/libXi.so.6.1.0
+Nov 28 00:01:56 e001 python2[335]: 72c22000-72c23000 r--p 0000b000 b3:02 286893     /usr/lib/libXi.so.6.1.0
+Nov 28 00:01:56 e001 python2[335]: 72c23000-72c24000 rw-p 0000c000 b3:02 286893     /usr/lib/libXi.so.6.1.0
+Nov 28 00:01:56 e001 python2[335]: 72c24000-72c26000 r-xp 00000000 b3:02 288260     /usr/lib/libXinerama.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 72c26000-72c2d000 ---p 00002000 b3:02 288260     /usr/lib/libXinerama.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 72c2d000-72c2e000 rw-p 00001000 b3:02 288260     /usr/lib/libXinerama.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 72c2e000-72c36000 r-xp 00000000 b3:02 287752     /usr/lib/libXrender.so.1.3.0
+Nov 28 00:01:56 e001 python2[335]: 72c36000-72c45000 ---p 00008000 b3:02 287752     /usr/lib/libXrender.so.1.3.0
+Nov 28 00:01:56 e001 python2[335]: 72c45000-72c46000 r--p 00007000 b3:02 287752     /usr/lib/libXrender.so.1.3.0
+Nov 28 00:01:56 e001 python2[335]: 72c46000-72c47000 rw-p 00008000 b3:02 287752     /usr/lib/libXrender.so.1.3.0
+Nov 28 00:01:56 e001 python2[335]: 72c47000-72c78000 r-xp 00000000 b3:02 286574     /usr/lib/libfontconfig.so.1.8.0
+Nov 28 00:01:56 e001 python2[335]: 72c78000-72c88000 ---p 00031000 b3:02 286574     /usr/lib/libfontconfig.so.1.8.0
+Nov 28 00:01:56 e001 python2[335]: 72c88000-72c89000 r--p 00031000 b3:02 286574     /usr/lib/libfontconfig.so.1.8.0
+Nov 28 00:01:56 e001 python2[335]: 72c89000-72c8a000 rw-p 00032000 b3:02 286574     /usr/lib/libfontconfig.so.1.8.0
+Nov 28 00:01:56 e001 python2[335]: 72c8a000-72cc7000 r-xp 00000000 b3:02 288375     /usr/lib/libpango-1.0.so.0.3800.1
+Nov 28 00:01:56 e001 python2[335]: 72cc7000-72cd7000 ---p 0003d000 b3:02 288375     /usr/lib/libpango-1.0.so.0.3800.1
+Nov 28 00:01:56 e001 python2[335]: 72cd7000-72cd8000 r--p 0003d000 b3:02 288375     /usr/lib/libpango-1.0.so.0.3800.1
+Nov 28 00:01:56 e001 python2[335]: 72cd8000-72cd9000 rw-p 0003e000 b3:02 288375     /usr/lib/libpango-1.0.so.0.3800.1
+Nov 28 00:01:56 e001 python2[335]: 72cd9000-72ce9000 r-xp 00000000 b3:02 288384     /usr/lib/libpangoft2-1.0.so.0.3800.1
+Nov 28 00:01:56 e001 python2[335]: 72ce9000-72cf8000 ---p 00010000 b3:02 288384     /usr/lib/libpangoft2-1.0.so.0.3800.1
+Nov 28 00:01:56 e001 python2[335]: 72cf8000-72cf9000 r--p 0000f000 b3:02 288384     /usr/lib/libpangoft2-1.0.so.0.3800.1
+Nov 28 00:01:56 e001 python2[335]: 72cf9000-72cfa000 rw-p 00010000 b3:02 288384     /usr/lib/libpangoft2-1.0.so.0.3800.1
+Nov 28 00:01:56 e001 python2[335]: 72cfa000-72e2e000 r-xp 00000000 b3:02 279672     /usr/lib/libgio-2.0.so.0.4600.2
+Nov 28 00:01:56 e001 python2[335]: 72e2e000-72e3e000 ---p 00134000 b3:02 279672     /usr/lib/libgio-2.0.so.0.4600.2
+Nov 28 00:01:56 e001 python2[335]: 72e3e000-72e40000 r--p 00134000 b3:02 279672     /usr/lib/libgio-2.0.so.0.4600.2
+Nov 28 00:01:56 e001 python2[335]: 72e40000-72e42000 rw-p 00136000 b3:02 279672     /usr/lib/libgio-2.0.so.0.4600.2
+Nov 28 00:01:56 e001 python2[335]: 72e42000-72e43000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 72e43000-72e64000 r-xp 00000000 b3:02 288618     /usr/lib/libgdk_pixbuf-2.0.so.0.3200.2
+Nov 28 00:01:56 e001 python2[335]: 72e64000-72e73000 ---p 00021000 b3:02 288618     /usr/lib/libgdk_pixbuf-2.0.so.0.3200.2
+Nov 28 00:01:56 e001 python2[335]: 72e73000-72e74000 r--p 00020000 b3:02 288618     /usr/lib/libgdk_pixbuf-2.0.so.0.3200.2
+Nov 28 00:01:56 e001 python2[335]: 72e74000-72e75000 rw-p 00021000 b3:02 288618     /usr/lib/libgdk_pixbuf-2.0.so.0.3200.2
+Nov 28 00:01:56 e001 python2[335]: 72e75000-72f59000 r-xp 00000000 b3:02 288333     /usr/lib/libcairo.so.2.11400.4
+Nov 28 00:01:56 e001 python2[335]: 72f59000-72f68000 ---p 000e4000 b3:02 288333     /usr/lib/libcairo.so.2.11400.4
+Nov 28 00:01:56 e001 python2[335]: 72f68000-72f6a000 r--p 000e3000 b3:02 288333     /usr/lib/libcairo.so.2.11400.4
+Nov 28 00:01:56 e001 python2[335]: 72f6a000-72f6b000 rw-p 000e5000 b3:02 288333     /usr/lib/libcairo.so.2.11400.4
+Nov 28 00:01:56 e001 python2[335]: 72f6b000-72f6c000 rw-p 00000000 00:00 0
+Nov 28 00:01:56 e001 python2[335]: 72f6c000-72f87000 r-xp 00000000 b3:02 281466     /usr/lib/libatk-1.0.so.0.21809.1
+Nov 28 00:01:56 e001 python2[335]: 72f87000-72f97000 ---p 0001b000 b3:02 281466     /usr/lib/libatk-1.0.so.0.21809.1
+Nov 28 00:01:56 e001 python2[335]: 72f97000-72f98000 r--p 0001b000 b3:02 281466     /usr/lib/libatk-1.0.so.0.21809.1
+Nov 28 00:01:56 e001 python2[335]: 72f98000-72f99000 rw-p 0001c000 b3:02 281466     /usr/lib/libatk-1.0.so.0.21809.1
+Nov 28 00:01:56 e001 python2[335]: 72f99000-72fa2000 r-xp 00000000 b3:02 288385     /usr/lib/libpangocairo-1.0.so.0.3800.1
+Nov 28 00:01:56 e001 python2[335]: 72fa2000-72fb1000 ---p 00009000 b3:02 288385     /usr/lib/libpangocairo-1.0.so.0.3800.1
+Nov 28 00:01:56 e001 python2[335]: 72fb1000-72fb2000 r--p 00008000 b3:02 288385     /usr/lib/libpangocairo-1.0.so.0.3800.1
+Nov 28 00:01:56 e001 python2[335]: 72fb2000-72fb3000 rw-p 00009000 b3:02 288385     /usr/lib/libpangocairo-1.0.so.0.3800.1
+Nov 28 00:01:56 e001 python2[335]: 72fb3000-72fb5000 r-xp 00000000 b3:02 279946     /usr/lib/libgmodule-2.0.so.0.4600.2
+Nov 28 00:01:56 e001 python2[335]: 72fb5000-72fc5000 ---p 00002000 b3:02 279946     /usr/lib/libgmodule-2.0.so.0.4600.2
+Nov 28 00:01:56 e001 python2[335]: 72fc5000-72fc6000 r--p 00002000 b3:02 279946     /usr/lib/libgmodule-2.0.so.0.4600.2
+Nov 28 00:01:56 e001 python2[335]: 72fc6000-72fc7000 rw-p 00003000 b3:02 279946     /usr/lib/libgmodule-2.0.so.0.4600.2
+Nov 28 00:01:56 e001 python2[335]: 72fc7000-72fcc000 r-xp 00000000 b3:02 283022     /usr/lib/libIlmThread-2_2.so.12.0.0
+Nov 28 00:01:56 e001 python2[335]: 72fcc000-72fdb000 ---p 00005000 b3:02 283022     /usr/lib/libIlmThread-2_2.so.12.0.0
+Nov 28 00:01:56 e001 python2[335]: 72fdb000-72fdc000 r--p 00004000 b3:02 283022     /usr/lib/libIlmThread-2_2.so.12.0.0
+Nov 28 00:01:56 e001 python2[335]: 72fdc000-72fdd000 rw-p 00005000 b3:02 283022     /usr/lib/libIlmThread-2_2.so.12.0.0
+Nov 28 00:01:56 e001 python2[335]: 72fdd000-72ff2000 r-xp 00000000 b3:02 283023     /usr/lib/libIex-2_2.so.12.0.0
+Nov 28 00:01:56 e001 python2[335]: 72ff2000-73001000 ---p 00015000 b3:02 283023     /usr/lib/libIex-2_2.so.12.0.0
+Nov 28 00:01:56 e001 python2[335]: 73001000-73003000 r--p 00014000 b3:02 283023     /usr/lib/libIex-2_2.so.12.0.0
+Nov 28 00:01:56 e001 python2[335]: 73003000-73004000 rw-p 00016000 b3:02 283023     /usr/lib/libIex-2_2.so.12.0.0
+Nov 28 00:01:56 e001 python2[335]: 73004000-7300f000 r-xp 00000000 b3:02 283009     /usr/lib/libImath-2_2.so.12.0.0
+Nov 28 00:01:56 e001 python2[335]: 7300f000-7301f000 ---p 0000b000 b3:02 283009     /usr/lib/libImath-2_2.so.12.0.0
+Nov 28 00:01:56 e001 python2[335]: 7301f000-73020000 r--p 0000b000 b3:02 283009     /usr/lib/libImath-2_2.so.12.0.0
+Nov 28 00:01:56 e001 python2[335]: 73020000-73021000 rw-p 0000c000 b3:02 283009     /usr/lib/libImath-2_2.so.12.0.0
+Nov 28 00:01:56 e001 python2[335]: 73021000-73040000 r-xp 00000000 b3:02 261780     /usr/lib/liblzma.so.5.2.2
+Nov 28 00:01:56 e001 python2[335]: 73040000-7304f000 ---p 0001f000 b3:02 261780     /usr/lib/liblzma.so.5.2.2
+Nov 28 00:01:56 e001 python2[335]: 7304f000-73050000 r--p 0001e000 b3:02 261780     /usr/lib/liblzma.so.5.2.2
+Nov 28 00:01:56 e001 python2[335]: 73050000-73051000 rw-p 0001f000 b3:02 261780     /usr/lib/liblzma.so.5.2.2
+Nov 28 00:01:56 e001 python2[335]: 73051000-7305c000 r-xp 00000000 b3:02 287186     /usr/lib/libdrm.so.2.4.0
+Nov 28 00:01:56 e001 python2[335]: 7305c000-7306b000 ---p 0000b000 b3:02 287186     /usr/lib/libdrm.so.2.4.0
+Nov 28 00:01:56 e001 python2[335]: 7306b000-7306c000 r--p 0000a000 b3:02 287186     /usr/lib/libdrm.so.2.4.0
+Nov 28 00:01:56 e001 python2[335]: 7306c000-7306d000 rw-p 0000b000 b3:02 287186     /usr/lib/libdrm.so.2.4.0
+Nov 28 00:01:56 e001 python2[335]: 7306d000-73071000 r-xp 00000000 b3:02 287319     /usr/lib/libXxf86vm.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 73071000-73080000 ---p 00004000 b3:02 287319     /usr/lib/libXxf86vm.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 73080000-73081000 r--p 00003000 b3:02 287319     /usr/lib/libXxf86vm.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 73081000-73082000 rw-p 00004000 b3:02 287319     /usr/lib/libXxf86vm.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 73082000-73083000 r-xp 00000000 b3:02 287353     /usr/lib/libxshmfence.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 73083000-73092000 ---p 00001000 b3:02 287353     /usr/lib/libxshmfence.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 73092000-73093000 r--p 00000000 b3:02 287353     /usr/lib/libxshmfence.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 73093000-73094000 rw-p 00001000 b3:02 287353     /usr/lib/libxshmfence.so.1.0.0
+Nov 28 00:01:56 e001 python2[335]: 73094000-730aa000 r-xp 00000000 b3:02 283209     /usr/lib/libxcb.so.1.1.0
+Nov 28 00:01:57 e001 python2[335]: 730aa000-730b9000 ---p 00016000 b3:02 283209     /usr/lib/libxcb.so.1.1.0
+Nov 28 00:01:57 e001 python2[335]: 730b9000-730ba000 r--p 00015000 b3:02 283209     /usr/lib/libxcb.so.1.1.0
+Nov 28 00:01:57 e001 python2[335]: 730ba000-730bb000 rw-p 00016000 b3:02 283209     /usr/lib/libxcb.so.1.1.0
+Nov 28 00:01:57 e001 python2[335]: 730bb000-730bf000 r-xp 00000000 b3:02 283249     /usr/lib/libxcb-sync.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 730bf000-730ce000 ---p 00004000 b3:02 283249     /usr/lib/libxcb-sync.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 730ce000-730cf000 r--p 00003000 b3:02 283249     /usr/lib/libxcb-sync.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 730cf000-730d0000 rw-p 00004000 b3:02 283249     /usr/lib/libxcb-sync.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 730d0000-730d2000 r-xp 00000000 b3:02 283285     /usr/lib/libxcb-shape.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 730d2000-730e1000 ---p 00002000 b3:02 283285     /usr/lib/libxcb-shape.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 730e1000-730e2000 r--p 00001000 b3:02 283285     /usr/lib/libxcb-shape.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 730e2000-730e3000 rw-p 00002000 b3:02 283285     /usr/lib/libxcb-shape.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 730e3000-730e9000 r-xp 00000000 b3:02 283235     /usr/lib/libxcb-render.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 730e9000-730f8000 ---p 00006000 b3:02 283235     /usr/lib/libxcb-render.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 730f8000-730f9000 r--p 00005000 b3:02 283235     /usr/lib/libxcb-render.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 730f9000-730fa000 rw-p 00006000 b3:02 283235     /usr/lib/libxcb-render.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 730fa000-730fe000 r-xp 00000000 b3:02 283225     /usr/lib/libxcb-xfixes.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 730fe000-7310d000 ---p 00004000 b3:02 283225     /usr/lib/libxcb-xfixes.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 7310d000-7310e000 r--p 00003000 b3:02 283225     /usr/lib/libxcb-xfixes.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 7310e000-7310f000 rw-p 00004000 b3:02 283225     /usr/lib/libxcb-xfixes.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 7310f000-73118000 r-xp 00000000 b3:02 283246     /usr/lib/libxcb-randr.so.0.1.0
+Nov 28 00:01:57 e001 python2[335]: 73118000-73127000 ---p 00009000 b3:02 283246     /usr/lib/libxcb-randr.so.0.1.0
+Nov 28 00:01:57 e001 python2[335]: 73127000-73128000 r--p 00008000 b3:02 283246     /usr/lib/libxcb-randr.so.0.1.0
+Nov 28 00:01:57 e001 python2[335]: 73128000-73129000 rw-p 00009000 b3:02 283246     /usr/lib/libxcb-randr.so.0.1.0
+Nov 28 00:01:57 e001 python2[335]: 73129000-7312b000 r-xp 00000000 b3:02 283239     /usr/lib/libxcb-present.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 7312b000-7313a000 ---p 00002000 b3:02 283239     /usr/lib/libxcb-present.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 7313a000-7313b000 r--p 00001000 b3:02 283239     /usr/lib/libxcb-present.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 7313b000-7313c000 rw-p 00002000 b3:02 283239     /usr/lib/libxcb-present.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 7313c000-7313e000 r-xp 00000000 b3:02 283208     /usr/lib/libxcb-dri3.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 7313e000-7314d000 ---p 00002000 b3:02 283208     /usr/lib/libxcb-dri3.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 7314d000-7314e000 r--p 00001000 b3:02 283208     /usr/lib/libxcb-dri3.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 7314e000-7314f000 rw-p 00002000 b3:02 283208     /usr/lib/libxcb-dri3.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 7314f000-73152000 r-xp 00000000 b3:02 283212     /usr/lib/libxcb-dri2.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 73152000-73161000 ---p 00003000 b3:02 283212     /usr/lib/libxcb-dri2.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 73161000-73162000 r--p 00002000 b3:02 283212     /usr/lib/libxcb-dri2.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 73162000-73163000 rw-p 00003000 b3:02 283212     /usr/lib/libxcb-dri2.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 73163000-73172000 r-xp 00000000 b3:02 283281     /usr/lib/libxcb-glx.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 73172000-73181000 ---p 0000f000 b3:02 283281     /usr/lib/libxcb-glx.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 73181000-73182000 r--p 0000e000 b3:02 283281     /usr/lib/libxcb-glx.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 73182000-73183000 rw-p 0000f000 b3:02 283281     /usr/lib/libxcb-glx.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 73183000-7328d000 r-xp 00000000 b3:02 285559     /usr/lib/libX11.so.6.3.0
+Nov 28 00:01:57 e001 python2[335]: 7328d000-7329c000 ---p 0010a000 b3:02 285559     /usr/lib/libX11.so.6.3.0
+Nov 28 00:01:57 e001 python2[335]: 7329c000-7329d000 r--p 00109000 b3:02 285559     /usr/lib/libX11.so.6.3.0
+Nov 28 00:01:57 e001 python2[335]: 7329d000-732a0000 rw-p 0010a000 b3:02 285559     /usr/lib/libX11.so.6.3.0
+Nov 28 00:01:57 e001 python2[335]: 732a0000-732a1000 r-xp 00000000 b3:02 285561     /usr/lib/libX11-xcb.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 732a1000-732b0000 ---p 00001000 b3:02 285561     /usr/lib/libX11-xcb.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 732b0000-732b1000 r--p 00000000 b3:02 285561     /usr/lib/libX11-xcb.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 732b1000-732b2000 rw-p 00001000 b3:02 285561     /usr/lib/libX11-xcb.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 732b2000-732b6000 r-xp 00000000 b3:02 286973     /usr/lib/libXfixes.so.3.1.0
+Nov 28 00:01:57 e001 python2[335]: 732b6000-732bd000 ---p 00004000 b3:02 286973     /usr/lib/libXfixes.so.3.1.0
+Nov 28 00:01:57 e001 python2[335]: 732bd000-732be000 rw-p 00003000 b3:02 286973     /usr/lib/libXfixes.so.3.1.0
+Nov 28 00:01:57 e001 python2[335]: 732be000-732c0000 r-xp 00000000 b3:02 287347     /usr/lib/libXdamage.so.1.1.0
+Nov 28 00:01:57 e001 python2[335]: 732c0000-732c7000 ---p 00002000 b3:02 287347     /usr/lib/libXdamage.so.1.1.0
+Nov 28 00:01:57 e001 python2[335]: 732c7000-732c8000 r--p 00001000 b3:02 287347     /usr/lib/libXdamage.so.1.1.0
+Nov 28 00:01:57 e001 python2[335]: 732c8000-732c9000 rw-p 00002000 b3:02 287347     /usr/lib/libXdamage.so.1.1.0
+Nov 28 00:01:57 e001 python2[335]: 732c9000-732d7000 r-xp 00000000 b3:02 286408     /usr/lib/libXext.so.6.4.0
+Nov 28 00:01:57 e001 python2[335]: 732d7000-732de000 ---p 0000e000 b3:02 286408     /usr/lib/libXext.so.6.4.0
+Nov 28 00:01:57 e001 python2[335]: 732de000-732df000 r--p 0000d000 b3:02 286408     /usr/lib/libXext.so.6.4.0
+Nov 28 00:01:57 e001 python2[335]: 732df000-732e0000 rw-p 0000e000 b3:02 286408     /usr/lib/libXext.so.6.4.0
+Nov 28 00:01:57 e001 python2[335]: 732e0000-73310000 r-xp 00000000 b3:02 293097     /usr/lib/libglapi.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 73310000-73320000 ---p 00030000 b3:02 293097     /usr/lib/libglapi.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 73320000-73323000 r--p 00030000 b3:02 293097     /usr/lib/libglapi.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 73323000-73324000 rw-p 00033000 b3:02 293097     /usr/lib/libglapi.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 73324000-73343000 r-xp 00000000 b3:02 279950     /usr/lib/libexpat.so.1.6.0
+Nov 28 00:01:57 e001 python2[335]: 73343000-7334a000 ---p 0001f000 b3:02 279950     /usr/lib/libexpat.so.1.6.0
+Nov 28 00:01:57 e001 python2[335]: 7334a000-7334c000 r--p 0001e000 b3:02 279950     /usr/lib/libexpat.so.1.6.0
+Nov 28 00:01:57 e001 python2[335]: 7334c000-7334d000 rw-p 00020000 b3:02 279950     /usr/lib/libexpat.so.1.6.0
+Nov 28 00:01:57 e001 python2[335]: 7334d000-73353000 r-xp 00000000 b3:02 280561     /usr/lib/librt-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 73353000-73362000 ---p 00006000 b3:02 280561     /usr/lib/librt-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 73362000-73363000 r--p 00005000 b3:02 280561     /usr/lib/librt-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 73363000-73364000 rw-p 00006000 b3:02 280561     /usr/lib/librt-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 73364000-733b5000 r-xp 00000000 b3:02 288217     /usr/lib/libswscale.so.3.1.101
+Nov 28 00:01:57 e001 python2[335]: 733b5000-733c5000 ---p 00051000 b3:02 288217     /usr/lib/libswscale.so.3.1.101
+Nov 28 00:01:57 e001 python2[335]: 733c5000-733c6000 r--p 00051000 b3:02 288217     /usr/lib/libswscale.so.3.1.101
+Nov 28 00:01:57 e001 python2[335]: 733c6000-733c7000 rw-p 00052000 b3:02 288217     /usr/lib/libswscale.so.3.1.101
+Nov 28 00:01:57 e001 python2[335]: 733c7000-733cf000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 733cf000-73424000 r-xp 00000000 b3:02 288222     /usr/lib/libavutil.so.54.31.100
+Nov 28 00:01:57 e001 python2[335]: 73424000-73434000 ---p 00055000 b3:02 288222     /usr/lib/libavutil.so.54.31.100
+Nov 28 00:01:57 e001 python2[335]: 73434000-73437000 r--p 00055000 b3:02 288222     /usr/lib/libavutil.so.54.31.100
+Nov 28 00:01:57 e001 python2[335]: 73437000-73438000 rw-p 00058000 b3:02 288222     /usr/lib/libavutil.so.54.31.100
+Nov 28 00:01:57 e001 python2[335]: 73438000-7344c000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 7344c000-735e8000 r-xp 00000000 b3:02 288225     /usr/lib/libavformat.so.56.40.101
+Nov 28 00:01:57 e001 python2[335]: 735e8000-735f7000 ---p 0019c000 b3:02 288225     /usr/lib/libavformat.so.56.40.101
+Nov 28 00:01:57 e001 python2[335]: 735f7000-73604000 r--p 0019b000 b3:02 288225     /usr/lib/libavformat.so.56.40.101
+Nov 28 00:01:57 e001 python2[335]: 73604000-73610000 rw-p 001a8000 b3:02 288225     /usr/lib/libavformat.so.56.40.101
+Nov 28 00:01:57 e001 python2[335]: 73610000-73f33000 r-xp 00000000 b3:02 288228     /usr/lib/libavcodec.so.56.60.100
+Nov 28 00:01:57 e001 python2[335]: 73f33000-73f43000 ---p 00923000 b3:02 288228     /usr/lib/libavcodec.so.56.60.100
+Nov 28 00:01:57 e001 python2[335]: 73f43000-73f5d000 r--p 00923000 b3:02 288228     /usr/lib/libavcodec.so.56.60.100
+Nov 28 00:01:57 e001 python2[335]: 73f5d000-73f71000 rw-p 0093d000 b3:02 288228     /usr/lib/libavcodec.so.56.60.100
+Nov 28 00:01:57 e001 python2[335]: 73f71000-745ee000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 745ee000-745f6000 r-xp 00000000 b3:02 287969     /usr/lib/libv4l2.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 745f6000-74606000 ---p 00008000 b3:02 287969     /usr/lib/libv4l2.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 74606000-74607000 r--p 00008000 b3:02 287969     /usr/lib/libv4l2.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 74607000-7460b000 rw-p 00009000 b3:02 287969     /usr/lib/libv4l2.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 7460b000-74610000 r-xp 00000000 b3:02 287985     /usr/lib/libv4l1.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 74610000-7461f000 ---p 00005000 b3:02 287985     /usr/lib/libv4l1.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 7461f000-74620000 r--p 00004000 b3:02 287985     /usr/lib/libv4l1.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 74620000-74621000 rw-p 00005000 b3:02 287985     /usr/lib/libv4l1.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 74621000-74670000 r-xp 00000000 b3:02 288277     /usr/lib/libxine.so.2.5.0
+Nov 28 00:01:57 e001 python2[335]: 74670000-74680000 ---p 0004f000 b3:02 288277     /usr/lib/libxine.so.2.5.0
+Nov 28 00:01:57 e001 python2[335]: 74680000-74683000 r--p 0004f000 b3:02 288277     /usr/lib/libxine.so.2.5.0
+Nov 28 00:01:57 e001 python2[335]: 74683000-74684000 rw-p 00052000 b3:02 288277     /usr/lib/libxine.so.2.5.0
+Nov 28 00:01:57 e001 python2[335]: 74684000-74688000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 74688000-746b7000 r-xp 00000000 b3:02 288292     /usr/lib/libdc1394.so.22.1.10
+Nov 28 00:01:57 e001 python2[335]: 746b7000-746c6000 ---p 0002f000 b3:02 288292     /usr/lib/libdc1394.so.22.1.10
+Nov 28 00:01:57 e001 python2[335]: 746c6000-746c7000 r--p 0002e000 b3:02 288292     /usr/lib/libdc1394.so.22.1.10
+Nov 28 00:01:57 e001 python2[335]: 746c7000-746c8000 rw-p 0002f000 b3:02 288292     /usr/lib/libdc1394.so.22.1.10
+Nov 28 00:01:57 e001 python2[335]: 746c8000-74708000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 74708000-74751000 r-xp 00000000 b3:02 289001     /usr/lib/libgdkglext-x11-1.0.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 74751000-74758000 ---p 00049000 b3:02 289001     /usr/lib/libgdkglext-x11-1.0.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 74758000-74759000 r--p 00048000 b3:02 289001     /usr/lib/libgdkglext-x11-1.0.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 74759000-7475c000 rw-p 00049000 b3:02 289001     /usr/lib/libgdkglext-x11-1.0.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 7475c000-74849000 r-xp 00000000 b3:02 280325     /usr/lib/libglib-2.0.so.0.4600.2
+Nov 28 00:01:57 e001 python2[335]: 74849000-74858000 ---p 000ed000 b3:02 280325     /usr/lib/libglib-2.0.so.0.4600.2
+Nov 28 00:01:57 e001 python2[335]: 74858000-74859000 r--p 000ec000 b3:02 280325     /usr/lib/libglib-2.0.so.0.4600.2
+Nov 28 00:01:57 e001 python2[335]: 74859000-7485a000 rw-p 000ed000 b3:02 280325     /usr/lib/libglib-2.0.so.0.4600.2
+Nov 28 00:01:57 e001 python2[335]: 7485a000-748a0000 r-xp 00000000 b3:02 279976     /usr/lib/libgobject-2.0.so.0.4600.2
+Nov 28 00:01:57 e001 python2[335]: 748a0000-748af000 ---p 00046000 b3:02 279976     /usr/lib/libgobject-2.0.so.0.4600.2
+Nov 28 00:01:57 e001 python2[335]: 748af000-748b0000 r--p 00045000 b3:02 279976     /usr/lib/libgobject-2.0.so.0.4600.2
+Nov 28 00:01:57 e001 python2[335]: 748b0000-748b1000 rw-p 00046000 b3:02 279976     /usr/lib/libgobject-2.0.so.0.4600.2
+Nov 28 00:01:57 e001 python2[335]: 748b1000-7493f000 r-xp 00000000 b3:02 288648     /usr/lib/libgdk-x11-2.0.so.0.2400.28
+Nov 28 00:01:57 e001 python2[335]: 7493f000-7494f000 ---p 0008e000 b3:02 288648     /usr/lib/libgdk-x11-2.0.so.0.2400.28
+Nov 28 00:01:57 e001 python2[335]: 7494f000-74951000 r--p 0008e000 b3:02 288648     /usr/lib/libgdk-x11-2.0.so.0.2400.28
+Nov 28 00:01:57 e001 python2[335]: 74951000-74952000 rw-p 00090000 b3:02 288648     /usr/lib/libgdk-x11-2.0.so.0.2400.28
+Nov 28 00:01:57 e001 python2[335]: 74952000-74cdb000 r-xp 00000000 b3:02 288657     /usr/lib/libgtk-x11-2.0.so.0.2400.28
+Nov 28 00:01:57 e001 python2[335]: 74cdb000-74cea000 ---p 00389000 b3:02 288657     /usr/lib/libgtk-x11-2.0.so.0.2400.28
+Nov 28 00:01:57 e001 python2[335]: 74cea000-74cee000 r--p 00388000 b3:02 288657     /usr/lib/libgtk-x11-2.0.so.0.2400.28
+Nov 28 00:01:57 e001 python2[335]: 74cee000-74cf1000 rw-p 0038c000 b3:02 288657     /usr/lib/libgtk-x11-2.0.so.0.2400.28
+Nov 28 00:01:57 e001 python2[335]: 74cf1000-74cf2000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 74cf2000-74d34000 r-xp 00000000 b3:02 283014     /usr/lib/libHalf.so.12.0.0
+Nov 28 00:01:57 e001 python2[335]: 74d34000-74d43000 ---p 00042000 b3:02 283014     /usr/lib/libHalf.so.12.0.0
+Nov 28 00:01:57 e001 python2[335]: 74d43000-74d44000 r--p 00041000 b3:02 283014     /usr/lib/libHalf.so.12.0.0
+Nov 28 00:01:57 e001 python2[335]: 74d44000-74d45000 rw-p 00042000 b3:02 283014     /usr/lib/libHalf.so.12.0.0
+Nov 28 00:01:57 e001 python2[335]: 74d45000-74ee0000 r-xp 00000000 b3:02 283083     /usr/lib/libIlmImf-2_2.so.22.0.0
+Nov 28 00:01:57 e001 python2[335]: 74ee0000-74eef000 ---p 0019b000 b3:02 283083     /usr/lib/libIlmImf-2_2.so.22.0.0
+Nov 28 00:01:57 e001 python2[335]: 74eef000-74ef1000 r--p 0019a000 b3:02 283083     /usr/lib/libIlmImf-2_2.so.22.0.0
+Nov 28 00:01:57 e001 python2[335]: 74ef1000-74ff3000 rw-p 0019c000 b3:02 283083     /usr/lib/libIlmImf-2_2.so.22.0.0
+Nov 28 00:01:57 e001 python2[335]: 74ff3000-75035000 r-xp 00000000 b3:02 288601     /usr/lib/libjasper.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 75035000-75044000 ---p 00042000 b3:02 288601     /usr/lib/libjasper.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 75044000-75045000 r--p 00041000 b3:02 288601     /usr/lib/libjasper.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 75045000-75048000 rw-p 00042000 b3:02 288601     /usr/lib/libjasper.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 75048000-7504e000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 7504e000-750b7000 r-xp 00000000 b3:02 294223     /usr/lib/libtiff.so.5.2.4
+Nov 28 00:01:57 e001 python2[335]: 750b7000-750c6000 ---p 00069000 b3:02 294223     /usr/lib/libtiff.so.5.2.4
+Nov 28 00:01:57 e001 python2[335]: 750c6000-750c7000 r--p 00068000 b3:02 294223     /usr/lib/libtiff.so.5.2.4
+Nov 28 00:01:57 e001 python2[335]: 750c7000-750cc000 rw-p 00069000 b3:02 294223     /usr/lib/libtiff.so.5.2.4
+Nov 28 00:01:57 e001 python2[335]: 750cc000-750f6000 r-xp 00000000 b3:02 286539     /usr/lib/libpng16.so.16.19.0
+Nov 28 00:01:57 e001 python2[335]: 750f6000-75105000 ---p 0002a000 b3:02 286539     /usr/lib/libpng16.so.16.19.0
+Nov 28 00:01:57 e001 python2[335]: 75105000-75106000 r--p 00029000 b3:02 286539     /usr/lib/libpng16.so.16.19.0
+Nov 28 00:01:57 e001 python2[335]: 75106000-75107000 rw-p 0002a000 b3:02 286539     /usr/lib/libpng16.so.16.19.0
+Nov 28 00:01:57 e001 python2[335]: 75107000-75137000 r-xp 00000000 b3:02 287541     /usr/lib/libjpeg.so.8.0.2
+Nov 28 00:01:57 e001 python2[335]: 75137000-75146000 ---p 00030000 b3:02 287541     /usr/lib/libjpeg.so.8.0.2
+Nov 28 00:01:57 e001 python2[335]: 75146000-75147000 r--p 0002f000 b3:02 287541     /usr/lib/libjpeg.so.8.0.2
+Nov 28 00:01:57 e001 python2[335]: 75147000-75148000 rw-p 00030000 b3:02 287541     /usr/lib/libjpeg.so.8.0.2
+Nov 28 00:01:57 e001 python2[335]: 75148000-751c7000 r-xp 00000000 b3:02 530132     /usr/lib/mesa/libGL.so.1.2.0
+Nov 28 00:01:57 e001 python2[335]: 751c7000-751d6000 ---p 0007f000 b3:02 530132     /usr/lib/mesa/libGL.so.1.2.0
+Nov 28 00:01:57 e001 python2[335]: 751d6000-751d8000 r--p 0007e000 b3:02 530132     /usr/lib/mesa/libGL.so.1.2.0
+Nov 28 00:01:57 e001 python2[335]: 751d8000-751d9000 rw-p 00080000 b3:02 530132     /usr/lib/mesa/libGL.so.1.2.0
+Nov 28 00:01:57 e001 python2[335]: 751d9000-751fc000 r-xp 00000000 b3:02 289019     /usr/lib/libtbb.so.2
+Nov 28 00:01:57 e001 python2[335]: 751fc000-7520b000 ---p 00023000 b3:02 289019     /usr/lib/libtbb.so.2
+Nov 28 00:01:57 e001 python2[335]: 7520b000-7520c000 r--p 00022000 b3:02 289019     /usr/lib/libtbb.so.2
+Nov 28 00:01:57 e001 python2[335]: 7520c000-7520d000 rw-p 00023000 b3:02 289019     /usr/lib/libtbb.so.2
+Nov 28 00:01:57 e001 python2[335]: 7520d000-7520e000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 7520e000-75339000 r-xp 00000000 b3:02 280195     /usr/lib/libstdc++.so.6.0.21
+Nov 28 00:01:57 e001 python2[335]: 75339000-75349000 ---p 0012b000 b3:02 280195     /usr/lib/libstdc++.so.6.0.21
+Nov 28 00:01:57 e001 python2[335]: 75349000-7534e000 r--p 0012b000 b3:02 280195     /usr/lib/libstdc++.so.6.0.21
+Nov 28 00:01:57 e001 python2[335]: 7534e000-75350000 rw-p 00130000 b3:02 280195     /usr/lib/libstdc++.so.6.0.21
+Nov 28 00:01:57 e001 python2[335]: 75350000-75352000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 75352000-7554e000 r-xp 00000000 b3:02 289062     /usr/lib/libopencv_core.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 7554e000-7555d000 ---p 001fc000 b3:02 289062     /usr/lib/libopencv_core.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 7555d000-7555f000 r--p 001fb000 b3:02 289062     /usr/lib/libopencv_core.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 7555f000-75564000 rw-p 001fd000 b3:02 289062     /usr/lib/libopencv_core.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75564000-75565000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 75565000-7571e000 r-xp 00000000 b3:02 289038     /usr/lib/libopencv_imgproc.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 7571e000-7572d000 ---p 001b9000 b3:02 289038     /usr/lib/libopencv_imgproc.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 7572d000-75730000 r--p 001b8000 b3:02 289038     /usr/lib/libopencv_imgproc.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75730000-75731000 rw-p 001bb000 b3:02 289038     /usr/lib/libopencv_imgproc.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75731000-757be000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 757be000-757d6000 r-xp 00000000 b3:02 294039     /usr/lib/libopencv_photo.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 757d6000-757e6000 ---p 00018000 b3:02 294039     /usr/lib/libopencv_photo.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 757e6000-757e7000 r--p 00018000 b3:02 294039     /usr/lib/libopencv_photo.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 757e7000-757e8000 rw-p 00019000 b3:02 294039     /usr/lib/libopencv_photo.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 757e8000-7582c000 r-xp 00000000 b3:02 289050     /usr/lib/libopencv_highgui.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 7582c000-7583c000 ---p 00044000 b3:02 289050     /usr/lib/libopencv_highgui.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 7583c000-7583d000 r--p 00044000 b3:02 289050     /usr/lib/libopencv_highgui.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 7583d000-7583e000 rw-p 00045000 b3:02 289050     /usr/lib/libopencv_highgui.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 7583e000-7583f000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 7583f000-758a5000 r-xp 00000000 b3:02 289075     /usr/lib/libopencv_objdetect.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 758a5000-758b5000 ---p 00066000 b3:02 289075     /usr/lib/libopencv_objdetect.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 758b5000-758b6000 r--p 00066000 b3:02 289075     /usr/lib/libopencv_objdetect.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 758b6000-758b7000 rw-p 00067000 b3:02 289075     /usr/lib/libopencv_objdetect.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 758b7000-75902000 r-xp 00000000 b3:02 289079     /usr/lib/libopencv_video.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75902000-75911000 ---p 0004b000 b3:02 289079     /usr/lib/libopencv_video.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75911000-75912000 r--p 0004a000 b3:02 289079     /usr/lib/libopencv_video.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75912000-75913000 rw-p 0004b000 b3:02 289079     /usr/lib/libopencv_video.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75913000-75985000 r-xp 00000000 b3:02 289073     /usr/lib/libopencv_ml.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75985000-75995000 ---p 00072000 b3:02 289073     /usr/lib/libopencv_ml.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75995000-75996000 r--p 00072000 b3:02 289073     /usr/lib/libopencv_ml.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75996000-75997000 rw-p 00073000 b3:02 289073     /usr/lib/libopencv_ml.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75997000-759ed000 r-xp 00000000 b3:02 289053     /usr/lib/libopencv_flann.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 759ed000-759fc000 ---p 00056000 b3:02 289053     /usr/lib/libopencv_flann.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 759fc000-759fd000 r--p 00055000 b3:02 289053     /usr/lib/libopencv_flann.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 759fd000-759fe000 rw-p 00056000 b3:02 289053     /usr/lib/libopencv_flann.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 759fe000-75a8d000 r-xp 00000000 b3:02 289074     /usr/lib/libopencv_features2d.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75a8d000-75a9c000 ---p 0008f000 b3:02 289074     /usr/lib/libopencv_features2d.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75a9c000-75a9e000 r--p 0008e000 b3:02 289074     /usr/lib/libopencv_features2d.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75a9e000-75aa0000 rw-p 00090000 b3:02 289074     /usr/lib/libopencv_features2d.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75aa0000-75b4b000 r-xp 00000000 b3:02 289061     /usr/lib/libopencv_calib3d.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75b4b000-75b5a000 ---p 000ab000 b3:02 289061     /usr/lib/libopencv_calib3d.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75b5a000-75b5b000 r--p 000aa000 b3:02 289061     /usr/lib/libopencv_calib3d.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75b5b000-75b5c000 rw-p 000ab000 b3:02 289061     /usr/lib/libopencv_calib3d.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75b5c000-75c47000 r-xp 00000000 b3:02 289071     /usr/lib/libopencv_legacy.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75c47000-75c56000 ---p 000eb000 b3:02 289071     /usr/lib/libopencv_legacy.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75c56000-75c58000 r--p 000ea000 b3:02 289071     /usr/lib/libopencv_legacy.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75c58000-75c5a000 rw-p 000ec000 b3:02 289071     /usr/lib/libopencv_legacy.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75c5a000-75c5b000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 75c5b000-75c72000 r-xp 00000000 b3:02 289040     /usr/lib/libopencv_nonfree.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75c72000-75c82000 ---p 00017000 b3:02 289040     /usr/lib/libopencv_nonfree.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75c82000-75c83000 r--p 00017000 b3:02 289040     /usr/lib/libopencv_nonfree.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75c83000-75c84000 rw-p 00018000 b3:02 289040     /usr/lib/libopencv_nonfree.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75c84000-75d40000 r-xp 00000000 b3:02 294035     /usr/lib/libopencv_contrib.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75d40000-75d50000 ---p 000bc000 b3:02 294035     /usr/lib/libopencv_contrib.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75d50000-75d51000 r--p 000bc000 b3:02 294035     /usr/lib/libopencv_contrib.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75d51000-75d52000 rw-p 000bd000 b3:02 294035     /usr/lib/libopencv_contrib.so.2.4.12
+Nov 28 00:01:57 e001 python2[335]: 75d52000-75d53000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 75d58000-75d5a000 r-xp 00000000 b3:02 402311     /usr/lib/python2.7/lib-dynload/grp.so
+Nov 28 00:01:57 e001 python2[335]: 75d5a000-75d69000 ---p 00002000 b3:02 402311     /usr/lib/python2.7/lib-dynload/grp.so
+Nov 28 00:01:57 e001 python2[335]: 75d69000-75d6a000 r--p 00001000 b3:02 402311     /usr/lib/python2.7/lib-dynload/grp.so
+Nov 28 00:01:57 e001 python2[335]: 75d6a000-75d6b000 rw-p 00002000 b3:02 402311     /usr/lib/python2.7/lib-dynload/grp.so
+Nov 28 00:01:57 e001 python2[335]: 75d6b000-75e71000 r-xp 00000000 b3:02 658509     /usr/lib/python2.7/site-packages/cv2.so
+Nov 28 00:01:57 e001 python2[335]: 75e71000-75e80000 ---p 00106000 b3:02 658509     /usr/lib/python2.7/site-packages/cv2.so
+Nov 28 00:01:57 e001 python2[335]: 75e80000-75e81000 r--p 00105000 b3:02 658509     /usr/lib/python2.7/site-packages/cv2.so
+Nov 28 00:01:57 e001 python2[335]: 75e81000-75e8d000 rw-p 00106000 b3:02 658509     /usr/lib/python2.7/site-packages/cv2.so
+Nov 28 00:01:57 e001 python2[335]: 75e8d000-75ecd000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 75ecd000-7618d000 r-xp 00000000 b3:02 292587     /usr/lib/libmysqlclient.so.18.0.0
+Nov 28 00:01:57 e001 python2[335]: 7618d000-7619c000 ---p 002c0000 b3:02 292587     /usr/lib/libmysqlclient.so.18.0.0
+Nov 28 00:01:57 e001 python2[335]: 7619c000-761a0000 r--p 002bf000 b3:02 292587     /usr/lib/libmysqlclient.so.18.0.0
+Nov 28 00:01:57 e001 python2[335]: 761a0000-761f4000 rw-p 002c3000 b3:02 292587     /usr/lib/libmysqlclient.so.18.0.0
+Nov 28 00:01:57 e001 python2[335]: 761f4000-761fb000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 761fd000-76202000 r-xp 00000000 b3:02 402291     /usr/lib/python2.7/lib-dynload/_multiprocessing.so
+Nov 28 00:01:57 e001 python2[335]: 76202000-76211000 ---p 00005000 b3:02 402291     /usr/lib/python2.7/lib-dynload/_multiprocessing.so
+Nov 28 00:01:57 e001 python2[335]: 76211000-76212000 r--p 00004000 b3:02 402291     /usr/lib/python2.7/lib-dynload/_multiprocessing.so
+Nov 28 00:01:57 e001 python2[335]: 76212000-76213000 rw-p 00005000 b3:02 402291     /usr/lib/python2.7/lib-dynload/_multiprocessing.so
+Nov 28 00:01:57 e001 python2[335]: 76213000-762bf000 r-xp 00000000 b3:02 289618     /usr/lib/libsqlite3.so.0.8.6
+Nov 28 00:01:57 e001 python2[335]: 762bf000-762cf000 ---p 000ac000 b3:02 289618     /usr/lib/libsqlite3.so.0.8.6
+Nov 28 00:01:57 e001 python2[335]: 762cf000-762d0000 r--p 000ac000 b3:02 289618     /usr/lib/libsqlite3.so.0.8.6
+Nov 28 00:01:57 e001 python2[335]: 762d0000-762d2000 rw-p 000ad000 b3:02 289618     /usr/lib/libsqlite3.so.0.8.6
+Nov 28 00:01:57 e001 python2[335]: 762d3000-762d4000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 762d4000-762d5000 rw-s 00000000 00:11 10673      /dev/shm/d7w62c (deleted)
+Nov 28 00:01:57 e001 python2[335]: 762d5000-762d6000 rw-s 00000000 00:11 10672      /dev/shm/6oX1tG (deleted)
+Nov 28 00:01:57 e001 python2[335]: 762d6000-762de000 r-xp 00000000 b3:02 661508     /usr/lib/python2.7/site-packages/_mysql.so
+Nov 28 00:01:57 e001 python2[335]: 762de000-762e5000 ---p 00008000 b3:02 661508     /usr/lib/python2.7/site-packages/_mysql.so
+Nov 28 00:01:57 e001 python2[335]: 762e5000-762e6000 r--p 00007000 b3:02 661508     /usr/lib/python2.7/site-packages/_mysql.so
+Nov 28 00:01:57 e001 python2[335]: 762e6000-762ea000 rw-p 00008000 b3:02 661508     /usr/lib/python2.7/site-packages/_mysql.so
+Nov 28 00:01:57 e001 python2[335]: 762ea000-762f8000 r-xp 00000000 b3:02 402290     /usr/lib/python2.7/lib-dynload/_sqlite3.so
+Nov 28 00:01:57 e001 python2[335]: 762f8000-76307000 ---p 0000e000 b3:02 402290     /usr/lib/python2.7/lib-dynload/_sqlite3.so
+Nov 28 00:01:57 e001 python2[335]: 76307000-76308000 r--p 0000d000 b3:02 402290     /usr/lib/python2.7/lib-dynload/_sqlite3.so
+Nov 28 00:01:57 e001 python2[335]: 76308000-7630a000 rw-p 0000e000 b3:02 402290     /usr/lib/python2.7/lib-dynload/_sqlite3.so
+Nov 28 00:01:57 e001 python2[335]: 7630a000-7634a000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 7634a000-7635a000 r-xp 00000000 b3:02 402320     /usr/lib/python2.7/lib-dynload/cPickle.so
+Nov 28 00:01:57 e001 python2[335]: 7635a000-76369000 ---p 00010000 b3:02 402320     /usr/lib/python2.7/lib-dynload/cPickle.so
+Nov 28 00:01:57 e001 python2[335]: 76369000-7636a000 r--p 0000f000 b3:02 402320     /usr/lib/python2.7/lib-dynload/cPickle.so
+Nov 28 00:01:57 e001 python2[335]: 7636a000-7636b000 rw-p 00010000 b3:02 402320     /usr/lib/python2.7/lib-dynload/cPickle.so
+Nov 28 00:01:57 e001 python2[335]: 7636b000-76371000 r-xp 00000000 b3:02 402334     /usr/lib/python2.7/lib-dynload/array.so
+Nov 28 00:01:57 e001 python2[335]: 76371000-76381000 ---p 00006000 b3:02 402334     /usr/lib/python2.7/lib-dynload/array.so
+Nov 28 00:01:57 e001 python2[335]: 76381000-76382000 r--p 00006000 b3:02 402334     /usr/lib/python2.7/lib-dynload/array.so
+Nov 28 00:01:57 e001 python2[335]: 76382000-76384000 rw-p 00007000 b3:02 402334     /usr/lib/python2.7/lib-dynload/array.so
+Nov 28 00:01:57 e001 python2[335]: 76384000-7638b000 r-xp 00000000 b3:02 402347     /usr/lib/python2.7/lib-dynload/_json.so
+Nov 28 00:01:57 e001 python2[335]: 7638b000-7639b000 ---p 00007000 b3:02 402347     /usr/lib/python2.7/lib-dynload/_json.so
+Nov 28 00:01:57 e001 python2[335]: 7639b000-7639c000 r--p 00007000 b3:02 402347     /usr/lib/python2.7/lib-dynload/_json.so
+Nov 28 00:01:57 e001 python2[335]: 7639c000-7639d000 rw-p 00008000 b3:02 402347     /usr/lib/python2.7/lib-dynload/_json.so
+Nov 28 00:01:57 e001 python2[335]: 7639d000-76432000 r-xp 00000000 b3:02 402295     /usr/lib/python2.7/lib-dynload/unicodedata.so
+Nov 28 00:01:57 e001 python2[335]: 76432000-76441000 ---p 00095000 b3:02 402295     /usr/lib/python2.7/lib-dynload/unicodedata.so
+Nov 28 00:01:57 e001 python2[335]: 76441000-76442000 r--p 00094000 b3:02 402295     /usr/lib/python2.7/lib-dynload/unicodedata.so
+Nov 28 00:01:57 e001 python2[335]: 76442000-76455000 rw-p 00095000 b3:02 402295     /usr/lib/python2.7/lib-dynload/unicodedata.so
+Nov 28 00:01:57 e001 python2[335]: 76455000-764d5000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 764d5000-764e3000 r-xp 00000000 b3:02 402294     /usr/lib/python2.7/lib-dynload/datetime.so
+Nov 28 00:01:57 e001 python2[335]: 764e3000-764f2000 ---p 0000e000 b3:02 402294     /usr/lib/python2.7/lib-dynload/datetime.so
+Nov 28 00:01:57 e001 python2[335]: 764f2000-764f3000 r--p 0000d000 b3:02 402294     /usr/lib/python2.7/lib-dynload/datetime.so
+Nov 28 00:01:57 e001 python2[335]: 764f3000-764f6000 rw-p 0000e000 b3:02 402294     /usr/lib/python2.7/lib-dynload/datetime.so
+Nov 28 00:01:57 e001 python2[335]: 764f6000-76536000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 76536000-7658b000 r-xp 00000000 b3:02 280054     /usr/lib/libssl.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 7658b000-7659a000 ---p 00055000 b3:02 280054     /usr/lib/libssl.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 7659a000-7659d000 r--p 00054000 b3:02 280054     /usr/lib/libssl.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 7659d000-765a1000 rw-p 00057000 b3:02 280054     /usr/lib/libssl.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 765a1000-765a2000 rw-s 00000000 00:11 10671      /dev/shm/9v7oR9 (deleted)
+Nov 28 00:01:57 e001 python2[335]: 765a2000-765a3000 rw-s 00000000 00:11 10670      /dev/shm/kv9igD (deleted)
+Nov 28 00:01:57 e001 python2[335]: 765a3000-765a7000 r-xp 00000000 b3:02 402283     /usr/lib/python2.7/lib-dynload/select.so
+Nov 28 00:01:57 e001 python2[335]: 765a7000-765b6000 ---p 00004000 b3:02 402283     /usr/lib/python2.7/lib-dynload/select.so
+Nov 28 00:01:57 e001 python2[335]: 765b6000-765b7000 r--p 00003000 b3:02 402283     /usr/lib/python2.7/lib-dynload/select.so
+Nov 28 00:01:57 e001 python2[335]: 765b7000-765b9000 rw-p 00004000 b3:02 402283     /usr/lib/python2.7/lib-dynload/select.so
+Nov 28 00:01:57 e001 python2[335]: 765b9000-765c8000 r-xp 00000000 b3:02 402314     /usr/lib/python2.7/lib-dynload/_ssl.so
+Nov 28 00:01:57 e001 python2[335]: 765c8000-765d7000 ---p 0000f000 b3:02 402314     /usr/lib/python2.7/lib-dynload/_ssl.so
+Nov 28 00:01:57 e001 python2[335]: 765d7000-765d8000 r--p 0000e000 b3:02 402314     /usr/lib/python2.7/lib-dynload/_ssl.so
+Nov 28 00:01:57 e001 python2[335]: 765d8000-765db000 rw-p 0000f000 b3:02 402314     /usr/lib/python2.7/lib-dynload/_ssl.so
+Nov 28 00:01:57 e001 python2[335]: 765db000-765e7000 r-xp 00000000 b3:02 402310     /usr/lib/python2.7/lib-dynload/_socket.so
+Nov 28 00:01:57 e001 python2[335]: 765e7000-765f6000 ---p 0000c000 b3:02 402310     /usr/lib/python2.7/lib-dynload/_socket.so
+Nov 28 00:01:57 e001 python2[335]: 765f6000-765f7000 r--p 0000b000 b3:02 402310     /usr/lib/python2.7/lib-dynload/_socket.so
+Nov 28 00:01:57 e001 python2[335]: 765f7000-765fb000 rw-p 0000c000 b3:02 402310     /usr/lib/python2.7/lib-dynload/_socket.so
+Nov 28 00:01:57 e001 python2[335]: 765fb000-765fe000 r-xp 00000000 b3:02 402298     /usr/lib/python2.7/lib-dynload/fcntl.so
+Nov 28 00:01:57 e001 python2[335]: 765fe000-7660d000 ---p 00003000 b3:02 402298     /usr/lib/python2.7/lib-dynload/fcntl.so
+Nov 28 00:01:57 e001 python2[335]: 7660d000-7660e000 r--p 00002000 b3:02 402298     /usr/lib/python2.7/lib-dynload/fcntl.so
+Nov 28 00:01:57 e001 python2[335]: 7660e000-7660f000 rw-p 00003000 b3:02 402298     /usr/lib/python2.7/lib-dynload/fcntl.so
+Nov 28 00:01:57 e001 python2[335]: 7660f000-76774000 r-xp 00000000 b3:02 279961     /usr/lib/libcrypto.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 76774000-76784000 ---p 00165000 b3:02 279961     /usr/lib/libcrypto.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 76784000-76792000 r--p 00165000 b3:02 279961     /usr/lib/libcrypto.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 76792000-76799000 rw-p 00173000 b3:02 279961     /usr/lib/libcrypto.so.1.0.0
+Nov 28 00:01:57 e001 python2[335]: 76799000-7679c000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 7679c000-7679d000 rw-s 00000000 00:11 10669      /dev/shm/jiqKB6 (deleted)
+Nov 28 00:01:57 e001 python2[335]: 7679d000-7679e000 rw-s 00000000 00:11 10668      /dev/shm/Qs2OMA (deleted)
+Nov 28 00:01:57 e001 python2[335]: 7679e000-7679f000 rw-s 00000000 00:11 10667      /dev/shm/99wLW4 (deleted)
+Nov 28 00:01:57 e001 python2[335]: 7679f000-767a0000 rw-s 00000000 00:11 10666      /dev/shm/gbNn3y (deleted)
+Nov 28 00:01:57 e001 python2[335]: 767a0000-767a1000 rw-s 00000000 00:11 3030       /dev/shm/DgLh72 (deleted)
+Nov 28 00:01:57 e001 python2[335]: 767a1000-767a3000 r-xp 00000000 b3:02 402339     /usr/lib/python2.7/lib-dynload/_random.so
+Nov 28 00:01:57 e001 python2[335]: 767a3000-767b2000 ---p 00002000 b3:02 402339     /usr/lib/python2.7/lib-dynload/_random.so
+Nov 28 00:01:57 e001 python2[335]: 767b2000-767b3000 r--p 00001000 b3:02 402339     /usr/lib/python2.7/lib-dynload/_random.so
+Nov 28 00:01:57 e001 python2[335]: 767b3000-767b4000 rw-p 00002000 b3:02 402339     /usr/lib/python2.7/lib-dynload/_random.so
+Nov 28 00:01:57 e001 python2[335]: 767b4000-767f4000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 767f4000-7680b000 r-xp 00000000 b3:02 402296     /usr/lib/python2.7/lib-dynload/_io.so
+Nov 28 00:01:57 e001 python2[335]: 7680b000-7681a000 ---p 00017000 b3:02 402296     /usr/lib/python2.7/lib-dynload/_io.so
+Nov 28 00:01:57 e001 python2[335]: 7681a000-7681b000 r--p 00016000 b3:02 402296     /usr/lib/python2.7/lib-dynload/_io.so
+Nov 28 00:01:57 e001 python2[335]: 7681b000-76823000 rw-p 00017000 b3:02 402296     /usr/lib/python2.7/lib-dynload/_io.so
+Nov 28 00:01:57 e001 python2[335]: 76823000-76835000 r-xp 00000000 b3:02 280019     /usr/lib/libz.so.1.2.8
+Nov 28 00:01:57 e001 python2[335]: 76835000-76844000 ---p 00012000 b3:02 280019     /usr/lib/libz.so.1.2.8
+Nov 28 00:01:57 e001 python2[335]: 76844000-76845000 r--p 00011000 b3:02 280019     /usr/lib/libz.so.1.2.8
+Nov 28 00:01:57 e001 python2[335]: 76845000-76846000 rw-p 00012000 b3:02 280019     /usr/lib/libz.so.1.2.8
+Nov 28 00:01:57 e001 python2[335]: 76846000-76847000 rw-s 00000000 00:11 3029       /dev/shm/mtkT0e (deleted)
+Nov 28 00:01:57 e001 python2[335]: 76847000-76848000 rw-s 00000000 00:11 3028       /dev/shm/DfrDWq (deleted)
+Nov 28 00:01:57 e001 python2[335]: 76848000-7684d000 r-xp 00000000 b3:02 402317     /usr/lib/python2.7/lib-dynload/math.so
+Nov 28 00:01:57 e001 python2[335]: 7684d000-7685c000 ---p 00005000 b3:02 402317     /usr/lib/python2.7/lib-dynload/math.so
+Nov 28 00:01:57 e001 python2[335]: 7685c000-7685d000 r--p 00004000 b3:02 402317     /usr/lib/python2.7/lib-dynload/math.so
+Nov 28 00:01:57 e001 python2[335]: 7685d000-7685e000 rw-p 00005000 b3:02 402317     /usr/lib/python2.7/lib-dynload/math.so
+Nov 28 00:01:57 e001 python2[335]: 7685e000-7689e000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 7689e000-7689f000 rw-s 00000000 00:11 3027       /dev/shm/krOy7C (deleted)
+Nov 28 00:01:57 e001 python2[335]: 7689f000-768a0000 rw-s 00000000 00:11 3026       /dev/shm/DCfReP (deleted)
+Nov 28 00:01:57 e001 python2[335]: 768a0000-768a1000 rw-s 00000000 00:11 3025       /dev/shm/6KSXn1 (deleted)
+Nov 28 00:01:57 e001 python2[335]: 768a1000-768a2000 rw-s 00000000 00:11 3024       /dev/shm/JuUArd (deleted)
+Nov 28 00:01:57 e001 python2[335]: 768a2000-768a4000 r-xp 00000000 b3:02 402287     /usr/lib/python2.7/lib-dynload/_bisect.so
+Nov 28 00:01:57 e001 python2[335]: 768a4000-768b3000 ---p 00002000 b3:02 402287     /usr/lib/python2.7/lib-dynload/_bisect.so
+Nov 28 00:01:57 e001 python2[335]: 768b3000-768b4000 r--p 00001000 b3:02 402287     /usr/lib/python2.7/lib-dynload/_bisect.so
+Nov 28 00:01:57 e001 python2[335]: 768b4000-768b5000 rw-p 00002000 b3:02 402287     /usr/lib/python2.7/lib-dynload/_bisect.so
+Nov 28 00:01:57 e001 python2[335]: 768b5000-768c0000 r--s 00000000 b3:02 1309629    /opt/ethoscope-git/.git/objects/pack/pack-44864c3bb5fd82bb882a7a138248a576fa14069e.pack
+Nov 28 00:01:57 e001 python2[335]: 768c0000-76900000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 76900000-76903000 r-xp 00000000 b3:02 402324     /usr/lib/python2.7/lib-dynload/_hashlib.so
+Nov 28 00:01:57 e001 python2[335]: 76903000-76912000 ---p 00003000 b3:02 402324     /usr/lib/python2.7/lib-dynload/_hashlib.so
+Nov 28 00:01:57 e001 python2[335]: 76912000-76913000 r--p 00002000 b3:02 402324     /usr/lib/python2.7/lib-dynload/_hashlib.so
+Nov 28 00:01:57 e001 python2[335]: 76913000-76914000 rw-p 00003000 b3:02 402324     /usr/lib/python2.7/lib-dynload/_hashlib.so
+Nov 28 00:01:57 e001 python2[335]: 76914000-76918000 r-xp 00000000 b3:02 402336     /usr/lib/python2.7/lib-dynload/binascii.so
+Nov 28 00:01:57 e001 python2[335]: 76918000-76927000 ---p 00004000 b3:02 402336     /usr/lib/python2.7/lib-dynload/binascii.so
+Nov 28 00:01:57 e001 python2[335]: 76927000-76928000 r--p 00003000 b3:02 402336     /usr/lib/python2.7/lib-dynload/binascii.so
+Nov 28 00:01:57 e001 python2[335]: 76928000-76929000 rw-p 00004000 b3:02 402336     /usr/lib/python2.7/lib-dynload/binascii.so
+Nov 28 00:01:57 e001 python2[335]: 76929000-7692e000 r-xp 00000000 b3:02 402297     /usr/lib/python2.7/lib-dynload/_struct.so
+Nov 28 00:01:57 e001 python2[335]: 7692e000-7693d000 ---p 00005000 b3:02 402297     /usr/lib/python2.7/lib-dynload/_struct.so
+Nov 28 00:01:57 e001 python2[335]: 7693d000-7693e000 r--p 00004000 b3:02 402297     /usr/lib/python2.7/lib-dynload/_struct.so
+Nov 28 00:01:57 e001 python2[335]: 7693e000-76940000 rw-p 00005000 b3:02 402297     /usr/lib/python2.7/lib-dynload/_struct.so
+Nov 28 00:01:57 e001 python2[335]: 76940000-76942000 r-xp 00000000 b3:02 402328     /usr/lib/python2.7/lib-dynload/_functools.so
+Nov 28 00:01:57 e001 python2[335]: 76942000-76951000 ---p 00002000 b3:02 402328     /usr/lib/python2.7/lib-dynload/_functools.so
+Nov 28 00:01:57 e001 python2[335]: 76951000-76952000 r--p 00001000 b3:02 402328     /usr/lib/python2.7/lib-dynload/_functools.so
+Nov 28 00:01:57 e001 python2[335]: 76952000-76953000 rw-p 00002000 b3:02 402328     /usr/lib/python2.7/lib-dynload/_functools.so
+Nov 28 00:01:57 e001 python2[335]: 76953000-76993000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 76993000-76997000 r-xp 00000000 b3:02 402285     /usr/lib/python2.7/lib-dynload/strop.so
+Nov 28 00:01:57 e001 python2[335]: 76997000-769a6000 ---p 00004000 b3:02 402285     /usr/lib/python2.7/lib-dynload/strop.so
+Nov 28 00:01:57 e001 python2[335]: 769a6000-769a7000 r--p 00003000 b3:02 402285     /usr/lib/python2.7/lib-dynload/strop.so
+Nov 28 00:01:57 e001 python2[335]: 769a7000-769a9000 rw-p 00004000 b3:02 402285     /usr/lib/python2.7/lib-dynload/strop.so
+Nov 28 00:01:57 e001 python2[335]: 769a9000-769e9000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 769e9000-769eb000 r-xp 00000000 b3:02 402293     /usr/lib/python2.7/lib-dynload/_heapq.so
+Nov 28 00:01:57 e001 python2[335]: 769eb000-769fa000 ---p 00002000 b3:02 402293     /usr/lib/python2.7/lib-dynload/_heapq.so
+Nov 28 00:01:57 e001 python2[335]: 769fa000-769fb000 r--p 00001000 b3:02 402293     /usr/lib/python2.7/lib-dynload/_heapq.so
+Nov 28 00:01:57 e001 python2[335]: 769fb000-769fd000 rw-p 00002000 b3:02 402293     /usr/lib/python2.7/lib-dynload/_heapq.so
+Nov 28 00:01:57 e001 python2[335]: 769fd000-76a05000 r-xp 00000000 b3:02 402308     /usr/lib/python2.7/lib-dynload/itertools.so
+Nov 28 00:01:57 e001 python2[335]: 76a05000-76a14000 ---p 00008000 b3:02 402308     /usr/lib/python2.7/lib-dynload/itertools.so
+Nov 28 00:01:57 e001 python2[335]: 76a14000-76a15000 r--p 00007000 b3:02 402308     /usr/lib/python2.7/lib-dynload/itertools.so
+Nov 28 00:01:57 e001 python2[335]: 76a15000-76a18000 rw-p 00008000 b3:02 402308     /usr/lib/python2.7/lib-dynload/itertools.so
+Nov 28 00:01:57 e001 python2[335]: 76a18000-76a1e000 r-xp 00000000 b3:02 402342     /usr/lib/python2.7/lib-dynload/operator.so
+Nov 28 00:01:57 e001 python2[335]: 76a1e000-76a2d000 ---p 00006000 b3:02 402342     /usr/lib/python2.7/lib-dynload/operator.so
+Nov 28 00:01:57 e001 python2[335]: 76a2d000-76a2e000 r--p 00005000 b3:02 402342     /usr/lib/python2.7/lib-dynload/operator.so
+Nov 28 00:01:57 e001 python2[335]: 76a2e000-76a30000 rw-p 00006000 b3:02 402342     /usr/lib/python2.7/lib-dynload/operator.so
+Nov 28 00:01:57 e001 python2[335]: 76a30000-76a35000 r-xp 00000000 b3:02 402299     /usr/lib/python2.7/lib-dynload/_collections.so
+Nov 28 00:01:57 e001 python2[335]: 76a35000-76a44000 ---p 00005000 b3:02 402299     /usr/lib/python2.7/lib-dynload/_collections.so
+Nov 28 00:01:57 e001 python2[335]: 76a44000-76a45000 r--p 00004000 b3:02 402299     /usr/lib/python2.7/lib-dynload/_collections.so
+Nov 28 00:01:57 e001 python2[335]: 76a45000-76a46000 rw-p 00005000 b3:02 402299     /usr/lib/python2.7/lib-dynload/_collections.so
+Nov 28 00:01:57 e001 python2[335]: 76a46000-76a49000 r-xp 00000000 b3:02 402316     /usr/lib/python2.7/lib-dynload/cStringIO.so
+Nov 28 00:01:57 e001 python2[335]: 76a49000-76a58000 ---p 00003000 b3:02 402316     /usr/lib/python2.7/lib-dynload/cStringIO.so
+Nov 28 00:01:57 e001 python2[335]: 76a58000-76a59000 r--p 00002000 b3:02 402316     /usr/lib/python2.7/lib-dynload/cStringIO.so
+Nov 28 00:01:57 e001 python2[335]: 76a59000-76a5a000 rw-p 00003000 b3:02 402316     /usr/lib/python2.7/lib-dynload/cStringIO.so
+Nov 28 00:01:57 e001 python2[335]: 76a5a000-76a9a000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 76a9a000-76aa4000 r-xp 00000000 b3:02 280249     /usr/lib/libnss_files-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76aa4000-76ab3000 ---p 0000a000 b3:02 280249     /usr/lib/libnss_files-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76ab3000-76ab4000 r--p 00009000 b3:02 280249     /usr/lib/libnss_files-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76ab4000-76ab5000 rw-p 0000a000 b3:02 280249     /usr/lib/libnss_files-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76ab5000-76abb000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 76abb000-76abc000 rw-s 00000000 00:11 3023       /dev/shm/SuwQ9o (deleted)
+Nov 28 00:01:57 e001 python2[335]: 76abc000-76abd000 rw-s 00000000 00:11 3021       /dev/shm/1Kg2PA (deleted)
+Nov 28 00:01:57 e001 python2[335]: 76abd000-76abe000 rw-s 00000000 00:11 3020       /dev/shm/qXwpsM (deleted)
+Nov 28 00:01:57 e001 python2[335]: 76abe000-76ac1000 r-xp 00000000 b3:02 402343     /usr/lib/python2.7/lib-dynload/time.so
+Nov 28 00:01:57 e001 python2[335]: 76ac1000-76ad0000 ---p 00003000 b3:02 402343     /usr/lib/python2.7/lib-dynload/time.so
+Nov 28 00:01:57 e001 python2[335]: 76ad0000-76ad1000 r--p 00002000 b3:02 402343     /usr/lib/python2.7/lib-dynload/time.so
+Nov 28 00:01:57 e001 python2[335]: 76ad1000-76ad3000 rw-p 00003000 b3:02 402343     /usr/lib/python2.7/lib-dynload/time.so
+Nov 28 00:01:57 e001 python2[335]: 76ad3000-76b93000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 76b93000-76bff000 r-xp 00000000 b3:02 280096     /usr/lib/libm-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76bff000-76c0e000 ---p 0006c000 b3:02 280096     /usr/lib/libm-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76c0e000-76c0f000 r--p 0006b000 b3:02 280096     /usr/lib/libm-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76c0f000-76c10000 rw-p 0006c000 b3:02 280096     /usr/lib/libm-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76c10000-76c13000 r-xp 00000000 b3:02 280159     /usr/lib/libutil-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76c13000-76c22000 ---p 00003000 b3:02 280159     /usr/lib/libutil-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76c22000-76c23000 r--p 00002000 b3:02 280159     /usr/lib/libutil-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76c23000-76c24000 rw-p 00003000 b3:02 280159     /usr/lib/libutil-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76c24000-76c28000 r-xp 00000000 b3:02 280012     /usr/lib/libdl-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76c28000-76c37000 ---p 00004000 b3:02 280012     /usr/lib/libdl-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76c37000-76c38000 r--p 00003000 b3:02 280012     /usr/lib/libdl-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76c38000-76c39000 rw-p 00004000 b3:02 280012     /usr/lib/libdl-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76c39000-76c55000 r-xp 00000000 b3:02 280104     /usr/lib/libgcc_s.so.1
+Nov 28 00:01:57 e001 python2[335]: 76c55000-76c65000 ---p 0001c000 b3:02 280104     /usr/lib/libgcc_s.so.1
+Nov 28 00:01:57 e001 python2[335]: 76c65000-76c66000 rw-p 0001c000 b3:02 280104     /usr/lib/libgcc_s.so.1
+Nov 28 00:01:57 e001 python2[335]: 76c66000-76d8f000 r-xp 00000000 b3:02 280337     /usr/lib/libc-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76d8f000-76d9f000 ---p 00129000 b3:02 280337     /usr/lib/libc-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76d9f000-76da1000 r--p 00129000 b3:02 280337     /usr/lib/libc-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76da1000-76da2000 rw-p 0012b000 b3:02 280337     /usr/lib/libc-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76da2000-76da5000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 76da5000-76dbb000 r-xp 00000000 b3:02 280253     /usr/lib/libpthread-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76dbb000-76dca000 ---p 00016000 b3:02 280253     /usr/lib/libpthread-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76dca000-76dcb000 r--p 00015000 b3:02 280253     /usr/lib/libpthread-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76dcb000-76dcc000 rw-p 00016000 b3:02 280253     /usr/lib/libpthread-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76dcc000-76dce000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 76dce000-76f05000 r-xp 00000000 b3:02 289638     /usr/lib/libpython2.7.so.1.0
+Nov 28 00:01:57 e001 python2[335]: 76f05000-76f14000 ---p 00137000 b3:02 289638     /usr/lib/libpython2.7.so.1.0
+Nov 28 00:01:57 e001 python2[335]: 76f14000-76f15000 r--p 00136000 b3:02 289638     /usr/lib/libpython2.7.so.1.0
+Nov 28 00:01:57 e001 python2[335]: 76f15000-76f40000 rw-p 00137000 b3:02 289638     /usr/lib/libpython2.7.so.1.0
+Nov 28 00:01:57 e001 python2[335]: 76f40000-76f4a000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 76f4a000-76f4b000 rw-s 00000000 00:11 3019       /dev/shm/D7iKjY (deleted)
+Nov 28 00:01:57 e001 python2[335]: 76f4b000-76f4d000 r--s 00000000 b3:02 1309639    /opt/ethoscope-git/.git/objects/pack/pack-44864c3bb5fd82bb882a7a138248a576fa14069e.idx
+Nov 28 00:01:57 e001 python2[335]: 76f4d000-76f4e000 rwxp 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 76f4e000-76f51000 r-xp 00000000 b3:02 402327     /usr/lib/python2.7/lib-dynload/_locale.so
+Nov 28 00:01:57 e001 python2[335]: 76f51000-76f60000 ---p 00003000 b3:02 402327     /usr/lib/python2.7/lib-dynload/_locale.so
+Nov 28 00:01:57 e001 python2[335]: 76f60000-76f61000 r--p 00002000 b3:02 402327     /usr/lib/python2.7/lib-dynload/_locale.so
+Nov 28 00:01:57 e001 python2[335]: 76f61000-76f62000 rw-p 00003000 b3:02 402327     /usr/lib/python2.7/lib-dynload/_locale.so
+Nov 28 00:01:57 e001 python2[335]: 76f62000-76f82000 r-xp 00000000 b3:02 280548     /usr/lib/ld-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76f82000-76f84000 r-xp 00000000 b3:02 288997     /usr/lib/libgtkglext-x11-1.0.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 76f84000-76f8c000 ---p 00002000 b3:02 288997     /usr/lib/libgtkglext-x11-1.0.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 76f8c000-76f8d000 r--p 00002000 b3:02 288997     /usr/lib/libgtkglext-x11-1.0.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 76f8d000-76f8e000 rw-p 00003000 b3:02 288997     /usr/lib/libgtkglext-x11-1.0.so.0.0.0
+Nov 28 00:01:57 e001 python2[335]: 76f8e000-76f91000 rw-p 00000000 00:00 0
+Nov 28 00:01:57 e001 python2[335]: 76f91000-76f92000 r--p 0001f000 b3:02 280548     /usr/lib/ld-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 76f92000-76f93000 rw-p 00020000 b3:02 280548     /usr/lib/ld-2.22.so
+Nov 28 00:01:57 e001 python2[335]: 7e9eb000-7ea0c000 rw-p 00000000 00:00 0          [stack]
+Nov 28 00:01:57 e001 python2[335]: 7ecc2000-7ecc3000 r-xp 00000000 00:00 0          [sigpage]
+Nov 28 00:01:57 e001 python2[335]: 7ecc3000-7ecc4000 r--p 00000000 00:00 0          [vvar]
+Nov 28 00:01:57 e001 python2[335]: 7ecc4000-7ecc5000 r-xp 00000000 00:00 0          [vdso]
+Nov 28 00:01:57 e001 python2[335]: ffff0000-ffff1000 r-xp 00000000 00:00 0          [vectors]
+Nov 28 00:02:08 e001 systemd[1]: ethoscope_device.service: Main process exited, code=killed, status=6/ABRT
+Nov 28 00:02:08 e001 systemd[1]: ethoscope_device.service: Unit entered failed state.
+Nov 28 00:02:08 e001 systemd[1]: ethoscope_device.service: Failed with result 'signal'.
+Nov 28 00:02:13 e001 systemd-coredump[9706]: Process 335 (python2) of user 0 dumped core.
+Nov 28 00:02:14 e001 systemd[1]: ethoscope_device.service: Service hold-off time over, scheduling restart.
+Nov 28 00:02:14 e001 systemd[1]: Stopped Ethoscope device server.
+Nov 28 00:02:14 e001 systemd[1]: Started Ethoscope device server.
+Nov 28 00:02:14 e001 systemd[1]: Started Update man-db cache.
+Nov 28 00:02:16 e001 python2[10062]: WARNING:root:Starting control thread with data:
+Nov 28 00:02:16 e001 python2[10062]: WARNING:root:{}
+Nov 28 00:02:16 e001 python2[10062]: WARNING:root:No field interactor, using default
+Nov 28 00:02:16 e001 python2[10062]: WARNING:root:No field camera, using default
+Nov 28 00:02:16 e001 python2[10062]: WARNING:root:No field drawer, using default
+Nov 28 00:02:16 e001 python2[10062]: WARNING:root:No field result_writer, using default
+Nov 28 00:02:16 e001 python2[10062]: WARNING:root:No field tracker, using default
+Nov 28 00:02:16 e001 python2[10062]: WARNING:root:No field roi_builder, using default
+Nov 28 00:02:16 e001 python2[10062]: Bottle v0.12.9 server starting up (using CherryPyServer())...
+Nov 28 00:02:16 e001 python2[10062]: Listening on http://0.0.0.0:9000/
+Nov 28 00:02:16 e001 python2[10062]: Hit Ctrl-C to quit.
+Nov 28 00:12:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 00:12:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 00:28:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 00:28:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 00:44:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 00:44:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 01:00:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 01:00:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 01:16:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 01:16:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 01:32:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 01:32:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 01:48:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 01:48:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 02:04:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 02:04:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 02:20:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 02:20:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 02:36:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 02:36:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 02:52:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 02:52:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 03:08:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 03:08:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 03:24:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 03:24:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 03:40:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 03:40:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 03:56:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 03:56:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 04:12:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 04:12:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 04:28:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 04:28:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 04:44:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 04:44:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 05:00:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 05:00:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 05:16:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 05:16:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 05:32:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 05:32:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 05:48:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 05:48:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 06:04:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 06:04:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 06:20:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 06:20:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 06:36:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 06:36:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 06:52:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 06:52:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 07:08:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 07:08:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 07:24:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 07:24:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 07:40:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 07:40:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 07:56:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 07:56:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 08:12:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 08:12:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 08:28:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 08:28:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 08:44:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 08:44:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 09:00:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 09:00:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 09:16:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 09:16:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 09:32:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 09:32:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 09:48:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 09:48:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 10:04:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 10:04:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 10:20:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 10:20:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 10:36:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 10:36:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 10:52:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 10:52:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 11:08:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 11:08:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 11:24:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 11:24:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 11:40:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 11:40:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 11:56:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 11:56:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 12:12:14 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 12:12:14 e001 systemd[1]: Started Periodically saves system time to file.
+Nov 28 12:26:20 e001 sshd[10949]: Accepted password for root from 192.169.123.1 port 44944 ssh2
+Nov 28 12:26:20 e001 sshd[10949]: pam_unix(sshd:session): session opened for user root by (uid=0)
+Nov 28 12:26:20 e001 systemd[1]: Created slice user-0.slice.
+Nov 28 12:26:20 e001 systemd[1]: Starting User Manager for UID 0...
+Nov 28 12:26:20 e001 systemd-logind[201]: New session c1 of user root.
+Nov 28 12:26:20 e001 systemd[1]: Started Session c1 of user root.
+Nov 28 12:26:20 e001 systemd[10951]: pam_unix(systemd-user:session): session opened for user root by (uid=0)
+Nov 28 12:26:20 e001 systemd[10951]: Starting D-Bus User Message Bus Socket.
+Nov 28 12:26:20 e001 systemd[10951]: Reached target Timers.
+Nov 28 12:26:20 e001 systemd[10951]: Reached target Paths.
+Nov 28 12:26:20 e001 systemd[10951]: Listening on D-Bus User Message Bus Socket.
+Nov 28 12:26:20 e001 systemd[10951]: Reached target Sockets.
+Nov 28 12:26:20 e001 systemd[10951]: Reached target Basic System.
+Nov 28 12:26:20 e001 systemd[10951]: Reached target Default.
+Nov 28 12:26:20 e001 systemd[10951]: Startup finished in 132ms.
+Nov 28 12:26:20 e001 systemd[1]: Started User Manager for UID 0.
+Nov 28 12:28:13 e001 systemd[1]: Starting Periodically saves system time to file...
+Nov 28 12:28:13 e001 systemd[1]: Started Periodically saves system time to file.
