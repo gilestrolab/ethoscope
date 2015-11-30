@@ -1,0 +1,12 @@
+
+
+{"roi_builder":{"name":"SleepMonitorWithTargetROIBuilder",
+                      "arguments":{}},
+        "tracker": {"name":"AdaptiveBGModel",
+                      "arguments":{}},
+        "interactor": {"name":"ExperimentalSleepDepInteractor",
+                       "arguments":{"velocity_threshold": 0.0060,
+                                     "start_datetime":0,
+                                    "end_datetime":99999999999999}}
+
+}

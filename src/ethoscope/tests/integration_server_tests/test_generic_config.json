@@ -1,0 +1,15 @@
+
+{"roi_builder":{"name":"TargetGridROIBuilder",
+                      "arguments":{ "n_cols": 2 ,
+                                    "n_rows": 10
+                                  }
+                  },
+        "tracker": {"name":"AdaptiveBGModel",
+                      "arguments":{}},
+        "interactor": {"name":"DefaultInteractor",
+                      "arguments":{}},
+        "drawer": {"name":"DefaultDrawer",
+                      "arguments":{"draw_frames":true}},
+        "camera": {"name":"MovieVirtualCamera",
+                      "arguments":{"path":"./test_video.mp4"}}
+}

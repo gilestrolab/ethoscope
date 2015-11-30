@@ -29,6 +29,22 @@ from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
 
 
+from ethoscope.utils.description import DescribedObject
+
+class ExperimentalInformations(DescribedObject):
+        _description  = {   "overview": "Optional information about your experiment",
+                            "arguments": [
+                                    {"type": "str", "name":"name", "description": "Who are you?","default":""},
+                                    {"type": "str", "name":"location", "description": "Where is your device","default":""}
+                                   ]}
+        def __init__(self,name="",location=""):
+            self._info_dic = {"name":name,
+                              "location":location}
+        @property
+        def info_dic(self):
+            return self._info_dic
+
+
 class ControlThread(Thread):
     _evanescent = False
     _option_dict = {
@@ -52,26 +68,15 @@ class ControlThread(Thread):
                     },
         "result_writer":{
                         "possible_classes":[ResultWriter, SQLiteResultWriter],
+                },
+        "experimental_info":{
+                        "possible_classes":[ExperimentalInformations],
                 }
      }
     for k in _option_dict:
         _option_dict[k]["class"] =_option_dict[k]["possible_classes"][0]
         _option_dict[k]["kwargs"] ={}
 
-    #
-    # _possible_roi_builder_classes = [TargetGridROIBuilder, OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder]
-    # _ROIBuilderClass = SleepMonitorWithTargetROIBuilder
-    # _ROIBuilderClass_kwargs = {}
-    #
-    # _possible_tracker_classes = [AdaptiveBGModel]
-    # _TrackerClass = AdaptiveBGModel
-    # _TrackerClass_kwargs = {}
-    #
-    # _possible_interactor_classes = [DefaultInteractor, FakeSleepDepInteractor, SleepDepInteractor]
-    # _InteractorClass = DefaultInteractor
-    # _InteractorClass_kwargs = {}
-
-    # _DrawerClass = DefaultDrawer
 
     _tmp_last_img_file = "last_img.jpg"
     _dbg_img_file = "dbg_img.png"
@@ -115,15 +120,19 @@ class ControlThread(Thread):
                         "version": version,
                         "db_name":self._db_credentials["name"],
                         "monitor_info": self._default_monitor_info,
-                        "user_options": self._get_user_options()
+                        "user_options": self._get_user_options(),
+                        "experimental_info": {}
                         }
         self._monit = None
 
         self._parse_user_options(data)
 
+
         DrawerClass = self._option_dict["drawer"]["class"]
         drawer_kwargs = self._option_dict["drawer"]["kwargs"]
         self._drawer = DrawerClass(**drawer_kwargs)
+
+
         super(ControlThread, self).__init__()
 
 
@@ -239,6 +248,12 @@ class ControlThread(Thread):
             self._last_info_t_stamp = 0
             self._last_info_frame_idx = 0
             try:
+
+
+
+
+
+
                 CameraClass = self._option_dict["camera"]["class"]
 
                 camera_kwargs = self._option_dict["camera"]["kwargs"]
@@ -265,18 +280,26 @@ class ControlThread(Thread):
 
                 logging.info("Initialising monitor")
                 cam.restart()
+                #the camera start time is the reference 0
 
-                #todo add info about select options here
+
+                ExpInfoClass = self._option_dict["experimental_info"]["class"]
+                exp_info_kwargs = self._option_dict["experimental_info"]["kwargs"]
+                self._info["experimental_info"] = ExpInfoClass(**exp_info_kwargs).info_dic
+                self._info["time"] = cam.start_time
+
+
                 self._metadata = {
                              "machine_id": self._info["id"],
                              "machine_name": self._info["name"],
                              "date_time": cam.start_time, #the camera start time is the reference 0
                              "frame_width":cam.width,
                              "frame_height":cam.height,
-                             "version": self._info["version"]["id"]
+                             "version": self._info["version"]["id"],
+                             "experimental_info": str(self._info["experimental_info"]),
+                             "selected_options": str(self._option_dict)
                               }
-                #the camera start time is the reference 0
-                self._info["time"] = cam.start_time
+
 
 
 
@@ -324,6 +347,7 @@ class ControlThread(Thread):
     def stop(self, error=None):
         self._info["status"] = "stopping"
         self._info["time"] = time.time()
+        self._info["experimental_info"] = {}
 
         logging.info("Stopping monitor")
         if not self._monit is None:
