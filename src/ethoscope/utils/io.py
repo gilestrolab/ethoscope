@@ -343,7 +343,7 @@ class ResultWriter(object):
 
 
         logging.info("Creating 'METADATA' table")
-        self._create_table("METADATA", "field CHAR(100), value CHAR(200)")
+        self._create_table("METADATA", "field CHAR(100), value VARCHAR(3000)")
 
         for k,v in self.metadata.items():
             command = "INSERT INTO METADATA VALUES %s" % str((k, v))

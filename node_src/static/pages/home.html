@@ -19,6 +19,8 @@
             <th>Status</th>
             <th>Since</th>
             <th>Time since backup</th>
+            <th>User</th>
+            <th>Location</th>
             <th>ip</th>
             <th>id</th>
             <th><center>Select</center></th>
@@ -34,6 +36,8 @@
             <span ng-if="device.status == 'stopped'" class="fa fa-circle color-red"></span> {{device.status}}</td>
                 <td>{{secToDate(device.time)}}</td>
                 <td>{{elapsedtime(device.time_since_backup)}}</td>
+                <td>{{device.experimental_info.name}}</td>
+                <td>{{device.experimental_info.location}}</td>
                 <td>{{device.ip}}</td>
                 <td>{{device.id.substring(0,6)}}</td>
                 <td><center>

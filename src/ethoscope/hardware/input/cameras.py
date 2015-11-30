@@ -508,7 +508,7 @@ class OurPiCameraAsync(BaseCamera):
 
 
 
-        im = self._queue.get(timeout=5)
+        im = self._queue.get(timeout=10)
 
         self._frame = cv2.cvtColor(im,cv2.COLOR_GRAY2BGR)
 
