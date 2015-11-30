@@ -468,7 +468,8 @@ class PiFrameGrabber(multiprocessing.Process):
                     raw_capture.truncate(0)
                     # out = np.copy(frame.array)
                     out = cv2.cvtColor(frame.array,cv2.COLOR_BGR2GRAY)
-
+                    #fixme here we could actually pass a JPG compressed file object (http://docs.scipy.org/doc/scipy-0.16.0/reference/generated/scipy.misc.imsave.html)
+                    # This way, we would manage to get faster FPS
                     self._queue.put(out)
         finally:
             self._stop_queue.close()
@@ -499,7 +500,7 @@ class OurPiCameraAsync(BaseCamera):
             raise EthoscopeException("FPS must be an integer number")
 
 
-        self._queue = multiprocessing.Queue(maxsize=2)
+        self._queue = multiprocessing.Queue(maxsize=1)
         self._stop_queue = multiprocessing.JoinableQueue(maxsize=1)
         self._p = PiFrameGrabber(target_fps,target_resolution,self._queue,self._stop_queue )
         self._p.daemon = True
