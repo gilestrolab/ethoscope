@@ -44,6 +44,10 @@
 
     // create the controller and inject Angular's $scope
     app.controller('mainController', function($scope, $http, $interval, $timeout) {
+        $scope.sortType = 'name'; // set the default sort type
+        $scope.sortReverse = false;  // set the default sort order
+        $scope.filterEthoscopes = '';     // set the default search/filter term
+        
         $scope.groupActions = {};
         $http.get('/node/time').success(function(data){
             console.log(data);
@@ -52,7 +56,9 @@
         });
         $http.get('/devices_list').success(function(data){
             $scope.devices = data;
+            
         });
+        
 
         var get_date = function(){
             $http.get('/node/time').success(function(data){
