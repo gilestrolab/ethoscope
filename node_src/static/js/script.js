@@ -87,7 +87,15 @@
             }
             $scope.loading_devices = true;
             $http.get('/devices').success(function(data){
-                $scope.devices = data;
+
+                data_list = [];
+
+                for(d in data){
+                    data_list.push(data[d]);
+                    }
+
+                $scope.devices = data_list;
+
                 spinner.stop();
                 $scope.loading_devices = false;
 
