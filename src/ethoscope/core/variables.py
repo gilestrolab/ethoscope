@@ -37,6 +37,10 @@ class PhiVariable(BaseIntVariable):
     header_name = "phi"
     functional_type = "angle"
 
+class Label(BaseIntVariable):
+    header_name = "label"
+    functional_type = "label"
+
 
 class BaseDistanceIntVar(BaseIntVariable):
     functional_type = "distance"

@@ -67,6 +67,7 @@ class DefaultDrawer(BaseDrawer):
 
 
         for track_u in tracking_units:
+
             x,y = track_u.roi.offset
             y += track_u.roi.rectangle[3]/2
 
@@ -77,18 +78,17 @@ class DefaultDrawer(BaseDrawer):
             cv2.drawContours(img,[track_u.roi.polygon],-1, roi_colour, 1, cv2.CV_AA)
 
             try:
-                pos = positions[track_u.roi.idx]
-                if pos is None:
-                    continue
+                pos_list = positions[track_u.roi.idx]
             except KeyError:
                 continue
 
-            colour = (0 ,0, 255)
-            try:
-                if pos["has_interacted"]:
-                    colour = (255, 0,0)
-            except KeyError:
-                pass
+            for pos in pos_list:
+                colour = (0 ,0, 255)
+                try:
+                    if pos["has_interacted"]:
+                        colour = (255, 0,0)
+                except KeyError:
+                    pass
 
-            cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),black_colour,3,cv2.CV_AA)
-            cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),colour,1,cv2.CV_AA)
+                cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),black_colour,3,cv2.CV_AA)
+                cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),colour,1,cv2.CV_AA)
