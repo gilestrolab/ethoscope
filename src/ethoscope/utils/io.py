@@ -393,12 +393,6 @@ class ResultWriter(object):
         t = int(round(t))
         roi_id = roi.idx
 
-        # tps = [(0, t) + tuple(dr.values()) for dr in data_rows]
-        #
-        # tps = tuple(tps)
-        #
-        # for
-
         for dr in data_rows:
             tp = (0, t) + tuple(dr.values())
 
@@ -501,14 +495,22 @@ class AsyncSQLiteWriter(multiprocessing.Process):
                     if (msg == 'DONE'):
                         do_run=False
                         continue
+
+                    command, args = msg
+
+
                     c = db.cursor()
-                    c.execute(msg)
+                    if args is None:
+                        c.execute(command)
+                    else:
+                        c.execute(command, args)
+
                     db.commit()
 
                 except:
                     do_run=False
                     try:
-                        logging.error("Failed to run mysql command:\n%s" % msg)
+                        logging.error("Failed to run mysql command:\n%s" % command)
                     except:
                         logging.error("Did not retrieve queue value")
 
@@ -554,17 +556,16 @@ class SQLiteResultWriter(ResultWriter):
         logging.info("Creating database table with: " + command)
         self._write_async_command(command)
 
-
-
-    def _add(self,t, roi, data_row):
+    def _add(self, t, roi, data_rows):
         t = int(round(t))
         roi_id = roi.idx
 
-        tp = (self._null, t) + tuple(data_row.values())
+        for dr in data_rows:
+            # here we use NULL because SQLite does not support '0' for auto index
+            tp = (self._null, t) + tuple(dr.values())
 
-        if roi_id not in self._insert_dict  or self._insert_dict[roi_id] == "":
-            command = 'INSERT INTO ROI_%i VALUES %s' % (roi_id, str(tp))
-            self._insert_dict[roi_id] = command
-        else:
-            self._insert_dict[roi_id] += ("," + str(tp))
-
+            if roi_id not in self._insert_dict  or self._insert_dict[roi_id] == "":
+                command = 'INSERT INTO ROI_%i VALUES %s' % (roi_id, str(tp))
+                self._insert_dict[roi_id] = command
+            else:
+                self._insert_dict[roi_id] += ("," + str(tp))
