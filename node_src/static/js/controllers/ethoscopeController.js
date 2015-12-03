@@ -63,7 +63,17 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
             $("#startModal").modal('hide');
             spStart= new Spinner(opts).spin();
             starting_tracking.appendChild(spStart.el);
-            $http.post('/device/'+device_id+'/controls/start', data=option)
+            
+            for (opt in option){
+                for(arg in option[opt].arguments){
+                    if(option[opt].arguments[arg][0] instanceof Date ){                        
+                        option[opt].arguments[arg]=option[opt].arguments[arg][1];
+                        console.log(option[opt].arguments[arg]);
+                    }
+                }
+            }
+            console.log(option);
+            /*$http.post('/device/'+device_id+'/controls/start', data=option)
                  .success(function(data){$scope.device.status = data.status;});
             $http.get('/devices').success(function(data){
                     $http.get('/device/'+device_id+'/data').success(function(data){
@@ -74,7 +84,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                         device_ip = data;
                     });
                  $("#startModal").modal('hide');
-            });
+            });*/
 
         };
 
