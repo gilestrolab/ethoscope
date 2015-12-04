@@ -86,7 +86,9 @@ class ControlThread(Thread):
                       "password": "ethoscope"}
 
     _default_monitor_info =  {
+                            #fixme, not needed
                             "last_positions":None,
+
                             "last_time_stamp":0,
                             "fps":0
                             }
@@ -213,18 +215,22 @@ class ControlThread(Thread):
             f = round(df/dt, 2)
         else:
             f="NaN"
-        p = self._monit.last_positions
 
-        pos = {}
-        for k,v in p.items():
-            if v is None:
-                continue
-            pos[k] = dict(v)
-            pos[k]["roi_idx"] = k
+
+        #fixme, this is not available anymore since we have position list now
+
+        # possibly, we just don't need it altogether
+        # p = self._monit.last_positions
+        # pos = {}
+        # for k,v in p.items():
+        #     if v is None:
+        #         continue
+        #     pos[k] = dict(v)
+        #     pos[k]["roi_idx"] = k
 
         if t is not None and p is not None:
             self._info["monitor_info"] = {
-                            "last_positions":pos,
+                            # "last_positions":pos,
                             "last_time_stamp":t,
                             "fps": f
                             }
