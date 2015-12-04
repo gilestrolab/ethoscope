@@ -228,7 +228,7 @@ class ControlThread(Thread):
         #     pos[k] = dict(v)
         #     pos[k]["roi_idx"] = k
 
-        if t is not None and p is not None:
+        if t is not None:# and p is not None:
             self._info["monitor_info"] = {
                             # "last_positions":pos,
                             "last_time_stamp":t,
