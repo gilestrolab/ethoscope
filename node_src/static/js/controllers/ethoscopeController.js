@@ -63,7 +63,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
             $("#startModal").modal('hide');
             spStart= new Spinner(opts).spin();
             starting_tracking.appendChild(spStart.el);
-            
+            //get only the second parameter in the time array. (linux timestamp).
             for (opt in option){
                 for(arg in option[opt].arguments){
                     if(option[opt].arguments[arg][0] instanceof Date ){                        

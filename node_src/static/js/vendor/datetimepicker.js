@@ -331,7 +331,7 @@
                 var hourMoment = moment.utc(selectedDate).add(i, 'hours');
                 var dateValue = {
                   'utcDateValue': hourMoment.valueOf(),
-                  'display': hourMoment.format('LT'),
+                  'display': hourMoment.format('H:mm'),
                   'active': hourMoment.format('YYYY-MM-DD H') === activeFormat
                 };
 
@@ -365,7 +365,7 @@
                 var hourMoment = moment.utc(selectedDate).add(i * configuration.minuteStep, 'minute');
                 var dateValue = {
                   'utcDateValue': hourMoment.valueOf(),
-                  'display': hourMoment.format('LT'),
+                  'display': hourMoment.format('H:mm'),
                   'active': hourMoment.format('YYYY-MM-DD H:mm') === activeFormat
                 };
 
