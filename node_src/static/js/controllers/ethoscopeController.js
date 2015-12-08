@@ -47,15 +47,27 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
         $scope.ethoscope.update_user_options = function(name){
             data=$scope.device;
+            
             for (var i=0;i<data.user_options[name].length;i++){
                 if (data.user_options[name][i]['name']== $scope.selected_options[name]['name']){
                     $scope.selected_options[name]['arguments']={};
+                    
+                    
                     for(var j=0;j<data.user_options[name][i]['arguments'].length; j++){
-                        $scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']]=data.user_options[name][i]['arguments'][j]['default'];
+                        
+                        if (data.user_options[name][i]['arguments'][j]['type']=='datetime'){
+                          $scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']]=[];
+                          $scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']][0]=moment(data.user_options[name][i]['arguments'][j]['default']).format('LLLL'); 
+                        $scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']][1]=data.user_options[name][i]['arguments'][j]['default']; 
+                            console.log($scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']]);
+                        }else{
+                            $scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']]=data.user_options[name][i]['arguments'][j]['default'];
+                        }
 
                     }
                 }
             }
+           
         }
 
 
