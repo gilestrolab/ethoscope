@@ -175,7 +175,13 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
                     $scope.device= data;
                     //$scope.device.img = device_ip+':9000/static'+$scope.device.last_drawn_img + '?' + new Date().getTime();
-                    $scope.device.img = "/device/"+ $scope.device.id  + "/last_img" + '?' + new Date().getTime();
+
+                    url_img_query = "/device/"+ $scope.device.id  + "/last_img";
+
+                    $http.get(url_img_query).success(function(data){
+                        $scope.device.url_img = data + '?' + new Date().getTime();
+                    });
+
                     $scope.device.ip = device_ip;
                     if (typeof spStart != undefined && $scope.device.status == 'running' || $scope.device.status=='stopped'){
                         spStart.stop();

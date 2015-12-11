@@ -38,6 +38,10 @@ def get_favicon():
 def server_static(filepath):
     return static_file(filepath, root=STATIC_DIR)
 
+@app.route('/tmp_static/<filepath:path>')
+def server_static(filepath):
+    return static_file(filepath, root=tmp_imgs_dir)
+
 @app.route('/download/<filepath:path>')
 def server_download(filepath):
     return static_file(filepath, root="/", download=filepath)
@@ -117,17 +121,16 @@ def device(id):
         device_info = devices_map[id]
         dev_ip = device_info["ip"]
         img_path = device_info["last_drawn_img"]
-        url = dev_ip +':9000/' + img_path
-        print "getting url: ", url
+        url = dev_ip +':9000/static' + img_path
         file_like = urllib2.urlopen(url)
         # Open our local file for writing
         local_file = os.path.join(tmp_imgs_dir, id + ".jpg")
         with open(local_file, "wb") as lf:
             lf.write(file_like.read())
-        print "saving in ", local_file
-        return local_file
+        return os.path.basename(local_file)
 
     except Exception as e:
+        print e
         return {'error':traceback.format_exc(e)}
 
 
