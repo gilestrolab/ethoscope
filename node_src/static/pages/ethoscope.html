@@ -34,9 +34,9 @@
 <p>Time since last experiment: {{ethoscope.elapsedtime(device.time_since_backup)}}</p>        </div>
 
         <button class="btn btn-success btn-xl" ng-if="device.status == 'stopped'"  data-toggle="modal" data-target="#startModal">Start</button>
-        <button class="btn btn-danger" ng-if="device.status == 'running'"  ng-click="ethoscope.stop() ">Stop</button>
+        <button class="btn btn-danger" ng-if="device.status == 'running'"   data-toggle="modal" data-target="#stopTrackingModal">Stop</button>
 
-        <button class="btn btn-info disable" ng-if="device.status == 'stopping'"  ng-click="ethoscope.alert('Please wait, system is stopping')">Stopping</button>
+        <button class="btn btn-info disable" ng-if="device.status == 'stopping'" ng-click="ethoscope.alert('Please wait, system is stopping')">Stopping</button>
         <button class="btn btn-danger disable" ng-if="device.status == 'initialising'"  ng-click="ethoscope.alert('Please wait, system is starting')">Starting</button>
 
         <!--<a href="/#/more/browse" class="btn btn-info">Download Data</a>-->
@@ -166,6 +166,26 @@
     </div>
   </div>
 </div>
+
+<!-- Modal stop tracking -->
+<div class="modal fade" id="stopTrackingModal" tabindex="-1" role="dialog" aria-labelledby="stopTrackingModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Stoping Tracking!</h4>
+      </div>
+      <div class="modal-body">
+       <p>Do you really want to stop the tracking in “{{device.name}}”? Any ongoing acquisition will be ended.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">No</button>
+        <button type="button" class="btn btn-primary" ng-click="ethoscope.stop()" data-dismiss="modal">Yes, of course!</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <!-- Modal Record -->
 <div class="modal fade" id="recordModal" tabindex="-1" role="dialog" aria-labelledby="recordModal" aria-hidden="true">
