@@ -54,7 +54,7 @@ class TrackingUnit(object):
         """
         return self._roi
 
-    def get_last_position(self,absolute=False):
+    def get_last_positions(self,absolute=False):
         """
         The last position of the animal monitored by this `TrackingUnit`
 
@@ -64,21 +64,26 @@ class TrackingUnit(object):
         """
 
         if len(self._tracker.positions) < 1:
-            return None
-        last_position = self._tracker.positions[-1]
+            return []
+        last_positions = self._tracker.positions[-1]
 
 
         if not absolute:
-            return last_position
+            return last_positions
+
 
         out =[]
-        for k,i in last_position.items():
-            if isinstance(i, BaseRelativeVariable):
-                out.append(i.to_absolute(self.roi))
-            else:
-                out.append(i)
+        for last_pos in last_positions:
+            tmp_out = []
+            for k,i in last_pos.items():
+                if isinstance(i, BaseRelativeVariable):
+                    tmp_out.append(i.to_absolute(self.roi))
+                else:
+                    tmp_out.append(i)
+            tmp_out = DataPoint(tmp_out)
+            out.append(tmp_out)
 
-        out = DataPoint(out)
+
         return out
 
 
@@ -95,11 +100,14 @@ class TrackingUnit(object):
         :return: The resulting data point
         :rtype:  :class:`~ethoscope.core.data_point.DataPoint`
         """
-        data_row = self._tracker.track(t,img)
+        data_rows = self._tracker.track(t,img)
+
         interact, result = self._interactor.apply()
-        if data_row is None:
-            return
+        if len(data_rows) == 0:
+            return []
 
         # TODO data_row should have some result
-        data_row.append(interact)
-        return data_row
+        for dr in data_rows:
+            dr.append(interact)
+
+        return data_rows

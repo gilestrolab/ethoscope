@@ -354,17 +354,23 @@ class ResultWriter(object):
         logging.info("Result writer initialised")
 
 
-    def write(self, t, roi, data_row):
+    def write(self, t, roi, data_rows):
+
+        #fixme
+        dr = data_rows[0]
+
         if not self._var_map_initialised:
             for r in self._rois:
-                self._initialise(r, data_row)
-            self._initialise_var_map(data_row)
+                self._initialise(r, dr)
+            self._initialise_var_map(dr)
 
-        self._add(t, roi, data_row)
+        self._add(t, roi, data_rows)
         self._last_t = t
 
+        # now this is irrelevant when tracking multiple animals
+
         if self._dam_file_helper is not None:
-            self._dam_file_helper.input_roi_data(t, roi, data_row)
+            self._dam_file_helper.input_roi_data(t, roi, dr)
 
     def flush(self, t, img=None):
         if self._dam_file_helper is not None:
@@ -383,16 +389,18 @@ class ResultWriter(object):
                 self._insert_dict[k] = ""
         return False
 
-    def _add(self, t, roi, data_row):
+    def _add(self, t, roi, data_rows):
         t = int(round(t))
         roi_id = roi.idx
-        tp = (0, t) + tuple(data_row.values())
 
-        if roi_id not in self._insert_dict  or self._insert_dict[roi_id] == "":
-            command = 'INSERT INTO ROI_%i VALUES %s' % (roi_id, str(tp))
-            self._insert_dict[roi_id] = command
-        else:
-            self._insert_dict[roi_id] += ("," + str(tp))
+        for dr in data_rows:
+            tp = (0, t) + tuple(dr.values())
+
+            if roi_id not in self._insert_dict  or self._insert_dict[roi_id] == "":
+                command = 'INSERT INTO ROI_%i VALUES %s' % (roi_id, str(tp))
+                self._insert_dict[roi_id] = command
+            else:
+                self._insert_dict[roi_id] += ("," + str(tp))
 
 
 
@@ -487,14 +495,22 @@ class AsyncSQLiteWriter(multiprocessing.Process):
                     if (msg == 'DONE'):
                         do_run=False
                         continue
+
+                    command, args = msg
+
+
                     c = db.cursor()
-                    c.execute(msg)
+                    if args is None:
+                        c.execute(command)
+                    else:
+                        c.execute(command, args)
+
                     db.commit()
 
                 except:
                     do_run=False
                     try:
-                        logging.error("Failed to run mysql command:\n%s" % msg)
+                        logging.error("Failed to run mysql command:\n%s" % command)
                     except:
                         logging.error("Did not retrieve queue value")
 
@@ -540,17 +556,16 @@ class SQLiteResultWriter(ResultWriter):
         logging.info("Creating database table with: " + command)
         self._write_async_command(command)
 
-
-
-    def _add(self,t, roi, data_row):
+    def _add(self, t, roi, data_rows):
         t = int(round(t))
         roi_id = roi.idx
 
-        tp = (self._null, t) + tuple(data_row.values())
+        for dr in data_rows:
+            # here we use NULL because SQLite does not support '0' for auto index
+            tp = (self._null, t) + tuple(dr.values())
 
-        if roi_id not in self._insert_dict  or self._insert_dict[roi_id] == "":
-            command = 'INSERT INTO ROI_%i VALUES %s' % (roi_id, str(tp))
-            self._insert_dict[roi_id] = command
-        else:
-            self._insert_dict[roi_id] += ("," + str(tp))
-
+            if roi_id not in self._insert_dict  or self._insert_dict[roi_id] == "":
+                command = 'INSERT INTO ROI_%i VALUES %s' % (roi_id, str(tp))
+                self._insert_dict[roi_id] = command
+            else:
+                self._insert_dict[roi_id] += ("," + str(tp))

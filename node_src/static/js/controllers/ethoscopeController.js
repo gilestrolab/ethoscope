@@ -47,15 +47,27 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
         $scope.ethoscope.update_user_options = function(name){
             data=$scope.device;
+            
             for (var i=0;i<data.user_options[name].length;i++){
                 if (data.user_options[name][i]['name']== $scope.selected_options[name]['name']){
                     $scope.selected_options[name]['arguments']={};
+                    
+                    
                     for(var j=0;j<data.user_options[name][i]['arguments'].length; j++){
-                        $scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']]=data.user_options[name][i]['arguments'][j]['default'];
+                        
+                        if (data.user_options[name][i]['arguments'][j]['type']=='datetime'){
+                          $scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']]=[];
+                          $scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']][0]=moment(data.user_options[name][i]['arguments'][j]['default']).format('LLLL'); 
+                        $scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']][1]=data.user_options[name][i]['arguments'][j]['default']; 
+                            console.log($scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']]);
+                        }else{
+                            $scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']]=data.user_options[name][i]['arguments'][j]['default'];
+                        }
 
                     }
                 }
             }
+           
         }
 
 
@@ -63,6 +75,15 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
             $("#startModal").modal('hide');
             spStart= new Spinner(opts).spin();
             starting_tracking.appendChild(spStart.el);
+            //get only the second parameter in the time array. (linux timestamp).
+            for (opt in option){
+                for(arg in option[opt].arguments){
+                    if(option[opt].arguments[arg][0] instanceof Date ){                        
+                        option[opt].arguments[arg]=option[opt].arguments[arg][1];
+                    }
+                }
+            }
+
             $http.post('/device/'+device_id+'/controls/start', data=option)
                  .success(function(data){$scope.device.status = data.status;});
             $http.get('/devices').success(function(data){
@@ -153,7 +174,14 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                  .success(function(data){
 
                     $scope.device= data;
-                    $scope.device.img = device_ip+':9000/static'+$scope.device.last_drawn_img + '?' + new Date().getTime();
+                    //$scope.device.img = device_ip+':9000/static'+$scope.device.last_drawn_img + '?' + new Date().getTime();
+
+                    url_img_query = "/device/"+ $scope.device.id  + "/last_img";
+
+                    $http.get(url_img_query).success(function(data){
+                        $scope.device.url_img = data + '?' + new Date().getTime();
+                    });
+
                     $scope.device.ip = device_ip;
                     if (typeof spStart != undefined && $scope.device.status == 'running' || $scope.device.status=='stopped'){
                         spStart.stop();

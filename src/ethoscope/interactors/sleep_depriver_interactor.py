@@ -28,7 +28,12 @@ class IsMovingInteractor(BaseInteractor):
 
         if len(positions ) <2 :
             return False
-        tail_m = positions[-1]
+
+
+
+        if len(positions[-1]) != 1:
+            raise Exception("This interactor can only work with a single animal per ROI")
+        tail_m = positions[-1][0]
 
         times = self._tracker.times
         last_time_for_position = times[-1]

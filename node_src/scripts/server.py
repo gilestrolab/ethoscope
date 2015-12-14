@@ -9,6 +9,8 @@ import logging
 import traceback
 from ethoscope_node.utils.helpers import generate_new_device_map, update_dev_map_wrapped
 from ethoscope_node.utils.helpers import get_last_backup_time
+import shutil
+import tempfile
 
 from os import walk
 import optparse
@@ -35,6 +37,10 @@ def get_favicon():
 @app.route('/static/<filepath:path>')
 def server_static(filepath):
     return static_file(filepath, root=STATIC_DIR)
+
+@app.route('/tmp_static/<filepath:path>')
+def server_static(filepath):
+    return static_file(filepath, root=tmp_imgs_dir)
 
 @app.route('/download/<filepath:path>')
 def server_download(filepath):
@@ -106,6 +112,27 @@ def device(id):
         return devices_map[id]
     except Exception as e:
         return {'error':traceback.format_exc(e)}
+
+
+#Get the information of one Sleep Monitor
+@app.get('/device/<id>/last_img')
+def device(id):
+    try:
+        device_info = devices_map[id]
+        dev_ip = device_info["ip"]
+        img_path = device_info["last_drawn_img"]
+        url = dev_ip +':9000/static' + img_path
+        file_like = urllib2.urlopen(url)
+        # Open our local file for writing
+        local_file = os.path.join(tmp_imgs_dir, id + ".jpg")
+        with open(local_file, "wb") as lf:
+            lf.write(file_like.read())
+        return os.path.basename(local_file)
+
+    except Exception as e:
+        print e
+        return {'error':traceback.format_exc(e)}
+
 
 @app.post('/device/<id>/controls/<type_of_req>')
 def device(id, type_of_req):
@@ -394,7 +421,7 @@ if __name__ == '__main__':
     devices_map = {}
     scan_subnet()
 
-
+    tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
     try:
         run(app, host='0.0.0.0', port=PORT, debug=debug, server='cherrypy')
 
@@ -410,4 +437,5 @@ if __name__ == '__main__':
         logging.error(traceback.format_exc(e))
         close(1)
     finally:
+        shutil.rmtree(tmp_imgs_dir)
         close()

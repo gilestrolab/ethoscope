@@ -109,18 +109,18 @@ class Monitor(object):
                 self._frame_buffer = frame
 
                 for j,track_u in enumerate(self._unit_trackers):
-                    data_row = track_u.track(t, frame)
-                    if data_row is None:
-                        self._last_positions[track_u.roi.idx] = None
+                    data_rows = track_u.track(t, frame)
+                    if len(data_rows) == 0:
+                        self._last_positions[track_u.roi.idx] = []
                         continue
 
-                    abs_pos = track_u.get_last_position(absolute=True)
+                    abs_pos = track_u.get_last_positions(absolute=True)
 
                     # if abs_pos is not None:
                     self._last_positions[track_u.roi.idx] = abs_pos
 
                     if not result_writer is None:
-                        result_writer.write(t,track_u.roi, data_row)
+                        result_writer.write(t,track_u.roi, data_rows)
 
                 if result_writer is not None:
                     result_writer.flush(t, frame)
