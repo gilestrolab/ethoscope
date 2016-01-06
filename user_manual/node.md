@@ -1,3 +1,6 @@
+This document explains how to setup a "node".
+It assumes, at leat, some familiarity with Unix/Linux.
+
 What is the "node"
 ======================
 
@@ -87,6 +90,11 @@ TARGET_GIT_INSTALL=/opt/ethoscope-git
 echo 'Installing ethoscope package'
 git clone $LOCAL_BARE_PATH $TARGET_GIT_INSTALL
 
+cd $TARGET_GIT_INSTALL
+
+# IMPORTANT this is if you want to work on the "dev" branch otherwise, you are using "master"
+git checkout dev
+
 cd $TARGET_GIT_INSTALL/node_src
 # we install with pip
 pip2 install -e .
@@ -98,33 +106,7 @@ Network
 
 The idea is to set up the network so that we can use, at the same time, a connection to the internet and the intranet (in house router).
 
-It is important to check the name of your wireless interface:
-
-you can use `ip link`. it should list interfaces. the wireless interface has a name starting with "wl". In the following example, we use the name "wlan0".
-Of course change that with the actual name you get.
-
-
-```sh
-# change this!
-WL_INTERFACE=wlan0
-
-#wireless connection
-echo 'Description=ethoscope wifi network' > /etc/netctl/ethoscope_wifi
-echo "Interface=$WL_INTERFACE" >> /etc/netctl/ethoscope_wifi
-echo 'Connection=wireless' >> /etc/netctl/ethoscope_wifi
-echo 'Security=wpa' >> /etc/netctl/ethoscope_wifi
-echo 'IP=dhcp' >> /etc/netctl/ethoscope_wifi
-echo 'ESSID=ETHOSCOPE_WIFI' >> /etc/netctl/ethoscope_wifi
-echo 'Key=ETHOSCOPE_1234' >> /etc/netctl/ethoscope_wifi
-
-#wired connection
-echo 'Description=eth0 Network' > /etc/netctl/eth0
-echo 'Interface=eth0' >> /etc/netctl/eth0
-echo 'Connection=ethernet' >> /etc/netctl/eth0
-echo 'IP=dhcp' >> /etc/netctl/eth0
-```
-
-Also we create a DNS mask so that we can use both connections at the same time.
+First, we create a DNS mask.
 
 ```sh
 # see how to setup router
@@ -139,17 +121,15 @@ echo "addn-hosts=/etc/host.dnsmasq" >> /etc/dnsmasq.conf
 echo "$NODE_IP    node" >> /etc/hosts.dnsmasq
 ```
 
+In order to connect to the wireless interface, the simplest is to go in the network configuration interface.
+Just click on the network icon on the top-right of the screen, select `ETHOSCOPE_WIFI`. The default password is `ETHOSCOPE_1234` (see [network instruction](network.md)).
+
 System daemons
 -----------------------------
 
 We need to enable some utilities though `systemd`:
 
 ```sh
-systemctl daemon-reload
-
-# we use netctl, not networkd
-systemctl disable systemd-networkd
-ip link set eth0 down
 
 # Enable networktime protocol
 systemctl start ntpd.service
@@ -163,11 +143,6 @@ systemctl start sshd.service
 systemctl start git-daemon.socket
 systemctl enable git-daemon.socket
 
-#setting up wifi
-netctl start ethoscope_wifi || echo 'No ethoscope_wifi connection'
-netctl enable ethoscope_wifi
-netctl enable eth0
-netctl start eth0
 ```
 
 Our own daemons
@@ -192,6 +167,7 @@ In addition to the node services, we ant to run the update daemon.
 It is important that the update server is copied out of the git repository. This way, the update does *not* update itself.
 
 ```sh
+UPDATER_LOCATION_IN_GIT=UPDATER_LOCATION_IN_GIT=scripts/ethoscope_updater
 cp $TARGET_GIT_INSTALL/$UPDATER_LOCATION_IN_GIT $TARGET_UPDATER_DIR -r
 cd $TARGET_UPDATER_DIR
 cp ethoscope_update_node.service /etc/systemd/system/ethoscope_update_node.service
@@ -200,20 +176,21 @@ systemctl daemon-reload
 systemctl enable ethoscope_update_node.service
 ```
 
-Last touches
---------------
-```sh
-# the name of the computer is now 'node'
-hostnamectl set-hostname node
-```
 
 What is next
 -----------------------
+In order to check things:
 
 * reboot the computer
 * open firefox
 * test the local server at http://0.0.0.0
 * test the local server at http://192.169.123.1 (will fail until your network is configured)
 * test the update server http://192.169.123.1:8888
+* test the dns mask http://node
+
+
+
+ 
+
 
 
