@@ -232,6 +232,10 @@ echo 'options 8192cu rtw_power_mgnt=0' > /etc/modprobe.d/8192cu.conf
 #Add in the below line of code under the [mysqld] section:
 # skip-name-resolve
 
+#use tmpfs so we don't use too much disk io
+echo 'tmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0' >> /etc/fstab; cat /etc/fstab
+
 echo 'SUCCESS, please reboot'
+
 
 #todo set up update daemon

@@ -3,15 +3,10 @@ A script to exctract frames from a .db file and create a video.
 There are to external deps: ffmpeg and imagemagick.
 """
 import sqlite3
-import sys
-import base64
 import cStringIO
-import shutil
-import cv2
 import tempfile
 import shutil
 import os
-import glob
 from optparse import OptionParser
 import datetime
 import glob
@@ -23,26 +18,12 @@ def annotate_image(args):
     input, time, t0 = args
     label = datetime.datetime.fromtimestamp(time/1000 + t0).strftime('%Y-%m-%d %H:%M:%S')
     out = input+"_tmp.jpg"
-    print label
+
     command = "convert %s -pointsize 50  -font Courier -background Khaki  label:'%s' +swap -gravity Center -append %s" % (input, label, out)
     os.system(command)
     shutil.move(out,input)
 
-if __name__ == '__main__':
-
-    ETHOGRAM_DIR = "/ethoscope_data/results"
-    MACHINE_ID_FILE = '/etc/machine-id'
-    MACHINE_NAME_FILE = '/etc/machine-name'
-
-    parser = OptionParser()
-    parser.add_option("-i", "--input", dest="input", help="The input .db file")
-    parser.add_option("-o", "--output", dest="output", help="The output mp4")
-    parser.add_option("-f", "--fps", dest="fps", default=1, help="The output fps")
-    parser.add_option("-a", "--annotate", dest="annot", default=False, help="Whether date and time should be written on the bottom of the frames", action="store_true")
-
-    (options, args) = parser.parse_args()
-    option_dict = vars(options)
-    file = option_dict["input"]
+def make_video_file(file, output, fps=1, annotate=True):
 
     dir = tempfile.mkdtemp(prefix="etho_video")
     try:
@@ -59,6 +40,9 @@ if __name__ == '__main__':
             sql1 = 'select id,t,img from IMG_SNAPSHOTS'
             conn.commit()
             cursor.execute(sql1)
+
+
+
             for i,c in enumerate(cursor):
                 id, t, blob = c
                 file_name = os.path.join(dir,"%05d_%i.jpg" % (id, t))
@@ -82,11 +66,35 @@ if __name__ == '__main__':
             # if option_dict["annot"]:
 
 
-        command = "ffmpeg -y -framerate %i -pattern_type glob -i '%s/*.jpg' -c:v libx264 %s" % (option_dict["fps"], dir, option_dict["output"])
+        command = "ffmpeg -loglevel panic -y -framerate %i -pattern_type glob -i '%s/*.jpg' -c:v libx264 %s" % (fps, dir, output)
         os.system(command)
 
     finally:
         shutil.rmtree(dir)
-        print dir
 
 
+
+
+
+if __name__ == '__main__':
+
+    ETHOGRAM_DIR = "/ethoscope_data/results"
+    MACHINE_ID_FILE = '/etc/machine-id'
+    MACHINE_NAME_FILE = '/etc/machine-name'
+
+    parser = OptionParser()
+    parser.add_option("-i", "--input", dest="input", help="The input .db file")
+    parser.add_option("-o", "--output", dest="output", help="The output mp4")
+    parser.add_option("-f", "--fps", dest="fps", default=1, help="The output fps")
+    parser.add_option("-a", "--annotate", dest="annot", default=False, help="Whether date and time should be written on the bottom of the frames", action="store_true")
+
+    (options, args) = parser.parse_args()
+    option_dict = vars(options)
+
+
+
+    make_video_file(option_dict["input"],
+                    option_dict["output"],
+                    option_dict["fps"],
+                    option_dict["annot"]
+                    )
