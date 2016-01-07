@@ -189,14 +189,6 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                  });
        }
 
-       //tracking selection
-//        $scope.tracking={"options":{
-//                            "32_arena":{name:"32_arena", kwargs:""},
-//                            "20_tubes":{name:"20_tubes", kwargs:""},
-//                            "72_wells":{name:"72_wells", kwargs:""},
-//                            "custom":{name:"custom", kwargs:""}
-//                        }};
-
         $scope.ethoscope.start_recording = function(){
                 $http.post('/device/'+device_id+'/controls/start_record', data={})
                     .success(function(data){

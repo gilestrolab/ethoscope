@@ -82,31 +82,34 @@
         $scope.activate_modal = function(devices, action){
             spin("start");
             error = check_devices_state(devices, "running");
-            switch(action){
-                case 'update':
-                    $scope.modal={
-                        title: 'Update devices',
-                        info:'This devices are going to be updated. Do not disconnect them.',
-                        action_text:'Update',
-                        action:'update',
-                    }
-                    break;
-                case 'restart':
-                    $scope.modal={
-                        title: 'Restart devices',
-                        info:'The following devices are going to be restarted.',
-                        action_text:'Restart',
-                        action:'restart',
-                    }
-                    break;
-                case 'swBranch':
-                    $scope.modal={
-                        title: 'Switch Branch devices',
-                        info:'Select branch to switch selected devices:',
-                        action_text:'Switch Branch',
-                        action:'swBranch',
-                    }
-                    break;
+            if(!error){
+		        switch(action){
+		            case 'update':
+		                $scope.modal={
+		                    title: 'Update devices',
+		                    info:'This devices are going to be updated. Do not disconnect them.',
+		                    action_text:'Update',
+		                    action:'update',
+		                }
+		                break;
+		            case 'restart':
+		                $scope.modal={
+		                    title: 'Restart devices',
+		                    info:'The following devices are going to be restarted.',
+		                    action_text:'Restart',
+		                    action:'restart',
+		                }
+		                break;
+		            case 'swBranch':
+		                $scope.modal={
+		                    title: 'Switch Branch devices',
+		                    info:'Select branch to switch selected devices:',
+		                    action_text:'Switch Branch',
+		                    action:'swBranch',
+		                }
+		                break;
+		        }
+
             }
             $("#Modal").modal('show');
             spin("stop");
@@ -169,8 +172,8 @@
                 }
 
                 for (device in devices){
-                    if (device.status == state){
-                        $scope.system.error="One or more selected devices are "+state+" and cannot be updated, check selection"
+                    if (devices[device]["status"] == state){
+                        $scope.system.modal_error="One or more selected devices are "+state+" and cannot be updated, remove them from the selection."
                         return true;
 
                     }
