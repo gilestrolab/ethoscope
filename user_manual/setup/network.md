@@ -1,4 +1,4 @@
-This document explains how to setup a wireless router for the ethoscope platform.
+This document explains how to setup a wireless router for the Ethoscope platform.
 
 Router
 ==============
@@ -27,8 +27,7 @@ in order to do that, you will need the MAC ip of the **wireless interface** of t
 
 In order to get it, you can use `ip link` on the node. You will get something like:
 
-```
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [18:53:13]
+```sh
 $ ip link
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default 
     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
