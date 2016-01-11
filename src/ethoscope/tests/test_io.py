@@ -54,7 +54,7 @@ class TestMySQL(unittest.TestCase):
         """
         # building five rois
         coordinates = np.array([(0,0), (100,0), (100,100), (0,100)])
-        rois = [ROI(coordinates +i*100) for i in range(1,33)]
+        rois = [ROI(coordinates +i*100, i) for i in range(1,33)]
         rpg = RandomResultGenerator()
 
         with RWClass(rois=rois, *args, **kwargs) as rw:
@@ -67,28 +67,32 @@ class TestMySQL(unittest.TestCase):
                 rt = t * 1000 /5
 
                 if t % (n/100)== 0:
-                    logging.info("filling with dummy variables: %f percent" % (100.*float(t)/float(n)))
+
+                    print "filling with dummy variables: %f percent" % (100.*float(t)/float(n))
+                    print time.time() - t0
                 for r in rois:
                     data = rpg.make_one_point()
-                    rw.write(rt , r, data)
-                print time.time() - t0
+                    rw.write(rt , r, [data])
+
                 rw.flush(t)
 
 
 
-    def test_sqlite(self):
-        logging.getLogger().setLevel(logging.INFO)
-        a = tempfile.mkdtemp(prefix="psv_results_")
-
-        try:
-
-            self._test_dbwriter(SQLiteResultWriter,a)
-            self.assertEqual(1, 1)
-        finally:
-            logging.info(a)
-            shutil.rmtree(a)
+    # def test_sqlite(self):
+    #     logging.getLogger().setLevel(logging.INFO)
+    #     a = tempfile.mkdtemp(prefix="ethoscope_test")
+    #
+    #     try:
+    #
+    #         self._test_dbwriter(SQLiteResultWriter,a)
+    #         self.assertEqual(1, 1)
+    #     finally:
+    #         logging.info(a)
+    #         shutil.rmtree(a)
 
     def test_mysql(self):
+        creds = {"name":"ethoscope_db", "user":"ethoscope", "password":"ethoscope"}
         logging.getLogger().setLevel(logging.INFO)
-        self._test_dbwriter(ResultWriter, db_name="psv_test_io")
+        self._test_dbwriter(ResultWriter, db_credentials=creds)
+
 

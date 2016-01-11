@@ -18,7 +18,7 @@ setup(
               ],
     url="https://github.com/gilestrolab/ethoscope",
     license="GPL3",
-    description='todo', #TODO
+    description='The API of the Ethoscope device.', #TODO
     long_description=open('README').read(),
 
     scripts=['scripts/device_server.py'],
@@ -36,7 +36,6 @@ setup(
         "MySQL-python >= 1.2.5",
         "cherrypy >= 3.6.0",
         "scipy >= 0.15.1",
-        "GitPython >=1.0.1",
-        "bjoern >= 1.4.2",
+        "GitPython >=1.0.1"
     ],
 )
