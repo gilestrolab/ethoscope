@@ -1,5 +1,6 @@
-This section describes how to get an Ethoscope platform working in your lab.
+This section describes how setup the software side of an Ethoscope platform in your lab.
 This involves installing a node computer, several devices, setting up a router and things such as scheduled backup of the node data.
+For general information about the platform, please read our [website](http://gilestrolab.github.io/ethoscope/)
 
 * Setting up a [Node](node.md)
 * Setting up an [Ethoscope](ethoscope.md)
