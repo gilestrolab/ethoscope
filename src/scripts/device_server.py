@@ -40,7 +40,7 @@ def controls(id, action):
     global record
     try:
         if id != machine_id:
-            raise Exception("Wrong machine ID")
+            raise WrongMachineID
 
         if action == 'start':
             data = request.json
@@ -71,8 +71,10 @@ def controls(id, action):
             return info(id)
 
         elif action == 'start_record':
-
-            record = RecordVideo()
+            data = request.json
+            #json_data.update(data)
+            logging.warning("Recording video, data is %s" % str(data))
+            record = RecordVideo(data=data)
             record.start()
             control.info['status'] = 'recording'
             return info(id)

@@ -43,7 +43,7 @@ class RecordVideo(Thread):
 
     def stop(self):
         try:
-            
+
             self.camera.stop_recording()
             self.camera.close()
             return self.save_dir
