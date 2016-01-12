@@ -6,7 +6,7 @@ from optparse import OptionParser
 from bottle import *
 from ethoscope.web_utils.control_thread import ControlThread
 from ethoscope.web_utils.helpers import get_machine_info, get_version
-from ethoscope.web_utils.record import RecordVideo
+from ethoscope.web_utils.record import ControlThreadVideoRecording
 from subprocess import call
 
 api = Bottle()
@@ -38,6 +38,7 @@ def name():
 def controls(id, action):
     global control
     global record
+    print id, action
     try:
         if id != machine_id:
             raise WrongMachineID
@@ -55,7 +56,7 @@ def controls(id, action):
             return info(id)
 
         elif action in ['stop', 'close', 'poweroff']:
-            if control.info['status'] == 'running':
+            if control.info['status'] == 'running' or control.info['status'] == "recording" :
                 logging.info("Stopping monitor")
                 control.stop()
                 control.join()
@@ -74,21 +75,16 @@ def controls(id, action):
             data = request.json
             #json_data.update(data)
             logging.warning("Recording video, data is %s" % str(data))
-            record = RecordVideo(data=data)
-            record.start()
-            control.info['status'] = 'recording'
+            data = request.json
+            json_data.update(data)
+            control = ControlThreadVideoRecording(machine_id=machine_id,
+                    name=machine_name,
+                    version=version,
+                    ethoscope_dir=ETHOGRAM_DIR,
+                    data=json_data)
+
+            control.start()
             return info(id)
-
-        elif action == 'stop_record':
-
-            if record is not None:
-                recording_file = record.stop()
-                record.join()
-                control.info['status'] = 'stopped'
-                control.info['recording_file'] = recording_file
-                return info(id)
-            else:
-                logging.warning("Can not stop video record. No video record started.")
 
 
     except Exception as e:
@@ -125,6 +121,7 @@ if __name__ == '__main__':
     parser = OptionParser()
     parser.add_option("-r", "--run", dest="run", default=False, help="Runs tracking directly", action="store_true")
     parser.add_option("-s", "--stop-after-run", dest="stop_after_run", default=False, help="When -r, stops immediately after. otherwise, server waits", action="store_true")
+    parser.add_option("-v", "--record-video", dest="record_video", default=False, help="Records video instead of tracking", action="store_true")
     parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
     parser.add_option("-p", "--port", dest="port", default=9000,help="port")
     parser.add_option("-e", "--results-dir", dest="results_dir", default=ETHOGRAM_DIR,help="Where temporary result files are stored")
@@ -150,11 +147,20 @@ if __name__ == '__main__':
 
     ETHOGRAM_DIR = option_dict["results_dir"]
 
-    control = ControlThread(machine_id=machine_id,
+    if option_dict["record_video"]:
+        control = ControlThreadVideoRecording(  machine_id=machine_id,
+                                                name=machine_name,
+                                                version=version,
+                                                ethoscope_dir=ETHOGRAM_DIR,
+                                                data=json_data)
+
+    else:
+        control = ControlThread(machine_id=machine_id,
                             name=machine_name,
                             version=version,
                             ethoscope_dir=ETHOGRAM_DIR,
                             data=json_data)
+
 
     if option_dict["debug"]:
         logging.basicConfig(level=logging.DEBUG)
