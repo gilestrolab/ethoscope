@@ -68,20 +68,21 @@ class BaseRelativeVariable(BaseDistanceIntVar):
     """
     def to_absolute(self, roi):
         """
+        Converts a positional variable from a relative (to the top left of a ROI) to an absolute (e.i. top left of the image).
 
-        :param roi:
-        :type roi:
-        :return:
-        :rtype: classBaseRelativeVariable
+        :param roi: a region of interest
+        :type roi: :class:`~ethoscope.rois.roi_builders.ROI`.
+        :return: A new variable
+        :rtype: :class:`~ethoscope.core.variable.BaseRelativeVariable`
         """
-        return self.get_absolute_value(roi)
-    def get_absolute_value(self, roi):
+        return self._get_absolute_value(roi)
+    def _get_absolute_value(self, roi):
         raise NotImplementedError("Relative variable must implement a `get_absolute_value()` method")
 
 
 class XPosVariable(BaseRelativeVariable):
     header_name = "x"
-    def get_absolute_value(self, roi):
+    def _get_absolute_value(self, roi):
         out = int(self)
 
         ox, _ = roi.offset
@@ -90,7 +91,7 @@ class XPosVariable(BaseRelativeVariable):
 
 class YPosVariable(BaseRelativeVariable):
     header_name = "y"
-    def get_absolute_value(self, roi):
+    def _get_absolute_value(self, roi):
         out = int(self)
         _, oy = roi.offset
         out += oy

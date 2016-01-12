@@ -1,63 +1,22 @@
 __author__ = 'quentin'
 
 
-#
-#
-# class DescribedArgumentBase(object):
-#     __name = None
-#     __description = None
-#     __type = None
-#     __range = None
-#     __default_value = None
-#
-#     @property
-#     def name(self):
-#         if self.__name is None:
-#             raise NotImplementedError
-#         return self.__name
-#
-#     @property
-#     def description(self):
-#         if self.__description is None:
-#             raise NotImplementedError
-#         return self.__description
-#
-#     @property
-#     def default_value(self):
-#         if self.__default_value is None:
-#             raise NotImplementedError
-#         return self.__default_value
-#
-#     @property
-#     def type(self):
-#         if self.__type is None:
-#             raise NotImplementedError
-#         return self.__type
-#
-#     @property
-#     def range(self):
-#         return self.__range
-#
-#
-# class DescribedNumericalArgument(DescribedArgumentBase):
-#     @property
-#     def range(self):
-#         if self.__range is None:
-#             raise NotImplementedError
-#         return self.__range
-#
-#
-# class DescribedStringArgument(DescribedArgumentBase):
-#     __type = "str"
-#
-# class DescribedIntArgument(DescribedNumericalArgument):
-#     __type = "int"
-#
-# class DescribedFloatArgument(DescribedNumericalArgument):
-#     __type = "float"
-#
-
 class DescribedObject(object):
+    """
+    An object that contains a `description` attribute.
+    This is used to parse user option for the web interface.
+    This way, users can send option to the different objects used.
+    `description is a dictionary with the fields "overview" and "arguments".
+    "overview" is simply a string. "arguments" is a list of dictionaries. Each has the field:
+
+     * name: The name of the argument as it is in "__init__"
+     * description: "A user friendly description of the argument"
+     * type: "number", "datetime" and "string".
+     * min, max and step: only for type "number", defines the accepted limits of the arguments as well as the increment in the user interface
+     * default: the default value
+
+    Each argument must match a argument in `__init__`.
+    """
     _description = None
 
     @property
