@@ -111,7 +111,7 @@ class VideoRecorder(DescribedObject):
     def __init__(self, img_path,width=1280, height=960,bitrate=200000):
 
         # self._recording_thread = RecordingThread(h=height, w=width, bitrate=bitrate, last_img_path=img_path)
-        self._recording_thread = FakeRecordingThread(h=height, w=width, bitrate=bitrate, last_img_path=img_path)
+        self._recording_thread = RecordingThread(h=height, w=width, bitrate=bitrate, last_img_path=img_path)
 
     def run(self):
         self._recording_thread.run()
@@ -245,7 +245,7 @@ class ControlThreadVideoRecording(ControlThread):
             recorder_kwargs = self._option_dict["recorder"]["kwargs"]
             self._recorder = RecorderClass(img_path=self._info["last_drawn_img"],**recorder_kwargs)
             self._info["status"] = "recording"
-            self._recorder.run()
+            self._recorder.start()
 
 
         except Exception as e:
