@@ -17,12 +17,12 @@ except:
 
 
 class RecordingThread(Thread):
-    def __init__(self, w,h, last_img_path, name="myvideo",  ETHOSCOPE_DIR = "/ethoscope_data/results"):
+    def __init__(self, w,h,bitrate, last_img_path, name="myvideo",  ETHOSCOPE_DIR = "/ethoscope_data/results"):
 
         #TODO parse data here
         resolution=(w,h)
         framerate=25
-        bitrate=200000
+
         # self._is_recording = False
         super(RecordingThread, self).__init__()
         self.camera = picamera.PiCamera()
@@ -52,19 +52,19 @@ class RecordingThread(Thread):
 
     def stop(self):
         self._is_recording = False
-        return self.save_dir
+        # return self.save_dir
 
 
 
 
 
 class FakeRecordingThread(Thread):
-    def __init__(self, w,h,last_img_path, name="myvideo",  ETHOSCOPE_DIR = "/ethoscope_data/results"):
+    def __init__(self, w,h,bitrate,last_img_path, name="myvideo",  ETHOSCOPE_DIR = "/ethoscope_data/results"):
 
         #TODO parse data here
         resolution=(w,h)
         framerate=25
-        bitrate=200000
+
         self._last_img_path = last_img_path
         # self._is_recording = False
         super(FakeRecordingThread, self).__init__()
@@ -79,6 +79,14 @@ class FakeRecordingThread(Thread):
 
             while self._is_recording:
                 time.sleep(2)
+                import numpy as np
+                import cv2
+
+                img = np.ones((960,1280,3),dtype=np.float)
+                img *= 255
+                img *= np.random.rand(960,1280,3)
+                cv2.imwrite(self._last_img_path,img.astype(np.uint8))
+
                 print "capturing, and saving at "+ self._last_img_path
         except Exception as e:
             logging.error("Error or starting video record:" + traceback.format_exc(e))
@@ -96,12 +104,14 @@ class VideoRecorder(DescribedObject):
     _description  = {   "overview": "A video simple recorder",
                             "arguments": [
                                 {"type": "number", "name":"width", "description": "The width of the frame","default":1280, "min":480, "max":1980,"step":1},
-                                {"type": "number", "name":"height", "description": "The height of the frame","default":960, "min":360, "max":1080,"step":1}
+                                {"type": "number", "name":"height", "description": "The height of the frame","default":960, "min":360, "max":1080,"step":1},
+                                {"type": "number", "name":"bitrate", "description": "The target bitrate","default":200000, "min":0, "max":10000000,"step":1000}
                                ]}
 
-    def __init__(self, img_path,width=1280, height=960):
+    def __init__(self, img_path,width=1280, height=960,bitrate=200000):
 
-        self._recording_thread = RecordingThread(h=height, w=width, last_img_path=img_path)
+        # self._recording_thread = RecordingThread(h=height, w=width, bitrate=bitrate, last_img_path=img_path)
+        self._recording_thread = FakeRecordingThread(h=height, w=width, bitrate=bitrate, last_img_path=img_path)
 
     def run(self):
         self._recording_thread.run()
@@ -109,6 +119,8 @@ class VideoRecorder(DescribedObject):
     def stop(self):
         print "stop video recorder"
         self._recording_thread.stop()
+        self._recording_thread.join()
+
 
 
 
@@ -253,7 +265,7 @@ class ControlThreadVideoRecording(ControlThread):
 
         logging.info("Stopping monitor")
         if self._recorder is not None:
-            print "control thread stoping recorder"
+            print "control thread stopping recorder"
             self._recorder.stop()
             self._recorder = None
 

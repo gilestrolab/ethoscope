@@ -4,6 +4,7 @@
         <p>Here you can perform actions and know the status of the device</p>
 
         <div class= "last_drawn_img">
+            <!--TODO || device.status == 'recording'-->
         <img ng-if="device.status == 'running'"  ng-src="/tmp_static/{{device.url_img}}" alt="" width="480"></img>
         </div>
         <div ng-if="device.status == 'running'">
