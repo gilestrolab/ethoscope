@@ -114,7 +114,7 @@ class VideoRecorder(DescribedObject):
         self._recording_thread = RecordingThread(h=height, w=width, bitrate=bitrate, last_img_path=img_path)
 
     def run(self):
-        self._recording_thread.run()
+        self._recording_thread.start()
 
     def stop(self):
         print "stop video recorder"
@@ -245,7 +245,7 @@ class ControlThreadVideoRecording(ControlThread):
             recorder_kwargs = self._option_dict["recorder"]["kwargs"]
             self._recorder = RecorderClass(img_path=self._info["last_drawn_img"],**recorder_kwargs)
             self._info["status"] = "recording"
-            self._recorder.start()
+            self._recorder.run()
 
 
         except Exception as e:
@@ -259,6 +259,13 @@ class ControlThreadVideoRecording(ControlThread):
 
 
     def stop(self, error=None):
+
+        if error is not None:
+            logging.error("Recorder closed with an error:")
+            logging.error(error)
+        else:
+            logging.info("Recorder closed all right")
+
         self._info["status"] = "stopping"
         self._info["time"] = time.time()
         self._info["experimental_info"] = {}
@@ -274,11 +281,6 @@ class ControlThreadVideoRecording(ControlThread):
         self._info["error"] = error
 
 
-        if error is not None:
-            logging.error("Recorder closed with an error:")
-            logging.error(error)
-        else:
-            logging.info("Recorder closed all right")
 
     def __del__(self):
         self.stop()
