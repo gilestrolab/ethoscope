@@ -106,11 +106,11 @@ class VideoRecorder(DescribedObject):
                             "arguments": [
                                 {"type": "number", "name":"width", "description": "The width of the frame","default":1280, "min":480, "max":1980,"step":1},
                                 {"type": "number", "name":"height", "description": "The height of the frame","default":960, "min":360, "max":1080,"step":1},
-                                {"type": "number", "name":"fps", "description": "The target neumber of frames per seconds","default":25, "min":1, "max":25,"step":1},
+                                {"type": "number", "name":"fps", "description": "The target number of frames per seconds","default":25, "min":1, "max":25,"step":1},
                                 {"type": "number", "name":"bitrate", "description": "The target bitrate","default":200000, "min":0, "max":10000000,"step":1000}
                                ]}
 
-    def __init__(self, img_path,width=1280, height=960,bitrate=200000):
+    def __init__(self, img_path,width=1280, height=960,fps=25,bitrate=200000):
 
         # self._recording_thread = RecordingThread(h=height, w=width, bitrate=bitrate, last_img_path=img_path)
         self._recording_thread = RecordingThread(h=height, w=width,framerate=fps, bitrate=bitrate, last_img_path=img_path)
