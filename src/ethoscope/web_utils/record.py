@@ -33,6 +33,7 @@ class RecordingThread(Thread):
         self._last_img_path = last_img_path
         self._save_dir = path.join(ETHOSCOPE_DIR, name + '.h264')
         logging.warning("saving video in " +  self._save_dir)
+        raise Exception("saving video in " +  self._save_dir)
 
     def run(self):
         self._is_recording = True
