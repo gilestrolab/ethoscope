@@ -30,22 +30,23 @@ class RecordingThread(Thread):
     def run(self):
         self._is_recording = True
         try:
-            with picamera.PiCamera() as camera:
-                camera.resolution = self._resolution
-                camera.framerate = self._framerate
-                camera.start_recording(self._save_dir,bitrate=self._bitrate)
+            camera = picamera.PiCamera()
+            camera.resolution = self._resolution
+            camera.framerate = self._framerate
+            camera.start_recording(self._save_dir,bitrate=self._bitrate)
 
-                while self._is_recording:
-                    camera.wait_recording(2)
-                    camera.capture(self._last_img_path, use_video_port=True)
+            while self._is_recording:
+                camera.wait_recording(2)
+                camera.capture(self._last_img_path, use_video_port=True)
 
-                camera.wait_recording(1)
-                camera.stop_recording()
-                
+            camera.wait_recording(1)
+            camera.stop_recording()
 
         except Exception as e:
             logging.error("Error or starting video record:" + traceback.format_exc(e))
 
+        finally:
+            camera.close()
 
 
     def stop(self):
