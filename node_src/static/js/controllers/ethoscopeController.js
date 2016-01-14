@@ -23,19 +23,35 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
         var refresh_data = false;
         var spStart= new Spinner(opts).spin();
         var starting_tracking= document.getElementById('starting');
-        $http.get('/device/'+device_id+'/tracking_user_options').success(function(data){
-            $scope.user_options= data;
+
+
+        $http.get('/device/'+device_id+'/user_options').success(function(data){
+            $scope.user_options.tracking= data.tracking;
+            $scope.user_options.recording= data.recording;
+
             $scope.selected_options = {};
-            for (var k in data){
-                $scope.selected_options[k]={};
-                $scope.selected_options[k]['name']=data[k][0]['name'];
-                $scope.selected_options[k]['arguments']={};
-                for(var j=0;j<data[k][0]['arguments'].length; j++){
-                        $scope.selected_options[k]['arguments'][data[k][0]['arguments'][j]['name']]=data[k][0]['arguments'][j]['default'];
+            $scope.selected_options.tracking = {};
+            $scope.selected_options.recording = {};
+
+            for (var k in data.tracking){
+                $scope.selected_options.tracking[k]={};
+                $scope.selected_options.tracking[k]['name']=data[k][0]['name'];
+                $scope.selected_options.tracking[k]['arguments']={};
+                for(var j=0;j<data.tracking[k][0]['arguments'].length; j++){
+                        $scope.selected_options.tracking[k]['arguments'][data.tracking[k][0]['arguments'][j]['name']]=data.tracking[k][0]['arguments'][j]['default'];
                 }
             }
 
+            for (var k in data.recording){
+                $scope.selected_options.recording[k]={};
+                $scope.selected_options.recording[k]['name']=data[k][0]['name'];
+                $scope.selected_options.recording[k]['arguments']={};
+                for(var j=0;j<data.recording[k][0]['arguments'].length; j++){
+                        $scope.selected_options.recording[k]['arguments'][data.recording[k][0]['arguments'][j]['name']]=data.recording[k][0]['arguments'][j]['default'];
+                }
+            }
         });
+
 
        $http.get('/device/'+device_id+'/data').success(function(data){
             $scope.device = data;

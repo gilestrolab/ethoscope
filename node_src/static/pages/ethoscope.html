@@ -93,40 +93,40 @@
 </div>
 
 <!-- Modal start tracking -->
-<div class="modal fade" id="recordModal" tabindex="-1" role="dialog" aria-labelledby="recordModal" aria-hidden="true">
+<div class="modal fade" id="startModal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h3 class="modal-title" id="startModalLabel">Select recording type</h3>
+        <h3 class="modal-title" id="startModalLabel">Select tracking type</h3>
       </div>
       <div class="modal-body">
           <form>
-          <div id="user_options" ng-repeat="(name,option) in user_options">
+          <div id="user_options" ng-repeat="(name,option) in user_options.tracking">
             <h4>{{name}}</h4>
               <ul class="option-list">
                 <li ng-repeat="opt in option">
-                    <input type=radio name={{opt.name}} value={{opt.name}} ng-model="selected_options[name]['name']" ng-click="ethoscope.update_user_options(name)">
+                    <input type=radio name={{opt.name}} value={{opt.name}} ng-model="selected_options.tracking[name]['name']" ng-click="ethoscope.update_user_options(name)">
                     <strong data-toggle="tooltip" data-placement="top" title=" {{opt.overview}}" ng-init="description[opt.name] = false">{{opt.name}}</strong> <a href=""  ng-click="description[opt.name] = true" ng-if="description[opt.name]==false"> <icon class="fa fa-plus-square-o"> </icon></a>
                     <a href="" ng-click="description[opt.name] = false" ng-if="description[opt.name]==true"> <icon class="fa fa-minus-square-o"> </icon></a>
                     <div ng-if="description[opt.name] == true">
                         {{opt.overview}}
                     </div>
-                  <ul ng-if="selected_options[name]['name']==opt.name">
+                  <ul ng-if="selected_options.tracking[name]['name']==opt.name">
                         <li  ng-repeat="arg in opt.arguments">
                             {{arg.description}}
-                            <input ng-if="arg.type == 'number'" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options[name]['arguments'][arg.name]" >
-                            <input ng-if="arg.type == 'str'" type=text name={{arg.name}}  ng-model="selected_options[name]['arguments'][arg.name]"  >
-                        <input ng-if="arg.type == 'datetime'" type=number name={{arg.name}}  ng-model="selected_options[name]['arguments'][arg.name][1]" step=1>
+                            <input ng-if="arg.type == 'number'" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]" >
+                            <input ng-if="arg.type == 'str'" type=text name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  >
+                        <input ng-if="arg.type == 'datetime'" type=number name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name][1]" step=1>
                             <div class="dropdown" ng-if="arg.type == 'datetime'">
                                 <a class="dropdown-toggle" id="dropdown{{arg.name}}" role="button" data-toggle="dropdown" data-target="#" href="#">
                                     <div class="input-group">
-                                        <input type="text" class="form-control" ng-model="selected_options[name]['arguments'][arg.name][0]">
+                                        <input type="text" class="form-control" ng-model="selected_options.tracking[name]['arguments'][arg.name][0]">
                                         <span class="input-group-addon"><i class="glyphicon glyphicon-calendar"></i></span>
                                     </div>
                                 </a>
                                 <ul class="dropdown-menu" role="menu" aria-labelledby="dLabel">
-                                    <datetimepicker ng-model="selected_options[name]['arguments'][arg.name]" data-datetimepicker-config="{ dropdownSelector: '#dropdown{{arg.name}}' }"/>
+                                    <datetimepicker ng-model="selected_options.tracking[name]['arguments'][arg.name]" data-datetimepicker-config="{ dropdownSelector: '#dropdown{{arg.name}}' }"/>
                                 </ul>
                             </div>
                         </li>
@@ -139,8 +139,62 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
-        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start(selected_options)" data-toggle="modal">Start Tracking</button>
+        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start(selected_options.tracking)" data-toggle="modal">Start Tracking</button>
       </div>
     </div>
   </div>
 </div>
+
+
+<!--&lt;!&ndash; Modal recording &ndash;&gt;-->
+<!--<div class="modal fade" id="recordModal" tabindex="-1" role="dialog" aria-labelledby="recordModal" aria-hidden="true">-->
+  <!--<div class="modal-dialog">-->
+    <!--<div class="modal-content">-->
+      <!--<div class="modal-header">-->
+        <!--<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>-->
+        <!--<h3 class="modal-title" id="startModalLabel">Select recording type</h3>-->
+      <!--</div>-->
+      <!--<div class="modal-body">-->
+          <!--<form>-->
+          <!--<div id="user_options" ng-repeat="(name,option) in recording_user_options">-->
+            <!--<h4>{{name}}</h4>-->
+              <!--<ul class="option-list">-->
+                <!--<li ng-repeat="opt in option">-->
+                    <!--<input type=radio name={{opt.name}} value={{opt.name}} ng-model="selected_options[name]['name']" ng-click="ethoscope.update_user_options(name)">-->
+                    <!--<strong data-toggle="tooltip" data-placement="top" title=" {{opt.overview}}" ng-init="description[opt.name] = false">{{opt.name}}</strong> <a href=""  ng-click="description[opt.name] = true" ng-if="description[opt.name]==false"> <icon class="fa fa-plus-square-o"> </icon></a>-->
+                    <!--<a href="" ng-click="description[opt.name] = false" ng-if="description[opt.name]==true"> <icon class="fa fa-minus-square-o"> </icon></a>-->
+                    <!--<div ng-if="description[opt.name] == true">-->
+                        <!--{{opt.overview}}-->
+                    <!--</div>-->
+                  <!--<ul ng-if="selected_options[name]['name']==opt.name">-->
+                        <!--<li  ng-repeat="arg in opt.arguments">-->
+                            <!--{{arg.description}}-->
+                            <!--<input ng-if="arg.type == 'number'" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options[name]['arguments'][arg.name]" >-->
+                            <!--<input ng-if="arg.type == 'str'" type=text name={{arg.name}}  ng-model="selected_options[name]['arguments'][arg.name]"  >-->
+                        <!--<input ng-if="arg.type == 'datetime'" type=number name={{arg.name}}  ng-model="selected_options[name]['arguments'][arg.name][1]" step=1>-->
+                            <!--<div class="dropdown" ng-if="arg.type == 'datetime'">-->
+                                <!--<a class="dropdown-toggle" id="dropdown{{arg.name}}" role="button" data-toggle="dropdown" data-target="#" href="#">-->
+                                    <!--<div class="input-group">-->
+                                        <!--<input type="text" class="form-control" ng-model="selected_options[name]['arguments'][arg.name][0]">-->
+                                        <!--<span class="input-group-addon"><i class="glyphicon glyphicon-calendar"></i></span>-->
+                                    <!--</div>-->
+                                <!--</a>-->
+                                <!--<ul class="dropdown-menu" role="menu" aria-labelledby="dLabel">-->
+                                    <!--<datetimepicker ng-model="selected_options[name]['arguments'][arg.name]" data-datetimepicker-config="{ dropdownSelector: '#dropdown{{arg.name}}' }"/>-->
+                                <!--</ul>-->
+                            <!--</div>-->
+                        <!--</li>-->
+                    <!--</ul>-->
+                <!--</li>-->
+              <!--</ul>-->
+              <!--<hr>-->
+          <!--</div>-->
+        <!--</form>-->
+      <!--</div>-->
+      <!--<div class="modal-footer">-->
+        <!--<button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>-->
+        <!--<button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start(selected_options)" data-toggle="modal">Start Tracking</button>-->
+      <!--</div>-->
+    <!--</div>-->
+  <!--</div>-->
+<!--</div>-->

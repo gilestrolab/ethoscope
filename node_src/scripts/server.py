@@ -113,6 +113,17 @@ def device(id):
     except Exception as e:
         return {'error':traceback.format_exc(e)}
 
+#Get the information of one Sleep Monitor
+@app.get('/device/<id>/user_options')
+def device(id):
+    try:
+        update_device_map(id,what="data")
+        return devices_map[id]
+    except Exception as e:
+        return {'error':traceback.format_exc(e)}
+
+
+
 
 #Get the information of one Sleep Monitor
 @app.get('/device/<id>/last_img')
