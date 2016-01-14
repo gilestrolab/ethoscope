@@ -141,7 +141,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
-        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start(selected_options.tracking)" data-toggle="modal">Start Tracking</button>
+        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_tracking(selected_options.tracking)" data-toggle="modal">Start Tracking</button>
       </div>
     </div>
   </div>
@@ -196,7 +196,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
-        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start(selected_options.recording)" data-toggle="modal">Start recording</button>
+        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_recording(selected_options.recording)" data-toggle="modal">Start recording</button>
       </div>
     </div>
   </div>

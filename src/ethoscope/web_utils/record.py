@@ -17,11 +17,10 @@ except:
 
 
 class RecordingThread(Thread):
-    def __init__(self, w,h,bitrate, last_img_path, name="myvideo",  ETHOSCOPE_DIR = "/ethoscope_data/results"):
-
+    def __init__(self, w,h,framerate,bitrate, last_img_path, name="myvideo",  ETHOSCOPE_DIR = "/ethoscope_data/results"):
         #TODO parse data here
         resolution=(w,h)
-        framerate=25
+
 
         # self._is_recording = False
         super(RecordingThread, self).__init__()
@@ -32,8 +31,7 @@ class RecordingThread(Thread):
         self._is_recording = False
         self._last_img_path = last_img_path
         self._save_dir = path.join(ETHOSCOPE_DIR, name + '.h264')
-        logging.warning("saving video in " +  self._save_dir)
-        raise Exception("saving video in " +  self._save_dir)
+
 
     def run(self):
         self._is_recording = True
@@ -108,19 +106,19 @@ class VideoRecorder(DescribedObject):
                             "arguments": [
                                 {"type": "number", "name":"width", "description": "The width of the frame","default":1280, "min":480, "max":1980,"step":1},
                                 {"type": "number", "name":"height", "description": "The height of the frame","default":960, "min":360, "max":1080,"step":1},
+                                {"type": "number", "name":"fps", "description": "The target neumber of frames per seconds","default":25, "min":1, "max":25,"step":1},
                                 {"type": "number", "name":"bitrate", "description": "The target bitrate","default":200000, "min":0, "max":10000000,"step":1000}
                                ]}
 
     def __init__(self, img_path,width=1280, height=960,bitrate=200000):
 
         # self._recording_thread = RecordingThread(h=height, w=width, bitrate=bitrate, last_img_path=img_path)
-        self._recording_thread = RecordingThread(h=height, w=width, bitrate=bitrate, last_img_path=img_path)
+        self._recording_thread = RecordingThread(h=height, w=width,framerate=fps, bitrate=bitrate, last_img_path=img_path)
 
     def run(self):
         self._recording_thread.start()
 
     def stop(self):
-        print "stop video recorder"
         self._recording_thread.stop()
         self._recording_thread.join()
 
@@ -295,7 +293,6 @@ class ControlThreadVideoRecording(ControlThread):
 
         logging.info("Stopping monitor")
         if self._recorder is not None:
-            print "control thread stopping recorder"
             self._recorder.stop()
             self._recorder = None
 

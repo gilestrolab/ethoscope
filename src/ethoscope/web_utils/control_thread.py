@@ -27,9 +27,8 @@ from ethoscope.interactors.fake_sleep_dep_interactor import FakeSleepDepInteract
 
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
-
-
 from ethoscope.utils.description import DescribedObject
+
 
 class ExperimentalInformations(DescribedObject):
         _description  = {   "overview": "Optional information about your experiment",

@@ -117,7 +117,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
         }
 
-        $scope.ethoscope.start = function(option){
+        $scope.ethoscope.start_tracking = function(option){
             $("#startModal").modal('hide');
             spStart= new Spinner(opts).spin();
             starting_tracking.appendChild(spStart.el);
@@ -144,6 +144,37 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
             });
 
         };
+
+
+
+        $scope.ethoscope.start_recording = function(option){
+            $("#recordModal").modal('hide');
+            spStart= new Spinner(opts).spin();
+            starting_tracking.appendChild(spStart.el);
+            //get only the second parameter in the time array. (linux timestamp).
+            for (opt in option){
+                for(arg in option[opt].arguments){
+                    if(option[opt].arguments[arg][0] instanceof Date ){
+                        option[opt].arguments[arg]=option[opt].arguments[arg][1];
+                    }
+                }
+            }
+
+            $http.post('/device/'+device_id+'/controls/start_recording', data=option)
+                 .success(function(data){$scope.device.status = data.status;});
+            $http.get('/devices').success(function(data){
+                    $http.get('/device/'+device_id+'/data').success(function(data){
+                        $scope.device = data;
+                    });
+                    $http.get('/device/'+device_id+'/ip').success(function(data){
+                        $scope.device.ip = data;
+                        device_ip = data;
+                    });
+                 $("#recordModal").modal('hide');
+            });
+
+        };
+
 
         $scope.ethoscope.stop = function(){
                             $http.post('/device/'+device_id+'/controls/stop', data={})
@@ -235,21 +266,14 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                  });
        }
 
-        $scope.ethoscope.start_recording = function(){
-                $http.post('/device/'+device_id+'/controls/start_record', data={})
-                    .success(function(data){
-                        $scope.device.status = data.status;
-                    });
-        }
+//        $scope.ethoscope.start_recording = function(){
+//                $http.post('/device/'+device_id+'/controls/start_record', data={})
+//                    .success(function(data){
+//                        $scope.device.status = data.status;
+//                    });
+//        }
 
-        $scope.ethoscope.stop_recording = function(){
-                $http.post('/device/'+device_id+'/controls/stop_record', data={})
-                    .success(function(data)
-                             {
-                                $scope.device.recording_file = data.recording_file;
-                                $scope.device.status = data.status;
-                                           });
-        }
+
 
         refresh_data = $interval(refresh, 3000);
         //clear interval when scope is destroyed
