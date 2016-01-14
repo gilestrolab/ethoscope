@@ -26,6 +26,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
 
         $http.get('/device/'+device_id+'/user_options').success(function(data){
+            $scope.user_options = {};
             $scope.user_options.tracking= data.tracking;
             $scope.user_options.recording= data.recording;
 
@@ -35,7 +36,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
             for (var k in data.tracking){
                 $scope.selected_options.tracking[k]={};
-                $scope.selected_options.tracking[k]['name']=data[k][0]['name'];
+                $scope.selected_options.tracking[k]['name']=data.tracking[k][0]['name'];
                 $scope.selected_options.tracking[k]['arguments']={};
                 for(var j=0;j<data.tracking[k][0]['arguments'].length; j++){
                         $scope.selected_options.tracking[k]['arguments'][data.tracking[k][0]['arguments'][j]['name']]=data.tracking[k][0]['arguments'][j]['default'];
@@ -44,7 +45,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
             for (var k in data.recording){
                 $scope.selected_options.recording[k]={};
-                $scope.selected_options.recording[k]['name']=data[k][0]['name'];
+                $scope.selected_options.recording[k]['name']=data.recording[k][0]['name'];
                 $scope.selected_options.recording[k]['arguments']={};
                 for(var j=0;j<data.recording[k][0]['arguments'].length; j++){
                         $scope.selected_options.recording[k]['arguments'][data.recording[k][0]['arguments'][j]['name']]=data.recording[k][0]['arguments'][j]['default'];
@@ -63,23 +64,25 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                     device_ip = data;
                 });
 
-        $scope.ethoscope.update_user_options = function(name){
-            data=$scope.device;
-            
-            for (var i=0;i<data.user_options[name].length;i++){
-                if (data.user_options[name][i]['name']== $scope.selected_options[name]['name']){
-                    $scope.selected_options[name]['arguments']={};
+        $scope.ethoscope.update_user_options = {};
+
+        $scope.ethoscope.update_user_options.tracking = function(name){
+            data=$scope.user_options;
+            console.log(data);
+            for (var i=0;i<data.tracking[name].length;i++){
+                if (data.tracking[name][i]['name']== $scope.selected_options.tracking[name]['name']){
+                    $scope.selected_options.tracking[name]['arguments']={};
                     
                     
-                    for(var j=0;j<data.user_options[name][i]['arguments'].length; j++){
+                    for(var j=0;j<data.tracking[name][i]['arguments'].length; j++){
                         
-                        if (data.user_options[name][i]['arguments'][j]['type']=='datetime'){
-                          $scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']]=[];
-                          $scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']][0]=moment(data.user_options[name][i]['arguments'][j]['default']).format('LLLL'); 
-                        $scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']][1]=data.user_options[name][i]['arguments'][j]['default']; 
-                            console.log($scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']]);
+                        if (data.tracking[name][i]['arguments'][j]['type']=='datetime'){
+                          $scope.selected_options.tracking[name]['arguments'][data.tracking[name][i]['arguments'][j]['name']]=[];
+                          $scope.selected_options.tracking[name]['arguments'][data.tracking[name][i]['arguments'][j]['name']][0]=moment(data.tracking[name][i]['arguments'][j]['default']).format('LLLL');
+                            $scope.selected_options.tracking[name]['arguments'][data.tracking[name][i]['arguments'][j]['name']][1]=data.tracking[name][i]['arguments'][j]['default'];
+                            console.log($scope.selected_options.tracking[name]['arguments'][data.tracking[name][i]['arguments'][j]['name']]);
                         }else{
-                            $scope.selected_options[name]['arguments'][data.user_options[name][i]['arguments'][j]['name']]=data.user_options[name][i]['arguments'][j]['default'];
+                            $scope.selected_options.tracking[name]['arguments'][data.tracking[name][i]['arguments'][j]['name']]=data.tracking[name][i]['arguments'][j]['default'];
                         }
 
                     }
@@ -88,6 +91,31 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
            
         }
 
+
+        $scope.ethoscope.update_user_options.recording = function(name){
+            data=$scope.user_options;
+            console.log(data);
+            for (var i=0;i<data.recording[name].length;i++){
+                if (data.recording[name][i]['name']== $scope.selected_options.recording[name]['name']){
+                    $scope.selected_options.recording[name]['arguments']={};
+
+
+                    for(var j=0;j<data.recording[name][i]['arguments'].length; j++){
+
+                        if (data.recording[name][i]['arguments'][j]['type']=='datetime'){
+                          $scope.selected_options.recording[name]['arguments'][data.recording[name][i]['arguments'][j]['name']]=[];
+                          $scope.selected_options.recording[name]['arguments'][data.recording[name][i]['arguments'][j]['name']][0]=moment(data.recording[name][i]['arguments'][j]['default']).format('LLLL');
+                            $scope.selected_options.recording[name]['arguments'][data.recording[name][i]['arguments'][j]['name']][1]=data.recording[name][i]['arguments'][j]['default'];
+                            console.log($scope.selected_options.recording[name]['arguments'][data.recording[name][i]['arguments'][j]['name']]);
+                        }else{
+                            $scope.selected_options.recording[name]['arguments'][data.recording[name][i]['arguments'][j]['name']]=data.recording[name][i]['arguments'][j]['default'];
+                        }
+
+                    }
+                }
+            }
+
+        }
 
         $scope.ethoscope.start = function(option){
             $("#startModal").modal('hide');

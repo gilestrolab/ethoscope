@@ -164,26 +164,26 @@ class ControlThread(Thread):
 
         return out_currated
 
-
-    def _get_user_options(self):
-        out = {}
-        for key, value in self._option_dict.iteritems():
-            out[key] = []
-            for p in value["possible_classes"]:
-                try:
-                    d = p.__dict__["_description"]
-                except KeyError:
-                    continue
-
-                d["name"] = p.__name__
-                out[key].append(d)
-        out_currated = {}
-
-        for key, value in out.iteritems():
-            if len(value) >0:
-                out_currated[key] = value
-
-        return out_currated
+    #
+    # def _get_user_options(self):
+    #     out = {}
+    #     for key, value in self._option_dict.iteritems():
+    #         out[key] = []
+    #         for p in value["possible_classes"]:
+    #             try:
+    #                 d = p.__dict__["_description"]
+    #             except KeyError:
+    #                 continue
+    #
+    #             d["name"] = p.__name__
+    #             out[key].append(d)
+    #     out_currated = {}
+    #
+    #     for key, value in out.iteritems():
+    #         if len(value) >0:
+    #             out_currated[key] = value
+    #
+    #     return out_currated
 
     def _parse_one_user_option(self,field, data):
 

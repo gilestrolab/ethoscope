@@ -117,8 +117,15 @@ def device(id):
 @app.get('/device/<id>/user_options')
 def device(id):
     try:
-        update_device_map(id,what="data")
-        return devices_map[id]
+
+        device_info = devices_map[id]
+        dev_ip = device_info["ip"]
+
+        url = dev_ip +':9000/user_options/' + id
+        out = urllib2.urlopen(url)
+
+        return out
+
     except Exception as e:
         return {'error':traceback.format_exc(e)}
 
