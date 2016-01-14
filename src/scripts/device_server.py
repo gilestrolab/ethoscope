@@ -61,6 +61,7 @@ def controls(id, action):
                 logging.info("Stopping monitor")
                 control.stop()
                 control.join()
+
                 logging.info("Monitor stopped")
 
             if action == 'close':

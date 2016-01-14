@@ -163,26 +163,7 @@ class ControlThread(Thread):
 
         return out_currated
 
-    #
-    # def _get_user_options(self):
-    #     out = {}
-    #     for key, value in self._option_dict.iteritems():
-    #         out[key] = []
-    #         for p in value["possible_classes"]:
-    #             try:
-    #                 d = p.__dict__["_description"]
-    #             except KeyError:
-    #                 continue
-    #
-    #             d["name"] = p.__name__
-    #             out[key].append(d)
-    #     out_currated = {}
-    #
-    #     for key, value in out.iteritems():
-    #         if len(value) >0:
-    #             out_currated[key] = value
-    #
-    #     return out_currated
+
 
     def _parse_one_user_option(self,field, data):
 
@@ -238,16 +219,6 @@ class ControlThread(Thread):
             f="NaN"
 
 
-        #fixme, this is not available anymore since we have position list now
-
-        # possibly, we just don't need it altogether
-        # p = self._monit.last_positions
-        # pos = {}
-        # for k,v in p.items():
-        #     if v is None:
-        #         continue
-        #     pos[k] = dict(v)
-        #     pos[k]["roi_idx"] = k
 
         if t is not None:# and p is not None:
             self._info["monitor_info"] = {
