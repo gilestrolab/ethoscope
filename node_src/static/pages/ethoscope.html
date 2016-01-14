@@ -4,10 +4,9 @@
         <p>Here you can perform actions and know the status of the device</p>
 
         <div class= "last_drawn_img">
-            <!--TODO || device.status == 'recording'-->
-        <img ng-if="device.status == 'running'"  ng-src="/tmp_static/{{device.url_img}}" alt="" width="480"></img>
+        <img ng-if="device.status == 'running'  || device.status == 'recording'"  ng-src="/tmp_static/{{device.url_img}}" alt="" width="480"></img>
         </div>
-        <div ng-if="device.status == 'running'">
+        <div ng-if="device.status == 'running' || device.status == 'recording'">
 
             <p><span class="fa fa-clock-o"></span> Started on {{ethoscope.start_date_time(device.time)}}
                 (i.e. {{ethoscope.elapsedtime(device.monitor_info.last_time_stamp)}} ago)</p>
@@ -19,9 +18,6 @@
             <p>Your file will be saved as: <a href="/download{{device.backup_path}}" target="_blank" data-toggle="tooltip" data-placement="top" title="{{device.backup_path}}">{{ethoscope.readable_url(device.backup_path)}}</a></p>
             <p>Time since last backup: {{ethoscope.elapsedtime(device.time_since_backup)}}</p>
 
-        </div>
-        <div ng-if="device.status == 'recording'">
-            <p>Ethoscope is recording a video. Use the recording panel to stop it.</p>
         </div>
         <div id="starting" class="spinner" >
         </div>
@@ -35,14 +31,14 @@
 <p>Time since last experiment: {{ethoscope.elapsedtime(device.time_since_backup)}}</p>        </div>
 
         <button class="btn btn-success btn-xl" ng-if="device.status == 'stopped'"  data-toggle="modal" data-target="#startModal">Start</button>
-        <button class="btn btn-danger" ng-if="device.status == 'running'"   data-toggle="modal" data-target="#stopTrackingModal">Stop</button>
+        <button class="btn btn-danger" ng-if="device.status == 'running' || device.status == 'recording'"   data-toggle="modal" data-target="#stopTrackingModal">Stop</button>
 
         <button class="btn btn-info disable" ng-if="device.status == 'stopping'" ng-click="ethoscope.alert('Please wait, system is stopping')">Stopping</button>
         <button class="btn btn-danger disable" ng-if="device.status == 'initialising'"  ng-click="ethoscope.alert('Please wait, system is starting')">Starting</button>
 
         <!--<a href="/#/more/browse" class="btn btn-info">Download Data</a>-->
         <button class="btn btn-info" ng-click="ethoscope.log()">Log</button>
-        <button class="btn btn-info" ng-if="device.status == 'stopped' || device.status == 'recording'" data-toggle="modal" data-target="#recordModal">Recording Pannel</button>
+        <button class="btn btn-info" ng-if="device.status == 'stopped'" data-toggle="modal" data-target="#recordModal">Start recording</button>
         <button class="btn btn-danger" data-toggle="modal" data-target="#powerOffAlert">Power off Device</button>
 
     </div>
@@ -97,12 +93,12 @@
 </div>
 
 <!-- Modal start tracking -->
-<div class="modal fade" id="startModal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
+<div class="modal fade" id="recordModal" tabindex="-1" role="dialog" aria-labelledby="recordModal" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h3 class="modal-title" id="startModalLabel">Select tracking type</h3>
+        <h3 class="modal-title" id="startModalLabel">Select recording type</h3>
       </div>
       <div class="modal-body">
           <form>
@@ -148,49 +144,3 @@
     </div>
   </div>
 </div>
-
-<!-- Modal stop tracking -->
-<div class="modal fade" id="stopTrackingModal" tabindex="-1" role="dialog" aria-labelledby="stopTrackingModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="myModalLabel">Stoping Tracking!</h4>
-      </div>
-      <div class="modal-body">
-       <p>Do you really want to stop the tracking in “{{device.name}}”? Any ongoing acquisition will be ended.</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">No</button>
-        <button type="button" class="btn btn-primary" ng-click="ethoscope.stop()" data-dismiss="modal">Yes, of course!</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-
-<!-- Modal Record -->
-<div class="modal fade" id="recordModal" tabindex="-1" role="dialog" aria-labelledby="recordModal" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="startModalLabel">Video recording panel</h4>
-      </div>
-      <div class="modal-body">
-          <div class="list-group">
-            <p>Here you can start and stop recording a Video. You cannot do that while tracking.</p>
-              <h5 ng-if="device.status == 'recording'">Device is now recording</h5>
-          </div>
-          <div ng-if="device.status == 'stopped'">
-          <a ng-href="{{device.ip}}:9000/download{{device.recording_file}}" target="_blank">Download the video</a>
-          </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-default" ng-if="device.status == 'recording'" ng-click="ethoscope.stop_recording()">Stop Recording</button>
-        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_recording()" data-toggle="modal">Start Recording</button>
-      </div>
-    </div>
-  </div>
-</div>
-

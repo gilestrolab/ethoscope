@@ -122,7 +122,7 @@ class ControlThread(Thread):
                         "version": version,
                         "db_name":self._db_credentials["name"],
                         "monitor_info": self._default_monitor_info,
-                        "user_options": self._get_user_options(),
+                        #"user_options": self._get_user_options(),
                         "experimental_info": {}
                         }
         self._monit = None
@@ -142,6 +142,28 @@ class ControlThread(Thread):
     def info(self):
         self._update_info()
         return self._info
+
+    @staticmethod
+    def user_options():
+        out = {}
+        for key, value in ControlThread._option_dict.iteritems():
+            out[key] = []
+            for p in value["possible_classes"]:
+                try:
+                    d = p.__dict__["_description"]
+                except KeyError:
+                    continue
+
+                d["name"] = p.__name__
+                out[key].append(d)
+        out_currated = {}
+
+        for key, value in out.iteritems():
+            if len(value) >0:
+                out_currated[key] = value
+
+        return out_currated
+
 
     def _get_user_options(self):
         out = {}

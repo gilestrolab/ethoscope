@@ -101,6 +101,24 @@ def info(id):
     except Exception as e:
         return {'error': "Error on machine ID"}
 
+@api.get('/tracking_user_options/<id>')
+def tracking_user_options(id):
+    try:
+        if machine_id != id:
+            raise WrongMachineID
+        return ControlThread.user_options()
+    except Exception as e:
+        return {'error': "Error on machine ID"}
+
+@api.get('/recording_user_options/<id>')
+def recording_user_options(id):
+    try:
+        if machine_id != id:
+            raise WrongMachineID
+        return ControlThreadVideoRecording.user_options()
+    except Exception as e:
+        return {'error': "Error on machine ID"}
+
 
 def close(exit_status=0):
     global control

@@ -23,21 +23,23 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
         var refresh_data = false;
         var spStart= new Spinner(opts).spin();
         var starting_tracking= document.getElementById('starting');
-        $http.get('/device/'+device_id+'/data').success(function(data){
-            $scope.device = data;
-            $scope.user_options= data.user_options;
+        $http.get('/device/'+device_id+'/tracking_user_options').success(function(data){
+            $scope.user_options= data;
             $scope.selected_options = {};
-            for (var k in data.user_options){
+            for (var k in data){
                 $scope.selected_options[k]={};
-                $scope.selected_options[k]['name']=data.user_options[k][0]['name'];
+                $scope.selected_options[k]['name']=data[k][0]['name'];
                 $scope.selected_options[k]['arguments']={};
-                for(var j=0;j<data.user_options[k][0]['arguments'].length; j++){
-                        $scope.selected_options[k]['arguments'][data.user_options[k][0]['arguments'][j]['name']]=data.user_options[k][0]['arguments'][j]['default'];
+                for(var j=0;j<data[k][0]['arguments'].length; j++){
+                        $scope.selected_options[k]['arguments'][data[k][0]['arguments'][j]['name']]=data[k][0]['arguments'][j]['default'];
                 }
             }
 
         });
 
+       $http.get('/device/'+device_id+'/data').success(function(data){
+            $scope.device = data;
+        });
 
 
         $http.get('/device/'+device_id+'/ip').success(function(data){
