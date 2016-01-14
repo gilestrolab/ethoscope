@@ -31,12 +31,14 @@ class RecordingThread(Thread):
         self._bitrate=bitrate
         self._is_recording = False
         self._last_img_path = last_img_path
-        self.save_dir = path.join(ETHOSCOPE_DIR, name + '.h264')
+        self._save_dir = path.join(ETHOSCOPE_DIR, name + '.h264')
+        logging.warning("saving video in " +  self._save_dir)
 
     def run(self):
         self._is_recording = True
         try:
-            self.camera.start_recording(self.save_dir,bitrate=self._bitrate)
+            self.camera.start_recording(self._save_dir,bitrate=self._bitrate)
+
             while self._is_recording:
                 self.camera.wait_recording(2)
                 self.camera.capture(self._last_img_path, use_video_port=True)
@@ -309,3 +311,68 @@ class ControlThreadVideoRecording(ControlThread):
     def set_evanescent(self, value=True):
         self._evanescent = value
 
+
+
+
+from os import path
+from threading import Thread
+import traceback
+import logging
+import time
+import os
+import tempfile
+import shutil
+
+
+import picamera
+
+class RecordingThread(Thread):
+    def __init__(self, w,h,bitrate, last_img_path, name="myvideo",  ETHOSCOPE_DIR = "/ethoscope_data/results"):
+
+        #TODO parse data here
+        resolution=(w,h)
+        framerate=25
+
+        # self._is_recording = False
+        super(RecordingThread, self).__init__()
+        self.camera = picamera.PiCamera()
+        self.camera.resolution = resolution
+        self.camera.framerate = framerate
+        self._bitrate=bitrate
+        self._is_recording = False
+        self._last_img_path = last_img_path
+        self._save_dir = path.join(ETHOSCOPE_DIR, name + '.h264')
+        logging.warning("saving video in " +  self._save_dir)
+        logging.warning("w,h,b =" +  str((w,h,bitrate)))
+
+    def run(self):
+        self._is_recording = True
+        try:
+            self.camera.start_recording(self._save_dir,bitrate=self._bitrate)
+
+            while self._is_recording:
+                self.camera.wait_recording(2)
+                self.camera.capture(self._last_img_path, use_video_port=True)
+
+
+        except Exception as e:
+            logging.error("Error or starting video record:" + traceback.format_exc(e))
+        finally:
+            self.camera.wait_recording(1)
+            self.camera.stop_recording()
+            self.camera.close()
+
+
+    def stop(self):
+        self._is_recording = False
+        # return self.save_dir
+
+
+rec = RecordingThread(1280,960, "/tmp/last_img.jpg")
+rec.start()
+try:
+    while True:
+        time.sleep(1)
+except:
+    rec.stop()
+    rec.join()
