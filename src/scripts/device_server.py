@@ -11,7 +11,8 @@ from subprocess import call
 
 api = Bottle()
 
-json_data = {}
+tracking_json_data = {}
+recording_json_data = {}
 ETHOGRAM_DIR = None
 
 
@@ -45,12 +46,12 @@ def controls(id, action):
 
         if action == 'start':
             data = request.json
-            json_data.update(data)
+            tracking_json_data.update(data)
             control = ControlThread(machine_id=machine_id,
                     name=machine_name,
                     version=version,
                     ethoscope_dir=ETHOGRAM_DIR,
-                    data=json_data)
+                    data=tracking_json_data)
 
             control.start()
             return info(id)
@@ -76,16 +77,17 @@ def controls(id, action):
             #json_data.update(data)
             logging.warning("Recording video, data is %s" % str(data))
             data = request.json
-            json_data.update(data)
+            recording_json_data.update(data)
             control = ControlThreadVideoRecording(machine_id=machine_id,
                     name=machine_name,
                     version=version,
                     ethoscope_dir=ETHOGRAM_DIR,
-                    data=json_data)
+                    data=recording_json_data)
 
             control.start()
             return info(id)
-
+        else:
+            raise Exception("No such action: %s" % action)
 
     except Exception as e:
         return {'error':traceback.format_exc(e)}
@@ -157,22 +159,25 @@ if __name__ == '__main__':
             json_data= json.loads(f.read())
     else:
         data = None
+        json_data = {}
 
     ETHOGRAM_DIR = option_dict["results_dir"]
 
     if option_dict["record_video"]:
+        recording_json_data = json_data
         control = ControlThreadVideoRecording(  machine_id=machine_id,
                                                 name=machine_name,
                                                 version=version,
                                                 ethoscope_dir=ETHOGRAM_DIR,
-                                                data=json_data)
+                                                data=recording_json_data)
 
     else:
+        tracking_json_data = json_data
         control = ControlThread(machine_id=machine_id,
                             name=machine_name,
                             version=version,
                             ethoscope_dir=ETHOGRAM_DIR,
-                            data=json_data)
+                            data=tracking_json_data)
 
 
     if option_dict["debug"]:

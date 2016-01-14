@@ -167,7 +167,7 @@ def device(id, type_of_req):
 
         elif type_of_req == 'stop':
 
-            if device_info['status'] == 'running':
+            if device_info['status'] == 'running' or device_info['status'] == 'recording':
                 stop_device(id,post_data)
             else:
                 raise Exception("Cannot stop, device %s status is `%s`" %  (id, device_info['status']))

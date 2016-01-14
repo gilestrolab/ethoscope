@@ -148,6 +148,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
 
         $scope.ethoscope.start_recording = function(option){
+            console.log(option)
             $("#recordModal").modal('hide');
             spStart= new Spinner(opts).spin();
             starting_tracking.appendChild(spStart.el);
@@ -160,7 +161,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                 }
             }
 
-            $http.post('/device/'+device_id+'/controls/start_recording', data=option)
+            $http.post('/device/'+device_id+'/controls/start_record', data=option)
                  .success(function(data){$scope.device.status = data.status;});
             $http.get('/devices').success(function(data){
                     $http.get('/device/'+device_id+'/data').success(function(data){
@@ -177,6 +178,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
 
         $scope.ethoscope.stop = function(){
+            console.log("stopping")
                             $http.post('/device/'+device_id+'/controls/stop', data={})
                             .success(function(data){
                                 $scope.device.status = data.status;
@@ -260,8 +262,11 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                     });
 
                     $scope.device.ip = device_ip;
-                    if (typeof spStart != undefined && $scope.device.status == 'running' || $scope.device.status=='stopped'){
-                        spStart.stop();
+                    status = $scope.device.status
+                    if (typeof spStart != undefined){
+                        if(status != 'initialising' && status !='stopping'){
+                            spStart.stop();
+                        }
                     }
                  });
        }
