@@ -187,7 +187,7 @@ class ControlThreadVideoRecording(ControlThread):
     @staticmethod
     def user_options():
         out = {}
-        for key, value in ControlThread._option_dict.iteritems():
+        for key, value in ControlThreadVideoRecording._option_dict.iteritems():
             out[key] = []
             for p in value["possible_classes"]:
                 try:
