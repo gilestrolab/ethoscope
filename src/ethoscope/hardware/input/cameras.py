@@ -456,14 +456,14 @@ class PiFrameGrabber(multiprocessing.Process):
 
                 capture.framerate = self._target_fps
                 raw_capture = PiRGBArray(capture, size=self._target_resolution)
-
+                    
                 for frame in capture.capture_continuous(raw_capture, format="bgr", use_video_port=True):
                     if not self._stop_queue.empty():
-                        logging.info("The stop queue is not empty. Stop acquiring frames")
+                        logging.warning("The stop queue is not empty. Stop acquiring frames")
 
                         self._stop_queue.get()
                         self._stop_queue.task_done()
-                        logging.info("Stop Task Done")
+                        logging.warning("Stop Task Done")
                         break
                     raw_capture.truncate(0)
                     # out = np.copy(frame.array)
@@ -472,6 +472,7 @@ class PiFrameGrabber(multiprocessing.Process):
                     # This way, we would manage to get faster FPS
                     self._queue.put(out)
         finally:
+            logging.warning("Cloasing frame grabber process")
             self._stop_queue.close()
             self._queue.close()
             logging.warning("Camera Frame grabber stopped acquisition cleanly")
