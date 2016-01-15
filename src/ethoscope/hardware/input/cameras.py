@@ -511,7 +511,20 @@ class OurPiCameraAsync(BaseCamera):
             im = self._queue.get(timeout=10)
         except Exception as e:
             logging.error("Could not get any frame from the camera")
-            self._close()
+
+            self._stop_queue.cancel_join_thread()
+            self._queue.cancel_join_thread()
+
+            logging.warning("Stopping stop queue")
+            self._stop_queue.close()
+
+            logging.warning("Stopping queue")
+            self._queue.close()
+
+            logging.warning("Joining process")
+
+            self._p.join()
+            logging.warning("Process joined")
             raise e
 
         self._frame = cv2.cvtColor(im,cv2.COLOR_GRAY2BGR)
