@@ -130,16 +130,19 @@ class VideoRecorder(DescribedObject):
                 while self._is_recording:
                     camera.wait_recording(2)
                     camera.capture(self._last_img_path, use_video_port=True)
+                    logging.warning("Capture------------------------------------")
 
                 camera.wait_recording(1)
                 camera.stop_recording()
 
+            del camera
 
         except Exception as e:
             logging.error("Error or starting video record:" + traceback.format_exc(e))
 
     def stop(self):
         self._is_recording = False
+        logging.warning("recorder stopped")
 
 
 
@@ -239,6 +242,7 @@ class ControlThreadVideoRecording(ControlThread):
             self._recorder = RecorderClass(img_path=self._info["last_drawn_img"],**recorder_kwargs)
             self._info["status"] = "recording"
             self._recorder.run()
+            logging.warning("recording RUN finished")
 
 
         except Exception as e:
@@ -265,7 +269,9 @@ class ControlThreadVideoRecording(ControlThread):
 
         logging.info("Stopping monitor")
         if self._recorder is not None:
+            logging.warning("Control thread asking recorder to stop")
             self._recorder.stop()
+
             self._recorder = None
 
         self._info["status"] = "stopped"

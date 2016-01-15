@@ -58,11 +58,14 @@ def controls(id, action):
 
         elif action in ['stop', 'close', 'poweroff']:
             if control.info['status'] == 'running' or control.info['status'] == "recording" :
-                logging.info("Stopping monitor")
+                # logging.info("Stopping monitor")
+                logging.warning("Stopping monitor")
                 control.stop()
+                logging.warning("Joining monitor")
                 control.join()
-
-                logging.info("Monitor stopped")
+                logging.warning("Monitor joined")
+                logging.warning("Monitor stopped")
+                # logging.info("Monitor stopped")
 
             if action == 'close':
                 close()
@@ -71,6 +74,7 @@ def controls(id, action):
                 logging.info("Stopping monitor due to poweroff request")
                 logging.info("Powering off Device.")
                 call('poweroff')
+
             return info(id)
 
         elif action == 'start_record':
