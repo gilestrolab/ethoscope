@@ -47,6 +47,7 @@ def controls(id, action):
         if action == 'start':
             data = request.json
             tracking_json_data.update(data)
+            control = None
             control = ControlThread(machine_id=machine_id,
                     name=machine_name,
                     version=version,
@@ -83,6 +84,7 @@ def controls(id, action):
             logging.warning("Recording video, data is %s" % str(data))
             data = request.json
             recording_json_data.update(data)
+            control = None
             control = ControlThreadVideoRecording(machine_id=machine_id,
                     name=machine_name,
                     version=version,
