@@ -6,11 +6,7 @@ import logging
 import os
 from ethoscope.utils.debug import EthoscopeException
 import multiprocessing
-try:
-    from picamera.array import PiRGBArray
-    from picamera import PiCamera
-except:
-    logging.warning("Could not load picamera module")
+
 
 class BaseCamera(object):
     #TODO catch exception eg, if initialise with a wrong file
@@ -451,7 +447,11 @@ class PiFrameGrabber(multiprocessing.Process):
 
     def run(self):
         try:
+            from picamera.array import PiRGBArray
+            from picamera import PiCamera
+
             with  PiCamera() as capture:
+                logging.warning(capture)
                 capture.resolution = self._target_resolution
 
                 capture.framerate = self._target_fps
@@ -474,7 +474,7 @@ class PiFrameGrabber(multiprocessing.Process):
         finally:
             self._stop_queue.close()
             self._queue.close()
-            logging.info("Camera Frame grabber stopped acquisition cleanly")
+            logging.warning("Camera Frame grabber stopped acquisition cleanly")
 
 
 class OurPiCameraAsync(BaseCamera):

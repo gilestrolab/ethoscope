@@ -9,92 +9,6 @@ import os
 import tempfile
 import shutil
 
-try:
-    import picamera
-except:
-    logging.warning("Could not load picamera module")
-
-
-#
-# class RecordingThread(Thread):
-#     def __init__(self, w,h,framerate,bitrate, last_img_path, name="myvideo",  ETHOSCOPE_DIR = "/ethoscope_data/results"):
-#         #TODO parse data here
-#         self._resolution=(w,h)
-#         self._framerate = framerate
-#         self._bitrate=bitrate
-#         self._is_recording = False
-#         self._last_img_path = last_img_path
-#         self._save_dir = path.join(ETHOSCOPE_DIR, name + '.h264')
-#         super(RecordingThread, self).__init__()
-#
-#     def run(self):
-#         self._is_recording = True
-#         try:
-#             with picamera.PiCamera() as camera:
-#                 camera.resolution = self._resolution
-#                 camera.framerate = self._framerate
-#                 camera.start_recording(self._save_dir,bitrate=self._bitrate)
-#
-#                 while self._is_recording:
-#                     camera.wait_recording(2)
-#                     camera.capture(self._last_img_path, use_video_port=True)
-#
-#                 camera.wait_recording(1)
-#                 camera.stop_recording()
-#
-#
-#         except Exception as e:
-#             logging.error("Error or starting video record:" + traceback.format_exc(e))
-#
-#
-#
-#     def stop(self):
-#         self._is_recording = False
-#         # return self.save_dir
-
-
-#
-#
-#
-# class FakeRecordingThread(Thread):
-#     def __init__(self, w,h,bitrate,last_img_path, name="myvideo",  ETHOSCOPE_DIR = "/ethoscope_data/results"):
-#
-#         #TODO parse data here
-#         resolution=(w,h)
-#         framerate=25
-#
-#         self._last_img_path = last_img_path
-#         # self._is_recording = False
-#         super(FakeRecordingThread, self).__init__()
-#
-#         self._bitrate=bitrate
-#         self._is_recording = False
-#         self.save_dir = path.join(ETHOSCOPE_DIR, name + '.h264')
-#
-#     def run(self):
-#         self._is_recording = True
-#         try:
-#
-#             while self._is_recording:
-#                 time.sleep(2)
-#                 import numpy as np
-#                 import cv2
-#
-#                 img = np.ones((960,1280,3),dtype=np.float)
-#                 img *= 255
-#                 img *= np.random.rand(960,1280,3)
-#                 cv2.imwrite(self._last_img_path,img.astype(np.uint8))
-#
-#                 print "capturing, and saving at "+ self._last_img_path
-#         except Exception as e:
-#             logging.error("Error or starting video record:" + traceback.format_exc(e))
-#         finally:
-#             print "stop recording"
-#
-#     def stop(self):
-#         print "stop recording Thread"
-#         self._is_recording = False
-
 
 
 
@@ -121,6 +35,7 @@ class VideoRecorder(DescribedObject):
 
     def run(self):
         self._is_recording = True
+        import picamera
         try:
             with picamera.PiCamera() as camera:
                 camera.resolution = self._resolution
