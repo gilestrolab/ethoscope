@@ -507,8 +507,12 @@ class OurPiCameraAsync(BaseCamera):
         self._p.start()
 
 
-
-        im = self._queue.get(timeout=10)
+        try:
+            im = self._queue.get(timeout=10)
+        except Exception as e:
+            logging.error("Could not get any frame from the camera")
+            self._close()
+            raise e
 
         self._frame = cv2.cvtColor(im,cv2.COLOR_GRAY2BGR)
 
