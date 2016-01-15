@@ -112,7 +112,7 @@ class VideoRecorder(DescribedObject):
         # self._recording_thread = RecordingThread(h=height, w=width, bitrate=bitrate, last_img_path=img_path)
         # self._recording_thread = RecordingThread(h=height, w=width,framerate=fps, bitrate=bitrate, last_img_path=img_path)
         self._is_recording = True
-        self._resolution=(w,h)
+        self._resolution=(width,height)
         self._fps = fps
         self._bitrate=bitrate
         self._is_recording = False
