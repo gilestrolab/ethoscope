@@ -142,10 +142,11 @@ class ControlThread(Thread):
         self._update_info()
         return self._info
 
-    @staticmethod
-    def user_options():
+
+    @classmethod
+    def user_options(cls):
         out = {}
-        for key, value in ControlThread._option_dict.iteritems():
+        for key, value in cls._option_dict.iteritems():
             out[key] = []
             for p in value["possible_classes"]:
                 try:
@@ -162,7 +163,6 @@ class ControlThread(Thread):
                 out_currated[key] = value
 
         return out_currated
-
 
 
     def _parse_one_user_option(self,field, data):
@@ -246,11 +246,6 @@ class ControlThread(Thread):
             self._last_info_t_stamp = 0
             self._last_info_frame_idx = 0
             try:
-
-
-
-
-
 
                 CameraClass = self._option_dict["camera"]["class"]
 

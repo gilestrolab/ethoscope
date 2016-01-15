@@ -1,5 +1,5 @@
 from os import path
-from threading import Thread
+# from threading import Thread
 import traceback
 import logging
 import time
@@ -15,86 +15,85 @@ except:
     logging.warning("Could not load picamera module")
 
 
-
-class RecordingThread(Thread):
-    def __init__(self, w,h,framerate,bitrate, last_img_path, name="myvideo",  ETHOSCOPE_DIR = "/ethoscope_data/results"):
-        #TODO parse data here
-        self._resolution=(w,h)
-        self._framerate = framerate
-        self._bitrate=bitrate
-        self._is_recording = False
-        self._last_img_path = last_img_path
-        self._save_dir = path.join(ETHOSCOPE_DIR, name + '.h264')
-        super(RecordingThread, self).__init__()
-
-    def run(self):
-        self._is_recording = True
-        try:
-            camera = picamera.PiCamera()
-            camera.resolution = self._resolution
-            camera.framerate = self._framerate
-            camera.start_recording(self._save_dir,bitrate=self._bitrate)
-
-            while self._is_recording:
-                camera.wait_recording(2)
-                camera.capture(self._last_img_path, use_video_port=True)
-
-            camera.wait_recording(1)
-            camera.stop_recording()
-
-        except Exception as e:
-            logging.error("Error or starting video record:" + traceback.format_exc(e))
-
-        finally:
-            camera.close()
-
-
-    def stop(self):
-        self._is_recording = False
-        # return self.save_dir
-
+#
+# class RecordingThread(Thread):
+#     def __init__(self, w,h,framerate,bitrate, last_img_path, name="myvideo",  ETHOSCOPE_DIR = "/ethoscope_data/results"):
+#         #TODO parse data here
+#         self._resolution=(w,h)
+#         self._framerate = framerate
+#         self._bitrate=bitrate
+#         self._is_recording = False
+#         self._last_img_path = last_img_path
+#         self._save_dir = path.join(ETHOSCOPE_DIR, name + '.h264')
+#         super(RecordingThread, self).__init__()
+#
+#     def run(self):
+#         self._is_recording = True
+#         try:
+#             with picamera.PiCamera() as camera:
+#                 camera.resolution = self._resolution
+#                 camera.framerate = self._framerate
+#                 camera.start_recording(self._save_dir,bitrate=self._bitrate)
+#
+#                 while self._is_recording:
+#                     camera.wait_recording(2)
+#                     camera.capture(self._last_img_path, use_video_port=True)
+#
+#                 camera.wait_recording(1)
+#                 camera.stop_recording()
+#
+#
+#         except Exception as e:
+#             logging.error("Error or starting video record:" + traceback.format_exc(e))
+#
+#
+#
+#     def stop(self):
+#         self._is_recording = False
+#         # return self.save_dir
 
 
-
-
-class FakeRecordingThread(Thread):
-    def __init__(self, w,h,bitrate,last_img_path, name="myvideo",  ETHOSCOPE_DIR = "/ethoscope_data/results"):
-
-        #TODO parse data here
-        resolution=(w,h)
-        framerate=25
-
-        self._last_img_path = last_img_path
-        # self._is_recording = False
-        super(FakeRecordingThread, self).__init__()
-
-        self._bitrate=bitrate
-        self._is_recording = False
-        self.save_dir = path.join(ETHOSCOPE_DIR, name + '.h264')
-
-    def run(self):
-        self._is_recording = True
-        try:
-
-            while self._is_recording:
-                time.sleep(2)
-                import numpy as np
-                import cv2
-
-                img = np.ones((960,1280,3),dtype=np.float)
-                img *= 255
-                img *= np.random.rand(960,1280,3)
-                cv2.imwrite(self._last_img_path,img.astype(np.uint8))
-
-                print "capturing, and saving at "+ self._last_img_path
-        except Exception as e:
-            logging.error("Error or starting video record:" + traceback.format_exc(e))
-        finally:
-            print "stop recording"
-
-    def stop(self):
-        print "stop recording Thread"
-        self._is_recording = False
+#
+#
+#
+# class FakeRecordingThread(Thread):
+#     def __init__(self, w,h,bitrate,last_img_path, name="myvideo",  ETHOSCOPE_DIR = "/ethoscope_data/results"):
+#
+#         #TODO parse data here
+#         resolution=(w,h)
+#         framerate=25
+#
+#         self._last_img_path = last_img_path
+#         # self._is_recording = False
+#         super(FakeRecordingThread, self).__init__()
+#
+#         self._bitrate=bitrate
+#         self._is_recording = False
+#         self.save_dir = path.join(ETHOSCOPE_DIR, name + '.h264')
+#
+#     def run(self):
+#         self._is_recording = True
+#         try:
+#
+#             while self._is_recording:
+#                 time.sleep(2)
+#                 import numpy as np
+#                 import cv2
+#
+#                 img = np.ones((960,1280,3),dtype=np.float)
+#                 img *= 255
+#                 img *= np.random.rand(960,1280,3)
+#                 cv2.imwrite(self._last_img_path,img.astype(np.uint8))
+#
+#                 print "capturing, and saving at "+ self._last_img_path
+#         except Exception as e:
+#             logging.error("Error or starting video record:" + traceback.format_exc(e))
+#         finally:
+#             print "stop recording"
+#
+#     def stop(self):
+#         print "stop recording Thread"
+#         self._is_recording = False
 
 
 
@@ -108,18 +107,39 @@ class VideoRecorder(DescribedObject):
                                 {"type": "number", "name":"bitrate", "description": "The target bitrate","default":200000, "min":0, "max":10000000,"step":1000}
                                ]}
 
-    def __init__(self, img_path,width=1280, height=960,fps=25,bitrate=200000):
+    def __init__(self, img_path,width=1280, height=960,fps=25,bitrate=200000, name="myvideo",  video_dir = "/ethoscope_data/results"):
 
         # self._recording_thread = RecordingThread(h=height, w=width, bitrate=bitrate, last_img_path=img_path)
-        self._recording_thread = RecordingThread(h=height, w=width,framerate=fps, bitrate=bitrate, last_img_path=img_path)
+        # self._recording_thread = RecordingThread(h=height, w=width,framerate=fps, bitrate=bitrate, last_img_path=img_path)
+        self._is_recording = True
+        self._resolution=(w,h)
+        self._fps = fps
+        self._bitrate=bitrate
+        self._is_recording = False
+        self._last_img_path = img_path
+        self._video_out_path = path.join(video_dir, name + '.h264')
 
     def run(self):
-        self._recording_thread.start()
+        self._is_recording = True
+        try:
+            with picamera.PiCamera() as camera:
+                camera.resolution = self._resolution
+                camera.framerate = self._fps
+                camera.start_recording(self._video_out_path,bitrate=self._bitrate)
+
+                while self._is_recording:
+                    camera.wait_recording(2)
+                    camera.capture(self._last_img_path, use_video_port=True)
+
+                camera.wait_recording(1)
+                camera.stop_recording()
+
+
+        except Exception as e:
+            logging.error("Error or starting video record:" + traceback.format_exc(e))
 
     def stop(self):
-        self._recording_thread.stop()
-        self._recording_thread.join()
-
+        self._is_recording = False
 
 
 
@@ -177,32 +197,8 @@ class ControlThreadVideoRecording(ControlThread):
     def _update_info(self):
         if self._recorder is None:
             return
-        # self._recorder.capture(self._info["last_drawn_img"])
         self._last_info_t_stamp = time.time()
 
-
-
-
-    @staticmethod
-    def user_options():
-        out = {}
-        for key, value in ControlThreadVideoRecording._option_dict.iteritems():
-            out[key] = []
-            for p in value["possible_classes"]:
-                try:
-                    d = p.__dict__["_description"]
-                except KeyError:
-                    continue
-
-                d["name"] = p.__name__
-                out[key].append(d)
-        out_currated = {}
-
-        for key, value in out.iteritems():
-            if len(value) >0:
-                out_currated[key] = value
-
-        return out_currated
 
     def _parse_one_user_option(self,field, data):
 
@@ -217,28 +213,6 @@ class ControlThreadVideoRecording(ControlThread):
 
         return Class, kwargs
 
-
-    def _parse_user_options(self,data):
-
-        if data is None:
-            return
-        #FIXME DEBUG
-        logging.warning("Starting control thread with data:")
-        logging.warning(str(data))
-
-        for key in self._option_dict.iterkeys():
-
-            Class, kwargs = self._parse_one_user_option(key, data)
-            # when no field is present in the JSON config, we get the default class
-
-            if Class is None:
-
-                self._option_dict[key]["class"] = self._option_dict[key]["possible_classes"][0]
-                self._option_dict[key]["kwargs"] = {}
-                continue
-
-            self._option_dict[key]["class"] = Class
-            self._option_dict[key]["kwargs"] = kwargs
 
     def run(self):
 
@@ -297,13 +271,4 @@ class ControlThreadVideoRecording(ControlThread):
         self._info["status"] = "stopped"
         self._info["time"] = time.time()
         self._info["error"] = error
-
-
-
-    def __del__(self):
-        self.stop()
-        shutil.rmtree(self._tmp_dir, ignore_errors=True)
-
-    def set_evanescent(self, value=True):
-        self._evanescent = value
 

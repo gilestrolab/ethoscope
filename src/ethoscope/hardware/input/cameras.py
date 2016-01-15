@@ -451,28 +451,27 @@ class PiFrameGrabber(multiprocessing.Process):
 
     def run(self):
         try:
-            capture = PiCamera()
-            capture.resolution = self._target_resolution
+            with  PiCamera() as capture:
+                capture.resolution = self._target_resolution
 
-            capture.framerate = self._target_fps
-            raw_capture = PiRGBArray(capture, size=self._target_resolution)
+                capture.framerate = self._target_fps
+                raw_capture = PiRGBArray(capture, size=self._target_resolution)
 
-            for frame in capture.capture_continuous(raw_capture, format="bgr", use_video_port=True):
-                if not self._stop_queue.empty():
-                    logging.info("The stop queue is not empty. Stop acquiring frames")
+                for frame in capture.capture_continuous(raw_capture, format="bgr", use_video_port=True):
+                    if not self._stop_queue.empty():
+                        logging.info("The stop queue is not empty. Stop acquiring frames")
 
-                    self._stop_queue.get()
-                    self._stop_queue.task_done()
-                    logging.info("Stop Task Done")
-                    break
-                raw_capture.truncate(0)
-                # out = np.copy(frame.array)
-                out = cv2.cvtColor(frame.array,cv2.COLOR_BGR2GRAY)
-                #fixme here we could actually pass a JPG compressed file object (http://docs.scipy.org/doc/scipy-0.16.0/reference/generated/scipy.misc.imsave.html)
-                # This way, we would manage to get faster FPS
-                self._queue.put(out)
+                        self._stop_queue.get()
+                        self._stop_queue.task_done()
+                        logging.info("Stop Task Done")
+                        break
+                    raw_capture.truncate(0)
+                    # out = np.copy(frame.array)
+                    out = cv2.cvtColor(frame.array,cv2.COLOR_BGR2GRAY)
+                    #fixme here we could actually pass a JPG compressed file object (http://docs.scipy.org/doc/scipy-0.16.0/reference/generated/scipy.misc.imsave.html)
+                    # This way, we would manage to get faster FPS
+                    self._queue.put(out)
         finally:
-            capture.close()
             self._stop_queue.close()
             self._queue.close()
             logging.info("Camera Frame grabber stopped acquisition cleanly")
