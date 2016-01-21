@@ -1,3 +1,4 @@
+[![Documentation Status](https://readthedocs.org/projects/ethoscope/badge/?version=latest)](http://ethoscope.readthedocs.org/en/latest/?badge=dev)
 Ethoscope
 ============
 
