@@ -8,8 +8,8 @@ import time
 
 class HasInteractedVariable(BaseIntVariable):
     """
-    Custom variable to save whether the interactor has sent instruction to its hardware interface.
-    0 means no interaction. Any positive integer describes a different interaction.
+    Custom variable to save whether the interactor has sent instruction to its hardware interface. 0 means
+     no interaction. Any positive integer describes a different interaction.
     """
     functional_type = "interaction"
     header_name = "has_interacted"
@@ -59,9 +59,7 @@ class   BaseInteractor(DescribedObject):
         Template class to interact with the tracked animal in a real-time feedback loop.
         Derived classes must have an attribute ``_hardwareInterfaceClass`` defining the class of the
         :class:`~ethoscope.hardware.interfaces.interfaces.BaseInterface` object (not on object) that instances will
-        share with one another.
-
-        In addition, they must implement a ``_decide()`` method.
+        share with one another. In addition, they must implement a ``_decide()`` method.
 
 
         :param hardware_interface: The hardware interface to use.
@@ -77,6 +75,7 @@ class   BaseInteractor(DescribedObject):
         1. check ``_tracker`` exists
         2. decide (``_decide``) whether to interact
         3. if 2. pass the interaction arguments to the hardware interface
+        
         :return:
         """
 
