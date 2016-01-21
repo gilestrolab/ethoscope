@@ -3,7 +3,13 @@ import time
 import serial
 from serial.tools import list_ports
 
-from ethoscope.hardware.interfaces.sleep_depriver_interface import WrongSleepDepPortError, NoValidPortError
+
+
+class WrongSerialPortError(serial.SerialException):
+    pass
+
+class NoValidPortError(serial.SerialException):
+    pass
 
 
 class SimpleLynxMotionConnection(object):
@@ -21,9 +27,12 @@ class SimpleLynxMotionConnection(object):
 
     def __init__(self, port=None):
         """
-        Class to connect and abstract the Lynx Motion servo controller.
+        Class to connect and abstract the SSC-32U Lynx Motion servo controller.
+        It assumes a BAUD of 115200, which can be configured on the board as described in the
+        `user manual (page 34) <http://www.lynxmotion.com/images/data/lynxmotion_ssc-32u_usb_user_guide.pdf>`_.
 
         :param port: the serial port to use. Automatic detection if ``None``.
+        :type port: str.
         """
 
 
@@ -56,7 +65,7 @@ class SimpleLynxMotionConnection(object):
                 #here we use a recursive strategy to find the good port (ap).
                 SimpleLynxMotionConnection(ap)
                 return ap
-            except (WrongSleepDepPortError, serial.SerialException):
+            except (WrongSerialPortError, serial.SerialException):
                 warn_str = "Tried to use port %s. Failed." % ap
                 logging.warning(warn_str)
                 pass
@@ -101,7 +110,7 @@ class SimpleLynxMotionConnection(object):
 
     def move_to_angle(self,idx,angle=0.,time=1000):
         """
-        Move a given servo to a given angle in a given time.
+        Move a given servo to an angle in a given time.
 
         :param idx: the number of the servo to be moved
         :type idx: int

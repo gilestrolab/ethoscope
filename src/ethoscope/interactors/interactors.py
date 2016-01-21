@@ -11,6 +11,7 @@ class HasInteractedVariable(BaseIntVariable):
     Custom variable to save whether the interactor has sent instruction to its hardware interface.
     0 means no interaction. Any positive integer describes a different interaction.
     """
+    functional_type = "interaction"
     header_name = "has_interacted"
 
 
