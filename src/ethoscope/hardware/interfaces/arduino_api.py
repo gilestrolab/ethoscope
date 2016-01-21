@@ -6,7 +6,7 @@ import logging
 
 class NoValidPortError(Exception):
     pass
-class WrongSleepDepPortError(serial.SerialException):
+class WrongSleepDepPortError(Exception):
     pass
 
 class SleepDepriverInterface(object):
