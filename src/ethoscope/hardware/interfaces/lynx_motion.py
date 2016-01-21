@@ -1,14 +1,14 @@
 import logging
 import time
-import serial
-from serial.tools import list_ports
 
 
 
-class WrongSerialPortError(serial.SerialException):
+
+class WrongSerialPortError(Exception):
+
     pass
 
-class NoValidPortError(serial.SerialException):
+class NoValidPortError(Exception):
     pass
 
 
@@ -34,6 +34,7 @@ class SimpleLynxMotionConnection(object):
         :param port: the serial port to use. Automatic detection if ``None``.
         :type port: str.
         """
+        import serial
 
 
         logging.info("Connecting to Lynx motion serial port...")
@@ -50,6 +51,7 @@ class SimpleLynxMotionConnection(object):
 
 
     def _find_port(self):
+        from serial.tools import list_ports
         all_port_tuples = list_ports.comports()
         logging.info("listing serial ports")
 

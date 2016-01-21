@@ -1,6 +1,5 @@
 __author__ = 'quentin'
 
-import serial
 import time
 import logging
 import multiprocessing

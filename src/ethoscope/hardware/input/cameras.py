@@ -6,11 +6,6 @@ import logging
 import os
 from ethoscope.utils.debug import EthoscopeException
 import multiprocessing
-try:
-    from picamera.array import PiRGBArray
-    from picamera import PiCamera
-except:
-    logging.warning("Could not load picamera module")
 
 class BaseCamera(object):
     #TODO catch exception eg, if initialise with a wrong file
@@ -323,6 +318,10 @@ class V4L2Camera(BaseCamera):
 class OurPiCamera(BaseCamera):
 
     def __init__(self, target_fps=10, target_resolution=(960,720), *args, **kwargs):
+        # lazy import should only use those on devices
+        from picamera.array import PiRGBArray
+        from picamera import PiCamera
+
 
 
         logging.info("Initialising camera")
@@ -450,6 +449,10 @@ class PiFrameGrabber(multiprocessing.Process):
 
 
     def run(self):
+        # lazy import should only use those on devices
+        from picamera.array import PiRGBArray
+        from picamera import PiCamera
+
         try:
             with  PiCamera() as capture:
                 capture.resolution = self._target_resolution

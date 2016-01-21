@@ -4,17 +4,11 @@ import traceback
 import logging
 import time
 
-try:
-    import picamera
-except:
-    logging.warning("Could not load picamera module")
-
-
 
 class RecordVideo(Thread):
 
     def __init__(self, data=None, name="myvideo",  ETHOSCOPE_DIR = "/ethoscope_data/results"):
-
+        import picamera
         #TODO parse data here
         resolution=(1280,960)
         framerate=25

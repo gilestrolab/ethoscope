@@ -5,8 +5,7 @@ import time, datetime
 import traceback
 import logging
 from collections import OrderedDict
-import sqlite3
-import MySQLdb
+
 import multiprocessing
 import cv2
 import tempfile
@@ -16,6 +15,9 @@ import os
 class AsyncMySQLWriter(multiprocessing.Process):
 
     def __init__(self, db_credentials, queue):
+
+
+
         self._db_name = db_credentials["name"]
         self._db_user_name = db_credentials["user"]
         self._db_user_pass = db_credentials["password"]
@@ -27,6 +29,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
 
     def _delete_my_sql_db(self):
+        import MySQLdb
         try:
             db =   MySQLdb.connect(host="localhost",
                  user=self._db_user_name, passwd=self._db_user_pass, db=self._db_name)
@@ -62,7 +65,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
 
     def _create_mysql_db(self):
-
+        import MySQLdb
         db =   MySQLdb.connect(host="localhost",
                  user=self._db_user_name, passwd=self._db_user_pass)
 
@@ -81,6 +84,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
         db.close()
 
     def _get_connection(self):
+        import MySQLdb
         db =   MySQLdb.connect(host="localhost",
                  user=self._db_user_name, passwd=self._db_user_pass,
                   db=self._db_name)
@@ -477,6 +481,7 @@ class AsyncSQLiteWriter(multiprocessing.Process):
 
         
     def _get_connection(self):
+        import sqlite3
         db =   sqlite3.connect(self._db_name)
         return db
 
