@@ -1,4 +1,5 @@
-[![Documentation Status](https://readthedocs.org/projects/ethoscope/badge/?version=latest)](http://ethoscope.readthedocs.org/en/latest/?badge=dev)
+[![Documentation Status](https://readthedocs.org/projects/ethoscope/badge/?version=latest)](http://ethoscope.readthedocs.org/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/ethoscope/badge/?version=dev)](http://ethoscope.readthedocs.org/en/latest/?badge=dev)
 Ethoscope
 ============
 
