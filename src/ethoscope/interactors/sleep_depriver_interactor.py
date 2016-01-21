@@ -1,10 +1,9 @@
 __author__ = 'quentin'
 
 
-from ethoscope.interactors.interactors import BaseInteractor, HasInteractedVariable
+from ethoscope.interactors.interactors import BaseInteractor, HasInteractedVariable, SimpleScheduler
 from ethoscope.hardware.interfaces.interfaces import  DefaultInterface
 from ethoscope.hardware.interfaces.sleep_depriver_interface import SleepDepriverInterface
-import time
 import sys
 
 
@@ -30,7 +29,6 @@ class IsMovingInteractor(BaseInteractor):
             return False
 
 
-
         if len(positions[-1]) != 1:
             raise Exception("This interactor can only work with a single animal per ROI")
         tail_m = positions[-1][0]
@@ -42,7 +40,6 @@ class IsMovingInteractor(BaseInteractor):
         # we assume no movement if the animal was not spotted
         if last_time != last_time_for_position:
             return False
-
 
         dt_s = abs(times[-1] - times[-2]) / 1000.0
         dist = 10.0 ** (tail_m["xy_dist_log10x1000"]/1000.0)
@@ -59,7 +56,6 @@ class IsMovingInteractor(BaseInteractor):
             self._last_active = t[-1]
             return HasInteractedVariable(False), {}
         return HasInteractedVariable(True), {}
-
 
 class SleepDepInteractor(IsMovingInteractor):
     _description = {"overview": "An interactor to sleep deprive an animal using servo motor. See http://todo/fixme.html",
@@ -91,26 +87,15 @@ class SleepDepInteractor(IsMovingInteractor):
         :type velocity_threshold: float
         :param min_inactive_time: the minimal time without motion after which an animal should be disturbed (in seconds)
         :type min_inactive_time: float
-        :param start_datetime: The unix time stamp of the start of the experiment
-        :type start_datetime: int
-        :param end_datetime: The unix time stamp of the end of the experiment
-        :type end_datetime: int
         :return:
         """
 
         self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
-        self._start_datetime = int(start_datetime)
-        self._end_datetime = int(end_datetime)
-        self._t0 = None
 
+        self._t0 = None
+        self._scheduler = SimpleScheduler(start_datetime, end_datetime)
         super(SleepDepInteractor, self).__init__(hardware_interface,velocity_threshold)
 
-    def _check_time_range(self):
-
-        wall_clock_time = time.time()
-        if self._end_datetime > wall_clock_time > self._start_datetime:
-            return True
-        return False
 
 
     def _decide(self):
@@ -123,7 +108,7 @@ class SleepDepInteractor(IsMovingInteractor):
         except KeyError:
             return HasInteractedVariable(False), {"channel":0}
 
-        if self._check_time_range() is False:
+        if self._scheduler.check_time_range() is False:
             return HasInteractedVariable(False), {"channel":channel}
 
         has_moved = self._has_moved()
@@ -141,10 +126,6 @@ class SleepDepInteractor(IsMovingInteractor):
             self._t0 = now
 
         return HasInteractedVariable(False), {"channel":channel}
-
-
-
-
 
 class BaseStaticSleepDepInteractor(BaseInteractor):
     _hardwareInterfaceClass = SleepDepriverInterface
@@ -169,22 +150,10 @@ class BaseStaticSleepDepInteractor(BaseInteractor):
         :return:
         """
 
-        self._start_datetime= int(start_datetime)
-        self._end_datetime= int(end_datetime)
 
-
+        self._scheduler = SimpleScheduler(start_datetime, end_datetime)
         #super(RandomSleepDepInteractor, self).__init__(hardware_interface,velocity_threshold)
         super(BaseStaticSleepDepInteractor,self).__init__(hardware_interface)
-
-    def _check_time_range(self):
-        wall_clock_time = time.time()
-        if self._end_datetime > wall_clock_time > self._start_datetime:
-            return True
-        return False
-
-
-
-
 
 class SystematicSleepDepInteractor(BaseStaticSleepDepInteractor):
     _hardwareInterfaceClass = SleepDepriverInterface
@@ -222,7 +191,7 @@ class SystematicSleepDepInteractor(BaseStaticSleepDepInteractor):
         except KeyError:
             return HasInteractedVariable(False), {"channel":0}
 
-        if self._check_time_range() is False:
+        if self._scheduler.check_time_range() is False:
             return HasInteractedVariable(False), {"channel":channel}
 
         if float(now - self._t0) > self._dt:
@@ -230,7 +199,6 @@ class SystematicSleepDepInteractor(BaseStaticSleepDepInteractor):
                 return HasInteractedVariable(True), {"channel":channel}
 
         return HasInteractedVariable(False), {"channel":channel}
-
 
 class ExperimentalSleepDepInteractor(IsMovingInteractor):
     _description = {"overview": "An interactor to sleep deprive an animal using servo motor. See http://todo/fixme.html",
@@ -271,14 +239,10 @@ class ExperimentalSleepDepInteractor(IsMovingInteractor):
         self._start_datetime = int(start_datetime)
         self._end_datetime = int(end_datetime)
         self._t0 = None
-
+        self._scheduler = SimpleScheduler(start_datetime, end_datetime)
         super(ExperimentalSleepDepInteractor, self).__init__(hardware_interface,velocity_threshold)
 
-    def _check_time_range(self):
-        wall_clock_time = time.time()
-        if self._end_datetime > wall_clock_time > self._start_datetime:
-            return True
-        return False
+
 
 
     def _decide(self):
@@ -297,7 +261,7 @@ class ExperimentalSleepDepInteractor(IsMovingInteractor):
         inactivity_time_threshold_ms = round( channel ** 1.7) * 20 * 1000
 
 
-        if self._check_time_range() is False:
+        if self._scheduler.check_time_range() is False:
             return HasInteractedVariable(False), {"channel":channel}
 
         has_moved = self._has_moved()
