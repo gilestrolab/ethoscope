@@ -213,7 +213,7 @@ class MySQLdbToSQlite(object):
         for c in dst_cur:
             last_id_in_dst = c[0]
             if last_id_in_dst is None:
-                logging.warning("There seem to be no data in %s stopping here")
+                logging.warning("There seem to be no data in %s, %s stopping here" % (os.path.basename(self._dst_path), table_name))
                 return
         src_command = "SELECT * FROM %s WHERE id > %d" % (table_name, last_id_in_dst)
         src_cur.execute(src_command)
@@ -263,7 +263,7 @@ class MySQLdbToSQlite(object):
         for c in dst_cur:
             last_id_in_dst = c[0]
             if last_id_in_dst is None:
-                logging.warning("There seem to be no data in %s stopping here")
+                logging.warning("There seem to be no data in %s, %s stopping here" % (os.path.basename(self._dst_path), table_name))
                 return
         src_command = "SELECT id,t,img FROM %s WHERE id > %d" % (table_name, last_id_in_dst)
         src_cur.execute(src_command)
