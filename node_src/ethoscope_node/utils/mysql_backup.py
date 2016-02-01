@@ -70,9 +70,6 @@ class MySQLdbToSQlite(object):
                 logging.warning(e)
                 pass
 
-        #
-
-
         try:
             logging.info("Making parent directories")
             os.makedirs(os.path.dirname(self._dst_path))
@@ -205,7 +202,7 @@ class MySQLdbToSQlite(object):
         dst_cur = dst.cursor()
 
         try:
-            dst_command= "SELECT id FROM %s ORDER BY id DESC LIMIT 1" % table_name
+            dst_command= "SELECT MAX(id) FROM %s" % table_name
             dst_cur.execute(dst_command)
         except (sqlite3.OperationalError, MySQLdb.ProgrammingError):
             logging.warning(" Local table %s appears empty. Rebuilding it from source" % table_name)
@@ -252,7 +249,7 @@ class MySQLdbToSQlite(object):
         dst_cur = dst.cursor()
 
         try:
-            dst_command= "SELECT id FROM %s ORDER BY id DESC LIMIT 1" % table_name
+            dst_command= "SELECT MAX(id) FROM %s" % table_name
             dst_cur.execute(dst_command)
         except (sqlite3.OperationalError, MySQLdb.ProgrammingError):
             logging.warning("Local table %s appears empty. Rebuilding it from source" % table_name)
