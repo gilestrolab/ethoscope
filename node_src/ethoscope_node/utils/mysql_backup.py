@@ -70,9 +70,6 @@ class MySQLdbToSQlite(object):
                 logging.warning(e)
                 pass
 
-        #
-
-
         try:
             logging.info("Making parent directories")
             os.makedirs(os.path.dirname(self._dst_path))
@@ -205,7 +202,7 @@ class MySQLdbToSQlite(object):
         dst_cur = dst.cursor()
 
         try:
-            dst_command= "SELECT id FROM %s ORDER BY id DESC LIMIT 1" % table_name
+            dst_command= "SELECT MAX(id) FROM %s" % table_name
             dst_cur.execute(dst_command)
         except (sqlite3.OperationalError, MySQLdb.ProgrammingError):
             logging.warning(" Local table %s appears empty. Rebuilding it from source" % table_name)
@@ -215,6 +212,9 @@ class MySQLdbToSQlite(object):
         last_id_in_dst = 0
         for c in dst_cur:
             last_id_in_dst = c[0]
+            if last_id_in_dst is None:
+                logging.warning("There seem to be no data in %s, %s stopping here" % (os.path.basename(self._dst_path), table_name))
+                return
         src_command = "SELECT * FROM %s WHERE id > %d" % (table_name, last_id_in_dst)
         src_cur.execute(src_command)
 
@@ -252,7 +252,7 @@ class MySQLdbToSQlite(object):
         dst_cur = dst.cursor()
 
         try:
-            dst_command= "SELECT id FROM %s ORDER BY id DESC LIMIT 1" % table_name
+            dst_command= "SELECT MAX(id) FROM %s" % table_name
             dst_cur.execute(dst_command)
         except (sqlite3.OperationalError, MySQLdb.ProgrammingError):
             logging.warning("Local table %s appears empty. Rebuilding it from source" % table_name)
@@ -262,6 +262,9 @@ class MySQLdbToSQlite(object):
         last_id_in_dst = 0
         for c in dst_cur:
             last_id_in_dst = c[0]
+            if last_id_in_dst is None:
+                logging.warning("There seem to be no data in %s, %s stopping here" % (os.path.basename(self._dst_path), table_name))
+                return
         src_command = "SELECT id,t,img FROM %s WHERE id > %d" % (table_name, last_id_in_dst)
         src_cur.execute(src_command)
 

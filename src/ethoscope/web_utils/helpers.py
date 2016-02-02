@@ -1,9 +1,8 @@
 
-import subprocess
+
 import random
 import logging
 import traceback
-import git
 import datetime
 import os
 
@@ -25,6 +24,7 @@ def get_commit_version(commit):
             "date":datetime.datetime.utcfromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
                     }
 def get_version():
+    import git
     wd = os.getcwd()
 
     while wd != "/":

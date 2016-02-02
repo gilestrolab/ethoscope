@@ -49,10 +49,10 @@ class BackupClass(object):
 def backup_job(device_info):
     logging.info("Initiating backup for device  %s" % device_info["id"])
     backup_job = BackupClass(device_info)
-    
+
     logging.info("Running backup for device  %s" % device_info["id"])
     backup_job.run()
-    
+
     logging.info("Backup done for for device  %s" % device_info["id"])
 
 
@@ -89,15 +89,6 @@ if __name__ == '__main__':
 
         TICK = 1.0 #s
         BACKUP_DT = 5*60 # 5min
-        if DEBUG:
-            import getpass
-            if getpass.getuser() == "quentin":
-                SUBNET_DEVICE = b'enp3s0'
-
-
-            if getpass.getuser() == "asterix":
-                SUBNET_DEVICE = b'lo'
-                RESULTS_DIR = "/data1/todel/psv_results"
         t0 = time.time()
         t1 = t0 + BACKUP_DT
 

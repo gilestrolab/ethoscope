@@ -1,21 +1,20 @@
 __author__ = 'quentin'
 
-import serial
-from serial.tools import list_ports
-
 import time
 import logging
 
 
-class NoValidPortError(serial.SerialException):
+class NoValidPortError(Exception):
     pass
-class WrongSleepDepPortError(serial.SerialException):
+class WrongSleepDepPortError(Exception):
     pass
 
 class SleepDepriverInterface(object):
     _baud = 57600
 
     def __init__(self, port=None):
+        import serial
+
     # def __init__(self, port="/dev/ttyACM0"):
         self._serial = None
 
@@ -30,6 +29,7 @@ class SleepDepriverInterface(object):
         self._test_serial_connection()
 
     def _find_port(self):
+        from serial.tools import list_ports
         all_ports = list_ports.comports()
 
         for ap, _, _  in all_ports:
