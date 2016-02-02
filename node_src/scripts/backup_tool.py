@@ -46,21 +46,20 @@ class BackupClass(object):
         except Exception as e:
             logging.error(traceback.format_exc(e))
 
-# def backup_job(device_info):
-#     logging.info("Initiating backup for device  %s" % device_info["id"])
-#     backup_job = BackupClass(device_info)
-#
-#     logging.info("Running backup for device  %s" % device_info["id"])
-#     backup_job.run()
-#
-#     logging.info("Backup done for for device  %s" % device_info["id"])
+def backup_job(device_info):
+    logging.info("Initiating backup for device  %s" % device_info["id"])
+    backup_job = BackupClass(device_info)
+
+    logging.info("Running backup for device  %s" % device_info["id"])
+    backup_job.run()
+
+    logging.info("Backup done for for device  %s" % device_info["id"])
 
 
 if __name__ == '__main__':
     # TODO where to save the files and the logs
 
     logging.getLogger().setLevel(logging.INFO)
-    backup_tools = {}
 
     try:
 
@@ -90,15 +89,6 @@ if __name__ == '__main__':
 
         TICK = 1.0 #s
         BACKUP_DT = 5*60 # 5min
-        if DEBUG:
-            import getpass
-            if getpass.getuser() == "quentin":
-                SUBNET_DEVICE = b'enp3s0'
-
-
-            if getpass.getuser() == "asterix":
-                SUBNET_DEVICE = b'lo'
-                RESULTS_DIR = "/data1/todel/psv_results"
         t0 = time.time()
         t1 = t0 + BACKUP_DT
 
@@ -113,16 +103,17 @@ if __name__ == '__main__':
             logging.info("Generating device map")
             dev_map = generate_new_device_map(device=SUBNET_DEVICE,result_main_dir=RESULTS_DIR)
             logging.info("Regenerated device map")
-            for v in dev_map.values():
-                if "backup_path" not in v:
-                    logging.warning("No backup path for %s" % str(v))
-                    continue
-                out_file = v["backup_path"]
-                if out_file not in backup_tools.keys():
-                    backup_tools[out_file] = BackupClass(v)
 
-            for bt in backup_tools.values():
-                bt.run()
+            if safe ==True:
+                map(backup_job, dev_map.values())
+            else:
+                pool = multiprocessing.Pool(4)
+
+                pool_res =  pool.map(backup_job, dev_map.values())
+                logging.info("Pool mapped")
+                pool.close()
+                logging.info("Joining now")
+                pool.join()
 
             t1 = time.time()
             logging.info("Backup finished at t=%i" % t1)
