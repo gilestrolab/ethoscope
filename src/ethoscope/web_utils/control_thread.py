@@ -265,6 +265,26 @@ class ControlThread(Thread):
                 result_writer_kwargs = self._option_dict["result_writer"]["kwargs"]
 
 
+                from picamera.array import PiRGBArray
+                from picamera import PiCamera
+
+                with  PiCamera() as capture:
+                    logging.warning(capture)
+                    capture.resolution = (1280, 960)
+
+                    capture.framerate = 20
+                    raw_capture = PiRGBArray(capture, size=(1280, 960))
+
+                    for i, frame in enumerate(capture.capture_continuous(raw_capture, format="bgr", use_video_port=True)):
+                        raw_capture.truncate(0)
+                        # out = np.copy(frame.array)
+                        out = cv2.cvtColor(frame.array, cv2.COLOR_BGR2GRAY)
+                        print i, out.shape
+                        if i > 100:
+                            break
+
+                raise Exception("Mock camera init")
+
                 cam = CameraClass(**camera_kwargs)
 
 
