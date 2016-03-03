@@ -480,7 +480,7 @@ class PiFrameGrabber(multiprocessing.Process):
                     # This way, we would manage to get faster FPS
                     self._queue.put(out)
         finally:
-            logging.warning("Cloasing frame grabber process")
+            logging.warning("Closing frame grabber process")
             self._stop_queue.close()
             self._queue.close()
             logging.warning("Camera Frame grabber stopped acquisition cleanly")
@@ -532,7 +532,8 @@ class OurPiCameraAsync(BaseCamera):
 
             logging.warning("Joining process")
 
-            self._p.join()
+            # we kill the frame grabber if it does not reply within 10s
+            self._p.join(10)
             logging.warning("Process joined")
             raise e
 
