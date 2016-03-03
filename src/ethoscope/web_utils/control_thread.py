@@ -280,10 +280,11 @@ class ControlThread(Thread):
                         # out = np.copy(frame.array)
                         out = cv2.cvtColor(frame.array, cv2.COLOR_BGR2GRAY)
                         logging.warning(str((i, out.shape)))
-                        if i > 100:
+                        if i > 10:
                             break
 
-                raise Exception("Mock camera init")
+
+                #raise Exception("Mock camera init")
 
                 cam = CameraClass(**camera_kwargs)
 
