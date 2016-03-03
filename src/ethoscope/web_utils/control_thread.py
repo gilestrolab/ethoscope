@@ -279,7 +279,7 @@ class ControlThread(Thread):
                         raw_capture.truncate(0)
                         # out = np.copy(frame.array)
                         out = cv2.cvtColor(frame.array, cv2.COLOR_BGR2GRAY)
-                        logging.warning(i, out.shape)
+                        logging.warning(str((i, out.shape)))
                         if i > 100:
                             break
 
