@@ -15,30 +15,44 @@ import multiprocessing
 
 
 class PiCameraProcess(multiprocessing.Process):
-    def __init__(self, stop_queue, img_path, width, height, fps, bitrate, video_out_path):
+    _VIDEO_CHUNCK_DURATION = 30 * 10
+    def __init__(self, stop_queue, img_path, width, height, fps, bitrate, video_prefix):
         self._stop_queue = stop_queue
         self._img_path = img_path
         self._resolution = (width, height)
         self._fps = fps
         self._bitrate = bitrate
-        self._video_out_path = video_out_path
+        self._video_prefix = video_prefix
 
         super(PiCameraProcess, self).__init__()
+
+    def _make_video_name(self, i):
+        return '%s_%04d.h264' % (self._video_prefix, i)
+
+
     def run(self):
         import picamera
+        i = 0
         try:
             with picamera.PiCamera() as camera:
                 camera.resolution = self._resolution
                 camera.framerate = self._fps
-                camera.start_recording(self._video_out_path, bitrate=self._bitrate)
+                camera.start_recording(self._make_video_name(i), bitrate=self._bitrate)
 
+                start_time = time.time()
+                i += 1
                 while True:
                     camera.wait_recording(2)
                     camera.capture(self._img_path, use_video_port=True)
+                    if time.time() - start_time >= self._VIDEO_CHUNCK_DURATION:
+                        camera.split_recording(self._make_video_name(i))
+                        start_time = time.time()
+                        i += 1
                     if not self._stop_queue.empty():
                         self._stop_queue.get()
                         self._stop_queue.task_done()
                         break
+
                 camera.wait_recording(1)
                 camera.stop_recording()
 
