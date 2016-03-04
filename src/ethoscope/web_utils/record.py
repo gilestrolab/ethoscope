@@ -8,8 +8,42 @@ from ethoscope.utils.description import DescribedObject
 import os
 import tempfile
 import shutil
+import multiprocessing
 
 
+
+
+
+class PiCameraProcess(multiprocessing.Process):
+    def __init__(self, stop_queue, img_path, width, height, fps, bitrate, video_out_path):
+        self._stop_queue = stop_queue
+        self._img_path = img_path
+        self._resolution = (width, height)
+        self._fps = fps
+        self._bitrate = bitrate
+        self._video_out_path = video_out_path
+
+        super(PiCameraProcess, self).__init__()
+    def run(self):
+        import picamera
+        try:
+            with picamera.PiCamera() as camera:
+                camera.resolution = self._resolution
+                camera.framerate = self._fps
+                camera.start_recording(self._video_out_path, bitrate=self._bitrate)
+
+                while True:
+                    camera.wait_recording(2)
+                    camera.capture(self._img_path, use_video_port=True)
+                    if not self._stop_queue.empty():
+                        self._stop_queue.get()
+                        self._stop_queue.task_done()
+                        break
+                camera.wait_recording(1)
+                camera.stop_recording()
+
+        except Exception as e:
+            logging.error("Error or starting video record:" + traceback.format_exc(e))
 
 
 class VideoRecorder(DescribedObject):
@@ -23,41 +57,27 @@ class VideoRecorder(DescribedObject):
 
     def __init__(self, img_path,width=1280, height=960,fps=25,bitrate=200000, name="myvideo",  video_dir = "/ethoscope_data/results"):
 
-        # self._recording_thread = RecordingThread(h=height, w=width, bitrate=bitrate, last_img_path=img_path)
-        # self._recording_thread = RecordingThread(h=height, w=width,framerate=fps, bitrate=bitrate, last_img_path=img_path)
-        self._is_recording = True
-        self._resolution=(width,height)
-        self._fps = fps
-        self._bitrate=bitrate
-        self._is_recording = False
-        self._last_img_path = img_path
-        self._video_out_path = path.join(video_dir, name + '.h264')
+        video_out_path = path.join(video_dir, name + '.h264')
+        self._stop_queue = multiprocessing.JoinableQueue(maxsize=1)
+        self._p = PiCameraProcess(self._stop_queue, img_path, width, height,fps,bitrate, video_out_path)
+
 
     def run(self):
         self._is_recording = True
-        import picamera
-        try:
-            with picamera.PiCamera() as camera:
-                camera.resolution = self._resolution
-                camera.framerate = self._fps
-                camera.start_recording(self._video_out_path,bitrate=self._bitrate)
-
-                while self._is_recording:
-                    camera.wait_recording(2)
-                    camera.capture(self._last_img_path, use_video_port=True)
-                    logging.warning("Capture------------------------------------")
-
-                camera.wait_recording(1)
-                camera.stop_recording()
-
-            del camera
-
-        except Exception as e:
-            logging.error("Error or starting video record:" + traceback.format_exc(e))
-
+        self._p.start()
+        while self._p.is_alive():
+            time.sleep(.25)
     def stop(self):
         self._is_recording = False
-        logging.warning("recorder stopped")
+        self._stop_queue.put(None)
+        self._stop_queue.close()
+        self._p.join(10)
+
+
+
+
+
+
 
 
 
