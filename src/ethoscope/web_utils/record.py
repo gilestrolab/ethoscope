@@ -9,58 +9,63 @@ import os
 import tempfile
 import shutil
 import multiprocessing
-
-
+import glob
+import os
 
 
 
 class PiCameraProcess(multiprocessing.Process):
     _VIDEO_CHUNCK_DURATION = 30 * 10
-    def __init__(self, stop_queue, img_path, width, height, fps, bitrate, video_prefix):
+    def __init__(self, stop_queue, img_path, width, height, fps, bitrate, video_prefix, video_root_dir = "/ethoscope_data/results"):
         self._stop_queue = stop_queue
         self._img_path = img_path
         self._resolution = (width, height)
         self._fps = fps
         self._bitrate = bitrate
         self._video_prefix = video_prefix
-
+        self._video_root_dir = video_root_dir
         super(PiCameraProcess, self).__init__()
 
     def _make_video_name(self, i):
         return '%s_%04d.h264' % (self._video_prefix, i)
 
+    def _write_video_index(self):
+        index_file = os.path.join(self._video_root_dir, "index.html")
+        all_video_files = [y for x in os.walk(self._video_root_dir) for y in glob.glob(os.path.join(x[0], '*.h264'))]
+
+        with open(index_file, "w") as index:
+            for f in all_video_files:
+                index.write(f + "\n")
 
     def run(self):
         import picamera
         i = 0
-        index_file = "%s_index.txt" % self._video_prefix
-        with open(index_file, "w") as index:
-            try:
-                with picamera.PiCamera() as camera:
-                    camera.resolution = self._resolution
-                    camera.framerate = self._fps
-                    camera.start_recording(self._make_video_name(i), bitrate=self._bitrate)
-                    index.write(self._make_video_name(i) + "\n")
-                    start_time = time.time()
-                    i += 1
-                    while True:
-                        camera.wait_recording(2)
-                        camera.capture(self._img_path, use_video_port=True)
-                        if time.time() - start_time >= self._VIDEO_CHUNCK_DURATION:
-                            camera.split_recording(self._make_video_name(i))
-                            index.write(self._make_video_name(i) + "\n")
-                            start_time = time.time()
-                            i += 1
-                        if not self._stop_queue.empty():
-                            self._stop_queue.get()
-                            self._stop_queue.task_done()
-                            break
 
-                    camera.wait_recording(1)
-                    camera.stop_recording()
+        try:
+            with picamera.PiCamera() as camera:
+                camera.resolution = self._resolution
+                camera.framerate = self._fps
+                camera.start_recording(self._make_video_name(i), bitrate=self._bitrate)
+                start_time = time.time()
+                i += 1
+                while True:
+                    camera.wait_recording(2)
+                    camera.capture(self._img_path, use_video_port=True)
+                    if time.time() - start_time >= self._VIDEO_CHUNCK_DURATION:
+                        camera.split_recording(self._make_video_name(i))
+                        self._write_video_index()
+                        start_time = time.time()
+                        i += 1
+                    if not self._stop_queue.empty():
+                        self._stop_queue.get()
+                        self._stop_queue.task_done()
+                        break
 
-            except Exception as e:
-                logging.error("Error or starting video record:" + traceback.format_exc(e))
+                camera.wait_recording(1)
+                camera.stop_recording()
+
+        except Exception as e:
+            logging.error("Error or starting video record:" + traceback.format_exc(e))
 
 
 class VideoRecorder(DescribedObject):
