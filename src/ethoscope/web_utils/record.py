@@ -33,31 +33,34 @@ class PiCameraProcess(multiprocessing.Process):
     def run(self):
         import picamera
         i = 0
-        try:
-            with picamera.PiCamera() as camera:
-                camera.resolution = self._resolution
-                camera.framerate = self._fps
-                camera.start_recording(self._make_video_name(i), bitrate=self._bitrate)
+        index_file = "%s_index.txt" % self._video_prefix
+        with open(index_file, "w") as index:
+            try:
+                with picamera.PiCamera() as camera:
+                    camera.resolution = self._resolution
+                    camera.framerate = self._fps
+                    camera.start_recording(self._make_video_name(i), bitrate=self._bitrate)
+                    index.write(self._make_video_name(i) + "\n")
+                    start_time = time.time()
+                    i += 1
+                    while True:
+                        camera.wait_recording(2)
+                        camera.capture(self._img_path, use_video_port=True)
+                        if time.time() - start_time >= self._VIDEO_CHUNCK_DURATION:
+                            camera.split_recording(self._make_video_name(i))
+                            index.write(self._make_video_name(i) + "\n")
+                            start_time = time.time()
+                            i += 1
+                        if not self._stop_queue.empty():
+                            self._stop_queue.get()
+                            self._stop_queue.task_done()
+                            break
 
-                start_time = time.time()
-                i += 1
-                while True:
-                    camera.wait_recording(2)
-                    camera.capture(self._img_path, use_video_port=True)
-                    if time.time() - start_time >= self._VIDEO_CHUNCK_DURATION:
-                        camera.split_recording(self._make_video_name(i))
-                        start_time = time.time()
-                        i += 1
-                    if not self._stop_queue.empty():
-                        self._stop_queue.get()
-                        self._stop_queue.task_done()
-                        break
+                    camera.wait_recording(1)
+                    camera.stop_recording()
 
-                camera.wait_recording(1)
-                camera.stop_recording()
-
-        except Exception as e:
-            logging.error("Error or starting video record:" + traceback.format_exc(e))
+            except Exception as e:
+                logging.error("Error or starting video record:" + traceback.format_exc(e))
 
 
 class VideoRecorder(DescribedObject):
