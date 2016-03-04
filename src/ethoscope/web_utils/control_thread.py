@@ -381,7 +381,7 @@ class ControlThread(Thread):
 
     def __del__(self):
         self.stop()
-        shutil.rmtree(self._tmp_dir, ignore_errors=True)
+        #shutil.rmtree(self._tmp_dir, ignore_errors=True)
 
     def set_evanescent(self, value=True):
         self._evanescent = value

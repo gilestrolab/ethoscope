@@ -16,7 +16,7 @@ import os
 
 class PiCameraProcess(multiprocessing.Process):
     _VIDEO_CHUNCK_DURATION = 30 * 10
-    def __init__(self, stop_queue, img_path, width, height, fps, bitrate, video_prefix, video_root_dir = "/ethoscope_data/results"):
+    def __init__(self, stop_queue,video_prefix, video_root_dir, img_path, width, height, fps, bitrate):
         self._stop_queue = stop_queue
         self._img_path = img_path
         self._resolution = (width, height)
@@ -46,6 +46,7 @@ class PiCameraProcess(multiprocessing.Process):
                 camera.resolution = self._resolution
                 camera.framerate = self._fps
                 camera.start_recording(self._make_video_name(i), bitrate=self._bitrate)
+                self._write_video_index()
                 start_time = time.time()
                 i += 1
                 while True:
@@ -77,11 +78,10 @@ class VideoRecorder(DescribedObject):
                                 {"type": "number", "name":"bitrate", "description": "The target bitrate","default":200000, "min":0, "max":10000000,"step":1000}
                                ]}
 
-    def __init__(self, img_path,width=1280, height=960,fps=25,bitrate=200000, name="myvideo",  video_dir = "/ethoscope_data/results"):
+    def __init__(self, video_prefix, video_dir, img_path,width=1280, height=960,fps=25,bitrate=200000):
 
-        video_out_path = path.join(video_dir, name + '.h264')
         self._stop_queue = multiprocessing.JoinableQueue(maxsize=1)
-        self._p = PiCameraProcess(self._stop_queue, img_path, width, height,fps,bitrate, video_out_path)
+        self._p = PiCameraProcess(self._stop_queue, video_prefix, video_dir, img_path, width, height,fps, bitrate)
 
 
     def run(self):
@@ -131,8 +131,22 @@ class ControlThreadVideoRecording(ControlThread):
         self._last_info_frame_idx = 0
         self._recorder = None
 
+        now = time.time()
+        date_time = datetime.datetime.fromtimestamp(now)
+        formated_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
+        device_id = machine_id
+        device_name = name
+        file_prefix = "%s_%s" % (formated_time, device_id)
+        self._video_root_dir = ethoscope_dir
+        self._output_video_full_prefix = os.path.join(ethoscope_dir,
+                                      device_id,
+                                      device_name,
+                                      formated_time,
+                                      file_prefix
+                                      )
+
         try:
-            os.makedirs(ethoscope_dir)
+            os.makedirs(os.path.dirname(self._output_video_full_prefix))
         except OSError:
             pass
 
@@ -196,7 +210,10 @@ class ControlThreadVideoRecording(ControlThread):
 
             RecorderClass = self._option_dict["recorder"]["class"]
             recorder_kwargs = self._option_dict["recorder"]["kwargs"]
-            self._recorder = RecorderClass(img_path=self._info["last_drawn_img"],**recorder_kwargs)
+            self._recorder = RecorderClass(video_prefix = self._output_video_full_prefix,
+                                           video_dir = self._video_root_dir,
+                                           img_path=self._info["last_drawn_img"],**recorder_kwargs)
+
             self._info["status"] = "recording"
             self._recorder.run()
             logging.warning("recording RUN finished")
