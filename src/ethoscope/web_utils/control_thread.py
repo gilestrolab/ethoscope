@@ -102,7 +102,9 @@ class ControlThread(Thread):
         self._last_info_frame_idx = 0
 
         # We wipe off previous data
-        shutil.rmtree(ethoscope_dir, ignore_errors=True)
+        os.remove(os.path.join(ethoscope_dir, self._log_file))
+        os.remove(os.path.join(ethoscope_dir, self._dbg_img_file))
+
         try:
             os.makedirs(ethoscope_dir)
         except OSError:
@@ -381,7 +383,7 @@ class ControlThread(Thread):
 
     def __del__(self):
         self.stop()
-        #shutil.rmtree(self._tmp_dir, ignore_errors=True)
+        shutil.rmtree(self._tmp_dir, ignore_errors=True)
 
     def set_evanescent(self, value=True):
         self._evanescent = value
