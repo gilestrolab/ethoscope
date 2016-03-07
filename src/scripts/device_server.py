@@ -49,7 +49,9 @@ def rm_static_file(id):
             raise WrongMachineID
 
         if file_in_dir_r(file_to_del, ETHOSCOPE_DIR ):
+            logging.warning("removing %s" % file_to_del)
             os.remove(file_to_del)
+            logging.warning("REMOVED %s" % file_to_del)
         else:
             msg = "Could not delete file %s. It is not allowed to remove files outside of %s" % (file_to_del, ETHOSCOPE_DIR)
             logging.error(msg)
