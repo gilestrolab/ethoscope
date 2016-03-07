@@ -36,18 +36,21 @@ def name():
         return {'error':traceback.format_exc(e)}
 
 
-@api.post('/rm_static_file/<id>/<file>')
-def rm_static_file(id, file):
+@api.post('/rm_static_file/<id>')
+def rm_static_file(id):
     global control
     global record
 
     try:
+        data = request.body.read()
+        data = json.loads(data)
+
         if id != machine_id:
             raise WrongMachineID
         #fixme here, we should check that files lives in static dir!
-        os.remove(file)
-
-
+        #os.remove()
+        
+        return data
     except Exception as e:
         return {'error':traceback.format_exc(e)}
 
