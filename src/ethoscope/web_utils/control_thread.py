@@ -102,8 +102,15 @@ class ControlThread(Thread):
         self._last_info_frame_idx = 0
 
         # We wipe off previous data
-        os.remove(os.path.join(ethoscope_dir, self._log_file))
-        os.remove(os.path.join(ethoscope_dir, self._dbg_img_file))
+
+        try:
+            os.remove(os.path.join(ethoscope_dir, self._log_file))
+        except OSError:
+            pass
+        try:
+            os.remove(os.path.join(ethoscope_dir, self._dbg_img_file))
+        except OSError:
+            pass
 
         try:
             os.makedirs(ethoscope_dir)
