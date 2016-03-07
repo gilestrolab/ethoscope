@@ -37,7 +37,7 @@ def name():
 
 
 @api.post('/rm_static_file/<id>/<file>')
-def controls(id, file):
+def rm_static_file(id, file):
     global control
     global record
 
