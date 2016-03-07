@@ -37,7 +37,12 @@ def get_version():
             wd = os.path.dirname(wd)
     raise Exception("Not in a git Tree")
 
-
-
-
-
+def file_in_dir_r(file, dir):
+    file_dir_path = os.path.dirname(file).rstrip("//")
+    dir_path = dir.rstrip("//")
+    if file_dir_path == dir_path:
+        return True
+    elif file_dir_path == "":
+        return False
+    else:
+        return file_in_dir_r(file_dir_path, dir_path)

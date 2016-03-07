@@ -5,7 +5,7 @@ import traceback
 from optparse import OptionParser
 from bottle import *
 from ethoscope.web_utils.control_thread import ControlThread
-from ethoscope.web_utils.helpers import get_machine_info, get_version
+from ethoscope.web_utils.helpers import get_machine_info, get_version, file_in_dir_r
 from ethoscope.web_utils.record import ControlThreadVideoRecording
 from subprocess import call
 
@@ -13,7 +13,7 @@ api = Bottle()
 
 tracking_json_data = {}
 recording_json_data = {}
-ETHOGRAM_DIR = None
+ETHOSCOPE_DIR = None
 
 
 class WrongMachineID(Exception):
@@ -44,12 +44,16 @@ def rm_static_file(id):
     try:
         data = request.body.read()
         data = json.loads(data)
-
+        file_to_del = data["file"]
         if id != machine_id:
             raise WrongMachineID
-        #fixme here, we should check that files lives in static dir!
-        #os.remove()
-        
+
+        if file_in_dir_r(file_to_del, ETHOSCOPE_DIR ):
+            os.remove(file_to_del)
+        else:
+            msg = "Could not delete file %s. It is not allowed to remove files outside of %s" % (file_to_del, ETHOSCOPE_DIR)
+            logging.error(msg)
+            raise Exception(msg)
         return data
     except Exception as e:
         return {'error':traceback.format_exc(e)}
@@ -70,10 +74,10 @@ def controls(id, action):
             tracking_json_data.update(data)
             control = None
             control = ControlThread(machine_id=machine_id,
-                    name=machine_name,
-                    version=version,
-                    ethoscope_dir=ETHOGRAM_DIR,
-                    data=tracking_json_data)
+                                    name=machine_name,
+                                    version=version,
+                                    ethoscope_dir=ETHOSCOPE_DIR,
+                                    data=tracking_json_data)
 
             control.start()
             return info(id)
@@ -107,10 +111,10 @@ def controls(id, action):
             recording_json_data.update(data)
             control = None
             control = ControlThreadVideoRecording(machine_id=machine_id,
-                    name=machine_name,
-                    version=version,
-                    ethoscope_dir=ETHOGRAM_DIR,
-                    data=recording_json_data)
+                                                  name=machine_name,
+                                                  version=version,
+                                                  ethoscope_dir=ETHOSCOPE_DIR,
+                                                  data=recording_json_data)
 
             control.start()
             return info(id)
@@ -157,7 +161,7 @@ def close(exit_status=0):
 
 if __name__ == '__main__':
 
-    ETHOGRAM_DIR = "/ethoscope_data/results"
+    ETHOSCOPE_DIR = "/ethoscope_data/results"
     MACHINE_ID_FILE = '/etc/machine-id'
     MACHINE_NAME_FILE = '/etc/machine-name'
 
@@ -167,7 +171,7 @@ if __name__ == '__main__':
     parser.add_option("-v", "--record-video", dest="record_video", default=False, help="Records video instead of tracking", action="store_true")
     parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
     parser.add_option("-p", "--port", dest="port", default=9000,help="port")
-    parser.add_option("-e", "--results-dir", dest="results_dir", default=ETHOGRAM_DIR,help="Where temporary result files are stored")
+    parser.add_option("-e", "--results-dir", dest="results_dir", default=ETHOSCOPE_DIR, help="Where temporary result files are stored")
     parser.add_option("-D", "--debug", dest="debug", default=False, help="Shows all logging messages", action="store_true")
 
 
@@ -189,23 +193,23 @@ if __name__ == '__main__':
         data = None
         json_data = {}
 
-    ETHOGRAM_DIR = option_dict["results_dir"]
+    ETHOSCOPE_DIR = option_dict["results_dir"]
 
     if option_dict["record_video"]:
         recording_json_data = json_data
-        control = ControlThreadVideoRecording(  machine_id=machine_id,
-                                                name=machine_name,
-                                                version=version,
-                                                ethoscope_dir=ETHOGRAM_DIR,
-                                                data=recording_json_data)
+        control = ControlThreadVideoRecording(machine_id=machine_id,
+                                              name=machine_name,
+                                              version=version,
+                                              ethoscope_dir=ETHOSCOPE_DIR,
+                                              data=recording_json_data)
 
     else:
         tracking_json_data = json_data
         control = ControlThread(machine_id=machine_id,
-                            name=machine_name,
-                            version=version,
-                            ethoscope_dir=ETHOGRAM_DIR,
-                            data=tracking_json_data)
+                                name=machine_name,
+                                version=version,
+                                ethoscope_dir=ETHOSCOPE_DIR,
+                                data=tracking_json_data)
 
 
     if option_dict["debug"]:
