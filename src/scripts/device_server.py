@@ -35,6 +35,24 @@ def name():
     except Exception as e:
         return {'error':traceback.format_exc(e)}
 
+
+@api.post('/rm_static_file/<id>/<file>')
+def controls(id, file):
+    global control
+    global record
+
+    try:
+        if id != machine_id:
+            raise WrongMachineID
+        #fixme here, we should check that files lives in static dir!
+        os.remove(file)
+
+
+    except Exception as e:
+        return {'error':traceback.format_exc(e)}
+
+
+
 @api.post('/controls/<id>/<action>')
 def controls(id, action):
     global control
