@@ -26,7 +26,9 @@ class PiCameraProcess(multiprocessing.Process):
         super(PiCameraProcess, self).__init__()
 
     def _make_video_name(self, i):
-        return '%s_%04d.h264' % (self._video_prefix, i)
+        w,h = self._resolution
+        video_info= "%ix%i@%i" %(w, h, self._fps)
+        return '%s_%s_%05d.h264' % (self._video_prefix, video_info, i)
 
     def _write_video_index(self):
         index_file = os.path.join(self._video_root_dir, "index.html")
