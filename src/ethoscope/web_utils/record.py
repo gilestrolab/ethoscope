@@ -102,7 +102,7 @@ class GeneralVideoRecorder(DescribedObject):
 class HDVideoRecorder(GeneralVideoRecorder):
     _description  = { "overview": "A preset 1920 x 1080, 25fps, bitrate = 5e5 video recorder. "
                                   "At this resolution, the field of view is only partial, "
-                                  "so we effectively zoom in the middle of arenas","arguments": {}}
+                                  "so we effectively zoom in the middle of arenas","arguments": []}
     def __init__(self, video_prefix, video_dir, img_path):
         super(HDVideoRecorder).__init__(video_prefix, video_dir, img_path,
                                         width=1920, height=1080,fps=25,bitrate=500000)
@@ -111,7 +111,7 @@ class HDVideoRecorder(GeneralVideoRecorder):
 
 
 class StandardVideoRecorder(GeneralVideoRecorder):
-    _description  = { "overview": "A preset 1280 x 960, 25fps, bitrate = 2e5 video recorder." ,"arguments": {}}
+    _description  = { "overview": "A preset 1280 x 960, 25fps, bitrate = 2e5 video recorder." ,"arguments": []}
     def __init__(self, video_prefix, video_dir, img_path):
         super(StandardVideoRecorder).__init__(video_prefix, video_dir, img_path,
                                         width=1280, height=960,fps=25,bitrate=200000)
