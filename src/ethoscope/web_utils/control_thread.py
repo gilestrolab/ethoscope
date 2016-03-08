@@ -236,9 +236,10 @@ class ControlThread(Thread):
                             "fps": f
                             }
 
-        f = self._drawer.last_drawn_frame
-        if not f is None:
-            cv2.imwrite(self._info["last_drawn_img"], f)
+        frame = self._drawer.last_drawn_frame
+        if frame is not None:
+            cv2.imwrite(self._info["last_drawn_img"], frame, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
+
 
         self._last_info_t_stamp = wall_time
         self._last_info_frame_idx = frame_idx
@@ -251,9 +252,9 @@ class ControlThread(Thread):
 
             self._info["error"] = None
 
-
             self._last_info_t_stamp = 0
             self._last_info_frame_idx = 0
+            cam = None
             try:
 
                 CameraClass = self._option_dict["camera"]["class"]
@@ -273,27 +274,6 @@ class ControlThread(Thread):
                 ResultWriterClass = self._option_dict["result_writer"]["class"]
                 result_writer_kwargs = self._option_dict["result_writer"]["kwargs"]
 
-
-                # from picamera.array import PiRGBArray
-                # from picamera import PiCamera
-                #
-                # with  PiCamera() as capture:
-                #     logging.warning(capture)
-                #     capture.resolution = (1280, 960)
-                #
-                #     capture.framerate = 20
-                #     raw_capture = PiRGBArray(capture, size=(1280, 960))
-                #
-                #     for i, frame in enumerate(capture.capture_continuous(raw_capture, format="bgr", use_video_port=True)):
-                #         raw_capture.truncate(0)
-                #         # out = np.copy(frame.array)
-                #         out = cv2.cvtColor(frame.array, cv2.COLOR_BGR2GRAY)
-                #         logging.warning(str((i, out.shape)))
-                #         if i > 10:
-                #             break
-                #
-                #
-                # #raise Exception("Mock camera init")
 
                 cam = CameraClass(**camera_kwargs)
 
@@ -347,7 +327,8 @@ class ControlThread(Thread):
 
             finally:
                 try:
-                    cam._close()
+                    if cam is not None:
+                        cam._close()
                 except:
                     logging.warning("Could not close camera properly")
                     pass
