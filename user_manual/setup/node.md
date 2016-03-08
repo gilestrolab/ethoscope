@@ -10,6 +10,7 @@ The node is a regular computer with an wireless connection does quite a few thin
 * Runs a webserver to update server (http://node:8888)
 * Runs a backup tool, that fetches data from all detected devices every 5min
 * Runs an NTP server (so it used as the central clock of the platform)
+* Runs a video backup tool, that fetches video chunks from recording devices (we can record instead of tracking).
 
 The node simply orchestrate the platform, ** it does not analyse any data** tracking is performed, in real time, by each device.
 Hence, if some devices are running and the node (or the network) shuts down, tracking will not be interrupted, and the data will be backed up on the node as soon as it is running again.
@@ -156,11 +157,13 @@ cd $TARGET_GIT_INSTALL/scripts
 
 cp ./ethoscope_node.service /etc/systemd/system/ethoscope_node.service
 cp ./ethoscope_backup.service /etc/systemd/system/ethoscope_backup.service
+cp ./ethoscope_backup.service /etc/systemd/system/ethoscope_video_backup.service
 
 systemctl daemon-reload
 
 systemctl enable ethoscope_node.service
 systemctl enable ethoscope_backup.service
+systemctl enable ethoscope_video_backup.service
 ```
 
 In addition to the node services, we ant to run the update daemon.
