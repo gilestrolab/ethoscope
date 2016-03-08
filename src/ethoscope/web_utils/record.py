@@ -70,7 +70,7 @@ class PiCameraProcess(multiprocessing.Process):
             logging.error("Error or starting video record:" + traceback.format_exc(e))
 
 
-class VideoRecorder(DescribedObject):
+class GeneralVideoRecorder(DescribedObject):
     _description  = {   "overview": "A video simple recorder",
                             "arguments": [
                                 {"type": "number", "name":"width", "description": "The width of the frame","default":1280, "min":480, "max":1980,"step":1},
@@ -99,6 +99,22 @@ class VideoRecorder(DescribedObject):
 
 
 
+class HDVideoRecorder(GeneralVideoRecorder):
+    _description  = { "overview": "A preset 1920 x 1080, 25fps, bitrate = 5e5 video recorder. "
+                                  "At this resolution, the field of view is only partial, "
+                                  "so we effectively zoom in the middle of arenas","arguments": {}}
+    def __init__(self, video_prefix, video_dir, img_path):
+        super(HDVideoRecorder).__init__(video_prefix, video_dir, img_path,
+                                        width=1920, height=1080,fps=25,bitrate=500000)
+
+
+
+
+class StandardVideoRecorder(GeneralVideoRecorder):
+    _description  = { "overview": "A preset 1280 x 960, 25fps, bitrate = 2e5 video recorder." ,"arguments": {}}
+    def __init__(self, video_prefix, video_dir, img_path):
+        super(StandardVideoRecorder).__init__(video_prefix, video_dir, img_path,
+                                        width=1280, height=960,fps=25,bitrate=200000)
 
 
 
@@ -110,7 +126,7 @@ class ControlThreadVideoRecording(ControlThread):
     _option_dict = {
 
         "recorder":{
-                "possible_classes":[VideoRecorder],
+                "possible_classes":[StandardVideoRecorder, HDVideoRecorder, GeneralVideoRecorder],
             },
         "experimental_info":{
                         "possible_classes":[ExperimentalInformations],
