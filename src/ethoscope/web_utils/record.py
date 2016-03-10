@@ -52,7 +52,7 @@ class PiCameraProcess(multiprocessing.Process):
                 i += 1
                 while True:
                     camera.wait_recording(2)
-                    camera.capture(self._img_path, use_video_port=True)
+                    camera.capture(self._img_path, use_video_port=True, quality=50)
                     if time.time() - start_time >= self._VIDEO_CHUNCK_DURATION:
                         camera.split_recording(self._make_video_name(i))
                         self._write_video_index()

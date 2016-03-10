@@ -6,7 +6,7 @@ import logging
 import os
 from ethoscope.utils.debug import EthoscopeException
 import multiprocessing
-
+import traceback
 
 class BaseCamera(object):
     #TODO catch exception eg, if initialise with a wrong file
@@ -44,10 +44,10 @@ class BaseCamera(object):
         # We ensure timestamps and frame index are set to 0
 
         self.restart()
-        at_leat_one_frame = False
+        at_least_one_frame = False
         while True:
             if self.is_last_frame() or not self.is_opened():
-                if not at_leat_one_frame:
+                if not at_least_one_frame:
                     raise EthoscopeException("Camera could not read the first frame")
                 break
 
@@ -56,16 +56,13 @@ class BaseCamera(object):
             if out is None:
                 break
             t_ms = int(1000*t)
-            at_leat_one_frame = True
+            at_least_one_frame = True
 
             if (self._frame_idx % self._drop_each) == 0:
                 yield t_ms,out
 
             if self._max_duration is not None and t > self._max_duration:
                 break
-
-
-
 
     @property
     def resolution(self):
@@ -284,8 +281,6 @@ class V4L2Camera(BaseCamera):
 
     def _close(self):
         self.capture.release()
-
-
     def _next_image(self):
 
         if self._frame_idx >0 :
@@ -347,8 +342,6 @@ class OurPiCamera(BaseCamera):
             raise EthoscopeException("Error whist retrieving video frame. Got None instead. Camera not plugged?")
 
         self._frame = im
-
-
 
         if len(im.shape) < 2:
             raise EthoscopeException("The camera image is corrupted (less that 2 dimensions)")
@@ -603,10 +596,10 @@ class OurPiCameraAsync(BaseCamera):
         logging.info("All joined ok")
 
     def _next_image(self):
-
         try:
             g = self._queue.get(timeout=30)
             cv2.cvtColor(g,cv2.COLOR_GRAY2BGR,self._frame)
             return self._frame
+
         except Exception as e:
-            raise EthoscopeException("Could not get frame from camera\n%s", str(e))
+            raise EthoscopeException("Could not get frame from camera\n%s", traceback.format_exception(e))
