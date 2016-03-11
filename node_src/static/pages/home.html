@@ -62,6 +62,12 @@
                 <span ng-show="sortType == 'experimental_info.location' && sortReverse" class="fa fa-caret-up"></span>    
             </th>
             <th>
+            <th>
+                <a href="#" ng-click="sortType = 'experimental_info.suffix_video_name'; sortReverse = !sortReverse">
+                User
+                <span ng-show="sortType == 'experimental_info.suffix_video_name' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'experimental_info.suffix_video_name' && sortReverse" class="fa fa-caret-up"></span>
+            </th>
                 <a href="#" ng-click="sortType = 'ip'; sortReverse = !sortReverse">
                 ip
                     <span ng-show="sortType == 'ip' && !sortReverse" class="fa fa-caret-down"></span>

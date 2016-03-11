@@ -147,20 +147,10 @@ class ControlThreadVideoRecording(ControlThread):
         self._last_info_t_stamp = 0
         self._last_info_frame_idx = 0
         self._recorder = None
+        self._machine_id = machine_id
+        self._machine_name = name
+        self._ethoscope_dir = ethoscope_dir
 
-        now = time.time()
-        date_time = datetime.datetime.fromtimestamp(now)
-        formated_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
-        device_id = machine_id
-        device_name = name
-        file_prefix = "%s_%s" % (formated_time, device_id)
-        self._video_root_dir = ethoscope_dir
-        self._output_video_full_prefix = os.path.join(ethoscope_dir,
-                                      device_id,
-                                      device_name,
-                                      formated_time,
-                                      file_prefix
-                                      )
 
         try:
             os.makedirs(os.path.dirname(self._output_video_full_prefix))
@@ -210,7 +200,6 @@ class ControlThreadVideoRecording(ControlThread):
         try:
             self._info["status"] = "initialising"
             logging.info("Starting Monitor thread")
-
             self._info["error"] = None
 
 
@@ -222,8 +211,27 @@ class ControlThreadVideoRecording(ControlThread):
             self._info["experimental_info"] = ExpInfoClass(**exp_info_kwargs).info_dic
             self._info["time"] = time.time()
 
+            date_time = datetime.datetime.fromtimestamp(self._info["time"])
+            formated_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
+
+            try:
+                code = self._info["experimental_info"]["code"]
+            except KeyError:
+                code = "NA"
+                logging.warning("No code field in experimental info")
+
+
+            file_prefix = "%s_%s_%s" % (formated_time, self._machine_id, code)
+            self._output_video_full_prefix = os.path.join(self._ethoscope_dir,
+                                           self._machine_id,
+                                          self._device_name,
+                                          formated_time,
+                                          file_prefix
+                                          )
 
             logging.info("Start recording")
+
+
 
             RecorderClass = self._option_dict["recorder"]["class"]
             recorder_kwargs = self._option_dict["recorder"]["kwargs"]
