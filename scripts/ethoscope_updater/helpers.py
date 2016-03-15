@@ -5,15 +5,36 @@ import  urllib2 as urllib2
 import subprocess
 import os
 import traceback
-import concurrent
-import concurrent.futures as futures
-from netifaces import ifaddresses, AF_INET
 import datetime, time
 import MySQLdb
 from functools import wraps
 import socket
 
 
+
+
+try:
+    from netifaces import ifaddresses, AF_INET, AF_LINK
+except:
+    logging.warning("Could not load netifaces. This is needed for node stuff")
+try:
+    import concurrent
+    import concurrent.futures as futures
+except:
+    logging.warning("Could not load concurrent. This is needed for node stuff")
+
+class UnexpectedAction(Exception):
+    pass
+class NotNode(Exception):
+    pass
+def get_commit_version(commit):
+    return {"id":str(commit),
+            "date":datetime.datetime.utcfromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
+                    }
+def assert_node(is_node):
+    if not is_node:
+        raise NotNode("This device is not a node.")
+        
 def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
     """Retry calling the decorated function using an exponential backoff.
 
