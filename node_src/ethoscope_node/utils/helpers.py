@@ -11,7 +11,7 @@ from netifaces import ifaddresses, AF_INET
 import datetime, time
 import MySQLdb
 from functools import wraps
-
+import socket
 
 
 def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
@@ -120,30 +120,6 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
         logging.error("Unexpected error whilst scanning url: %s" % request_url)
         raise Exception(str(e))
 
-    # except urllib2.httplib.BadStatusLine:
-    #     logging.error('BadlineSatus, most probably due to update device and auto-reset')
-    #
-    # except urllib2.URLError as e:
-    #     raise
-    #     if hasattr(e, 'reason'):
-    #         logging.error('We failed to reach a server.')
-    #         logging.error('Reason: '+ str(e.reason))
-    #     elif hasattr(e, 'code'):
-    #         logging.error('The server could not fulfill the request.')
-    #         logging.error('Error code: '+ str(e.code))
-    #
-
-    # return devices_map
-
-
-def get_subnet_ip(device="wlan0"):
-    try:
-        ip = ifaddresses(device)[AF_INET][0]["addr"]
-        return ".".join(ip.split(".")[0:3])
-    except ValueError:
-        raise ValueError("Device '%s' is not valid" % device)
-
-
 
 def make_backup_path(device, result_main_dir, timeout=30):
 
@@ -183,9 +159,10 @@ def make_backup_path(device, result_main_dir, timeout=30):
         return None
     return output_db_file
 
-def generate_new_device_map(ip_range=(2,64),device="wlan0", result_main_dir="/ethoscope_results"):
+def generate_new_device_map(local_ip, ip_range=(2,64), result_main_dir="/ethoscope_results"):
         devices_map = {}
-        subnet_ip = get_subnet_ip(device)
+        subnet_ip = local_ip.split(".")[0:3]
+        subnet_ip = ".".join(subnet_ip)
 
         t0 = time.time()
 
@@ -193,6 +170,7 @@ def generate_new_device_map(ip_range=(2,64),device="wlan0", result_main_dir="/et
 
         scanned = [ "%s.%i" % (subnet_ip, i) for i in range(*ip_range) ]
         urls= ["http://%s" % str(s) for s in scanned]
+
 
         # We can use a with statement to ensure threads are cleaned up promptly
         with futures.ThreadPoolExecutor(max_workers=64) as executor:
@@ -275,3 +253,39 @@ def get_last_backup_time(device):
         return time_since_last_backup
     except Exception:
         return "No backup"
+
+
+
+
+
+def get_local_ip(local_router_ip = "192.169.123.254", node_subnet_address="1"):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect((local_router_ip ,80))
+    except socket.gaierror:
+        raise Exception("Cannot find local ip, check your connection")
+
+
+    ip = s.getsockname()[0]
+    s.close()
+
+    router_ip = local_router_ip.split(".")
+    ip_list = ip.split(".")
+    if router_ip[0:3] != ip_list[0:3]:
+        raise Exception("The local ip address does not match the expected router subnet: %s != %s" % (str(router_ip[0:3]), str(ip_list[0:3])))
+    if  ip_list[3] != node_subnet_address:
+        raise Exception("The ip of the node in the intranet should finish by %s. current ip = %s" % (node_subnet_address, ip))
+    return ip
+
+
+def get_internet_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    try:
+        s.connect(("google.com", 80))
+    except socket.gaierror:
+        raise Exception("Cannot find internet (www) connection")
+
+    ip = s.getsockname()[0]
+    s.close()
+    return ip

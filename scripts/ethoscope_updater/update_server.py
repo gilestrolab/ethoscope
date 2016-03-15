@@ -1,11 +1,5 @@
 from bottle import *
 
-import subprocess
-import socket
-import json
-import logging
-import traceback
-import urllib2
 from optparse import OptionParser
 
 import updater
@@ -140,11 +134,7 @@ def bare(action):
 def node_info():#, device):
     try:
         assert_node(is_node)
-
-        local_addrs = ifaddresses(SUBNET_DEVICE)
-        local_ip = local_addrs[AF_INET][0]["addr"]
-
-        return {'ip': "http://" + local_ip,
+        return {'ip': "http://" + LOCAL_IP,
                 'status': "NA",
                 "id": "node"}
 
@@ -152,14 +142,11 @@ def node_info():#, device):
         logging.error(e)
         return {'error': traceback.format_exc(e)}
 
-
-
-
 @app.get('/devices')
 def scan_subnet(ip_range=(2,253)):
     try:
         assert_node(is_node)
-        devices_map = generate_new_device_map(ip_range,SUBNET_DEVICE)
+        devices_map = generate_new_device_map(LOCAL_IP, ip_range)
         return devices_map
     except Exception as e:
         logging.error("Unexpected exception when scanning for devices:")
@@ -199,19 +186,9 @@ def group(what):
         logging.error(traceback.format_exc(e))
         return {'error': traceback.format_exc(e)}
 
-
-
-#
-# @app.get('/node/<action>')
-# def node(action):
-#         try:
-#             if action == 'check_updates':
-#
-#         except Exception as e:
-#             logging.error(e)
-
-
-
+def close(exit_status=0):
+    logging.info("Closing server")
+    os._exit(exit_status)
 
 
 if __name__ == '__main__':
@@ -222,8 +199,11 @@ if __name__ == '__main__':
     parser.add_option("-g", "--git-local-repo", dest="local_repo", help="route to local repository to update")
     # when no bare repo path is declares. we are in a device else, we are on a node
     parser.add_option("-b", "--bare-repo", dest="bare_repo", default=None, help="route to bare repository")
-    parser.add_option("-i", "--node-ip", dest="node_ip", help="Ip of the node in the local network")
+    #parser.add_option("-i", "--node-ip", dest="node_ip", help="Ip of the node in the local network")
+    parser.add_option("-r", "--router-ip", dest="router_ip", default="192.169.123.254",
+                      help="the ip of the router in your setup")
     parser.add_option("-p", "--port", default=8888, dest="port", help="the port to run the server on")
+    parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
 
     (options, args) = parser.parse_args()
 
@@ -236,19 +216,9 @@ if __name__ == '__main__':
     node_ip = option_dict["node_ip"]
     port = option_dict["port"]
 
-
     MACHINE_ID_FILE = '/etc/machine-id'
-    MACHINE_NAME_FILE = '/etc/machine-name'
+    DEBUG = option_dict["debug"]
 
-    p1 = subprocess.Popen(["ip", "link", "show"], stdout=subprocess.PIPE)
-    network_devices, err = p1.communicate()
-
-    wireless = re.search(r'[0-9]: (wl.*):', network_devices)
-    if wireless is not None:
-        SUBNET_DEVICE = wireless.group(1)
-
-    else:
-        logging.error("Not Wireless adapter has been detected. It is necessary to connect to Devices.")
 
     ethoscope_updater = updater.DeviceUpdater(local_repo)
 
@@ -261,6 +231,16 @@ if __name__ == '__main__':
         bare_repo_updater = None
         is_node = False
         device_id = get_machine_info(MACHINE_ID_FILE)
+
+    LOCAL_IP = get_local_ip(option_dict["router_ip"])
+    try:
+        WWW_IP = get_internet_ip()
+    except Exception as e:
+        if is_node:
+            logging.warning("Could not access internet!")
+            logging.warning(traceback.format_exception(e))
+        WWW_IP = None
+
 
     try:
         run(app, host='0.0.0.0', port=port, debug=debug, server='cherrypy')

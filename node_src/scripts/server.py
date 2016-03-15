@@ -7,7 +7,7 @@ import json
 import re
 import logging
 import traceback
-from ethoscope_node.utils.helpers import generate_new_device_map, update_dev_map_wrapped
+from ethoscope_node.utils.helpers import generate_new_device_map, update_dev_map_wrapped, get_local_ip, get_internet_ip
 from ethoscope_node.utils.helpers import get_last_backup_time
 import shutil
 import tempfile
@@ -69,10 +69,10 @@ def enable_cors():
 
 
 @app.get('/devices')
-def scan_subnet(ip_range=(2,64)):
+def scan_subnet( ip_range=(2,64)):
     global devices_map
     try:
-        devices_map_tmp = generate_new_device_map(ip_range,SUBNET_DEVICE)
+        devices_map_tmp = generate_new_device_map(LOCAL_IP, ip_range)
         detected_devices = devices_map_tmp.keys()
         for k in detected_devices:
             if k in devices_map:
@@ -300,22 +300,23 @@ def node_info(req):#, device):
             df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout=subprocess.PIPE)
             disk_free = df.communicate()[0]
             disk_usage = RESULTS_DIR+" Not Found on disk"
-            ip = "No IP assigned, check cable"
-            MAC_addr = "Not detected"
-            local_ip = ""
-            try:
-                disk_usage = disk_free.split("\n")[1].split()
-                addrs = ifaddresses(INTERNET_DEVICE)
-                MAC_addr = addrs[AF_LINK][0]["addr"]
-
-                ip = addrs[AF_INET][0]["addr"]
-                local_addrs = ifaddresses(SUBNET_DEVICE)
-                local_ip = local_addrs[AF_INET][0]["addr"]
-            except Exception as e:
-                logging.error(e)
-
-            return {'disk_usage': disk_usage, 'MAC_addr': MAC_addr, 'ip': ip,
-                    'local_ip':local_ip}
+            # ip = "No IP assigned, check cable"
+            # MAC_addr = "Not detected"
+            # local_ip = ""
+            # try:
+            #     disk_usage = disk_free.split("\n")[1].split()
+            #     addrs = ifaddresses(INTERNET_DEVICE)
+            #     MAC_addr = addrs[AF_LINK][0]["addr"]
+            #
+            #     ip = addrs[AF_INET][0]["addr"]
+            #     local_addrs = ifaddresses(SUBNET_DEVICE)
+            #     local_ip = local_addrs[AF_INET][0]["addr"]
+            # except Exception as e:
+            #     logging.error(e)
+            #fixme
+            MAC_addr = "TODO"
+            return {'disk_usage': disk_usage, 'MAC_addr': MAC_addr, 'ip': WWW_IP,
+                    'local_ip':LOCAL_IP}
         if req == 'time':
             return {'time':datetime.datetime.now().isoformat()}
         else:
@@ -386,62 +387,40 @@ def close(exit_status=0):
 
 #======================================================================================================================#
 
-
-
 if __name__ == '__main__':
-    # TODO where to save the files and the logs
-
     logging.getLogger().setLevel(logging.INFO)
-
     parser = optparse.OptionParser()
     parser.add_option("-D", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-p", "--port", dest="port", default=80,help="port")
     parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
     parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_results",help="Where temporary result files are stored")
-    parser.add_option("-i", "--internet-adapter", dest="internet_adapter", default="",help="e.g. En0, adapter user to internet connection (updates)")
-    parser.add_option("-l", "--local-adapter", dest="local_adapter", default="",help="e.g. wlan0, adapter used for the local connection with devices")
+    parser.add_option("-r", "--router-ip", dest="router_ip", default="192.169.123.254", help="the ip of the router in your setup")
+
+
 
     (options, args) = parser.parse_args()
 
     option_dict = vars(options)
     PORT = option_dict["port"]
-    debug = option_dict["debug"]
-
+    DEBUG = option_dict["debug"]
     RESULTS_DIR = option_dict["results_dir"]
+    LOCAL_IP = get_local_ip(option_dict["router_ip"])
 
-
-    #SUBNET_DEVICE = b'wlan0'
-    p1 = subprocess.Popen(["ip", "link", "show"], stdout=subprocess.PIPE)
-    network_devices, err = p1.communicate()
-    wireless = re.search(r'[0-9]: (wl.*):', network_devices)
-    ethernet = re.search(r'[0-9]: (en.*):', network_devices)
-
-    if option_dict["local_adapter"] != "":
-        SUBNET_DEVICE = option_dict["local_adapter"]
-
-    elif wireless is not None:
-        SUBNET_DEVICE = wireless.group(1)
-    else:
-        logging.error("Not Wireless adapter has been detected. It is necessary to connect to Devices.")
-        raise Exception("Not Wireless adapter has been detected. It is necessary to connect to Devices.")
-
-
-
-    if option_dict["internet_adapter"] != "":
-        INTERNET_DEVICE = option_dict["internet_adapter"]
-    elif ethernet is not None:
-        INTERNET_DEVICE = ethernet.group(1)
-    else:
-        logging.warning("Not ethernet adapter has been detected. It is necessary to connect to the internet.")
+    try:
+        WWW_IP = get_internet_ip()
+    except Exception as e:
+        logging.warning("Could not access internet!")
+        logging.warning(traceback.format_exception(e))
+        WWW_IP = None
 
     global devices_map
-
     devices_map = {}
     scan_subnet()
 
+
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
     try:
-        run(app, host='0.0.0.0', port=PORT, debug=debug, server='cherrypy')
+        run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='cherrypy')
 
     except KeyboardInterrupt:
         logging.info("Stopping server cleanly")
