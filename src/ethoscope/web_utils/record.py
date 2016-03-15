@@ -71,7 +71,7 @@ class PiCameraProcess(multiprocessing.Process):
 
 
 class GeneralVideoRecorder(DescribedObject):
-    _description  = {   "overview": "A video simple recorder",
+    _description  = {  "overview": "A video simple recorder",
                             "arguments": [
                                 {"type": "number", "name":"width", "description": "The width of the frame","default":1280, "min":480, "max":1980,"step":1},
                                 {"type": "number", "name":"height", "description": "The height of the frame","default":960, "min":360, "max":1080,"step":1},
@@ -111,12 +111,10 @@ class HDVideoRecorder(GeneralVideoRecorder):
 
 
 class StandardVideoRecorder(GeneralVideoRecorder):
-    _description  = { "overview": "A preset 1280 x 960, 25fps, bitrate = 2e5 video recorder." ,"arguments": []}
+    _description  = { "overview": "A preset 1280 x 960, 25fps, bitrate = 2e5 video recorder.", "arguments": []}
     def __init__(self, video_prefix, video_dir, img_path):
         super(StandardVideoRecorder, self).__init__(video_prefix, video_dir, img_path,
                                         width=1280, height=960,fps=25,bitrate=200000)
-
-
 
 
 
@@ -147,30 +145,14 @@ class ControlThreadVideoRecording(ControlThread):
         self._last_info_t_stamp = 0
         self._last_info_frame_idx = 0
         self._recorder = None
-
-        now = time.time()
-        date_time = datetime.datetime.fromtimestamp(now)
-        formated_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
-        device_id = machine_id
-        device_name = name
-        file_prefix = "%s_%s" % (formated_time, device_id)
+        self._machine_id = machine_id
+        self._device_name = name
         self._video_root_dir = ethoscope_dir
-        self._output_video_full_prefix = os.path.join(ethoscope_dir,
-                                      device_id,
-                                      device_name,
-                                      formated_time,
-                                      file_prefix
-                                      )
-
-        try:
-            os.makedirs(os.path.dirname(self._output_video_full_prefix))
-        except OSError:
-            pass
-
         self._tmp_dir = tempfile.mkdtemp(prefix="ethoscope_")
 
+
         #todo add 'data' -> how monitor was started to metadata
-        self._info = {  "status": "stopped",
+        self._info = {"status": "stopped",
                         "time": time.time(),
                         "error": None,
                         "log_file": os.path.join(ethoscope_dir, self._log_file),
@@ -210,7 +192,6 @@ class ControlThreadVideoRecording(ControlThread):
         try:
             self._info["status"] = "initialising"
             logging.info("Starting Monitor thread")
-
             self._info["error"] = None
 
 
@@ -222,14 +203,45 @@ class ControlThreadVideoRecording(ControlThread):
             self._info["experimental_info"] = ExpInfoClass(**exp_info_kwargs).info_dic
             self._info["time"] = time.time()
 
+            date_time = datetime.datetime.fromtimestamp(self._info["time"])
+            formated_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
+
+            try:
+                code = self._info["experimental_info"]["code"]
+            except KeyError:
+                code = "NA"
+                logging.warning("No code field in experimental info")
+
+
+
+
+            file_prefix = "%s_%s_%s" % (formated_time, self._machine_id, code)
+
+            import os
+            self._output_video_full_prefix = os.path.join(self._video_root_dir,
+                                           self._machine_id,
+                                          self._device_name,
+                                          formated_time,
+                                          file_prefix
+                                          )
+
+
+            try:
+                os.makedirs(os.path.dirname(self._output_video_full_prefix))
+            except OSError:
+                pass
+
+
 
             logging.info("Start recording")
 
             RecorderClass = self._option_dict["recorder"]["class"]
             recorder_kwargs = self._option_dict["recorder"]["kwargs"]
+
             self._recorder = RecorderClass(video_prefix = self._output_video_full_prefix,
                                            video_dir = self._video_root_dir,
                                            img_path=self._info["last_drawn_img"],**recorder_kwargs)
+
 
             self._info["status"] = "recording"
             self._recorder.run()

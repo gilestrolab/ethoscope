@@ -5,6 +5,7 @@ import traceback
 import shutil
 import logging
 import time
+import re
 
 import cv2
 
@@ -34,11 +35,25 @@ class ExperimentalInformations(DescribedObject):
         _description  = {   "overview": "Optional information about your experiment",
                             "arguments": [
                                     {"type": "str", "name":"name", "description": "Who are you?","default":""},
-                                    {"type": "str", "name":"location", "description": "Where is your device","default":""}
+                                    {"type": "str", "name":"location", "description": "Where is your device","default":""},
+                                    {"type": "str", "name":"code", "description": "Would you like to add any particular information in the video file name?","default":""}
+
                                    ]}
-        def __init__(self,name="",location=""):
+        def __init__(self, name="", location="", code=""):
+            self._check_code(code)
             self._info_dic = {"name":name,
-                              "location":location}
+                              "location":location,
+                              "code":code}
+
+        def _check_code(self, code):
+            r = re.compile(r"[^a-zA-Z0-9-]")
+            clean_code = r.sub("",code)
+            if len(code) != len(clean_code):
+                logging.error("the code in the video name contains unallowed characters")
+                raise Exception("Code contains special characters. Please use only letters, digits or -")
+
+
+
         @property
         def info_dic(self):
             return self._info_dic
