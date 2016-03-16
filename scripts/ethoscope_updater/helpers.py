@@ -10,6 +10,7 @@ import traceback
 import random
 import subprocess
 import time
+import socket
 
 try:
     from netifaces import ifaddresses, AF_INET, AF_LINK
@@ -308,3 +309,4 @@ def get_internet_ip():
     ip = s.getsockname()[0]
     s.close()
     return ip
+    
