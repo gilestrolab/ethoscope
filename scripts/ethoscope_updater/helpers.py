@@ -201,29 +201,6 @@ def generate_new_device_map(local_ip, ip_range=(2,64), result_main_dir="/ethosco
         logging.info("DEVICE INFO -> Detected %i devices in %i seconds:\n%s" % (len(devices_map),time.time() - t0, str(all_devices)))
 
 
- # We can use a with statement to ensure threads are cleaned up promptly
-        with futures.ThreadPoolExecutor(max_workers=64) as executor:
-            # Start the load operations and mark each future with its URL
-            fs = {}
-            for id in devices_map.keys():
-                device = devices_map[id]
-                fs[executor.submit(make_backup_path, device,result_main_dir)] = id
-
-            for f in concurrent.futures.as_completed(fs):
-                try:
-                    id = fs[f]
-                    path = f.result()
-                    if path:
-                        devices_map[id]["backup_path"] = path
-
-                except Exception as e:
-                    logging.error("Error whilst getting backup path for device")
-                    logging.error(traceback.format_exc(e))
-
-
-        for d in devices_map.values():
-            d["time_since_backup"] = get_last_backup_time(d)
-
 
         all_devices = sorted(devices_map.keys())
         logging.info("BACKUP_PATH -> Detected %i devices in %i seconds:\n%s" % (len(devices_map),time.time() - t0, str(all_devices)))
