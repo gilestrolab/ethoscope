@@ -88,7 +88,7 @@ if __name__ == '__main__':
         parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
         parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_results",
                           help="Where temporary result files are stored")
-        parser.add_option("-v", "--videos-dirs", dest="videos_dirs", default="/ethoscope_videos",
+        parser.add_option("-v", "--videos-dir", dest="videos_dir", default="/ethoscope_videos",
                           help="Where video should be saved")
         parser.add_option("-r", "--router-ip", dest="router_ip", default="192.169.123.254",
                           help="the ip of the router in your setup")
