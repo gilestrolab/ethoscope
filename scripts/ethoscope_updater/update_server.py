@@ -213,7 +213,6 @@ if __name__ == '__main__':
         raise Exception("Where is the git wd to update?. use -g")
 
     bare_repo = option_dict["bare_repo"]
-    node_ip = option_dict["node_ip"]
     port = option_dict["port"]
 
     MACHINE_ID_FILE = '/etc/machine-id'
