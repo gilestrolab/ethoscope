@@ -273,3 +273,38 @@ def reload_node_daemon():
 
 def reload_device_daemon():
     _reload_daemon("ethoscope_device")
+
+
+
+
+def get_local_ip(local_router_ip = "192.169.123.254", node_subnet_address="1"):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect((local_router_ip ,80))
+    except socket.gaierror:
+        raise Exception("Cannot find local ip, check your connection")
+
+
+    ip = s.getsockname()[0]
+    s.close()
+
+    router_ip = local_router_ip.split(".")
+    ip_list = ip.split(".")
+    if router_ip[0:3] != ip_list[0:3]:
+        raise Exception("The local ip address does not match the expected router subnet: %s != %s" % (str(router_ip[0:3]), str(ip_list[0:3])))
+    if  ip_list[3] != node_subnet_address:
+        raise Exception("The ip of the node in the intranet should finish by %s. current ip = %s" % (node_subnet_address, ip))
+    return ip
+
+
+def get_internet_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    try:
+        s.connect(("google.com", 80))
+    except socket.gaierror:
+        raise Exception("Cannot find internet (www) connection")
+
+    ip = s.getsockname()[0]
+    s.close()
+    return ip
