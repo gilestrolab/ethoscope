@@ -145,21 +145,20 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
     return devices_map
 
 
-def generate_new_device_map(local_ip, ip_range=(2,64), result_main_dir="/ethoscope_results"):
+
+
+def generate_new_device_map(local_ip, ip_range=(2, 128)):
         devices_map = {}
         subnet_ip = local_ip.split(".")[0:3]
         subnet_ip = ".".join(subnet_ip)
 
-        t0 = time.time()
 
         logging.info("Scanning attached devices")
-
         scanned = [ "%s.%i" % (subnet_ip, i) for i in range(*ip_range) ]
         urls= ["http://%s" % str(s) for s in scanned]
 
-
         # We can use a with statement to ensure threads are cleaned up promptly
-        with futures.ThreadPoolExecutor(max_workers=64) as executor:
+        with futures.ThreadPoolExecutor(max_workers=128) as executor:
             # Start the load operations and mark each future with its URL
 
             fs = [executor.submit(scan_one_device, url) for url in urls]
@@ -167,45 +166,70 @@ def generate_new_device_map(local_ip, ip_range=(2,64), result_main_dir="/ethosco
 
                 try:
                     id, ip = f.result()
-                    devices_map[id] = {"ip":ip, "id":id}
+                    if id is None:
+                        continue
+                    devices_map[id] = {"ip":ip, "status": "Software broken", "id":id}
+
 
                 except Exception as e:
                     logging.error("Error whilst pinging url")
                     logging.error(traceback.format_exc(e))
-
         if len(devices_map) < 1:
             logging.warning("No device detected")
             return  devices_map
 
-        all_devices = sorted(devices_map.keys())
-        logging.info("DEVICE ID -> Detected %i devices in %i seconds:\n%s" % (len(devices_map),time.time() - t0, str(all_devices)))
-        # We can use a with statement to ensure threads are cleaned up promptly
+        logging.info("Detected %i devices:\n%s" % (len(devices_map), str(devices_map.keys())))
 
-        with futures.ThreadPoolExecutor(max_workers=5) as executor:
+
+        # We can use a with statement to ensure threads are cleaned up promptly
+        with futures.ThreadPoolExecutor(max_workers=128) as executor:
             # Start the load operations and mark each future with its URL
             fs = {}
             for id in devices_map.keys():
                 fs[executor.submit(update_dev_map_wrapped,devices_map, id)] = id
 
             for f in concurrent.futures.as_completed(fs):
+                id = fs[f]
                 try:
-                    id = fs[f]
                     data = f.result()
                     devices_map[id].update(data)
-
                 except Exception as e:
                     logging.error("Could not get data from device %s :" % id)
                     logging.error(traceback.format_exc(e))
-                    del devices_map[id]
-        all_devices = sorted(devices_map.keys())
-        logging.info("DEVICE INFO -> Detected %i devices in %i seconds:\n%s" % (len(devices_map),time.time() - t0, str(all_devices)))
 
+        # Adds the active_branch to devices_,map
+        with futures.ThreadPoolExecutor(max_workers=128) as executor:
+            # Start the load operations and mark each future with its URL
+            fs={}
+            for id in devices_map.keys():
+                fs[executor.submit(update_dev_map_wrapped,devices_map, id,what='device/active_branch',port='8888')] = id
+            for f in concurrent.futures.as_completed(fs):
+                id = fs[f]
+                try:
+                    data = f.result()
+                    devices_map[id].update(data)
+                except Exception as e:
+                    logging.error("Could not get data from device %s :" % id)
+                    logging.error(traceback.format_exc(e))
 
+        # Adds the check_update to devices_,map
+        with futures.ThreadPoolExecutor(max_workers=128) as executor:
+            # Start the load operations and mark each future with its URL
+            fs={}
+            for id in devices_map.keys():
+                fs[executor.submit(update_dev_map_wrapped,devices_map, id,what='device/check_update',port='8888')] = id
+            for f in concurrent.futures.as_completed(fs):
+                id = fs[f]
+                try:
+                    data = f.result()
+                    devices_map[id].update(data)
+                except Exception as e:
+                    logging.error("Could not get data from device %s :" % id)
+                    logging.error(traceback.format_exc(e))
 
-        all_devices = sorted(devices_map.keys())
-        logging.info("BACKUP_PATH -> Detected %i devices in %i seconds:\n%s" % (len(devices_map),time.time() - t0, str(all_devices)))
 
         return devices_map
+
 
 def updates_api_wrapper(ip,id, what="check_update",type=None, port=8888, data=None):
     response = ''
