@@ -7,11 +7,14 @@ import os
 import traceback
 import concurrent
 import concurrent.futures as futures
-from netifaces import ifaddresses, AF_INET
+
 import datetime, time
 import MySQLdb
 from functools import wraps
 import socket
+
+class ScanException(Exception):
+    pass
 
 
 def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
@@ -35,10 +38,6 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
         return f_retry
     return deco_retry
 
-class ScanException(Exception):
-    pass
-
-
 @retry(ScanException, tries=3,delay=1, backoff=1)
 def scan_one_device(ip, timeout=3, port=9000, page="id"):
     """
@@ -48,7 +47,6 @@ def scan_one_device(ip, timeout=3, port=9000, page="id"):
     :return: The message, parsed as dictionary. the "ip" field is also added to the result.
     If the url could not be reached/parsed, (None,None) is returned
     """
-
 
     url="%s:%i/%s" % (ip, port, page)
     try:
