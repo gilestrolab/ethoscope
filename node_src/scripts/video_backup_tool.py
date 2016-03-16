@@ -99,7 +99,7 @@ if __name__ == '__main__':
         VIDEO_RESULTS_DIR = option_dict["videos_dir"]
 
         gbw = GenericBackupWrapper( backup_job,
-                                    option_dict["result_dir"],
+                                    option_dict["results_dir"],
                                     option_dict["safe"]
                                     )
         gbw.run()
