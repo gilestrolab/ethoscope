@@ -105,7 +105,7 @@ class HDVideoRecorder(GeneralVideoRecorder):
                                   "so we effectively zoom in the middle of arenas","arguments": []}
     def __init__(self, video_prefix, video_dir, img_path):
         super(HDVideoRecorder, self).__init__(video_prefix, video_dir, img_path,
-                                        width=1920, height=1080,fps=25,bitrate=500000)
+                                        width=1920, height=1080,fps=25,bitrate=1000000)
 
 
 
@@ -114,7 +114,7 @@ class StandardVideoRecorder(GeneralVideoRecorder):
     _description  = { "overview": "A preset 1280 x 960, 25fps, bitrate = 2e5 video recorder.", "arguments": []}
     def __init__(self, video_prefix, video_dir, img_path):
         super(StandardVideoRecorder, self).__init__(video_prefix, video_dir, img_path,
-                                        width=1280, height=960,fps=25,bitrate=200000)
+                                        width=1280, height=960,fps=25,bitrate=500000)
 
 
 
