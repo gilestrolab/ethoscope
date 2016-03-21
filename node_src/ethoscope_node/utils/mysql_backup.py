@@ -205,20 +205,19 @@ class MySQLdbToSQlite(object):
             dst_command= "SELECT MAX(id) FROM %s" % table_name
             dst_cur.execute(dst_command)
         except (sqlite3.OperationalError, MySQLdb.ProgrammingError):
-            logging.warning(" Local table %s appears empty. Rebuilding it from source" % table_name)
+            logging.warning("Local table %s appears empty. Rebuilding it from source" % table_name)
             self._replace_table(table_name, src, dst)
             return
 
         last_id_in_dst = 0
         for c in dst_cur:
-            last_id_in_dst = c[0]
-            if last_id_in_dst is None:
-                logging.warning("There seem to be no data in %s, %s stopping here" % (os.path.basename(self._dst_path), table_name))
-                return
+            if c[0] is None:
+                logging.warning("There seem to be no data in %s, %s. Recreating it" % (os.path.basename(self._dst_path), table_name))
+                self._replace_table(table_name, src, dst)
+            else:
+                last_id_in_dst = c[0]
         src_command = "SELECT * FROM %s WHERE id > %d" % (table_name, last_id_in_dst)
         src_cur.execute(src_command)
-
-
 
         to_insert = []
         i = 0
