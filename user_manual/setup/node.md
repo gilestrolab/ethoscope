@@ -180,6 +180,16 @@ systemctl enable ethoscope_update_node.service
 ```
 
 
+
+Time
+----------
+
+It makes everything easier if you force time to be GMT regardless of your timezone and season:
+
+```
+timedatectl set-timezone GMT
+```
+
 What is next
 -----------------------
 In order to check things:
