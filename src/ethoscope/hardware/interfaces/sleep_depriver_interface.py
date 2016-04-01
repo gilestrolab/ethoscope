@@ -29,7 +29,7 @@ class SleepDepriverConnection(SimpleLynxMotionConnection):
             for i in range(1,11):
                 self.deprive(i)
 
-    def deprive(self,channel, dt=500,margin=5):
+    def deprive(self,channel, dt=500,margin=10):
         """
         Sleep deprive an animal by rotating its tube.
 
