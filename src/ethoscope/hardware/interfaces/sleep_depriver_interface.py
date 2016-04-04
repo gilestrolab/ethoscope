@@ -29,22 +29,28 @@ class SleepDepriverConnection(SimpleLynxMotionConnection):
             for i in range(1,11):
                 self.deprive(i)
 
-    def deprive(self,channel, dt=500,margin=10):
+    def deprive(self,channel, dt=350,margin=10):
         """
         Sleep deprive an animal by rotating its tube.
 
         :param channel: The chanel to use (i.e. the number of the servo)
         :typechannel: int
-        :param dt: The time it takes to go from 0 to 180 degrees (inms)
+        :param dt: The time it takes to go from 0 to 180 degrees (in ms)
         :type dt: int
         :param margin: the number of degree to pad rotation. eg 5 -> rotation from 5 -> 175
         :type dt: int
         """
-        self.move_to_angle(channel, self._max_angle_pulse[0] - margin,dt)
+        
+        
+        half_dt = int(float(dt/2.0))
+        self.move_to_angle(channel, self._max_angle_pulse[0]-margin,half_dt)
+        time.sleep(dt/2000.0)
+        self.move_to_angle(channel, self._min_angle_pulse[0]+margin,dt)
         time.sleep(dt/1000.0)
-        self.move_to_angle(channel, self._min_angle_pulse[0] + margin,dt)
+        self.move_to_angle(channel, self._max_angle_pulse[0]-margin,dt)
         time.sleep(dt/1000.0)
-
+        self.move_to_angle(channel, 0,half_dt)
+        time.sleep(dt/2000.0)
 
 class SleepDepriverSubProcess(multiprocessing.Process):
     _DepriverConnectionClass = SleepDepriverConnection
