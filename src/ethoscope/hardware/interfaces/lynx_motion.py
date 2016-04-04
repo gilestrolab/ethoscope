@@ -21,8 +21,9 @@ class SimpleLynxMotionConnection(object):
     #_max_angle_pulse = (150.,2400.)
 
     # blue old school servo
-    _min_angle_pulse = (0.,500.)
-    _max_angle_pulse = (180.,2500.)
+    _min_angle_pulse = (-90.,535.)
+    _max_angle_pulse = (90.,2500.)
+
 
 
     def __init__(self, port=None):
@@ -107,7 +108,7 @@ class SimpleLynxMotionConnection(object):
             raise Exception("Angle too narrow: %i" % angle)
 
         slope = (max_p - min_p)/(max_a-min_a)
-        pulse = min_p + angle * slope
+        pulse = min_p + (angle - min_a) * slope
         return pulse
 
     def move_to_angle(self,idx,angle=0.,time=1000):
