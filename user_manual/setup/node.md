@@ -12,7 +12,7 @@ The node is a regular computer with an wireless connection does quite a few thin
 * Runs an NTP server (so it used as the central clock of the platform)
 * Runs a video backup tool, that fetches video chunks from recording devices (we can record instead of tracking).
 
-The node simply orchestrate the platform, ** it does not analyse any data** tracking is performed, in real time, by each device.
+The node simply orchestrate the platform, **it does not analyse any data** tracking is performed, in real time, by each device.
 Hence, if some devices are running and the node (or the network) shuts down, tracking will not be interrupted, and the data will be backed up on the node as soon as it is running again.
 
 The hardware specification for the node can therefore be pretty standard, I would go with:
@@ -180,6 +180,16 @@ systemctl enable ethoscope_update_node.service
 ```
 
 
+
+Time
+----------
+
+It makes everything easier if you force time to be GMT regardless of your timezone and season:
+
+```
+timedatectl set-timezone GMT
+```
+
 What is next
 -----------------------
 In order to check things:
@@ -189,7 +199,7 @@ In order to check things:
 * test the local server at http://0.0.0.0
 * test the local server at http://192.169.123.1 (will fail until your network is configured)
 * test the update server http://192.169.123.1:8888
-* test the dns mask http://node
+* test the dns mask (go at http://node)
 
 
 
