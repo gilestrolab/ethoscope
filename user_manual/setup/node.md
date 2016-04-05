@@ -170,7 +170,7 @@ In addition to the node services, we ant to run the update daemon.
 It is important that the update server is copied out of the git repository. This way, the update does *not* update itself.
 
 ```sh
-UPDATER_LOCATION_IN_GIT=UPDATER_LOCATION_IN_GIT=scripts/ethoscope_updater
+UPDATER_LOCATION_IN_GIT=scripts/ethoscope_updater
 cp $TARGET_GIT_INSTALL/$UPDATER_LOCATION_IN_GIT $TARGET_UPDATER_DIR -r
 cd $TARGET_UPDATER_DIR
 cp ethoscope_update_node.service /etc/systemd/system/ethoscope_update_node.service
