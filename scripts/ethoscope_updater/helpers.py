@@ -147,7 +147,7 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
 
 
 
-def generate_new_device_map(local_ip, ip_range=(2, 128)):
+def generate_new_device_map(local_ip, ip_range=(6, 128)):
         devices_map = {}
         subnet_ip = local_ip.split(".")[0:3]
         subnet_ip = ".".join(subnet_ip)

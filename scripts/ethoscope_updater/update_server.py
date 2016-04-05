@@ -143,7 +143,7 @@ def node_info():#, device):
         return {'error': traceback.format_exc(e)}
 
 @app.get('/devices')
-def scan_subnet(ip_range=(2,253)):
+def scan_subnet(ip_range=(6,253)):
     try:
         assert_node(is_node)
         devices_map = generate_new_device_map(LOCAL_IP, ip_range)
@@ -237,7 +237,7 @@ if __name__ == '__main__':
     except Exception as e:
         if is_node:
             logging.warning("Could not access internet!")
-            logging.warning(traceback.format_exception(e))
+            logging.warning(traceback.format_exc(e))
         WWW_IP = None
 
 

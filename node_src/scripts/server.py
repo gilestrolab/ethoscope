@@ -69,7 +69,7 @@ def enable_cors():
 
 
 @app.get('/devices')
-def scan_subnet( ip_range=(2,64)):
+def scan_subnet( ip_range=(6,100)):
     global devices_map
     try:
         devices_map_tmp = generate_new_device_map(LOCAL_IP, ip_range)
@@ -410,7 +410,7 @@ if __name__ == '__main__':
         WWW_IP = get_internet_ip()
     except Exception as e:
         logging.warning("Could not access internet!")
-        logging.warning(traceback.format_exception(e))
+        logging.warning(traceback.format_exc(e))
         WWW_IP = None
 
     global devices_map
