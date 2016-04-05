@@ -18,12 +18,13 @@ Wireless configuration
 DHCP
 --------
 
-* **start ip** is `192.169.123.2`
+* **start ip** is `192.169.123.6`
 * **end ip** is `192.169.123.250`
 * **default gateway** is `192.169.123.254`
 A **very important thing** is to reserve the ip `192.169.123.1` to the node.
 in order to do that, you will need the MAC ip of the **wireless interface** of the node.
 **DO NOT PUT THE MAC IP OF THE ETHERNET INTERFACE**
+
 
 In order to get it, you can use `ip link` on the node. You will get something like:
 
