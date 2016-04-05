@@ -157,7 +157,7 @@ cd $TARGET_GIT_INSTALL/scripts
 
 cp ./ethoscope_node.service /etc/systemd/system/ethoscope_node.service
 cp ./ethoscope_backup.service /etc/systemd/system/ethoscope_backup.service
-cp ./ethoscope_backup.service /etc/systemd/system/ethoscope_video_backup.service
+cp ./ethoscope_video_backup.service /etc/systemd/system/ethoscope_video_backup.service
 
 systemctl daemon-reload
 
