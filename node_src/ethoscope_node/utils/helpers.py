@@ -256,26 +256,7 @@ def get_last_backup_time(device):
 
 
 
-# def get_local_ip(local_router_ip = "192.169.123.254", max_node_subnet_address=5):
-#     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-#     try:
-#         s.connect((local_router_ip ,80))
-#     except socket.gaierror:
-#         raise Exception("Cannot find local ip, check your connection")
-#
-#
-#     ip = s.getsockname()[0]
-#     s.close()
-#
-#     router_ip = local_router_ip.split(".")
-#     ip_list = ip.split(".")
-#     if router_ip[0:3] != ip_list[0:3]:
-#         raise Exception("The local ip address does not match the expected router subnet: %s != %s" % (str(router_ip[0:3]), str(ip_list[0:3])))
-#     if  int(ip_list[3]) >  max_node_subnet_address:
-#         raise Exception("The the last field of the node ip should be lower or equal to %i. current ip = %s" % (max_node_subnet_address, ip))
-#     return ip
-
-def get_local_ip(local_router_ip = "192.169.123.254", node_subnet_address="1"):
+def get_local_ip(local_router_ip = "192.169.123.254", max_node_subnet_address=5):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         s.connect((local_router_ip ,80))
@@ -290,10 +271,9 @@ def get_local_ip(local_router_ip = "192.169.123.254", node_subnet_address="1"):
     ip_list = ip.split(".")
     if router_ip[0:3] != ip_list[0:3]:
         raise Exception("The local ip address does not match the expected router subnet: %s != %s" % (str(router_ip[0:3]), str(ip_list[0:3])))
-    if  ip_list[3] != node_subnet_address:
-        raise Exception("The ip of the node in the intranet should finish by %s. current ip = %s" % (node_subnet_address, ip))
+    if  int(ip_list[3]) >  max_node_subnet_address:
+        raise Exception("The the last field of the node ip should be lower or equal to %i. current ip = %s" % (max_node_subnet_address, ip))
     return ip
-
 
 def get_internet_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
