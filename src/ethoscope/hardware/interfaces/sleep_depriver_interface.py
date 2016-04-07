@@ -84,7 +84,7 @@ class SleepDepriverSubProcess(multiprocessing.Process):
                     sleep_dep.deprive(**instruction_kwargs)
                 except Exception as e:
                     do_run=False
-                    logging.error("Unexpected error whist depriving. Instruction was: %s" % str(instruction_kwargs))
+                    logging.error("Unexpected error whilst depriving. Instruction was: %s" % str(instruction_kwargs))
                     logging.error(e)
 
                 finally:

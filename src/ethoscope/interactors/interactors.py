@@ -83,6 +83,9 @@ class   BaseInteractor(DescribedObject):
             raise ValueError("No tracker bound to this interactor. Use `bind_tracker()` methods")
 
         interact, result  = self._decide()
+        # print "--------------------"
+        # print interact, result
+
         if interact == HasInteractedVariable(True):
             self._interact(**result)
 
@@ -102,7 +105,8 @@ class   BaseInteractor(DescribedObject):
         raise NotImplementedError
 
     def _interact(self, **kwargs):
-        self._hardware_interface.interact(**kwargs)
+        if self._hardware_interface is not None:
+            self._hardware_interface.interact(**kwargs)
 
 
 class DefaultInteractor(BaseInteractor):

@@ -10,7 +10,7 @@ import sys
 class IsMovingInteractor(BaseInteractor):
     _hardwareInterfaceClass = DefaultInterface
 
-    def __init__(self, hardware_interface, velocity_threshold=0.0060):
+    def __init__(self, hardware_interface=None, velocity_threshold=0.0060):
         """
         class implementing an interactor that decides whether an animal has moved though does nothing   accordingly.
         :param hardware_interface: a default hardware interface object
