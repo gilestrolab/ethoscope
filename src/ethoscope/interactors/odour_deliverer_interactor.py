@@ -98,15 +98,15 @@ class DynamicOdourDeliverer(HasChangedSideInteractor):
         try:
             channel = self._roi_to_channel[roi_id]
         except KeyError:
-            return HasInteractedVariable(False), {"channel":0}
+            return HasInteractedVariable(False), {"channel":0, "pos": None}
 
         if self._scheduler.check_time_range() is False:
-            return HasInteractedVariable(False), {"channel":channel}
+            return HasInteractedVariable(False), {"channel":channel, "pos": None}
 
         has_changed_side = self._has_changed_side()
 
         if has_changed_side == 0:
-            return HasInteractedVariable(False), {"channel": channel}
+            return HasInteractedVariable(False), {"channel": channel, "pos": None}
 
         return HasInteractedVariable(True), {"channel":channel, "pos" : self._side_to_pos[has_changed_side]}
 

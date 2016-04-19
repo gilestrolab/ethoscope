@@ -22,7 +22,7 @@ class OdourDelivererConnection(SimpleLynxMotionConnection):
                                       2: 20,
                                       3: 0}
         self._extra_move = 0.25
-        self._dt = 750.0
+        self._dt = 750
         self._current_pos = [3] * 10
         self.warm_up()
 
@@ -35,9 +35,7 @@ class OdourDelivererConnection(SimpleLynxMotionConnection):
         for i in range(1, 2):
             for k in range(1,4):
                 self.move_to_pos(i, k)
-
             time.sleep(3 * self._dt / 1000.0)
-            print ('i', i)
 
     def move_to_pos(self,channel, pos):
         """
@@ -54,7 +52,7 @@ class OdourDelivererConnection(SimpleLynxMotionConnection):
         if pos !=3:
             self.move_to_angle(channel, angle + angle * self._extra_move,  self._dt)
         else:
-            current_angle = self._positions_to_angles[self._current_pos[channel]]
+            current_angle = self._positions_to_angles[self._current_pos[channel-1]]
             pos_to_go = 0 - current_angle * self._extra_move
             self.move_to_angle(channel, pos_to_go, self._dt)
 
@@ -62,7 +60,7 @@ class OdourDelivererConnection(SimpleLynxMotionConnection):
         # then we bounce back to the final position:
         time.sleep(self._dt/1000)
         self.move_to_angle(channel, angle, self._dt)
-        self._current_pos[channel] = pos
+        self._current_pos[channel-1] = pos
         time.sleep(self._dt / 1000.0)
 
 #
@@ -100,7 +98,7 @@ class OdourDelivererSubProcess(multiprocessing.Process):
                     device.move_to_pos(**instruction_kwargs)
                 except Exception as e:
                     do_run=False
-                    logging.error("Unexpected error whilst depriving. Instruction was: %s" % str(instruction_kwargs))
+                    logging.error("Unexpected error whilst moving to position. Instruction was: %s" % str(instruction_kwargs))
                     logging.error(e)
 
                 finally:
