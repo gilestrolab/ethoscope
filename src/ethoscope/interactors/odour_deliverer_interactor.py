@@ -3,7 +3,7 @@ __author__ = 'quentin'
 
 from ethoscope.interactors.interactors import BaseInteractor, HasInteractedVariable, SimpleScheduler
 from ethoscope.hardware.interfaces.interfaces import  DefaultInterface
-from ethoscope.hardware.interfaces.sleep_depriver_interface import SleepDepriverInterface
+from ethoscope.hardware.interfaces.odour_delivery_device import OdourDelivererInterface
 import sys
 
 
@@ -63,7 +63,7 @@ class DynamicOdourDeliverer(HasChangedSideInteractor):
                                     {"type": "datetime", "name": "end_datetime", "description": "When sleep deprivation is to be ended","default":sys.maxsize}
                                    ]}
 
-    _hardwareInterfaceClass = SleepDepriverInterface
+    _hardwareInterfaceClass =  OdourDelivererInterface
     _roi_to_channel = {
             1:1,  2:2,  3:3,  4:4,  5:5,
             6:6, 7:7, 8:8, 9:9, 10:10
