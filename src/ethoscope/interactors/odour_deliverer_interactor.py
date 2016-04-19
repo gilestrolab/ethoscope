@@ -27,12 +27,12 @@ class HasChangedSideInteractor(BaseInteractor):
         if len(positions ) <2 :
             return False
 
-
+        w = float(self._tracker._roi.get_feature_dict()["w"])
         if len(positions[-1]) != 1:
             raise Exception("This interactor can only work with a single animal per ROI")
-        x0 = positions[-1][0]["x"]
-        xm1 = positions[-2][0]["x"]
-
+        x0 = positions[-1][0]["x"] / w
+        xm1 = positions[-2][0]["x"] / w
+        
         if x0 > self._middle_line:
             current_region = 2
         else:
