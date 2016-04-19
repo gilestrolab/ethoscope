@@ -53,6 +53,7 @@ class SimpleLynxMotionConnection(object):
 
     def _find_port(self):
         from serial.tools import list_ports
+        import serial
         all_port_tuples = list_ports.comports()
         logging.info("listing serial ports")
 

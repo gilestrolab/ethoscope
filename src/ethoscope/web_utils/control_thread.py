@@ -24,6 +24,7 @@ from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.interactors.interactors import DefaultInteractor
 from ethoscope.interactors.sleep_depriver_interactor import SleepDepInteractor, SystematicSleepDepInteractor, ExperimentalSleepDepInteractor
+from ethoscope.interactors.odour_deliverer_interactor import DynamicOdourDeliverer
 from ethoscope.interactors.fake_sleep_dep_interactor import FakeSleepDepInteractor, FakeSystematicSleepDepInteractor
 
 from ethoscope.utils.debug import EthoscopeException
@@ -72,7 +73,8 @@ class ControlThread(Thread):
                         "possible_classes":[DefaultInteractor,SleepDepInteractor,
                                             SystematicSleepDepInteractor,
                                             ExperimentalSleepDepInteractor,
-                                            FakeSystematicSleepDepInteractor],
+                                            FakeSystematicSleepDepInteractor,
+                                            DynamicOdourDeliverer],
                     },
         "drawer":{
                         "possible_classes":[DefaultDrawer, NullDrawer],
