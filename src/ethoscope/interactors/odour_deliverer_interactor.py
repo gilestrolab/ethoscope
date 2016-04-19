@@ -82,8 +82,6 @@ class DynamicOdourDeliverer(HasChangedSideInteractor):
         :return:
         """
 
-        self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
-
         self._t0 = None
         self._scheduler = SimpleScheduler(start_datetime, end_datetime)
         super(DynamicOdourDeliverer, self).__init__(hardware_interface)
@@ -91,10 +89,7 @@ class DynamicOdourDeliverer(HasChangedSideInteractor):
 
 
     def _decide(self):
-
         roi_id= self._tracker._roi.idx
-        now =  self._tracker.last_time_point
-
         try:
             channel = self._roi_to_channel[roi_id]
         except KeyError:
