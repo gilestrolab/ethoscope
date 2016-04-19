@@ -5,7 +5,7 @@ from ethoscope.interactors.interactors import BaseInteractor, HasInteractedVaria
 from ethoscope.hardware.interfaces.interfaces import  DefaultInterface
 from ethoscope.hardware.interfaces.odour_delivery_device import OdourDelivererInterface
 import sys
-
+import logging
 
 class HasChangedSideInteractor(BaseInteractor):
     _hardwareInterfaceClass = DefaultInterface
@@ -32,7 +32,8 @@ class HasChangedSideInteractor(BaseInteractor):
             raise Exception("This interactor can only work with a single animal per ROI")
         x0 = positions[-1][0]["x"] / w
         xm1 = positions[-2][0]["x"] / w
-        
+
+
         if x0 > self._middle_line:
             current_region = 2
         else:
@@ -42,6 +43,10 @@ class HasChangedSideInteractor(BaseInteractor):
             past_region = 2
         else:
             past_region = 1
+
+        if self._tracker._roi == 1:
+            logging.warning(str((x0, xm1, current_region, past_region)))
+
         if current_region != past_region:
             # we return the current region as 1 or 2 if it has changed
             return current_region
