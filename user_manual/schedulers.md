@@ -4,7 +4,8 @@ Using schedulers to define when modules will perform their tasks.
 
 When plannig experiment with ethoscope modules, you will often want to decide **when** to run module.
 Schedulers allow you to specify this in a flexible maner.
-Importantly, this only controls optional hardware modules, not tracking. TRacking is only stopped when clicking on the "stop" button.
+Importantly, this only controls optional hardware modules, not tracking. 
+Tracking is only stopped when clicking on the "stop" button.
 
 Default
 --------------
@@ -45,7 +46,8 @@ Advances uses
 Sometimes, you will want to specify several valid time intervals when to apply your module.
 For instance, overnight interaction for two consecutive night (but nothing during the day).
 
-You can set sevral time range by separating them with a `,`. FOr inctance:
+You can set sevral time range by separating them with a `,`. 
+For instance:
 ```
 DATE1 > DATE2, DATE3 > DATE4
 ```
