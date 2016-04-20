@@ -1,13 +1,14 @@
 import re
 import datetime
 import time
+import logging
 
 class DateRangeError(Exception):
     pass
 
 class Scheduler(object):
-    def __init__(self,str):
-        date_range_str = str.split(",")
+    def __init__(self, in_str):
+        date_range_str = in_str.split(",")
         self._date_ranges = []
         for drs in  date_range_str:
             dr = self._parse_date_range(drs)
@@ -66,6 +67,8 @@ class Scheduler(object):
                 out =  (d1, float("inf"))
             else:
                 out =  (d1, d2)
+        else:
+            raise Exception("Unexpected date string")
         if out[0] >= out[1]:
             raise DateRangeError("Error in date %s, the thse second date appears before the first!" % str)
         return out

@@ -119,6 +119,7 @@
                             {{arg.description}}
                             <input ng-if="arg.type == 'number'" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]" >
                             <input ng-if="arg.type == 'str'" type=text name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  >
+                            <input ng-if="arg.type == 'date_range'" type=text name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  >
                         <input ng-if="arg.type == 'datetime'" type=number name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name][1]" step=1>
                             <div class="dropdown" ng-if="arg.type == 'datetime'">
                                 <a class="dropdown-toggle" id="dropdown{{arg.name}}" role="button" data-toggle="dropdown" data-target="#" href="#">
@@ -172,8 +173,11 @@
                   <ul ng-if="selected_options.recording[name]['name']==opt.name">
                         <li  ng-repeat="arg in opt.arguments">
                             {{arg.description}}
+                            <!--<span ng-bind-html="argDescription"></span>-->
                             <input ng-if="arg.type == 'number'" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.recording[name]['arguments'][arg.name]" >
                             <input ng-if="arg.type == 'str'" type=text name={{arg.name}}  ng-model="selected_options.recording[name]['arguments'][arg.name]"  >
+                            <input ng-if="arg.type == 'date_range'" type=text name={{arg.name}}  ng-model="selected_options.recording[name]['arguments'][arg.name]"  >
+
                         <input ng-if="arg.type == 'datetime'" type=number name={{arg.name}}  ng-model="selected_options.recording[name]['arguments'][arg.name][1]" step=1>
                             <div class="dropdown" ng-if="arg.type == 'datetime'">
                                 <a class="dropdown-toggle" id="dropdown{{arg.name}}" role="button" data-toggle="dropdown" data-target="#" href="#">

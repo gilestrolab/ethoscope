@@ -132,8 +132,8 @@ class OdourDelivererInterface(BaseInterface):
         :type port: str or None
         """
         self._queue = multiprocessing.JoinableQueue()
-        self._sleep_dep_interface = self._SubProcessClass(queue = self._queue, port=port) # fixme, auto port detection
-        self._sleep_dep_interface.start()
+        self._module_interface = self._SubProcessClass(queue = self._queue, port=port) # fixme, auto port detection
+        self._module_interface.start()
         super(OdourDelivererInterface, self).__init__()
 
     def interact(self, **kwargs):
@@ -149,6 +149,6 @@ class OdourDelivererInterface(BaseInterface):
         logging.info("Freeing queue")
         self._queue.cancel_join_thread()
         logging.info("Joining thread")
-        self._sleep_dep_interface.join()
+        self._module_interface.join()
         logging.info("Joined OK")
 #

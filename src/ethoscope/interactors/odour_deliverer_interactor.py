@@ -67,8 +67,7 @@ class DynamicOdourDeliverer(HasChangedSideInteractor):
     _description = {"overview": "An interactor to deliver an odour according to which side the animal of its ROI is in",
                     "arguments": [
                                 {"type": "date_range", "name": "date_range",
-                                 "description": "A date  and time range in which the device will perform see "
-                                                "<a href='https://github.com/gilestrolab/ethoscope/blob/master/user_manual/schedulers.md'>tutorial</a>",
+                                 "description": "A date  and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
                                  "default": ""}
                                    ]}
 
