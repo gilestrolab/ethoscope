@@ -14,40 +14,40 @@ class HasInteractedVariable(BaseIntVariable):
     functional_type = "interaction"
     header_name = "has_interacted"
 
-class SimpleScheduler(object):
-    def __init__(self, start_time, end_time):
-        """
-        Class to schedule interators. `SimpleScheduler` objects are meant to be instantiated as member variables in
-        Interactors. They also check for inconsistencies in the time schedule.
-
-        :param start_time: When is the first valid time (in unix timestamp)
-        :type start_time: int
-        :param end_time: When is the last valid time (in unix timestamp)
-        :type end_time: int
-
-        """
-
-
-        end_time = int(end_time)
-        start_time = int(start_time )
-
-
-        wall_clock_time = time.time()
-        self._start_datetime = start_time
-        self._end_datetime = end_time
-
-        if(wall_clock_time > end_time):
-            raise Exception("You cannot end experiment in the past. Current time is %i, end time is %i" % (wall_clock_time, end_time))
-
-        if(start_time > end_time):
-            raise Exception("This experiment is scheduled to stop BEFORE it starts, Start time is %i, end time is %i" % (start_time, end_time))
-
-    def check_time_range(self):
-
-        wall_clock_time = time.time()
-        if self._end_datetime > wall_clock_time > self._start_datetime:
-            return True
-        return False
+# class SimpleScheduler(object):
+#     def __init__(self, start_time, end_time):
+#         """
+#         Class to schedule interators. `SimpleScheduler` objects are meant to be instantiated as member variables in
+#         Interactors. They also check for inconsistencies in the time schedule.
+#
+#         :param start_time: When is the first valid time (in unix timestamp)
+#         :type start_time: int
+#         :param end_time: When is the last valid time (in unix timestamp)
+#         :type end_time: int
+#
+#         """
+#
+#
+#         end_time = int(end_time)
+#         start_time = int(start_time )
+#
+#
+#         wall_clock_time = time.time()
+#         self._start_datetime = start_time
+#         self._end_datetime = end_time
+#
+#         if(wall_clock_time > end_time):
+#             raise Exception("You cannot end experiment in the past. Current time is %i, end time is %i" % (wall_clock_time, end_time))
+#
+#         if(start_time > end_time):
+#             raise Exception("This experiment is scheduled to stop BEFORE it starts, Start time is %i, end time is %i" % (start_time, end_time))
+#
+#     def check_time_range(self):
+#
+#         wall_clock_time = time.time()
+#         if self._end_datetime > wall_clock_time > self._start_datetime:
+#             return True
+#         return False
 
 
 class   BaseInteractor(DescribedObject):

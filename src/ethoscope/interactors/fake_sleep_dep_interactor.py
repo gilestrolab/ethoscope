@@ -16,8 +16,9 @@ class FakeSleepDepInteractor(SleepDepInteractor):
                     "arguments": [
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_threshold", "description": "The minimal velocity that counts as movement","default":0.0060},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken","default":120},
-                                    {"type": "datetime", "name": "start_datetime", "description": "When sleep deprivation is to be started","default":0},
-                                    {"type": "datetime", "name": "end_datetime", "description": "When sleep deprivation is to be ended","default":sys.maxsize}
+                                    {"type": "daterange", "name": "daterange",
+                                      "description": "A date  and time range in which the device will perform see "
+                                                     "<a href='https://github.com/gilestrolab/ethoscope/blob/master/user_manual/schedulers.md'>tutorial</a>","default":""},
                                    ]}
     _hardwareInterfaceClass = FakeSleepDepriverInterface
 
@@ -35,8 +36,10 @@ class FakeSystematicSleepDepInteractor(SystematicSleepDepInteractor):
     _description = {"overview": "A dummy interactor that simply print messages instead of moving tubes. For development only. Mimics Systematic sleep deprivation ",
                     "arguments": [
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "dt", "description": "The time between two consecutive stimulation (in s)","default":120},
-                                    {"type": "datetime", "name": "start_datetime", "description": "When sleep deprivation is to be started","default":0},
-                                    {"type": "datetime", "name": "end_datetime", "description": "When sleep deprivation is to be ended","default":sys.maxsize}
+                                    {"type": "daterange", "name": "daterange",
+                                     "description": "A date  and time range in which the device will perform see "
+                                                    "<a href='https://github.com/gilestrolab/ethoscope/blob/master/user_manual/schedulers.md'>tutorial</a>",
+                                     "default": ""},
                                    ]}
     _hardwareInterfaceClass = FakeSleepDepriverInterface
 

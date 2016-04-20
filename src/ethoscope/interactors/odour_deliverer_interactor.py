@@ -1,7 +1,9 @@
 __author__ = 'quentin'
 
 
-from ethoscope.interactors.interactors import BaseInteractor, HasInteractedVariable, SimpleScheduler
+from ethoscope.interactors.interactors import BaseInteractor, HasInteractedVariable
+from ethoscope.utils.scheduler import Scheduler
+
 from ethoscope.hardware.interfaces.interfaces import  DefaultInterface
 from ethoscope.hardware.interfaces.odour_delivery_device import OdourDelivererInterface
 import sys
@@ -64,8 +66,10 @@ class HasChangedSideInteractor(BaseInteractor):
 class DynamicOdourDeliverer(HasChangedSideInteractor):
     _description = {"overview": "An interactor to deliver an odour according to which side the animal of its ROI is in",
                     "arguments": [
-                                    {"type": "datetime", "name": "start_datetime", "description": "When sleep deprivation is to be started","default":0},
-                                    {"type": "datetime", "name": "end_datetime", "description": "When sleep deprivation is to be ended","default":sys.maxsize}
+                                {"type": "date_range", "name": "date_range",
+                                 "description": "A date  and time range in which the device will perform see "
+                                                "<a href='https://github.com/gilestrolab/ethoscope/blob/master/user_manual/schedulers.md'>tutorial</a>",
+                                 "default": ""}
                                    ]}
 
     _hardwareInterfaceClass =  OdourDelivererInterface
@@ -76,8 +80,7 @@ class DynamicOdourDeliverer(HasChangedSideInteractor):
     _side_to_pos = {1:1, 2:2 }
     def __init__(self,
                  hardware_interface,
-                 start_datetime=0,
-                 end_datetime=sys.maxsize,
+                 date_range=""
                   ):
         """
         A interactor to control a sleep depriver module
@@ -88,7 +91,7 @@ class DynamicOdourDeliverer(HasChangedSideInteractor):
         """
 
         self._t0 = None
-        self._scheduler = SimpleScheduler(start_datetime, end_datetime)
+        self._scheduler = Scheduler(date_range)
         super(DynamicOdourDeliverer, self).__init__(hardware_interface)
 
 

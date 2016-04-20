@@ -1,7 +1,8 @@
 __author__ = 'quentin'
 
 
-from ethoscope.interactors.interactors import BaseInteractor, HasInteractedVariable, SimpleScheduler
+from ethoscope.interactors.interactors import BaseInteractor, HasInteractedVariable
+from ethoscope.utils.scheduler import Scheduler
 from ethoscope.hardware.interfaces.interfaces import  DefaultInterface
 from ethoscope.hardware.interfaces.sleep_depriver_interface import SleepDepriverInterface
 import sys
@@ -62,8 +63,10 @@ class SleepDepInteractor(IsMovingInteractor):
                     "arguments": [
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_threshold", "description": "The minimal velocity that counts as movement","default":0.0060},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken","default":120},
-                                    {"type": "datetime", "name": "start_datetime", "description": "When sleep deprivation is to be started","default":0},
-                                    {"type": "datetime", "name": "end_datetime", "description": "When sleep deprivation is to be ended","default":sys.maxsize}
+                                    {"type": "date_range", "name": "date_range",
+                                     "description": "A date  and time range in which the device will perform see "
+                                                    "<a href='https://github.com/gilestrolab/ethoscope/blob/master/user_manual/schedulers.md'>tutorial</a>",
+                                     "default": ""}
                                    ]}
 
     _hardwareInterfaceClass = SleepDepriverInterface
@@ -75,8 +78,7 @@ class SleepDepInteractor(IsMovingInteractor):
                  hardware_interface,
                  velocity_threshold=0.0060,
                  min_inactive_time=120, #s
-                 start_datetime=0,
-                 end_datetime=sys.maxsize,
+                 date_range=""
                   ):
         """
         A interactor to control a sleep depriver module
@@ -93,7 +95,7 @@ class SleepDepInteractor(IsMovingInteractor):
         self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
 
         self._t0 = None
-        self._scheduler = SimpleScheduler(start_datetime, end_datetime)
+        self._scheduler = Scheduler(date_range)
         super(SleepDepInteractor, self).__init__(hardware_interface,velocity_threshold)
 
 
@@ -135,8 +137,7 @@ class BaseStaticSleepDepInteractor(BaseInteractor):
         }
     def __init__(self,
                  hardware_interface,
-                 start_datetime=0,
-                 end_datetime=sys.maxsize,
+                 date_range=""
                   ):
         """
         A interactor to control a sleep depriver module to perform static and systematic sleep deprivation by moving tubes every ``dt`` seconds.
@@ -151,7 +152,7 @@ class BaseStaticSleepDepInteractor(BaseInteractor):
         """
 
 
-        self._scheduler = SimpleScheduler(start_datetime, end_datetime)
+        self._scheduler = Scheduler(date_range)
         #super(RandomSleepDepInteractor, self).__init__(hardware_interface,velocity_threshold)
         super(BaseStaticSleepDepInteractor,self).__init__(hardware_interface)
 
@@ -160,15 +161,16 @@ class SystematicSleepDepInteractor(BaseStaticSleepDepInteractor):
     _description = {"overview": "An interactor to sleep deprive an animal using servo motor. See http://todo/fixme.html",
                     "arguments": [
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "dt", "description": "The time between two consecutive stimulation (in s)","default":120},
-                                    {"type": "datetime", "name": "start_datetime", "description": "When sleep deprivation is to be started","default":0},
-                                    {"type": "datetime", "name": "end_datetime", "description": "When sleep deprivation is to be ended","default":sys.maxsize}
+                                    {"type": "date_range", "name": "date_range",
+                                     "description": "A date  and time range in which the device will perform see "
+                                                    "<a href='https://github.com/gilestrolab/ethoscope/blob/master/user_manual/schedulers.md'>tutorial</a>",
+                                     "default": ""}
                                    ]}
 
     def __init__(self,
                  hardware_interface,
                  dt=120,
-                 start_datetime=0,
-                 end_datetime=sys.maxsize,
+                 date_range=""
                   ):
         """
         A interactor to control a sleep depriver module to perform static and systematic sleep deprivation by moving tubes every ``dt`` seconds.
@@ -180,7 +182,7 @@ class SystematicSleepDepInteractor(BaseStaticSleepDepInteractor):
         """
         self._t0 = 0
         self._dt = dt *1000 #so we use ms internally
-        super(SystematicSleepDepInteractor,self).__init__(hardware_interface, start_datetime, end_datetime)
+        super(SystematicSleepDepInteractor,self).__init__(hardware_interface, date_range="")
 
     def _decide(self):
         roi_id= self._tracker._roi.idx
@@ -204,8 +206,10 @@ class ExperimentalSleepDepInteractor(IsMovingInteractor):
     _description = {"overview": "An interactor to sleep deprive an animal using servo motor. See http://todo/fixme.html",
                     "arguments": [
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_threshold", "description": "The minimal velocity that counts as movement","default":0.0060},
-                                    {"type": "datetime", "name": "start_datetime", "description": "When sleep deprivation is to be started","default":0},
-                                    {"type": "datetime", "name": "end_datetime", "description": "When sleep deprivation is to be ended","default":sys.maxsize}
+                                    {"type": "date_range", "name": "date_range",
+                                     "description": "A date  and time range in which the device will perform see "
+                                                    "<a href='https://github.com/gilestrolab/ethoscope/blob/master/user_manual/schedulers.md'>tutorial</a>",
+                                     "default": ""}
                                    ]}
 
     _hardwareInterfaceClass = SleepDepriverInterface
@@ -217,8 +221,7 @@ class ExperimentalSleepDepInteractor(IsMovingInteractor):
     def __init__(self,
                  hardware_interface,
                  velocity_threshold=0.0060,
-                 start_datetime=0,
-                 end_datetime=sys.maxsize,
+                 date_range=""
                   ):
         """
         A interactor to control a sleep depriver module
@@ -234,12 +237,8 @@ class ExperimentalSleepDepInteractor(IsMovingInteractor):
         :return:
         """
 
-
-
-        self._start_datetime = int(start_datetime)
-        self._end_datetime = int(end_datetime)
         self._t0 = None
-        self._scheduler = SimpleScheduler(start_datetime, end_datetime)
+        self._scheduler = Scheduler(date_range)
         super(ExperimentalSleepDepInteractor, self).__init__(hardware_interface,velocity_threshold)
 
 
