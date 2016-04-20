@@ -11,7 +11,7 @@ class DescribedObject(object):
 
      * name: The name of the argument as it is in "__init__"
      * description: "A user friendly description of the argument"
-     * type: "number", "datetime" and "string".
+     * type: "number", "datetime", "daterange" and "string".
      * min, max and step: only for type "number", defines the accepted limits of the arguments as well as the increment in the user interface
      * default: the default value
 
