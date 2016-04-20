@@ -21,6 +21,8 @@ DATE1 > DATE2
 Where `DATE1` and `DATE2` are two dates formated as `YYYY-MM-DD hh:mm:ss`.
 So, for instance, a valid time range could be `2016-04-01 21:00:00 > 2016-04-02 09:00:00`, which is 12h overnight.
 
+Like the for rest of the platform, **you want to use GMT time, NOT local time**.
+
 Special cases
 --------------
 Simply entering one date:
