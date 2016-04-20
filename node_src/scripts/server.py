@@ -392,7 +392,7 @@ if __name__ == '__main__':
     parser = optparse.OptionParser()
     parser.add_option("-D", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-p", "--port", dest="port", default=80,help="port")
-    parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
+    parser.add_option("-l", "--local", dest="local", default=False, help="Run on localhost (run a node and device on the same machine, for development)", action="store_true")
     parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_results",help="Where temporary result files are stored")
     parser.add_option("-r", "--router-ip", dest="router_ip", default="192.169.123.254", help="the ip of the router in your setup")
 
@@ -404,7 +404,10 @@ if __name__ == '__main__':
     PORT = option_dict["port"]
     DEBUG = option_dict["debug"]
     RESULTS_DIR = option_dict["results_dir"]
-    LOCAL_IP = get_local_ip(option_dict["router_ip"])
+    if option_dict["local"]:
+        LOCAL_IP  = "127.0.0.1"
+    else:
+        LOCAL_IP = get_local_ip(option_dict["router_ip"])
 
     try:
         WWW_IP = get_internet_ip()
