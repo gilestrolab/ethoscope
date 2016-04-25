@@ -161,8 +161,7 @@ class SystematicSleepDepInteractor(BaseStaticSleepDepInteractor):
                     "arguments": [
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "dt", "description": "The time between two consecutive stimulation (in s)","default":120},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date  and time range in which the device will perform see "
-                                                    "<a href='https://github.com/gilestrolab/ethoscope/blob/master/user_manual/schedulers.md'>tutorial</a>",
+                                     "description": "A date  and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
                                      "default": ""}
                                    ]}
 

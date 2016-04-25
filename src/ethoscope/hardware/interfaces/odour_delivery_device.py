@@ -31,8 +31,8 @@ class OdourDelivererConnection(SimpleLynxMotionConnection):
         Warm up the module. That is move each tube three times in order to check setup and that no servo has failed.
         """
 
-        #for i in range(1,11):
-        for i in range(1, 2):
+        for i in range(1,11):
+        #for i in range(1, 2):
             for k in range(1,4):
                 self.move_to_pos(i, k)
             time.sleep(3 * self._dt / 1000.0)
