@@ -11,5 +11,5 @@
         "drawer": {"name":"DefaultDrawer",
                       "arguments":{"draw_frames":true}},
         "camera": {"name":"MovieVirtualCamera",
-                      "arguments":{"path":"/data/sleep_dep_vid_2fps.mp4"}}
+                      "arguments":{"path":"/data/ethoscope_ref_videos/2016-03-22_14-36-58_cs_long_validation/2016-03-22_14-36-58_cs_long_validation.mp4"}}
 }

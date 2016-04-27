@@ -1,6 +1,11 @@
 __author__ = 'quentin'
 
 import cv2
+try:
+    from cv2.cv import CV_FOURCC
+except ImportError:
+    from cv2 import CV_FOURCC
+
 from ethoscope.utils.description import DescribedObject
 import os
 
@@ -70,7 +75,7 @@ class BaseDrawer(object):
             return
 
         if self._video_writer is None:
-            self._video_writer = cv2.VideoWriter(self._video_out, cv2.cv.CV_FOURCC(*'DIVX'),
+            self._video_writer = cv2.VideoWriter(self._video_out, CV_FOURCC(*'DIVX'),
                                                  self._out_fps, (img.shape[1], img.shape[0]))
 
         self._video_writer.write(self._last_drawn_frame)

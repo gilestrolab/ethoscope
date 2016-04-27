@@ -1,6 +1,12 @@
 __author__ = 'quentin'
 
 import cv2
+try:
+    from cv2.cv import CV_CAP_PROP_FRAME_WIDTH, CV_CAP_PROP_FRAME_HEIGHT, CV_CAP_PROP_FRAME_COUNT, CV_CAP_PROP_POS_MSEC, CV_CAP_PROP_FPS
+except ImportError:
+    from cv2 import CV_CAP_PROP_FRAME_WIDTH, CV_CAP_PROP_FRAME_HEIGHT, CV_CAP_PROP_FRAME_COUNT, CV_CAP_PROP_POS_MSEC, CV_CAP_PROP_FPS
+
+
 import time
 import logging
 import os
@@ -145,9 +151,9 @@ class MovieVirtualCamera(BaseCamera):
             raise EthoscopeException("'%s' does not exist. No such file" % path)
 
         self.capture = cv2.VideoCapture(path)
-        w = self.capture.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH)
-        h = self.capture.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)
-        self._total_n_frames =self.capture.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT)
+        w = self.capture.get(CV_CAP_PROP_FRAME_WIDTH)
+        h = self.capture.get(CV_CAP_PROP_FRAME_HEIGHT)
+        self._total_n_frames =self.capture.get(CV_CAP_PROP_FRAME_COUNT)
         if self._total_n_frames == 0.:
             self._has_end_of_file = False
         else:
@@ -186,8 +192,8 @@ class MovieVirtualCamera(BaseCamera):
         if self._use_wall_clock:
             now = time.time()
             return now - self._start_time
-
-        time_s = self.capture.get(cv2.cv.CV_CAP_PROP_POS_MSEC) / 1e3
+        CV_CAP_PROP_FRAME_WIDTH, CV_CAP_PROP_FRAME_HEIGHT, CV_CAP_PROP_FRAME_COUNT, CV_CAP_PROP_POS_MSEC
+        time_s = self.capture.get(CV_CAP_PROP_POS_MSEC) / 1e3
         return time_s
 
     def is_last_frame(self):
@@ -218,19 +224,18 @@ class V4L2Camera(BaseCamera):
 
         w, h = target_resolution
         if w <0 or h <0:
-            self.capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, 99999)
-            self.capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, 99999)
+            self.capture.set(CV_CAP_PROP_FRAME_WIDTH, 99999)
+            self.capture.set(CV_CAP_PROP_FRAME_HEIGHT, 99999)
         else:
-            self.capture.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, w)
-            self.capture.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, h)
+            self.capture.set(CV_CAP_PROP_FRAME_WIDTH, w)
+            self.capture.set(CV_CAP_PROP_FRAME_HEIGHT, h)
 
         if not isinstance(target_fps, int):
             raise EthoscopeException("FPS must be an integer number")
 
         if target_fps < 2:
             raise EthoscopeException("FPS must be at least 2")
-
-        self.capture.set(cv2.cv.CV_CAP_PROP_FPS, target_fps)
+        self.capture.set(CV_CAP_PROP_FPS, target_fps)
 
         self._target_fps = float(target_fps)
         _, im = self.capture.read()

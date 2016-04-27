@@ -1,6 +1,13 @@
 __author__ = 'quentin'
 
 import cv2
+try:
+    from cv2.cv import CV_CHAIN_APPROX_SIMPLE
+except ImportError:
+    from cv2 import CV_CHAIN_APPROX_SIMPLE
+
+
+
 import numpy as np
 import logging
 from ethoscope.roi_builders.roi_builders import BaseROIBuilder
@@ -91,7 +98,7 @@ class TargetGridROIBuilder(BaseROIBuilder):
             cv2.threshold(grey, t, 255,cv2.THRESH_BINARY_INV,bin)
             if np.count_nonzero(bin) > 0.7 * im.shape[0] * im.shape[1]:
                 continue
-            contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
+            contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,CV_CHAIN_APPROX_SIMPLE)
             bin.fill(0)
             for c in contours:
                 score = scoring_fun(c, im)
@@ -144,9 +151,10 @@ class TargetGridROIBuilder(BaseROIBuilder):
         bin = np.zeros_like(map)
 
         # as soon as we have three objects, we stop
+        contours = []
         for t in range(0, 255,1):
             cv2.threshold(map, t, 255,cv2.THRESH_BINARY  ,bin)
-            contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
+            contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE)
 
             if len(contours) <3:
                 raise EthoscopeException("There should be three targets. Only %i objects have been found" % (len(contours)), img)
@@ -263,3 +271,25 @@ class OlfactionAssayROIBuilder(TargetGridROIBuilder):
                                                                vertical_fill= .7
                                                                )
 
+
+class HD12TubesRoiBuilder(TargetGridROIBuilder):
+    _description = {"overview": "The default sleep monitor arena with ten rows of two tubes.",
+                    "arguments": []}
+
+
+    def __init__(self):
+        """
+        Class to build ROIs for a twelve columns, one row for the HD tracking arena
+        (https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_mini_12_tubes)
+        """
+
+
+        super(HD12TubesRoiBuilder, self).__init__( n_rows=1,
+                                                   n_cols=12,
+                                                   top_margin= 1.5,
+                                                   bottom_margin= 1.5,
+                                                   left_margin=0.05,
+                                                   right_margin=0.05,
+                                                   horizontal_fill=.7,
+                                                   vertical_fill=1.4
+                                                   )
