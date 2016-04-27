@@ -1,4 +1,5 @@
 import cv2
+CV_VERSION = int(cv2.__version__.split(".")[0])
 try:
     from cv2 import CV_LOAD_IMAGE_GRAYSCALE as IMG_READ_FLAG_GREY
     from cv import CV_RETR_EXTERNAL as RETR_EXTERNAL
@@ -34,8 +35,10 @@ class ImgMaskROIBuilder(BaseROIBuilder):
 
         if len(self._mask.shape) == 3:
             self._mask = cv2.cvtColor(self._mask, cv2.COLOR_BGR2GRAY)
-
-        contours, hiera = cv2.findContours(np.copy(self._mask), RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)
+        if CV_VERSION == 3:
+            _, contours, hiera = cv2.findContours(np.copy(self._mask), RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)
+        else:
+            contours, hiera = cv2.findContours(np.copy(self._mask), RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)
 
         rois = []
         for i,c in enumerate(contours):

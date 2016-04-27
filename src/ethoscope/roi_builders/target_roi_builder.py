@@ -1,6 +1,8 @@
 __author__ = 'quentin'
 
 import cv2
+CV_VERSION = int(cv2.__version__.split(".")[0])
+
 try:
     from cv2.cv import CV_CHAIN_APPROX_SIMPLE as CHAIN_APPROX_SIMPLE
     from cv2.cv import CV_AA as LINE_AA
@@ -101,7 +103,11 @@ class TargetGridROIBuilder(BaseROIBuilder):
             cv2.threshold(grey, t, 255,cv2.THRESH_BINARY_INV,bin)
             if np.count_nonzero(bin) > 0.7 * im.shape[0] * im.shape[1]:
                 continue
-            contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,CHAIN_APPROX_SIMPLE)
+            if CV_VERSION == 3:
+                _, contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,CHAIN_APPROX_SIMPLE)
+            else:
+                contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,CHAIN_APPROX_SIMPLE)
+
             bin.fill(0)
             for c in contours:
                 score = scoring_fun(c, im)
@@ -157,7 +163,11 @@ class TargetGridROIBuilder(BaseROIBuilder):
         contours = []
         for t in range(0, 255,1):
             cv2.threshold(map, t, 255,cv2.THRESH_BINARY  ,bin)
-            contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)
+            if CV_VERSION == 3:
+                _, contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)
+            else:
+                contours, h = cv2.findContours(bin, cv2.RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)
+
 
             if len(contours) <3:
                 raise EthoscopeException("There should be three targets. Only %i objects have been found" % (len(contours)), img)

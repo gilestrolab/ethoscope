@@ -2,6 +2,8 @@ __author__ = 'quentin'
 
 from collections import deque
 import cv2
+CV_VERSION = int(cv2.__version__.split(".")[0])
+
 import numpy as np
 from ethoscope.core.variables import XPosVariable, YPosVariable, WidthVariable, HeightVariable, PhiVariable
 from ethoscope.core.data_point import DataPoint
@@ -101,7 +103,10 @@ class AdaptiveBGModelOneObject(BaseTracker):
             print "no pixs"
             raise NoPositionError
         # show(self._buff_fg,100)
-        contours,hierarchy = cv2.findContours(self._buff_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if CV_VERSION == 3:
+            _, contours,hierarchy = cv2.findContours(self._buff_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        else:
+            contours,hierarchy = cv2.findContours(self._buff_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         if len(contours) == 0:
             self._bg_model.increase_learning_rate()
