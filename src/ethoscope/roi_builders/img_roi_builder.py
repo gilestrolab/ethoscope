@@ -1,5 +1,12 @@
-import cv
 import cv2
+try:
+    from cv2 import CV_LOAD_IMAGE_GRAYSCALE as IMG_READ_FLAG_GREY
+    from cv import CV_RETR_EXTERNAL as RETR_EXTERNAL
+    from cv import CV_CHAIN_APPROX_SIMPLE as CHAIN_APPROX_SIMPLE
+except ImportError:
+    from cv2 import IMREAD_GRAYSCALE as IMG_READ_FLAG_GREY
+    from cv2 import RETR_EXTERNAL, CHAIN_APPROX_SIMPLE
+
 import numpy as np
 from ethoscope.roi_builders.roi_builders import BaseROIBuilder
 from ethoscope.core.roi import ROI
@@ -18,7 +25,8 @@ class ImgMaskROIBuilder(BaseROIBuilder):
         """
 
 
-        self._mask = cv2.imread(mask_path, cv2.CV_LOAD_IMAGE_GRAYSCALE)
+        self._mask = cv2.imread(mask_path, IMG_READ_FLAG_GREY)
+
         super(ImgMaskROIBuilder,self).__init__()
 
 
@@ -27,7 +35,7 @@ class ImgMaskROIBuilder(BaseROIBuilder):
         if len(self._mask.shape) == 3:
             self._mask = cv2.cvtColor(self._mask, cv2.COLOR_BGR2GRAY)
 
-        contours, hiera = cv2.findContours(np.copy(self._mask), cv.CV_RETR_EXTERNAL, cv.CV_CHAIN_APPROX_SIMPLE)
+        contours, hiera = cv2.findContours(np.copy(self._mask), RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)
 
         rois = []
         for i,c in enumerate(contours):

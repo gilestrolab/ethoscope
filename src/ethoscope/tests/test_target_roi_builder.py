@@ -5,6 +5,11 @@ import cv2
 import unittest
 import os
 
+try:
+    from cv2.cv import CV_AA as LINE_AA
+except ImportError:
+    from cv2 import LINE_AA
+
 images = {"bright_targets":"./img/bright_targets.png",
            "dark_targets": "./img/dark_targets.png"}
 
@@ -17,7 +22,7 @@ class TestTargetROIBuilder(unittest.TestCase):
 
     def _draw(self,img, rois):
         for r in rois:
-            cv2.drawContours(img,r.polygon,-1, (255,255,0), 2, cv2.CV_AA)
+            cv2.drawContours(img,r.polygon,-1, (255,255,0), 2, LINE_AA)
 
 
     def _test_one_img(self,path, out):

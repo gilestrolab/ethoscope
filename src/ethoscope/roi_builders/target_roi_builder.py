@@ -2,9 +2,12 @@ __author__ = 'quentin'
 
 import cv2
 try:
-    from cv2.cv import CV_CHAIN_APPROX_SIMPLE
+    from cv2.cv import CV_CHAIN_APPROX_SIMPLE as CHAIN_APPROX_SIMPLE
+    from cv2.cv import CV_AA as LINE_AA
 except ImportError:
-    from cv2 import CV_CHAIN_APPROX_SIMPLE
+    from cv2 import CHAIN_APPROX_SIMPLE
+    from cv2 import LINE_AA
+
 
 
 
@@ -98,7 +101,7 @@ class TargetGridROIBuilder(BaseROIBuilder):
             cv2.threshold(grey, t, 255,cv2.THRESH_BINARY_INV,bin)
             if np.count_nonzero(bin) > 0.7 * im.shape[0] * im.shape[1]:
                 continue
-            contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,CV_CHAIN_APPROX_SIMPLE)
+            contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,CHAIN_APPROX_SIMPLE)
             bin.fill(0)
             for c in contours:
                 score = scoring_fun(c, im)
@@ -154,7 +157,7 @@ class TargetGridROIBuilder(BaseROIBuilder):
         contours = []
         for t in range(0, 255,1):
             cv2.threshold(map, t, 255,cv2.THRESH_BINARY  ,bin)
-            contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE)
+            contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)
 
             if len(contours) <3:
                 raise EthoscopeException("There should be three targets. Only %i objects have been found" % (len(contours)), img)
@@ -221,7 +224,7 @@ class TargetGridROIBuilder(BaseROIBuilder):
             mapped_rectangle = np.dot(wrap_mat, r.T).T
             mapped_rectangle -= shift
             ct = mapped_rectangle.reshape((1,4,2)).astype(np.int32)
-            cv2.drawContours(img,[ct], -1, (255,0,0),1,cv2.CV_AA)
+            cv2.drawContours(img,[ct], -1, (255,0,0),1,LINE_AA)
             rois.append(ROI(ct, idx=i+1))
 
             # cv2.imshow("dbg",img)

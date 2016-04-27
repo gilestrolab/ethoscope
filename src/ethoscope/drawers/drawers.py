@@ -2,9 +2,11 @@ __author__ = 'quentin'
 
 import cv2
 try:
-    from cv2.cv import CV_FOURCC
+    from cv2.cv import CV_FOURCC as VideoWriter_fourcc
+    from cv2.cv import CV_AA as LINE_AA
 except ImportError:
-    from cv2 import CV_FOURCC
+    from cv2 import VideoWriter_fourcc
+    from cv2 import LINE_AA
 
 from ethoscope.utils.description import DescribedObject
 import os
@@ -28,7 +30,7 @@ class BaseDrawer(object):
         self._video_writer = None
         self._window_name = "ethoscope_" + str(os.getpid())
         if draw_frames:
-            cv2.namedWindow(self._window_name, cv2.CV_WINDOW_AUTOSIZE)
+            cv2.namedWindow(self._window_name, cv2.WINDOW_AUTOSIZE)
         self._last_drawn_frame = None
 
     def _annotate_frame(self,img, positions, tracking_units):
@@ -75,7 +77,7 @@ class BaseDrawer(object):
             return
 
         if self._video_writer is None:
-            self._video_writer = cv2.VideoWriter(self._video_out, CV_FOURCC(*'DIVX'),
+            self._video_writer = cv2.VideoWriter(self._video_out, VideoWriter_fourcc(*'DIVX'),
                                                  self._out_fps, (img.shape[1], img.shape[0]))
 
         self._video_writer.write(self._last_drawn_frame)
@@ -129,8 +131,8 @@ class DefaultDrawer(BaseDrawer):
             cv2.putText(img, str(track_u.roi.idx), (x,y), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,0))
             black_colour = (0, 0,0)
             roi_colour = (0, 255,0)
-            cv2.drawContours(img,[track_u.roi.polygon],-1, black_colour, 3, cv2.CV_AA)
-            cv2.drawContours(img,[track_u.roi.polygon],-1, roi_colour, 1, cv2.CV_AA)
+            cv2.drawContours(img,[track_u.roi.polygon],-1, black_colour, 3, LINE_AA)
+            cv2.drawContours(img,[track_u.roi.polygon],-1, roi_colour, 1, LINE_AA)
 
             try:
                 pos_list = positions[track_u.roi.idx]
@@ -145,5 +147,5 @@ class DefaultDrawer(BaseDrawer):
                 except KeyError:
                     pass
 
-                cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),black_colour,3,cv2.CV_AA)
-                cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),colour,1,cv2.CV_AA)
+                cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),black_colour,3, LINE_AA)
+                cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),colour,1, LINE_AA)
