@@ -1,6 +1,7 @@
 This document explains how to setup an "ethoscope" **from a pre-written SD card image**.
 It assumes, at least, some familiarity with Unix/Linux.
-If you feel like building the SD card yourself, have a look [here](ethoscope_scratch.md) instead
+If you feel like building the SD card yourself, have a look [here](ethoscope_scratch.md) instead.
+You may need to make your own card if you decide to use a different SD card (e.g. if it is smaller in size).
 
 
 
@@ -8,9 +9,11 @@ Burning your SD card
 =======================
 
 1. Download the latest zipped image [here](https://imperialcollegelondon.app.box.com/ethoscope).
-2. Unzip the image (it should inflate to 32GB).
+2. Unzip the image (it should inflate to 32GB). `gzip -d  yyyymmdd_ethoscope.img.gz`
 3. Burn the image to a 32GB SD card (we typically use the 32G Samsung EVO).
-You can use the `dd` command to burn your card as described [here](https://wiki.archlinux.org/index.php/USB_flash_installation_media#Using_dd)
+You can use the `dd` command to burn your card as described [here](https://wiki.archlinux.org/index.php/USB_flash_installation_media#Using_dd).
+For instance `dd if=/home/quentin/Desktop/yyyymmdd_ethoscope.img of=/dev/sdX`.
+Be **very careful with dd. You want to write on the write drive!**
 4. Before you can use these card, there are exactly 3 files you need to change before you can use the card.
     * `/etc/machine-id`. This is a hexadecimal unique name for the machine. You can put some random string prefixed with a number. For instance `001ae2f5cee1`...
     * `/etc/machine-name`. This is the human friendly name of the machine. For instance ETHOSCOPE_001.
