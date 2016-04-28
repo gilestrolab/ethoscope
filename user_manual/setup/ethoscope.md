@@ -12,7 +12,7 @@ Burning your SD card
 2. Unzip the image (it should inflate to 32GB). `gzip -d  yyyymmdd_ethoscope.img.gz`
 3. Burn the image to a 32GB SD card (we typically use the 32G Samsung EVO).
 You can use the `dd` command to burn your card as described [here](https://wiki.archlinux.org/index.php/USB_flash_installation_media#Using_dd).
-For instance `dd if=/home/quentin/Desktop/yyyymmdd_ethoscope.img of=/dev/sdX`.
+For instance `dd if=/home/quentin/Desktop/yyyymmdd_ethoscope.img of=/dev/sdX bs=64K`.
 Be **very careful with dd. You want to write on the write drive!**
 4. Before you can use these card, there are exactly 3 files you need to change before you can use the card.
     * `/etc/machine-id`. This is a hexadecimal unique name for the machine. You can put some random string prefixed with a number. For instance `001ae2f5cee1`...
