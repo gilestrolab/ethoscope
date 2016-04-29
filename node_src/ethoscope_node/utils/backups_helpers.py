@@ -15,6 +15,7 @@ class GenericBackupWrapper(object):
         self._safe = safe
         self._backup_job = backup_job
 
+        self._ip_range = (6,100)
 
     def run(self):
         t0 = time.time()
@@ -28,7 +29,7 @@ class GenericBackupWrapper(object):
 
             logging.info("Starting backup")
             logging.info("Generating device map")
-            dev_map = generate_new_device_map(self._local_ip, result_main_dir=self._result_dir)
+            dev_map = generate_new_device_map(self._local_ip,self._ip_range, result_main_dir=self._result_dir)
             logging.info("Regenerated device map")
             if self._safe:
                 map(self._backup_job, dev_map.values())

@@ -71,7 +71,7 @@ def scan_one_device(ip, timeout=3, port=9000, page="id"):
 
 
 @retry(ScanException, tries=3,delay=3, backoff=1)
-def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, data=None,
+def update_dev_map_wrapped (local_ip, devices_map,id, what="data",type=None, port=9000, data=None,
                            result_main_dir="/ethoscope_results",timeout=5):
     """
     Just a routine to format our GET urls. This improves readability whilst allowing us to change convention (e.g. port) without rewriting everything.
@@ -101,7 +101,7 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
 
             if not id in devices_map:
                 logging.warning("Device %s is not in device map. Rescanning subnet..." % id)
-                devices_map = generate_new_device_map(result_main_dir=result_main_dir)
+                devices_map = generate_new_device_map(local_ip, result_main_dir=result_main_dir)
             try:
                 if data is None:
                     raise Exception("No data in JSON")
@@ -157,7 +157,7 @@ def make_backup_path(device, result_main_dir, timeout=30):
         return None
     return output_db_file
 
-def generate_new_device_map(local_ip, ip_range=(2,64), result_main_dir="/ethoscope_results"):
+def generate_new_device_map(local_ip, ip_range=(2,100), result_main_dir="/ethoscope_results"):
         devices_map = {}
         subnet_ip = local_ip.split(".")[0:3]
         subnet_ip = ".".join(subnet_ip)
@@ -171,7 +171,7 @@ def generate_new_device_map(local_ip, ip_range=(2,64), result_main_dir="/ethosco
 
 
         # We can use a with statement to ensure threads are cleaned up promptly
-        with futures.ThreadPoolExecutor(max_workers=64) as executor:
+        with futures.ThreadPoolExecutor(max_workers=255) as executor:
             # Start the load operations and mark each future with its URL
 
             fs = [executor.submit(scan_one_device, url) for url in urls]
@@ -199,7 +199,7 @@ def generate_new_device_map(local_ip, ip_range=(2,64), result_main_dir="/ethosco
             # Start the load operations and mark each future with its URL
             fs = {}
             for id in devices_map.keys():
-                fs[executor.submit(update_dev_map_wrapped,devices_map, id)] = id
+                fs[executor.submit(update_dev_map_wrapped,local_ip, devices_map, id)] = id
 
             for f in concurrent.futures.as_completed(fs):
                 try:

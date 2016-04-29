@@ -27,7 +27,7 @@ STATIC_DIR = "../static"
 
 def update_device_map(id, what="data",type=None, port=9000, data=None):
     global  devices_map
-    update_dev_map_wrapped(devices_map,id,what,type,port,data,result_main_dir=RESULTS_DIR )
+    update_dev_map_wrapped(LOCAL_IP, devices_map,id,what,type,port,data,result_main_dir=RESULTS_DIR )
 
 
 @app.get('/favicon.ico')
