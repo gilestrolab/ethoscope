@@ -282,10 +282,28 @@ cd /etc
 nano machine-id machine-name hostname
 ```
 
+
+Snapshot of the OS
+----------------------------
+At this point, it makes sense to back-up your work by making a snapshot of the OS:
+
+Put the sd card in a computer.
+
+Let us assume you have your root partition in `/mnt/root/` and boot in `/mnt/boot/`.
+Your resulting snapshot will live be `/tmp/ethoscope_os_yyymmdd.tar.gz`.
+
+```
+cd /mnt/root/
+cp -r ../boot/* ./boot/
+sudo tar -zcvpf /tmp/ethoscope_os_yyymmdd.tar.gz  *
+rm ./boot/* -r
+```
+ 
+
 Burning your card
 -----------------------------
 
-After turning you pi off, you can take the card and burn it to a referenc image on a Linux PC.
+After turning you pi off, you can also take the card and burn it to a reference image on a Linux PC.
 To make a ref image, we replace `sdX` by the real drive name and do something like:
 
 
