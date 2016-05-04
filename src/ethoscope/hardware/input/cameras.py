@@ -5,8 +5,8 @@ try:
     from cv2.cv import CV_CAP_PROP_FRAME_WIDTH as CAP_PROP_FRAME_WIDTH
     from cv2.cv import CV_CAP_PROP_FRAME_HEIGHT as CAP_PROP_FRAME_HEIGHT
     from cv2.cv import CV_CAP_PROP_FRAME_COUNT as CAP_PROP_FRAME_COUNT
-    from cv2.cv import CV_CAP_PROP_FRAME_MSEC as CAP_PROP_POS_MSEC
-    from cv2.cv import CV_CAP_PROP_FRAME_FPS as CAP_PROP_FPS
+    from cv2.cv import CV_CAP_PROP_MSEC as CAP_PROP_POS_MSEC
+    from cv2.cv import CV_CAP_PROP_FPS as CAP_PROP_FPS
 
 except ImportError:
     from cv2 import CAP_PROP_FRAME_WIDTH, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_COUNT, CAP_PROP_POS_MSEC, CAP_PROP_FPS
