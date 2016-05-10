@@ -8,6 +8,7 @@ from ethoscope.hardware.interfaces.interfaces import  DefaultInterface
 from ethoscope.hardware.interfaces.odour_delivery_device import OdourDelivererInterface
 import sys
 import logging
+import sleep_depriver_interactor
 
 class HasChangedSideInteractor(BaseInteractor):
     _hardwareInterfaceClass = DefaultInterface
@@ -111,4 +112,59 @@ class DynamicOdourDeliverer(HasChangedSideInteractor):
             return HasInteractedVariable(False), {"channel": channel, "pos": None}
 
         return HasInteractedVariable(True), {"channel":channel, "pos" : self._side_to_pos[has_changed_side]}
+
+
+
+
+class DynamicOdourSleepDepriver(sleep_depriver_interactor.SleepDepInteractor):
+    _description = {
+        "overview": "An interactor to sleep deprive an animal using servo motor. See http://todo/fixme.html",
+        "arguments": [
+            {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_threshold",
+             "description": "The minimal velocity that counts as movement", "default": 0.0060},
+            {"type": "number", "min": 2.0, "max": 10.0, "step": 0.5, "name": "stimulus_duration",
+             "description": "How long to send the puff of odour for", "default": 5.0},
+            {"type": "number", "min": 1, "max": 3600 * 12, "step": 1, "name": "min_inactive_time",
+             "description": "The minimal time after which an inactive animal is awaken", "default": 120},
+            {"type": "date_range", "name": "date_range",
+             "description": "A date  and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+             "default": ""}
+        ]}
+
+    _hardwareInterfaceClass =  OdourDelivererInterface
+    _roi_to_channel = {
+            1:1,  2:2,  3:3,  4:4,  5:5,
+            6:6, 7:7, 8:8, 9:9, 10:10
+        }
+    _side_to_pos = {1:1, 2:2 }
+
+
+
+    def __init__(self,
+                 hardware_interface,
+                 velocity_threshold=0.0060,
+                 min_inactive_time=120,  # s
+                 stimulus_duration=5, #s
+                 date_range=""
+                 ):
+        """
+        A interactor to control a sleep depriver module
+
+        :param hardware_interface: the sleep depriver module hardware interface
+        :type hardware_interface: :class:`~ethoscope.hardawre.interfaces.sleep_depriver_interface.SleepDepriverInterface`
+        :param velocity_threshold:
+        :type velocity_threshold: float
+        :param min_inactive_time: the minimal time without motion after which an animal should be disturbed (in seconds)
+        :type min_inactive_time: float
+        :return:
+        """
+        self._stimulus_duration = stimulus_duration
+        super(DynamicOdourSleepDepriver, self).__init__(hardware_interface, velocity_threshold,min_inactive_time, date_range)
+
+    def _decide(self):
+        decide, args = super(DynamicOdourSleepDepriver, self)._decide()
+        args["stimulus_duration"] = self._stimulus_duration
+        return decide, args
+
+
 

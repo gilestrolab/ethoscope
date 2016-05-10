@@ -152,3 +152,21 @@ class OdourDelivererInterface(BaseInterface):
         self._module_interface.join()
         logging.info("Joined OK")
 #
+
+class DynamicOdourSleepDepriverInterface(OdourDelivererInterface):
+    _SubProcessClass = OdourDepriverSubProcess
+    def __init__(self,port="/dev/ttyUSB0"):
+        super(DynamicOdourSleepDepriverInterface, self).__init__()
+
+
+class OdourDepriverSubProcess(OdourDelivererSubProcess):
+    _ConnectionClass = OdourDepriverConnection
+
+class OdourDepriverConnection(OdourDelivererConnection):
+    def _move_to_pos(self, channel, pos):
+        return super(OdourDepriverConnection, self).move_to_angle(channel, pos)
+
+    def move_to_pos(self, channel, stimulus_duration ):
+        self._move_to_pos(channel, 1)
+        time.sleep(stimulus_duration)
+        self._move_to_pos(channel, 3)
