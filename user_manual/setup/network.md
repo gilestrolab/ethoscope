@@ -38,4 +38,5 @@ $ ip link
 ```
 In this exanple, my wireless interface is `wlp5s1` (all wifi interfaces start with `wl`), then my MAC address is `00:26:5a:e6:47:f1`
 
+As long as you know what you are doing, you can also use a second ethernet card, instead of a a wireless connection to connect to the intranet. This will make scaning and backups faster.
 
