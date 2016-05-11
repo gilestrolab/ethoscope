@@ -12,11 +12,10 @@ class HardwareConnection(Thread):
         super(HardwareConnection, self).__init__()
         self.start()
     def run(self):
-        while self._connection_open:
+        while len(self._instructions) > 0 and self._connection_open:
             time.sleep(.1)
-            while len(self._instructions) > 0:
-                instruc = self._instructions.popleft()
-                ret = self._interface.send(**instruc)
+            instruc = self._instructions.popleft()
+            ret = self._interface.send(**instruc)
 
     def send_instruction(self, instruction=None):
         if instruction is None:
