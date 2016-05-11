@@ -1,19 +1,17 @@
 import tempfile
 import os
-from threading import Thread
 import traceback
 import shutil
 import logging
 import time
 import re
-
 import cv2
-
-
+from threading import Thread
 
 # Interface to V4l
 from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera
 # Build ROIs from greyscale image
+
 
 from ethoscope.roi_builders.target_roi_builder import  OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder
 from ethoscope.roi_builders.roi_builders import  DefaultROIBuilder
@@ -22,10 +20,11 @@ from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
 
 # the robust self learning tracker
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
-from ethoscope.interactors.interactors import DefaultInteractor
-from ethoscope.interactors.sleep_depriver_interactor import SleepDepInteractor, SystematicSleepDepInteractor, ExperimentalSleepDepInteractor
-from ethoscope.interactors.odour_deliverer_interactor import DynamicOdourDeliverer, DynamicOdourSleepDepriver
-from ethoscope.interactors.fake_sleep_dep_interactor import FakeSleepDepInteractor, FakeSystematicSleepDepInteractor
+from ethoscope.hardware.interfaces.interfaces import HardwareConnection
+from ethoscope.stimulators.stimulators import DefaultStimulator
+from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator, ExperimentalSleepDepStimulator#, SystematicSleepDepInteractor
+from ethoscope.stimulators.odour_stimulators import DynamicOdourDeliverer, DynamicOdourSleepDepriver
+
 
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
@@ -70,10 +69,9 @@ class ControlThread(Thread):
                 "possible_classes":[AdaptiveBGModel],
             },
         "interactor":{
-                        "possible_classes":[DefaultInteractor,SleepDepInteractor,
-                                            SystematicSleepDepInteractor,
-                                            ExperimentalSleepDepInteractor,
-                                            FakeSystematicSleepDepInteractor,
+                        "possible_classes":[DefaultStimulator, SleepDepStimulator,
+                                            #SystematicSleepDepInteractor,
+                                            ExperimentalSleepDepStimulator,
                                             #DynamicOdourDeliverer,
                                             DynamicOdourSleepDepriver],
                     },
@@ -269,10 +267,11 @@ class ControlThread(Thread):
             logging.info("Starting Monitor thread")
 
             self._info["error"] = None
-
             self._last_info_t_stamp = 0
             self._last_info_frame_idx = 0
             cam = None
+            hardware_connection = None
+
             try:
 
                 CameraClass = self._option_dict["camera"]["class"]
@@ -321,17 +320,16 @@ class ControlThread(Thread):
                              "selected_options": str(self._option_dict)
                               }
 
+                #hardware_interface is a running thread
+                hardware_connection = HardwareConnection(HardWareInterfaceClass)
 
-
-
-                hardware_interface = HardWareInterfaceClass()
-                interactors = [InteractorClass(hardware_interface ,**interactor_kwargs) for _ in rois]
+                interactors = [InteractorClass(hardware_connection ,**interactor_kwargs) for _ in rois]
                 kwargs = self._monit_kwargs.copy()
                 kwargs.update(tracker_kwargs)
 
                 self._monit = Monitor(cam, TrackerClass, rois,
-                                      interactors=interactors,
-                                     *self._monit_args, **kwargs)
+                                      stimulators=interactors,
+                                      *self._monit_args, **kwargs)
 
                 logging.info("Starting monitor")
 
@@ -349,6 +347,13 @@ class ControlThread(Thread):
                         cam._close()
                 except:
                     logging.warning("Could not close camera properly")
+                    pass
+
+                try:
+                    if hardware_connection is not None:
+                        hardware_connection.stop()
+                except:
+                    logging.warning("Could not close hardware interfaceproperly")
                     pass
 
         except EthoscopeException as e:

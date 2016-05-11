@@ -5,7 +5,7 @@ __author__ = 'quentin'
 
 from ethoscope.core.variables import BaseRelativeVariable
 from ethoscope.core.data_point import DataPoint
-from ethoscope.interactors.interactors import DefaultInteractor
+from ethoscope.stimulators.stimulators import DefaultStimulator
 
 
 
@@ -33,7 +33,7 @@ class TrackingUnit(object):
         if interactor is not None:
             self._interactor= interactor
         else:
-            self._interactor = DefaultInteractor(None)
+            self._interactor = DefaultStimulator(None)
 
         self._interactor.bind_tracker(self._tracker)
 

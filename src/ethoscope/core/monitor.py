@@ -8,8 +8,8 @@ import traceback
 class Monitor(object):
 
     def __init__(self, camera, tracker_class,
-                 rois = None, interactors=None,
-                *args, **kwargs # extra arguments for the tracker objects
+                 rois = None, stimulators=None,
+                 *args, **kwargs  # extra arguments for the tracker objects
                  ):
         r"""
         Class to orchestrate the tracking of multiple objects. It is performs, in order, the following actions:
@@ -27,8 +27,8 @@ class Monitor(object):
         :type tracker_class: class
         :param rois: A list of region of interest.
         :type rois: list(:class:`~ethoscope.core.roi.ROI`)
-        :param interactors: The class that will be used to analyse the position of the object and interact with the system/hardware.
-        :type interactors: list(:class:`~ethoscope.interactors.interactors.BaseInteractor`
+        :param stimulators: The class that will be used to analyse the position of the object and interact with the system/hardware.
+        :type stimulators: list(:class:`~ethoscope.interactors.interactors.BaseInteractor`
         :param args: additional arguments passed to the tracking algorithm
         :param kwargs: additional keyword arguments passed to the tracking algorithm
 
@@ -45,11 +45,11 @@ class Monitor(object):
         if rois is None:
             raise NotImplementedError("rois must exist (cannot be None)")
 
-        if interactors is None:
+        if stimulators is None:
             self._unit_trackers = [TrackingUnit(tracker_class, r, None, *args, **kwargs) for r in rois]
 
-        elif len(interactors) == len(rois):
-            self._unit_trackers = [TrackingUnit(tracker_class, r, inter, *args, **kwargs) for r, inter in zip(rois, interactors)]
+        elif len(stimulators) == len(rois):
+            self._unit_trackers = [TrackingUnit(tracker_class, r, inter, *args, **kwargs) for r, inter in zip(rois, stimulators)]
         else:
             raise ValueError("You should have one interactor per ROI")
 

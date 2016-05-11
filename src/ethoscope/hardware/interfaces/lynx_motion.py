@@ -1,29 +1,20 @@
 import logging
 import time
-
-
-
+from ethoscope.hardware.interfaces.interfaces import BaseInterface
 
 class WrongSerialPortError(Exception):
-
     pass
 
 class NoValidPortError(Exception):
     pass
 
-
-class SimpleLynxMotionConnection(object):
+class SimpleLynxMotionInterface(BaseInterface):
 
     _baud = 115200
 
-    # digital servos
-    #_min_angle_pulse = (0.,800.)
-    #_max_angle_pulse = (150.,2400.)
-
-    # blue old school servo
     _min_angle_pulse = (-90.,535.)
     _max_angle_pulse = (90.,2500.)
-
+    _n_channels = 10
 
 
     def __init__(self, port=None):
@@ -49,6 +40,7 @@ class SimpleLynxMotionConnection(object):
         self._serial = serial.Serial(self._port, self._baud, timeout=2)
         time.sleep(2)
         self._test_serial_connection()
+        super(SimpleLynxMotionInterface, self).__init__()
 
 
     def _find_port(self):
@@ -56,7 +48,6 @@ class SimpleLynxMotionConnection(object):
         import serial
         all_port_tuples = list_ports.comports()
         logging.info("listing serial ports")
-
         all_ports = set()
         for ap, _, _  in all_port_tuples:
             all_ports |= {ap}
@@ -67,7 +58,7 @@ class SimpleLynxMotionConnection(object):
 
             try:
                 #here we use a recursive strategy to find the good port (ap).
-                SimpleLynxMotionConnection(ap)
+                SimpleLynxMotionInterface(ap)
                 return ap
             except (WrongSerialPortError, serial.SerialException):
                 warn_str = "Tried to use port %s. Failed." % ap
@@ -112,12 +103,12 @@ class SimpleLynxMotionConnection(object):
         pulse = min_p + (angle - min_a) * slope
         return pulse
 
-    def move_to_angle(self,idx,angle=0.,time=1000):
+    def move_to_angle(self,channel,angle=0., duration=1000):
         """
         Move a given servo to an angle in a given time.
 
-        :param idx: the number of the servo to be moved
-        :type idx: int
+        :param channel: the number of the servo to be moved
+        :type channel: int
         :param angle: the angle (between 0 and 180) to move to
         :type angle: int
         :param time: the time it takes to go from the original angle to the new one (in ms)
@@ -125,9 +116,17 @@ class SimpleLynxMotionConnection(object):
         :return:
         """
 
-        if idx < 1:
+        if channel < 1:
             raise Exception("idx must be greater or equal to one")
         pulse = self._angle_to_pulse(angle)
-        instruction = "#%i P%i T%i\r" % (idx - 1,pulse,time)
+        instruction = "#%i P%i T%i\r" % (channel - 1,pulse,duration)
         o = self._serial.write(instruction)
+        time.sleep(float(duration)/1000.0)
         return o
+
+    def send(self, *args, **kwargs):
+        self.move_to_angle(*args, **kwargs)
+
+    def _warm_up(self):
+        for i in range(1, 1 + self._n_channels):
+            self.move_to_angle(i, 0)

@@ -105,7 +105,7 @@ we developed an ``R`` package named `rethomics <https://github.com/gilestrolab/r
 
 import core
 import hardware
-import interactors
+import stimulators
 import roi_builders
 import trackers
 import utils
