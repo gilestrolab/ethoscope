@@ -74,7 +74,7 @@ class   BaseStimulator(DescribedObject):
 
     def _deliver(self, **kwargs):
         if self._hardware_connection is not None:
-            self._hardware_connection.send(**kwargs)
+            self._hardware_connection.send_instruction(kwargs)
 
 
 class DefaultStimulator(BaseStimulator):

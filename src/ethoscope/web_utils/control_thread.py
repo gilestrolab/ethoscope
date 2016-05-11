@@ -353,7 +353,7 @@ class ControlThread(Thread):
                     if hardware_connection is not None:
                         hardware_connection.stop()
                 except:
-                    logging.warning("Could not close hardware interfaceproperly")
+                    logging.warning("Could not close hardware connection properly")
                     pass
 
         except EthoscopeException as e:

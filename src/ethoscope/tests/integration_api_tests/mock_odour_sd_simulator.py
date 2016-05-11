@@ -9,10 +9,13 @@ from ethoscope.drawers.drawers import DefaultDrawer
 from ethoscope.roi_builders.target_roi_builder import SleepMonitorWithTargetROIBuilder
 from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver
 from ethoscope.hardware.interfaces.interfaces import BaseInterface
+from ethoscope.hardware.interfaces.interfaces import HardwareConnection
+import time
 
 class MockSDInterface(BaseInterface):
     def send(self,channel, stimulus_duration ):
         print(("Stimulus in channel ", channel, "for a duration of ", stimulus_duration ))
+        time.sleep(2)
     def _warm_up(self):
         print("Warming up")
 
@@ -30,8 +33,8 @@ rb = SleepMonitorWithTargetROIBuilder()
 rois = rb.build(cam)
 cam.restart()
 
-msdi = MockSDInterface()
-stimulators = [MockSDStimulator(msdi,min_inactive_time= 10) for _ in rois ]
+connection  = HardwareConnection(MockSDInterface)
+stimulators = [MockSDStimulator(connection, min_inactive_time= 10) for _ in rois ]
 
 mon = Monitor(cam, AdaptiveBGModel, rois, stimulators=stimulators)
 drawer = DefaultDrawer(draw_frames=True)
@@ -46,3 +49,4 @@ finally:
     os.remove(tmp)
 
 
+connection.stop()
