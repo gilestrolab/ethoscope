@@ -4,7 +4,7 @@ import logging
 from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVariable
 from ethoscope.utils.scheduler import Scheduler
 from ethoscope.hardware.interfaces.interfaces import  DefaultInterface
-from ethoscope.hardware.interfaces.odour_delivery_device import OdourDelivererInterface
+from ethoscope.hardware.interfaces.odour_delivery_device import OdourDelivererInterface, OdourDepriverInterface
 import sleep_depriver_stimulators
 
 class HasChangedSideStimulator(BaseStimulator):
@@ -128,7 +128,7 @@ class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
              "default": ""}
         ]}
 
-    _HardwareInterfaceClass =  OdourDelivererInterface
+    _HardwareInterfaceClass =  OdourDepriverInterface
     _roi_to_channel = {
             1:1,  2:2,  3:3,  4:4,  5:5,
             6:6, 7:7, 8:8, 9:9, 10:10
