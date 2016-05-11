@@ -23,7 +23,7 @@ from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection
 from ethoscope.stimulators.stimulators import DefaultStimulator
 from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator, ExperimentalSleepDepStimulator#, SystematicSleepDepInteractor
-from ethoscope.stimulators.odour_stimulators import DynamicOdourDeliverer, DynamicOdourSleepDepriver
+from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver #, DynamicOdourDeliverer
 
 
 from ethoscope.utils.debug import EthoscopeException
@@ -281,9 +281,9 @@ class ControlThread(Thread):
                 ROIBuilderClass= self._option_dict["roi_builder"]["class"]
                 roi_builder_kwargs = self._option_dict["roi_builder"]["kwargs"]
 
-                InteractorClass= self._option_dict["interactor"]["class"]
-                interactor_kwargs = self._option_dict["interactor"]["kwargs"]
-                HardWareInterfaceClass =  InteractorClass.__dict__["_hardwareInterfaceClass"]
+                StimulatorClass= self._option_dict["interactor"]["class"]
+                stimulator_kwargs = self._option_dict["interactor"]["kwargs"]
+                HardWareInterfaceClass =  StimulatorClass.__dict__["_HardwareInterfaceClass"]
 
                 TrackerClass= self._option_dict["tracker"]["class"]
                 tracker_kwargs = self._option_dict["tracker"]["kwargs"]
@@ -323,12 +323,12 @@ class ControlThread(Thread):
                 #hardware_interface is a running thread
                 hardware_connection = HardwareConnection(HardWareInterfaceClass)
 
-                interactors = [InteractorClass(hardware_connection ,**interactor_kwargs) for _ in rois]
+                stimulators = [StimulatorClass(hardware_connection ,**stimulator_kwargs) for _ in rois]
                 kwargs = self._monit_kwargs.copy()
                 kwargs.update(tracker_kwargs)
 
                 self._monit = Monitor(cam, TrackerClass, rois,
-                                      stimulators=interactors,
+                                      stimulators=stimulators,
                                       *self._monit_args, **kwargs)
 
                 logging.info("Starting monitor")
