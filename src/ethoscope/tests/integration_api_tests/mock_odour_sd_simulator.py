@@ -10,6 +10,7 @@ from ethoscope.roi_builders.target_roi_builder import SleepMonitorWithTargetROIB
 from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver
 from ethoscope.hardware.interfaces.interfaces import BaseInterface
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection
+from _constants import VIDEO, DRAW_FRAMES
 import time
 
 class MockSDInterface(BaseInterface):
@@ -21,9 +22,6 @@ class MockSDInterface(BaseInterface):
 
 class MockSDStimulator(DynamicOdourSleepDepriver):
     _HardwareInterfaceClass = MockSDInterface
-
-
-VIDEO = "../static_files/videos/arena_10x2_sortTubes.mp4"
 
 tmp = tempfile.mkstemp(suffix="_ethoscope_test.db")[1]
 
@@ -37,7 +35,7 @@ connection  = HardwareConnection(MockSDInterface)
 stimulators = [MockSDStimulator(connection, min_inactive_time= 10) for _ in rois ]
 
 mon = Monitor(cam, AdaptiveBGModel, rois, stimulators=stimulators)
-drawer = DefaultDrawer(draw_frames=True)
+drawer = DefaultDrawer(draw_frames=DRAW_FRAMES)
 
 
 try:
@@ -47,6 +45,5 @@ try:
 finally:
     print("Removing temp db (" + tmp+ ")")
     os.remove(tmp)
-
 
 connection.stop()

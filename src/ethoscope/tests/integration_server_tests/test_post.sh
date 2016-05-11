@@ -21,12 +21,12 @@ failed(){
     }
 
 
-echo "Starting deamon in background"
+echo "Starting daemon in background"
 python $SERVER_SCRIPT -j $JSON_FILE  -D  > /dev/null&
 daemon_pid=$!
 echo "Wait 5s"
 sleep 5
-
+echo "tmp file is saved at $tmp"
 
 for i in $(seq 1 2)
     do

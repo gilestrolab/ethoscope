@@ -4,7 +4,7 @@ from threading import Thread
 import time
 import collections
 
-class HardwareConnection(Thread):
+class   HardwareConnection(Thread):
     def __init__(self, interface_class, *args, **kwargs):
         self._interface = interface_class(*args, **kwargs)
         self._instructions = collections.deque()
@@ -12,10 +12,11 @@ class HardwareConnection(Thread):
         super(HardwareConnection, self).__init__()
         self.start()
     def run(self):
-        while len(self._instructions) > 0 and self._connection_open:
+        while self._connection_open:
             time.sleep(.1)
-            instruc = self._instructions.popleft()
-            ret = self._interface.send(**instruc)
+            while len(self._instructions) > 0 and self._connection_open:
+                instruc = self._instructions.popleft()
+                ret = self._interface.send(**instruc)
 
     def send_instruction(self, instruction=None):
         if instruction is None:

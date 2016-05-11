@@ -11,6 +11,8 @@ from ethoscope.roi_builders.target_roi_builder import SleepMonitorWithTargetROIB
 from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator
 from ethoscope.hardware.interfaces.sleep_depriver_interface import SleepDepriverInterface
 from ethoscope.hardware.interfaces.lynx_motion import SimpleLynxMotionInterface
+from ethoscope.hardware.interfaces.interfaces import HardwareConnection
+from _constants import VIDEO, DRAW_FRAMES
 
 class MockSerial(object):
     def write(self, str):
@@ -31,8 +33,6 @@ class MockSDInterface(MockLynxMotionInterface, SleepDepriverInterface):
 class MockSDStimulator(SleepDepStimulator):
     _HardwareInterfaceClass = MockSDInterface
 
-VIDEO = "../static_files/videos/arena_10x2_sortTubes.mp4"
-
 tmp = tempfile.mkstemp(suffix="_ethoscope_test.db")[1]
 
 print("Making a tmp db: " + tmp)
@@ -41,19 +41,15 @@ rb = SleepMonitorWithTargetROIBuilder()
 rois = rb.build(cam)
 cam.restart()
 
-msdi = MockSDInterface()
-stimulators = [MockSDStimulator(msdi,min_inactive_time= 10) for _ in rois ]
-
+connection  = HardwareConnection(MockSDInterface)
+stimulators = [MockSDStimulator(connection,min_inactive_time= 10) for _ in rois ]
 mon = Monitor(cam, AdaptiveBGModel, rois, stimulators=stimulators)
-drawer = DefaultDrawer(draw_frames=True)
-
+drawer = DefaultDrawer(draw_frames=DRAW_FRAMES)
 
 try:
     with SQLiteResultWriter(tmp , rois) as rw:
         mon.run(result_writer=rw, drawer=drawer)
-
 finally:
     print("Removing temp db (" + tmp+ ")")
     os.remove(tmp)
-
-
+connection.stop()

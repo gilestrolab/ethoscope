@@ -6,7 +6,7 @@
                   },
         "tracker": {"name":"AdaptiveBGModel",
                       "arguments":{}},
-        "interactor": {"name":"DefaultInteractor",
+        "interactor": {"name":"DefaultStimulator",
                       "arguments":{}},
         "drawer": {"name":"DefaultDrawer",
                       "arguments":{"draw_frames":true}},

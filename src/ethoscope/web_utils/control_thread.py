@@ -321,7 +321,7 @@ class ControlThread(Thread):
                               }
 
                 #hardware_interface is a running thread
-                hardware_connection = HardwareConnection(HardWareInterfaceClass,port = "/dev/ttyUSB0")
+                hardware_connection = HardwareConnection(HardWareInterfaceClass)
 
                 stimulators = [StimulatorClass(hardware_connection ,**stimulator_kwargs) for _ in rois]
                 kwargs = self._monit_kwargs.copy()

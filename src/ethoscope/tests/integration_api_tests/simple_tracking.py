@@ -7,8 +7,8 @@ from ethoscope.utils.io import SQLiteResultWriter
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.drawers.drawers import DefaultDrawer
 from ethoscope.roi_builders.target_roi_builder import SleepMonitorWithTargetROIBuilder
+from _constants import VIDEO, DRAW_FRAMES
 
-VIDEO = "../static_files/videos/arena_10x2_sortTubes.mp4"
 
 tmp = tempfile.mkstemp(suffix="_ethoscope_test.db")[1]
 
@@ -18,7 +18,7 @@ rb = SleepMonitorWithTargetROIBuilder()
 rois = rb.build(cam)
 cam.restart()
 mon = Monitor(cam,AdaptiveBGModel, rois)
-drawer = DefaultDrawer(draw_frames=True)
+drawer = DefaultDrawer(draw_frames=DRAW_FRAMES)
 try:
     with SQLiteResultWriter(tmp , rois) as rw:
         mon.run(result_writer=rw, drawer=drawer)
