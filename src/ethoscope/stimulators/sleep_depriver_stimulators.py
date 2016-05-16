@@ -148,6 +148,7 @@ class ExperimentalSleepDepStimulator(SleepDepStimulator):
         """
 
         self._t0 = None
+        roi_id = self._tracker._roi.idx
         channel = self._roi_to_channel[roi_id]
         # the inactive time depends on the chanel here
         min_incative_time = round(channel ** 1.7) * 20 * 1000
