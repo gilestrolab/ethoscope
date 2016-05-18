@@ -190,6 +190,18 @@ It makes everything easier if you force time to be GMT regardless of your timezo
 timedatectl set-timezone GMT
 ```
 
+Node will act as an NTP server for ethoscopes. 
+That is machines will use local network to sync time from the node.
+However, by default, **the server (node) will not serve time if it fails to get it from internet**.
+In order to allow the node to server time regardless, you can addthese two lines to `/etc/ntp.conf`:
+
+```
+server 127.127.1.1
+fudge  127.127.1.1 stratum 12
+```
+
+
+
 What is next
 -----------------------
 In order to check things:
