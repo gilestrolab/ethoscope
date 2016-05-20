@@ -45,4 +45,4 @@ finally:
     print("Removing temp db (" + tmp+ ")")
     os.remove(tmp)
 
-connection.stop()
+    connection.stop()

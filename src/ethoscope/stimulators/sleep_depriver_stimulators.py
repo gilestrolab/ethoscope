@@ -102,13 +102,18 @@ class SleepDepStimulator(IsMovingStimulator):
     def _decide(self):
         roi_id= self._tracker._roi.idx
         now =  self._tracker.last_time_point
+
         try:
             channel = self._roi_to_channel[roi_id]
         except KeyError:
             return HasInteractedVariable(False), {}
+
         has_moved = self._has_moved()
+
+
         if self._t0 is None:
             self._t0 = now
+
         if not has_moved:
             if float(now - self._t0) > self._inactivity_time_threshold_ms:
                 self._t0 = None
@@ -148,9 +153,19 @@ class ExperimentalSleepDepStimulator(SleepDepStimulator):
         """
 
         self._t0 = None
-        roi_id = self._tracker._roi.idx
-        channel = self._roi_to_channel[roi_id]
+
         # the inactive time depends on the chanel here
-        min_incative_time = round(channel ** 1.7) * 20 * 1000
-        super(ExperimentalSleepDepStimulator, self).__init__(hardware_connection, velocity_threshold, min_incative_time, date_range)
+        super(ExperimentalSleepDepStimulator, self).__init__(hardware_connection, velocity_threshold, 0, date_range)
+        self._inactivity_time_threshold_ms = None
+
+    # here we override bind tracker so that we also define inactive time for this stimulator
+    def bind_tracker(self, tracker):
+        self._tracker = tracker
+
+        roi_id = self._tracker._roi.idx
+        try:
+            channel = self._roi_to_channel[roi_id]
+            self._inactivity_time_threshold_ms = round(channel ** 1.7) * 20 * 1000
+        except KeyError:
+            pass
 

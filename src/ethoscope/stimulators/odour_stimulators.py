@@ -158,6 +158,7 @@ class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
     def _decide(self):
         decide, args = super(DynamicOdourSleepDepriver, self)._decide()
         args["stimulus_duration"] = self._stimulus_duration
+
         return decide, args
 
 

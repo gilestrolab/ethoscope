@@ -46,13 +46,11 @@ class   BaseStimulator(DescribedObject):
         
         :return:
         """
-
         if self._tracker is None:
             raise ValueError("No tracker bound to this stimulator. Use `bind_tracker()` methods")
 
         if self._scheduler.check_time_range() is False:
             return HasInteractedVariable(False) , {}
-
         interact, result  = self._decide()
         if interact > 0:
             self._deliver(**result)
