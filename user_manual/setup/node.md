@@ -48,7 +48,7 @@ pacman -Syu --noconfirm
 pacman -S base-devel git gcc-fortran rsync wget fping --noconfirm --needed
 
 # utilities
-pacman -S ntp bash-completion --noconfirm --needed
+pacman -S ntp bash-completion openssh --noconfirm --needed
 
 #so we can set up a dns
 pacman -S dnsmasq --noconfirm --needed
@@ -94,7 +94,7 @@ git clone $LOCAL_BARE_PATH $TARGET_GIT_INSTALL
 cd $TARGET_GIT_INSTALL
 
 # IMPORTANT this is if you want to work on the "dev" branch otherwise, you are using "master"
-git checkout dev
+git checkout -b dev
 
 cd $TARGET_GIT_INSTALL/node_src
 # we install with pip
