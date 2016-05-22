@@ -13,6 +13,8 @@ import MySQLdb
 from functools import wraps
 import socket
 
+from scapy.all import srp, Ether, ARP
+
 class ScanException(Exception):
     pass
 
@@ -157,6 +159,23 @@ def make_backup_path(device, result_main_dir, timeout=30):
         return None
     return output_db_file
 
+def get_alive_devices(local_ip):
+        '''
+        We use the scappy srp function to emulate a arp-scan
+        This will not poison the network, can scan the entire subnet and will take less than 2 seconds
+        '''
+        #An alternative could be to interrogate the arp cache to get all machines on subnet
+        #For that we would need to set 0 to /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts on each ethoscope
+        #then issue a broadcast ping (e.g. ping -b 192.168.1.255 -c 2)
+        #then we interrogate the arp cache using a system call or arptable: http://python-arptable.readthedocs.io/en/latest/readme.html
+        
+        subnet_ip = local_ip.split(".")[0:3] 
+        subnet_address = ".".join(subnet_ip) + ".0/24"
+        
+        ans, unans = srp(Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=subnet_address), timeout=2, verbose=False)
+        collection = [rcv.sprintf(r"%ARP.psrc%") for snd, rcv in ans]
+        return collection
+
 def generate_new_device_map(local_ip, ip_range=(2,100), result_main_dir="/ethoscope_results"):
         devices_map = {}
         subnet_ip = local_ip.split(".")[0:3]
@@ -166,7 +185,15 @@ def generate_new_device_map(local_ip, ip_range=(2,100), result_main_dir="/ethosc
 
         logging.info("Scanning attached devices")
 
-        scanned = [ "%s.%i" % (subnet_ip, i) for i in range(*ip_range) ]
+        # the following line simply creates a list of ip to be interrogated, which is not very efficient
+        # scanned = [ "%s.%i" % (subnet_ip, i) for i in range(*ip_range) ]
+        # instead we try to use arp scanning first
+        try:
+            scanned = get_alive_devices(local_ip)
+        except Exception as e:
+            logging.error("Cannot use scappy/arp-scan. Defaulting to all subnet")
+            scanned = [ "%s.%i" % (subnet_ip, i) for i in range(*ip_range) ]
+            
         urls= ["http://%s" % str(s) for s in scanned]
 
 
@@ -242,6 +269,7 @@ def generate_new_device_map(local_ip, ip_range=(2,100), result_main_dir="/ethosc
         all_devices = sorted(devices_map.keys())
         logging.info("BACKUP_PATH -> Detected %i devices in %i seconds:\n%s" % (len(devices_map),time.time() - t0, str(all_devices)))
 
+        print devices_map
         return devices_map
 
 def get_last_backup_time(device):
