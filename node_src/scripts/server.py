@@ -88,8 +88,6 @@ def scan_subnet( ip_range=(6,100)):
                  logging.warning("Device %s not detected when scanning" % k)
                  devices_map[k]["status"] = "not detected"
 
-
-
         return devices_map
 
     
@@ -148,7 +146,6 @@ def device(id):
         return os.path.basename(local_file)
 
     except Exception as e:
-        print e
         return {'error':traceback.format_exc(e)}
 
 
