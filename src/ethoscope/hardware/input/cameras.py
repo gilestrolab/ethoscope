@@ -611,4 +611,4 @@ class OurPiCameraAsync(BaseCamera):
             return self._frame
 
         except Exception as e:
-            raise EthoscopeException("Could not get frame from camera\n%s", traceback.format_exception(e))
+            raise EthoscopeException("Could not get frame from camera\n%s", traceback.format_exc(e))
