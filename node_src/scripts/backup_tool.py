@@ -14,11 +14,11 @@ class BackupClass(object):
             "user":"ethoscope",
             "password":"ethoscope"
         }
-    def __init__(self, device_info, base_result_path = "/"):
+    def __init__(self, device_info, results_dir):
 
         self._device_info = device_info
         self._database_ip = os.path.basename(self._device_info["ip"])
-        self._base_result_path = base_result_path
+        self._results_dir = results_dir
 
 
     def run(self):
@@ -28,7 +28,7 @@ class BackupClass(object):
 
             if self._device_info["backup_path"] is None:
                 raise ValueError("backup path is None for device %s" % self._device_info["id"])
-            backup_path = "%s/%s" %(self._base_result_path, self._device_info["backup_path"])
+            backup_path = os.path.join(self._results_dir, self._device_info["backup_path"])
 
             mirror= MySQLdbToSQlite(backup_path, self._db_credentials["name"],
                             remote_host=self._database_ip,
@@ -46,10 +46,10 @@ class BackupClass(object):
             logging.error(traceback.format_exc(e))
 
 def backup_job(args):
-    device_info, base_result_dir = args
+    device_info, results_dir = args
     logging.info("Initiating backup for device  %s" % device_info["id"])
 
-    backup_job = BackupClass(device_info, base_result_path= base_result_dir)
+    backup_job = BackupClass(device_info, results_dir= results_dir)
     logging.info("Running backup for device  %s" % device_info["id"])
     backup_job.run()
     logging.info("Backup done for for device  %s" % device_info["id"])
@@ -63,7 +63,7 @@ if __name__ == '__main__':
         parser = optparse.OptionParser()
         parser = optparse.OptionParser()
         parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
-        parser.add_option("-e", "--results-dir", dest="results_dir", default="/",
+        parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_results",
                           help="Where temporary result files are stored")
         parser.add_option("-r", "--router-ip", dest="router_ip", default="192.169.123.254",
                           help="the ip of the router in your setup")

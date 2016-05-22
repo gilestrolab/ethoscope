@@ -83,10 +83,9 @@ if __name__ == '__main__':
         parser = optparse.OptionParser()
         parser = optparse.OptionParser()
         parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
-        parser.add_option("-e", "--results-dir", dest="results_dir", default="/",
+        parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_videos",
                           help="Where temporary result files are stored")
-        parser.add_option("-v", "--videos-dir", dest="videos_dir", default="ethoscope_videos",
-                          help="Where video should be saved")
+
         parser.add_option("-r", "--router-ip", dest="router_ip", default="192.169.123.254",
                           help="the ip of the router in your setup")
         parser.add_option("-s", "--safe", dest="safe", default=False,help="Set Safe mode ON", action="store_true")
@@ -100,10 +99,9 @@ if __name__ == '__main__':
 
         (options, args) = parser.parse_args()
         option_dict = vars(options)
-        video_out_dir = "%s/%s" % (option_dict["results_dir"], option_dict["videos_dir"])
 
         gbw = GenericBackupWrapper( backup_job,
-                                    video_out_dir,
+                                    option_dict["results_dir"],
                                     option_dict["safe"], local_ip
                                     )
         gbw.run()

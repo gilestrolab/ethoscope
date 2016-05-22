@@ -329,7 +329,8 @@ if __name__ == '__main__':
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
     device_scanner = None
     try:
-        device_scanner = DeviceScanner()
+        device_scanner = DeviceScanner(LOCAL_IP, results_dir=RESULTS_DIR)
+        #device_scanner = DeviceScanner( results_dir=RESULTS_DIR)
         device_scanner.start()
         run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='cherrypy')
 

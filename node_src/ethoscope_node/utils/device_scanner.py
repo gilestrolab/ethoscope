@@ -36,7 +36,7 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
 
 
 class DeviceScanner(Thread):
-    def __init__(self, local_ip = "192.169.123.1", ip_range = (6,100),device_refresh_period = 5):
+    def __init__(self, local_ip = "192.169.123.1", ip_range = (6,100),device_refresh_period = 5, results_dir="/ethoscope_results"):
         self._is_active = True
         self._devices = {}
         self._device_id_map = {}
@@ -46,7 +46,7 @@ class DeviceScanner(Thread):
             subnet_ip = local_ip.split(".")[0:3]
             subnet_ip = ".".join(subnet_ip)
             ip = "%s.%i" % (subnet_ip, i)
-            self._devices[ip] = Device(ip, device_refresh_period )
+            self._devices[ip] = Device(ip, device_refresh_period, results_dir=results_dir)
             self._devices[ip].start()
 
         super(DeviceScanner, self).__init__()
@@ -79,7 +79,7 @@ class Device(Thread):
     _ethoscope_db_credentials = {"user": "ethoscope",
                                 "passwd": "ethoscope",
                                 "db":"ethoscope_db"}
-    _result_main_dir = "/ethoscope_results/"
+
     _id_page = "id"
     _user_options_page = "user_options"
     _static_page = "static"
@@ -89,7 +89,8 @@ class Device(Thread):
                                      "stop": ["running", "recording"],
                                      "poweroff": ["stopped"]}
 
-    def __init__(self,ip, refresh_period= 2, port = 9000):
+    def __init__(self,ip, refresh_period= 2, port = 9000, results_dir="/ethoscope_results"):
+        self._results_dir = results_dir
         self._ip = ip
         self._port = port
         self._id_url = "http://%s:%i/%s" % (ip, port, self._id_page)
@@ -192,12 +193,22 @@ class Device(Thread):
             data_url = "http://%s:%i/data/%s" % (self._ip, self._port, self._id)
             resp = self._get_json(data_url)
             self._info.update(resp)
-            resp = self._make_backup_path(self._result_main_dir)
+            resp = self._make_backup_path()
+            self._info.update(resp)
+            resp = self._get_last_backup_time(self._info["backup_path"])
             self._info.update(resp)
         except ScanException:
             pass
 
-    def _make_backup_path(self, result_main_dir, timeout=30):
+    def _get_last_backup_time(self, backup_path):
+        try:
+            time_since_backup = time.time() - os.path.getmtime(backup_path)
+            return {"time_since_backup": time_since_backup}
+        except Exception as e:
+            logging.error(traceback.format_exc(e))
+            return {"time_since_backup": "None"}
+
+    def _make_backup_path(self,  timeout=30):
         try:
             import MySQLdb
             device_id = self._info["id"]
@@ -215,7 +226,7 @@ class Device(Thread):
             date_time = datetime.datetime.fromtimestamp(timestamp)
             formatted_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
             file_name = "%s_%s.db" % (formatted_time, device_id)
-            output_db_file = os.path.join(result_main_dir,
+            output_db_file = os.path.join(self._results_dir,
                                           device_id,
                                           device_name,
                                           formatted_time,

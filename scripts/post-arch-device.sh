@@ -91,8 +91,6 @@ echo 'driftfile /var/lib/ntp/ntp.drift' >> /etc/ntp.conf
 ######################################################################################
 
 
-cp ./ethoscope_device.service /etc/systemd/system/ethoscope_device.service
-
 
 ######################################################################################
 
@@ -237,5 +235,7 @@ echo 'tmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0' >> /etc/fstab; cat /etc/f
 
 echo 'SUCCESS, please reboot'
 
+
+cp ./ethoscope_device.service /etc/systemd/system/ethoscope_device.service
 
 #todo set up update daemon

@@ -10,14 +10,14 @@ import  multiprocessing
 
 
 class GenericBackupWrapper(object):
-    def __init__(self,backup_job, result_dir,safe, local_ip):
+    def __init__(self,backup_job, results_dir,safe, local_ip):
         self._TICK = 1.0  # s
-        self._BACKUP_DT = 5 * 10  # 5min
-        self._result_dir = result_dir
+        self._BACKUP_DT = 5 * 60  # 5min
+        self._results_dir = results_dir
         self._safe = safe
         self._backup_job = backup_job
         local_ip = "192.169.123.1"
-        self._device_scanner = DeviceScanner(local_ip, device_refresh_period=60)
+        self._device_scanner = DeviceScanner(local_ip, device_refresh_period=60, results_dir=self._results_dir)
         for d in self._device_scanner.get_device_list():
             d._update_info()
 
@@ -41,7 +41,7 @@ class GenericBackupWrapper(object):
 
                 dev_list =  str([d for d in sorted(dev_map.keys())])
                 logging.info("device map is: %s" %dev_list)
-                args = [(d, self._result_dir) for d in dev_map.values()]
+                args = [(d, self._results_dir) for d in dev_map.values()]
                 if self._safe:
                     map(self._backup_job, args)
                 else:
