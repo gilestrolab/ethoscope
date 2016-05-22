@@ -10,7 +10,9 @@ def get_last_backup_time(device):
     except Exception:
         return "No backup"
 
-def get_local_ip(local_router_ip = "192.169.123.254", max_node_subnet_address=5):
+def get_local_ip(local_router_ip = "192.169.123.254", max_node_subnet_address=5,localhost=False):
+    if localhost:
+        return "127.0.0.1"
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         s.connect((local_router_ip ,80))

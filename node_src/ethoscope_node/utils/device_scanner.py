@@ -36,7 +36,7 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
 
 
 class DeviceScanner(Thread):
-    def __init__(self, local_ip = "192.169.123.1", ip_range = (6,8)):
+    def __init__(self, local_ip = "192.169.123.1", ip_range = (6,100),device_refresh_period = 5):
         self._is_active = True
         self._devices = {}
         self._device_id_map = {}
@@ -46,14 +46,14 @@ class DeviceScanner(Thread):
             subnet_ip = local_ip.split(".")[0:3]
             subnet_ip = ".".join(subnet_ip)
             ip = "%s.%i" % (subnet_ip, i)
-            self._devices[ip] = Device(ip)
+            self._devices[ip] = Device(ip, device_refresh_period )
             self._devices[ip].start()
 
         super(DeviceScanner, self).__init__()
 
     def run(self):
         while self._is_active :
-            time.sleep(1)
+            time.sleep(.5)
             for d in self._devices.values():
                 id = d.id()
                 if id:
@@ -89,19 +89,25 @@ class Device(Thread):
                                      "stop": ["running", "recording"],
                                      "poweroff": ["stopped"]}
 
-    def __init__(self,ip, port = 9000):
+    def __init__(self,ip, refresh_period= 2, port = 9000):
         self._ip = ip
         self._port = port
         self._id_url = "http://%s:%i/%s" % (ip, port, self._id_page)
         self._id = ""
         self._info = {}
         self._is_active = True
+
+        self._refresh_period = refresh_period
+
         super(Device,self).__init__()
 
     def run(self):
+        last_refresh = 0
         while self._is_active:
-            time.sleep(5)
-            self._update_info()
+            time.sleep(.2)
+            if time.time() - last_refresh > self._refresh_period:
+                self._update_info()
+                last_refresh = time.time()
 
     def send_instruction(self,instruction,post_data):
 
@@ -177,6 +183,7 @@ class Device(Thread):
             logging.warning("Device id changed!")
             self._info = {}
 
+        self._info["ip"] = self._ip
 
 
     def _update_info(self):

@@ -1,33 +1,20 @@
 from bottle import *
-
-import urllib2
 import subprocess
 import socket
-import json
-import re
 import logging
 import traceback
-from ethoscope_node.utils.helpers import generate_new_device_map, update_dev_map_wrapped, get_local_ip, get_internet_ip
-from ethoscope_node.utils.helpers import get_last_backup_time
+from ethoscope_node.utils.helpers import  get_local_ip, get_internet_ip
+from ethoscope_node.utils.device_scanner import DeviceScanner
 import shutil
 import tempfile
-
 from os import walk
 import optparse
 import zipfile
 import datetime
 import fnmatch
-from netifaces import ifaddresses, AF_INET, AF_LINK
-
-
 
 app = Bottle()
 STATIC_DIR = "../static"
-
-
-def update_device_map(id, what="data",type=None, port=9000, data=None):
-    global  devices_map
-    update_dev_map_wrapped(LOCAL_IP, devices_map,id,what,type,port,data,result_main_dir=RESULTS_DIR )
 
 
 @app.get('/favicon.ico')
@@ -63,51 +50,28 @@ def enable_cors():
 
 
 #################################
-# API to connect with SM/SD
+# API to connect with ethoscopes
 #################################
 
-
-
 @app.get('/devices')
-def scan_subnet( ip_range=(6,100)):
-    global devices_map
+def devices():
     try:
-        devices_map_tmp = generate_new_device_map(LOCAL_IP, ip_range)
-        detected_devices = devices_map_tmp.keys()
-        for k in detected_devices:
-            if k in devices_map:
-                devices_map[k].update(devices_map_tmp[k])
-            else:
-                logging.info("new device detected %s" % k)
-                devices_map[k] = devices_map_tmp[k]
-
-
-
-        for k in devices_map.keys():
-             if k not in detected_devices:
-                 logging.warning("Device %s not detected when scanning" % k)
-                 devices_map[k]["status"] = "not detected"
-
-        return devices_map
-
-    
+        return device_scanner.get_device_list()
     except Exception as e:
-        logging.error("Unexpected exception whilst scanning devices:")
         logging.error(traceback.format_exc(e))
-
+        return {'error':traceback.format_exc(e)}
 
 @app.get('/devices_list')
 def get_devices_list():
-    global devices_map
-    return devices_map
-
+    devices()
 
 #Get the information of one Sleep Monitor
 @app.get('/device/<id>/data')
 def device(id):
     try:
-        update_device_map(id,what="data")
-        return devices_map[id]
+        device = device_scanner.get_device(id)
+
+        return device.data()
     except Exception as e:
         return {'error':traceback.format_exc(e)}
 
@@ -115,99 +79,44 @@ def device(id):
 @app.get('/device/<id>/user_options')
 def device(id):
     try:
-
-        device_info = devices_map[id]
-        dev_ip = device_info["ip"]
-
-        url = dev_ip +':9000/user_options/' + id
-        out = urllib2.urlopen(url)
-
-        return out
-
+        device = device_scanner.get_device(id)
+        return device.user_options()
     except Exception as e:
-        return {'error':traceback.format_exc(e)}
-
-
+        return {'error': traceback.format_exc(e)}
 
 
 #Get the information of one Sleep Monitor
 @app.get('/device/<id>/last_img')
 def device(id):
     try:
-        device_info = devices_map[id]
-        dev_ip = device_info["ip"]
-        img_path = device_info["last_drawn_img"]
-        url = dev_ip +':9000/static' + img_path
-        file_like = urllib2.urlopen(url)
-        # Open our local file for writing
+        device = device_scanner.get_device(id)
+        file_like = device.last_image()
         local_file = os.path.join(tmp_imgs_dir, id + ".jpg")
         with open(local_file, "wb") as lf:
             lf.write(file_like.read())
         return os.path.basename(local_file)
 
     except Exception as e:
-        return {'error':traceback.format_exc(e)}
+        return {'error': traceback.format_exc(e)}
 
 
-@app.post('/device/<id>/controls/<type_of_req>')
-def device(id, type_of_req):
+@app.post('/device/<id>/controls/<instruction>')
+def device(id, instruction):
     try:
+
         post_data = request.body.read()
-        update_device_map(id, "data")
-        device_info = devices_map[id]
-
-        if type_of_req == 'start':
-            if device_info['status'] == 'stopped':
-                update_device_map(id, "controls", type_of_req, data=post_data)
-            else:
-                raise Exception("Cannot start, device %s status is `%s`" %  (id, device_info['status']))
-
-        elif type_of_req == 'stop':
-
-            if device_info['status'] == 'running' or device_info['status'] == 'recording':
-                stop_device(id,post_data)
-            else:
-                raise Exception("Cannot stop, device %s status is `%s`" %  (id, device_info['status']))
-        elif type_of_req == 'start_record':
-            if device_info['status'] == 'stopped':
-                update_device_map(id, 'controls', type_of_req, data=post_data)
-            else:
-                raise Exception("Cannot %s recording, device %s status is %s"% (type_of_req, id, device_info['status']))
-        elif type_of_req == 'stop_record':
-            if device_info['status'] == 'recording':
-                update_device_map(id, 'controls', type_of_req, data=post_data)
-            else:
-                raise Exception("Cannot %s recording, device %s status is %s"% (type_of_req, id, device_info['status']))
-
-        elif type_of_req == 'poweroff':
-            if device_info['status'] == 'running':
-                stop_device(id, post_data)
-            update_device_map(id, "controls", type_of_req, data=post_data)
-
+        device = device_scanner.get_device(id)
+        device.send_instruction(instruction, post_data)
     except Exception as e:
         logging.error(traceback.format_exc(e))
         return {'error':traceback.format_exc(e)}
 
-def stop_device(id, post_data):
-    update_device_map(id, "controls", 'stop', data=post_data)
+
 
 @app.post('/device/<id>/log')
 def get_log(id):
     try:
-
-        data = request.body.read()
-        data = json.loads(data)
-
-        #TO DISCUSS @luis static files url not understood
-        req = urllib2.Request(url=devices_map[id]['ip']+':9000/static'+data["file_path"])
-
-        f = urllib2.urlopen(req)
-        result = {}
-        for i, line in enumerate(f):
-            result[i]=line
-
-        return result
-
+        raise NotImplementedError()
     except Exception as e:
         return {'error':traceback.format_exc(e)}
 
@@ -369,10 +278,13 @@ def redirection_to_home(id):
     return redirect('/#/ethoscope/'+id)
 @app.get('/device/<id>/ip')
 def redirection_to_home(id):
-    if len(devices_map) > 0:
-        return devices_map[id]['ip']
-    else:
-        return "no devices"
+    try:
+        raise NotImplementedError
+    except Exception as e:
+        logging.error(e)
+        return {'error': traceback.format_exc(e)}
+
+
 @app.get('/more/<action>')
 def redirection_to_more(action):
     return redirect('/#/more/'+action)
@@ -401,10 +313,7 @@ if __name__ == '__main__':
     PORT = option_dict["port"]
     DEBUG = option_dict["debug"]
     RESULTS_DIR = option_dict["results_dir"]
-    if option_dict["local"]:
-        LOCAL_IP  = "127.0.0.1"
-    else:
-        LOCAL_IP = get_local_ip(option_dict["router_ip"])
+    LOCAL_IP = get_local_ip(option_dict["router_ip"],localhost=option_dict["local"])
 
     try:
         WWW_IP = get_internet_ip()
@@ -413,13 +322,13 @@ if __name__ == '__main__':
         logging.warning(traceback.format_exc(e))
         WWW_IP = None
 
-    global devices_map
-    devices_map = {}
-    scan_subnet()
 
 
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
+    device_scanner = None
     try:
+        device_scanner = DeviceScanner()
+        device_scanner.start()
         run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='cherrypy')
 
     except KeyboardInterrupt:
@@ -434,5 +343,6 @@ if __name__ == '__main__':
         logging.error(traceback.format_exc(e))
         close(1)
     finally:
+        device_scanner.stop()
         shutil.rmtree(tmp_imgs_dir)
         close()

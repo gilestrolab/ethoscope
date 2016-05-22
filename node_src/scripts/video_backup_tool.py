@@ -1,3 +1,5 @@
+__author__ = 'quentin'
+
 import urllib2
 import logging
 import optparse
@@ -5,7 +7,7 @@ import  traceback
 import subprocess
 import json
 from ethoscope_node.utils.backups_helpers import GenericBackupWrapper
-
+from ethoscope_node.utils.helpers import  get_local_ip
 
 class WGetERROR(Exception):
     pass
@@ -41,7 +43,6 @@ def get_video_list(ip, port=9000,static_dir = "static", index_file="ethoscope_da
         return None
 
 def remove_video_from_host(ip, id, target, port=9000):
-    print "asking %s to remove %s" %  (ip, target)
     request_url = "{ip}:{port}/rm_static_file/{id}".format(ip=ip, id=id, port=port)
     data = {"file": target}
     data =json.dumps(data)
@@ -51,13 +52,13 @@ def remove_video_from_host(ip, id, target, port=9000):
 
 
 def get_all_videos(device_info,out_dir, port=9000, static_dir="static"):
-    ip = device_info["ip"]
+    url = "http://" + device_info["ip"]
     id = device_info["id"]
-    video_list = get_video_list(ip, port=port, static_dir=static_dir)
+    video_list = get_video_list(url, port=port, static_dir=static_dir)
     #backward compatible. if no index, we do not stop
     if video_list is None:
         return
-    target_prefix = "/".join(["%s:%i"%(ip,port), static_dir])
+    target_prefix = "/".join(["%s:%i"%(url,port), static_dir])
     for v in video_list:
         try:
             current = wget_mirror_wrapper(v, target_prefix=target_prefix, output_dir=out_dir)
@@ -67,17 +68,13 @@ def get_all_videos(device_info,out_dir, port=9000, static_dir="static"):
 
         if not current:
             # we only attempt to remove if the files is mirrored
-            remove_video_from_host(ip, id, v)
+            remove_video_from_host(url, id, v)
 
-def backup_job(device_info):
+def backup_job(args):
+    device_info, video_result_dir = args
     logging.info("Initiating backup for device  %s" % device_info["id"])
-    get_all_videos(device_info, VIDEO_RESULTS_DIR)
+    get_all_videos(device_info, video_result_dir)
     logging.info("Backup done for for device  %s" % device_info["id"])
-
-
-__author__ = 'quentin'
-
-
 
 
 if __name__ == '__main__':
@@ -86,21 +83,28 @@ if __name__ == '__main__':
         parser = optparse.OptionParser()
         parser = optparse.OptionParser()
         parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
-        parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_results",
+        parser.add_option("-e", "--results-dir", dest="results_dir", default="/",
                           help="Where temporary result files are stored")
-        parser.add_option("-v", "--videos-dir", dest="videos_dir", default="/ethoscope_videos",
+        parser.add_option("-v", "--videos-dir", dest="videos_dir", default="ethoscope_videos",
                           help="Where video should be saved")
         parser.add_option("-r", "--router-ip", dest="router_ip", default="192.169.123.254",
                           help="the ip of the router in your setup")
-
         parser.add_option("-s", "--safe", dest="safe", default=False,help="Set Safe mode ON", action="store_true")
+        parser.add_option("-l", "--local", dest="local", default=False,
+                          help="Run on localhost (run a node and device on the same machine, for development)",
+                          action="store_true")
         (options, args) = parser.parse_args()
         option_dict = vars(options)
-        VIDEO_RESULTS_DIR = option_dict["videos_dir"]
+
+        local_ip= get_local_ip(option_dict["router_ip"],localhost = option_dict["local"])
+
+        (options, args) = parser.parse_args()
+        option_dict = vars(options)
+        video_out_dir = "%s/%s" % (option_dict["results_dir"], option_dict["videos_dir"])
 
         gbw = GenericBackupWrapper( backup_job,
-                                    option_dict["results_dir"],
-                                    option_dict["safe"]
+                                    video_out_dir,
+                                    option_dict["safe"], local_ip
                                     )
         gbw.run()
     except Exception as e:
