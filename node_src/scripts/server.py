@@ -225,6 +225,8 @@ def node_info(req):#, device):
                     'local_ip':LOCAL_IP}
         if req == 'time':
             return {'time':datetime.datetime.now().isoformat()}
+        if req == 'timestamp':
+            return {'timestamp': time.time()}
         else:
             raise NotImplementedError()
     except Exception as e:

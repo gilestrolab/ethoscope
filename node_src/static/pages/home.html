@@ -1,9 +1,9 @@
 <!-- home.html -->
     <div class="jumbotron text-center" ng-cloak>
         <h1>Device List</h1>
-        <div class="intro">Scan the network to detect connected ethoscopes</div>
-
-        <button class=" btn btn-default" ng-click="get_devices()">Scan Network for Devices</button>
+        <h2>({{n_devices}} detected)</h2>
+        <!--<div class="intro">Scan the network to detect connected ethoscopes</div>-->
+        <!--<button class=" btn btn-default" ng-click="get_devices()">Scan Network for Devices</button>-->
 
         <div  id="loading_devices" class="spinner"></div>
         <div id="node-info" class="intro">

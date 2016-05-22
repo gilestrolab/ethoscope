@@ -65,7 +65,6 @@ def rm_static_file(id):
 def controls(id, action):
     global control
     global record
-    print id, action
     try:
         if id != machine_id:
             raise WrongMachineID
@@ -132,7 +131,9 @@ def info(id):
     try:
         if machine_id != id:
             raise WrongMachineID
-        return control.info
+        info = control.info
+        info["timetamp"] = time.time()
+        return info
     except Exception as e:
         return {'error': "Error on machine ID"}
 

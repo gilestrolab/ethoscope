@@ -253,6 +253,30 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                  .success(function(data){
 
                     $scope.device= data;
+                    $scope.node_datetime = "TODO"
+                    $scope.device_datetime = "TODO"
+                    if("timestamp" in data){
+
+                    $scope.device_timestamp = new Date(data.timestamp*1000);
+                    $scope.device_datetime = $scope.device_time.toUTCString();
+                    console.log($scope.device_datetime);
+                    $http.get('/node/timestamp').success(function(data){
+                        node_t = data.timestamp;
+                        node_time = new Date(node_t*1000);
+                        $scope.node_datetime = node_time.toUTCString();
+                        $scope.delta_t_min = (node_t - $scope.device.time) / 60;
+
+
+                     });
+                    }
+//                    else{
+//                        $http.get('/node/timestamp').success(function(data){
+//                        node_t = data.timestamp;
+//                        node_time = new Date(node_t*1000);
+//                        $scope.node_datetime = node_time.toUTCString();
+//                        $scope.delta_t_min = 0;
+//                        }
+//                    }
                     //$scope.device.img = device_ip+':9000/static'+$scope.device.last_drawn_img + '?' + new Date().getTime();
 
                     url_img_query = "/device/"+ $scope.device.id  + "/last_img";

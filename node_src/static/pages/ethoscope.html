@@ -1,15 +1,35 @@
 <!-- home.html -->
     <div class="jumbotron text-center" ng-cloak>
-        <h1>Ethoscope: “{{device.name}}”</h1>
-        <p>Here you can perform actions and know the status of the device</p>
+        <h1>Device: “{{device.name}}”</h1>
+        <h3>Time for node: {{node_datetime}}</h3>
+        <h3>Time for device: {{device_datetime}}</h3>
+
+        <div ng-if="delta_t_min > 5">
+        <h2 id="dt_warning"><span class="fa fa-warning"></span> There is more than 5min difference between node and this device!!</h2>
+        </div>
+
+
+
+
 
         <div class= "last_drawn_img">
         <img ng-if="device.status == 'running'  || device.status == 'recording'"  ng-src="/tmp_static/{{device.url_img}}" alt="" width="480"></img>
         </div>
-        <div ng-if="device.status == 'running' || device.status == 'recording'">
 
-            <p><span class="fa fa-clock-o"></span> Started on {{ethoscope.start_date_time(device.time)}}
-                (i.e. {{ethoscope.elapsedtime(device.monitor_info.last_time_stamp)}} ago)</p>
+
+        <div ng-if="device.status == 'running' || device.status == 'recording'" >
+        <div id="node-info" class="intro">
+            <p><span class="fa fa-clock-o"></span> Running since {{ethoscope.start_date_time(device.time)}}
+                (i.e. {{ethoscope.elapsedtime(device.monitor_info.last_time_stamp)}} ago)
+                <br>
+                <span class="fa fa-user"></span> User:  “{{device.experimental_info.name}}”
+                <br>
+                <span class="fa fa-map-marker"></span> Location: “{{device.experimental_info.location}}”
+                <br>
+
+            </p>
+
+        </div>
         </div>
 
         <div ng-if="device.status == 'running'">
@@ -28,7 +48,9 @@
             <p>Stopping tracking...</p>
         </div>
 <div ng-if="device.status == 'stopped'">
-<p>Time since last experiment: {{ethoscope.elapsedtime(device.time_since_backup)}}</p>        </div>
+    <p>Stopped since {{ethoscope.start_date_time(device.time)}}</p>
+    <p>Time since last backup: {{ethoscope.elapsedtime(device.time_since_backup)}}</p>
+</div>
 
 
         <button class="btn btn-success btn-xl" ng-if="device.status == 'stopped'"  data-toggle="modal" data-target="#startModal">Start tracking</button>

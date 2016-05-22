@@ -43,3 +43,11 @@
 .option-list li{
 list-style: none;
 }
+
+p {
+    text-align: left;
+}
+
+#dt_warning{
+    color: red;
+}

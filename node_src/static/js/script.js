@@ -49,11 +49,10 @@
         $scope.filterEthoscopes = '';     // set the default search/filter term
         
         $scope.groupActions = {};
-        $http.get('/node/time').success(function(data){
-            console.log(data);
-            t = new Date(data.time);
-            $scope.time = t.toString();
-        });
+//        $http.get('/node/time').success(function(data){
+//            t = new Date(data.time);
+//            $scope.time = t.toString();
+//        });
         $http.get('/devices_list').success(function(data){
             $scope.devices = data;
             
@@ -62,20 +61,13 @@
 
         var get_date = function(){
             $http.get('/node/time').success(function(data){
-            console.log(data);
             t = new Date(data.time);
             $scope.time = t.toString();
-        });
+            });
             var t= new Date();
             $scope.localtime =t.toString();
         };
-        get_date();
-         refresh_time = $interval(get_date, 60000);
-        //clear interval when scope is destroyed
-        $scope.$on("$destroy", function(){
-            $interval.cancel(refresh_time);
-        });
-        //Scan for SM or SD connected.
+
         $scope.get_devices = function(){
             var spinner= new Spinner(opts).spin();
             var loadingContainer = document.getElementById('loading_devices');
@@ -95,6 +87,7 @@
                     }
 
                 $scope.devices = data_list;
+                $scope.n_devices=$scope.devices.length
 
                 spinner.stop();
                 $scope.loading_devices = false;
@@ -162,10 +155,22 @@
                  $("#startModal").modal('hide');
             });
         };
-        
-        
 
         $scope.$on('$viewContentLoaded',$scope.get_devices);
+
+
+        var refresh = function(){
+            $scope.get_devices();
+            get_date();
+       }
+
+       refresh_data = $interval(refresh, 3000);
+        //clear interval when scope is destroyed
+        $scope.$on("$destroy", function(){
+            $interval.cancel(refresh_data);
+            //clearInterval(refresh_data);
+        });
+
 
     });
 
