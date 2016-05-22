@@ -82,8 +82,9 @@
                     <span class="fa fa-circle-o"></span><span> {{device.name}}</span>
                     </a>
                 </td>
-                <td><span ng-if="device.status == 'running'" class="fa fa-circle color-green"></span>
-            <span ng-if="device.status == 'stopped'" class="fa fa-circle color-red"></span> {{device.status}}</td>
+                <td><span ng-if="device.status == 'running'" class="fa fa-circle color-blue"></span>
+                <span ng-if="device.status == 'recording'" class="fa fa-circle color-green"></span>
+                <span ng-if="device.status == 'stopped'" class="fa fa-square color-red"></span> {{device.status}}</td>
                 <td>{{secToDate(device.time)}}</td>
                 <td>{{elapsedtime(device.time_since_backup)}}</td>
                 <td>{{device.experimental_info.name}}</td>
