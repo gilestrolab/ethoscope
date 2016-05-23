@@ -48,7 +48,7 @@ pacman -Syu --noconfirm
 pacman -S base-devel git gcc-fortran rsync wget fping --noconfirm --needed
 
 # utilities
-pacman -S ntp bash-completion --noconfirm --needed
+pacman -S ntp bash-completion openssh --noconfirm --needed
 
 #so we can set up a dns
 pacman -S dnsmasq --noconfirm --needed
@@ -94,7 +94,7 @@ git clone $LOCAL_BARE_PATH $TARGET_GIT_INSTALL
 cd $TARGET_GIT_INSTALL
 
 # IMPORTANT this is if you want to work on the "dev" branch otherwise, you are using "master"
-git checkout dev
+git checkout -b dev
 
 cd $TARGET_GIT_INSTALL/node_src
 # we install with pip
@@ -189,6 +189,18 @@ It makes everything easier if you force time to be GMT regardless of your timezo
 ```
 timedatectl set-timezone GMT
 ```
+
+Node will act as an NTP server for ethoscopes. 
+That is machines will use local network to sync time from the node.
+However, by default, **the server (node) will not serve time if it fails to get it from internet**.
+In order to allow the node to server time regardless, you can addthese two lines to `/etc/ntp.conf`:
+
+```
+server 127.127.1.1
+fudge  127.127.1.1 stratum 12
+```
+
+
 
 What is next
 -----------------------
