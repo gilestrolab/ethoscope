@@ -23,5 +23,6 @@ class SleepDepriverInterface(SimpleLynxMotionInterface):
 
 
     def _warm_up(self):
-        for i in range(1, 1 + self._n_channels):
-            self.send(i)
+        for r in range(0,3):
+            for i in range(1, 1 + self._n_channels):
+                self.send(i)
