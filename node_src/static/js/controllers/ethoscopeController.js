@@ -253,19 +253,20 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                  .success(function(data){
 
                     $scope.device= data;
-                    $scope.node_datetime = "TODO";
-                    $scope.device_datetime = "TODO";
+                    $scope.node_datetime = "TODO"
+                    $scope.device_datetime = "TODO"
+
                     if("current_timestamp" in data){
 
                     $scope.device_timestamp = new Date(data.current_timestamp*1000);
-                    $scope.device_datetime = $scope.device_time.toUTCString();
+                    $scope.device_datetime = $scope.device_timestamp.toUTCString();
                     console.log($scope.device_datetime);
-                    $http.get('/node/timestamp').success(function(data){
-                        node_t = data.current_timestamp;
+                    $http.get('/node/timestamp').success(function(data_node){
+                        node_t = data_node.timestamp;
                         node_time = new Date(node_t*1000);
                         $scope.node_datetime = node_time.toUTCString();
-                        $scope.delta_t_min = (node_t - $scope.device.time) / 60;
-
+                        $scope.delta_t_min = (node_t - data.current_timestamp) / 60;
+                        console.log($scope.delta_t_min )
 
                      });
                     }

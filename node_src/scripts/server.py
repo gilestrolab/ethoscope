@@ -281,7 +281,11 @@ def redirection_to_home(id):
 @app.get('/device/<id>/ip')
 def redirection_to_home(id):
     try:
-        raise NotImplementedError
+        dev_list = device_scanner.get_device_list()
+        for id, data  in dev_list.items():
+            if id == id:
+                return data["ip"]
+        return "None"
     except Exception as e:
         logging.error(e)
         return {'error': traceback.format_exc(e)}
