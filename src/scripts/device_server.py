@@ -132,7 +132,7 @@ def info(id):
         if machine_id != id:
             raise WrongMachineID
         info = control.info
-        info["timetamp"] = time.time()
+        info["current_timestamp"] = time.time()
         return info
     except Exception as e:
         return {'error': "Error on machine ID"}
