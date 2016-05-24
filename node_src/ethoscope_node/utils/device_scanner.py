@@ -56,7 +56,7 @@ class DeviceScanner(Thread):
         self._ip_range = ip_range
         self._use_scapy = _use_scapy
 
-        for ip in  self._available_ips(local_ip, ip_range):
+        for ip in range(6,254):
             self._devices[ip] = Device(ip, device_refresh_period, results_dir=results_dir)
             self._devices[ip].start()
 
