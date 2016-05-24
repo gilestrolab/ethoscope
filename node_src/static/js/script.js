@@ -69,14 +69,7 @@
         };
 
         $scope.get_devices = function(){
-            var spinner= new Spinner(opts).spin();
-            var loadingContainer = document.getElementById('loading_devices');
-            try {
-                loadingContainer.appendChild(spinner.el);
-            }
-            catch(err) {
-                console.log("no container");
-            }
+
             $scope.loading_devices = true;
             $http.get('/devices').success(function(data){
 
@@ -89,7 +82,6 @@
                 $scope.devices = data_list;
                 $scope.n_devices=$scope.devices.length
 
-                spinner.stop();
                 $scope.loading_devices = false;
 
             })
@@ -160,8 +152,10 @@
 
 
         var refresh = function(){
+
             $scope.get_devices();
             get_date();
+            console.log("refresh");
        }
 
        refresh_data = $interval(refresh, 3000);

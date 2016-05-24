@@ -16,17 +16,27 @@ import fnmatch
 app = Bottle()
 STATIC_DIR = "../static"
 
+def error_decorator(func):
+    """
+    A simple decorator to return an error dict so we can display it the ui
+    """
+    def func_wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
 
-@app.get('/favicon.ico')
-def get_favicon():
-    return server_static(STATIC_DIR+'/img/favicon.ico')
+        except Exception as e:
+
+            logging.error(traceback.format_exc(e))
+            return {'error': traceback.format_exc(e)}
+
+    return func_wrapper
 
 @app.route('/static/<filepath:path>')
 def server_static(filepath):
     return static_file(filepath, root=STATIC_DIR)
 
 @app.route('/tmp_static/<filepath:path>')
-def server_static(filepath):
+def server_tmp_static(filepath):
     return static_file(filepath, root=tmp_imgs_dir)
 
 @app.route('/download/<filepath:path>')
@@ -53,72 +63,83 @@ def enable_cors():
 # API to connect with ethoscopes
 #################################
 
+
+@app.get('/favicon.ico')
+def get_favicon():
+    return server_static(STATIC_DIR+'/img/favicon.ico')
+
+
 @app.get('/devices')
+@error_decorator
 def devices():
-    try:
-        return device_scanner.get_device_list()
-    except Exception as e:
-        logging.error(traceback.format_exc(e))
-        return {'error':traceback.format_exc(e)}
+    return device_scanner.get_device_list()
+
 
 @app.get('/devices_list')
 def get_devices_list():
     devices()
 
-#Get the information of one Sleep Monitor
+#Get the information of one device
 @app.get('/device/<id>/data')
-def device(id):
-    try:
-        device = device_scanner.get_device(id)
+@error_decorator
+def get_device_info(id):
+    device = device_scanner.get_device(id)
+    return device.info()
 
-        return device.data()
-    except Exception as e:
-        return {'error':traceback.format_exc(e)}
 
-#Get the information of one Sleep Monitor
 @app.get('/device/<id>/user_options')
-def device(id):
-    try:
-        device = device_scanner.get_device(id)
-        return device.user_options()
-    except Exception as e:
-        return {'error': traceback.format_exc(e)}
+@error_decorator
+def get_device_options(id):
+    device = device_scanner.get_device(id)
+    return device.user_options()
 
 
 #Get the information of one Sleep Monitor
 @app.get('/device/<id>/last_img')
-def device(id):
-    try:
-        device = device_scanner.get_device(id)
-        file_like = device.last_image()
-        local_file = os.path.join(tmp_imgs_dir, id + ".jpg")
-        with open(local_file, "wb") as lf:
-            lf.write(file_like.read())
-        return os.path.basename(local_file)
+@error_decorator
+def get_device_last_img(id):
 
-    except Exception as e:
-        return {'error': traceback.format_exc(e)}
+    device = device_scanner.get_device(id)
+    file_like = device.last_image()
+    basename = os.path.join(tmp_imgs_dir, id + "_last_img.jpg")
+    return cache_img(file_like, basename)
+
+
+
+#Get the information of one Sleep Monitor
+@app.get('/device/<id>/dbg_img')
+@error_decorator
+def get_device_dbg_img(id):
+
+    device = device_scanner.get_device(id)
+    file_like = device.dbg_img()
+    basename = os.path.join(tmp_imgs_dir, id + "_debug.png")
+    return cache_img(file_like, basename)
+
+
+
+def cache_img(file_like, basename):
+    if not file_like:
+        #todo return link to "broken img"
+        return ""
+    local_file = os.path.join(tmp_imgs_dir, basename)
+    with open(local_file, "wb") as lf:
+        lf.write(file_like.read())
+    return server_tmp_static(os.path.basename(local_file))
 
 
 @app.post('/device/<id>/controls/<instruction>')
-def device(id, instruction):
-    try:
-
-        post_data = request.body.read()
-        device = device_scanner.get_device(id)
-        device.send_instruction(instruction, post_data)
-    except Exception as e:
-        logging.error(traceback.format_exc(e))
-        return {'error':traceback.format_exc(e)}
-
-
-
+@error_decorator
+def post_device_instructions(id, instruction):
+    post_data = request.body.read()
+    device = device_scanner.get_device(id)
+    device.send_instruction(instruction, post_data)
+    return get_device_info(id)
 @app.post('/device/<id>/log')
+@error_decorator
 def get_log(id):
-    try:
-        raise NotImplementedError()
-    except Exception as e:
-        return {'error':traceback.format_exc(e)}
+    raise NotImplementedError()
+
 
 #################################
 # NODE Functions
@@ -128,146 +149,118 @@ def get_log(id):
 #Browse, delete and download files from node
 
 @app.get('/result_files/<type>')
+@error_decorator
 def result_file(type):
     """
     :param type:'all', 'db' or 'txt'
     :return: a dict with a single key: "files" which maps a list of matching result files (absolute path)
     """
-
-    try:
-        type="txt"
-        if type == "all":
-            pattern =  '*'
-        else:
-            pattern =  '*.'+type
-
-        matches = []
-        for root, dirnames, filenames in os.walk(RESULTS_DIR):
-            for f in fnmatch.filter(filenames, pattern):
-                matches.append(os.path.join(root, f))
-            return {"files":matches}
-
-    except Exception as e:
-        logging.error(traceback.format_exc(e))
-        return {'error':traceback.format_exc(e)}
+    type="txt"
+    if type == "all":
+        pattern =  '*'
+    else:
+        pattern =  '*.'+type
+    matches = []
+    for root, dirnames, filenames in os.walk(RESULTS_DIR):
+        for f in fnmatch.filter(filenames, pattern):
+            matches.append(os.path.join(root, f))
+        return {"files":matches}
 
 
 @app.get('/browse/<folder:path>')
+@error_decorator
 def browse(folder):
-    try:
-        if folder == 'null':
-            directory = RESULTS_DIR
-        else:
-            directory = '/'+folder
-        files = []
-        for (dirpath, dirnames, filenames) in walk(directory):
-            for name in filenames:
-                abs_path = os.path.join(dirpath,name)
-                size = os.path.getsize(abs_path)
-                #rel_path = os.path.relpath(abs_path,directory)
-                files.append({'abs_path':abs_path, 'size':size})
-
-        return {'files': files}
-
-    except Exception as e:
-        return {'error': traceback.format_exc(e)}
-
-
+    if folder == 'null':
+        directory = RESULTS_DIR
+    else:
+        directory = '/'+folder
+    files = []
+    for (dirpath, dirnames, filenames) in walk(directory):
+        for name in filenames:
+            abs_path = os.path.join(dirpath,name)
+            size = os.path.getsize(abs_path)
+            #rel_path = os.path.relpath(abs_path,directory)
+            files.append({'abs_path':abs_path, 'size':size})
+    return {'files': files}
 
 
 @app.post('/request_download/<what>')
+@error_decorator
 def download(what):
-    try:
-        # zip the files and provide a link to download it
-        if what == 'files':
-            req_files = request.json
-            t = datetime.datetime.now()
-            #FIXME change the route for this? and old zips need to be erased
-            zip_file_name = os.path.join(RESULTS_DIR,'results_'+t.strftime("%y%m%d_%H%M%S")+'.zip')
-            zf = zipfile.ZipFile(zip_file_name, mode='a')
-            logging.info("Saving files : %s in %s" % (str(req_files['files']), zip_file_name) )
-            for f in req_files['files']:
-                zf.write(f['url'])
-            zf.close()
-
-            return {'url':zip_file_name}
-
-        else:
-            raise NotImplementedError()
-
-    except Exception as e:
-        logging.error(e)
-        return {'error': traceback.format_exc(e)}
+    # zip the files and provide a link to download it
+    if what == 'files':
+        req_files = request.json
+        t = datetime.datetime.now()
+        #FIXME change the route for this? and old zips need to be erased
+        zip_file_name = os.path.join(RESULTS_DIR,'results_'+t.strftime("%y%m%d_%H%M%S")+'.zip')
+        zf = zipfile.ZipFile(zip_file_name, mode='a')
+        logging.info("Saving files : %s in %s" % (str(req_files['files']), zip_file_name) )
+        for f in req_files['files']:
+            zf.write(f['url'])
+        zf.close()
+        return {'url':zip_file_name}
+    else:
+        raise NotImplementedError()
 
 @app.get('/node/<req>')
+@error_decorator
 def node_info(req):#, device):
-    try:
-        if req == 'info':
-            df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout=subprocess.PIPE)
-            disk_free = df.communicate()[0]
-            disk_usage = RESULTS_DIR+" Not Found on disk"
-            # ip = "No IP assigned, check cable"
-            # MAC_addr = "Not detected"
-            # local_ip = ""
-            # try:
-            #     disk_usage = disk_free.split("\n")[1].split()
-            #     addrs = ifaddresses(INTERNET_DEVICE)
-            #     MAC_addr = addrs[AF_LINK][0]["addr"]
-            #
-            #     ip = addrs[AF_INET][0]["addr"]
-            #     local_addrs = ifaddresses(SUBNET_DEVICE)
-            #     local_ip = local_addrs[AF_INET][0]["addr"]
-            # except Exception as e:
-            #     logging.error(e)
-            #fixme
-            MAC_addr = "TODO"
-            return {'disk_usage': disk_usage, 'MAC_addr': MAC_addr, 'ip': WWW_IP,
-                    'local_ip':LOCAL_IP}
-        if req == 'time':
-            return {'time':datetime.datetime.now().isoformat()}
-        if req == 'timestamp':
-            return {'timestamp': time.time()}
-        else:
-            raise NotImplementedError()
-    except Exception as e:
-        logging.error(e)
-        return {'error': traceback.format_exc(e)}
+    if req == 'info':
+        df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout=subprocess.PIPE)
+        disk_free = df.communicate()[0]
+        disk_usage = RESULTS_DIR+" Not Found on disk"
+        # ip = "No IP assigned, check cable"
+        # MAC_addr = "Not detected"
+        # local_ip = ""
+        # try:
+        #     disk_usage = disk_free.split("\n")[1].split()
+        #     addrs = ifaddresses(INTERNET_DEVICE)
+        #     MAC_addr = addrs[AF_LINK][0]["addr"]
+        #
+        #     ip = addrs[AF_INET][0]["addr"]
+        #     local_addrs = ifaddresses(SUBNET_DEVICE)
+        #     local_ip = local_addrs[AF_INET][0]["addr"]
+        # except Exception as e:
+        #     logging.error(e)
+        #fixme
+        MAC_addr = "TODO"
+        return {'disk_usage': disk_usage, 'MAC_addr': MAC_addr, 'ip': WWW_IP,
+                'local_ip':LOCAL_IP}
+    if req == 'time':
+        return {'time':datetime.datetime.now().isoformat()}
+    if req == 'timestamp':
+        return {'timestamp': time.time()}
+    else:
+        raise NotImplementedError()
 
 @app.post('/node-actions')
+@error_decorator
 def node_actions():
-    try:
-        action = request.json
-        if action['action'] == 'poweroff':
-            logging.info('User request a poweroff, shutting down system. Bye bye.')
+    action = request.json
+    if action['action'] == 'poweroff':
+        logging.info('User request a poweroff, shutting down system. Bye bye.')
 
-            close()
-            #poweroff = subprocess.Popen(['poweroff'], stdout=subprocess.PIPE)
-        elif action['action'] == 'close':
-            close()
-        else:
-            raise NotImplementedError()
-    except Exception as e:
-        logging.error(e)
-        return {'error': traceback.format_exc(e)}
+        close()
+        #poweroff = subprocess.Popen(['poweroff'], stdout=subprocess.PIPE)
+    elif action['action'] == 'close':
+        close()
+    else:
+        raise NotImplementedError()
 
 @app.post('/remove_files')
+@error_decorator
 def remove_files():
-    try:
-        req = request.json
-        res = []
-        for f in req['files']:
-            rm = subprocess.Popen(['rm', f['url']],
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
-            out, err = rm.communicate()
-            logging.info(out)
-            logging.error(err)
-            res.append(f['url'])
-        return {'result': res}
-    except Exception as e:
-        logging.error(e)
-        return {'error': traceback.format_exc(e)}
-
+    req = request.json
+    res = []
+    for f in req['files']:
+        rm = subprocess.Popen(['rm', f['url']],
+                         stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
+        out, err = rm.communicate()
+        logging.info(out)
+        logging.error(err)
+        res.append(f['url'])
+    return {'result': res}
 
 @app.get('/list/<type>')
 def redirection_to_home(type):
@@ -278,17 +271,17 @@ def redirection_to_home():
 @app.get('/ethoscope/<id>')
 def redirection_to_home(id):
     return redirect('/#/ethoscope/'+id)
+
 @app.get('/device/<id>/ip')
+@error_decorator
 def redirection_to_home(id):
-    try:
-        dev_list = device_scanner.get_device_list()
-        for id, data  in dev_list.items():
-            if id == id:
-                return data["ip"]
-        return "None"
-    except Exception as e:
-        logging.error(e)
-        return {'error': traceback.format_exc(e)}
+    raise NotImplementedError
+    #
+    # dev_list = device_scanner.get_device_list()
+    # for id, data  in dev_list.items():
+    #     if id == id:
+    #         return data["ip"]
+    # return "None"
 
 
 @app.get('/more/<action>')
