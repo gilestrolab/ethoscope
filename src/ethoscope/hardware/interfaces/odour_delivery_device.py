@@ -7,8 +7,7 @@ class OdourDelivererInterface(SimpleLynxMotionInterface):
     _positions_to_angles = {1: -20,
                             2: 20,
                             3: 0}
-    _extra_move = 0.25
-    _dt = 750
+    _dt = 250
 
     def __init__(self,*args, **kwargs):
         self._current_pos = [3] * 10
@@ -16,8 +15,8 @@ class OdourDelivererInterface(SimpleLynxMotionInterface):
 
     def _warm_up(self):
         for i in range(1, 1 + self._n_channels):
-            for k in range(1, 4):
-                self.send(i, k)
+            for k in range(3):
+                self.send(i, k + 1)
 
     def send(self,channel, pos):
         return self._move_to_pos(channel, pos)
@@ -33,15 +32,7 @@ class OdourDelivererInterface(SimpleLynxMotionInterface):
         """
 
         angle = self._positions_to_angles[pos]
-        #we first move a bit further:
-        if pos !=3:
-            self.move_to_angle(channel, angle + angle * self._extra_move,  self._dt)
-        else:
-            current_angle = self._positions_to_angles[self._current_pos[channel-1]]
-            pos_to_go = 0 - current_angle * self._extra_move
-            self.move_to_angle(channel, pos_to_go, self._dt)
         self.move_to_angle(channel, angle, self._dt)
-        self._current_pos[channel-1] = pos
 
 class OdourDepriverInterface(OdourDelivererInterface):
 
@@ -51,5 +42,5 @@ class OdourDepriverInterface(OdourDelivererInterface):
         self._move_to_pos(channel, 2)
 
     def _warm_up(self):
-        for i in range(1, 1 + self._n_channels):
-            self.send(i)
+        for i in range(self._n_channels):
+            self.send(i + 1)
