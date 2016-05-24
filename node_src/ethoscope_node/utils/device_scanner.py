@@ -139,7 +139,8 @@ class Device(Thread):
     _allowed_instructions_status = { "start": ["stopped"],
                                      "start_record": ["stopped"],
                                      "stop": ["running", "recording"],
-                                     "poweroff": ["stopped"]}
+                                     "poweroff": ["stopped"],
+                                     "not_in_use": []}
 
     def __init__(self,ip, refresh_period= 2, port = 9000, results_dir="/ethoscope_results"):
         self._results_dir = results_dir
@@ -206,6 +207,10 @@ class Device(Thread):
         return out
 
     def last_image(self):
+        # we return none if the device is not in a stoppable status (e.g. running, recording)
+        if self._info["status"] not in self._allowed_instructions_status["stop"]:
+            return None
+
         try:
             img_path = self._info["last_drawn_img"]
         except KeyError:
