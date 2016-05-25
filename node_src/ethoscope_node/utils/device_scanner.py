@@ -44,7 +44,7 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
 
 
 class DeviceScanner(Thread):
-    _refresh_period = .5
+    _refresh_period = 1.0
     _filter_device_period = 5
 
     def __init__(self, local_ip = "192.169.123.1", ip_range = (6,100),device_refresh_period = 5, results_dir="/ethoscope_results"):
@@ -56,7 +56,7 @@ class DeviceScanner(Thread):
         self._ip_range = ip_range
         self._use_scapy = _use_scapy
 
-        for ip in range(6,254):
+        for ip in self._subnet_ips(local_ip, (6,254)):
             self._devices[ip] = Device(ip, device_refresh_period, results_dir=results_dir)
             self._devices[ip].start()
 
@@ -67,10 +67,14 @@ class DeviceScanner(Thread):
             for c in self._arp_alive(local_ip):
                 yield c
         else:
-            for i in range(ip_range[0], ip_range[1] + 1):
-                subnet_ip = local_ip.split(".")[0:3]
-                subnet_ip = ".".join(subnet_ip)
-                yield "%s.%i" % (subnet_ip, i)
+            for c in self._subnet_ips(local_ip, ip_range):
+                yield c
+
+    def _subnet_ips(self,local_ip, ip_range):
+        for i in range(ip_range[0], ip_range[1] + 1):
+            subnet_ip = local_ip.split(".")[0:3]
+            subnet_ip = ".".join(subnet_ip)
+            yield "%s.%i" % (subnet_ip, i)
 
     def _arp_alive(self, local_ip):
         try:
@@ -81,7 +85,6 @@ class DeviceScanner(Thread):
             subnet_address = ".".join(subnet_ip) + ".0/24"
             ans, unans = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=subnet_address), timeout=2, verbose=False)
             collection = [rcv.sprintf(r"%ARP.psrc%") for snd, rcv in ans]
-
             if len(collection) == 0:
                 raise Exception("Empty ip list")
             return collection
@@ -95,19 +98,23 @@ class DeviceScanner(Thread):
     def run(self):
         last_device_filter_time = 0
         valid_ips = [ip for ip in self._available_ips(self._local_ip, self._ip_range)]
+
         while self._is_active :
             if time.time() - last_device_filter_time > self._filter_device_period:
                 valid_ips = [ip for ip in self._available_ips(self._local_ip, self._ip_range)]
                 last_device_filter_time = time.time()
 
+
             time.sleep(self._refresh_period)
             for d in self._devices.values():
                 if d.ip() not in valid_ips:
                     d.skip_scanning(True)
+                    pass
                 else:
                     d.skip_scanning(False)
 
                 id = d.id()
+
                 if id:
                     self._device_id_map[id] = d
                     self._device_id_list[id] = d.info()
