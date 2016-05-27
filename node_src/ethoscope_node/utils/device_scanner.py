@@ -10,6 +10,7 @@ from functools import wraps
 
 try:
     from scapy.all import srp, Ether, ARP
+    import netifaces
     _use_scapy = True
 except ImportError:
     logging.warning("Cannot import scapy to scan subnet")
@@ -49,17 +50,18 @@ class DeviceScanner(Thread):
 
     def __init__(self, local_ip = "192.169.123.1", ip_range = (6,100),device_refresh_period = 5, results_dir="/ethoscope_results"):
         self._is_active = True
-        self._devices = {}
+        self._devices = []
+        # "id" -> "info", "dev"
         self._device_id_map = {}
-        self._device_id_list = {}
+        # self._device_id_list = {}
         self._local_ip = local_ip
         self._ip_range = ip_range
         self._use_scapy = _use_scapy
 
         for ip in self._subnet_ips(local_ip, (6,254)):
-            self._devices[ip] = Device(ip, device_refresh_period, results_dir=results_dir)
-            self._devices[ip].start()
-
+            d =  Device(ip, device_refresh_period, results_dir=results_dir)
+            d.start()
+            self._devices.append(d)
         super(DeviceScanner, self).__init__()
 
     def _available_ips(self, local_ip, ip_range):
@@ -77,13 +79,26 @@ class DeviceScanner(Thread):
             yield "%s.%i" % (subnet_ip, i)
 
     def _arp_alive(self, local_ip):
+
         try:
-            if not self._use_scapy :
+            if not self._use_scapy:
                 raise Exception("Arp table can only be uses using scapy package")
+
+            # find interface in use for the given local ip/subnet
+            subnet_list = local_ip.split(".")[0:3]
+            interface = None
+            for inter in netifaces.interfaces():
+                candidate = netifaces.ifaddresses(inter)
+                if 2 in candidate.keys():
+                    ip = candidate[2][0]["addr"]
+                    if ip.split(".")[0:3] == subnet_list:
+                        interface = inter
+                        break
+            print("using",interface)
 
             subnet_ip = local_ip.split(".")[0:3]
             subnet_address = ".".join(subnet_ip) + ".0/24"
-            ans, unans = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=subnet_address), timeout=2, verbose=False)
+            ans, unans = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=subnet_address), timeout=3, verbose=False, iface=interface)
             collection = [rcv.sprintf(r"%ARP.psrc%") for snd, rcv in ans]
             if len(collection) == 0:
                 raise Exception("Empty ip list")
@@ -105,32 +120,59 @@ class DeviceScanner(Thread):
                 last_device_filter_time = time.time()
 
 
-            time.sleep(self._refresh_period)
-            for d in self._devices.values():
-                if d.ip() not in valid_ips:
-                    d.skip_scanning(True)
-                    pass
-                else:
-                    d.skip_scanning(False)
 
+            for d in self._devices:
+
+                if d.ip() in valid_ips:
+
+                    d.skip_scanning(False)
+                else:
+                    d.skip_scanning(True)
+
+            for d in self._devices:
                 id = d.id()
 
-                if id:
-                    self._device_id_map[id] = d
-                    self._device_id_list[id] = d.info()
+                if id and  (id not in self._device_id_map.keys()):
+                    logging.info("New device detected with id = %s" % id)
+                    self._device_id_map[id]= {}
+                    self._device_id_map[id]["dev"] = d
+                    self._device_id_map[id]["info"] = d.info().copy()
 
-    def get_device_list(self):
-        return self._device_id_list
+            # can we find a device fo this each id
+            detected_ids = [d.id() for d in self._devices if d.id()]
+
+            for id in self._device_id_map.keys():
+                # special status for devices that are not detected anymore
+                status = self._device_id_map[id]["info"]["status"]
+
+                # this default time is now. if device get out of use, their time is not updated
+                if status != "not_in_use":
+                    self._device_id_map[id]["info"]["time"] = time.time()
+                self._device_id_map[id]["dev"] = None
+                self._device_id_map[id]["info"]["status"] = "not_in_use"
+
+                for d in self._devices:
+                    if d.id() in detected_ids:
+                        self._device_id_map[id] = {}
+                        self._device_id_map[id]["dev"] = d
+                        self._device_id_map[id]["info"] = d.info().copy()
+            time.sleep(self._refresh_period)
+
+    def get_all_devices_info(self):
+        out = {}
+        for k, v in self._device_id_map.items():
+            out[k] =  v["info"]
+        return out
 
     def get_device(self, id):
         try:
-            return self._device_id_map[id]
+            return self._device_id_map[id]["dev"]
         except KeyError:
             raise KeyError("No such device: %s" % id)
 
 
     def stop(self):
-        for d in self._devices.values():
+        for d in self._devices:
             d.stop()
         self._is_active = False
 
@@ -154,11 +196,10 @@ class Device(Thread):
         self._ip = ip
         self._port = port
         self._id_url = "http://%s:%i/%s" % (ip, port, self._id_page)
-        self._id = ""
-        self._info = {}
+        self._reset_info()
+
         self._is_active = True
         self._skip_scanning = False
-
         self._refresh_period = refresh_period
 
         super(Device,self).__init__()
@@ -168,7 +209,11 @@ class Device(Thread):
         while self._is_active:
             time.sleep(.2)
             if time.time() - last_refresh > self._refresh_period:
-                self._update_info()
+
+                if not self._skip_scanning:
+                    self._update_info()
+                else:
+                    self._reset_info()
                 last_refresh = time.time()
 
     def send_instruction(self,instruction,post_data):
@@ -217,14 +262,17 @@ class Device(Thread):
         # we return none if the device is not in a stoppable status (e.g. running, recording)
         if self._info["status"] not in self._allowed_instructions_status["stop"]:
             return None
-
         try:
             img_path = self._info["last_drawn_img"]
         except KeyError:
             raise KeyError("Cannot find last image for device %s" % self._id)
+
         img_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._static_page, img_path)
-        file_like = urllib2.urlopen(img_url)
-        return file_like
+        try:
+            return urllib2.urlopen(img_url)
+        except  urllib2.HTTPError:
+            logging.error("Could not get image for ip = %s (id = %s)" % (self._ip, self._id))
+            raise Exception("Could not get image for ip = %s (id = %s)" % (self._ip, self._id))
 
     def dbg_img(self):
         try:
@@ -249,7 +297,6 @@ class Device(Thread):
             req = urllib2.Request(url, data=post_data, headers={'Content-Type': 'application/json'})
             f = urllib2.urlopen(req, timeout=timeout)
             message = f.read()
-
             if not message:
                 # logging.error("URL error whist scanning url: %s. No message back." % self._id_url)
                 raise ScanException("No message back")
@@ -267,25 +314,31 @@ class Device(Thread):
 
     def _update_id(self):
         if self._skip_scanning:
-            raise ScanException("Not scanning this ip.")
+            raise ScanException("Not scanning this ip (%s)." % self._ip)
 
         old_id = self._id
         resp = self._get_json(self._id_url)
         self._id = resp['id']
         if self._id != old_id:
-            logging.warning("Device id changed!")
-            self._info = {}
+            logging.warning("Device id changed at %s. %s ===> %s" % (self._ip, old_id, self._id))
+            self._reset_info()
 
         self._info["ip"] = self._ip
+        self._id = resp['id']
 
+
+    def _reset_info(self):
+        self._info = {"status": "not_in_use"}
+        self._id = ""
 
     def _update_info(self):
         try:
-            self._update_id()
-        except ScanException:
-            self._info["status"] = "not_in_use"
-            return
 
+            self._update_id()
+            print "id", self._id
+        except ScanException:
+            self._reset_info()
+            return
         try:
             data_url = "http://%s:%i/data/%s" % (self._ip, self._port, self._id)
             resp = self._get_json(data_url)
@@ -335,7 +388,7 @@ class Device(Thread):
         except Exception as e:
             logging.error("Could not generate backup path for device. Probably a MySQL issue")
             logging.error(traceback.format_exc(e))
-            return {}
+            return {"backup_path": "None"}
 
         return {"backup_path": output_db_file}
 

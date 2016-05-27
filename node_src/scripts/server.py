@@ -23,12 +23,9 @@ def error_decorator(func):
     def func_wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-
         except Exception as e:
-
             logging.error(traceback.format_exc(e))
             return {'error': traceback.format_exc(e)}
-
     return func_wrapper
 
 @app.route('/static/<filepath:path>')
@@ -72,7 +69,7 @@ def get_favicon():
 @app.get('/devices')
 @error_decorator
 def devices():
-    return device_scanner.get_device_list()
+    return device_scanner.get_all_devices_info()
 
 
 @app.get('/devices_list')
@@ -84,6 +81,10 @@ def get_devices_list():
 @error_decorator
 def get_device_info(id):
     device = device_scanner.get_device(id)
+    # if we fail to access directly the device, we have the old info map
+    if not device:
+        return device_scanner.get_all_devices_info()[id]
+
     return device.info()
 
 
@@ -98,9 +99,12 @@ def get_device_options(id):
 @app.get('/device/<id>/last_img')
 @error_decorator
 def get_device_last_img(id):
-
     device = device_scanner.get_device(id)
+    if "status" not in device.info.keys() or device.info["status"] == "not_in use":
+        raise Exception("Device %s is not in use, no image" % id )
     file_like = device.last_image()
+    if not file_like:
+        raise Exception("No image for %s" % id)
     basename = os.path.join(tmp_imgs_dir, id + "_last_img.jpg")
     return cache_img(file_like, basename)
 
@@ -302,7 +306,7 @@ if __name__ == '__main__':
     parser.add_option("-p", "--port", dest="port", default=80,help="port")
     parser.add_option("-l", "--local", dest="local", default=False, help="Run on localhost (run a node and device on the same machine, for development)", action="store_true")
     parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_results",help="Where temporary result files are stored")
-    parser.add_option("-r", "--router-ip", dest="router_ip", default="192.169.123.254", help="the ip of the router in your setup")
+    parser.add_option("-r", "--subnet-ip", dest="subnet_ip", default="192.169.123.0", help="the ip of the router in your setup")
 
 
 
@@ -312,7 +316,7 @@ if __name__ == '__main__':
     PORT = option_dict["port"]
     DEBUG = option_dict["debug"]
     RESULTS_DIR = option_dict["results_dir"]
-    LOCAL_IP = get_local_ip(option_dict["router_ip"],localhost=option_dict["local"])
+    LOCAL_IP = get_local_ip(option_dict["subnet_ip"],localhost=option_dict["local"])
 
     try:
         WWW_IP = get_internet_ip()
@@ -320,8 +324,6 @@ if __name__ == '__main__':
         logging.warning("Could not access internet!")
         logging.warning(traceback.format_exc(e))
         WWW_IP = None
-
-
 
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
     device_scanner = None
