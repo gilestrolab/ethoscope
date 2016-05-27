@@ -1,14 +1,27 @@
 <!-- home.html -->
     <div class="jumbotron text-center" ng-cloak>
-        <h1>Device List</h1>
-        <h2>({{n_devices}} detected)</h2>
+        <h1>Platform Overview</h1>
+
         <!--<div class="intro">Scan the network to detect connected ethoscopes</div>-->
         <!--<button class=" btn btn-default" ng-click="get_devices()">Scan Network for Devices</button>-->
 
 
+        <!--dddddddddddddddddd-->
+
         <div id="node-info" class="intro">
-            <p><span class="fa fa-clock-o"></span> Time on the platform: {{time}}</p>
-            <p><span class="fa fa-clock-o"></span> Time on your machine: {{localtime}}</p>
+             <div class="row">
+                 <div class="col-sm-6">
+                <h2><span class="fa fa-list"></span> {{n_devices}} devices detected:</h2>
+                    <li ng-repeat="(status, n) in status_n_summary">{{n}} {{status}} </li>
+                </div>
+
+                <div class="col-sm-6">
+                <h2><span class="fa fa-clock-o"></span> Time:</h2>
+                    <li> On the platform, {{time}}</li>
+                    <li> On your machine, {{localtime}}</li>
+                </div>
+
+            </div>
         </div>
 
     </div>
@@ -17,7 +30,7 @@
       <div class="input-group">
         <div class="input-group-addon"><i class="fa fa-search"></i></div>
 
-        <input type="text" class="form-control" placeholder="Filter " ng-model="filterEthoscopes">
+        <input type="text" class="form-control" placeholder="Filter devices " ng-model="filterEthoscopes">
 
       </div>      
     </div>

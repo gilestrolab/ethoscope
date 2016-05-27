@@ -69,8 +69,6 @@
         };
 
         $scope.get_devices = function(){
-
-            $scope.loading_devices = true;
             $http.get('/devices').success(function(data){
 
                 data_list = [];
@@ -80,10 +78,20 @@
                     }
 
                 $scope.devices = data_list;
-                $scope.n_devices=$scope.devices.length
+                $scope.n_devices=$scope.devices.length;
+                status_summary = {};
 
-                $scope.loading_devices = false;
+                for(d in $scope.devices){
 
+                    dev = $scope.devices[d]
+
+                    if(!(dev.status in status_summary))
+                        status_summary[dev.status] = 0;
+                     status_summary[dev.status] += 1;
+                }
+
+
+                $scope.status_n_summary = status_summary
             })
         };
         $scope.secToDate = function(secs){

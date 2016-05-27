@@ -51,3 +51,15 @@ p {
 #dt_warning{
     color: red;
 }
+
+
+li {
+    text-align: left;
+    font-size= 150%;
+}
+
+
+
+h2 {
+    text-align: left;
+}
