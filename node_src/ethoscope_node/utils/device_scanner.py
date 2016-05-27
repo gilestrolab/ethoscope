@@ -140,21 +140,22 @@ class DeviceScanner(Thread):
             detected_ids = [d.id() for d in self._devices if d.id()]
             print "did=", detected_ids
             for id in self._device_id_map.keys():
-                # special status for devices that are not detected anymore
-                status = self._device_id_map[id]["info"]["status"]
 
+                status = self._device_id_map[id]["info"]["status"]
                 # this default time is now. if device get out of use, their time is not updated
                 if status != "not_in_use":
                     self._device_id_map[id]["info"]["time"] = time.time()
                 self._device_id_map[id]["dev"] = None
+                # special status for devices that are not detected anymore
                 self._device_id_map[id]["info"]["status"] = "not_in_use"
 
                 for d in self._devices:
-                    if d.id() in detected_ids:
+                    if d.id() == id and d.id() in detected_ids:
                         self._device_id_map[id] = {}
                         self._device_id_map[id]["dev"] = d
                         self._device_id_map[id]["info"] = d.info().copy()
                         print "adding %s =>> %s" % (id, str(self._device_id_map[id]["info"]["ip"]))
+                        continue
 
             time.sleep(self._refresh_period)
 
