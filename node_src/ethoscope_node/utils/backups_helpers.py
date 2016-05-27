@@ -37,7 +37,7 @@ class GenericBackupWrapper(object):
 
                 logging.info("Starting backup")
 
-                dev_map = self._device_scanner.get_device_list()
+                dev_map = self._device_scanner.get_all_devices_info()
 
                 dev_list =  str([d for d in sorted(dev_map.keys())])
                 logging.info("device map is: %s" %dev_list)
