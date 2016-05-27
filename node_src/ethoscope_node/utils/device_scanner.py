@@ -94,8 +94,6 @@ class DeviceScanner(Thread):
                     if ip.split(".")[0:3] == subnet_list:
                         interface = inter
                         break
-            print("using",interface)
-
             subnet_ip = local_ip.split(".")[0:3]
             subnet_address = ".".join(subnet_ip) + ".0/24"
             ans, unans = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=subnet_address), timeout=3, verbose=False, iface=interface)
@@ -140,7 +138,7 @@ class DeviceScanner(Thread):
 
             # can we find a device fo this each id
             detected_ids = [d.id() for d in self._devices if d.id()]
-
+            print "did=", detected_ids
             for id in self._device_id_map.keys():
                 # special status for devices that are not detected anymore
                 status = self._device_id_map[id]["info"]["status"]
@@ -156,6 +154,8 @@ class DeviceScanner(Thread):
                         self._device_id_map[id] = {}
                         self._device_id_map[id]["dev"] = d
                         self._device_id_map[id]["info"] = d.info().copy()
+                        print "adding %s =>> %s" % (id, str(self._device_id_map[id]["info"]["ip"]))
+
             time.sleep(self._refresh_period)
 
     def get_all_devices_info(self):

@@ -100,7 +100,7 @@ def get_device_options(id):
 @error_decorator
 def get_device_last_img(id):
     device = device_scanner.get_device(id)
-    if "status" not in device.info.keys() or device.info["status"] == "not_in use":
+    if "status" not in device.info().keys() or device.info()["status"] == "not_in use":
         raise Exception("Device %s is not in use, no image" % id )
     file_like = device.last_image()
     if not file_like:
