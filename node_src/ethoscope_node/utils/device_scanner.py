@@ -138,7 +138,6 @@ class DeviceScanner(Thread):
 
             # can we find a device fo this each id
             detected_ids = [d.id() for d in self._devices if d.id()]
-            print "did=", detected_ids
             for id in self._device_id_map.keys():
 
                 status = self._device_id_map[id]["info"]["status"]
@@ -154,7 +153,6 @@ class DeviceScanner(Thread):
                         self._device_id_map[id] = {}
                         self._device_id_map[id]["dev"] = d
                         self._device_id_map[id]["info"] = d.info().copy()
-                        print "adding %s =>> %s" % (id, str(self._device_id_map[id]["info"]["ip"]))
                         continue
 
             time.sleep(self._refresh_period)
@@ -336,7 +334,6 @@ class Device(Thread):
         try:
 
             self._update_id()
-            print "id", self._id
         except ScanException:
             self._reset_info()
             return
