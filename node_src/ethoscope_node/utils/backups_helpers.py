@@ -44,9 +44,9 @@ class GenericBackupWrapper(object):
 
                 args = []
                 for d in dev_map.values():
-                    if d.infos()["status"] != "not_in_use":
+                    if d["status"] != "not_in_use":
                         args.append((d, self._results_dir))
-                
+
                 if self._safe:
                     map(self._backup_job, args)
                 else:
