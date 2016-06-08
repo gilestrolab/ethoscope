@@ -125,7 +125,7 @@ class MySQLdbToSQlite(object):
             dst_cur.execute(dst_command)
 
         except sqlite3.OperationalError:
-            logging.info("Table %s exists, not copying it" % table_name)
+            logging.debug("Table %s exists, not copying it" % table_name)
             return
         if table_name == "IMG_SNAPSHOTS":
             self._replace_img_snapshot_table(table_name, src, dst)

@@ -41,7 +41,12 @@ class GenericBackupWrapper(object):
 
                 dev_list =  str([d for d in sorted(dev_map.keys())])
                 logging.info("device map is: %s" %dev_list)
-                args = [(d, self._results_dir) for d in dev_map.values()]
+
+                args = []
+                for d in dev_map.values():
+                    if d.infos()["status"] != "not_in_use":
+                        args.append((d, self._results_dir))
+                
                 if self._safe:
                     map(self._backup_job, args)
                 else:
