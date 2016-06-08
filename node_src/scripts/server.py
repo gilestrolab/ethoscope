@@ -5,13 +5,13 @@ import logging
 import traceback
 from ethoscope_node.utils.helpers import  get_local_ip, get_internet_ip
 from ethoscope_node.utils.device_scanner import DeviceScanner
-import shutil
-import tempfile
 from os import walk
 import optparse
 import zipfile
 import datetime
 import fnmatch
+import tempfile
+import shutil
 
 app = Bottle()
 STATIC_DIR = "../static"
@@ -127,8 +127,10 @@ def cache_img(file_like, basename):
         #todo return link to "broken img"
         return ""
     local_file = os.path.join(tmp_imgs_dir, basename)
-    with open(local_file, "wb") as lf:
+    tmp_file = tempfile.mktemp(prefix="ethoscope_", suffix=".jpg")
+    with open(tmp_file , "wb") as lf:
         lf.write(file_like.read())
+    shutil.move(tmp_file, local_file)
     return server_tmp_static(os.path.basename(local_file))
 
 

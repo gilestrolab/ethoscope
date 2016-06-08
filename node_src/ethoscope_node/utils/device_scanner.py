@@ -268,7 +268,7 @@ class Device(Thread):
 
         img_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._static_page, img_path)
         try:
-            return urllib2.urlopen(img_url)
+            return urllib2.urlopen(img_url,timeout=5)
         except  urllib2.HTTPError:
             logging.error("Could not get image for ip = %s (id = %s)" % (self._ip, self._id))
             raise Exception("Could not get image for ip = %s (id = %s)" % (self._ip, self._id))
