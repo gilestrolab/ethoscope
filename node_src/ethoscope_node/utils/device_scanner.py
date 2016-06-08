@@ -290,7 +290,7 @@ class Device(Thread):
 
 
     @retry(ScanException, tries=3, delay=1, backoff=1)
-    def _get_json(self, url,timeout=2, post_data=None):
+    def _get_json(self, url,timeout=5, post_data=None):
 
         try:
             req = urllib2.Request(url, data=post_data, headers={'Content-Type': 'application/json'})
@@ -319,7 +319,8 @@ class Device(Thread):
         resp = self._get_json(self._id_url)
         self._id = resp['id']
         if self._id != old_id:
-            logging.warning("Device id changed at %s. %s ===> %s" % (self._ip, old_id, self._id))
+            if old_id:
+                logging.warning("Device id changed at %s. %s ===> %s" % (self._ip, old_id, self._id))
             self._reset_info()
 
         self._info["ip"] = self._ip
