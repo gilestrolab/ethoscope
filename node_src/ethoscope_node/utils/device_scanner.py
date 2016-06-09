@@ -108,6 +108,20 @@ class DeviceScanner(Thread):
             self._use_scapy = False
             return []
 
+
+    def _get_last_backup_time(self, device):
+        try:
+            backup_path = device.info()["backup_path"]
+            time_since_backup = time.time() - os.path.getmtime(backup_path)
+            return time_since_backup
+        except OSError:
+            return
+        except KeyError:
+            return
+        except Exception as e:
+            logging.error(traceback.format_exc(e))
+            return
+
     def run(self):
         last_device_filter_time = 0
         valid_ips = [ip for ip in self._available_ips(self._local_ip, self._ip_range)]
@@ -116,17 +130,11 @@ class DeviceScanner(Thread):
             if time.time() - last_device_filter_time > self._filter_device_period:
                 valid_ips = [ip for ip in self._available_ips(self._local_ip, self._ip_range)]
                 last_device_filter_time = time.time()
-
-
-
             for d in self._devices:
-
                 if d.ip() in valid_ips:
-
                     d.skip_scanning(False)
                 else:
                     d.skip_scanning(True)
-
             for d in self._devices:
                 id = d.id()
 
@@ -153,6 +161,7 @@ class DeviceScanner(Thread):
                         self._device_id_map[id] = {}
                         self._device_id_map[id]["dev"] = d
                         self._device_id_map[id]["info"] = d.info().copy()
+                        self._device_id_map[id]["info"]["time_since_backup"] = self._get_last_backup_time(d)
                         continue
 
             time.sleep(self._refresh_period)
@@ -344,20 +353,11 @@ class Device(Thread):
             self._info.update(resp)
             resp = self._make_backup_path()
             self._info.update(resp)
-            resp = self._get_last_backup_time(self._info["backup_path"])
-            self._info.update(resp)
+            # resp = self._get_last_backup_time(self._info["backup_path"])
+            # self._info.update(resp)
         except ScanException:
             pass
 
-    def _get_last_backup_time(self, backup_path):
-        try:
-            time_since_backup = time.time() - os.path.getmtime(backup_path)
-            return {"time_since_backup": time_since_backup}
-        except OSError:
-            return {"time_since_backup": "None"}
-        except Exception as e:
-            logging.error(traceback.format_exc(e))
-            return {"time_since_backup": "None"}
 
     def _make_backup_path(self,  timeout=30):
         try:
