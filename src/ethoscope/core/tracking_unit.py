@@ -1,12 +1,7 @@
 __author__ = 'quentin'
-
-
-
-
 from ethoscope.core.variables import BaseRelativeVariable
 from ethoscope.core.data_point import DataPoint
 from ethoscope.stimulators.stimulators import DefaultStimulator
-
 
 
 class TrackingUnit(object):
@@ -66,12 +61,8 @@ class TrackingUnit(object):
         if len(self._tracker.positions) < 1:
             return []
         last_positions = self._tracker.positions[-1]
-
-
         if not absolute:
             return last_positions
-
-
         out =[]
         for last_pos in last_positions:
             tmp_out = []

@@ -53,8 +53,8 @@ class BaseCamera(object):
         """
 
         # We ensure timestamps and frame index are set to 0
+        # self.restart()
 
-        self.restart()
         at_least_one_frame = False
         while True:
             if self.is_last_frame() or not self.is_opened():
@@ -489,7 +489,7 @@ class PiFrameGrabber(multiprocessing.Process):
 
 
 class OurPiCameraAsync(BaseCamera):
-
+    _frame_grabber_class = PiFrameGrabber
     def __init__(self, target_fps=20, target_resolution=(1280, 960), *args, **kwargs):
 
         """
@@ -513,7 +513,7 @@ class OurPiCameraAsync(BaseCamera):
 
         self._queue = multiprocessing.Queue(maxsize=1)
         self._stop_queue = multiprocessing.JoinableQueue(maxsize=1)
-        self._p = PiFrameGrabber(target_fps,target_resolution,self._queue,self._stop_queue )
+        self._p = self._frame_grabber_class(target_fps,target_resolution,self._queue,self._stop_queue )
         self._p.daemon = True
         self._p.start()
 
@@ -563,6 +563,21 @@ class OurPiCameraAsync(BaseCamera):
     def restart(self):
         self._frame_idx = 0
         self._start_time = time.time()
+
+    def __getstate__(self):
+        return {"args": {"target_resolution": self._resolution,
+                         "start_time": self._start_time,
+                         "target_fps": self._p._target_fps,
+                         "drop_each": self._drop_each,
+                         "max_duration": self._max_duration},
+                "frame_idx": self._frame_idx,
+                "start_time": self._start_time}
+
+    def __setstate__(self, state):
+        self.__init__(**state["args"])
+        self._frame_idx = int(state["frame_idx"])
+        self._start_time = int(state["start_time"])
+
 
     def is_opened(self):
         return True

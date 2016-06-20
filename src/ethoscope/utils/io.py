@@ -1,12 +1,9 @@
 __author__ = 'quentin'
-
-
+import multiprocessing
 import time, datetime
 import traceback
 import logging
 from collections import OrderedDict
-
-import multiprocessing
 import cv2
 import tempfile
 import os
@@ -14,17 +11,17 @@ import os
 
 class AsyncMySQLWriter(multiprocessing.Process):
 
-    def __init__(self, db_credentials, queue):
-
-
-
+    def __init__(self, db_credentials, queue, erase_old_db=True):
         self._db_name = db_credentials["name"]
         self._db_user_name = db_credentials["user"]
         self._db_user_pass = db_credentials["password"]
+        self._erase_old_db = erase_old_db
 
         self._queue = queue
-        self._delete_my_sql_db()
-        self._create_mysql_db()
+
+        # if erase_old_db:
+        #     self._delete_my_sql_db()
+        #     self._create_mysql_db()
         super(AsyncMySQLWriter,self).__init__()
 
 
@@ -95,8 +92,10 @@ class AsyncMySQLWriter(multiprocessing.Process):
         db = None
         do_run = True
         try:
-            self._delete_my_sql_db()
-            self._create_mysql_db()
+            if self._erase_old_db:
+                self._delete_my_sql_db()
+                self._create_mysql_db()
+
             db = self._get_connection()
             while do_run:
                 try:
@@ -299,15 +298,20 @@ class ResultWriter(object):
     # _flush_every_ns = 30 # flush every 10s of data
     _max_insert_string_len = 1000
     _async_writing_class = AsyncMySQLWriter
-    def __init__(self, db_credentials, rois, metadata=None, make_dam_like_table=True, take_frame_shots=False, *args, **kwargs):
+    _null = 0
+    def __init__(self, db_credentials, rois, metadata=None, make_dam_like_table=True, take_frame_shots=False, erase_old_db=True, *args, **kwargs):
         self._queue = multiprocessing.JoinableQueue()
-        self._async_writer = self._async_writing_class(db_credentials, self._queue)
+        self._async_writer = self._async_writing_class(db_credentials, self._queue, erase_old_db)
         self._async_writer.start()
-
         self._last_t, self._last_flush_t, self._last_dam_t = [0] * 3
 
-        self.metadata = metadata
+        self._metadata = metadata
         self._rois = rois
+        self._db_credentials = db_credentials
+
+        self._make_dam_like_table = make_dam_like_table
+        self._take_frame_shots = take_frame_shots
+
         if make_dam_like_table:
             self._dam_file_helper = DAMFileHelper(n_rois=len(rois))
         else:
@@ -319,11 +323,19 @@ class ResultWriter(object):
             self._shot_saver = None
 
         self._insert_dict = {}
-        if self.metadata is None:
-            self.metadata  = {}
+        if self._metadata is None:
+            self._metadata  = {}
 
         self._var_map_initialised = False
+        if erase_old_db:
+            self._create_all_tables()
+        else:
+            event = "crash_recovery"
+            command = "INSERT INTO START_EVENTS VALUES %s" % str((self._null, int(time.time()), event))
+            self._write_async_command(command)
 
+        logging.info("Result writer initialised")
+    def _create_all_tables(self):
         logging.info("Creating master table 'ROI_MAP'")
         self._create_table("ROI_MAP", "roi_idx SMALLINT, roi_value SMALLINT, x SMALLINT,y SMALLINT,w SMALLINT,h SMALLINT")
 
@@ -349,14 +361,23 @@ class ResultWriter(object):
         logging.info("Creating 'METADATA' table")
         self._create_table("METADATA", "field CHAR(100), value VARCHAR(3000)")
 
+        logging.info("Creating 'START_EVENTS' table")
+        self._create_table("START_EVENTS", "id INT  NOT NULL AUTO_INCREMENT PRIMARY KEY, t INT, event CHAR(100)")
+        event = "graceful_start"
+        command = "INSERT INTO START_EVENTS VALUES %s" % str((self._null, int(time.time()), event))
+        self._write_async_command(command)
+
+
         for k,v in self.metadata.items():
             command = "INSERT INTO METADATA VALUES %s" % str((k, v))
             self._write_async_command(command)
         while not self._queue.empty():
             logging.info("waiting for queue to be processed")
             time.sleep(.1)
-        logging.info("Result writer initialised")
 
+    @property
+    def metadata(self):
+        return self._metadata
 
     def write(self, t, roi, data_rows):
 
@@ -387,7 +408,7 @@ class ResultWriter(object):
             if c_args is not None:
                 self._write_async_command(*c_args)
 
-        for k, v in self._insert_dict.iteritems():
+        for k, v in self._insert_dict.items():
             if len(v) > self._max_insert_string_len:
                 self._write_async_command(v)
                 self._insert_dict[k] = ""
@@ -410,6 +431,8 @@ class ResultWriter(object):
 
     def _initialise_var_map(self,  data_row):
         logging.info("Filling 'VAR_MAP' with values")
+        # we recreate var map so we do not have duplicate entries
+        self._write_async_command("DELETE FROM VAR_MAP")
 
         for dt in data_row.values():
             command = "INSERT INTO VAR_MAP VALUES %s"% str((dt.header_name, dt.sql_data_type, dt.functional_type))
@@ -433,15 +456,25 @@ class ResultWriter(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         logging.info("Closing result writer...")
+        try:
+            command = "INSERT INTO METADATA VALUES %s" % str(("stop_date_time", str(int(time.time()))))
+            self._write_async_command(command)
 
-        logging.info("Closing mysql async queue")
-        self._queue.put("DONE")
+            while not self._queue.empty():
+                logging.info("waiting for queue to be processed")
+                time.sleep(.1)
+        except Exception as e:
+            print("Error writing metadata stop time:" + str(e))
+        finally:
 
-        logging.info("Freeing queue")
-        self._queue.cancel_join_thread()
-        logging.info("Joining thread")
-        self._async_writer.join()
-        logging.info("Joined OK")
+            logging.info("Closing mysql async queue")
+            self._queue.put("DONE")
+
+            logging.info("Freeing queue")
+            self._queue.cancel_join_thread()
+            logging.info("Joining thread")
+            self._async_writer.join()
+            logging.info("Joined OK")
 
     def close(self):
         pass
@@ -452,32 +485,49 @@ class ResultWriter(object):
         self._queue.put((command, args))
 
     def _create_table(self, name, fields, engine="MyISAM"):
-        command = "CREATE TABLE %s (%s) ENGINE %s KEY_BLOCK_SIZE=16" % (name, fields, engine)
+        command = "CREATE TABLE IF NOT EXISTS %s (%s) ENGINE %s KEY_BLOCK_SIZE=16" % (name, fields, engine)
         logging.info("Creating database table with: " + command)
         self._write_async_command(command)
+
+    # def __init__(self, db_credentials, rois, metadata=None, make_dam_like_table=True, take_frame_shots=False, erase_old_db=True *args, **kwargs):
+    def __getstate__(self):
+        return {"args": {"db_credentials": self._db_credentials,
+                         "rois": self._rois,
+                         "metadata": self._metadata,
+                         "make_dam_like_table": self._make_dam_like_table,
+                         "take_frame_shots": self._take_frame_shots,
+                         "erase_old_db": False}}
+
+    def __setstate__(self, state):
+        self.__init__(**state["args"])
+
+
+
 
 class AsyncSQLiteWriter(multiprocessing.Process):
     _pragmas = {"temp_store": "MEMORY",
                 "journal_mode": "OFF",
                 "locking_mode":  "EXCLUSIVE"}
 
-    def __init__(self, db_name, queue):
+    def __init__(self, db_name, queue, erase_old_db=True):
         self._db_name = db_name
         self._queue = queue
+        self._erase_old_db =  erase_old_db
 
         super(AsyncSQLiteWriter,self).__init__()
-        try:
-            os.remove(self._db_name)
-        except:
-            pass
+        if erase_old_db:
+            try:
+                os.remove(self._db_name)
+            except:
+                pass
 
-        conn = self._get_connection()
+            conn = self._get_connection()
 
-        c = conn.cursor()
-        logging.info("Setting DB parameters'")
-        for k,v in self._pragmas.items():
-            command = "PRAGMA %s = %s" %(str(k), str(v))
-            c.execute(command)
+            c = conn.cursor()
+            logging.info("Setting DB parameters'")
+            for k,v in self._pragmas.items():
+                command = "PRAGMA %s = %s" %(str(k), str(v))
+                c.execute(command)
 
         
     def _get_connection(self):
@@ -491,7 +541,6 @@ class AsyncSQLiteWriter(multiprocessing.Process):
         db = None
         do_run = True
         try:
-
             db = self._get_connection()
             while do_run:
                 try:
@@ -550,14 +599,14 @@ class Null(object):
 class SQLiteResultWriter(ResultWriter):
     _async_writing_class = AsyncSQLiteWriter
     _null= Null()
-    def __init__(self, db_name, rois, metadata=None, make_dam_like_table=False, take_frame_shots=False, *args, **kwargs):
-        super(SQLiteResultWriter, self).__init__(db_name, rois, metadata,make_dam_like_table=False, take_frame_shots=False, *args, **kwargs)
+    def __init__(self, db_credentials, rois, metadata=None, make_dam_like_table=False, take_frame_shots=False, *args, **kwargs):
+        super(SQLiteResultWriter, self).__init__(db_credentials, rois, metadata,make_dam_like_table, take_frame_shots, *args, **kwargs)
 
 
     def _create_table(self, name, fields, engine=None):
 
         fields = fields.replace("NOT NULL", "")
-        command = "CREATE TABLE %s (%s)" % (name,fields)
+        command = "CREATE TABLE IF NOT EXISTS %s (%s)" % (name,fields)
         logging.info("Creating database table with: " + command)
         self._write_async_command(command)
 

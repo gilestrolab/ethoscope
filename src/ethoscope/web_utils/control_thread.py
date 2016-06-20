@@ -7,25 +7,18 @@ import time
 import re
 import cv2
 from threading import Thread
+import pickle
 
-# Interface to V4l
 from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera
-# Build ROIs from greyscale image
-
-
 from ethoscope.roi_builders.target_roi_builder import  OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder
 from ethoscope.roi_builders.roi_builders import  DefaultROIBuilder
 from ethoscope.core.monitor import Monitor
 from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
-
-# the robust self learning tracker
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection
 from ethoscope.stimulators.stimulators import DefaultStimulator
 from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator, ExperimentalSleepDepStimulator#, SystematicSleepDepInteractor
 from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver #, DynamicOdourDeliverer
-
-
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
 from ethoscope.utils.description import DescribedObject
@@ -107,6 +100,8 @@ class ControlThread(Thread):
                             "last_time_stamp":0,
                             "fps":0
                             }
+    _persistent_state_file = "/var/cache/ethoscope/persistent_state.pkl"
+
     def __init__(self, machine_id, name, version, ethoscope_dir, data=None, *args, **kwargs):
 
         self._monit_args = args
@@ -171,7 +166,7 @@ class ControlThread(Thread):
     @classmethod
     def user_options(cls):
         out = {}
-        for key, value in cls._option_dict.iteritems():
+        for key, value in cls._option_dict.items():
             out[key] = []
             for p in value["possible_classes"]:
                 try:
@@ -183,7 +178,7 @@ class ControlThread(Thread):
                 out[key].append(d)
         out_currated = {}
 
-        for key, value in out.iteritems():
+        for key, value in out.items():
             if len(value) >0:
                 out_currated[key] = value
 
@@ -212,7 +207,7 @@ class ControlThread(Thread):
         logging.warning("Starting control thread with data:")
         logging.warning(str(data))
 
-        for key in self._option_dict.iterkeys():
+        for key in self._option_dict.keys():
 
             Class, kwargs = self._parse_one_user_option(key, data)
             # when no field is present in the JSON config, we get the default class
@@ -260,8 +255,98 @@ class ControlThread(Thread):
         self._last_info_t_stamp = wall_time
         self._last_info_frame_idx = frame_idx
 
-    def run(self):
 
+    def _start_tracking(self, camera, result_writer, rois,   TrackerClass, tracker_kwargs,
+                        hardware_connection, StimulatorClass, stimulator_kwargs):
+
+        hardware_connection = HardwareConnection(HardWareInterfaceClass)
+
+        stimulators = [StimulatorClass(hardware_connection, **stimulator_kwargs) for _ in rois]
+        kwargs = self._monit_kwargs.copy()
+        kwargs.update(tracker_kwargs)
+
+        # todo: pickle hardware connection, camera, rois, tracker class, stimulator class,.
+        # then rerun stimulators and Monitor(......)
+        self._monit = Monitor(camera, TrackerClass, rois,
+                              stimulators=stimulators,
+                              *self._monit_args)
+        self._info["status"] = "running"
+        logging.info("Setting monitor status as running: '%s'" % self._info["status"])
+        self._monit.run(rw, self._drawer)
+
+    def _set_tracking_from_pickled(self):
+        with open(self._persistent_state_file, "r") as f:
+            return pickle.load(f)
+
+    def _save_pickled_state(self, camera, result_writer, rois,   TrackerClass, tracker_kwargs,
+                        hardware_connection, StimulatorClass, stimulator_kwargs):
+
+        tpl = (camera, result_writer, rois,   TrackerClass, tracker_kwargs,
+                        hardware_connection, StimulatorClass, stimulator_kwargs)
+
+        if not os.path.exists(os.path.dirname(self._persistent_state_file)):
+            logging.warning("No cache dir detected. making one")
+            os.makedirs(os.path.dirname(self._persistent_state_file))
+
+        with open(self._persistent_state_file, "w") as f:
+            return pickle.dump(tpl, f)
+
+    def _set_tracking_from_scratch(self):
+        CameraClass = self._option_dict["camera"]["class"]
+        camera_kwargs = self._option_dict["camera"]["kwargs"]
+
+        ROIBuilderClass = self._option_dict["roi_builder"]["class"]
+        roi_builder_kwargs = self._option_dict["roi_builder"]["kwargs"]
+
+        StimulatorClass = self._option_dict["interactor"]["class"]
+        stimulator_kwargs = self._option_dict["interactor"]["kwargs"]
+        HardWareInterfaceClass = StimulatorClass.__dict__["_HardwareInterfaceClass"]
+
+        TrackerClass = self._option_dict["tracker"]["class"]
+        tracker_kwargs = self._option_dict["tracker"]["kwargs"]
+
+        ResultWriterClass = self._option_dict["result_writer"]["class"]
+        result_writer_kwargs = self._option_dict["result_writer"]["kwargs"]
+
+        cam = CameraClass(**camera_kwargs)
+
+        roi_builder = ROIBuilderClass(**roi_builder_kwargs)
+        rois = roi_builder.build(cam)
+
+        logging.info("Initialising monitor")
+        cam.restart()
+        # the camera start time is the reference 0
+
+
+        ExpInfoClass = self._option_dict["experimental_info"]["class"]
+        exp_info_kwargs = self._option_dict["experimental_info"]["kwargs"]
+        self._info["experimental_info"] = ExpInfoClass(**exp_info_kwargs).info_dic
+        self._info["time"] = cam.start_time
+        hardware_connection = HardwareConnection(HardWareInterfaceClass)
+
+        self._metadata = {
+            "machine_id": self._info["id"],
+            "machine_name": self._info["name"],
+            "date_time": cam.start_time,  # the camera start time is the reference 0
+            "frame_width": cam.width,
+            "frame_height": cam.height,
+            "version": self._info["version"]["id"],
+            "experimental_info": str(self._info["experimental_info"]),
+            "selected_options": str(self._option_dict),
+        }
+        # hardware_interface is a running thread
+        rw = ResultWriter(self._db_credentials, rois, self._metadata, take_frame_shots=True)
+
+        return  (cam, rw, rois, TrackerClass, tracker_kwargs,
+                        hardware_connection, StimulatorClass, stimulator_kwargs)
+
+    def run(self):
+        # try:
+        #     self._run_from_pickled()
+        # except OSError:
+        #     logging.info("Could not load from pickled state, normal run")
+        # except Exception:
+        #     pass
         try:
             self._info["status"] = "initialising"
             logging.info("Starting Monitor thread")
@@ -273,72 +358,17 @@ class ControlThread(Thread):
             hardware_connection = None
 
             try:
-
-                CameraClass = self._option_dict["camera"]["class"]
-
-                camera_kwargs = self._option_dict["camera"]["kwargs"]
-
-                ROIBuilderClass= self._option_dict["roi_builder"]["class"]
-                roi_builder_kwargs = self._option_dict["roi_builder"]["kwargs"]
-
-                StimulatorClass= self._option_dict["interactor"]["class"]
-                stimulator_kwargs = self._option_dict["interactor"]["kwargs"]
-                HardWareInterfaceClass =  StimulatorClass.__dict__["_HardwareInterfaceClass"]
-
-                TrackerClass= self._option_dict["tracker"]["class"]
-                tracker_kwargs = self._option_dict["tracker"]["kwargs"]
-
-                ResultWriterClass = self._option_dict["result_writer"]["class"]
-                result_writer_kwargs = self._option_dict["result_writer"]["kwargs"]
+                cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_pickled()
+            except:
+                cam,rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs =  self._set_tracking_from_scratch()
+                self._save_pickled_state(cam,rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
 
 
-                cam = CameraClass(**camera_kwargs)
+                with rw as result_writer:
+                    self._save_pickled_state(cam,rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
+                    self._start_tracking(cam, result_writer, rois, TrackerClass, tracker_kwargs,
+                                         hardware_connection, StimulatorClass, stimulator_kwargs)
 
-
-                roi_builder = ROIBuilderClass(**roi_builder_kwargs)
-                rois = roi_builder.build(cam)
-
-                logging.info("Initialising monitor")
-                cam.restart()
-                #the camera start time is the reference 0
-
-
-                ExpInfoClass = self._option_dict["experimental_info"]["class"]
-                exp_info_kwargs = self._option_dict["experimental_info"]["kwargs"]
-                self._info["experimental_info"] = ExpInfoClass(**exp_info_kwargs).info_dic
-                self._info["time"] = cam.start_time
-
-
-                self._metadata = {
-                             "machine_id": self._info["id"],
-                             "machine_name": self._info["name"],
-                             "date_time": cam.start_time, #the camera start time is the reference 0
-                             "frame_width":cam.width,
-                             "frame_height":cam.height,
-                             "version": self._info["version"]["id"],
-                             "experimental_info": str(self._info["experimental_info"]),
-                             "selected_options": str(self._option_dict)
-                              }
-
-                #hardware_interface is a running thread
-                hardware_connection = HardwareConnection(HardWareInterfaceClass)
-
-                stimulators = [StimulatorClass(hardware_connection ,**stimulator_kwargs) for _ in rois]
-                kwargs = self._monit_kwargs.copy()
-                kwargs.update(tracker_kwargs)
-
-                self._monit = Monitor(cam, TrackerClass, rois,
-                                      stimulators=stimulators,
-                                      *self._monit_args, **kwargs)
-
-                logging.info("Starting monitor")
-
-                #fixme
-                with ResultWriter(self._db_credentials, rois, self._metadata, take_frame_shots=True) as rw:
-                    self._info["status"] = "running"
-                    logging.info("Setting monitor status as running: '%s'" % self._info["status"] )
-                    self._monit.run(rw,self._drawer)
-                logging.info("Stopping Monitor thread")
                 self.stop()
 
             finally:
@@ -370,7 +400,11 @@ class ControlThread(Thread):
             self.stop()
             os._exit(0)
 
-
+    def _pickle(self, monitor, result_writer, drawer, hardware_connection):
+        out = {"monitor": monitor,
+               "result_writer": result_writer,
+                "drawer": drawer,
+               "hardware_connection":hardware_connection}
     def stop(self, error=None):
         self._info["status"] = "stopping"
         self._info["time"] = time.time()
@@ -391,6 +425,8 @@ class ControlThread(Thread):
             logging.error(error)
         else:
             logging.info("Monitor closed all right")
+
+        shutil.rmtree(self._persistent_state_file, ignore_errors=True)
 
     def __del__(self):
         self.stop()
