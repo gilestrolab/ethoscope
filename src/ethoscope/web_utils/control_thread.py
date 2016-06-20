@@ -361,6 +361,7 @@ class ControlThread(Thread):
 
             try:
                 cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_pickled()
+                time.sleep(15)
             except IOError:
                 cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
             except Exception as e:

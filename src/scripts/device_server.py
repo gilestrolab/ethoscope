@@ -220,11 +220,7 @@ if __name__ == '__main__':
     if option_dict["stop_after_run"]:
          control.set_evanescent(True) # kill program after first run
 
-    if option_dict["run"]:
-        control.start()
-    elif control.was_interrupted:
-        # we let some time to the pi to reboot, so resources are more likely to be free
-        time.sleep(15)
+    if option_dict["run"] or control.was_interrupted:
         control.start()
 
     try:
