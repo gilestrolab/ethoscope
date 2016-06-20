@@ -281,6 +281,7 @@ class ControlThread(Thread):
 
     def _set_tracking_from_pickled(self):
         with open(self._persistent_state_file, "r") as f:
+            time.sleep(15)
             return pickle.load(f)
 
     def _save_pickled_state(self, camera, result_writer, rois,   TrackerClass, tracker_kwargs,
@@ -361,7 +362,7 @@ class ControlThread(Thread):
 
             try:
                 cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_pickled()
-                time.sleep(15)
+
             except IOError:
                 cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
             except Exception as e:
