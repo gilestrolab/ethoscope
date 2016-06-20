@@ -484,7 +484,7 @@ class ResultWriter(object):
             raise Exception("Async database writer has stopped unexpectedly")
         self._queue.put((command, args))
 
-    def _create_table(self, name, fields, engine="MyISAM"):
+    def _create_table(self, name, fields, engine="InnoDB"):
         command = "CREATE TABLE IF NOT EXISTS %s (%s) ENGINE %s KEY_BLOCK_SIZE=16" % (name, fields, engine)
         logging.info("Creating database table with: " + command)
         self._write_async_command(command)
