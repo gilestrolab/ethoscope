@@ -443,7 +443,7 @@ class PiFrameGrabber(multiprocessing.Process):
     Class to grab frames from pi camera. Designed to be used within :class:`~ethoscope.hardware.camreras.camreras.OurPiCameraAsync`
     """
 
-    def __init__(self, target_fps, target_resolution, queue,stop_queue):
+    def __init__(self, target_fps, target_resolution, queue,stop_queue, *args, **kwargs):
         self._queue = queue
         self._stop_queue = stop_queue
         self._target_fps = target_fps
@@ -510,10 +510,11 @@ class OurPiCameraAsync(BaseCamera):
         if not isinstance(target_fps, int):
             raise EthoscopeException("FPS must be an integer number")
 
-
+        self._args = args
+        self._kwargs = kwargs
         self._queue = multiprocessing.Queue(maxsize=1)
         self._stop_queue = multiprocessing.JoinableQueue(maxsize=1)
-        self._p = self._frame_grabber_class(target_fps,target_resolution,self._queue,self._stop_queue )
+        self._p = self._frame_grabber_class(target_fps,target_resolution,self._queue,self._stop_queue, *args, **kwargs)
         self._p.daemon = True
         self._p.start()
 
@@ -565,16 +566,13 @@ class OurPiCameraAsync(BaseCamera):
         self._start_time = time.time()
 
     def __getstate__(self):
-        return {"args": {"target_resolution": self._resolution,
-                         "start_time": self._start_time,
-                         "target_fps": self._p._target_fps,
-                         "drop_each": self._drop_each,
-                         "max_duration": self._max_duration},
+        return {"args": self._args,
+                "kwargs": self._kwargs,
                 "frame_idx": self._frame_idx,
                 "start_time": self._start_time}
 
     def __setstate__(self, state):
-        self.__init__(**state["args"])
+        self.__init__(*state["args"], **state["kwargs"])
         self._frame_idx = int(state["frame_idx"])
         self._start_time = int(state["start_time"])
 
@@ -627,3 +625,40 @@ class OurPiCameraAsync(BaseCamera):
 
         except Exception as e:
             raise EthoscopeException("Could not get frame from camera\n%s", traceback.format_exc(e))
+
+
+
+
+class DummyFrameGrabber(multiprocessing.Process):
+    def __init__(self, target_fps, target_resolution, queue, stop_queue, path, *args, **kwargs):
+        self._queue = queue
+        self._stop_queue = stop_queue
+        self._target_fps = target_fps
+        self._target_resolution = target_resolution
+        self._video_file = path
+        super(DummyFrameGrabber, self).__init__()
+    def run(self):
+        try:
+
+            cap = cv2.VideoCapture(self._video_file)
+            while True:
+                if not self._stop_queue.empty():
+
+                    logging.warning("The stop queue is not empty. Stop acquiring frames")
+                    self._stop_queue.get()
+                    self._stop_queue.task_done()
+                    logging.warning("Stop Task Done")
+                    break
+                _, out = cap.read()
+                out = cv2.cvtColor(out, cv2.COLOR_BGR2GRAY)
+                self._queue.put(out)
+
+        finally:
+            logging.warning("Closing frame grabber process")
+            self._stop_queue.close()
+            self._queue.close()
+            logging.warning("Camera Frame grabber stopped acquisition cleanly")
+
+class DummyPiCameraAsync(OurPiCameraAsync):
+
+    _frame_grabber_class = DummyFrameGrabber

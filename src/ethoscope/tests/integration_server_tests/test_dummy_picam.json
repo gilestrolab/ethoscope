@@ -1,0 +1,15 @@
+
+{"roi_builder":{"name":"TargetGridROIBuilder",
+                      "arguments":{ "n_cols": 2 ,
+                                    "n_rows": 10
+                                  }
+                  },
+        "tracker": {"name":"AdaptiveBGModel",
+                      "arguments":{}},
+        "interactor": {"name":"DefaultStimulator",
+                      "arguments":{}},
+        "drawer": {"name":"DefaultDrawer",
+                      "arguments":{"draw_frames":true}},
+        "camera": {"name":"DummyPiCameraAsync",
+                      "arguments":{"path":"/data/ethoscope_ref_videos/2016-03-22_14-36-58_cs_long_validation/2016-03-22_14-36-58_cs_long_validation.mp4"}}
+}

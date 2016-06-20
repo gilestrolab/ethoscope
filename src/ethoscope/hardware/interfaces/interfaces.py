@@ -6,6 +6,10 @@ import collections
 
 class   HardwareConnection(Thread):
     def __init__(self, interface_class, *args, **kwargs):
+        self._interface_class = interface_class
+        self._interface_args = args
+        self._interface_kwargs = kwargs
+
         self._interface = interface_class(*args, **kwargs)
         self._instructions = collections.deque()
         self._connection_open = True
@@ -30,9 +34,23 @@ class   HardwareConnection(Thread):
     def __del__(self):
         self.stop()
 
+    def __getstate__(self):
+        return {
+                "interface_class": self._interface_class,
+                "interface_args": self._interface_args,
+                "interface_kwargs": self._interface_kwargs}
+
+    def __setstate__(self, state):
+        kwargs = state["interface_kwargs"]
+        kwargs["do_warm_up"] = False
+        self.__init__(state["interface_class"],
+                      *state["interface_args"], **kwargs)
+
+
 class BaseInterface(object):
-    def __init__(self):
-        self._warm_up()
+    def __init__(self, do_warm_up = True):
+        if do_warm_up:
+            self._warm_up()
 
     def _warm_up(self):
         raise NotImplementedError
@@ -42,6 +60,7 @@ class BaseInterface(object):
         :param kwargs: keywords arguments
         """
         raise NotImplementedError
+
 
 class DefaultInterface(BaseInterface):
     def _warm_up(self):

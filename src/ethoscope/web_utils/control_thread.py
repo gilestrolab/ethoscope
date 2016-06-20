@@ -9,7 +9,8 @@ import cv2
 from threading import Thread
 import pickle
 
-from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera
+import trace
+from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera, DummyPiCameraAsync
 from ethoscope.roi_builders.target_roi_builder import  OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder
 from ethoscope.roi_builders.roi_builders import  DefaultROIBuilder
 from ethoscope.core.monitor import Monitor
@@ -72,7 +73,7 @@ class ControlThread(Thread):
                         "possible_classes":[DefaultDrawer, NullDrawer],
                     },
         "camera":{
-                        "possible_classes":[OurPiCameraAsync, MovieVirtualCamera],
+                        "possible_classes":[OurPiCameraAsync, MovieVirtualCamera, DummyPiCameraAsync],
                     },
         "result_writer":{
                         "possible_classes":[ResultWriter, SQLiteResultWriter],
@@ -259,7 +260,6 @@ class ControlThread(Thread):
     def _start_tracking(self, camera, result_writer, rois,   TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs):
 
-        hardware_connection = HardwareConnection(HardWareInterfaceClass)
 
         stimulators = [StimulatorClass(hardware_connection, **stimulator_kwargs) for _ in rois]
         kwargs = self._monit_kwargs.copy()
@@ -272,7 +272,8 @@ class ControlThread(Thread):
                               *self._monit_args)
         self._info["status"] = "running"
         logging.info("Setting monitor status as running: '%s'" % self._info["status"])
-        self._monit.run(rw, self._drawer)
+
+        self._monit.run(result_writer, self._drawer)
 
     def _set_tracking_from_pickled(self):
         with open(self._persistent_state_file, "r") as f:
@@ -284,10 +285,13 @@ class ControlThread(Thread):
         tpl = (camera, result_writer, rois,   TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs)
 
+
         if not os.path.exists(os.path.dirname(self._persistent_state_file)):
             logging.warning("No cache dir detected. making one")
             os.makedirs(os.path.dirname(self._persistent_state_file))
 
+
+        # with open("/tmp/test.pkl", "w") as f:
         with open(self._persistent_state_file, "w") as f:
             return pickle.dump(tpl, f)
 
@@ -341,50 +345,32 @@ class ControlThread(Thread):
                         hardware_connection, StimulatorClass, stimulator_kwargs)
 
     def run(self):
-        # try:
-        #     self._run_from_pickled()
-        # except OSError:
-        #     logging.info("Could not load from pickled state, normal run")
-        # except Exception:
-        #     pass
+        cam = None
+        hardware_connection = None
+
         try:
             self._info["status"] = "initialising"
             logging.info("Starting Monitor thread")
-
             self._info["error"] = None
             self._last_info_t_stamp = 0
             self._last_info_frame_idx = 0
-            cam = None
-            hardware_connection = None
 
             try:
                 cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_pickled()
-            except:
-                cam,rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs =  self._set_tracking_from_scratch()
+            except IOError:
+                cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
+            except Exception as e:
+                logging.error("Could not load previous state for unexpected reason:")
+                logging.error(traceback.format_exc(e))
+                cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
+            finally:
                 self._save_pickled_state(cam,rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
 
-
-                with rw as result_writer:
-                    self._save_pickled_state(cam,rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
-                    self._start_tracking(cam, result_writer, rois, TrackerClass, tracker_kwargs,
-                                         hardware_connection, StimulatorClass, stimulator_kwargs)
-
-                self.stop()
-
-            finally:
-                try:
-                    if cam is not None:
-                        cam._close()
-                except:
-                    logging.warning("Could not close camera properly")
-                    pass
-
-                try:
-                    if hardware_connection is not None:
-                        hardware_connection.stop()
-                except:
-                    logging.warning("Could not close hardware connection properly")
-                    pass
+            with rw as result_writer:
+                self._save_pickled_state(cam,rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
+                self._start_tracking(cam, result_writer, rois, TrackerClass, tracker_kwargs,
+                                     hardware_connection, StimulatorClass, stimulator_kwargs)
+            self.stop()
 
         except EthoscopeException as e:
             if e.img is not  None:
@@ -393,18 +379,34 @@ class ControlThread(Thread):
         except Exception as e:
             self.stop(traceback.format_exc(e))
 
-        #for testing purposes
-        if self._evanescent:
-            import os
-            del self._drawer
-            self.stop()
-            os._exit(0)
 
-    def _pickle(self, monitor, result_writer, drawer, hardware_connection):
-        out = {"monitor": monitor,
-               "result_writer": result_writer,
-                "drawer": drawer,
-               "hardware_connection":hardware_connection}
+        finally:
+
+            try:
+                os.remove(self._persistent_state_file)
+            except:
+                logging.warning("Failed to remove persistent file")
+            try:
+                if cam is not None:
+                    cam._close()
+
+            except:
+                logging.warning("Could not close camera properly")
+                pass
+            try:
+                if hardware_connection is not None:
+                    hardware_connection.stop()
+            except:
+                logging.warning("Could not close hardware connection properly")
+                pass
+
+            #for testing purposes
+            if self._evanescent:
+                del self._drawer
+                self.stop()
+                os._exit(0)
+
+
     def stop(self, error=None):
         self._info["status"] = "stopping"
         self._info["time"] = time.time()
@@ -426,11 +428,10 @@ class ControlThread(Thread):
         else:
             logging.info("Monitor closed all right")
 
-        shutil.rmtree(self._persistent_state_file, ignore_errors=True)
-
     def __del__(self):
         self.stop()
         shutil.rmtree(self._tmp_dir, ignore_errors=True)
+        shutil.rmtree(self._persistent_state_file, ignore_errors=True)
 
     def set_evanescent(self, value=True):
         self._evanescent = value
