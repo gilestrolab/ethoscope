@@ -163,6 +163,10 @@ class ControlThread(Thread):
         self._update_info()
         return self._info
 
+    @property
+    def was_interrupted(self):
+        return os.path.exists(self._persistent_state_file)
+
 
     @classmethod
     def user_options(cls):
@@ -363,7 +367,7 @@ class ControlThread(Thread):
                 logging.error("Could not load previous state for unexpected reason:")
                 logging.error(traceback.format_exc(e))
                 cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
-            
+
             with rw as result_writer:
                 self._save_pickled_state(cam,rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
                 self._start_tracking(cam, result_writer, rois, TrackerClass, tracker_kwargs,

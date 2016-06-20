@@ -220,7 +220,7 @@ if __name__ == '__main__':
     if option_dict["stop_after_run"]:
          control.set_evanescent(True) # kill program after first run
 
-    if option_dict["run"]:
+    if option_dict["run"] or control.was_interrupted:
         control.start()
 
     try:
