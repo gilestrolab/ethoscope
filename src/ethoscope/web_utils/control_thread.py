@@ -367,8 +367,8 @@ class ControlThread(Thread):
                 cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
             except Exception as e:
                 logging.error("Could not load previous state for unexpected reason:")
-                logging.error(traceback.format_exc(e))
-                cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
+                raise e
+                #cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
 
             with rw as result_writer:
                 self._save_pickled_state(cam,rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
