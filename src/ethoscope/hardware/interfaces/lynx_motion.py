@@ -17,7 +17,7 @@ class SimpleLynxMotionInterface(BaseInterface):
     _n_channels = 10
 
 
-    def __init__(self, port="/dev/ttyUSB0"):
+    def __init__(self, port="/dev/ttyUSB0", *args, **kwargs):
         """
         Class to connect and abstract the SSC-32U Lynx Motion servo controller.
         It assumes a BAUD of 115200, which can be configured on the board as described in the
@@ -40,7 +40,7 @@ class SimpleLynxMotionInterface(BaseInterface):
         self._serial = serial.Serial(self._port, self._baud, timeout=2)
         time.sleep(2)
         self._test_serial_connection()
-        super(SimpleLynxMotionInterface, self).__init__()
+        super(SimpleLynxMotionInterface, self).__init__(*args, **kwargs)
 
 
     def _find_port(self):
