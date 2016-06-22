@@ -20,7 +20,7 @@ Essential prerequisites
 
 Before you start you will need:
 
-* a wifi dongle in the pi (so we can access the node)
+* a wifi dongle in the pi2 (so we can access the node, pi3 has wifi on board)
 * a working internet connection via ethernet cable (so we can download extra software)
 * a node running at `192.169.123.1` [see here](node.md)
 * a working `ETHOSCOPE_WIFI` network [see here](network.md)
@@ -57,6 +57,7 @@ pacman -S fake-hwclock --noconfirm --needed
 #for setting up wireless/rooming 
 pacman -S wpa_supplicant ifplugd wpa_actiond --noconfirm --needed
 pacman -S libev --noconfirm --needed
+pacman -S watchdog macchanger --noconfirm --needed
 # we use pip to get picamera (python API to PiNoir)
 pip2 install 'picamera[array]'
 ```
@@ -76,6 +77,7 @@ DATA_DIR=/ethoscope_data
 # where to install and find our software
 TARGET_GIT_INSTALL=/opt/ethoscope-git
 UPDATER_LOCATION_IN_GIT=scripts/ethoscope_updater
+UPSTREAM_GIT_REPO=https://github.com/gilestrolab/ethoscope.git
 TARGET_UPDATER_DIR=/opt/ethoscope_updater
 BARE_GIT_NAME=ethoscope.git
 # network stuff
@@ -191,9 +193,23 @@ mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO \"$USER_NAME\"@'%' WITH GRANT O
 ```
 
 We can speedup mysql queries by adding, under the [mysqld] section `skip-name-resolve` in the mysql configuration file.
+
 ```
-nano /etc/mysql/my.cnf 
+nano /etc/mysql/my.cnf
 ```
+
+In addition, you may want to increase the memory allocation:
+
+```
+innodb_buffer_pool_size = 128M
+innodb_additional_mem_pool_size = 64M
+innodb_log_file_size = 32M
+innodb_log_buffer_size = 50M
+innodb_flush_log_at_trx_commit = 1
+innodb_lock_wait_timeout = 50
+```
+
+
 
 
 Getting the ethoscope software
@@ -201,6 +217,11 @@ Getting the ethoscope software
 
 ```
 git clone git://$NODE_IP/$BARE_GIT_NAME $TARGET_GIT_INSTALL
+cd $TARGET_GIT_INSTALL
+# this allor to pull from other nodes
+for i in $(seq 2 5); do git remote set-url origin --add git://$NODE_SUBNET.$i/$BARE_GIT_NAME; done
+git remote set-url origin --add $UPSTREAM_GIT_REPO
+git remote get-url --all   origin
 cd $TARGET_GIT_INSTALL/src
 ```
 
@@ -209,10 +230,10 @@ cd $TARGET_GIT_INSTALL/src
 git checkout dev
 ```
 
-The we install the package with `pip`:
+The we install the package with `pip` (`[device]` means we install optional deps for the device):
 
 ```
-pip2 install -e .
+pip2 install -e .[device]
 ```
 
 We copy our own services to `systemd` service list:
@@ -255,10 +276,40 @@ echo 'cma_offline_start=' >>  /boot/config.txt
 echo 'Loading bcm2835 module'
 echo "bcm2835-v4l2" > /etc/modules-load.d/picamera.conf
 ```
+
+Failure tolerance
+------------------------------------
+It is possible that power, SD card or any other hardware inseplicably fails whilst tracking.
+For this reason, we can set up the watchdog timer, so that the pi will restart itself in case of freezes.
+
+```
+echo "bcm2708_wdog" | sudo tee /etc/modules-load.d/bcm2708_wdog.conf
+sudo systemctl enable watchdog
+```
+
+A small disk write test can be created:
+```
+mkdir /etc/watchdog.d/
+echo '#!/bin/bash' > /etc/watchdog.d/write_test.sh && chmod 755 /etc/watchdog.d/write_test.sh
+echo 'sleep 5 &&  touch /var/tmp/write_test' >> /etc/watchdog.d/write_test.sh && chmod 755 /etc/watchdog.d/write_test.sh
+```
+
+We can add a few things to the config file (`nano /etc/watchdog.conf`):
+
+```
+max-load-1 = 24
+watchdog-device = /dev/watchdog
+realtime = yes
+priority = 1
+```
+
+A good documentation is provided [here](http://www.sat.dundee.ac.uk/psc/watchdog/watchdog-configure.html)
+
+
 Last touches
 --------------
 There is an issue with some wireless dongles that go to idle if unused, but then become really hard to reach.
-We can diable power management for these dongle:
+We can disable power management for these dongle:
 ```
 echo 'options 8192cu rtw_power_mgnt=0' > /etc/modprobe.d/8192cu.conf
 ```
@@ -295,7 +346,7 @@ Your resulting snapshot will live be `/tmp/ethoscope_os_yyymmdd.tar.gz`.
 ```
 cd /mnt/root/
 cp -r ../boot/* ./boot/
-sudo tar -zcvpf /tmp/ethoscope_os_yyymmdd.tar.gz  *
+sudo tar -zcvpf /tmp/ethoscope_os_yyyymmdd.tar.gz  *
 rm ./boot/* -r
 ```
  
