@@ -412,7 +412,10 @@ class ResultWriter(object):
             if len(v) > self._max_insert_string_len:
                 self._write_async_command(v)
                 self._insert_dict[k] = ""
+
         return False
+
+
 
     def _add(self, t, roi, data_rows):
         t = int(round(t))
@@ -426,8 +429,6 @@ class ResultWriter(object):
                 self._insert_dict[roi_id] = command
             else:
                 self._insert_dict[roi_id] += ("," + str(tp))
-
-
 
     def _initialise_var_map(self,  data_row):
         logging.info("Filling 'VAR_MAP' with values")
@@ -456,15 +457,20 @@ class ResultWriter(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         logging.info("Closing result writer...")
+        for k, v in self._insert_dict.items():
+            self._write_async_command(v)
+            self._insert_dict[k] = ""
+
         try:
             command = "INSERT INTO METADATA VALUES %s" % str(("stop_date_time", str(int(time.time()))))
             self._write_async_command(command)
-
             while not self._queue.empty():
                 logging.info("waiting for queue to be processed")
                 time.sleep(.1)
+
         except Exception as e:
-            print("Error writing metadata stop time:" + str(e))
+            logging.error("Error writing metadata stop time:")
+            logging.error(traceback.format_exc(e))
         finally:
 
             logging.info("Closing mysql async queue")
