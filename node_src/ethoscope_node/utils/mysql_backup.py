@@ -153,7 +153,10 @@ class MySQLdbToSQlite(object):
 
 
             self._update_one_roi_table("CSV_DAM_ACTIVITY", src, dst, dump_in_csv=True)
-            self._update_one_roi_table("START_EVENTS", src, dst)
+            try:
+                self._update_one_roi_table("START_EVENTS", src, dst)
+            except MySQLdb.ProgrammingError:
+                pass
 
             try:
                 self._update_img_snapshot_table("IMG_SNAPSHOTS", src, dst)
