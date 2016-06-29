@@ -352,14 +352,14 @@ epub_exclude_files = ['search.html']
 autoclass_content = "both"
 
 
-import sys
-from mock import Mock as MagicMock
-
-class Mock(MagicMock):
-    @classmethod
-    def __getattr__(cls, name):
-            return Mock()
-
-MOCK_MODULES = ['cv2', 'cv', 'numpy', 'scipy']
-
-sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
+# import sys
+# from mock import Mock as MagicMock
+#
+# class Mock(MagicMock):
+#     @classmethod
+#     def __getattr__(cls, name):
+#             return Mock()
+#
+# MOCK_MODULES = ['cv2', 'cv', 'numpy', 'scipy']
+#
+# sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
