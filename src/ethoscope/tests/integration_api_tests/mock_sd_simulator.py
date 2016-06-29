@@ -12,12 +12,12 @@ class MockSDInterface(BaseInterface):
         print("Warming up")
         time.sleep(1)
 
-class MockSDExperimentalStimulator(ExperimentalSleepDepStimulator):
+class MockSDExperimentalStimulator(SleepDepStimulator):
     _HardwareInterfaceClass = MockSDInterface
 
 class MockSDStimulator(SleepDepStimulator):
     _HardwareInterfaceClass = MockSDInterface
 
 if __name__ == "__main__":
-    test_stimulator(MockSDExperimentalStimulator, MockSDInterface)
+    test_stimulator(MockSDExperimentalStimulator, MockSDInterface, False, min_inactive_time=10)
     #test_stimulator(MockSDStimulator, MockSDInterface)

@@ -8,6 +8,15 @@ class DateRangeError(Exception):
 
 class Scheduler(object):
     def __init__(self, in_str):
+        """
+        Class to express time constrains.
+        It parses a formated string to define a list of allowed time range.
+        Then it can be used to assess if a date and time is within a valid range.
+        This is useful to control stimulators and other utilities.
+
+        :param in_str: A formatted string. Format described `here <https://github.com/gilestrolab/ethoscope/blob/master/user_manual/schedulers.md>`_
+        :type in_str: str
+        """
         date_range_str = in_str.split(",")
         self._date_ranges = []
         for drs in  date_range_str:
@@ -25,13 +34,19 @@ class Scheduler(object):
         for i  in  range(0, len(all_dates)-1):
             if (all_dates[i+1] - all_dates[i]) <= 0:
                 raise DateRangeError("Some date ranges overlap")
-
-
-
         pass
 
-    def check_time_range(self):
-        return self._in_range(time.time())
+    def check_time_range(self, t = None):
+        """
+        Check whether a unix timestamp is within the allowed range.
+        :param t: the time to test. When ``None``, the system time is used
+        :type t: float
+        :return: ``True`` if the time was in range, ``False`` otherwise
+        :rtype: bool
+        """
+        if t is None:
+            t= time.time()
+        return self._in_range(t)
 
     def _in_range(self, t):
         for r in self._date_ranges:

@@ -5,19 +5,19 @@ from ethoscope.stimulators.stimulators import DefaultStimulator
 
 
 class TrackingUnit(object):
-    def __init__(self, tracking_class, roi, interactor=None, *args, **kwargs):
+    def __init__(self, tracking_class, roi, stimulator=None, *args, **kwargs):
         r"""
-        Class instantiating tracker(:class:`~ethoscope.trackers.trackers.BaseTracker`),
+        Class instantiating a tracker(:class:`~ethoscope.trackers.trackers.BaseTracker`),
         and linking it with an individual ROI(:class:`~ethoscope.rois.roi_builders.ROI`) and
-        interactor(:class:`~ethoscope.interactors.interactors.BaseInteractor`).
+        stimulator(:class:`~ethoscope.stimulators.stimulators.BaseStimulator`).
         Typically, several `TrackingUnit` objects are built internally by a Monitor(:class:`~ethoscope.core.monitor.Monitor`).
 
         :param tracker_class: The algorithm that will be used for tracking. It must inherit from :class:`~ethoscope.trackers.trackers.BaseTracker`
         :type tracker_class: class
         :param roi: A region of interest.
         :type roi: :class:`~ethoscope.rois.roi_builders.ROI`.
-        :param interactor: an object used to physically interact with the detected animal.
-        :type interactor: :class:`~ethoscope.interactors.interactors.BaseInteractor`.
+        :param stimulator: an object used to physically interact with the detected animal.
+        :type stimulator: :class:`~ethoscope.stimulators.stimulators.BaseStimulator`.
         :param args: additional arguments passed to the tracking algorithm.
         :param kwargs: additional keyword arguments passed to the tracking algorithm.
         """
@@ -25,21 +25,21 @@ class TrackingUnit(object):
         self._tracker = tracking_class(roi,*args, **kwargs)
         self._roi = roi
 
-        if interactor is not None:
-            self._interactor= interactor
+        if stimulator is not None:
+            self._stimulator= stimulator
         else:
-            self._interactor = DefaultStimulator(None)
+            self._stimulator = DefaultStimulator(None)
 
-        self._interactor.bind_tracker(self._tracker)
+        self._stimulator.bind_tracker(self._tracker)
 
 
     @property
-    def interactor(self):
+    def stimulator(self):
         """
-        :return: A reference to the interactor used by this `TrackingUnit`
-        :rtype: :class:`~ethoscope.interactors.interactors.BaseInteractor`
+        :return: A reference to the stimulator used by this `TrackingUnit`
+        :rtype: :class:`~ethoscope.stimulators.stimulators.BaseStimulator`
         """
-        return self._interactor
+        return self._stimulator
 
     @property
     def roi(self):
@@ -82,7 +82,7 @@ class TrackingUnit(object):
     def track(self, t, img):
         """
         Uses the whole frame acquired, along with its time stamp to infer position of the animal.
-        Also runs the interactor object.
+        Also runs the stimulator object.
 
         :param t: the time stamp associated to the provided frame (in ms).
         :type t: int
@@ -93,7 +93,7 @@ class TrackingUnit(object):
         """
         data_rows = self._tracker.track(t,img)
 
-        interact, result = self._interactor.apply()
+        interact, result = self._stimulator.apply()
         if len(data_rows) == 0:
             return []
 

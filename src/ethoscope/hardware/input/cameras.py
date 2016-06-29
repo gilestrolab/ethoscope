@@ -11,7 +11,6 @@ try:
 except ImportError:
     from cv2 import CAP_PROP_FRAME_WIDTH, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_COUNT, CAP_PROP_POS_MSEC, CAP_PROP_FPS
 
-
 import time
 import logging
 import os
@@ -20,8 +19,6 @@ import multiprocessing
 import traceback
 
 class BaseCamera(object):
-    #TODO catch exception eg, if initialise with a wrong file
-
     capture = None
     _resolution = None
     _frame_idx = 0
@@ -30,19 +27,20 @@ class BaseCamera(object):
         """
         The template class to generate and use video streams.
 
-
         :param drop_each: keep only ``1/drop_each``'th frame
         :param max_duration: stop the video stream if ``t > max_duration`` (in seconds).
         :param args: additional arguments
         :param kwargs: additional keyword arguments
-        :return:
         """
+
         self._drop_each = drop_each
         self._max_duration = max_duration
 
     def __exit__(self):
         logging.info("Closing camera")
         self._close()
+    def _close(self):
+        pass
 
     def __iter__(self):
         """
@@ -51,18 +49,12 @@ class BaseCamera(object):
         :return: the time (in ms) and a frame (numpy array).
         :rtype: (int, :class:`~numpy.ndarray`)
         """
-
-        # We ensure timestamps and frame index are set to 0
-        # self.restart()
-
         at_least_one_frame = False
         while True:
             if self.is_last_frame() or not self.is_opened():
                 if not at_least_one_frame:
                     raise EthoscopeException("Camera could not read the first frame")
                 break
-
-
             t,out = self._next_time_image()
             if out is None:
                 break
@@ -106,8 +98,6 @@ class BaseCamera(object):
         self._frame_idx += 1
         return time, im
 
-
-
     def is_last_frame(self):
         raise NotImplementedError
 
@@ -126,7 +116,6 @@ class BaseCamera(object):
         :return:
         """
         raise NotImplementedError
-
 
 
 class MovieVirtualCamera(BaseCamera):
@@ -223,6 +212,7 @@ class V4L2Camera(BaseCamera):
         :param args: additional arguments
         :param kwargs: additional keyword arguments
         """
+
         self.capture = cv2.VideoCapture(device)
         self._warm_up()
 
@@ -250,8 +240,6 @@ class V4L2Camera(BaseCamera):
 
         self._frame = im
 
-
-        #TODO better exception handling is needed here / what do we do if initial capture fails...
         assert(len(im.shape) >1)
 
         self._resolution = (im.shape[1], im.shape[0])
@@ -276,7 +264,6 @@ class V4L2Camera(BaseCamera):
     def is_opened(self):
         return self.capture.isOpened()
 
-
     def is_last_frame(self):
         return False
 
@@ -291,13 +278,10 @@ class V4L2Camera(BaseCamera):
     def _close(self):
         self.capture.release()
     def _next_image(self):
-
         if self._frame_idx >0 :
             expected_time =  self._start_time + self._frame_idx / self._target_fps
             now = time.time()
-
             to_sleep = expected_time - now
-
             # Warnings if the fps is so high that we cannot grab fast enough
             if to_sleep < 0:
                 if self._frame_idx % 5000 == 0:
@@ -310,140 +294,28 @@ class V4L2Camera(BaseCamera):
                 now = time.time()
         else:
             self.capture.grab()
-
         self.capture.retrieve(self._frame)
-
-
-
         return self._frame
 
-
-
-
-class OurPiCamera(BaseCamera):
-
-    def __init__(self, target_fps=10, target_resolution=(960,720), *args, **kwargs):
-        # lazy import should only use those on devices
-        from picamera.array import PiRGBArray
-        from picamera import PiCamera
-
-
-
-        logging.info("Initialising camera")
-        w,h = target_resolution
-        self.capture = PiCamera()
-
-        self.capture.resolution = target_resolution
-        if not isinstance(target_fps, int):
-            raise EthoscopeException("FPS must be an integer number")
-        self.capture.framerate = target_fps
-
-        self._raw_capture = PiRGBArray(self.capture, size=target_resolution)
-
-        self._target_fps = float(target_fps)
-        self._warm_up()
-
-        self._cap_it = self._frame_iter()
-
-        im = next(self._cap_it)
-
-        if im is None:
-            raise EthoscopeException("Error whist retrieving video frame. Got None instead. Camera not plugged?")
-
-        self._frame = im
-
-        if len(im.shape) < 2:
-            raise EthoscopeException("The camera image is corrupted (less that 2 dimensions)")
-
-        self._resolution = (im.shape[1], im.shape[0])
-        if self._resolution != target_resolution:
-            if w > 0 and h > 0:
-                logging.warning('Target resolution "%s" could NOT be achieved. Effective resolution is "%s"' % (target_resolution, self._resolution ))
-            else:
-                logging.info('Maximal effective resolution is "%s"' % str(self._resolution))
-
-
-        super(OurPiCamera, self).__init__(*args, **kwargs)
-
-        self._start_time = time.time()
-        logging.info("Camera initialised")
-
-    def _warm_up(self):
-        logging.info("%s is warming up" % (str(self)))
-        time.sleep(1)
-
-    def restart(self):
-        self._frame_idx = 0
-        self._start_time = time.time()
-
-    def is_opened(self):
-        return True
-        # return self.capture.isOpened()
-
-
-    def is_last_frame(self):
-        return False
-
-    def _time_stamp(self):
-        now = time.time()
-        # relative time stamp
-        return now - self._start_time
-
-    @property
-    def start_time(self):
-        return self._start_time
-
-    def _close(self):
-        self._raw_capture.truncate(0)
-        self.capture.close()
-
-        # self.capture.release()
-
-    def _frame_iter(self):
-
-        # capture frames from the camera
-
-        for frame in self.capture.capture_continuous(self._raw_capture, format="bgr", use_video_port=True):
-            # grab the raw NumPy array representing the image, then initialize the timestamp
-            # and occupied/unoccupied text
-
-        # clear the stream in preparation for the next frame
-            self._raw_capture.truncate(0)
-            yield frame.array
-
-
-
-
-    def _next_image(self):
-
-        if self._frame_idx >0 :
-            expected_time =  self._start_time + self._frame_idx / self._target_fps
-            now = time.time()
-
-            to_sleep = expected_time - now
-
-            # Warnings if the fps is so high that we cannot grab fast enough
-            if to_sleep < 0:
-                if self._frame_idx % 5000 == 0:
-                    logging.warning("The target FPS (%f) could not be reached. Effective FPS is about %f" % (self._target_fps, self._frame_idx/(now - self._start_time)))
-                #next(self._cap_it)
-
-            # we simply drop frames until we go above expected time
-            while now < expected_time:
-                # next(self._cap_it)
-                time.sleep(.01)
-                now = time.time()
-
-
-        self._frame = next(self._cap_it)
-
-        return self._frame
 class PiFrameGrabber(multiprocessing.Process):
-    """
-    Class to grab frames from pi camera. Designed to be used within :class:`~ethoscope.hardware.camreras.camreras.OurPiCameraAsync`
-    """
 
     def __init__(self, target_fps, target_resolution, queue,stop_queue, *args, **kwargs):
+        """
+        Class to grab frames from pi camera. Designed to be used within :class:`~ethoscope.hardware.camreras.camreras.OurPiCameraAsync`
+        This allows to get frames asynchronously as acquisition is a bottleneck.
+
+        :param target_fps: desired fps
+        :type target_fps: int
+        :param target_resolution: the desired resolution (w, h)
+        :type target_resolution: (int, int)
+        :param queue: a queue that stores frame and makes them available to the parent process
+        :type queue: :class:`~multiprocessing.JoinableQueue`
+        :param stop_queue: a queue that can stop the async acquisition
+        :type stop_queue: :class:`~multiprocessing.JoinableQueue`
+        :param args: additional arguments
+        :param kwargs: additional keyword arguments
+        """
+
         self._queue = queue
         self._stop_queue = stop_queue
         self._target_fps = target_fps
@@ -452,11 +324,17 @@ class PiFrameGrabber(multiprocessing.Process):
 
 
     def run(self):
+        """
+        Initialise pi camera, get frames, convert them fo greyscale, and make them available in a queue.
+        Run stops if the _stop_queue is not empty.
+        """
+
         # lazy import should only use those on devices
-        from picamera.array import PiRGBArray
-        from picamera import PiCamera
+        # from picamera.array import PiRGBArray
+        # from picamera import PiCamera
 
         try:
+            # lazy import should only use those on devices
             from picamera.array import PiRGBArray
             from picamera import PiCamera
 
@@ -466,7 +344,7 @@ class PiFrameGrabber(multiprocessing.Process):
 
                 capture.framerate = self._target_fps
                 raw_capture = PiRGBArray(capture, size=self._target_resolution)
-                    
+
                 for frame in capture.capture_continuous(raw_capture, format="bgr", use_video_port=True):
                     if not self._stop_queue.empty():
                         logging.warning("The stop queue is not empty. Stop acquiring frames")
@@ -491,10 +369,9 @@ class PiFrameGrabber(multiprocessing.Process):
 class OurPiCameraAsync(BaseCamera):
     _frame_grabber_class = PiFrameGrabber
     def __init__(self, target_fps=20, target_resolution=(1280, 960), *args, **kwargs):
-
         """
         Class to acquire frames from the raspberry pi camera asynchronously.
-        At the moment, frames are greyscale images.
+        At the moment, frames are only greyscale images.
 
         :param target_fps: the desired number of frames par second (FPS)
         :type target_fps: int
@@ -503,13 +380,10 @@ class OurPiCameraAsync(BaseCamera):
         :param args: additional arguments
         :param kwargs: additional keyword arguments
         """
-
         logging.info("Initialising camera")
         w,h = target_resolution
-
         if not isinstance(target_fps, int):
             raise EthoscopeException("FPS must be an integer number")
-
         self._args = args
         self._kwargs = kwargs
         self._queue = multiprocessing.Queue(maxsize=1)
@@ -517,49 +391,33 @@ class OurPiCameraAsync(BaseCamera):
         self._p = self._frame_grabber_class(target_fps,target_resolution,self._queue,self._stop_queue, *args, **kwargs)
         self._p.daemon = True
         self._p.start()
-
-
         try:
             im = self._queue.get(timeout=10)
         except Exception as e:
             logging.error("Could not get any frame from the camera")
-
             self._stop_queue.cancel_join_thread()
             self._queue.cancel_join_thread()
-
             logging.warning("Stopping stop queue")
             self._stop_queue.close()
-
             logging.warning("Stopping queue")
             self._queue.close()
-
             logging.warning("Joining process")
-
             # we kill the frame grabber if it does not reply within 10s
             self._p.join(10)
             logging.warning("Process joined")
             raise e
-
         self._frame = cv2.cvtColor(im,cv2.COLOR_GRAY2BGR)
-
-
         if len(im.shape) < 2:
             raise EthoscopeException("The camera image is corrupted (less that 2 dimensions)")
-
         self._resolution = (im.shape[1], im.shape[0])
         if self._resolution != target_resolution:
             if w > 0 and h > 0:
                 logging.warning('Target resolution "%s" could NOT be achieved. Effective resolution is "%s"' % (target_resolution, self._resolution ))
             else:
                 logging.info('Maximal effective resolution is "%s"' % str(self._resolution))
-
-
         super(OurPiCameraAsync, self).__init__(*args, **kwargs)
-
         self._start_time = time.time()
         logging.info("Camera initialised")
-
-
 
     def restart(self):
         self._frame_idx = 0
@@ -576,11 +434,9 @@ class OurPiCameraAsync(BaseCamera):
         self._frame_idx = int(state["frame_idx"])
         self._start_time = int(state["start_time"])
 
-
     def is_opened(self):
         return True
         # return self.capture.isOpened()
-
 
     def is_last_frame(self):
         return False
@@ -596,23 +452,16 @@ class OurPiCameraAsync(BaseCamera):
 
     def _close(self):
         logging.info("Requesting grabbing process to stop!")
-
         self._stop_queue.put(None)
-
         while not self._queue.empty():
              self._queue.get()
-
         logging.info("Joining stop queue")
-
         self._stop_queue.cancel_join_thread()
         self._queue.cancel_join_thread()
-
         logging.info("Stopping stop queue")
         self._stop_queue.close()
-
         logging.info("Stopping queue")
         self._queue.close()
-
         logging.info("Joining process")
         self._p.join()
         logging.info("All joined ok")
@@ -622,15 +471,24 @@ class OurPiCameraAsync(BaseCamera):
             g = self._queue.get(timeout=30)
             cv2.cvtColor(g,cv2.COLOR_GRAY2BGR,self._frame)
             return self._frame
-
         except Exception as e:
             raise EthoscopeException("Could not get frame from camera\n%s", traceback.format_exc(e))
 
 
-
-
 class DummyFrameGrabber(multiprocessing.Process):
     def __init__(self, target_fps, target_resolution, queue, stop_queue, path, *args, **kwargs):
+        """
+        Class to mimic the behaviour of :class:`~ethoscope.hardware.input.cameras.PiFrameGrabber`.
+        This is intended for testing purposes.
+        This way, we can emulate the async functionality of the hardware camera by a video file.
+
+        :param target_fps: the desired number of frames par second (FPS)
+        :type target_fps: int
+        :param target_fps: the desired resolution (W x H)
+        :param target_resolution: (int,int)
+        :param args: additional arguments
+        :param kwargs: additional keyword arguments
+        """
         self._queue = queue
         self._stop_queue = stop_queue
         self._target_fps = target_fps
@@ -650,6 +508,7 @@ class DummyFrameGrabber(multiprocessing.Process):
                     logging.warning("Stop Task Done")
                     break
                 _, out = cap.read()
+                #todo sleep here
                 out = cv2.cvtColor(out, cv2.COLOR_BGR2GRAY)
                 self._queue.put(out)
 
@@ -660,5 +519,8 @@ class DummyFrameGrabber(multiprocessing.Process):
             logging.warning("Camera Frame grabber stopped acquisition cleanly")
 
 class DummyPiCameraAsync(OurPiCameraAsync):
-
+    """
+    Class to mimic the behaviour of :class:`~ethoscope.hardware.input.cameras.OurPiCameraAsync`.
+    This is intended for testing purposes. This way, we can emulate the async functionality of the hardware camera by a video file.
+    """
     _frame_grabber_class = DummyFrameGrabber

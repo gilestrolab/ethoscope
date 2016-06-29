@@ -11,11 +11,9 @@ class NoValidPortError(Exception):
 class SimpleLynxMotionInterface(BaseInterface):
 
     _baud = 115200
-
     _min_angle_pulse = (-90.,535.)
     _max_angle_pulse = (90.,2500.)
     _n_channels = 10
-
 
     def __init__(self, port="/dev/ttyUSB0", *args, **kwargs):
         """
@@ -25,10 +23,12 @@ class SimpleLynxMotionInterface(BaseInterface):
 
         :param port: the serial port to use. Automatic detection if ``None``.
         :type port: str.
+        :param args: additional arguments
+        :param kwargs: additional keyword arguments
         """
+
+        #lazzy import
         import serial
-
-
         logging.info("Connecting to Lynx motion serial port...")
 
         self._serial = None
@@ -91,14 +91,20 @@ class SimpleLynxMotionInterface(BaseInterface):
 #
 
     def _angle_to_pulse(self,angle):
+        """
+        Convert an angle, to a pulse, using simple linear interpolation.
+        :param angle: the angle to be converted, in degrees
+        :type angle: float
+        :return: the pulse width
+        :rtype: int
+
+        """
         min_a, min_p = self._min_angle_pulse
         max_a, max_p = self._max_angle_pulse
-
         if angle > max_a:
             raise Exception("Angle too wide: %i" % angle)
         if angle < min_a:
             raise Exception("Angle too narrow: %i" % angle)
-
         slope = (max_p - min_p)/(max_a-min_a)
         pulse = min_p + (angle - min_a) * slope
         return pulse
@@ -115,7 +121,6 @@ class SimpleLynxMotionInterface(BaseInterface):
         :type time: int
         :return:
         """
-
         if channel < 1:
             raise Exception("idx must be greater or equal to one")
         pulse = self._angle_to_pulse(angle)

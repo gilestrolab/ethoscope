@@ -20,6 +20,19 @@ ETHOSCOPE_DIR = None
 class WrongMachineID(Exception):
     pass
 
+
+def error_decorator(func):
+    """
+    A simple decorator to return an error dict so we can display it the ui
+    """
+    def func_wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logging.error(traceback.format_exc(e))
+            return {'error': traceback.format_exc(e)}
+    return func_wrapper
+
 @api.route('/static/<filepath:path>')
 def server_static(filepath):
     return static_file(filepath, root="/")
@@ -30,126 +43,113 @@ def server_static(filepath):
 
 
 @api.get('/id')
+@error_decorator
 def name():
-    try:
-        return {"id": control.info["id"]}
-    except Exception as e:
-        return {'error':traceback.format_exc(e)}
+    return {"id": control.info["id"]}
+
 
 
 @api.post('/rm_static_file/<id>')
+@error_decorator
 def rm_static_file(id):
     global control
     global record
 
-    try:
-        data = request.body.read()
-        data = json.loads(data)
-        file_to_del = data["file"]
-        if id != machine_id:
-            raise WrongMachineID
+    data = request.body.read()
+    data = json.loads(data)
+    file_to_del = data["file"]
+    if id != machine_id:
+        raise WrongMachineID
 
-        if file_in_dir_r(file_to_del, ETHOSCOPE_DIR ):
-            os.remove(file_to_del)
-        else:
-            msg = "Could not delete file %s. It is not allowed to remove files outside of %s" % (file_to_del, ETHOSCOPE_DIR)
-            logging.error(msg)
-            raise Exception(msg)
-        return data
-    except Exception as e:
-        return {'error':traceback.format_exc(e)}
+    if file_in_dir_r(file_to_del, ETHOSCOPE_DIR ):
+        os.remove(file_to_del)
+    else:
+        msg = "Could not delete file %s. It is not allowed to remove files outside of %s" % (file_to_del, ETHOSCOPE_DIR)
+        logging.error(msg)
+        raise Exception(msg)
+    return data
 
 
 
 @api.post('/controls/<id>/<action>')
+@error_decorator
 def controls(id, action):
     global control
     global record
-    try:
-        if id != machine_id:
-            raise WrongMachineID
+    if id != machine_id:
+        raise WrongMachineID
 
-        if action == 'start':
-            data = request.json
-            tracking_json_data.update(data)
-            control = None
-            control = ControlThread(machine_id=machine_id,
-                                    name=machine_name,
-                                    version=version,
-                                    ethoscope_dir=ETHOSCOPE_DIR,
-                                    data=tracking_json_data)
+    if action == 'start':
+        data = request.json
+        tracking_json_data.update(data)
+        control = None
+        control = ControlThread(machine_id=machine_id,
+                                name=machine_name,
+                                version=version,
+                                ethoscope_dir=ETHOSCOPE_DIR,
+                                data=tracking_json_data)
 
-            control.start()
-            return info(id)
+        control.start()
+        return info(id)
 
-        elif action in ['stop', 'close', 'poweroff']:
-            if control.info['status'] == 'running' or control.info['status'] == "recording" :
-                # logging.info("Stopping monitor")
-                logging.warning("Stopping monitor")
-                control.stop()
-                logging.warning("Joining monitor")
-                control.join()
-                logging.warning("Monitor joined")
-                logging.warning("Monitor stopped")
-                # logging.info("Monitor stopped")
+    elif action in ['stop', 'close', 'poweroff']:
+        if control.info['status'] == 'running' or control.info['status'] == "recording" :
+            # logging.info("Stopping monitor")
+            logging.warning("Stopping monitor")
+            control.stop()
+            logging.warning("Joining monitor")
+            control.join()
+            logging.warning("Monitor joined")
+            logging.warning("Monitor stopped")
+            # logging.info("Monitor stopped")
 
-            if action == 'close':
-                close()
+        if action == 'close':
+            close()
 
-            if action == 'poweroff':
-                logging.info("Stopping monitor due to poweroff request")
-                logging.info("Powering off Device.")
-                call('poweroff')
+        if action == 'poweroff':
+            logging.info("Stopping monitor due to poweroff request")
+            logging.info("Powering off Device.")
+            call('poweroff')
 
-            return info(id)
+        return info(id)
 
-        elif action == 'start_record':
-            data = request.json
-            #json_data.update(data)
-            logging.warning("Recording video, data is %s" % str(data))
-            data = request.json
-            recording_json_data.update(data)
-            control = None
-            control = ControlThreadVideoRecording(machine_id=machine_id,
-                                                  name=machine_name,
-                                                  version=version,
-                                                  ethoscope_dir=ETHOSCOPE_DIR,
-                                                  data=recording_json_data)
+    elif action == 'start_record':
+        data = request.json
+        #json_data.update(data)
+        logging.warning("Recording video, data is %s" % str(data))
+        data = request.json
+        recording_json_data.update(data)
+        control = None
+        control = ControlThreadVideoRecording(machine_id=machine_id,
+                                              name=machine_name,
+                                              version=version,
+                                              ethoscope_dir=ETHOSCOPE_DIR,
+                                              data=recording_json_data)
 
-            control.start()
-            return info(id)
-        else:
-            raise Exception("No such action: %s" % action)
-
-    except Exception as e:
-        return {'error':traceback.format_exc(e)}
-
+        control.start()
+        return info(id)
+    else:
+        raise Exception("No such action: %s" % action)
 
 
 @api.get('/data/<id>')
+@error_decorator
 def info(id):
-    try:
-        if machine_id != id:
-            raise WrongMachineID
-        info = control.info
-        info["current_timestamp"] = time.time()
-        return info
-    except Exception as e:
-        return {'error': "Error on machine ID"}
+
+    if machine_id != id:
+        raise WrongMachineID
+    info = control.info
+    info["current_timestamp"] = time.time()
+    return info
 
 @api.get('/user_options/<id>')
+@error_decorator
 def user_options(id):
-    try:
-        if machine_id != id:
-            raise WrongMachineID
-        return {
-            "tracking":ControlThread.user_options(),
-            "recording":ControlThreadVideoRecording.user_options()}
-
-    except Exception as e:
-        return {'error': "Error on machine ID"}
-
-
+    if machine_id != id:
+        raise WrongMachineID
+    return {
+        "tracking":ControlThread.user_options(),
+        "recording":ControlThreadVideoRecording.user_options()}
 
 def close(exit_status=0):
     global control

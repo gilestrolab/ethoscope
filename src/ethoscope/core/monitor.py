@@ -12,26 +12,26 @@ class Monitor(object):
                  *args, **kwargs  # extra arguments for the tracker objects
                  ):
         r"""
-        Class to orchestrate the tracking of multiple objects. It is performs, in order, the following actions:
+        Class to orchestrate the tracking of multiple objects.
+        It performs, in order, the following actions:
 
          * Requesting raw frames (delegated to :class:`~ethoscope.hardware.input.cameras.BaseCamera`)
          * Cutting frame portions according to the ROI layout (delegated to :class:`~ethoscope.core.tracking_unit.TrackingUnit`).
          * Detecting animals and computing their positions and other variables (delegated to :class:`~ethoscope.trackers.trackers.BaseTracker`).
-         * Using computed variables to interact physically with the animals (delegated to :class:`~ethoscope.interactors.interactors.BaseInteractor`).
+         * Using computed variables to interact physically (i.e. feed-back) with the animals (delegated to :class:`~ethoscope.stimulators.stimulators.BaseStimulator`).
          * Drawing results on a frame, optionally saving video (delegated to :class:`~ethoscope.drawers.drawers.BaseDrawer`).
          * Saving the result of tracking in a database (delegated to :class:`~ethoscope.utils.io.ResultWriter`).
 
-        :param camera: a camera object responsible of acquiring frames and associated time stamps.
+        :param camera: a camera object responsible of acquiring frames and associated time stamps
         :type camera: :class:`~ethoscope.hardware.input.cameras.BaseCamera`
         :param tracker_class: The algorithm that will be used for tracking. It must inherit from :class:`~ethoscope.trackers.trackers.BaseTracker`
         :type tracker_class: class
         :param rois: A list of region of interest.
         :type rois: list(:class:`~ethoscope.core.roi.ROI`)
         :param stimulators: The class that will be used to analyse the position of the object and interact with the system/hardware.
-        :type stimulators: list(:class:`~ethoscope.interactors.interactors.BaseInteractor`
+        :type stimulators: list(:class:`~ethoscope.stimulators.stimulators.BaseInteractor`
         :param args: additional arguments passed to the tracking algorithm
         :param kwargs: additional keyword arguments passed to the tracking algorithm
-
         """
 
         self._camera = camera
@@ -80,7 +80,7 @@ class Monitor(object):
 
     def stop(self):
         """
-        Interrupts the `run` method. This is meant to be called by another thread to stop monitoring.
+        Interrupts the `run` method. This is meant to be called by another thread to stop monitoring externally.
         """
         self._force_stop = True
 

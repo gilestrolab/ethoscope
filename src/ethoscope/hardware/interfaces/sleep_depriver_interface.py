@@ -8,7 +8,7 @@ class SleepDepriverInterface(SimpleLynxMotionInterface):
         Sleep deprive an animal by rotating its tube.
 
         :param channel: The chanel to use (i.e. the number of the servo)
-        :typechannel: int
+        :type channel: int
         :param dt: The time it takes to go from 0 to 180 degrees (in ms)
         :type dt: int
         :param margin: the number of degree to pad rotation. eg 5 -> rotation from 5 -> 175

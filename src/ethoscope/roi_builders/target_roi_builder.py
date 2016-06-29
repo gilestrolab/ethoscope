@@ -10,9 +10,6 @@ except ImportError:
     from cv2 import CHAIN_APPROX_SIMPLE
     from cv2 import LINE_AA
 
-
-
-
 import numpy as np
 import logging
 from ethoscope.roi_builders.roi_builders import BaseROIBuilder
@@ -248,8 +245,9 @@ class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilder):
                     "arguments": []}
 
     def __init__(self):
-        """
-        Class to build ROIs for a two-columns, ten-rows for the
+        r"""
+        Class to build ROIs for a two-columns, ten-rows for the sleep monitor
+        (`see here <https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_10x2_shortTubes>`_).
         """
         #`sleep monitor tube holder arena <todo>`_
 
@@ -266,11 +264,12 @@ class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilder):
 
 
 class OlfactionAssayROIBuilder(TargetGridROIBuilder):
-    _description = {"overview": "The default odor assay  roi layout with ten rows of single tubes.",
+    _description = {"overview": "The default odor assay roi layout with ten rows of single tubes.",
                     "arguments": []}
     def __init__(self):
         """
-        Class to build ROIs for a one-columns, ten-rows for the
+        Class to build ROIs for a one-column, ten-rows
+        (`see here <https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_10x1_longTubes>`_).
         """
         #`olfactory response arena <todo>`_
 
@@ -286,14 +285,14 @@ class OlfactionAssayROIBuilder(TargetGridROIBuilder):
 
 
 class HD12TubesRoiBuilder(TargetGridROIBuilder):
-    _description = {"overview": "The default sleep monitor arena with ten rows of two tubes.",
+    _description = {"overview": "The default high resolution, 12 tubes (1 row) roi layout",
                     "arguments": []}
 
 
     def __init__(self):
-        """
+        r"""
         Class to build ROIs for a twelve columns, one row for the HD tracking arena
-        (https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_mini_12_tubes)
+        (`see here <https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_mini_12_tubes>`_).
         """
 
 

@@ -13,7 +13,7 @@ class IsMovingStimulator(BaseStimulator):
 
     def __init__(self, hardware_connection=None, velocity_threshold=0.0060, date_range = ""):
         """
-        class implementing an interactor that decides whether an animal has moved though does nothing   accordingly.
+        class implementing an stimulator that decides whether an animal has moved though does nothing   accordingly.
         :param hardware_connection: a default hardware interface object
         :param velocity_threshold: Up to which velocity an animal is considered to be immobile
         :type velocity_threshold: float
@@ -31,7 +31,7 @@ class IsMovingStimulator(BaseStimulator):
 
 
         if len(positions[-1]) != 1:
-            raise Exception("This interactor can only work with a single animal per ROI")
+            raise Exception("This stimulator can only work with a single animal per ROI")
         tail_m = positions[-1][0]
 
         times = self._tracker.times
@@ -61,7 +61,7 @@ class IsMovingStimulator(BaseStimulator):
         return HasInteractedVariable(True), {}
 
 class SleepDepStimulator(IsMovingStimulator):
-    _description = {"overview": "An interactor to sleep deprive an animal using servo motor. See http://todo/fixme.html",
+    _description = {"overview": "A stimulator to sleep deprive an animal using servo motor. See http://todo/fixme.html",
                     "arguments": [
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_threshold", "description": "The minimal velocity that counts as movement","default":0.0060},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken","default":120},
@@ -82,7 +82,7 @@ class SleepDepStimulator(IsMovingStimulator):
                  date_range=""
                  ):
         """
-        A interactor to control a sleep depriver module
+        A stimulator to control a sleep depriver module.
 
         :param hardware_connection: the sleep depriver module hardware interface
         :type hardware_connection: :class:`~ethoscope.hardawre.interfaces.sleep_depriver_interface.SleepDepriverInterface`
@@ -123,7 +123,7 @@ class SleepDepStimulator(IsMovingStimulator):
         return HasInteractedVariable(False), {}
 
 class ExperimentalSleepDepStimulator(SleepDepStimulator):
-    _description = {"overview": "An interactor to sleep deprive an animal using servo motor. See http://todo/fixme.html",
+    _description = {"overview": "An stimulator to sleep deprive an animal using servo motor. See http://todo/fixme.html",
                     "arguments": [
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_threshold", "description": "The minimal velocity that counts as movement","default":0.0060},
                                     {"type": "date_range", "name": "date_range",
@@ -143,7 +143,8 @@ class ExperimentalSleepDepStimulator(SleepDepStimulator):
                  date_range=""
                  ):
         """
-        A interactor to control a sleep depriver module
+        A stimulator to control a sleep depriver module.
+        This is an experimental version where each channel has a different inactivity_time_threshold.
 
         :param hardware_connection: the sleep depriver module hardware interface
         :type hardware_connection: :class:`~ethoscope.hardawre.interfaces.sleep_depriver_interface.SleepDepriverInterface`

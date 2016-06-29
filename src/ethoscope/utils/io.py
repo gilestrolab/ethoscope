@@ -507,9 +507,6 @@ class ResultWriter(object):
     def __setstate__(self, state):
         self.__init__(**state["args"])
 
-
-
-
 class AsyncSQLiteWriter(multiprocessing.Process):
     _pragmas = {"temp_store": "MEMORY",
                 "journal_mode": "OFF",

@@ -86,10 +86,10 @@ class DefaultROIBuilder(BaseROIBuilder):
     def _rois_from_img(self,img):
         h, w = img.shape[0],img.shape[1]
         return[
-            ROI([
+            ROI(np.array([
                 (   0,        0       ),
                 (   0,        h -1    ),
                 (   w - 1,    h - 1   ),
-                (   w - 1,    0       )]
+                (   w - 1,    0       )])
             , idx=1)]
 

@@ -12,7 +12,7 @@ class HasChangedSideStimulator(BaseStimulator):
 
     def __init__(self, hardware_connection=None, middle_line=0.50):
         """
-        class implementing an interactor that decides whether an animal has change side in its ROI.
+        class implementing a stimulator that decides whether an animal has change side in its ROI.
         :param hardware_connection: a default hardware interface object
         :param middle_line: the x position defining the line to be crossed (from 0 to 1, relative to ROI)
         :type middle_line: float
@@ -29,7 +29,7 @@ class HasChangedSideStimulator(BaseStimulator):
 
         w = float(self._tracker._roi.get_feature_dict()["w"])
         if len(positions[-1]) != 1:
-            raise Exception("This interactor can only work with a single animal per ROI")
+            raise Exception("This stimulator can only work with a single animal per ROI")
         x0 = positions[-1][0]["x"] / w
         xm1 = positions[-2][0]["x"] / w
 
@@ -62,7 +62,7 @@ class HasChangedSideStimulator(BaseStimulator):
         return HasInteractedVariable(False), {}
 
 class DynamicOdourDeliverer(HasChangedSideStimulator):
-    _description = {"overview": "An interactor to deliver an odour according to which side the animal of its ROI is in",
+    _description = {"overview": "A stimulator to deliver an odour according to which side the animal of its ROI is in",
                     "arguments": [
                                 {"type": "date_range", "name": "date_range",
                                  "description": "A date  and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
@@ -80,7 +80,7 @@ class DynamicOdourDeliverer(HasChangedSideStimulator):
                  date_range=""
                  ):
         """
-        A interactor to control a sleep depriver module
+        A stimulator to control a sleep depriver module
 
         :param hardware_connection: the sleep depriver module hardware interface
         :type hardware_connection: :class:`~ethoscope.hardawre.interfaces.`
@@ -110,12 +110,9 @@ class DynamicOdourDeliverer(HasChangedSideStimulator):
         pos = self._side_to_pos[has_changed_side]
         return HasInteractedVariable(pos), {"channel":channel, "pos" : self._side_to_pos[has_changed_side]}
 
-
-
-
 class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
     _description = {
-        "overview": "An interactor to sleep deprive an animal using servo motor. See http://todo/fixme.html",
+        "overview": "An stimulator to sleep deprive an animal using servo motor. See http://todo/fixme.html",
         "arguments": [
             {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_threshold",
              "description": "The minimal velocity that counts as movement", "default": 0.0060*2},
@@ -142,12 +139,14 @@ class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
                  date_range=""
                  ):
         """
-        A interactor to control a sleep depriver module
+        A stimulator to control an odour sleep depriver module.
 
         :param hardware_connection: the sleep depriver module hardware interface
         :type hardware_connection: :class:`~ethoscope.hardawre.interfaces.sleep_depriver_interface.SleepDepriverInterface`
-        :param velocity_threshold:
+        :param velocity_threshold: The minimal velocity that counts as movement.
         :type velocity_threshold: float
+        :param stimulus_duration: how long the odour delivery takes place for
+        :type stimulus_duration: float
         :param min_inactive_time: the minimal time without motion after which an animal should be disturbed (in seconds)
         :type min_inactive_time: float
         :return:

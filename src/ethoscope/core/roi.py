@@ -12,9 +12,7 @@ class ROI(object):
         Class to define a region of interest(ROI).
         Internally, ROIs are single polygons.
         At the moment, they cannot have any holes.
-        The polygon defining the ROI is used to draw a mask.
-        Then, the mask can ba applied to arbitrary frames in order to
-        retrieve the image corresponding to the bounding rectangle of the polygon.
+        The polygon defining the ROI is used to draw a mask to exclude off-target pixels (so cross-ROI info).
 
         :param polygon: An array of points
         :type polygon: :class:`~numpy.ndarray`
@@ -86,7 +84,6 @@ class ROI(object):
     @property
     def longest_axis(self):
         """
-
         :return: the value of the longest axis (w or h)
         :rtype: float
         """
@@ -103,7 +100,6 @@ class ROI(object):
 
     def get_feature_dict(self):
         """
-
         :return: A dictionary of freatures for this roi. It containes the folowing fields:
 
         * "x"
