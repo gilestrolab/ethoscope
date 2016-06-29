@@ -100,7 +100,8 @@ class BaseTracker(DescribedObject):
     @property
     def positions(self):
         """
-        :return: The last few positions found by the tracker. Positions are kept for a certain duration defined by the ``_max_history_length `` attribute.
+        :return: The last few positions found by the tracker.\
+            Positions are kept for a certain duration defined by the ``_max_history_length`` attribute.
         :rtype: :class:`~collection.deque`
         """
         return self._positions
@@ -111,8 +112,8 @@ class BaseTracker(DescribedObject):
     @property
     def last_time_point(self):
         """
-        :return: The last time point that the tracker used.
-        This is updated even when position is inferred/no animal is found
+        :return: The last time point that the tracker used.\
+            This is updated even when position is inferred/no animal is found
         :rtype: int
         """
         return self._last_time_point

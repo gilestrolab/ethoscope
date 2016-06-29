@@ -1,7 +1,11 @@
 __author__ = 'quentin'
 
 import cv2
-CV_VERSION = int(cv2.__version__.split(".")[0])
+
+try:
+    CV_VERSION = int(cv2.__version__.split(".")[0])
+except:
+    CV_VERSION = 2
 
 try:
     from cv2.cv import CV_CHAIN_APPROX_SIMPLE as CHAIN_APPROX_SIMPLE

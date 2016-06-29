@@ -9,6 +9,7 @@ class   HardwareConnection(Thread):
         """
         A class to build a connection to arbitrary hardware.
         It implements an instance of a :class:`~ethoscope.hardware.interfaces.interfaces.BaseInterface` which it uses to send instructions, asynchronously and  on demand.
+
         :param interface_class: the class to use a an interface to hardware (derives from :class:`~ethoscope.hardware.interfaces.interfaces.BaseInterface`)
         :type interface_class: class
         :param args: list of arguments passed the the hardware interface
@@ -69,11 +70,12 @@ class BaseInterface(object):
     def __init__(self, do_warm_up = True):
         """
         Template class which is an abstract representation of an hardware interface.
-         It must define, in :method:`~ethoscope.hardware.interfaces.interfaces.BaseInterface.__init__`,
-         how the interface is connected, and in :method:`~ethoscope.hardware.interfaces.interfaces.BaseInterface.send`,
-         how information are communicated to the hardware. In addition, derived classes must implement a
-         :method:`~ethoscope.hardware.interfaces.interfaces.BaseInterface._warm_up`, method, which defines optionnal instructions
-          passed to the hardware upon first connection (that is useful to experimenters that want to manually check their settings).
+        It must define, in :func:`~ethoscope.hardware.interfaces.interfaces.BaseInterface.__init__`,
+        how the interface is connected, and in :func:`~ethoscope.hardware.interfaces.interfaces.BaseInterface.send`,
+        how information are communicated to the hardware. In addition, derived classes must implement a
+        :func:`~ethoscope.hardware.interfaces.interfaces.BaseInterface._warm_up`, method, which defines optionnal instructions
+        passed to the hardware upon first connection (that is useful to experimenters that want to manually check their settings).
+
         :param do_warm_up:
         """
         if do_warm_up:

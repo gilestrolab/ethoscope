@@ -15,7 +15,7 @@ class TrackingUnit(object):
         :param tracker_class: The algorithm that will be used for tracking. It must inherit from :class:`~ethoscope.trackers.trackers.BaseTracker`
         :type tracker_class: class
         :param roi: A region of interest.
-        :type roi: :class:`~ethoscope.rois.roi_builders.ROI`.
+        :type roi: :class:`~ethoscope.core.roi.ROI`.
         :param stimulator: an object used to physically interact with the detected animal.
         :type stimulator: :class:`~ethoscope.stimulators.stimulators.BaseStimulator`.
         :param args: additional arguments passed to the tracking algorithm.

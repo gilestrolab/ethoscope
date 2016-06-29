@@ -1,5 +1,10 @@
 import cv2
-CV_VERSION = int(cv2.__version__.split(".")[0])
+
+try:
+    CV_VERSION = int(cv2.__version__.split(".")[0])
+except:
+    CV_VERSION = 2
+
 try:
     from cv2 import CV_LOAD_IMAGE_GRAYSCALE as IMG_READ_FLAG_GREY
     from cv import CV_RETR_EXTERNAL as RETR_EXTERNAL

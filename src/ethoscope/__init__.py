@@ -9,15 +9,21 @@ The first purpose of the package is to provide biologists with a modular API to 
 deliver stimuli upon specific triggers, annotate video frames with tracking information and save data in a consistent format (database).
 In addition, is implements a webserver that can run a a daemon and performs actions upon POST requests.
 
+Core API
+======================
+This diagram represents the core of the API in UML:
 
-This diagram represents the
+.. image:: /img/uml_diagram.svg
 
-Since the API is modular, it can be used to simply perform of line racking from a video file.
+The classes prefixed with ``Base`` are abstract, and several derived classes are already implemented for most of them, but more can be done
+in the prospect of achieving modularity.
 
 
 Local tracking example
 =======================
-A very simple example of how to use the API to perform local tracking.
+
+Since the API is modular, it can be used to simply perform of line tracking from a video file.
+Here is a very simple example.
 If you want to run this code yourself, you can download the `test video <http://gilestrolab.github.io/ethoscope/data/test_video.mp4>`_.
 
 >>> # We import all the bricks from ethoscope package

@@ -5,7 +5,11 @@ from collections import deque
 from math import log10, sqrt, pi
 import cv2
 
-CV_VERSION = int(cv2.__version__.split(".")[0])
+try:
+    CV_VERSION = int(cv2.__version__.split(".")[0])
+except:
+    CV_VERSION = 2
+
 
 import numpy as np
 from scipy import ndimage

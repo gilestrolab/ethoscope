@@ -2,7 +2,12 @@ __author__ = 'quentin'
 
 from collections import deque
 import cv2
-CV_VERSION = int(cv2.__version__.split(".")[0])
+
+try:
+    CV_VERSION = int(cv2.__version__.split(".")[0])
+except:
+    CV_VERSION = 2
+
 
 import numpy as np
 from ethoscope.core.variables import XPosVariable, YPosVariable, WidthVariable, HeightVariable, PhiVariable
