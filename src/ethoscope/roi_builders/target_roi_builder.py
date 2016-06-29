@@ -269,7 +269,7 @@ class OlfactionAssayROIBuilder(TargetGridROIBuilder):
     def __init__(self):
         """
         Class to build ROIs for a one-column, ten-rows
-        (`see here <https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_10x1_longTubes>`_).
+        (`see here <https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_10x1_longTubes>`_)
         """
         #`olfactory response arena <todo>`_
 
@@ -292,7 +292,7 @@ class HD12TubesRoiBuilder(TargetGridROIBuilder):
     def __init__(self):
         r"""
         Class to build ROIs for a twelve columns, one row for the HD tracking arena
-        (`see here <https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_mini_12_tubes>`_).
+        (`see here <https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_mini_12_tubes>`_)
         """
 
 

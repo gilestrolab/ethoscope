@@ -38,13 +38,13 @@ class   BaseStimulator(DescribedObject):
 
     def apply(self):
         """
-        Apply this interactor. This method will:
+        Apply this stimulator. This method will:
 
         1. check ``_tracker`` exists
         2. decide (``_decide``) whether to interact
         3. if 2. pass the interaction arguments to the hardware interface
         
-        :return:
+        :return: whether a stimulator has worked, and a result dictionary
         """
         if self._tracker is None:
             raise ValueError("No tracker bound to this stimulator. Use `bind_tracker()` methods")

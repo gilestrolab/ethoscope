@@ -24,20 +24,16 @@ setup(
     # package_data={'ethoscope': ['data/classifiers/*.pkl']},
     extras_require={
          'device': ['picamera>=1.8', "GitPython >=1.0.1",
-                    "MySQL-python >= 1.2.5", "cherrypy >= 3.6.0", "pyserial>=2.7","bottle>=0.12.8"]
+                    "MySQL-python >= 1.2.5", "cherrypy >= 3.6.0", "pyserial>=2.7","bottle>=0.12.8"],
+         'dev': ['Sphinx >= 1.4.4', "sphinx_rtd_theme >= 0.1.9", "mock >= 2.0.0"]
      },
     setup_requires=[
         "numpy>=1.6.1"
         ],
     install_requires=[
         "numpy>=1.6.1",
-        #"pyserial>=2.7",
-        # "bottle>=0.12.8",
-        # "MySQL-python >= 1.2.5",
-        # "cherrypy >= 3.6.0",
         "scipy >= 0.15.1",
-        # "GitPython >=1.0.1"
     ],
-    tests_require=['nose'],
+    tests_require=['nose', 'mock'],
     test_suite='nose.collector'
 )
