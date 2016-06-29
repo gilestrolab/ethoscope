@@ -9,6 +9,19 @@ The first purpose of the package is to provide biologists with a modular API to 
 deliver stimuli upon specific triggers, annotate video frames with tracking information and save data in a consistent format (database).
 In addition, is implements a webserver that can run a a daemon and performs actions upon POST requests.
 
+Installation
+============
+
+Probably you want to work on a virtual environment.
+Then you want to install OpenCV (which is an external library -- i.e. not ip pip).
+Afterwards, you can clone the repository (the branch ``dev`` being the development version) and run:
+
+```
+cd src
+pip install -e .[dev]
+```
+
+
 Core API
 ======================
 This diagram represents the core of the API in UML:
