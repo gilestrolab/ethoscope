@@ -115,7 +115,7 @@ class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
         "overview": "An stimulator to sleep deprive an animal using servo motor. See http://todo/fixme.html",
         "arguments": [
             {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_threshold",
-             "description": "The minimal velocity that counts as movement", "default": 0.0060*2},
+             "description": "The minimal velocity that counts as movement", "default": 0.0060/2},
             {"type": "number", "min": 2.0, "max": 10.0, "step": 0.5, "name": "stimulus_duration",
              "description": "How long to send the puff of odour for", "default": 5.0},
             {"type": "number", "min": 1, "max": 3600 * 12, "step": 1, "name": "min_inactive_time",
@@ -133,7 +133,7 @@ class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
 
     def __init__(self,
                  hardware_connection,
-                 velocity_threshold=0.0060*2,
+                 velocity_threshold=0.0060/2,
                  min_inactive_time=120,  # s
                  stimulus_duration=5,  #s
                  date_range=""
