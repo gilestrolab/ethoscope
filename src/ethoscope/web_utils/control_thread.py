@@ -320,7 +320,12 @@ class ControlThread(Thread):
         cam = CameraClass(**camera_kwargs)
 
         roi_builder = ROIBuilderClass(**roi_builder_kwargs)
-        rois = roi_builder.build(cam)
+        try:
+            rois = roi_builder.build(cam)
+        except EthoscopeException as e:
+            cam._close()
+            raise e
+
 
         logging.info("Initialising monitor")
         cam.restart()
