@@ -240,7 +240,6 @@ We copy our own services to `systemd` service list:
 
 ```
 cp $TARGET_GIT_INSTALL/scripts/ethoscope_device.service /etc/systemd/system/ethoscope_device.service
-cp $TARGET_GIT_INSTALL/scripts/clean_mysql.service /etc/systemd/system/clean_mysql.service
 ```
 
 We move the updater webserver out of the ethoscope, so the updated does not update (/break) itself:
@@ -256,7 +255,6 @@ Now we can enable all:
 systemctl daemon-reload
 systemctl enable ethoscope_device.service
 systemctl enable ethoscope_update.service
-systemctl enable clean_mysql.service
 ```
 
 
