@@ -231,7 +231,7 @@ if __name__ == '__main__':
         is_node = False
         device_id = get_machine_info(MACHINE_ID_FILE)
 
-    LOCAL_IP = get_local_ip(option_dict["router_ip"])
+    LOCAL_IP = get_local_ip(option_dict["router_ip"], is_node=is_node)
     try:
         WWW_IP = get_internet_ip()
     except Exception as e:
