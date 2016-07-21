@@ -202,11 +202,11 @@ In addition, you may want to increase the memory allocation:
 
 ```
 innodb_buffer_pool_size = 128M
-innodb_additional_mem_pool_size = 64M
 innodb_log_file_size = 32M
 innodb_log_buffer_size = 50M
 innodb_flush_log_at_trx_commit = 1
 innodb_lock_wait_timeout = 50
+innodb_file_per_table=1
 ```
 
 
