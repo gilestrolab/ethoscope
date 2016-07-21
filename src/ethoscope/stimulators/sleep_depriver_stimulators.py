@@ -5,7 +5,7 @@ from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVaria
 
 from ethoscope.hardware.interfaces.interfaces import  DefaultInterface
 from ethoscope.hardware.interfaces.sleep_depriver_interface import SleepDepriverInterface
-import sys
+import random
 
 
 class IsMovingStimulator(BaseStimulator):
@@ -170,3 +170,70 @@ class ExperimentalSleepDepStimulator(SleepDepStimulator):
         except KeyError:
             pass
 
+
+
+
+class MiddleCrossingStimulator(BaseStimulator):
+    _description = {"overview": "A stimulator to disturb animal as they cross the midline",
+                    "arguments": [
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step":0.01, "name": "p", "description": "the probability to move the tube when a beam cross was detected","default":1.0},
+                                    {"type": "date_range", "name": "date_range",
+                                     "description": "A date  and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "default": ""}
+                                   ]}
+
+    _HardwareInterfaceClass = SleepDepriverInterface
+    _refractory_period = 10#s
+    _roi_to_channel = {
+            1:1,  3:2,  5:3,  7:4,  9:5,
+            12:6, 14:7, 16:8, 18:9, 20:10
+        }
+    def __init__(self,
+                 hardware_connection,
+                 p=1.0,
+                 date_range=""
+                 ):
+        """
+        :param hardware_connection: the sleep depriver module hardware interface
+        :type hardware_connection: :class:`~ethoscope.hardawre.interfaces.sleep_depriver_interface.SleepDepriverInterface`
+        :param p: the probability of disturbing the animal when a beam cross happens
+        :type p: float
+        :return:
+        """
+
+        self._last_stimulus_time = 0
+        self._p = p
+        super(MiddleCrossingStimulator, self).__init__(hardware_connection,  date_range=date_range)
+
+    def _decide(self):
+        roi_id = self._tracker._roi.idx
+        now = self._tracker.last_time_point
+        if now - self._last_stimulus_time < self._refractory_period * 1000:
+            return HasInteractedVariable(False), {}
+
+        try:
+            channel = self._roi_to_channel[roi_id]
+        except KeyError:
+            return HasInteractedVariable(False), {}
+
+        positions = self._tracker.positions
+
+        if len(positions) < 2:
+            return HasInteractedVariable(False), {}
+
+        if len(positions[-1]) != 1:
+            raise Exception("This stimulator can only work with a single animal per ROI")
+
+        roi_w = float(self._tracker._roi.longest_axis)
+        x_t_zero = positions[-1][0]["x"] / roi_w - 0.5
+        x_t_minus_one = positions[-2][0]["x"] / roi_w - 0.5
+
+        # if roi_id == 12:
+        #     print (roi_id, channel, roi_w, positions[-1][0]["x"], positions[-2][0]["x"], x_t_zero, x_t_minus_one)
+        if (x_t_zero > 0) ^ (x_t_minus_one >0): # this is a change of sign
+
+            if random.uniform(0,1) < self._p:
+                self._last_stimulus_time = now
+                return HasInteractedVariable(True), {"channel": channel}
+
+        return HasInteractedVariable(False), {"channel": channel}
