@@ -51,6 +51,11 @@ class BaseTracker(DescribedObject):
         """
 
         sub_img, mask = self._roi.apply(img)
+
+        #TO BE REPLACED
+        if self._data:
+            sub_img = self._roi.loose_apply(img)
+
         self._last_time_point = t
         try:
 
