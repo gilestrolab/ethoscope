@@ -24,6 +24,7 @@ class   HardwareConnection(Thread):
         self._connection_open = True
         super(HardwareConnection, self).__init__()
         self.start()
+        
     def run(self):
         """
         Infinite loop that send instructions to the hardware interface
