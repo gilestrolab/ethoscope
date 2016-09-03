@@ -8,14 +8,14 @@ __author__ = 'quentin'
 from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVariable
 
 from ethoscope.hardware.interfaces.interfaces import  DefaultInterface
-from ethoscope.hardware.interfaces.sleep_depriver_interface import SleepDepriverInterface, SleepDepriverInterfaceContinousRotation
+from ethoscope.hardware.interfaces.sleep_depriver_interface import SleepDepriverInterface, SleepDepriverInterfaceCR
 import random
 
 
 class IsMovingStimulator(BaseStimulator):
     _HardwareInterfaceClass = DefaultInterface
 
-    def __init__(self, hardware_connection=None, velocity_threshold=0.0060, date_range = ""):
+    def __init__(self, hardware_connection=None, velocity_threshold=0.0060, date_range = "", **kwargs):
         """
         class implementing an stimulator that decides whether an animal has moved though does nothing   accordingly.
         :param hardware_connection: a default hardware interface object
@@ -25,6 +25,7 @@ class IsMovingStimulator(BaseStimulator):
         self._velocity_threshold = velocity_threshold
         self._last_active = 0
         super(IsMovingStimulator, self).__init__(hardware_connection, date_range)
+
 
     def _has_moved(self):
 
@@ -89,7 +90,7 @@ class SleepDepStimulator(IsMovingStimulator):
         A stimulator to control a sleep depriver module.
 
         :param hardware_connection: the sleep depriver module hardware interface
-        :type hardware_connection: :class:`~ethoscope.hardawre.interfaces.sleep_depriver_interface.SleepDepriverInterface`
+        :type hardware_connection: :class:`~ethoscope.hardware.interfaces.sleep_depriver_interface.SleepDepriverInterface`
         :param velocity_threshold:
         :type velocity_threshold: float
         :param min_inactive_time: the minimal time without motion after which an animal should be disturbed (in seconds)
@@ -126,8 +127,9 @@ class SleepDepStimulator(IsMovingStimulator):
             self._t0 = now
         return HasInteractedVariable(False), {}
 
-class SleepDepStimulatorContinousRotation(SleepDepStimulator):
-    _description = {"overview": "A stimulator to sleep deprive an animal using continous rotation servo motors. See http://todo/fixme.html",
+
+class SleepDepStimulatorCR(SleepDepStimulator):
+    _description = {"overview": "A stimulator to sleep deprive an animal using servo motor in Continous Rotation mode. See http://todo/fixme.html",
                     "arguments": [
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_threshold", "description": "The minimal velocity that counts as movement","default":0.0060},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken","default":120},
@@ -136,12 +138,11 @@ class SleepDepStimulatorContinousRotation(SleepDepStimulator):
                                      "default": ""}
                                    ]}
 
-    _HardwareInterfaceClass = SleepDepriverInterfaceContinousRotation
+    _HardwareInterfaceClass = SleepDepriverInterfaceCR
     _roi_to_channel = {
-        1:1,  3:2,  5:3,  7:4,  9:5,
-        12:6, 14:7, 16:8, 18:9, 20:10
+            1:1,  3:2,  5:3,  7:4,  9:5,
+            12:6, 14:7, 16:8, 18:9, 20:10
         }
-
     def __init__(self,
                  hardware_connection,
                  velocity_threshold=0.0060,
@@ -152,7 +153,7 @@ class SleepDepStimulatorContinousRotation(SleepDepStimulator):
         A stimulator to control a sleep depriver module.
 
         :param hardware_connection: the sleep depriver module hardware interface
-        :type hardware_connection: :class:`~ethoscope.hardawre.interfaces.sleep_depriver_interface.SleepDepriverInterface`
+        :type hardware_connection: :class:`~ethoscope.hardware.interfaces.sleep_depriver_interface.SleepDepriverInterface`
         :param velocity_threshold:
         :type velocity_threshold: float
         :param min_inactive_time: the minimal time without motion after which an animal should be disturbed (in seconds)
@@ -162,7 +163,8 @@ class SleepDepStimulatorContinousRotation(SleepDepStimulator):
 
         self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
         self._t0 = None
-        super(SleepDepStimulatorContinousRotation, self).__init__(hardware_connection, velocity_threshold, date_range=date_range)
+        super(SleepDepStimulator, self).__init__(hardware_connection, velocity_threshold, date_range=date_range)
+
 
 
 
