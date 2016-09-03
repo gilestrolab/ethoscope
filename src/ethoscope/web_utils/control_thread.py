@@ -18,7 +18,7 @@ from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection
 from ethoscope.stimulators.stimulators import DefaultStimulator
-from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator, ExperimentalSleepDepStimulator, MiddleCrossingStimulator#, SystematicSleepDepInteractor
+from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator, SleepDepStimulatorCR, ExperimentalSleepDepStimulator, MiddleCrossingStimulator#, SystematicSleepDepInteractor
 from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver #, DynamicOdourDeliverer
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
@@ -68,7 +68,10 @@ class ControlThread(Thread):
                 "possible_classes":[AdaptiveBGModel],
             },
         "interactor":{
-                        "possible_classes":[DefaultStimulator, SleepDepStimulator, MiddleCrossingStimulator,
+                        "possible_classes":[DefaultStimulator, 
+                                            SleepDepStimulator,
+                                            SleepDepStimulatorCR, 
+                                            MiddleCrossingStimulator,
                                             #SystematicSleepDepInteractor,
                                             ExperimentalSleepDepStimulator,
                                             #DynamicOdourDeliverer,
@@ -90,7 +93,8 @@ class ControlThread(Thread):
      }
     
     #some classes do not need to be offered as choices to the user in normal conditions
-    _hidden_options = {'camera', 'result_writer'} 
+    _hidden_options = {'camera', 'result_writer'}
+    _hidden_options = {} #debug mode
     
     for k in _option_dict:
         _option_dict[k]["class"] =_option_dict[k]["possible_classes"][0]
@@ -276,8 +280,9 @@ class ControlThread(Thread):
     def _start_tracking(self, camera, result_writer, rois,   TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs):
 
-
+        #Here the stimulator passes args. Hardware connection was previously open as thread.
         stimulators = [StimulatorClass(hardware_connection, **stimulator_kwargs) for _ in rois]
+        
         kwargs = self._monit_kwargs.copy()
         kwargs.update(tracker_kwargs)
 
@@ -352,8 +357,11 @@ class ControlThread(Thread):
         exp_info_kwargs = self._option_dict["experimental_info"]["kwargs"]
         self._info["experimental_info"] = ExpInfoClass(**exp_info_kwargs).info_dic
         self._info["time"] = cam.start_time
+        
+        #here the hardwareconnection call the interface class without passing any argument!
         hardware_connection = HardwareConnection(HardWareInterfaceClass)
-
+        
+        
         self._metadata = {
             "machine_id": self._info["id"],
             "machine_name": self._info["name"],
@@ -394,6 +402,7 @@ class ControlThread(Thread):
             with rw as result_writer:
                 if cam.canbepickled:
                     self._save_pickled_state(cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
+                
                 self._start_tracking(cam, result_writer, rois, TrackerClass, tracker_kwargs,
                                      hardware_connection, StimulatorClass, stimulator_kwargs)
             self.stop()
