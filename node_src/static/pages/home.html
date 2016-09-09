@@ -113,7 +113,8 @@
 
 
 <!-- Modal start tracking -->
-<!--FIXME-->
+<!--gg: REMOVE THIS? Does not seem like it's used here any more. This is all handled by ethoscope.html instead -->
+<!--
 <div class="modal fade" id="startModal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -130,10 +131,12 @@
                     <input type=radio name={{opt.name}}>
                     {{opt.name}}: {{opt.overview}}
                   <ul>
+                      <li>type: {{arg.type}}</li>
+                      <li>test</li>
                         <li ng-repeat="arg in opt.arguments">
                             {{arg.description}}
                             <input ng-if="arg.type == 'number'" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}} value={{arg.default}} ngmodel="user_options.{{opt.name}}.{{arg.name}}" >
-                            <input ng-if="arg.type == 'text'" type=text name={{arg.name}} value={{arg.default}} ngmodel="user_options.{{opt.name}}.{{arg.name}}">
+                            <input ng-if="arg.type == 'str'" type=text name={{arg.name}} value={{arg.default}} ngmodel="user_options.{{opt.name}}.{{arg.name}}">
                             <input ng-if="arg.type == 'datetime'" type=datetime name={{arg.name}} value={{arg.default}} ngmodel="user_options.{{opt.name}}.{{arg.name}}">
                         </li>
                     </ul>
@@ -149,3 +152,4 @@
     </div>
   </div>
 </div>
+-->
