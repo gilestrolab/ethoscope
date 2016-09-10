@@ -318,7 +318,8 @@ if __name__ == '__main__':
     PORT = option_dict["port"]
     DEBUG = option_dict["debug"]
     RESULTS_DIR = option_dict["results_dir"]
-    LOCAL_IP = get_local_ip(option_dict["subnet_ip"],localhost=option_dict["local"])
+    max_address = 255 if DEBUG else 5
+    LOCAL_IP = get_local_ip(option_dict["subnet_ip"], max_node_subnet_address=max_address, localhost=option_dict["local"])
 
     try:
         WWW_IP = get_internet_ip()
