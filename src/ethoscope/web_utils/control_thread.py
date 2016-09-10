@@ -23,7 +23,7 @@ from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver #,
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
 from ethoscope.utils.description import DescribedObject
-
+from ethoscope.web_utils.helpers import isMachinePI
 
 class ExperimentalInformations(DescribedObject):
         _description  = {   "overview": "Optional information about your experiment",
@@ -93,8 +93,9 @@ class ControlThread(Thread):
      }
     
     #some classes do not need to be offered as choices to the user in normal conditions
+    #these are shown only if the machine is not a PI
+    _is_a_rPi = isMachinePI()
     _hidden_options = {'camera', 'result_writer'}
-    _hidden_options = {} #debug mode
     
     for k in _option_dict:
         _option_dict[k]["class"] =_option_dict[k]["possible_classes"][0]
@@ -186,10 +187,11 @@ class ControlThread(Thread):
     def user_options(self):
         out = {}
         for key, value in self._option_dict.items():
-            if key not in self._hidden_options:
+            # check if the options for the remote class will be visible
+            # they will be visible only if they have a description, and if we are on a PC or they are not hidden
+            if (self._is_a_rPi and key not in self._hidden_options) or not self._is_a_rPi:
                 out[key] = []
                 for p in value["possible_classes"]:
-                    # if no _description field is present in the remote class, abort and move on                
                     try:
                         d = p.__dict__["_description"]
                     except KeyError:
