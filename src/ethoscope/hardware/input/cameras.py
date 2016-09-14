@@ -119,6 +119,11 @@ class BaseCamera(object):
 
 
 class MovieVirtualCamera(BaseCamera):
+    _description = {"overview":  "Class to acquire frames from a video file.",
+                    "arguments": [
+                                    {"type": "filepath", "name": "path", "description": "The path to the video file to use as virtual camera","default":"/home/gg/Desktop/demo_monitor_x5.avi.mp4"},
+                                   ]}
+                                   
 
     def __init__(self, path, use_wall_clock = False, *args, **kwargs ):
         """
@@ -144,7 +149,8 @@ class MovieVirtualCamera(BaseCamera):
         if not os.path.exists(path):
             raise EthoscopeException("'%s' does not exist. No such file" % path)
 
-        self.capture = cv2.VideoCapture(path)
+        self.canbepickled = False #cv2.videocapture object cannot be serialized, hence cannot be picked
+        self.capture = cv2.VideoCapture(path) 
         w = self.capture.get(CAP_PROP_FRAME_WIDTH)
         h = self.capture.get(CAP_PROP_FRAME_HEIGHT)
         self._total_n_frames =self.capture.get(CAP_PROP_FRAME_COUNT)
@@ -199,7 +205,12 @@ class MovieVirtualCamera(BaseCamera):
 
 
 class V4L2Camera(BaseCamera):
-    def __init__(self,device, target_fps=5, target_resolution=(960,720), *args, **kwargs):
+    _description = {"overview": "Class to acquire frames from the V4L2 default interface (e.g. a webcam).",
+                    "arguments": [
+                    {"type": "number", "min": 0, "max": 4, "step": 1, "name": "device", "description": "The device to be open", "default":0},
+                    ]}
+    
+    def __init__(self, device=0, target_fps=5, target_resolution=(960,720), *args, **kwargs):
         """
         class to acquire stream from a video for linux compatible device (v4l2).
 
@@ -212,7 +223,8 @@ class V4L2Camera(BaseCamera):
         :param args: additional arguments
         :param kwargs: additional keyword arguments
         """
-
+        
+        self.canbepickled = False
         self.capture = cv2.VideoCapture(device)
         self._warm_up()
 
@@ -367,6 +379,10 @@ class PiFrameGrabber(multiprocessing.Process):
 
 
 class OurPiCameraAsync(BaseCamera):
+    _description = {"overview": "Default class to acquire frames from the raspberry pi camera asynchronously.",
+                    "arguments": []}
+                                   
+
     _frame_grabber_class = PiFrameGrabber
     def __init__(self, target_fps=20, target_resolution=(1280, 960), *args, **kwargs):
         """
@@ -381,6 +397,7 @@ class OurPiCameraAsync(BaseCamera):
         :param kwargs: additional keyword arguments
         """
         logging.info("Initialising camera")
+        self.canbepickled = True #cv2.videocapture object cannot be serialized, hence cannot be picked
         w,h = target_resolution
         if not isinstance(target_fps, int):
             raise EthoscopeException("FPS must be an integer number")

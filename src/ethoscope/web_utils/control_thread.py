@@ -10,7 +10,7 @@ from threading import Thread
 import pickle
 
 import trace
-from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera, DummyPiCameraAsync
+from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera, DummyPiCameraAsync, V4L2Camera
 from ethoscope.roi_builders.target_roi_builder import  OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder
 from ethoscope.roi_builders.roi_builders import  DefaultROIBuilder
 from ethoscope.core.monitor import Monitor
@@ -18,12 +18,12 @@ from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection
 from ethoscope.stimulators.stimulators import DefaultStimulator
-from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator, ExperimentalSleepDepStimulator, MiddleCrossingStimulator#, SystematicSleepDepInteractor
+from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator, SleepDepStimulatorCR, ExperimentalSleepDepStimulator, MiddleCrossingStimulator#, SystematicSleepDepInteractor
 from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver #, DynamicOdourDeliverer
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
 from ethoscope.utils.description import DescribedObject
-
+from ethoscope.web_utils.helpers import isMachinePI
 
 class ExperimentalInformations(DescribedObject):
         _description  = {   "overview": "Optional information about your experiment",
@@ -54,6 +54,11 @@ class ExperimentalInformations(DescribedObject):
 
 
 class ControlThread(Thread):
+    """
+    The versatile control thread
+    From this thread, the PI passes option to the node.
+    Note: Options are passed and shown only if the remote class contains a "_description" field!
+    """
     _evanescent = False
     _option_dict = {
         "roi_builder":{
@@ -63,17 +68,21 @@ class ControlThread(Thread):
                 "possible_classes":[AdaptiveBGModel],
             },
         "interactor":{
-                        "possible_classes":[DefaultStimulator, SleepDepStimulator, MiddleCrossingStimulator,
+                        "possible_classes":[DefaultStimulator, 
+                                            SleepDepStimulator,
+                                            SleepDepStimulatorCR, 
+                                            MiddleCrossingStimulator,
                                             #SystematicSleepDepInteractor,
                                             ExperimentalSleepDepStimulator,
                                             #DynamicOdourDeliverer,
-                                            DynamicOdourSleepDepriver],
+                                            DynamicOdourSleepDepriver
+                                            ],
                     },
         "drawer":{
                         "possible_classes":[DefaultDrawer, NullDrawer],
                     },
         "camera":{
-                        "possible_classes":[OurPiCameraAsync, MovieVirtualCamera, DummyPiCameraAsync],
+                        "possible_classes":[OurPiCameraAsync, MovieVirtualCamera, DummyPiCameraAsync, V4L2Camera],
                     },
         "result_writer":{
                         "possible_classes":[ResultWriter, SQLiteResultWriter],
@@ -82,6 +91,12 @@ class ControlThread(Thread):
                         "possible_classes":[ExperimentalInformations],
                 }
      }
+    
+    #some classes do not need to be offered as choices to the user in normal conditions
+    #these are shown only if the machine is not a PI
+    _is_a_rPi = isMachinePI()
+    _hidden_options = {'camera', 'result_writer'}
+    
     for k in _option_dict:
         _option_dict[k]["class"] =_option_dict[k]["possible_classes"][0]
         _option_dict[k]["kwargs"] ={}
@@ -169,25 +184,28 @@ class ControlThread(Thread):
 
 
     @classmethod
-    def user_options(cls):
+    def user_options(self):
         out = {}
-        for key, value in cls._option_dict.items():
-            out[key] = []
-            for p in value["possible_classes"]:
-                try:
-                    d = p.__dict__["_description"]
-                except KeyError:
-                    continue
+        for key, value in self._option_dict.items():
+            # check if the options for the remote class will be visible
+            # they will be visible only if they have a description, and if we are on a PC or they are not hidden
+            if (self._is_a_rPi and key not in self._hidden_options) or not self._is_a_rPi:
+                out[key] = []
+                for p in value["possible_classes"]:
+                    try:
+                        d = p.__dict__["_description"]
+                    except KeyError:
+                        continue
 
-                d["name"] = p.__name__
-                out[key].append(d)
-        out_currated = {}
+                    d["name"] = p.__name__
+                    out[key].append(d)
 
+        out_curated = {}
         for key, value in out.items():
             if len(value) >0:
-                out_currated[key] = value
+                out_curated[key] = value
 
-        return out_currated
+        return out_curated
 
 
     def _parse_one_user_option(self,field, data):
@@ -200,7 +218,7 @@ class ControlThread(Thread):
 
         Class = eval(subdata["name"])
         kwargs = subdata["arguments"]
-
+    
         return Class, kwargs
 
 
@@ -264,8 +282,9 @@ class ControlThread(Thread):
     def _start_tracking(self, camera, result_writer, rois,   TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs):
 
-
+        #Here the stimulator passes args. Hardware connection was previously open as thread.
         stimulators = [StimulatorClass(hardware_connection, **stimulator_kwargs) for _ in rois]
+        
         kwargs = self._monit_kwargs.copy()
         kwargs.update(tracker_kwargs)
 
@@ -286,8 +305,12 @@ class ControlThread(Thread):
 
     def _save_pickled_state(self, camera, result_writer, rois,   TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs):
+                            
+        """
+        note that cv2.videocapture is not a serializable object and cannot be pickled
+        """
 
-        tpl = (camera, result_writer, rois,   TrackerClass, tracker_kwargs,
+        tpl = (camera, result_writer, rois, TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs)
 
 
@@ -336,8 +359,11 @@ class ControlThread(Thread):
         exp_info_kwargs = self._option_dict["experimental_info"]["kwargs"]
         self._info["experimental_info"] = ExpInfoClass(**exp_info_kwargs).info_dic
         self._info["time"] = cam.start_time
+        
+        #here the hardwareconnection call the interface class without passing any argument!
         hardware_connection = HardwareConnection(HardWareInterfaceClass)
-
+        
+        
         self._metadata = {
             "machine_id": self._info["id"],
             "machine_name": self._info["name"],
@@ -374,9 +400,11 @@ class ControlThread(Thread):
                 logging.error("Could not load previous state for unexpected reason:")
                 raise e
                 #cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
-
+            
             with rw as result_writer:
-                self._save_pickled_state(cam,rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
+                if cam.canbepickled:
+                    self._save_pickled_state(cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
+                
                 self._start_tracking(cam, result_writer, rois, TrackerClass, tracker_kwargs,
                                      hardware_connection, StimulatorClass, stimulator_kwargs)
             self.stop()
@@ -387,7 +415,6 @@ class ControlThread(Thread):
             self.stop(traceback.format_exc(e))
         except Exception as e:
             self.stop(traceback.format_exc(e))
-
 
         finally:
 
