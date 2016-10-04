@@ -28,9 +28,11 @@ class   BaseStimulator(DescribedObject):
         :class:`~ethoscope.hardware.interfaces.interfaces.BaseInterface` object (not on object) that instances will
         share with one another. In addition, they must implement a ``_decide()`` method.
 
-
         :param hardware_connection: The hardware interface to use.
         :type hardware_connection: :class:`~ethoscope.hardware.interfaces.interfaces.BaseInterface`
+        :param date_range: the start and stop date/time for the stimulator. Format described `here <https://github.com/gilestrolab/ethoscope/blob/master/user_manual/schedulers.md>`_
+        :type date_range: str
+        
         """
 
         self._scheduler = Scheduler(date_range)

@@ -70,9 +70,9 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                         if (data.tracking[name][i]['arguments'][j]['type']=='datetime'){
                           $scope.selected_options.tracking[name]['arguments'][data.tracking[name][i]['arguments'][j]['name']]=[];
                           $scope.selected_options.tracking[name]['arguments'][data.tracking[name][i]['arguments'][j]['name']][0]=moment(data.tracking[name][i]['arguments'][j]['default']).format('LLLL');
-                            $scope.selected_options.tracking[name]['arguments'][data.tracking[name][i]['arguments'][j]['name']][1]=data.tracking[name][i]['arguments'][j]['default'];
-                            console.log($scope.selected_options.tracking[name]['arguments'][data.tracking[name][i]['arguments'][j]['name']]);
-                        }else{
+                          $scope.selected_options.tracking[name]['arguments'][data.tracking[name][i]['arguments'][j]['name']][1]=data.tracking[name][i]['arguments'][j]['default'];
+                          console.log($scope.selected_options.tracking[name]['arguments'][data.tracking[name][i]['arguments'][j]['name']]);
+                        } else {
                             $scope.selected_options.tracking[name]['arguments'][data.tracking[name][i]['arguments'][j]['name']]=data.tracking[name][i]['arguments'][j]['default'];
                         }
 
@@ -106,12 +106,20 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
             $("#startModal").modal('hide');
             spStart= new Spinner(opts).spin();
             starting_tracking.appendChild(spStart.el);
-            //get only the second parameter in the time array. (linux timestamp).
+
             for (opt in option){
                 for(arg in option[opt].arguments){
-                    if(option[opt].arguments[arg][0] instanceof Date ){                        
-                        option[opt].arguments[arg]=option[opt].arguments[arg][1];
+                    
+                    //OBSOLETE? get only the second parameter in the time array. (linux timestamp).
+                    //if(option[opt].arguments[arg][0] instanceof Date ){                        
+                        //option[opt].arguments[arg]=option[opt].arguments[arg][1];
+                    //}
+                    
+                    //get the "formatted" field only from daterangepicker if it exist
+                    if(option[opt].arguments[arg].hasOwnProperty('formatted')) {
+                        option[opt].arguments[arg] = option[opt].arguments[arg].formatted;
                     }
+                    console.log(option[opt].arguments[arg]);
                 }
             }
 

@@ -32,7 +32,7 @@ class SimpleLynxMotionInterface(BaseInterface):
         one can use a virtual terminal:
             socat -d -d pty,raw,echo=0 pty,raw,echo=0
         this will create two virtual pts ports (n and n+1)
-            ln -s /dev/pts/n /dev/ttyUSB0
+            sudo ln -s /dev/pts/n /dev/ttyUSB0
         send data to /dev/pts/n and read from /dev/pts/n+1
             cat < /dev/pts/n+1
         """

@@ -135,7 +135,7 @@
         <h3 class="modal-title" id="startModalLabel">Select tracking type</h3>
       </div>
       <div class="modal-body">
-          <form>
+          <form name="optionsform">
           <div id="user_options" ng-repeat="(name,option) in user_options.tracking">
             <h4>{{name}}</h4>
               <ul class="option-list">
@@ -149,25 +149,22 @@
                   <ul ng-if="selected_options.tracking[name]['name']==opt.name">
                         <li  ng-repeat="arg in opt.arguments">
                             <label for="input-{{arg.name}}">{{arg.description}}</label>
-                            <input  type="file" style="position: fixed; top: -100em">
                             
-                            
+                            <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=file name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  >
                             <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]" >
                             <input ng-if="arg.type == 'str'" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  >
-                            <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=file name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  >
-                            <input ng-if="arg.type == 'date_range'" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  >
-                            <input ng-if="arg.type == 'datetime'" id="input-{{arg.name}}" type=number name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name][1]" step=1>
-                                <div class="dropdown" ng-if="arg.type == 'datetime'">
-                                    <a class="dropdown-toggle" id="dropdown{{arg.name}}" role="button" data-toggle="dropdown" data-target="#" href="#">
-                                        <div class="input-group">
-                                            <input type="text" class="form-control" ng-model="selected_options.tracking[name]['arguments'][arg.name][0]">
-                                            <span class="input-group-addon"><i class="glyphicon glyphicon-calendar"></i></span>
-                                        </div>
-                                    </a>
-                                    <ul class="dropdown-menu" role="menu" aria-labelledby="dLabel">
-                                        <datetimepicker ng-model="selected_options.tracking[name]['arguments'][arg.name]" data-datetimepicker-config="{ dropdownSelector: '#dropdown{{arg.name}}' }"/>
-                                    </ul>
-                                </div>
+
+                            <div ng-if="arg.type == 'date_range'" class="input-group">
+                                <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-{{arg.name}}" type=text  ng-model="selected_options.tracking[name]['arguments'][arg.name]" options="{timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss', separator : ' > ' }}" > 
+                                <span class="input-group-addon"><i class="glyphicon glyphicon-calendar"></i></span>
+                            </div>
+
+                            <div ng-if="arg.type == 'datetime'" class="input-group">
+                                <input ng-if="arg.type == 'datetime'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-{{arg.name}}" type=text  ng-model="selected_options.tracking[name]['arguments'][arg.name]" options="{singleDatePicker: true, timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss' }}" > 
+                                <span class="input-group-addon"><i class="glyphicon glyphicon-calendar"></i></span>
+                            </div>
+
+
                         </li>
                     </ul>
                 </li>
@@ -208,25 +205,22 @@
                     </div>
                   <ul ng-if="selected_options.recording[name]['name']==opt.name">
                         <li  ng-repeat="arg in opt.arguments">
-                            {{arg.description}}
-                            <!--<span ng-bind-html="argDescription"></span>-->
-                            <input ng-if="arg.type == 'number'" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.recording[name]['arguments'][arg.name]" >
-                            <input ng-if="arg.type == 'str'" type=text name={{arg.name}}  ng-model="selected_options.recording[name]['arguments'][arg.name]"  >
-                            <input ng-if="arg.type == 'date_range'" type=text name={{arg.name}}  ng-model="selected_options.recording[name]['arguments'][arg.name]"  >
-                            <input ng-if="arg.type == 'filepath'" type=file name={{arg.name}}  ng-model="selected_options.recording[name]['arguments'][arg.name]"  >
+                            <label for="input-{{arg.name}}">{{arg.description}}</label>
+                            
+                            <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=file name={{arg.name}}  ng-model="selected_options.recording[name]['arguments'][arg.name]"  >
+                            <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.recording[name]['arguments'][arg.name]" >
+                            <input ng-if="arg.type == 'str'" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.recording[name]['arguments'][arg.name]"  >
 
-                        <input ng-if="arg.type == 'datetime'" type=number name={{arg.name}}  ng-model="selected_options.recording[name]['arguments'][arg.name][1]" step=1>
-                            <div class="dropdown" ng-if="arg.type == 'datetime'">
-                                <a class="dropdown-toggle" id="dropdown{{arg.name}}" role="button" data-toggle="dropdown" data-target="#" href="#">
-                                    <div class="input-group">
-                                        <input type="text" class="form-control" ng-model="selected_options.recording[name]['arguments'][arg.name][0]">
-                                        <span class="input-group-addon"><i class="glyphicon glyphicon-calendar"></i></span>
-                                    </div>
-                                </a>
-                                <ul class="dropdown-menu" role="menu" aria-labelledby="dLabel">
-                                    <datetimepicker ng-model="selected_options.recording[name]['arguments'][arg.name]" data-datetimepicker-config="{ dropdownSelector: '#dropdown{{arg.name}}' }"/>
-                                </ul>
+                            <div ng-if="arg.type == 'date_range'" class="input-group">
+                                <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]" options="{timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss', separator : ' > ' }}" > 
+                                <span class="input-group-addon"><i class="glyphicon glyphicon-calendar"></i></span>
                             </div>
+
+                            <div ng-if="arg.type == 'datetime'" class="input-group">
+                                <input ng-if="arg.type == 'datetime'" date-range-picker class="form-control date-picker" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]" options="{singleDatePicker: true, timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss' }}" > 
+                                <span class="input-group-addon"><i class="glyphicon glyphicon-calendar"></i></span>
+                            </div>
+
                         </li>
                     </ul>
                 </li>

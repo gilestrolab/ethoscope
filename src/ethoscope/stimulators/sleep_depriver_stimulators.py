@@ -71,8 +71,8 @@ class SleepDepStimulator(IsMovingStimulator):
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_threshold", "description": "The minimal velocity that counts as movement","default":0.0060},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken","default":120},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date  and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
-                                     "default": ""}
+                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "default": ""},
                                    ]}
 
     _HardwareInterfaceClass = SleepDepriverInterface
@@ -100,6 +100,7 @@ class SleepDepStimulator(IsMovingStimulator):
 
         self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
         self._t0 = None
+        
         super(SleepDepStimulator, self).__init__(hardware_connection, velocity_threshold, date_range=date_range)
 
 
@@ -134,7 +135,7 @@ class SleepDepStimulatorCR(SleepDepStimulator):
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_threshold", "description": "The minimal velocity that counts as movement","default":0.0060},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken","default":120},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date  and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
                                      "default": ""}
                                    ]}
 
@@ -163,6 +164,10 @@ class SleepDepStimulatorCR(SleepDepStimulator):
 
         self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
         self._t0 = None
+        
+        if "formatted" in date_range:
+            date_range = date_range["formatted"]
+        
         super(SleepDepStimulator, self).__init__(hardware_connection, velocity_threshold, date_range=date_range)
 
 
@@ -173,7 +178,7 @@ class ExperimentalSleepDepStimulator(SleepDepStimulator):
                     "arguments": [
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_threshold", "description": "The minimal velocity that counts as movement","default":0.0060},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date  and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
                                      "default": ""}
                                    ]}
 
@@ -201,6 +206,10 @@ class ExperimentalSleepDepStimulator(SleepDepStimulator):
 
         self._t0 = None
 
+        
+        if "formatted" in date_range:
+            date_range = date_range["formatted"]
+
         # the inactive time depends on the chanel here
         super(ExperimentalSleepDepStimulator, self).__init__(hardware_connection, velocity_threshold, 0, date_range)
         self._inactivity_time_threshold_ms = None
@@ -224,7 +233,7 @@ class MiddleCrossingStimulator(BaseStimulator):
                     "arguments": [
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":0.01, "name": "p", "description": "the probability to move the tube when a beam cross was detected","default":1.0},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date  and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
                                      "default": ""}
                                    ]}
 
@@ -249,6 +258,10 @@ class MiddleCrossingStimulator(BaseStimulator):
 
         self._last_stimulus_time = 0
         self._p = p
+        
+        if "formatted" in date_range:
+            date_range = date_range["formatted"]
+        
         super(MiddleCrossingStimulator, self).__init__(hardware_connection,  date_range=date_range)
 
     def _decide(self):
