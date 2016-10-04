@@ -165,9 +165,6 @@ class SleepDepStimulatorCR(SleepDepStimulator):
         self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
         self._t0 = None
         
-        if "formatted" in date_range:
-            date_range = date_range["formatted"]
-        
         super(SleepDepStimulator, self).__init__(hardware_connection, velocity_threshold, date_range=date_range)
 
 
@@ -207,9 +204,6 @@ class ExperimentalSleepDepStimulator(SleepDepStimulator):
         self._t0 = None
 
         
-        if "formatted" in date_range:
-            date_range = date_range["formatted"]
-
         # the inactive time depends on the chanel here
         super(ExperimentalSleepDepStimulator, self).__init__(hardware_connection, velocity_threshold, 0, date_range)
         self._inactivity_time_threshold_ms = None
@@ -258,9 +252,6 @@ class MiddleCrossingStimulator(BaseStimulator):
 
         self._last_stimulus_time = 0
         self._p = p
-        
-        if "formatted" in date_range:
-            date_range = date_range["formatted"]
         
         super(MiddleCrossingStimulator, self).__init__(hardware_connection,  date_range=date_range)
 
