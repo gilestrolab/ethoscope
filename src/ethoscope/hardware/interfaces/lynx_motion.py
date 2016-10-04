@@ -15,7 +15,7 @@ class SimpleLynxMotionInterface(BaseInterface):
     _max_angle_pulse = (90.,2500.)
     _n_channels = 10
 
-    def __init__(self, port="/dev/ttyUSB0", *args, **kwargs):
+    def __init__(self, port=None, *args, **kwargs):
         """
         Class to connect and abstract the SSC-32U Lynx Motion servo controller.
         It assumes a BAUD of 115200, which can be configured on the board as described in the
@@ -56,27 +56,36 @@ class SimpleLynxMotionInterface(BaseInterface):
     def _find_port(self):
         from serial.tools import list_ports
         import serial
+        import os
         all_port_tuples = list_ports.comports()
         logging.info("listing serial ports")
         all_ports = set()
         for ap, _, _  in all_port_tuples:
-            all_ports |= {ap}
-            logging.info("\t%s", str(ap))
+            p = os.path.basename(ap)
+            print(p)
+            if p.startswith("ttyUSB") or p.startswith("ttyACM"):
+                all_ports |= {ap}
+                logging.info("\t%s", str(ap))
 
-        for ap in list(all_ports):
-            logging.info("trying port %s", str(ap))
+        if len(all_ports) == 0:
+            logging.error("No valid port detected!. Possibly, device not plugged/detected.")
+            raise NoValidPortError()
 
-            try:
-                #here we use a recursive strategy to find the good port (ap).
-                SimpleLynxMotionInterface(ap)
-                return ap
-            except (WrongSerialPortError, serial.SerialException):
-                warn_str = "Tried to use port %s. Failed." % ap
-                logging.warning(warn_str)
-                pass
+        elif len(all_ports) > 2:
+            logging.info("Several port detected, using first one: %s", str(all_ports))
+        return  all_ports.pop()
+            # for ap in list(all_ports):
+        #     logging.info("trying port %s", str(ap))
+        #
+        #     try:
+        #         #here we use a recursive strategy to find the good port (ap).
+        #         SimpleLynxMotionInterface(ap)
+        #         return ap
+        #     except (WrongSerialPortError, serial.SerialException):
+        #         warn_str = "Tried to use port %s. Failed." % ap
+        #         logging.warning(warn_str)
+        #         pass
 
-        logging.error("No valid port detected!. Possibly, device not plugged/detected.")
-        raise NoValidPortError()
 
     def __del__(self):
         if self._serial is not None:
@@ -134,7 +143,7 @@ class SimpleLynxMotionInterface(BaseInterface):
         if channel < 1:
             raise Exception("idx must be greater or equal to one")
         pulse = self._angle_to_pulse(angle)
-        instruction = "#%i P%i T%i\r" % (channel - 1,pulse,duration)
+        instruction = "# %i P %i T %i\r" % (channel - 1,pulse,duration)
         o = self._serial.write(instruction)
         time.sleep(float(duration)/1000.0)
         return o
@@ -155,7 +164,7 @@ class SimpleLynxMotionInterface(BaseInterface):
         if channel < 1:
             raise Exception("idx must be greater or equal to one")
         pulse = self._speed_to_pulse(speed)
-        instruction = "#%i P%i T%i\r" % (channel - 1,pulse,duration)
+        instruction = "# %i P %i T %i\r" % (channel - 1,pulse,duration)
         o = self._serial.write(instruction)
         time.sleep(float(duration)/1000.0)
         return o        
@@ -182,6 +191,7 @@ class SimpleLynxMotionInterface(BaseInterface):
         """
         The default sending paradigm is empty
         """
+        #raise NotImplementedError
         pass
         
     def _warm_up(self):
