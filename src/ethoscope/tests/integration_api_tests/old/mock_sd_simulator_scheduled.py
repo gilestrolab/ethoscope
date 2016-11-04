@@ -10,7 +10,7 @@ from ethoscope.roi_builders.target_roi_builder import SleepMonitorWithTargetROIB
 from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator
 from ethoscope.hardware.interfaces.interfaces import BaseInterface
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection
-from _constants import VIDEO, DRAW_FRAMES
+from ethoscope.tests.integration_api_tests._constants import VIDEO, DRAW_FRAMES
 
 class MockSDInterface(BaseInterface):
     def send(self,channel, dt=350,margin=10):

@@ -17,6 +17,7 @@ from ethoscope.hardware.interfaces.interfaces import HardwareConnection
 from _constants import VIDEO, DRAW_FRAMES
 from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVariable
 
+
 import unittest
 
 
@@ -36,6 +37,13 @@ class MockStimulator(BaseStimulator):
         # every 100 times:
         interact = random.uniform(0.0, 1.0) < 0.01
         return HasInteractedVariable(interact), {"channel":roi_id, "time":now }
+
+# from ethoscope.stimulators.sleep_depriver_stimulators import MiddleCrossingStimulator
+# class MockStimulator2(MiddleCrossingStimulator):
+#     _HardwareInterfaceClass = MockInterface
+
+
+
 
 class TestAPI(unittest.TestCase):
     def test_API(self):
@@ -62,4 +70,3 @@ class TestAPI(unittest.TestCase):
             cam._close()
             print("Removing temp db (" + tmp+ ")")
             os.remove(tmp)
-        

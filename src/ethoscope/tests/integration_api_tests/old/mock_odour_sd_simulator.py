@@ -1,8 +1,10 @@
 from __future__ import print_function
-from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver
-from ethoscope.hardware.interfaces.interfaces import BaseInterface
-from utils import test_stimulator
+
 import time
+
+from ethoscope.hardware.interfaces.interfaces import BaseInterface
+from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver
+from ethoscope.tests.integration_api_tests.old.utils import test_stimulator
 
 
 class MockSDInterface(BaseInterface):

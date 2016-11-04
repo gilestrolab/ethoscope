@@ -12,7 +12,7 @@ from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator
 from ethoscope.hardware.interfaces.sleep_depriver_interface import SleepDepriverInterface
 from ethoscope.hardware.interfaces.lynx_motion import SimpleLynxMotionInterface
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection
-from _constants import VIDEO, DRAW_FRAMES
+from ethoscope.tests.integration_api_tests._constants import VIDEO, DRAW_FRAMES
 
 class MockSerial(object):
     def write(self, str):

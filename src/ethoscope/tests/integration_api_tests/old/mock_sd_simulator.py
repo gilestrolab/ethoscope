@@ -1,8 +1,11 @@
 from __future__ import print_function
-from utils import test_stimulator
-from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator, ExperimentalSleepDepStimulator
-from ethoscope.hardware.interfaces.interfaces import BaseInterface
+
 import time
+
+from ethoscope.hardware.interfaces.interfaces import BaseInterface
+from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator
+from ethoscope.tests.integration_api_tests.old.utils import test_stimulator
+
 
 class MockSDInterface(BaseInterface):
     def send(self,channel, dt=350,margin=10):
