@@ -4,7 +4,7 @@ from ethoscope.hardware.interfaces.sleep_depriver_interface import SleepDepriver
 import time
 
 class OdourDelivererInterface(SimpleLynxMotionInterface):
-    _positions_to_angles = {1: -20,
+    _positions_to_angles = {1: -25,
                             2: 20,
                             3: 0}
     _dt = 250
