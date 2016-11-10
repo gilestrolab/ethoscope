@@ -82,6 +82,7 @@
         //The formatter has been modified from original version 
         //to provide a "formatted" field - this makes things easier to handle
         modelCtrl.$formatters.push(function(objValue) {
+          console.log("formatting");
           var f;
           f = function(date) {
             if (!moment.isMoment(date)) {
@@ -103,6 +104,11 @@
             return '';
           }
         });
+
+        el.bind('blur', function() {
+            modelCtrl.$modelValue.formatted = modelCtrl.$viewValue;
+        });
+        
         modelCtrl.$render = function() {
           if (modelCtrl.$modelValue && modelCtrl.$modelValue.startDate) {
             _setStartDate(modelCtrl.$modelValue.startDate);
@@ -112,6 +118,7 @@
           }
           return el.val(modelCtrl.$viewValue);
         };
+        
         modelCtrl.$parsers.push(function(val) {
           var f, objValue, x;
           f = function(value) {
@@ -132,6 +139,7 @@
           }
           return objValue;
         });
+        
         modelCtrl.$isEmpty = function(val) {
           return !(angular.isString(val) && val.length > 0);
         };
@@ -212,5 +220,6 @@
       }
     };
   }]);
+
 
 }).call(this);
