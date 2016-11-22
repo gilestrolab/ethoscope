@@ -169,6 +169,16 @@ class SleepDepStimulatorCR(SleepDepStimulator):
 
 
 
+class GearMotorSleepDepStimulator(SleepDepStimulator):
+    _description = {"overview": "A stimulator to sleep deprive an animal using gear motors. See https://github.com/gilestrolab/ethoscope_hardware/tree/master/modules/gear_motor_sleep_depriver",
+                    "arguments": [
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_threshold", "description": "The minimal velocity that counts as movement","default":0.0060},
+                                    {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken","default":120},
+                                    {"type": "date_range", "name": "date_range",
+                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "default": ""}
+                                   ]}
+
 
 class ExperimentalSleepDepStimulator(SleepDepStimulator):
     _description = {"overview": "A stimulator to sleep deprive an animal using servo motor. See http://todo/fixme.html",
@@ -218,8 +228,6 @@ class ExperimentalSleepDepStimulator(SleepDepStimulator):
             self._inactivity_time_threshold_ms = round(channel ** 1.7) * 20 * 1000
         except KeyError:
             pass
-
-
 
 
 class MiddleCrossingStimulator(BaseStimulator):

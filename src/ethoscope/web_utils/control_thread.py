@@ -18,7 +18,7 @@ from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection
 from ethoscope.stimulators.stimulators import DefaultStimulator
-from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator, SleepDepStimulatorCR, ExperimentalSleepDepStimulator, MiddleCrossingStimulator#, SystematicSleepDepInteractor
+from ethoscope.stimulators.sleep_depriver_stimulators import GearMotorSleepDepStimulator, SleepDepStimulator, SleepDepStimulatorCR, ExperimentalSleepDepStimulator, MiddleCrossingStimulator#, SystematicSleepDepInteractor
 from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver #, DynamicOdourDeliverer
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
@@ -70,10 +70,11 @@ class ControlThread(Thread):
         "interactor":{
                         "possible_classes":[DefaultStimulator, 
                                             SleepDepStimulator,
-                                            SleepDepStimulatorCR, 
+                                            #SleepDepStimulatorCR,
                                             MiddleCrossingStimulator,
                                             #SystematicSleepDepInteractor,
                                             ExperimentalSleepDepStimulator,
+                                            GearMotorSleepDepStimulator,
                                             #DynamicOdourDeliverer,
                                             DynamicOdourSleepDepriver
                                             ],
