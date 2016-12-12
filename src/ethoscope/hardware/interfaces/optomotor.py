@@ -94,7 +94,7 @@ class OptoMotor(BaseInterface):
         o = self._serial.write(instruction)
         return o
 
-    def send(self, channel, duration=1000, intensity=1000):
+    def send(self, channel, duration=3000, intensity=1000):
         self.activate(channel, duration, intensity)
 
     def _warm_up(self):
