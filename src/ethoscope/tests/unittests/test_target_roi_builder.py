@@ -1,17 +1,18 @@
 __author__ = 'quentin'
 
-from ethoscope.roi_builders.target_roi_builder import SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder
 import cv2
 import unittest
 import os
+from ethoscope.roi_builders.target_roi_builder import SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder
+
 
 try:
     from cv2.cv import CV_AA as LINE_AA
 except ImportError:
     from cv2 import LINE_AA
 
-images = {"bright_targets":"./img/bright_targets.png",
-           "dark_targets": "./img/dark_targets.png"}
+images = {"bright_targets":"../static_files/img/bright_targets.png",
+           "dark_targets": "../static_files/img/dark_targets.png"}
 
 
 LOG_DIR = "./test_logs/"
@@ -36,8 +37,10 @@ class TestTargetROIBuilder(unittest.TestCase):
 
 
     def test_all(self):
-        for k,i in images.iteritems():
+
+        for k,i in images.items():
             out = os.path.join(LOG_DIR,k+".png")
+            print out
             self._test_one_img(i,out)
 
 

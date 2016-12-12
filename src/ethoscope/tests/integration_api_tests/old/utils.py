@@ -7,7 +7,7 @@ from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.drawers.drawers import DefaultDrawer
 from ethoscope.roi_builders.target_roi_builder import SleepMonitorWithTargetROIBuilder
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection
-from _constants import VIDEO, DRAW_FRAMES
+from ethoscope.tests.integration_api_tests._constants import VIDEO, DRAW_FRAMES
 
 
 def test_stimulator(StimulatorClass, InterfaceClass, remove_db_file = True, *args, **kwargs):
