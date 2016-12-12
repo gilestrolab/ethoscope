@@ -99,4 +99,5 @@ class OptoMotor(BaseInterface):
 
     def _warm_up(self):
         for i in range(self._n_channels):
-            self.send(i)
+            self.send(i, duration=1000)
+            time.sleep(1.000) #s
