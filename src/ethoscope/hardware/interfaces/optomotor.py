@@ -11,9 +11,9 @@ class NoValidPortError(Exception):
     pass
 
 
-class GearMotorSD(BaseInterface):
+class OptoMotor(BaseInterface):
     _baud = 115200
-    _n_channels = 10
+    _n_channels = 24
 
     def __init__(self, port=None, *args, **kwargs):
         """
@@ -39,7 +39,7 @@ class GearMotorSD(BaseInterface):
         self._serial = serial.Serial(self._port, self._baud, timeout=2)
         time.sleep(2)
         self._test_serial_connection()
-        super(GearMotorSD, self).__init__(*args, **kwargs)
+        super(OptoMotor, self).__init__(*args, **kwargs)
 
     def _find_port(self):
         from serial.tools import list_ports
@@ -72,35 +72,31 @@ class GearMotorSD(BaseInterface):
         return
 
 
-    def move(self, channel, duration, speed):
+    def activate(self, channel, duration, intensity):
         """
-        Move a motor for a certain time at a given speed.
+        Activates a component on a given channel of the PWM controller
 
-        :param channel: the number of the motor to be moved
+        :param channel: the chanel idx to be activated
         :type channel: int
-        :param speed: the speed, between 0 and 100.
-        :type speed: int
         :param duration: the time (ms) the stimulus should last for
         :type duration: int
+        :param intensity: duty cycle, between 0 and 1000.
+        :type intensity: int
         :return:
         """
 
-        if channel < 1:
-            raise Exception("idx must be greater or equal to one")
+        if channel < 0:
+            raise Exception("chanel must be greater or equal to zero")
 
         duration = int(duration)
-        speed = int(speed)
-        instruction = "M %i %i %i\r" % (channel, duration, speed)
+        intensity= int(intensity)
+        instruction = "P %i %i %i\r" % (channel, duration, intensity)
         o = self._serial.write(instruction)
-        #
         return o
 
-    def send(self, channel, duration=1000, speed=100):
-        """
-        The default sending paradigm is empty
-        """
-        self.move(channel, duration, speed)
+    def send(self, channel, duration=1000, intensity=1000):
+        self.activate(channel, duration, intensity)
 
     def _warm_up(self):
         for i in range(self._n_channels):
-            self.send(i + 1)
+            self.send(i)
