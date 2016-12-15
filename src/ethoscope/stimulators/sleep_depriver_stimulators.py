@@ -240,7 +240,7 @@ class MiddleCrossingStimulator(BaseStimulator):
                                    ]}
 
     _HardwareInterfaceClass = SleepDepriverInterface
-    _refractory_period = 10#s
+    _refractory_period = 60#s
     _roi_to_channel = {
             1:1,  3:2,  5:3,  7:4,  9:5,
             12:6, 14:7, 16:8, 18:9, 20:10
