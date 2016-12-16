@@ -1,5 +1,5 @@
 (function(){
-    var app = angular.module('flyApp', ['ngRoute','ui.bootstrap.datetimepicker']);
+    var app = angular.module('flyApp', ['ngRoute','daterangepicker']);
     app.filter("toArray", function(){
         return function(obj) {
             var result = [];

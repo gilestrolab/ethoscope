@@ -87,6 +87,7 @@ class Scheduler(object):
         if out[0] >= out[1]:
             raise DateRangeError("Error in date %s, the end date appears to be in the past" % str)
         return out
+        
     def _parse_date(self, str):
         pattern = re.compile("^\s*(?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2})\s*$")
         if re.match("^\s*$", str):
