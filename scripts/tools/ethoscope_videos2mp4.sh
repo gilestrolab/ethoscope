@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 cd $1
+echo "moving to $(pwd)"
 
 TMP_FILE=chunks.tmp
 echo "Merging $(ls *.h264 | wc -l) h264 chunks in tmp file"
