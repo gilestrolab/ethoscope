@@ -163,7 +163,7 @@ class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
 
 
 
-class MiddleCrossingOdourStimulator(BaseStimulator):
+class MiddleCrossingOdourStimulator(sleep_depriver_stimulators.MiddleCrossingStimulator):
     _description = {"overview": "A stimulator to send odour to an animal as it crosses the midline",
                     "arguments": [
                         {"type": "number", "min": 0.0, "max": 1.0, "step": 0.01, "name": "p",
@@ -172,6 +172,8 @@ class MiddleCrossingOdourStimulator(BaseStimulator):
                         {"type": "number", "min": 0.0, "max": 300, "step": 1, "name": "refractory_period",
                          "description": "cannot send two stimuli if they are not separated from, at least, this duration",
                          "default": 120},
+                        {"type": "number", "min": 2.0, "max": 10.0, "step": 0.5, "name": "stimulus_duration",
+                         "description": "How long to send the puff of odour for", "default": 5.0},
                         {"type": "date_range", "name": "date_range",
                          "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
                          "default": ""}
@@ -190,6 +192,7 @@ class MiddleCrossingOdourStimulator(BaseStimulator):
                  hardware_connection,
                  p=1.0,
                  refractory_period = 300,
+                 stimulus_duration = 5,
                  date_range=""
                  ):
         """
@@ -200,41 +203,46 @@ class MiddleCrossingOdourStimulator(BaseStimulator):
         :return:
         """
 
-        self._last_stimulus_time = 0
-        self._p = p
-        self._refractory_period = refractory_period
 
-        super(MiddleCrossingOdourStimulator, self).__init__(hardware_connection, date_range=date_range)
+        super(MiddleCrossingOdourStimulator, self).__init__(hardware_connection, p=p, date_range=date_range)
+        self._refractory_period = refractory_period
+        self._stimulus_duration = stimulus_duration
+
 
     def _decide(self):
-        roi_id = self._tracker._roi.idx
-        now = self._tracker.last_time_point
-        if now - self._last_stimulus_time < self._refractory_period * 1000:
-            return HasInteractedVariable(False), {}
+        decide, args = super(MiddleCrossingOdourStimulator, self)._decide()
+        args["stimulus_duration"] = self._stimulus_duration
 
-        try:
-            channel = self._roi_to_channel[roi_id]
-        except KeyError:
-            return HasInteractedVariable(False), {}
-
-        positions = self._tracker.positions
-
-        if len(positions) < 2:
-            return HasInteractedVariable(False), {}
-
-        if len(positions[-1]) != 1:
-            raise Exception("This stimulator can only work with a single animal per ROI")
-
-        roi_w = float(self._tracker._roi.longest_axis)
-        x_t_zero = positions[-1][0]["x"] / roi_w - 0.5
-        x_t_minus_one = positions[-2][0]["x"] / roi_w - 0.5
-
-        if (x_t_zero > 0) ^ (x_t_minus_one >0): # this is a change of sign
-
-            if random.uniform(0,1) < self._p:
-                self._last_stimulus_time = now
-                return HasInteractedVariable(True), {"channel": channel}
-
-        return HasInteractedVariable(False), {"channel": channel}
-
-
+        return decide, args
+    # def _decide(self):
+    #     roi_id = self._tracker._roi.idx
+    #     now = self._tracker.last_time_point
+    #     if now - self._last_stimulus_time < self._refractory_period * 1000:
+    #         return HasInteractedVariable(False), {}
+    #
+    #     try:
+    #         channel = self._roi_to_channel[roi_id]
+    #     except KeyError:
+    #         return HasInteractedVariable(False), {}
+    #
+    #     positions = self._tracker.positions
+    #
+    #     if len(positions) < 2:
+    #         return HasInteractedVariable(False), {}
+    #
+    #     if len(positions[-1]) != 1:
+    #         raise Exception("This stimulator can only work with a single animal per ROI")
+    #
+    #     roi_w = float(self._tracker._roi.longest_axis)
+    #     x_t_zero = positions[-1][0]["x"] / roi_w - 0.5
+    #     x_t_minus_one = positions[-2][0]["x"] / roi_w - 0.5
+    #
+    #     if (x_t_zero > 0) ^ (x_t_minus_one >0): # this is a change of sign
+    #
+    #         if random.uniform(0,1) < self._p:
+    #             self._last_stimulus_time = now
+    #             return HasInteractedVariable(True), {"channel": channel}
+    #
+    #     return HasInteractedVariable(False), {"channel": channel}
+    #
+    #
