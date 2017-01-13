@@ -179,7 +179,7 @@ class MiddleCrossingOdourStimulator(sleep_depriver_stimulators.MiddleCrossingSti
                          "default": ""}
                     ]}
 
-    _HardwareInterfaceClass = OdourDelivererInterface
+    _HardwareInterfaceClass = OdourDepriverInterface
 
     _roi_to_channel = {
             1:1,  2:2,  3:3,  4:4,  5:5,
@@ -195,14 +195,6 @@ class MiddleCrossingOdourStimulator(sleep_depriver_stimulators.MiddleCrossingSti
                  stimulus_duration = 5,
                  date_range=""
                  ):
-        """
-        :param hardware_connection: the sleep depriver module hardware interface
-        :type hardware_connection: :class:`~ethoscope.hardawre.interfaces.sleep_depriver_interface.SleepDepriverInterface`
-        :param p: the probability of disturbing the animal when a beam cross happens
-        :type p: float
-        :return:
-        """
-
 
         super(MiddleCrossingOdourStimulator, self).__init__(hardware_connection, p=p, date_range=date_range)
         self._refractory_period = refractory_period
@@ -214,35 +206,3 @@ class MiddleCrossingOdourStimulator(sleep_depriver_stimulators.MiddleCrossingSti
         args["stimulus_duration"] = self._stimulus_duration
 
         return decide, args
-    # def _decide(self):
-    #     roi_id = self._tracker._roi.idx
-    #     now = self._tracker.last_time_point
-    #     if now - self._last_stimulus_time < self._refractory_period * 1000:
-    #         return HasInteractedVariable(False), {}
-    #
-    #     try:
-    #         channel = self._roi_to_channel[roi_id]
-    #     except KeyError:
-    #         return HasInteractedVariable(False), {}
-    #
-    #     positions = self._tracker.positions
-    #
-    #     if len(positions) < 2:
-    #         return HasInteractedVariable(False), {}
-    #
-    #     if len(positions[-1]) != 1:
-    #         raise Exception("This stimulator can only work with a single animal per ROI")
-    #
-    #     roi_w = float(self._tracker._roi.longest_axis)
-    #     x_t_zero = positions[-1][0]["x"] / roi_w - 0.5
-    #     x_t_minus_one = positions[-2][0]["x"] / roi_w - 0.5
-    #
-    #     if (x_t_zero > 0) ^ (x_t_minus_one >0): # this is a change of sign
-    #
-    #         if random.uniform(0,1) < self._p:
-    #             self._last_stimulus_time = now
-    #             return HasInteractedVariable(True), {"channel": channel}
-    #
-    #     return HasInteractedVariable(False), {"channel": channel}
-    #
-    #
