@@ -40,6 +40,10 @@ class AsyncMySQLWriter(multiprocessing.Process):
         command = "SHOW TABLES"
         c.execute(command)
 
+        # we remove bin logs o save space!
+        command = "RESET MASTER"
+        c.execute(command)
+
         to_execute  = []
         for t in c:
             t = t[0]

@@ -9,6 +9,9 @@ from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVaria
 
 from ethoscope.hardware.interfaces.interfaces import  DefaultInterface
 from ethoscope.hardware.interfaces.sleep_depriver_interface import SleepDepriverInterface, SleepDepriverInterfaceCR
+from ethoscope.hardware.interfaces.optomotor import OptoMotor
+
+
 import random
 
 
@@ -169,15 +172,74 @@ class SleepDepStimulatorCR(SleepDepStimulator):
 
 
 
-class GearMotorSleepDepStimulator(SleepDepStimulator):
+class OptomotorSleepDepriver(SleepDepStimulator):
     _description = {"overview": "A stimulator to sleep deprive an animal using gear motors. See https://github.com/gilestrolab/ethoscope_hardware/tree/master/modules/gear_motor_sleep_depriver",
                     "arguments": [
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_threshold", "description": "The minimal velocity that counts as movement","default":0.0060},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken","default":120},
+                                    {"type": "number", "min": 500, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus", "default": 1000},
+                                    {"type": "number", "min": 0, "max": 3, "step": 1, "name": "stimulus_type",  "description": "1 = opto, 2= moto", "default": 2},
                                     {"type": "date_range", "name": "date_range",
                                      "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
                                      "default": ""}
                                    ]}
+
+    _HardwareInterfaceClass = OptoMotor
+
+    _roi_to_channel_opto = {
+        1: 1,
+        3: 3,
+        5: 5,
+        7: 7,
+        9: 9,
+        12: 23,
+        14: 21,
+        16: 19,
+        18: 17,
+        20: 15
+    }
+    _roi_to_channel_moto = {
+        1: 0,
+        3: 2,
+        5: 4,
+        7: 6,
+        9: 8,
+        12: 22,
+        14: 20,
+        16: 18,
+        18: 16,
+        20: 14
+    }
+
+
+    def __init__(self,
+                 hardware_connection,
+                 velocity_threshold=0.0060,
+                 pulse_duration = 1000,#ms
+                 code = 3, # 1 = opto, 2= moto, 3 = both
+                 date_range=""
+                 ):
+
+
+        self._t0 = None
+
+        # the inactive time depends on the chanel here
+        super(OptomotorSleepDepriver, self).__init__(hardware_connection, velocity_threshold, 0, date_range)
+        self._inactivity_time_threshold_ms = None
+
+
+        if code == 2:
+            self._roi_to_channel = self._roi_to_channel_moto
+        elif code == 1:
+            self._roi_to_channel = self._roi_to_channel_opto
+
+        self._pulse_duration= pulse_duration
+
+    def _decide(self):
+        out, dic = super(OptomotorSleepDepriver, self)._decide()
+        dic["duration"] = self._pulse_duration
+        return out,dic
+
 
 
 class ExperimentalSleepDepStimulator(SleepDepStimulator):
