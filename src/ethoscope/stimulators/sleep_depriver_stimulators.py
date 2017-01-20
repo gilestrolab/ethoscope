@@ -229,9 +229,9 @@ class OptomotorSleepDepriver(SleepDepStimulator):
         self._inactivity_time_threshold_ms = None
 
 
-        if code == 2:
+        if stimulus_type == 2:
             self._roi_to_channel = self._roi_to_channel_moto
-        elif code == 1:
+        elif stimulus_type == 1:
             self._roi_to_channel = self._roi_to_channel_opto
 
         self._pulse_duration= pulse_duration
