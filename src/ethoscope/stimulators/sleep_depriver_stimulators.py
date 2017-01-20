@@ -226,7 +226,7 @@ class OptomotorSleepDepriver(SleepDepStimulator):
 
         # the inactive time depends on the chanel here
         super(OptomotorSleepDepriver, self).__init__(hardware_connection, velocity_threshold, min_inactive_time, date_range)
-        self._inactivity_time_threshold_ms = None
+
 
 
         if stimulus_type == 2:
