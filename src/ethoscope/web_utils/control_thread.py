@@ -23,7 +23,7 @@ from ethoscope.stimulators.stimulators import DefaultStimulator
 
 
 
-from ethoscope.stimulators.sleep_depriver_stimulators import GearMotorSleepDepStimulator, SleepDepStimulator, SleepDepStimulatorCR, ExperimentalSleepDepStimulator, MiddleCrossingStimulator#, SystematicSleepDepInteractor
+from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator, SleepDepStimulatorCR, ExperimentalSleepDepStimulator, MiddleCrossingStimulator#, SystematicSleepDepInteractor
 from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver, MiddleCrossingOdourStimulator #, DynamicOdourDeliverer
 from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulator
 
@@ -81,7 +81,7 @@ class ControlThread(Thread):
                                             MiddleCrossingStimulator,
                                             #SystematicSleepDepInteractor,
                                             ExperimentalSleepDepStimulator,
-                                            GearMotorSleepDepStimulator,
+                                            #GearMotorSleepDepStimulator,
                                             #DynamicOdourDeliverer,
                                             DynamicOdourSleepDepriver,
                                             OptoMidlineCrossStimulator,
