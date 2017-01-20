@@ -215,8 +215,9 @@ class OptomotorSleepDepriver(SleepDepStimulator):
     def __init__(self,
                  hardware_connection,
                  velocity_threshold=0.0060,
-                 pulse_duration = 1000,#ms
-                 code = 3, # 1 = opto, 2= moto, 3 = both
+                 min_inactive_time=120,  # s
+                 pulse_duration = 1000,  #ms
+                 code = 3,  # 1 = opto, 2= moto, 3 = both
                  date_range=""
                  ):
 
@@ -224,7 +225,7 @@ class OptomotorSleepDepriver(SleepDepStimulator):
         self._t0 = None
 
         # the inactive time depends on the chanel here
-        super(OptomotorSleepDepriver, self).__init__(hardware_connection, velocity_threshold, 0, date_range)
+        super(OptomotorSleepDepriver, self).__init__(hardware_connection, velocity_threshold, min_inactive_time, date_range)
         self._inactivity_time_threshold_ms = None
 
 
