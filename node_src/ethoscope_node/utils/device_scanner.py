@@ -11,6 +11,7 @@ from functools import wraps
 try:
     from scapy.all import srp, Ether, ARP
     import netifaces
+    raise ImportError("Not using scapy until issue #75 (https://github.com/gilestrolab/ethoscope/issues/75) is fixed")
     _use_scapy = True
 except ImportError:
     logging.warning("Cannot import scapy to scan subnet")
