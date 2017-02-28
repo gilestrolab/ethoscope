@@ -1,6 +1,19 @@
 __author__ = 'quentin'
 
 import cv2
+
+try:
+    CV_VERSION = int(cv2.__version__.split(".")[0])
+except:
+    CV_VERSION = 2
+
+try:
+    from cv2.cv import CV_CHAIN_APPROX_SIMPLE as CHAIN_APPROX_SIMPLE
+    from cv2.cv import CV_AA as LINE_AA
+except ImportError:
+    from cv2 import CHAIN_APPROX_SIMPLE
+    from cv2 import LINE_AA
+
 import numpy as np
 import logging
 from ethoscope.roi_builders.roi_builders import BaseROIBuilder
@@ -91,7 +104,11 @@ class TargetGridROIBuilder(BaseROIBuilder):
             cv2.threshold(grey, t, 255,cv2.THRESH_BINARY_INV,bin)
             if np.count_nonzero(bin) > 0.7 * im.shape[0] * im.shape[1]:
                 continue
-            contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
+            if CV_VERSION == 3:
+                _, contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,CHAIN_APPROX_SIMPLE)
+            else:
+                contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,CHAIN_APPROX_SIMPLE)
+
             bin.fill(0)
             for c in contours:
                 score = scoring_fun(c, im)
@@ -144,9 +161,14 @@ class TargetGridROIBuilder(BaseROIBuilder):
         bin = np.zeros_like(map)
 
         # as soon as we have three objects, we stop
+        contours = []
         for t in range(0, 255,1):
             cv2.threshold(map, t, 255,cv2.THRESH_BINARY  ,bin)
-            contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL,cv2.cv.CV_CHAIN_APPROX_SIMPLE)
+            if CV_VERSION == 3:
+                _, contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)
+            else:
+                contours, h = cv2.findContours(bin, cv2.RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)
+
 
             if len(contours) <3:
                 raise EthoscopeException("There should be three targets. Only %i objects have been found" % (len(contours)), img)
@@ -213,7 +235,7 @@ class TargetGridROIBuilder(BaseROIBuilder):
             mapped_rectangle = np.dot(wrap_mat, r.T).T
             mapped_rectangle -= shift
             ct = mapped_rectangle.reshape((1,4,2)).astype(np.int32)
-            cv2.drawContours(img,[ct], -1, (255,0,0),1,cv2.CV_AA)
+            cv2.drawContours(img,[ct], -1, (255,0,0),1,LINE_AA)
             rois.append(ROI(ct, idx=i+1))
 
             # cv2.imshow("dbg",img)
@@ -227,8 +249,9 @@ class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilder):
                     "arguments": []}
 
     def __init__(self):
-        """
-        Class to build ROIs for a two-columns, ten-rows for the
+        r"""
+        Class to build ROIs for a two-columns, ten-rows for the sleep monitor
+        (`see here <https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_10x2_shortTubes>`_).
         """
         #`sleep monitor tube holder arena <todo>`_
 
@@ -245,11 +268,12 @@ class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilder):
 
 
 class OlfactionAssayROIBuilder(TargetGridROIBuilder):
-    _description = {"overview": "The default odor assay  roi layout with ten rows of single tubes.",
+    _description = {"overview": "The default odor assay roi layout with ten rows of single tubes.",
                     "arguments": []}
     def __init__(self):
         """
-        Class to build ROIs for a one-columns, ten-rows for the
+        Class to build ROIs for a one-column, ten-rows
+        (`see here <https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_10x1_longTubes>`_)
         """
         #`olfactory response arena <todo>`_
 
@@ -263,3 +287,25 @@ class OlfactionAssayROIBuilder(TargetGridROIBuilder):
                                                                vertical_fill= .7
                                                                )
 
+
+class HD12TubesRoiBuilder(TargetGridROIBuilder):
+    _description = {"overview": "The default high resolution, 12 tubes (1 row) roi layout",
+                    "arguments": []}
+
+
+    def __init__(self):
+        r"""
+        Class to build ROIs for a twelve columns, one row for the HD tracking arena
+        (`see here <https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_mini_12_tubes>`_)
+        """
+
+
+        super(HD12TubesRoiBuilder, self).__init__( n_rows=1,
+                                                   n_cols=12,
+                                                   top_margin= 1.5,
+                                                   bottom_margin= 1.5,
+                                                   left_margin=0.05,
+                                                   right_margin=0.05,
+                                                   horizontal_fill=.7,
+                                                   vertical_fill=1.4
+                                                   )

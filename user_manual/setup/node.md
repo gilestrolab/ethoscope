@@ -10,8 +10,9 @@ The node is a regular computer with an wireless connection does quite a few thin
 * Runs a webserver to update server (http://node:8888)
 * Runs a backup tool, that fetches data from all detected devices every 5min
 * Runs an NTP server (so it used as the central clock of the platform)
+* Runs a video backup tool, that fetches video chunks from recording devices (we can record instead of tracking).
 
-The node simply orchestrate the platform, ** it does not analyse any data** tracking is performed, in real time, by each device.
+The node simply orchestrate the platform, **it does not analyse any data** tracking is performed, in real time, by each device.
 Hence, if some devices are running and the node (or the network) shuts down, tracking will not be interrupted, and the data will be backed up on the node as soon as it is running again.
 
 The hardware specification for the node can therefore be pretty standard, I would go with:
@@ -47,7 +48,7 @@ pacman -Syu --noconfirm
 pacman -S base-devel git gcc-fortran rsync wget fping --noconfirm --needed
 
 # utilities
-pacman -S ntp bash-completion --noconfirm --needed
+pacman -S ntp bash-completion openssh --noconfirm --needed
 
 #so we can set up a dns
 pacman -S dnsmasq --noconfirm --needed
@@ -93,7 +94,7 @@ git clone $LOCAL_BARE_PATH $TARGET_GIT_INSTALL
 cd $TARGET_GIT_INSTALL
 
 # IMPORTANT this is if you want to work on the "dev" branch otherwise, you are using "master"
-git checkout dev
+git checkout -b dev
 
 cd $TARGET_GIT_INSTALL/node_src
 # we install with pip
@@ -156,11 +157,13 @@ cd $TARGET_GIT_INSTALL/scripts
 
 cp ./ethoscope_node.service /etc/systemd/system/ethoscope_node.service
 cp ./ethoscope_backup.service /etc/systemd/system/ethoscope_backup.service
+cp ./ethoscope_video_backup.service /etc/systemd/system/ethoscope_video_backup.service
 
 systemctl daemon-reload
 
 systemctl enable ethoscope_node.service
 systemctl enable ethoscope_backup.service
+systemctl enable ethoscope_video_backup.service
 ```
 
 In addition to the node services, we ant to run the update daemon.
@@ -177,6 +180,28 @@ systemctl enable ethoscope_update_node.service
 ```
 
 
+
+Time
+----------
+
+It makes everything easier if you force time to be GMT regardless of your timezone and season:
+
+```
+timedatectl set-timezone GMT
+```
+
+Node will act as an NTP server for ethoscopes. 
+That is machines will use local network to sync time from the node.
+However, by default, **the server (node) will not serve time if it fails to get it from internet**.
+In order to allow the node to server time regardless, you can addthese two lines to `/etc/ntp.conf`:
+
+```
+server 127.127.1.1
+fudge  127.127.1.1 stratum 12
+```
+
+
+
 What is next
 -----------------------
 In order to check things:
@@ -186,7 +211,7 @@ In order to check things:
 * test the local server at http://0.0.0.0
 * test the local server at http://192.169.123.1 (will fail until your network is configured)
 * test the update server http://192.169.123.1:8888
-* test the dns mask http://node
+* test the dns mask (go at http://node)
 
 
 

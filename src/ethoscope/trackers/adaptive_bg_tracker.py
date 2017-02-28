@@ -2,14 +2,21 @@
 __author__ = 'quentin'
 
 from collections import deque
-from math import log10
+from math import log10, sqrt, pi
 import cv2
+
+try:
+    CV_VERSION = int(cv2.__version__.split(".")[0])
+except:
+    CV_VERSION = 2
+
+
 import numpy as np
 from scipy import ndimage
 from ethoscope.core.variables import XPosVariable, YPosVariable, XYDistance, WidthVariable, HeightVariable, PhiVariable, Label
 from ethoscope.core.data_point import DataPoint
 from ethoscope.trackers.trackers import BaseTracker, NoPositionError
-from ethoscope.utils.debug import EthoscopeException
+
 import logging
 
 
@@ -17,7 +24,7 @@ class ObjectModel(object):
     """
     A class to model, update and predict foreground object (i.e. tracked animal).
     """
-    _sqrt_2_pi = np.sqrt(2.0 * np.pi)
+    _sqrt_2_pi = sqrt(2.0 * pi)
     def __init__(self, history_length=1000):
         #fixme this should be time, not number of points!
         self._features_header = [
@@ -389,7 +396,14 @@ class AdaptiveBGModel(BaseTracker):
             self._bg_model.increase_learning_rate()
             raise NoPositionError
 
-        contours,hierarchy = cv2.findContours(self._buff_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if CV_VERSION == 3:
+            _, contours,hierarchy = cv2.findContours(self._buff_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        else:
+            contours,hierarchy = cv2.findContours(self._buff_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+
+
+
         contours = [cv2.approxPolyDP(c,1.2,True) for c in contours]
 
         if len(contours) == 0:

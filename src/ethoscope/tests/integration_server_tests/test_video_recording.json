@@ -1,0 +1,7 @@
+
+
+{"recorder":{"name":"VideoRecorder",
+                      "arguments":{"width": 720, "height":480}},
+  "experimental_info": {"name":"ExperimentalInformations",
+                  "arguments":{"name":"Quentin Geissmann", "location":"incubator 5"}}
+}

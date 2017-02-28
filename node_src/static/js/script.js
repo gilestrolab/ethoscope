@@ -1,5 +1,5 @@
 (function(){
-    var app = angular.module('flyApp', ['ngRoute','ui.bootstrap.datetimepicker']);
+    var app = angular.module('flyApp', ['ngRoute','daterangepicker']);
     app.filter("toArray", function(){
         return function(obj) {
             var result = [];
@@ -49,11 +49,10 @@
         $scope.filterEthoscopes = '';     // set the default search/filter term
         
         $scope.groupActions = {};
-        $http.get('/node/time').success(function(data){
-            console.log(data);
-            t = new Date(data.time);
-            $scope.time = t.toString();
-        });
+//        $http.get('/node/time').success(function(data){
+//            t = new Date(data.time);
+//            $scope.time = t.toString();
+//        });
         $http.get('/devices_list').success(function(data){
             $scope.devices = data;
             
@@ -62,30 +61,14 @@
 
         var get_date = function(){
             $http.get('/node/time').success(function(data){
-            console.log(data);
             t = new Date(data.time);
             $scope.time = t.toString();
-        });
+            });
             var t= new Date();
             $scope.localtime =t.toString();
         };
-        get_date();
-         refresh_time = $interval(get_date, 60000);
-        //clear interval when scope is destroyed
-        $scope.$on("$destroy", function(){
-            $interval.cancel(refresh_time);
-        });
-        //Scan for SM or SD connected.
+
         $scope.get_devices = function(){
-            var spinner= new Spinner(opts).spin();
-            var loadingContainer = document.getElementById('loading_devices');
-            try {
-                loadingContainer.appendChild(spinner.el);
-            }
-            catch(err) {
-                console.log("no container");
-            }
-            $scope.loading_devices = true;
             $http.get('/devices').success(function(data){
 
                 data_list = [];
@@ -95,10 +78,20 @@
                     }
 
                 $scope.devices = data_list;
+                $scope.n_devices=$scope.devices.length;
+                status_summary = {};
 
-                spinner.stop();
-                $scope.loading_devices = false;
+                for(d in $scope.devices){
 
+                    dev = $scope.devices[d]
+
+                    if(!(dev.status in status_summary))
+                        status_summary[dev.status] = 0;
+                     status_summary[dev.status] += 1;
+                }
+
+
+                $scope.status_n_summary = status_summary
             })
         };
         $scope.secToDate = function(secs){
@@ -162,10 +155,24 @@
                  $("#startModal").modal('hide');
             });
         };
-        
-        
 
         $scope.$on('$viewContentLoaded',$scope.get_devices);
+
+
+        var refresh = function(){
+
+            $scope.get_devices();
+            get_date();
+            console.log("refresh");
+       }
+
+       refresh_data = $interval(refresh, 3000);
+        //clear interval when scope is destroyed
+        $scope.$on("$destroy", function(){
+            $interval.cancel(refresh_data);
+            //clearInterval(refresh_data);
+        });
+
 
     });
 

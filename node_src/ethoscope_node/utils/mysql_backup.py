@@ -70,9 +70,6 @@ class MySQLdbToSQlite(object):
                 logging.warning(e)
                 pass
 
-        #
-
-
         try:
             logging.info("Making parent directories")
             os.makedirs(os.path.dirname(self._dst_path))
@@ -128,7 +125,7 @@ class MySQLdbToSQlite(object):
             dst_cur.execute(dst_command)
 
         except sqlite3.OperationalError:
-            logging.info("Table %s exists, not copying it" % table_name)
+            logging.debug("Table %s exists, not copying it" % table_name)
             return
         if table_name == "IMG_SNAPSHOTS":
             self._replace_img_snapshot_table(table_name, src, dst)
@@ -147,8 +144,6 @@ class MySQLdbToSQlite(object):
 
         with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
 
-
-
             dst_cur = src.cursor()
             command = "SELECT roi_idx FROM ROI_MAP"
             dst_cur.execute(command)
@@ -158,6 +153,10 @@ class MySQLdbToSQlite(object):
 
 
             self._update_one_roi_table("CSV_DAM_ACTIVITY", src, dst, dump_in_csv=True)
+            try:
+                self._update_one_roi_table("START_EVENTS", src, dst)
+            except MySQLdb.ProgrammingError:
+                pass
 
             try:
                 self._update_img_snapshot_table("IMG_SNAPSHOTS", src, dst)
@@ -205,20 +204,22 @@ class MySQLdbToSQlite(object):
         dst_cur = dst.cursor()
 
         try:
-            dst_command= "SELECT id FROM %s ORDER BY id DESC LIMIT 1" % table_name
+            dst_command= "SELECT MAX(id) FROM %s" % table_name
             dst_cur.execute(dst_command)
         except (sqlite3.OperationalError, MySQLdb.ProgrammingError):
-            logging.warning(" Local table %s appears empty. Rebuilding it from source" % table_name)
+            logging.warning("Local table %s appears empty. Rebuilding it from source" % table_name)
             self._replace_table(table_name, src, dst)
             return
 
         last_id_in_dst = 0
         for c in dst_cur:
-            last_id_in_dst = c[0]
+            if c[0] is None:
+                logging.warning("There seem to be no data in %s, %s. Recreating it" % (os.path.basename(self._dst_path), table_name))
+                self._replace_table(table_name, src, dst)
+            else:
+                last_id_in_dst = c[0]
         src_command = "SELECT * FROM %s WHERE id > %d" % (table_name, last_id_in_dst)
         src_cur.execute(src_command)
-
-
 
         to_insert = []
         i = 0
@@ -252,7 +253,7 @@ class MySQLdbToSQlite(object):
         dst_cur = dst.cursor()
 
         try:
-            dst_command= "SELECT id FROM %s ORDER BY id DESC LIMIT 1" % table_name
+            dst_command= "SELECT MAX(id) FROM %s" % table_name
             dst_cur.execute(dst_command)
         except (sqlite3.OperationalError, MySQLdb.ProgrammingError):
             logging.warning("Local table %s appears empty. Rebuilding it from source" % table_name)
@@ -262,6 +263,9 @@ class MySQLdbToSQlite(object):
         last_id_in_dst = 0
         for c in dst_cur:
             last_id_in_dst = c[0]
+            if last_id_in_dst is None:
+                logging.warning("There seem to be no data in %s, %s stopping here" % (os.path.basename(self._dst_path), table_name))
+                return
         src_command = "SELECT id,t,img FROM %s WHERE id > %d" % (table_name, last_id_in_dst)
         src_cur.execute(src_command)
 

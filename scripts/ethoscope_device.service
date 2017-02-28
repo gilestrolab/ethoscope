@@ -1,7 +1,7 @@
 [Unit]
 Description=Ethoscope device server
 Wants=ntpd.service mysqld.service
-After=ntpd.service clean_mysql.service
+After=ntpd.service
 
 
 [Service]

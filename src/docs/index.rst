@@ -23,7 +23,7 @@ Submodules
     ethoscope.core
     ethoscope.roi_builders
     ethoscope.trackers
-    ethoscope.interactors
+    ethoscope.stimulators
     ethoscope.drawers
 
 

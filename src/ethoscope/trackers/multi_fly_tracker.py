@@ -3,6 +3,8 @@ from adaptive_bg_tracker import AdaptiveBGModel, BackgroundModel, ObjectModel
 from collections import deque
 from math import log10
 import cv2
+CV_VERSION = int(cv2.__version__.split(".")[0])
+
 import numpy as np
 from scipy import ndimage
 from ethoscope.core.variables import XPosVariable, YPosVariable, XYDistance, WidthVariable, HeightVariable, PhiVariable, Label
@@ -130,7 +132,11 @@ class MultiFlyTracker(BaseTracker):
             self._bg_model.increase_learning_rate()
             raise NoPositionError
 
-        contours,hierarchy = cv2.findContours(self._buff_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if CV_VERSION == 3:
+            _, contours,hierarchy = cv2.findContours(self._buff_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        else:
+            contours,hierarchy = cv2.findContours(self._buff_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
         contours = [cv2.approxPolyDP(c,1.2,True) for c in contours]
 
         valid_contours = []

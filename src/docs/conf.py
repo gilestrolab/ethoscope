@@ -18,7 +18,8 @@ import os
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-#sys.path.insert(0, os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('../'))
+
 
 # -- General configuration ------------------------------------------------
 
@@ -118,7 +119,7 @@ pygments_style = 'sphinx'
 # a list of builtin themes.
 
 #html_theme = 'default'
-html_theme = 'sphinxdoc'
+html_theme = 'sphinx_rtd_theme'
 
 
 # Theme options are theme-specific and customize the look and feel of a theme
@@ -349,3 +350,17 @@ epub_exclude_files = ['search.html']
 # If false, no index is generated.
 #epub_use_index = True
 autoclass_content = "both"
+
+
+import sys
+from mock import Mock as MagicMock
+
+class Mock(MagicMock):
+    @classmethod
+    def __getattr__(cls, name):
+            return Mock()
+
+MOCK_MODULES = [
+    'cv2', 'cv', 'cv2.cv',
+    'numpy', 'scipy']
+sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)

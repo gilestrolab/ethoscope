@@ -1,14 +1,27 @@
 <!-- home.html -->
     <div class="jumbotron text-center" ng-cloak>
-        <h1>Device List</h1>
-        <div class="intro">Scan the network to detect connected ethoscopes</div>
+        <h1>Platform Overview</h1>
 
-        <button class=" btn btn-default" ng-click="get_devices()">Scan Network for Devices</button>
+        <!--<div class="intro">Scan the network to detect connected ethoscopes</div>-->
+        <!--<button class=" btn btn-default" ng-click="get_devices()">Scan Network for Devices</button>-->
 
-        <div  id="loading_devices" class="spinner"></div>
+
+        <!--dddddddddddddddddd-->
+
         <div id="node-info" class="intro">
-            <p><span class="fa fa-clock-o"></span> Time on the platform: {{time}}</p>
-            <p><span class="fa fa-clock-o"></span> Time on your machine: {{localtime}}</p>
+             <div class="row">
+                 <div class="col-sm-6">
+                <h2><span class="fa fa-list"></span> {{n_devices}} devices:</h2>
+                    <li ng-repeat="(status, n) in status_n_summary">{{n}} {{status}} </li>
+                </div>
+
+                <div class="col-sm-6">
+                <h2><span class="fa fa-clock-o"></span> Time:</h2>
+                    <li> On the platform, {{time}}</li>
+                    <li> On your machine, {{localtime}}</li>
+                </div>
+
+            </div>
         </div>
 
     </div>
@@ -17,7 +30,7 @@
       <div class="input-group">
         <div class="input-group-addon"><i class="fa fa-search"></i></div>
 
-        <input type="text" class="form-control" placeholder="Filter " ng-model="filterEthoscopes">
+        <input type="text" class="form-control" placeholder="Filter devices " ng-model="filterEthoscopes">
 
       </div>      
     </div>
@@ -82,8 +95,9 @@
                     <span class="fa fa-circle-o"></span><span> {{device.name}}</span>
                     </a>
                 </td>
-                <td><span ng-if="device.status == 'running'" class="fa fa-circle color-green"></span>
-            <span ng-if="device.status == 'stopped'" class="fa fa-circle color-red"></span> {{device.status}}</td>
+                <td><span ng-if="device.status == 'running'" class="fa fa-circle color-blue"></span>
+                <span ng-if="device.status == 'recording'" class="fa fa-circle color-green"></span>
+                <span ng-if="device.status == 'stopped'" class="fa fa-square color-red"></span> {{device.status}}</td>
                 <td>{{secToDate(device.time)}}</td>
                 <td>{{elapsedtime(device.time_since_backup)}}</td>
                 <td>{{device.experimental_info.name}}</td>
@@ -99,7 +113,8 @@
 
 
 <!-- Modal start tracking -->
-<!--FIXME-->
+<!--gg: REMOVE THIS? Does not seem like it's used here any more. This is all handled by ethoscope.html instead -->
+<!--
 <div class="modal fade" id="startModal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -116,10 +131,12 @@
                     <input type=radio name={{opt.name}}>
                     {{opt.name}}: {{opt.overview}}
                   <ul>
+                      <li>type: {{arg.type}}</li>
+                      <li>test</li>
                         <li ng-repeat="arg in opt.arguments">
                             {{arg.description}}
                             <input ng-if="arg.type == 'number'" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}} value={{arg.default}} ngmodel="user_options.{{opt.name}}.{{arg.name}}" >
-                            <input ng-if="arg.type == 'text'" type=text name={{arg.name}} value={{arg.default}} ngmodel="user_options.{{opt.name}}.{{arg.name}}">
+                            <input ng-if="arg.type == 'str'" type=text name={{arg.name}} value={{arg.default}} ngmodel="user_options.{{opt.name}}.{{arg.name}}">
                             <input ng-if="arg.type == 'datetime'" type=datetime name={{arg.name}} value={{arg.default}} ngmodel="user_options.{{opt.name}}.{{arg.name}}">
                         </li>
                     </ul>
@@ -135,3 +152,4 @@
     </div>
   </div>
 </div>
+-->

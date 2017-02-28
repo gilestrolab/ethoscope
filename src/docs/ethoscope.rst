@@ -9,8 +9,7 @@ Subpackages
     ethoscope.core
     ethoscope.drawers
     ethoscope.hardware
-    ethoscope.interactors
-    ethoscope.rois
+    ethoscope.stimulators
     ethoscope.trackers
     ethoscope.utils
     ethoscope.web_utils

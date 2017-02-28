@@ -5,6 +5,8 @@ __author__ = 'quentin'
 import numpy as np
 
 from ethoscope.utils.description import DescribedObject
+import logging
+import traceback
 
 
 class BaseROIBuilder(DescribedObject):
@@ -37,11 +39,11 @@ class BaseROIBuilder(DescribedObject):
 
             accum = np.median(np.array(accum),0).astype(np.uint8)
         try:
-
             rois = self._rois_from_img(accum)
         except Exception as e:
             if not isinstance(input, np.ndarray):
                 del input
+            logging.error(traceback.format_exc(e))
             raise e
 
         rois_w_no_value = [r for r in rois if r.value is None]
@@ -84,10 +86,10 @@ class DefaultROIBuilder(BaseROIBuilder):
     def _rois_from_img(self,img):
         h, w = img.shape[0],img.shape[1]
         return[
-            ROI([
+            ROI(np.array([
                 (   0,        0       ),
                 (   0,        h -1    ),
                 (   w - 1,    h - 1   ),
-                (   w - 1,    0       )]
+                (   w - 1,    0       )])
             , idx=1)]
 

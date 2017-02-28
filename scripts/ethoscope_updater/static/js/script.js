@@ -81,7 +81,8 @@
         
         $scope.activate_modal = function(devices, action){
             spin("start");
-            error = check_devices_state(devices, "running");
+            // error == false => at least one device  is NOT {stopped, NA, Software broken}
+            error = check_devices_state(devices, ["stopped", "NA", "Software broken"]);
             if(!error){
 		        switch(action){
 		            case 'update':
@@ -163,7 +164,10 @@
         }
         };
         
-        check_devices_state = function(devices, state){
+        check_devices_state = function(devices, states){
+            var states_dic = {};
+            for(var i=0; i<states.length;i++){states_dic[states[i]]="";}
+
             var error = false;
                 $scope.system.modal_error = "";
                 if(devices.length == 0){
@@ -171,9 +175,11 @@
                     return true;
                 }
 
+
                 for (device in devices){
-                    if (devices[device]["status"] == state){
-                        $scope.system.modal_error="One or more selected devices are "+state+" and cannot be updated, remove them from the selection."
+                    if (!(devices[device]["status"] in states_dic)){
+                        //console.log(devices[device]["status"])
+                        $scope.system.modal_error="One or more selected devices not one of: {"+states.join(", ")+"} ( so cannot be updated, remove them from the selection)."
                         return true;
 
                     }

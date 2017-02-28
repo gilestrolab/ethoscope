@@ -1,2 +1,2 @@
 __author__ = 'quentin'
-import interactors
+import stimulators

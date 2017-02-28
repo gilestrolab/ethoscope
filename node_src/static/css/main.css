@@ -16,7 +16,6 @@
     color: red;
 }
 
-
 .last_drawn_img{
     margin-bottom: 1em;
 }
@@ -42,4 +41,42 @@
 
 .option-list li{
 list-style: none;
+}
+
+p {
+    text-align: left;
+}
+
+#dt_warning{
+    color: red;
+}
+
+
+li {
+    text-align: left;
+    font-size= 150%;
+}
+
+h2 {
+    text-align: left;
+}
+
+input {
+    padding-top: 0em;
+}
+
+input[type="text"] {
+width: 200px;
+}
+
+input[type="number"] {
+width: 75px;
+}
+
+
+label {
+    display: block;
+    padding-top: 0.5em;
+    font-weight: normal;
+    font-style: italic;
 }

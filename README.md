@@ -1,3 +1,5 @@
+[![Documentation Status](https://readthedocs.org/projects/ethoscope/badge/?version=latest)](http://ethoscope.readthedocs.org/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/ethoscope/badge/?version=dev)](http://ethoscope.readthedocs.org/en/dev/?badge=dev)
 Ethoscope
 ============
 
@@ -9,7 +11,7 @@ The [rethomics](https://github.com/gilestrolab/rethomics) `R` package is designe
 Organisation of the code
 --------------------------
 
-* `src` contains the main python package named `ethoscope`. It is installed on video monitors (devices), but it can be used as a standalone off line tracking tool.
+* `src` contains the main python package named `ethoscope`. It is installed on video monitors (devices), but it can be used as a standalone off-line tracking tool.
 * `node-src` contains the software stack running on the 'node'. Node is a unique computer that syncs and controls devices.
 * `prototypes` contains (often unsuccessful) developmental trials.
 * `scripts` contains a toolbox of scripts mainly to install the software on target devices.

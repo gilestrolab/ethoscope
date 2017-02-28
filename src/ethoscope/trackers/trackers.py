@@ -86,8 +86,6 @@ class BaseTracker(DescribedObject):
         if len(self._times) > 2 and (self._times[-1] - self._times[0]) > self._max_history_length:
             self._positions.popleft()
             self._times.popleft()
-
-
         return points
 
     def _infer_position(self, t, max_time=30 * 1000):
@@ -102,7 +100,8 @@ class BaseTracker(DescribedObject):
     @property
     def positions(self):
         """
-        :return: The last few positions found by the tracker. Positions are kept for a certain duration defined by the ``_max_history_length `` attribute.
+        :return: The last few positions found by the tracker.\
+            Positions are kept for a certain duration defined by the ``_max_history_length`` attribute.
         :rtype: :class:`~collection.deque`
         """
         return self._positions
@@ -113,7 +112,8 @@ class BaseTracker(DescribedObject):
     @property
     def last_time_point(self):
         """
-        :return: The last time point inputed to the tracker. This is updated even when position is inferred/no animal is found
+        :return: The last time point that the tracker used.\
+            This is updated even when position is inferred/no animal is found
         :rtype: int
         """
         return self._last_time_point

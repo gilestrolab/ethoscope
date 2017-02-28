@@ -1,62 +1,42 @@
 """
-
 Ethoscope is a platform developed at `Gilestro lab <http://lab.gilest.ro/>`_.
 It provide an integrated set of tools to acquire behavioural data on small animals and build feed back modules to interact with them in real time.
-By design, it is extremely modular (both on the hardware and software side).
-This project uses, as much as possible, open hardware and software.
+A description of the whole system is available on its `website <http://gilestrolab.github.io/ethoscope/>`_
+The documentation herein describes the ethoscope python package, which is the core of the device software.
+It is intended for programmers who want to contribute to development, and assumes familiarity with ``python`` programming language.
+
+The first purpose of the package is to provide biologists with a modular API to acquire videos, track animals in real time, feed back to
+deliver stimuli upon specific triggers, annotate video frames with tracking information and save data in a consistent format (database).
+In addition, is implements a webserver that can run a a daemon and performs actions upon POST requests.
+
+Installation
+============
+
+Probably you want to work on a virtual environment.
+Then you want to install OpenCV (which is an external library -- i.e. not ip pip).
+Afterwards, you can clone the repository (the branch ``dev`` being the development version) and run:
+
+```
+cd src
+pip install -e .[dev]
+```
 
 
-Hardware
-========
+Core API
+======================
+This diagram represents the core of the API in UML:
 
-Devices
---------
-Devices are enhanced Raspeberry Pi micro-computers with a camera and a wireless dongle.
-Animals lay on individual regions of an experimental arena (typically 3d printed).
-Each device is a *standalone* video tracker that will preform video acquisition, real-time tracking, and data saving.
+.. image:: /img/uml_diagram.svg
 
-This next figure shows the inside of a device (A), and an example of frame acquired with one of such devices(B).
-The left and right part of the frame shown in B represent the same arena acquired in light or dark conditions, respectively.
-
-.. image:: /img/device.jpg
-
-Hardware is available on our `hardware repository <https://github.com/PolygonalTree/ethoscope_hardware>`_.
-
-
-Node
--------
-
-The *Node* is a regular computer (preferably) connected to the internet.
-Its purpose is to send instruction to devices. Form instance, it can requests devices to start, stop, update...
-It also synchronise regularly data (MySQL) from all devices on individual local files (SQLite).
-It runs a front-end bottle server allowing users to send instructions (start tracking, record video, update ...) to each devices.
-The user interface can be used directly on the node or connected to with any web browsing device connected on the network (e.g. a phone).
-
-
-
-Communication between node and devices
-======================================
-The video tracking platform contains *multiple devices* and a *single node*.
-Communication between node and devices is done through a private local wireless network.
-Local network is also used by devices to synchronise their clocks with the node's.
-Optionally, experimental data saved on the node can be mirrored on a remote drive.
-
-This is an overview of the task performed by device and node as well as how they connect to each other.
-
-.. image:: /img/platform.png
-
-
-
-Software
-========
-
-IMAGE HERE
-
+The classes prefixed with ``Base`` are abstract, and several derived classes are already implemented for most of them, but more can be done
+in the prospect of achieving modularity.
 
 
 Local tracking example
 =======================
-A very simple example of how to use the API to perform local tracking.
+
+Since the API is modular, it can be used to simply perform of line tracking from a video file.
+Here is a very simple example.
 If you want to run this code yourself, you can download the `test video <http://gilestrolab.github.io/ethoscope/data/test_video.mp4>`_.
 
 >>> # We import all the bricks from ethoscope package
@@ -105,7 +85,7 @@ we developed an ``R`` package named `rethomics <https://github.com/gilestrolab/r
 
 import core
 import hardware
-import interactors
+import stimulators
 import roi_builders
 import trackers
 import utils

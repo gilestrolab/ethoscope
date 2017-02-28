@@ -1,5 +1,5 @@
 
-{   "roi_builder":{"name":"SleepMonitorWithTargetROIBuilder",
+  {   "roi_builder":{"name":"SleepMonitorWithTargetROIBuilder",
                       "arguments":{}},
     "tracker": {"name":"AdaptiveBGModel",
                   "arguments":{}},

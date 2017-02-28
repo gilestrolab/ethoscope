@@ -9,8 +9,8 @@ import json
 import traceback
 import random
 import subprocess
-
-
+import time
+import socket
 
 try:
     from netifaces import ifaddresses, AF_INET, AF_LINK
@@ -26,6 +26,7 @@ class UnexpectedAction(Exception):
     pass
 class NotNode(Exception):
     pass
+
 def get_commit_version(commit):
     return {"id":str(commit),
             "date":datetime.datetime.utcfromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
@@ -38,7 +39,6 @@ def close(exit_status=0):
     logging.info("Closing server")
     os._exit(exit_status)
 
-
 def get_machine_info(path):
     """
     Reads the machine NAME file and returns the value.
@@ -50,8 +50,6 @@ def get_machine_info(path):
     except Exception as e:
         logging.warning(traceback.format_exc(e))
         return 'Debug-'+str(random.randint(1,100))
-
-
 
 
 def scan_one_device(ip, timeout=2, port=8888, page="id"):
@@ -147,18 +145,14 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
     return devices_map
 
 
-def get_subnet_ip(device="wlan0"):
-    try:
-        ip = ifaddresses(device)[AF_INET][0]["addr"]
-        return ".".join(ip.split(".")[0:3])
-    except ValueError:
-        raise ValueError("Device '%s' is not valid" % device)
 
 
-
-def generate_new_device_map(ip_range=(2,253),device="wlan0"):
+def generate_new_device_map(local_ip, ip_range=(6, 128)):
         devices_map = {}
-        subnet_ip = get_subnet_ip(device)
+        subnet_ip = local_ip.split(".")[0:3]
+        subnet_ip = ".".join(subnet_ip)
+
+
         logging.info("Scanning attached devices")
         scanned = [ "%s.%i" % (subnet_ip, i) for i in range(*ip_range) ]
         urls= ["http://%s" % str(s) for s in scanned]
@@ -236,6 +230,7 @@ def generate_new_device_map(ip_range=(2,253),device="wlan0"):
 
         return devices_map
 
+
 def updates_api_wrapper(ip,id, what="check_update",type=None, port=8888, data=None):
     response = ''
     request_url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
@@ -272,8 +267,6 @@ def updates_api_wrapper(ip,id, what="check_update",type=None, port=8888, data=No
 
     return response
 
-
-
 def _reload_daemon(name):
     subprocess.call(["systemctl","restart", name])
 
@@ -282,3 +275,59 @@ def reload_node_daemon():
 
 def reload_device_daemon():
     _reload_daemon("ethoscope_device")
+
+
+#
+#
+# def get_local_ip(local_router_ip = "192.169.123.254", node_subnet_address="1"):
+#     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     try:
+#         s.connect((local_router_ip ,80))
+#     except socket.gaierror:
+#         raise Exception("Cannot find local ip, check your connection")
+#
+#
+#     ip = s.getsockname()[0]
+#     s.close()
+#
+#     router_ip = local_router_ip.split(".")
+#     ip_list = ip.split(".")
+#     if router_ip[0:3] != ip_list[0:3]:
+#         raise Exception("The local ip address does not match the expected router subnet: %s != %s" % (str(router_ip[0:3]), str(ip_list[0:3])))
+#     if  ip_list[3] != node_subnet_address:
+#         raise Exception("The ip of the node in the intranet should finish by %s. current ip = %s" % (node_subnet_address, ip))
+#     return ip
+
+
+def get_local_ip(local_router_ip = "192.169.123.254", max_node_subnet_address=5, is_node=False):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect((local_router_ip ,80))
+    except socket.gaierror:
+        raise Exception("Cannot find local ip, check your connection")
+
+
+    ip = s.getsockname()[0]
+    s.close()
+
+    router_ip = local_router_ip.split(".")
+    ip_list = ip.split(".")
+    if router_ip[0:3] != ip_list[0:3]:
+        raise Exception("The local ip address does not match the expected router subnet: %s != %s" % (str(router_ip[0:3]), str(ip_list[0:3])))
+    if  is_node and int(ip_list[3]) >  max_node_subnet_address:
+        raise Exception("The the last field of the node ip should be lower or equal to %i. current ip = %s" % (max_node_subnet_address, ip))
+    return ip
+
+
+def get_internet_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    try:
+        s.connect(("google.com", 80))
+    except socket.gaierror:
+        raise Exception("Cannot find internet (www) connection")
+
+    ip = s.getsockname()[0]
+    s.close()
+    return ip
+    
