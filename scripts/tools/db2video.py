@@ -19,7 +19,7 @@ def annotate_image(args):
     label = datetime.datetime.fromtimestamp(time/1000 + t0).strftime('%Y-%m-%d %H:%M:%S')
     out = input+"_tmp.jpg"
 
-    command = "convert %s -pointsize 50  -font Courier -background Khaki  label:'%s' +swap -gravity Center -append %s" % (input, label, out)
+    command = "convert %s -pointsize 50  -font FreeMono -background Khaki  label:'%s' +swap -gravity Center -append %s" % (input, label, out)
     os.system(command)
     shutil.move(out,input)
 
