@@ -155,7 +155,7 @@ class BackgroundModel(object):
     """
     A class to model background. It uses a dynamic running average and support arbitrary and heterogeneous frame rates
     """
-    def __init__(self, max_half_life=100. * 1000, min_half_life=1.* 1000, increment = 1.2):
+    def __init__(self, max_half_life=500. * 1000, min_half_life=5.* 1000, increment = 1.2):
         # the maximal half life of a pixel from background, in seconds
         self._max_half_life = float(max_half_life)
         # the minimal one
@@ -164,7 +164,7 @@ class BackgroundModel(object):
         # starts with the fastest learning rate
         self._current_half_life = self._min_half_life
 
-        # fixme theoritically this should depend on time, not frame index
+        # fixme theoretically this should depend on time, not frame index
         self._increment = increment
         # the mean background
         self._bg_mean = None
@@ -255,7 +255,7 @@ class AdaptiveBGModel(BaseTracker):
 
 
         self._bg_model = BackgroundModel()
-        self._max_m_log_lik = 6.
+        self._max_m_log_lik = 5.5
         self._buff_grey = None
         self._buff_object = None
         self._buff_object_old = None
