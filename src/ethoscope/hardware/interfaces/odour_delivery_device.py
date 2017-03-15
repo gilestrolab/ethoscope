@@ -44,3 +44,17 @@ class OdourDepriverInterface(OdourDelivererInterface):
     def _warm_up(self):
         for i in range(self._n_channels):
             self.send(i + 1)
+
+
+class OdourDelivererFlushedInterface(OdourDelivererInterface):
+
+    def send(self, channel, stimulus_duration=5.0, flush_duration=30.0):
+        self._move_to_pos(channel, 1)
+        time.sleep(stimulus_duration)
+        self._move_to_pos(channel, 2)
+        time.sleep(flush_duration)
+        self._move_to_pos(channel, 3)
+
+    def _warm_up(self):
+        for i in range(self._n_channels):
+            self.send(i + 1, 1,3)

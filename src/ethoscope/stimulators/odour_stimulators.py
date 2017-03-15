@@ -4,7 +4,7 @@ import logging
 from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVariable
 from ethoscope.utils.scheduler import Scheduler
 from ethoscope.hardware.interfaces.interfaces import  DefaultInterface
-from ethoscope.hardware.interfaces.odour_delivery_device import OdourDelivererInterface, OdourDepriverInterface
+from ethoscope.hardware.interfaces.odour_delivery_device import OdourDelivererInterface, OdourDepriverInterface, OdourDelivererFlushedInterface
 import sleep_depriver_stimulators
 import random
 
@@ -204,5 +204,54 @@ class MiddleCrossingOdourStimulator(sleep_depriver_stimulators.MiddleCrossingSti
     def _decide(self):
         decide, args = super(MiddleCrossingOdourStimulator, self)._decide()
         args["stimulus_duration"] = self._stimulus_duration
+
+        return decide, args
+
+class MiddleCrossingOdourStimulatorFlushed(MiddleCrossingOdourStimulator):
+    _description = {"overview": "A stimulator to send odour to an animal as it crosses the midline, and then flush it",
+                    "arguments": [
+                        {"type": "number", "min": 0.0, "max": 1.0, "step": 0.01, "name": "p",
+                         "description": "the probability to move the tube when a beam cross was detected",
+                         "default": 1.0},
+                        {"type": "number", "min": 0.0, "max": 300, "step": 1, "name": "refractory_period",
+                         "description": "cannot send two stimuli if they are not separated from, at least, this duration",
+                         "default": 120},
+                        {"type": "number", "min": 2.0, "max": 10.0, "step": 0.5, "name": "stimulus_duration",
+                         "description": "How long to send the puff of odour for", "default": 5.0},
+                        {"type": "number", "min": 2.0, "max": 60.0, "step": 0.5, "name": "flush_duration",
+                         "description": "How long to flush odour for", "default": 10.0},
+                        {"type": "date_range", "name": "date_range",
+                         "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                         "default": ""}
+                    ]}
+
+    _HardwareInterfaceClass = OdourDepriverInterface
+
+    _roi_to_channel = {
+            1:1,  2:2,  3:3,  4:4,  5:5,
+            6:6, 7:7, 8:8, 9:9, 10:10
+        }
+
+
+
+    def __init__(self,
+                 hardware_connection,
+                 p=1.0,
+                 refractory_period = 300,
+                 stimulus_duration = 5,
+                 flush_duration=10,
+                 date_range=""
+                 ):
+
+        super(MiddleCrossingOdourStimulator, self).__init__(hardware_connection, p=p, date_range=date_range)
+        self._refractory_period = refractory_period
+        self._stimulus_duration = stimulus_duration
+        self._flush_duration = flush_duration
+
+
+    def _decide(self):
+        decide, args = super(MiddleCrossingOdourStimulator, self)._decide()
+        args["stimulus_duration"] = self._stimulus_duration
+        args["flush_duration"] = self._flush_duration
 
         return decide, args
