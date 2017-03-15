@@ -225,14 +225,11 @@ class MiddleCrossingOdourStimulatorFlushed(MiddleCrossingOdourStimulator):
                          "default": ""}
                     ]}
 
-    _HardwareInterfaceClass = OdourDepriverInterface
-
+    _HardwareInterfaceClass = OdourDelivererFlushedInterface
     _roi_to_channel = {
             1:1,  2:2,  3:3,  4:4,  5:5,
             6:6, 7:7, 8:8, 9:9, 10:10
         }
-
-
 
     def __init__(self,
                  hardware_connection,
