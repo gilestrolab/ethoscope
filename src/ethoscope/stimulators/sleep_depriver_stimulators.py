@@ -13,7 +13,7 @@ from ethoscope.hardware.interfaces.optomotor import OptoMotor
 
 
 import random
-
+import time
 
 class IsMovingStimulator(BaseStimulator):
     _HardwareInterfaceClass = DefaultInterface
@@ -358,3 +358,54 @@ class MiddleCrossingStimulator(BaseStimulator):
                 return HasInteractedVariable(True), {"channel": channel}
 
         return HasInteractedVariable(False), {"channel": channel}
+
+
+
+
+
+class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
+    _description = {"overview": "A stimulator to sleep deprive an animal using gear motors. See https://github.com/gilestrolab/ethoscope_hardware/tree/master/modules/gear_motor_sleep_depriver",
+                    "arguments": [
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_threshold", "description": "The minimal velocity that counts as movement","default":0.0060},
+                                    {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "interval", "description": "The recurence of the stimulus","default":120},
+                                    {"type": "number", "min": 500, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
+                                    {"type": "number", "min": 0, "max": 3, "step": 1, "name": "stimulus_type",  "description": "1 = opto, 2= moto", "default": 2},
+                                    {"type": "date_range", "name": "date_range",
+                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "default": ""}
+                                   ]}
+
+
+    def __init__(self,
+                 hardware_connection,
+                 velocity_threshold=0.0060,
+                 interval=120,  # s
+                 pulse_duration = 1000,  #ms
+                 stimulus_type = 2,  # 1 = opto, 2= moto, 3 = both
+                 date_range=""
+                 ):
+
+
+        self._t0 = time.time()
+        self._interval = interval
+
+        super(OptomotorSleepDepriver, self).__init__(hardware_connection, velocity_threshold, None, date_range)
+
+
+
+        if stimulus_type == 2:
+            self._roi_to_channel = self._roi_to_channel_moto
+        elif stimulus_type == 1:
+            self._roi_to_channel = self._roi_to_channel_opto
+
+        self._pulse_duration= pulse_duration
+
+    def _decide(self):
+        now = time.time()
+        if now - self._t_0 > self._interval:
+            dic = {}
+            dic["duration"] = self._pulse_duration
+            self._t0 = now
+            return HasInteractedVariable(True), dic
+
+        return HasInteractedVariable(False), {}
