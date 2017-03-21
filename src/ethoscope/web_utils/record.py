@@ -30,13 +30,13 @@ class PiCameraProcess(multiprocessing.Process):
         video_info= "%ix%i@%i" %(w, h, self._fps)
         return '%s_%s_%05d.h264' % (self._video_prefix, video_info, i)
 
-    def _write_video_index(self):
-        index_file = os.path.join(self._video_root_dir, "index.html")
-        all_video_files = [y for x in os.walk(self._video_root_dir) for y in glob.glob(os.path.join(x[0], '*.h264'))]
-
-        with open(index_file, "w") as index:
-            for f in all_video_files:
-                index.write(f + "\n")
+    # def _write_video_index(self):
+    #     index_file = os.path.join(self._video_root_dir, "index.html")
+    #     all_video_files = [y for x in os.walk(self._video_root_dir) for y in glob.glob(os.path.join(x[0], '*.h264'))]
+    #
+    #     with open(index_file, "w") as index:
+    #         for f in all_video_files:
+    #             index.write(f + "\n")
 
     def run(self):
         import picamera
@@ -47,7 +47,7 @@ class PiCameraProcess(multiprocessing.Process):
                 camera.resolution = self._resolution
                 camera.framerate = self._fps
                 camera.start_recording(self._make_video_name(i), bitrate=self._bitrate)
-                self._write_video_index()
+                # self._write_video_index()
                 start_time = time.time()
                 i += 1
                 while True:
@@ -55,7 +55,7 @@ class PiCameraProcess(multiprocessing.Process):
                     camera.capture(self._img_path, use_video_port=True, quality=50)
                     if time.time() - start_time >= self._VIDEO_CHUNCK_DURATION:
                         camera.split_recording(self._make_video_name(i))
-                        self._write_video_index()
+                        # self._write_video_index()
                         start_time = time.time()
                         i += 1
                     if not self._stop_queue.empty():

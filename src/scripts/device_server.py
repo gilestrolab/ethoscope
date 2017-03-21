@@ -9,6 +9,8 @@ from ethoscope.web_utils.helpers import get_machine_info, get_version, file_in_d
 from ethoscope.web_utils.record import ControlThreadVideoRecording
 from subprocess import call
 import json
+import os
+import glob
 
 api = Bottle()
 
@@ -46,6 +48,17 @@ def server_static(filepath):
 @error_decorator
 def name():
     return {"id": control.info["id"]}
+
+
+@api.get('/make_index')
+@error_decorator
+def make_index():
+    index_file = os.path.join(ETHOSCOPE_DIR, "index.html")
+    all_video_files = [y for x in os.walk(ETHOSCOPE_DIR) for y in glob.glob(os.path.join(x[0], '*.h264'))]
+    with open(index_file, "w") as index:
+        for f in all_video_files:
+            index.write(f + "\n")
+    return {}
 
 
 
