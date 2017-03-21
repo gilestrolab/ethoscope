@@ -185,31 +185,10 @@ class OptomotorSleepDepriver(SleepDepStimulator):
                                    ]}
 
     _HardwareInterfaceClass = OptoMotor
-
-    _roi_to_channel_opto = {
-        1: 1,
-        3: 3,
-        5: 5,
-        7: 7,
-        9: 9,
-        12: 23,
-        14: 21,
-        16: 19,
-        18: 17,
-        20: 15
-    }
-    _roi_to_channel_moto = {
-        1: 0,
-        3: 2,
-        5: 4,
-        7: 6,
-        9: 8,
-        12: 22,
-        14: 20,
-        16: 18,
-        18: 16,
-        20: 14
-    }
+    _roi_to_channel_opto = {1:1, 3:3, 5:5, 7:7, 9:9,
+                            12:23, 14:21,16:19, 18:17, 20:15}
+    _roi_to_channel_moto = {1:0, 3:2, 5:4, 7:6, 9:8,
+                            12:22, 14:20, 16:18, 18:16, 20:14}
 
 
     def __init__(self,
@@ -374,6 +353,12 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
                                      "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
                                      "default": ""}
                                    ]}
+
+    _HardwareInterfaceClass = OptoMotor
+    _roi_to_channel_opto = {1:1, 3:3, 5:5, 7:7, 9:9,
+                            12:23, 14:21,16:19, 18:17, 20:15}
+    _roi_to_channel_moto = {1:0, 3:2, 5:4, 7:6, 9:8,
+                            12:22, 14:20, 16:18, 18:16, 20:14}
 
 
     def __init__(self,
