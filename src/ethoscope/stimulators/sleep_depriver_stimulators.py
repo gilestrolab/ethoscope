@@ -374,7 +374,7 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
         self._t0 = time.time()
         self._interval = interval
 
-        super(OptomotorSleepDepriver, self).__init__(hardware_connection, velocity_threshold, None, date_range)
+        super(OptomotorSleepDepriver, self).__init__(hardware_connection, velocity_threshold, interval, date_range)
 
 
 
