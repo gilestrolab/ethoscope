@@ -386,7 +386,7 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
                  ):
 
 
-        self._t0 = time.time()
+        self._t0 = time.time() +  self._tracker._roi.idx
         self._interval = interval
 
         super(OptomotorSleepDepriver, self).__init__(hardware_connection, velocity_threshold, None, date_range)
@@ -401,7 +401,7 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
         self._pulse_duration= pulse_duration
 
     def _decide(self):
-        now = time.time()
+        now = time.time() +  self._tracker._roi.idx
         if now - self._t_0 > self._interval:
             dic = {}
             dic["duration"] = self._pulse_duration
