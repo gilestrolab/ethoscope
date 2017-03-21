@@ -345,7 +345,7 @@ class MiddleCrossingStimulator(BaseStimulator):
 class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
     _description = {"overview": "A stimulator to sleep deprive an animal using gear motors. See https://github.com/gilestrolab/ethoscope_hardware/tree/master/modules/gear_motor_sleep_depriver",
                     "arguments": [
-                                    {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_threshold", "description": "The minimal velocity that counts as movement","default":0.0060},
+
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "interval", "description": "The recurence of the stimulus","default":120},
                                     {"type": "number", "min": 500, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
                                     {"type": "number", "min": 0, "max": 3, "step": 1, "name": "stimulus_type",  "description": "1 = opto, 2= moto", "default": 2},
@@ -363,7 +363,6 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
 
     def __init__(self,
                  hardware_connection,
-                 velocity_threshold=0.0060,
                  interval=120,  # s
                  pulse_duration = 1000,  #ms
                  stimulus_type = 2,  # 1 = opto, 2= moto, 3 = both
@@ -371,24 +370,25 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
                  ):
 
 
-        self._t0 = time.time()
-        self._interval = interval
 
-        super(OptomotorSleepDepriver, self).__init__(hardware_connection, velocity_threshold, interval, date_range)
+        self._interval = interval  *1000 # ms used internally
+
+        super(OptomotorSleepDepriverSystematic, self).__init__(hardware_connection, 0,0,
+                                                               pulse_duration, stimulus_type,
+                                                               date_range)
 
 
-
-        if stimulus_type == 2:
-            self._roi_to_channel = self._roi_to_channel_moto
-        elif stimulus_type == 1:
-            self._roi_to_channel = self._roi_to_channel_opto
-
-        self._pulse_duration= pulse_duration
+        self._t0 = 0
 
     def _decide(self):
-        now = time.time() +  self._tracker._roi.idx
+        roi_id = self._tracker._roi.idx
+        try:
+            channel = self._roi_to_channel[roi_id]
+        except KeyError:
+            return HasInteractedVariable(False), {}
+        now = self._tracker.last_time_point + roi_id *100
         if now - self._t0 > self._interval:
-            dic = {}
+            dic = {"channel": channel}
             dic["duration"] = self._pulse_duration
             self._t0 = now
             return HasInteractedVariable(True), dic
