@@ -38,8 +38,11 @@ def get_video_list(ip, port=9000,static_dir = "static", index_file="ethoscope_da
     url = "/".join(["%s:%i"%(ip,port), static_dir, index_file])
 
     try:
+        print "0 Making index" + url
         response = urllib2.urlopen(url)
+        print "1 Making index" + url
         out = [r.rstrip() for r in response]
+        print "2 Making index" + url
     except urllib2.HTTPError as e:
         logging.warning("No index file could be found for device %s" % ip)
         out = None
@@ -69,7 +72,9 @@ def make_index(ip, port=9000, page="make_index"):
 def get_all_videos(device_info, out_dir, port=9000, static_dir="static"):
     url = "http://" + device_info["ip"]
     id = device_info["id"]
+    print "id:"+id
     video_list = get_video_list(url, port=port, static_dir=static_dir)
+    print ("vlist", video_list)
     #backward compatible. if no index, we do not stop
     if video_list is None:
         return
