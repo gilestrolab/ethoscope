@@ -55,6 +55,7 @@ def remove_video_from_host(ip, id, target, port=9000):
 
 def make_index(ip, port=9000, page="make_index"):
     url = "/".join(["%s:%i"%(ip,port), make_index])
+    print "Making index" + url
     try:
         response = urllib2.urlopen(url)
         return True
