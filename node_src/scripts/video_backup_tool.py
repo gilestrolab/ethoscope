@@ -36,6 +36,7 @@ def wget_mirror_wrapper(target, target_prefix, output_dir, cut_dirs=3):
 def get_video_list(ip, port=9000,static_dir = "static", index_file="ethoscope_data/results/index.html"):
 
     url = "/".join(["%s:%i"%(ip,port), static_dir, index_file])
+    print  " 0 Making index" + url
     try:
         response = urllib2.urlopen(url)
         return [r.rstrip() for r in response]
