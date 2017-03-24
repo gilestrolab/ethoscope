@@ -377,7 +377,6 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
                                                                pulse_duration, stimulus_type,
                                                                date_range)
 
-
         self._t0 = 0
 
     def _decide(self):
