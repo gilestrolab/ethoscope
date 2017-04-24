@@ -115,8 +115,8 @@ class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
     _description = {
         "overview": "An stimulator to sleep deprive an animal using servo motor. See http://todo/fixme.html",
         "arguments": [
-            {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_threshold",
-             "description": "The minimal velocity that counts as movement", "default": 0.0060/2},
+            {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_correction_coef",
+             "description": "Velocity correction coef", "default": 3.0e-3 * 2},
             {"type": "number", "min": 2.0, "max": 10.0, "step": 0.5, "name": "stimulus_duration",
              "description": "How long to send the puff of odour for", "default": 5.0},
             {"type": "number", "min": 1, "max": 3600 * 12, "step": 1, "name": "min_inactive_time",
@@ -134,7 +134,7 @@ class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
 
     def __init__(self,
                  hardware_connection,
-                 velocity_threshold=0.0060/2,
+                 velocity_correction_coef=3.0e-3 * 2,
                  min_inactive_time=120,  # s
                  stimulus_duration=5,  #s
                  date_range=""
@@ -144,8 +144,8 @@ class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
 
         :param hardware_connection: the sleep depriver module hardware interface
         :type hardware_connection: :class:`~ethoscope.hardawre.interfaces.sleep_depriver_interface.SleepDepriverInterface`
-        :param velocity_threshold: The minimal velocity that counts as movement.
-        :type velocity_threshold: float
+        :param velocity_correction_coef: correct velocity by this coefficient to make it fps-inveriant. 1 => walking
+        :type velocity_correction_coef: float
         :param stimulus_duration: how long the odour delivery takes place for
         :type stimulus_duration: float
         :param min_inactive_time: the minimal time without motion after which an animal should be disturbed (in seconds)
@@ -153,7 +153,7 @@ class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
         :return:
         """
         self._stimulus_duration = stimulus_duration
-        super(DynamicOdourSleepDepriver, self).__init__(hardware_connection, velocity_threshold, min_inactive_time, date_range)
+        super(DynamicOdourSleepDepriver, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, date_range)
 
     def _decide(self):
         decide, args = super(DynamicOdourSleepDepriver, self)._decide()
