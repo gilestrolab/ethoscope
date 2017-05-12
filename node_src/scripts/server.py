@@ -215,21 +215,22 @@ def node_info(req):#, device):
         df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout=subprocess.PIPE)
         disk_free = df.communicate()[0]
         disk_usage = RESULTS_DIR+" Not Found on disk"
-        # ip = "No IP assigned, check cable"
-        # MAC_addr = "Not detected"
-        # local_ip = ""
-        # try:
-        #     disk_usage = disk_free.split("\n")[1].split()
-        #     addrs = ifaddresses(INTERNET_DEVICE)
-        #     MAC_addr = addrs[AF_LINK][0]["addr"]
-        #
-        #     ip = addrs[AF_INET][0]["addr"]
-        #     local_addrs = ifaddresses(SUBNET_DEVICE)
-        #     local_ip = local_addrs[AF_INET][0]["addr"]
-        # except Exception as e:
-        #     logging.error(e)
+        ip = "No IP assigned, check cable"
+        MAC_addr = "Not detected"
+        local_ip = ""
+        try:
+            disk_usage = disk_free.split("\n")[1].split()
+            net_info = subprocess.Popen(['ip','a'], stdout=subprocess.PIPE)
+            net_info = net_info.communicate()[0].split("\n")
+            WWW_MAC_addr = net_info[net_info.index([s for s in net_info if WWW_IP in s][0])-1].split("\t")[1].split(" ")[2]
+            LOCAL_MAC_addr = net_info[net_info.index([s for s in net_info if LOCAL_IP in s][0])-1].split("\t")[1].split(" ")[2]
+        except Exception as e:
+            logging.error(e)
         #fixme
-        MAC_addr = "TODO"
+        #MAC_addr = "TODO"
+        return {'disk_usage': disk_usage, 'MAC_addr': WWW_MAC_addr, 'ip': WWW_IP,
+                'local_ip':LOCAL_IP}
+
         return {'disk_usage': disk_usage, 'MAC_addr': MAC_addr, 'ip': WWW_IP,
                 'local_ip':LOCAL_IP}
     if req == 'time':
