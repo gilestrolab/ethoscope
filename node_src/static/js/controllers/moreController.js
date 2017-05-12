@@ -117,6 +117,22 @@
 	   return (bytes / Math.pow(k, i)).toPrecision(3) + ' ' + sizes[i];
 	}
 
+/// Node Management update
+        $scope.nodeManagement = {};
+        var get_node_info = function(){
+            $http.get('/node/info').success(function(res){
+                $scope.nodeManagement.info = res;
+            })
+        }
+        $scope.nodeManagement.time = new Date();
+        $scope.nodeManagement.time = $scope.nodeManagement.time.toString();
+        $scope.nodeManagement.action = function(action){
+               $http.post('/node-actions', data = {'action':action})
+               .success(function(res){
+                $scope.nodeManagement[action]=res;
+               });
+        };
+
 }
  angular.module('flyApp').controller('moreController',moreController);
 })()
