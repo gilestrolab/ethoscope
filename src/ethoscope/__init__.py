@@ -37,7 +37,7 @@ Local tracking example
 
 Since the API is modular, it can be used to simply perform of line tracking from a video file.
 Here is a very simple example.
-If you want to run this code yourself, you can download the `test video <http://gilestrolab.github.io/ethoscope/data/test_video.mp4>`_.
+If you want to run this code yourself, you can download the `test video <https://imperialcollegelondon.box.com/v/ethoscope-test-video>`_.
 
 >>> # We import all the bricks from ethoscope package
 >>> from ethoscope.core.monitor import Monitor
