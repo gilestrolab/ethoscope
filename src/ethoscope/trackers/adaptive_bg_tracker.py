@@ -282,13 +282,16 @@ class AdaptiveBGModel(BaseTracker):
         cv2.cvtColor(img,cv2.COLOR_BGR2GRAY, self._buff_grey)
         # cv2.imshow("dbg",self._buff_grey)
         cv2.GaussianBlur(self._buff_grey,(blur_rad,blur_rad),1.2, self._buff_grey)
+
+
         if darker_fg:
             cv2.subtract(255, self._buff_grey, self._buff_grey)
 
         #
         mean = cv2.mean(self._buff_grey, mask)
 
-        scale = 128. / mean[0]
+        if mean[0] >0:
+            scale = 128. / mean[0]
 
         cv2.multiply(self._buff_grey, scale, dst = self._buff_grey)
 
