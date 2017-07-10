@@ -200,7 +200,7 @@ if __name__ == '__main__':
     # when no bare repo path is declares. we are in a device else, we are on a node
     parser.add_option("-b", "--bare-repo", dest="bare_repo", default=None, help="route to bare repository")
     #parser.add_option("-i", "--node-ip", dest="node_ip", help="Ip of the node in the local network")
-    parser.add_option("-r", "--router-ip", dest="router_ip", default="192.169.123.254",
+    parser.add_option("-r", "--router-ip", dest="router_ip", default="192.168.123.254",
                       help="the ip of the router in your setup")
     parser.add_option("-p", "--port", default=8888, dest="port", help="the port to run the server on")
     parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")

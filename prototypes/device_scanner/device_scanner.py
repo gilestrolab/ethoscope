@@ -36,7 +36,7 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
 
 
 class DeviceScanner(Thread):
-    def __init__(self, local_ip = "192.169.123.1", ip_range = (6,8)):
+    def __init__(self, local_ip = "192.168.123.1", ip_range = (6,8)):
         self._is_active = True
         self._devices = {}
         self._device_id_map = {}

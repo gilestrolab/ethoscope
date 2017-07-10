@@ -111,7 +111,7 @@ First, we create a DNS mask.
 
 ```sh
 # see how to setup router
-NODE_IP=192.169.123.1
+NODE_IP=192.168.123.1
 
 #configuring dns server:
 echo "interface=$WL_INTERFACE" >/etc/dnsmasq.conf
@@ -209,8 +209,8 @@ In order to check things:
 * reboot the computer
 * open firefox
 * test the local server at http://0.0.0.0
-* test the local server at http://192.169.123.1 (will fail until your network is configured)
-* test the update server http://192.169.123.1:8888
+* test the local server at http://192.168.123.1 (will fail until your network is configured)
+* test the update server http://192.168.123.1:8888
 * test the dns mask (go at http://node)
 
 

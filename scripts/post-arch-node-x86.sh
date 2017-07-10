@@ -19,7 +19,7 @@ export LOCAL_BARE_PATH=/srv/git/ethoscope.git
 export TARGET_UPDATER_DIR=/opt/ethoscope_updater
 export TARGET_GIT_INSTALL=/opt/ethoscope-git
 export UPDATER_LOCATION_IN_GIT=scripts/ethoscope_updater
-export NODE_IP=192.169.123.1
+export NODE_IP=192.168.123.1
 export WL_INTERFACE=wlan0
 
 
@@ -97,7 +97,7 @@ echo "interface=$WL_INTERFACE" >/etc/dnsmasq.conf
 echo "dhcp-option = 6,$NODE_IP" >> /etc/dnsmasq.conf
 echo "no-hosts" >> /etc/dnsmasq.conf
 echo "addn-hosts=/etc/host.dnsmasq" >> /etc/dnsmasq.conf
-#domain=polygonaltreenetwork.com,192.169.123.0/24
+#domain=polygonaltreenetwork.com,192.168.123.0/24
 
 echo "$NODE_IP    node" >> /etc/hosts.dnsmasq
 

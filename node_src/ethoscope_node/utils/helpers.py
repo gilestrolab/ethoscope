@@ -10,7 +10,7 @@ def get_last_backup_time(device):
     except Exception:
         return "No backup"
 
-def get_local_ip(local_subnet_ip ="192.169.123.0", max_node_subnet_address=5, localhost=False):
+def get_local_ip(local_subnet_ip ="192.168.123.0", max_node_subnet_address=5, localhost=False):
     subnet_ip_list = local_subnet_ip.split(".")
     local_router_ip = ".".join(subnet_ip_list[0:3] + ["254"])
     if localhost:

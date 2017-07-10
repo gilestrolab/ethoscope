@@ -279,7 +279,7 @@ def reload_device_daemon():
 
 #
 #
-# def get_local_ip(local_router_ip = "192.169.123.254", node_subnet_address="1"):
+# def get_local_ip(local_router_ip = "192.168.123.254", node_subnet_address="1"):
 #     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 #     try:
 #         s.connect((local_router_ip ,80))
@@ -299,7 +299,7 @@ def reload_device_daemon():
 #     return ip
 
 
-def get_local_ip(local_router_ip = "192.169.123.254", max_node_subnet_address=5, is_node=False):
+def get_local_ip(local_router_ip = "192.168.123.254", max_node_subnet_address=5, is_node=False):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         s.connect((local_router_ip ,80))

@@ -51,7 +51,7 @@ def scan_one_device(ip, timeout=2.5, port=9000, page="id"):
 
 
 
-subnet = "192.169.123" #"129.31.135"
+subnet = "192.168.123" #"129.31.135"
 subnet = "129.31.135"
 ip_range = (2,253)
 to_scan = "%s.%i-%i" % (subnet, ip_range[0], ip_range[1])

@@ -49,7 +49,7 @@ class DeviceScanner(Thread):
     _refresh_period = 1.0
     _filter_device_period = 5
 
-    def __init__(self, local_ip = "192.169.123.1", ip_range = (6,100),device_refresh_period = 5, results_dir="/ethoscope_results"):
+    def __init__(self, local_ip = "192.168.123.1", ip_range = (6,100),device_refresh_period = 5, results_dir="/ethoscope_results"):
         self._is_active = True
         self._devices = []
         # "id" -> "info", "dev"

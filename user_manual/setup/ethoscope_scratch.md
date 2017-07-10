@@ -22,7 +22,7 @@ Before you start you will need:
 
 * a wifi dongle in the pi2 (so we can access the node, pi3 has wifi on board)
 * a working internet connection via ethernet cable (so we can download extra software)
-* a node running at `192.169.123.1` [see here](node.md)
+* a node running at `192.168.123.1` [see here](node.md)
 * a working `ETHOSCOPE_WIFI` network [see here](network.md)
 * a screen and a keyboard plugged in the pi make things simpler
  
@@ -84,7 +84,7 @@ BARE_GIT_NAME=ethoscope.git
 NETWORK_SSID=ETHOSCOPE_WIFI
 NETWORK_PASSWORD=ETHOSCOPE_1234
 #ip addresses
-NODE_SUBNET=192.169.123
+NODE_SUBNET=192.168.123
 NODE_IP=$NODE_SUBNET.1
 ```
 

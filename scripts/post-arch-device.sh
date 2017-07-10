@@ -17,7 +17,7 @@ export DB_NAME=ethoscope_db
 export TARGET_GIT_INSTALL=/opt/ethoscope-git
 export UPDATER_LOCATION_IN_GIT=scripts/ethoscope_updater
 export TARGET_UPDATER_DIR=/opt/ethoscope_updater
-export NODE_IP=192.169.123.1
+export NODE_IP=192.168.123.1
 export BARE_GIT_NAME=ethoscope.git
 
 
