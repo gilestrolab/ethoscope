@@ -4,7 +4,7 @@ Ethoscope
 ============
 
 This is the github repository of the software part of the [ethoscope platform](http://gilestrolab.github.io/ethoscope/).
-All technical information regarding ethoscope is compiled in [our documnetation](https://qgeissmann.gitbooks.io/ethoscope-manual/content/)
+All technical information regarding ethoscope is compiled in [our documentation](https://qgeissmann.gitbooks.io/ethoscope-manual/content/)
 
 Organisation of the code
 --------------------------
