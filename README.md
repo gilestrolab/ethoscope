@@ -4,9 +4,7 @@ Ethoscope
 ============
 
 This is the github repository of the software part of the [ethoscope platform](http://gilestrolab.github.io/ethoscope/).
-The harware repository lives [here](https://github.com/PolygonalTree/ethoscope_hardware).
-The [rethomics](https://github.com/gilestrolab/rethomics) `R` package is designed to analyse results.
-
+All technical information regarding ethoscope is compiled in [our documnetation](https://qgeissmann.gitbooks.io/ethoscope-manual/content/)
 
 Organisation of the code
 --------------------------
