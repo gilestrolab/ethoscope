@@ -74,6 +74,8 @@ if __name__ == '__main__':
         parser.add_option("-l", "--local", dest="local", default=False,
                           help="Run on localhost (run a node and device on the same machine, for development)",
                           action="store_true")
+        parser.add_option("-m", "--remote-dir", dest="remote", default=None,
+                          help="A secondary location to rsync data")
         (options, args) = parser.parse_args()
         option_dict = vars(options)
 
@@ -82,7 +84,9 @@ if __name__ == '__main__':
 
         gbw = GenericBackupWrapper(backup_job,
                                    option_dict["results_dir"],
-                                   option_dict["safe"], local_ip
+                                   option_dict["safe"],
+                                   option_dict["remote"],
+                                   local_ip
                                    )
         gbw.run()
 
