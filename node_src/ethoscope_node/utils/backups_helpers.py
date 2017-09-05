@@ -33,7 +33,7 @@ class GenericBackupWrapper(object):
             self._device_scanner.stop()
 
     def archive_results(self):
-        command = "rsync -avrz %s/ %s/%s/ --exclude=*.txt --exclude=*.db.*" % (self._results_dir,
+        command = "rsync -avrz %s/ %s/%s/ --whole-file --exclude=*.txt --exclude=*.db.*" % (self._results_dir,
                                                                                           self._remote_dir,
                                                                                           self._results_dir)
         os.system(command)
