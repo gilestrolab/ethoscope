@@ -37,6 +37,13 @@ class GenericBackupWrapper(object):
                                                                                           self._remote_dir,
                                                                                           self._results_dir)
         os.system(command)
+        idx_path = os.path.join(self._results_dir, "index.txt")
+
+        command = "rsync -v %s %s/%s/ " % (idx_path,
+                                            self._remote_dir,
+                                            self._results_dir)
+        os.system(command)
+
 
     def index_file(self, basename="index.txt"):
         idx_path = os.path.join(self._results_dir, basename)
