@@ -48,9 +48,9 @@ class GenericBackupWrapper(object):
     def index_file(self, basename="index.txt"):
         idx_path = os.path.join(self._results_dir, basename)
         with open(idx_path,"w") as f:
-            for x in sorted(os.walk(self._results_dir)):
+            for x in sorted(os.walk(self._remote_dir)):
                 for abs_path in glob.glob(os.path.join(x[0], "*.*")):
-                    rel_path = os.path.relpath(abs_path, start=self._results_dir)
+                    rel_path = os.path.relpath(abs_path, start=self._remote_dir)
                     size = os.stat(abs_path).st_size
                     f.write('"%s",%i\n' % (rel_path,size))
 
@@ -94,14 +94,14 @@ class GenericBackupWrapper(object):
                     pool.join()
                 logging.info("Backup finished at t=%i" % t1)
 
-                logging.info("Making index file")
-                self.index_file()
-
                 if t1_archive - t0_archive < self._ARCHIVE_DT:
                     t1_archive = time.time()
                     continue
 
                 if self._remote_dir is not None:
+                    logging.info("Making index file")
+                    self.index_file()
+
                     logging.info("Syncing files to remote archive at t=%i" % t1)
                     try:
                         self.archive_results()
