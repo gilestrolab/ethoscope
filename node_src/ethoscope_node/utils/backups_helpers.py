@@ -46,11 +46,12 @@ class GenericBackupWrapper(object):
 
 
     def index_file(self, basename="index.txt"):
+        scan_location = "%s/%s"  % (self._remote_dir, self._results_dir)
         idx_path = os.path.join(self._results_dir, basename)
         with open(idx_path,"w") as f:
-            for x in sorted(os.walk(self._remote_dir)):
+            for x in sorted(os.walk(scan_location)):
                 for abs_path in glob.glob(os.path.join(x[0], "*.*")):
-                    rel_path = os.path.relpath(abs_path, start=self._remote_dir)
+                    rel_path = os.path.relpath(abs_path, start=scan_location)
                     size = os.stat(abs_path).st_size
                     f.write('"%s",%i\n' % (rel_path,size))
 
