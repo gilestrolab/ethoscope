@@ -386,7 +386,7 @@ class Device(Thread):
                                           )
 
         except Exception as e:
-            logging.error("Could not generate backup path for device. Probably a MySQL issue")
+            logging.error("Could not generate backup path for device %s (%s). Probably a MySQL issue" % (device_id, self._ip))
             logging.error(traceback.format_exc(e))
             return {"backup_path": "None"}
 
