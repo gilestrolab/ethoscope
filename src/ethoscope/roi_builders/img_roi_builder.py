@@ -29,8 +29,6 @@ class ImgMaskROIBuilder(BaseROIBuilder):
         IMAGE HERE
 
         """
-
-
         self._mask = cv2.imread(mask_path, IMG_READ_FLAG_GREY)
 
         super(ImgMaskROIBuilder,self).__init__()

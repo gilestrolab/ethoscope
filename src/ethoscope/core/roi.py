@@ -2,12 +2,17 @@ import cv2
 import numpy as np
 from ethoscope.utils.debug import EthoscopeException
 
+try:
+    CV_VERSION = int(cv2.__version__.split(".")[0])
+except:
+    CV_VERSION = 2
+
 __author__ = 'quentin'
 
 
 class ROI(object):
 
-    def __init__(self, polygon, idx, value=None, orientation = None, regions=None):
+    def __init__(self, polygon, idx, value=None, orientation = None, regions=None, hierarchy=None):
         """
         Class to define a region of interest(ROI).
         Internally, ROIs are single polygons.
@@ -20,8 +25,8 @@ class ROI(object):
         :type idx: int
         :param value: an optional value to be save for this ROI (e.g. to define left and right side)
         :param orientation: Optional orientation Not implemented yet
-        :param regions: Optional sub-regions within the ROI. Not implemented yet
-
+        :param regions: Optional sub-regions within the ROI.
+        :param hierarchy: The hierarchy of subregions in the ROI
         """
 
         # TODO if we do not need polygon, we can drop it
@@ -43,6 +48,14 @@ class ROI(object):
             self._value = self._idx
         else:
             self._value = value
+
+        if regions is None:
+            self._regions = self._polygon
+        else:
+            if CV_VERSION == 3:
+                _, self._regions, self._hierarchy = cv2.findContours(np.copy(self._polygon), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            else:
+                self._regions, self._hierarchy = cv2.findContours(np.copy(self._polygon), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     @property
     def idx(self):
@@ -159,3 +172,16 @@ class ROI(object):
             raise EthoscopeException("Error whilst slicing region of interest. Possibly, the region out of the image: %s" % str(self.get_feature_dict()), img )
 
         return out, self._mask
+
+    @property
+    def regions(self):
+        """
+        :return: the regions of a ROI
+        """
+        return self._regions
+
+    def hierachy(self):
+        """
+        :return: the hierarchy of regions in a ROI
+        """
+        return self._hierarchy

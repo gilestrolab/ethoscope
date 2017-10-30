@@ -1,4 +1,3 @@
-
 __author__ = 'quentin'
 
 from collections import deque
@@ -208,7 +207,7 @@ class BackgroundModel(object):
         # it correspond to how much the present frame should account for the background
 
         lam =  np.log(2)/self._current_half_life
-        # how much the current frame should be accounted for
+        # how much the culsrrent frame should be accounted for
         alpha = 1 - np.exp(-lam * dt)
 
         # set-p a matrix of learning rate. it is 0 where foreground map is true
@@ -280,7 +279,7 @@ class AdaptiveBGModel(BaseTracker):
                 mask = np.ones_like(self._buff_grey) * 255
 
         cv2.cvtColor(img,cv2.COLOR_BGR2GRAY, self._buff_grey)
-        # cv2.imshow("dbg",self._buff_grey)
+        #cv2.imshow("dbg",self._buff_grey)
         cv2.GaussianBlur(self._buff_grey,(blur_rad,blur_rad),1.2, self._buff_grey)
 
 
@@ -290,7 +289,7 @@ class AdaptiveBGModel(BaseTracker):
         #
         mean = cv2.mean(self._buff_grey, mask)
 
-        if mean[0] >0:
+        if mean[0] > 0:
             scale = 128. / mean[0]
 
         cv2.multiply(self._buff_grey, scale, dst = self._buff_grey)
