@@ -40,6 +40,7 @@ class ROI(object):
         self._mask = np.zeros((h,w), np.uint8)
         cv2.drawContours(self._mask, [self._polygon], 0, 255,-1,offset=(-x,-y))
 
+
         self._rectangle = x,y,w,h
         # todo NOW! sort rois by value. if no values, left to right/ top to bottom!
         self._idx = idx

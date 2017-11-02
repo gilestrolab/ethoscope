@@ -12,7 +12,7 @@ from ethoscope.utils.description import DescribedObject
 import os
 
 class BaseDrawer(object):
-    def __init__(self, video_out=None, draw_frames=True, video_out_fourcc="DIVX", video_out_fps=2):
+    def __init__(self, video_out=None, draw_frames=True, video_out_fourcc="DIVX", video_out_fps=25):
         """
         A template class to annotate and save the processed frames. It can also save the annotated frames in a video
         file and/or display them in a new window. The :meth:`~ethoscope.drawers.drawers.BaseDrawer._annotate_frame`
@@ -135,7 +135,7 @@ class DefaultDrawer(BaseDrawer):
             sub_roi_colour = (255, 0, 0)
             cv2.drawContours(img,[track_u.roi.polygon],-1, black_colour, 3, LINE_AA)
             cv2.drawContours(img,[track_u.roi.polygon],-1, roi_colour, 1, LINE_AA)
-            cv2.drawContours(img,track_u.roi.regions, -1, sub_roi_colour, 1, LINE_AA)
+            #cv2.drawContours(img,track_u.roi.regions, -1, sub_roi_colour, 1, LINE_AA)
             try:
                 pos_list = positions[track_u.roi.idx]
             except KeyError:

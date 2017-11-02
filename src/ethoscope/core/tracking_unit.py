@@ -92,6 +92,19 @@ class TrackingUnit(object):
         :rtype:  :class:`~ethoscope.core.data_point.DataPoint`
         """
         data_rows = self._tracker.track(t,img)
+        #
+        #
+        # # TODO data_row should have some result
+        # for dr in data_rows:
+        #     # abort if x and y are not defined
+        #     # (put 0 as a value when impossible to define)
+        #     try:
+        #         x, y = dr["x"], dr["y"]
+        #         region = self._roi.find_region(x, y)
+        #     except Exception as e:
+        #         region = Region(0)
+        #     finally:
+        #         dr.append(region)
 
         interact, result = self._stimulator.apply()
         if len(data_rows) == 0:

@@ -20,6 +20,7 @@ import numpy as np
 import logging
 from ethoscope.core.roi import ROI
 
+
 class ArenaMaskROIBuilder(BaseROIBuilder):
 
     def __init__(self, mask_path):
@@ -37,10 +38,9 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
         params.minThreshold = 10
         params.maxThreshold = 200
 
-        #Filter by Area.
-        params.filterByArea = True
-        params.minArea = 100  #exclude the very small blobs
-        params.maxArea = 10000
+        # Filter by Area.
+        #params.filterByArea = True
+        #params.minArea = 50
 
         # Filter by Circularity
         params.filterByCircularity = True
@@ -52,17 +52,18 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
 
         # Filter by Inertia
         params.filterByInertia = True
-        params.minInertiaRatio = 0.7
+        params.minInertiaRatio = 0.8
 
         detector = cv2.SimpleBlobDetector(params)
 
-        # we want to obtain an image with white background and dark targets on it
+        # we want to obtain an image with white background and darg targets on it
         #if we have a color image than we threshold it and transform in white everything that is not black
         #otherwise if we have a mask (black background and white on top we invert it)
 
         img = self._get_black_targets_white_background(img)
 
         keypoints = detector.detect(img)
+
         if np.size(keypoints) !=3:
             logging.error('Just %s targets found instead of three', np.size(keypoints))
 
@@ -74,17 +75,15 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
         else:
             img = cv2.bitwise_not(img)
 
-        #get an image that contains the pixels values that are black. The pixels values > 25 become white.
-        ret, thresh = cv2.threshold(img, 25, 255, cv2.THRESH_BINARY)
+        ret, thresh = cv2.threshold(img, 10, 255, cv2.THRESH_BINARY)
 
         return thresh
 
     def _remove_targets(self, img):
-        margin = 10
         targets = self._find_target_coordinates(img)
         result = img.copy()
         for target in targets:
-            cv2.circle(result, (int(target.pt[0]), int(target.pt[1])), int(target.size) + margin, (0,0,0), -1)
+            cv2.circle(result, (int(target.pt[0]), int(target.pt[1])), int(target.size) + 10, (0,0,0), -1)
         return result
 
     def _sort(self, keypoints):
@@ -119,22 +118,18 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
         targets_sorted = self._sort(targets)
         return targets_sorted
 
-    def _get_corrected_mask_without_targets(self, img):
+    def _get_corrected_mask(self, img):
         rows, cols, _ = img.shape
         frame_targets_pts_sorted = self._get_targets_sorted(img)
         mask_target_pts_sorted = self._get_targets_sorted(self._mask)
-        #white_pixels = self._mask == 255
-        #remove targets
-        #self._mask[white_pixels] = 0
-        targets_removed = self._remove_targets(self._mask)
         M = cv2.getAffineTransform(np.float32(mask_target_pts_sorted), np.float32(frame_targets_pts_sorted))
-        mask_transformed = cv2.warpAffine(targets_removed,M,(cols, rows))
+        mask_transformed = cv2.warpAffine(self._mask,M,(cols, rows))
         return mask_transformed
 
     def _rois_from_img(self,img):
-        corrected_mask = self._get_corrected_mask_without_targets(img)
-
-        edged = cv2.Canny(corrected_mask, 50, 100)
+        corrected_mask = self._get_corrected_mask(img)
+        mask_without_targets = self._remove_targets(corrected_mask)
+        edged = cv2.Canny(mask_without_targets, 50, 100)
         if CV_VERSION == 3:
             _, contours, hierarchy = cv2.findContours(np.copy(edged), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         else:
@@ -143,26 +138,19 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
         rois = []
 
         for i,c in enumerate(contours):
-            #tmp_mask = np.zeros_like(corrected_mask)
-            #cv2.drawContours(tmp_mask, [c], 0, (255, 0, 0), thickness=-1)
-            #my_roi = cv2.bitwise_and(corrected_mask, corrected_mask, mask=tmp_mask)
             rois.append(ROI(c, i+1, value=None))
         return rois
 
 
-INPUT_VIDEO = "/data/Diana/data_node/ethoscope_videos/026c6ba04e534be486069c3db7b10827/ETHOSCOPE_026/2017-10-11_10-08-08/whole_2017-10-11_10-08-08_026c6ba04e534be486069c3db7b10827_trial_1920x1080@25_00000.mp4"
-#INPUT_VIDEO = "/home/diana/Desktop/hinata/11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.mp4"
-OUTPUT_VIDEO = "/home/diana/Desktop/hinata/out_11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.mp4"
+# INPUT_VIDEO = "/home/diana/Desktop/hinata/22_whole_2017-10-25_12-25-36_022c6ba04e534be486069c3db7b10827__1280x960@25_00000.mp4"
+# OUTPUT_VIDEO = "/home/diana/Desktop/hinata/22_whole_2017-10-25_12-25-36_022c6ba04e534be486069c3db7b10827__1280x960@25_00000.avi"
+# OUTPUT_DB = "/home/diana/Desktop/hinata/22_whole_2017-10-25_12-25-36_022c6ba04e534be486069c3db7b10827__1280x960@25_00000.db"
+
+INPUT_VIDEO = "/home/diana/Desktop/hinata/11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.mp4"
+OUTPUT_VIDEO = "/home/diana/Desktop/hinata/11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.avi"
 OUTPUT_DB = "/home/diana/Desktop/hinata/11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.db"
 
-#MASK = "/home/diana/github/ethoscope/prototypes/rois_from_images/masks/arena_hole_beneath.png"
-#MASK = "/home/diana/github/ethoscope/prototypes/rois_from_images/masks/trial_mask.png"
-#MASK = "/data/Diana/data_node/InkscapeFiles/hinata_arena_drawing2.png"
-
-#MASK = "/home/diana/Desktop/hinata/hinata_final_mask.png"
-#MASK = "/data/Diana/data_node/InkscapeFiles/test1.png"
-#MASK = "/data/Diana/data_node/InkscapeFiles/arena_hole_beneath.png"
-MASK = "/data/Diana/data_node/InkscapeFiles/general4.png"
+MASK = "/home/diana/Desktop/hinata/hinata_final_mask.png"
 
 # We use a video input file as if it was a "camera"
 cam = MovieVirtualCamera(INPUT_VIDEO, drop_each=1)
