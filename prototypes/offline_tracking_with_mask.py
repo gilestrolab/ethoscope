@@ -131,9 +131,10 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
         mask_transformed = cv2.warpAffine(targets_removed, M, (cols, rows), flags=cv2.INTER_NEAREST)
         return mask_transformed
 
+
+
     def _rois_from_img(self,img):
         corrected_mask = self._get_corrected_mask_without_targets(img)
-
         edged = cv2.Canny(corrected_mask, 50, 100)
         if CV_VERSION == 3:
             _, contours, hierarchy = cv2.findContours(np.copy(edged), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -146,7 +147,9 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
             #tmp_mask = np.zeros_like(corrected_mask)
             #cv2.drawContours(tmp_mask, [c], 0, (255, 0, 0), thickness=-1)
             #my_roi = cv2.bitwise_and(corrected_mask, corrected_mask, mask=tmp_mask)
-            rois.append(ROI(c, i+1, value=None))
+            x, y, w, h = cv2.boundingRect(c)
+            regions = corrected_mask[y : y + h, x : x +w]
+            rois.append(ROI(c, i+1, value=None, regions = regions))
         return rois
 
 
@@ -161,8 +164,9 @@ OUTPUT_DB = "/home/diana/Desktop/hinata/11_whole_2017-10-25_12-47-35_011d6ba04e5
 
 #MASK = "/home/diana/Desktop/hinata/hinata_final_mask.png"
 #MASK = "/data/Diana/data_node/InkscapeFiles/test1.png"
-MASK = "/data/Diana/data_node/InkscapeFiles/arena_hole_beneath.png"
+#MASK = "/data/Diana/data_node/InkscapeFiles/arena_hole_beneath.png"
 #MASK = "/data/Diana/data_node/InkscapeFiles/general4.png"
+MASK = "/data/Diana/data_node/InkscapeFiles/different_regions.png"
 
 # We use a video input file as if it was a "camera"
 cam = MovieVirtualCamera(INPUT_VIDEO, drop_each=1)

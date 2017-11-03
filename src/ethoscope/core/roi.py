@@ -20,7 +20,8 @@ class ROI(object):
         :type idx: int
         :param value: an optional value to be save for this ROI (e.g. to define left and right side)
         :param orientation: Optional orientation Not implemented yet
-        :param regions: Optional sub-regions within the ROI. Not implemented yet
+        :param regions: Optional sub-regions within the ROI.
+        :type regions: :class:`~numpy.ndarray`
 
         """
 
@@ -43,6 +44,11 @@ class ROI(object):
             self._value = self._idx
         else:
             self._value = value
+
+        if regions is None:
+            self._regions = self._mask
+        else:
+            self._regions = regions
 
     @property
     def idx(self):
@@ -121,9 +127,6 @@ class ROI(object):
         }
 
 
-
-
-
     def set_value(self, new_val):
         """
         :param new_val: assign a nex value to a ROI
@@ -148,8 +151,6 @@ class ROI(object):
         """
         x,y,w,h = self._rectangle
 
-
-
         try:
             out = img[y : y + h, x : x +w]
         except:
@@ -159,3 +160,11 @@ class ROI(object):
             raise EthoscopeException("Error whilst slicing region of interest. Possibly, the region out of the image: %s" % str(self.get_feature_dict()), img )
 
         return out, self._mask
+
+    def find_region(self, x, y):
+        gray_value = self._regions[x, y]
+        if gray_value is None:
+            return 0
+        else:
+            print gray_value, self.idx
+            return gray_value

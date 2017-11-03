@@ -13,7 +13,7 @@ except:
 
 import numpy as np
 from scipy import ndimage
-from ethoscope.core.variables import XPosVariable, YPosVariable, XYDistance, WidthVariable, HeightVariable, PhiVariable, Label
+from ethoscope.core.variables import XPosVariable, YPosVariable, XYDistance, WidthVariable, HeightVariable, PhiVariable, Label, RegionPosVariable
 from ethoscope.core.data_point import DataPoint
 from ethoscope.trackers.trackers import BaseTracker, NoPositionError
 
@@ -265,7 +265,6 @@ class AdaptiveBGModel(BaseTracker):
         self._buff_fg_backup = None
         self._buff_fg_diff = None
         self._old_sum_fg = 0
-
         super(AdaptiveBGModel, self).__init__(roi, data)
 
     def _pre_process_input_minimal(self, img, mask, t, darker_fg=True):
@@ -501,12 +500,16 @@ class AdaptiveBGModel(BaseTracker):
         phi_var = PhiVariable(int(round(angle)))
         # mlogl =   mLogLik(int(distance*1000))
 
+        gray_region = self._roi.find_region(x_var, y_var)
+        region = RegionPosVariable(gray_region)
+
         out = DataPoint([x_var, y_var, w_var, h_var,
                          phi_var,
                          #mlogl,
                          distance,
                          #xor_dist
                         #Label(0)
+                         region
                          ])
 
 
