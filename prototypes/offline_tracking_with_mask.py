@@ -128,7 +128,7 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
         #self._mask[white_pixels] = 0
         targets_removed = self._remove_targets(self._mask)
         M = cv2.getAffineTransform(np.float32(mask_target_pts_sorted), np.float32(frame_targets_pts_sorted))
-        mask_transformed = cv2.warpAffine(targets_removed,M,(cols, rows))
+        mask_transformed = cv2.warpAffine(targets_removed, M, (cols, rows), flags=cv2.INTER_NEAREST)
         return mask_transformed
 
     def _rois_from_img(self,img):
@@ -161,8 +161,8 @@ OUTPUT_DB = "/home/diana/Desktop/hinata/11_whole_2017-10-25_12-47-35_011d6ba04e5
 
 #MASK = "/home/diana/Desktop/hinata/hinata_final_mask.png"
 #MASK = "/data/Diana/data_node/InkscapeFiles/test1.png"
-#MASK = "/data/Diana/data_node/InkscapeFiles/arena_hole_beneath.png"
-MASK = "/data/Diana/data_node/InkscapeFiles/general4.png"
+MASK = "/data/Diana/data_node/InkscapeFiles/arena_hole_beneath.png"
+#MASK = "/data/Diana/data_node/InkscapeFiles/general4.png"
 
 # We use a video input file as if it was a "camera"
 cam = MovieVirtualCamera(INPUT_VIDEO, drop_each=1)
