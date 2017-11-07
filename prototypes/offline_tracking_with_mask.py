@@ -140,12 +140,9 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
         rois = []
 
         for i,c in enumerate(contours):
-            #tmp_mask = np.zeros_like(corrected_mask)
-            #cv2.drawContours(tmp_mask, [c], 0, (255, 0, 0), thickness=-1)
-            #my_roi = cv2.bitwise_and(corrected_mask, corrected_mask, mask=tmp_mask)
             x, y, w, h = cv2.boundingRect(c)
-            regions = corrected_mask[y : y + h, x : x +w]
-            rois.append(ROI(c, i+1, value=None, regions = regions))
+            regions = corrected_mask[y : y + h, x : x + w]
+            rois.append(ROI(c, i+1, value=None, regions=regions))
         return rois
 
 
@@ -154,16 +151,10 @@ INPUT_VIDEO = "/data/Diana/data_node/ethoscope_videos/026c6ba04e534be486069c3db7
 OUTPUT_VIDEO = "/home/diana/Desktop/hinata/out_11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.avi"
 OUTPUT_DB = "/home/diana/Desktop/hinata/11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.db"
 
-#MASK = "/home/diana/github/ethoscope/prototypes/rois_from_images/masks/arena_hole_beneath.png"
-#MASK = "/home/diana/github/ethoscope/prototypes/rois_from_images/masks/trial_mask.png"
-#MASK = "/data/Diana/data_node/InkscapeFiles/hinata_arena_drawing2.png"
 
 #MASK = "/home/diana/Desktop/hinata/hinata_final_mask.png"
-#MASK = "/data/Diana/data_node/InkscapeFiles/test1.png"
-#MASK = "/data/Diana/data_node/InkscapeFiles/arena_hole_beneath.png"
-#MASK = "/data/Diana/data_node/InkscapeFiles/general4.png"
-
-MASK = "/data/Diana/data_node/InkscapeFiles/different_regions.png"
+MASK = "/data/Diana/data_node/InkscapeFiles/test1.png"
+#MASK = "/data/Diana/data_node/InkscapeFiles/different_regions.png"
 
 # We use a video input file as if it was a "camera"
 cam = MovieVirtualCamera(INPUT_VIDEO, drop_each=1)

@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from ethoscope.utils.debug import EthoscopeException
+import logging
 
 __author__ = 'quentin'
 
@@ -47,8 +48,12 @@ class ROI(object):
 
         if regions is None:
             self._regions = self._mask
-        else:
+        elif (regions.size == self._mask.size) & (type(regions) == type(self._mask)):
             self._regions = regions
+        else:
+            self._regions = self._mask
+            logging.warning('The regions argument of the roi has to be an numpy.ndarray that has equal size with the mask of the roi')
+
 
     @property
     def idx(self):
