@@ -10,9 +10,10 @@ except ImportError:
 
 from ethoscope.utils.description import DescribedObject
 import os
+import numpy as np
 
 class BaseDrawer(object):
-    def __init__(self, video_out=None, draw_frames=True, video_out_fourcc="DIVX", video_out_fps=2):
+    def __init__(self, video_out=None, draw_frames=True, video_out_fourcc="DIVX", video_out_fps=25):
         """
         A template class to annotate and save the processed frames. It can also save the annotated frames in a video
         file and/or display them in a new window. The :meth:`~ethoscope.drawers.drawers.BaseDrawer._annotate_frame`
@@ -134,6 +135,17 @@ class DefaultDrawer(BaseDrawer):
             roi_colour = (0, 255,0)
             cv2.drawContours(img,[track_u.roi.polygon],-1, black_colour, 3, LINE_AA)
             cv2.drawContours(img,[track_u.roi.polygon],-1, roi_colour, 1, LINE_AA)
+
+            # if (np.array_equal(track_u.roi._regions, track_u.roi._mask)):
+            #     continue
+            # else:
+            #     opacity = 0.4
+            #     x, y, w, h = track_u.roi._rectangle
+            #     overlay = img.copy()
+            #     color_regions = cv2.cvtColor(track_u.roi._regions, cv2.COLOR_GRAY2BGR)
+            #     overlay[y:y+h, x: x+w] = color_regions
+            #     cv2.addWeighted(overlay, opacity, img, 1 - opacity, 0, img)
+
 
             try:
                 pos_list = positions[track_u.roi.idx]

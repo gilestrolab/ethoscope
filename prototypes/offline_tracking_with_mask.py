@@ -80,12 +80,11 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
         return thresh
 
     def _remove_targets(self, img):
-        margin = 10
-        targets = self._find_target_coordinates(img)
-        result = img.copy()
-        for target in targets:
-            cv2.circle(result, (int(target.pt[0]), int(target.pt[1])), int(target.size) + margin, (0,0,0), -1)
-        return result
+        #select white pixels (targets always made with 255)
+        #all the white pixels in the image become black
+        white_pixels = img == 255
+        img[white_pixels] = 0
+        return img
 
     def _sort(self, keypoints):
         #-----------A
@@ -123,9 +122,6 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
         rows, cols, _ = img.shape
         frame_targets_pts_sorted = self._get_targets_sorted(img)
         mask_target_pts_sorted = self._get_targets_sorted(self._mask)
-        #white_pixels = self._mask == 255
-        #remove targets
-        #self._mask[white_pixels] = 0
         targets_removed = self._remove_targets(self._mask)
         M = cv2.getAffineTransform(np.float32(mask_target_pts_sorted), np.float32(frame_targets_pts_sorted))
         mask_transformed = cv2.warpAffine(targets_removed, M, (cols, rows), flags=cv2.INTER_NEAREST)
@@ -155,7 +151,7 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
 
 INPUT_VIDEO = "/data/Diana/data_node/ethoscope_videos/026c6ba04e534be486069c3db7b10827/ETHOSCOPE_026/2017-10-11_10-08-08/whole_2017-10-11_10-08-08_026c6ba04e534be486069c3db7b10827_trial_1920x1080@25_00000.mp4"
 #INPUT_VIDEO = "/home/diana/Desktop/hinata/11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.mp4"
-OUTPUT_VIDEO = "/home/diana/Desktop/hinata/out_11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.mp4"
+OUTPUT_VIDEO = "/home/diana/Desktop/hinata/out_11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.avi"
 OUTPUT_DB = "/home/diana/Desktop/hinata/11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.db"
 
 #MASK = "/home/diana/github/ethoscope/prototypes/rois_from_images/masks/arena_hole_beneath.png"
@@ -166,6 +162,7 @@ OUTPUT_DB = "/home/diana/Desktop/hinata/11_whole_2017-10-25_12-47-35_011d6ba04e5
 #MASK = "/data/Diana/data_node/InkscapeFiles/test1.png"
 #MASK = "/data/Diana/data_node/InkscapeFiles/arena_hole_beneath.png"
 #MASK = "/data/Diana/data_node/InkscapeFiles/general4.png"
+
 MASK = "/data/Diana/data_node/InkscapeFiles/different_regions.png"
 
 # We use a video input file as if it was a "camera"

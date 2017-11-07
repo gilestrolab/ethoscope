@@ -162,9 +162,8 @@ class ROI(object):
         return out, self._mask
 
     def find_region(self, x, y):
-        gray_value = self._regions[x, y]
-        if gray_value is None:
-            return 0
-        else:
-            print gray_value, self.idx
-            return gray_value
+        try:
+            gray_value = self._regions[x, y]
+        except:
+            gray_value = 0
+        return gray_value
