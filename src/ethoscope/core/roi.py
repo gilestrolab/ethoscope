@@ -58,7 +58,6 @@ class ROI(object):
             logging.error("The sub_rois argument does not have the correct shape")
             raise Exception("Sub_roi and Mask have different sizes!")
 
-
     @property
     def idx(self):
         """
