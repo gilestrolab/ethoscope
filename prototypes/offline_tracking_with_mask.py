@@ -127,8 +127,6 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
         mask_transformed = cv2.warpAffine(targets_removed, M, (cols, rows), flags=cv2.INTER_NEAREST)
         return mask_transformed
 
-
-
     def _rois_from_img(self,img):
         corrected_mask = self._get_corrected_mask_without_targets(img)
         edged = cv2.Canny(corrected_mask, 50, 100)
@@ -141,8 +139,8 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
 
         for i,c in enumerate(contours):
             x, y, w, h = cv2.boundingRect(c)
-            regions = corrected_mask[y : y + h, x : x + w]
-            rois.append(ROI(c, i+1, value=None, regions=regions))
+            sub_rois = corrected_mask[y : y + h, x : x + w]
+            rois.append(ROI(c, i+1, value=None, sub_rois=sub_rois))
         return rois
 
 

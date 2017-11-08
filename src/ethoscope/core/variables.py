@@ -130,12 +130,12 @@ class YPosVariable(BaseRelativeVariable):
         out += oy
         return YPosVariable(out)
 
-class RegionPosVariable(BaseIntVariable):
+class SubRoiValueVariable(BaseIntVariable):
     """
     Type encoding a region inside the ROI, represented as the grayscale value of the pixel on which sits the center of the detected object.
     """
-    header_name = "gray_region"
-    functional_type = "color"
+    header_name = "sub_roi"
+    functional_type = "grey_value"
 
 
 
