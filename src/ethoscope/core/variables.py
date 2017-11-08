@@ -138,5 +138,3 @@ class SubRoiValueVariable(BaseIntVariable):
     header_name = "sub_roi"
     functional_type = "grey_value"
 
-
-

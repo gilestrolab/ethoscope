@@ -50,11 +50,11 @@ class ROI(object):
             self._value = value
 
         if sub_rois is None:
-            self._regions = self._mask
+            self._sub_rois = self._mask
         elif sub_rois.shape == self._mask.shape:
-            self._regions = sub_rois
+            self._sub_rois = sub_rois
         else:
-            self._regions = self._mask
+            self._sub_rois = self._mask
             logging.error("The sub_rois argument does not have the correct shape")
             raise Exception("Sub_roi and Mask have different sizes!")
 
@@ -171,7 +171,7 @@ class ROI(object):
 
     def find_sub_roi(self, x, y):
         try:
-            grey_value = self._regions[x, y]
+            grey_value = self._sub_rois[x, y]
         except Exception, e:
             logging.exception(e)
             grey_value = 0
