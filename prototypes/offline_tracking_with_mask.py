@@ -144,14 +144,14 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
         return rois
 
 
-INPUT_VIDEO = "/data/Diana/data_node/ethoscope_videos/026c6ba04e534be486069c3db7b10827/ETHOSCOPE_026/2017-10-11_10-08-08/whole_2017-10-11_10-08-08_026c6ba04e534be486069c3db7b10827_trial_1920x1080@25_00000.mp4"
-#INPUT_VIDEO = "/home/diana/Desktop/hinata/11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.mp4"
+#INPUT_VIDEO = "/data/Diana/data_node/ethoscope_videos/026c6ba04e534be486069c3db7b10827/ETHOSCOPE_026/2017-10-11_10-08-08/whole_2017-10-11_10-08-08_026c6ba04e534be486069c3db7b10827_trial_1920x1080@25_00000.mp4"
+INPUT_VIDEO = "/home/diana/Desktop/hinata/11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.mp4"
 OUTPUT_VIDEO = "/home/diana/Desktop/hinata/out_11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.avi"
 OUTPUT_DB = "/home/diana/Desktop/hinata/11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.db"
 
 
-#MASK = "/home/diana/Desktop/hinata/hinata_final_mask.png"
-MASK = "/data/Diana/data_node/InkscapeFiles/test1.png"
+MASK = "/home/diana/Desktop/hinata/hinata_final_mask.png"
+#MASK = "/data/Diana/data_node/InkscapeFiles/test1.png"
 #MASK = "/data/Diana/data_node/InkscapeFiles/different_regions.png"
 
 # We use a video input file as if it was a "camera"

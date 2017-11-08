@@ -21,9 +21,10 @@ class ROI(object):
         :type idx: int
         :param value: an optional value to be save for this ROI (e.g. to define left and right side)
         :param orientation: Optional orientation Not implemented yet
-        :param sub_rois: Optional sub-regions of interest within the ROI. This is a 2D array, same size as the roi, representing a greyscale map of the roi.
-        Each pixel (x, y) in sub_rois contains a grey value (scalar between 0 and 255). A sub-roi will contain
-        the same value of grey in all its pixels. Therefore, sub_rois can contain up to 255 different sub-rois.
+        :param sub_rois: Optional sub-regions of interest within the ROI.
+        This is a 2D array, same size as the roi, representing a greyscale map of the roi.Each pixel (x, y) in sub_rois
+        contains a grey value (scalar between 0 and 255). A sub-roi will contain the same value of grey
+        in all its pixels. Therefore, sub_rois can encode up to 255 different sub-rois.
         :type sub_rois: :class:`~numpy.ndarray`
 
         """
@@ -54,7 +55,7 @@ class ROI(object):
             self._regions = sub_rois
         else:
             self._regions = self._mask
-            logging.error("The sub_rois argument of the roi has to be an numpy.ndarray that has equal size with the mask of the roi")
+            logging.error("The sub_rois argument does not have the correct shape")
             raise Exception("Sub_roi and Mask have different sizes!")
 
 
@@ -171,8 +172,8 @@ class ROI(object):
 
     def find_sub_roi(self, x, y):
         try:
-            gray_value = self._regions[x, y]
+            grey_value = self._regions[x, y]
         except Exception, e:
             logging.exception(e)
-            gray_value = 0
-        return gray_value
+            grey_value = 0
+        return grey_value
