@@ -11,10 +11,10 @@ except:
 
 from ethoscope.core.monitor import Monitor
 import cv2
-from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel, ObjectModel
+from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel, AdaptiveBGModelExtraFlyPosInfo
 from ethoscope.utils.io import SQLiteResultWriter
 from ethoscope.hardware.input.cameras import MovieVirtualCamera
-from ethoscope.drawers.drawers import DefaultDrawer
+from ethoscope.drawers.drawers import DefaultDrawer, SubRoiDrawer
 from ethoscope.roi_builders.roi_builders import BaseROIBuilder
 import numpy as np
 import logging
@@ -62,6 +62,7 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
 
         img = self._get_black_targets_white_background(img)
 
+
         keypoints = detector.detect(img)
         if np.size(keypoints) !=3:
             logging.error('Just %s targets found instead of three', np.size(keypoints))
@@ -74,8 +75,8 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
         else:
             img = cv2.bitwise_not(img)
 
-        #get an image that contains the pixels values that are black. The pixels values > 25 become white.
-        ret, thresh = cv2.threshold(img, 25, 255, cv2.THRESH_BINARY)
+        #get an image that contains the pixels values that are black. The pixels values > 10 become white.
+        ret, thresh = cv2.threshold(img, 10, 255, cv2.THRESH_BINARY)
 
         return thresh
 
@@ -144,16 +145,25 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
         return rois
 
 
-#INPUT_VIDEO = "/data/Diana/data_node/ethoscope_videos/026c6ba04e534be486069c3db7b10827/ETHOSCOPE_026/2017-10-11_10-08-08/whole_2017-10-11_10-08-08_026c6ba04e534be486069c3db7b10827_trial_1920x1080@25_00000.mp4"
-INPUT_VIDEO = "/home/diana/Desktop/hinata/11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.mp4"
-OUTPUT_VIDEO = "/home/diana/Desktop/hinata/out_11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.avi"
-OUTPUT_DB = "/home/diana/Desktop/hinata/11_whole_2017-10-25_12-47-35_011d6ba04e534be486069c3db7b10827__1280x960@25_00000.db"
+# INPUT_VIDEO = "/data/Diana/data_node/ethoscope_videos/026c6ba04e534be486069c3db7b10827/ETHOSCOPE_026/2017-10-11_10-08-08/whole_2017-10-11_10-08-08_026c6ba04e534be486069c3db7b10827_trial_1920x1080@25_00000.mp4"
+# OUTPUT_VIDEO ="/data/Diana/data_node/ethoscope_videos/026c6ba04e534be486069c3db7b10827/ETHOSCOPE_026/2017-10-11_10-08-08/whole_2017-10-11_10-08-08_026c6ba04e534be486069c3db7b10827_trial_1920x1080@25_00000.avi"
+# OUTPUT_DB = "/home/diana/Desktop/test.db"
+
+INPUT_VIDEO = "/data/Diana/data_node/ethoscope_videos/026c6ba04e534be486069c3db7b10827/ETHOSCOPE_026/2017-10-11_10-08-08/whole_2017-10-11_10-08-08_026c6ba04e534be486069c3db7b10827_trial_1920x1080@25_00000.mp4"
+OUTPUT_VIDEO ="/home/diana/Desktop/test2.avi"
+OUTPUT_DB = "/home/diana/Desktop/test2.db"
+
+# INPUT_VIDEO = "/data/Hinata_videos/whole_2017-11-03_15-11-45_022c6ba04e534be486069c3db7b10827__1280x960@25_00000.mp4"
+# OUTPUT_VIDEO = "/data/Hinata_videos/whole_2017-11-03_15-11-45_022c6ba04e534be486069c3db7b10827__1280x960@25_00000_again.avi"
+# OUTPUT_DB = "/data/Hinata_videos/whole_2017-11-03_15-11-45_022c6ba04e534be486069c3db7b10827__1280x960@25_00000_again.db"
 
 
-MASK = "/home/diana/Desktop/hinata/hinata_final_mask.png"
+
+#MASK = "/home/diana/Desktop/hinata/hinata_final_mask.png"
+#MASK = "/data/Diana/data_node/InkscapeFiles/single_arena.png"
 #MASK = "/data/Diana/data_node/InkscapeFiles/test1.png"
 #MASK = "/data/Diana/data_node/InkscapeFiles/different_regions.png"
-
+MASK = "/data/Diana/data_node/InkscapeFiles/single_arena_2_regions.png"
 # We use a video input file as if it was a "camera"
 cam = MovieVirtualCamera(INPUT_VIDEO, drop_each=1)
 
@@ -165,10 +175,12 @@ cam.restart()
 
 # we use a drawer to show inferred position for each animal, display frames and save them as a video
 
-drawer = DefaultDrawer(OUTPUT_VIDEO, draw_frames = True)
+#drawer = DefaultDrawer(OUTPUT_VIDEO, draw_frames = True)
+drawer = SubRoiDrawer(OUTPUT_VIDEO, draw_frames = True)
 # We build our monitor
 
-monitor = Monitor(cam, AdaptiveBGModel, rois)
+#monitor = Monitor(cam, AdaptiveBGModel, rois)
+monitor = Monitor(cam, AdaptiveBGModelExtraFlyPosInfo, rois)
 
 # Now everything ius ready, we run the monitor with a result writer and a drawer
 with SQLiteResultWriter(OUTPUT_DB, rois) as rw:
