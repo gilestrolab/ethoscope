@@ -14,7 +14,7 @@ except:
 import numpy as np
 from scipy import ndimage
 from ethoscope.core.variables import XPosVariable, YPosVariable, XYDistance, WidthVariable, HeightVariable, PhiVariable,\
-    Label, SubRoiValueFlyCenterVariable, SubRoi1ValueVariable, SubRoi2ValueVariable,NPixelsSubRoi1Variable,NPixelsSubRoi2Variable
+    Label, SubRoiValueObjectCenterVariable, SubRoi1ValueVariable, SubRoi2ValueVariable,NPixelsSubRoi1Variable,NPixelsSubRoi2Variable, NPxObjectVariable
 from ethoscope.core.data_point import DataPoint
 from ethoscope.trackers.trackers import BaseTracker, NoPositionError
 
@@ -502,7 +502,7 @@ class AdaptiveBGModel(BaseTracker):
         # mlogl =   mLogLik(int(distance*1000))
 
         grey_value = self._roi.find_sub_roi(x_var, y_var)
-        sub_roi = SubRoiValueFlyCenterVariable(grey_value)
+        sub_roi = SubRoiValueObjectCenterVariable(grey_value)
 
         out = DataPoint([x_var, y_var, w_var, h_var,
                          phi_var,
@@ -518,7 +518,7 @@ class AdaptiveBGModel(BaseTracker):
         return [out]
 
 
-class AdaptiveBGModelExtraFlyPosInfo(AdaptiveBGModel):
+class AdaptiveBGModelExtraObjectPosInfo(AdaptiveBGModel):
     _description = {"overview": "The default tracker for fruit flies. One animal per ROI.",
                     "arguments": []}
     def _track(self, img,  grey, mask,t):
@@ -618,24 +618,25 @@ class AdaptiveBGModelExtraFlyPosInfo(AdaptiveBGModel):
         #todo center mass just on the ellipse area
 
         #extract the fly pixels and map them to the sub-rois mask in order to get information about the proportions of the fly in each subroi
-        grey_fly = self._buff_fg_backup
-        x_ind, y_ind = grey_fly.nonzero()
-        grey_fly[x_ind, y_ind] = self._roi.find_sub_roi(x_ind, y_ind)
+        grey_object = self._buff_fg_backup
+        total_px_object = np.count_nonzero(grey_object)
 
-        histg = cv2.calcHist([grey_fly[x_ind, y_ind]],[0],None,[256],[0,256])
+        x_ind, y_ind = grey_object.nonzero()
+        grey_object[x_ind, y_ind] = self._roi.find_sub_roi(x_ind, y_ind)
+
+        histg = cv2.calcHist([grey_object[x_ind, y_ind]],[0],None,[256],[0,256])
         nonzeroind = np.nonzero(histg)[0] # the return is a little funny so I use the [0]
-        fly_sub_rois = nonzeroind
+        obj_sub_rois = nonzeroind
         n_pixels_in_subrois = histg[nonzeroind].flatten()
         n_pixels_in_subrois = [int(x) for x in n_pixels_in_subrois]
 
-        total_fly_pixels = sum(n_pixels_in_subrois)
-        if (len(fly_sub_rois)==1):
-            sub_roi_1_grey_var = SubRoi1ValueVariable(fly_sub_rois[0])
+        if (len(obj_sub_rois)==1):
+            sub_roi_1_grey_var = SubRoi1ValueVariable(obj_sub_rois[0])
             n_pixels_sub_roi_1 = NPixelsSubRoi1Variable(n_pixels_in_subrois[0])
             sub_roi_2_grey_var = SubRoi2ValueVariable(0)
             n_pixels_sub_roi_2 = NPixelsSubRoi2Variable(0)
-        elif (len(fly_sub_rois) > 1):
-            matched = zip(n_pixels_in_subrois, fly_sub_rois)
+        elif (len(obj_sub_rois) > 1):
+            matched = zip(n_pixels_in_subrois, obj_sub_rois)
             sorted_n_pixels =sorted(matched, reverse=True)
             n_pixels_sorted = [point[0] for point in sorted_n_pixels]
             sub_rois_sorted = [point[1] for point in sorted_n_pixels]
@@ -683,7 +684,8 @@ class AdaptiveBGModelExtraFlyPosInfo(AdaptiveBGModel):
         # mlogl =   mLogLik(int(distance*1000))
 
         grey_value = self._roi.find_sub_roi(x_var, y_var)
-        sub_roi_center = SubRoiValueFlyCenterVariable(grey_value)
+        sub_roi_center = SubRoiValueObjectCenterVariable(grey_value)
+        total_px_obj = NPxObjectVariable(total_px_object)
 
         out = DataPoint([x_var, y_var, w_var, h_var,
                          phi_var,
@@ -692,10 +694,11 @@ class AdaptiveBGModelExtraFlyPosInfo(AdaptiveBGModel):
                          #xor_dist
                         #Label(0)
                          sub_roi_center,
+                         total_px_obj,
                          sub_roi_1_grey_var,
                          n_pixels_sub_roi_1,
                          sub_roi_2_grey_var,
-                         n_pixels_sub_roi_2
+                         n_pixels_sub_roi_2,
                          ])
 
 

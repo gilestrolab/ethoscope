@@ -130,7 +130,7 @@ class YPosVariable(BaseRelativeVariable):
         out += oy
         return YPosVariable(out)
 
-class SubRoiValueFlyCenterVariable(BaseIntVariable):
+class SubRoiValueObjectCenterVariable(BaseIntVariable):
     """
     Type encoding the sub-roi inside the ROI containing the center of the object.
     It contains the gray value of the pixel that contains the center of the object, a value from 0 to 255.
