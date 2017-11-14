@@ -698,7 +698,7 @@ class AdaptiveBGModelExtraObjectPosInfo(AdaptiveBGModel):
                          sub_roi_1_grey_var,
                          n_pixels_sub_roi_1,
                          sub_roi_2_grey_var,
-                         n_pixels_sub_roi_2,
+                         n_pixels_sub_roi_2
                          ])
 
 
