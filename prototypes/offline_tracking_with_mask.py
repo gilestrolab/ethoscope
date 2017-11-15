@@ -11,14 +11,17 @@ except:
 
 from ethoscope.core.monitor import Monitor
 import cv2
-from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel, AdaptiveBGModelExtraObjectPosInfo
+from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
+from ethoscope.trackers.adaptive_bg_extra_object_pos_info_tracker import AdaptiveBGModelExtraObjectPosInfo
 from ethoscope.utils.io import SQLiteResultWriter
 from ethoscope.hardware.input.cameras import MovieVirtualCamera
-from ethoscope.drawers.drawers import DefaultDrawer, SubRoiDrawer
+from ethoscope.drawers.drawers import DefaultDrawer
+from ethoscope.drawers.subroi_drawer import SubRoiDrawer
 from ethoscope.roi_builders.roi_builders import BaseROIBuilder
 import numpy as np
 import logging
 from ethoscope.core.roi import ROI
+
 
 class ArenaMaskROIBuilder(BaseROIBuilder):
 
@@ -153,17 +156,12 @@ INPUT_VIDEO = "/data/Diana/data_node/ethoscope_videos/026c6ba04e534be486069c3db7
 OUTPUT_VIDEO ="/home/diana/Desktop/test2.avi"
 OUTPUT_DB = "/home/diana/Desktop/test2.db"
 
-# INPUT_VIDEO = "/data/Hinata_videos/whole_2017-11-03_15-11-45_022c6ba04e534be486069c3db7b10827__1280x960@25_00000.mp4"
-# OUTPUT_VIDEO = "/data/Hinata_videos/whole_2017-11-03_15-11-45_022c6ba04e534be486069c3db7b10827__1280x960@25_00000_again.avi"
-# OUTPUT_DB = "/data/Hinata_videos/whole_2017-11-03_15-11-45_022c6ba04e534be486069c3db7b10827__1280x960@25_00000_again.db"
-
-
-
 #MASK = "/home/diana/Desktop/hinata/hinata_final_mask.png"
 #MASK = "/data/Diana/data_node/InkscapeFiles/single_arena.png"
 #MASK = "/data/Diana/data_node/InkscapeFiles/test1.png"
 #MASK = "/data/Diana/data_node/InkscapeFiles/different_regions.png"
 MASK = "/data/Diana/data_node/InkscapeFiles/single_arena_2_regions.png"
+
 # We use a video input file as if it was a "camera"
 cam = MovieVirtualCamera(INPUT_VIDEO, drop_each=1)
 
