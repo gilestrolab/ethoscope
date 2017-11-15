@@ -10,7 +10,6 @@ except ImportError:
 
 from ethoscope.utils.description import DescribedObject
 import os
-import numpy as np
 
 class BaseDrawer(object):
     def __init__(self, video_out=None, draw_frames=True, video_out_fourcc="DIVX", video_out_fps=2):
@@ -151,5 +150,3 @@ class DefaultDrawer(BaseDrawer):
 
                 cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),black_colour,3, LINE_AA)
                 cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),colour,1, LINE_AA)
-
-

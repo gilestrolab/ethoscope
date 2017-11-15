@@ -13,8 +13,8 @@ except:
 
 import numpy as np
 from scipy import ndimage
-from ethoscope.core.variables import XPosVariable, YPosVariable, XYDistance, WidthVariable, HeightVariable, PhiVariable,\
-    SubRoiValueObjectCenterVariable
+from ethoscope.core.variables import XPosVariable, YPosVariable, XYDistance, WidthVariable, HeightVariable, \
+                                    PhiVariable,SubRoiValueObjectCenterVariable
 from ethoscope.core.data_point import DataPoint
 from ethoscope.trackers.trackers import BaseTracker, NoPositionError
 
@@ -516,5 +516,3 @@ class AdaptiveBGModel(BaseTracker):
 
         self._previous_shape=np.copy(hull)
         return [out]
-
-

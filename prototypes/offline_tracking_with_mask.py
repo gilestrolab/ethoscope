@@ -79,7 +79,7 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
             img = cv2.bitwise_not(img)
 
         #get an image that contains the pixels values that are black. The pixels values > 10 become white.
-        ret, thresh = cv2.threshold(img, 25, 255, cv2.THRESH_BINARY)
+        ret, thresh = cv2.threshold(img, 10, 255, cv2.THRESH_BINARY)
 
         return thresh
 
