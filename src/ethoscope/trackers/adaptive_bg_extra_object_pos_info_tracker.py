@@ -60,6 +60,8 @@ class NPxObjectVariable(BaseIntVariable):
 class AdaptiveBGModelExtraObjectPosInfo(AdaptiveBGModel):
     _description = {"overview": "The default tracker for fruit flies. One animal per ROI.",
                     "arguments": []}
+
+
     def _track(self, img,  grey, mask,t):
 
         if self._bg_model.bg_img is None:
@@ -73,7 +75,6 @@ class AdaptiveBGModelExtraObjectPosInfo(AdaptiveBGModel):
 
         bg = self._bg_model.bg_img.astype(np.uint8)
         cv2.subtract(grey, bg, self._buff_fg)
-
         cv2.threshold(self._buff_fg,20,255,cv2.THRESH_TOZERO, dst=self._buff_fg)
 
         # cv2.bitwise_and(self._buff_fg_backup,self._buff_fg,dst=self._buff_fg_diff)
@@ -154,35 +155,14 @@ class AdaptiveBGModelExtraObjectPosInfo(AdaptiveBGModel):
 
         cv2.ellipse(self._buff_fg ,((x,y), (int(w*1.5),int(h*1.5)),angle),255,-1)
 
+        cv2.imshow('elipse', self._buff_fg)
+        #cv2.waitKey(0)
+
         #todo center mass just on the ellipse area
 
         #extract the fly pixels and map them to the sub-rois mask in order to get information about the proportions of the fly in each subroi
         grey_object = self._buff_fg_backup
-        total_px_object = np.count_nonzero(grey_object)
 
-        x_ind, y_ind = grey_object.nonzero()
-        grey_object[x_ind, y_ind] = self._roi.find_sub_roi(x_ind, y_ind)
-
-        histg = cv2.calcHist([grey_object[x_ind, y_ind]],[0],None,[256],[0,256])
-        nonzeroind = np.nonzero(histg)[0] # the return is a little funny so I use the [0]
-        obj_sub_rois = nonzeroind
-        n_pixels_in_subrois = histg[nonzeroind].flatten()
-        n_pixels_in_subrois = [int(x) for x in n_pixels_in_subrois]
-
-        if (len(obj_sub_rois)==1):
-            sub_roi_1_grey_var = SubRoi1ValueVariable(obj_sub_rois[0])
-            n_pixels_sub_roi_1 = NPixelsSubRoi1Variable(n_pixels_in_subrois[0])
-            sub_roi_2_grey_var = SubRoi2ValueVariable(0)
-            n_pixels_sub_roi_2 = NPixelsSubRoi2Variable(0)
-        elif (len(obj_sub_rois) > 1):
-            matched = zip(n_pixels_in_subrois, obj_sub_rois)
-            sorted_n_pixels =sorted(matched, reverse=True)
-            n_pixels_sorted = [point[0] for point in sorted_n_pixels]
-            sub_rois_sorted = [point[1] for point in sorted_n_pixels]
-            sub_roi_1_grey_var = SubRoi1ValueVariable(sub_rois_sorted[0])
-            n_pixels_sub_roi_1 = NPixelsSubRoi1Variable(n_pixels_sorted[0])
-            sub_roi_2_grey_var = SubRoi2ValueVariable(sub_rois_sorted[1])
-            n_pixels_sub_roi_2 = NPixelsSubRoi2Variable(n_pixels_sorted[1])
 
         cv2.bitwise_and(self._buff_fg_backup, self._buff_fg,self._buff_fg_backup)
 
@@ -199,7 +179,6 @@ class AdaptiveBGModelExtraObjectPosInfo(AdaptiveBGModel):
         # xor_dist *=1000.
         # self._old_sum_fg = sum_fg
         self._old_pos = pos
-
 
         if mask is not None:
             cv2.bitwise_and(self._buff_fg, mask,  self._buff_fg)
@@ -221,6 +200,34 @@ class AdaptiveBGModelExtraObjectPosInfo(AdaptiveBGModel):
         h_var = HeightVariable(int(round(h)))
         phi_var = PhiVariable(int(round(angle)))
         # mlogl =   mLogLik(int(distance*1000))
+
+        total_px_object = np.count_nonzero(grey_object)
+
+        x_ind, y_ind = grey_object.nonzero()
+        grey_object[x_ind, y_ind] = self._roi.find_sub_roi(y_ind, x_ind)
+
+        histg = cv2.calcHist([grey_object[x_ind, y_ind]],[0],None,[256],[0,256])
+        nonzeroind = np.nonzero(histg)[0] # the return is a little funny so I use the [0]
+        print nonzeroind
+        obj_sub_rois = nonzeroind
+        n_pixels_in_subrois = histg[nonzeroind].flatten()
+        n_pixels_in_subrois = [int(x) for x in n_pixels_in_subrois]
+
+
+        if (len(obj_sub_rois)==1):
+            sub_roi_1_grey_var = SubRoi1ValueVariable(obj_sub_rois[0])
+            n_pixels_sub_roi_1 = NPixelsSubRoi1Variable(n_pixels_in_subrois[0])
+            sub_roi_2_grey_var = SubRoi2ValueVariable(0)
+            n_pixels_sub_roi_2 = NPixelsSubRoi2Variable(0)
+        elif (len(obj_sub_rois) > 1):
+            matched = zip(n_pixels_in_subrois, obj_sub_rois)
+            sorted_n_pixels =sorted(matched, reverse=True)
+            n_pixels_sorted = [point[0] for point in sorted_n_pixels]
+            sub_rois_sorted = [point[1] for point in sorted_n_pixels]
+            sub_roi_1_grey_var = SubRoi1ValueVariable(sub_rois_sorted[0])
+            n_pixels_sub_roi_1 = NPixelsSubRoi1Variable(n_pixels_sorted[0])
+            sub_roi_2_grey_var = SubRoi2ValueVariable(sub_rois_sorted[1])
+            n_pixels_sub_roi_2 = NPixelsSubRoi2Variable(n_pixels_sorted[1])
 
         grey_value = self._roi.find_sub_roi(x_var, y_var)
         sub_roi_center = SubRoiValueObjectCenterVariable(grey_value)

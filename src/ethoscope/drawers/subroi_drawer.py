@@ -1,14 +1,19 @@
 __author__ = 'diana'
 
 import cv2
+import time
+
+try:
+    from cv2.cv import CV_AA as LINE_AA
+except ImportError:
+    from cv2 import LINE_AA
 
 from ethoscope.drawers.drawers import BaseDrawer
-from cv2.cv import CV_AA as LINE_AA
 import numpy as np
 
 class SubRoiDrawer(BaseDrawer):
 
-    def __init__(self, video_out= None, draw_frames=False):
+    def __init__(self, video_out= None, draw_frames=False, video_out_fps = 25):
         """
         The SubRoi drawer. It draws the sub-rois mask, with transparency, on top of the video. It draws ellipses on the detected objects and polygons around ROIs. When an "interaction"
         see :class:`~ethoscope.stimulators.stimulators.BaseInteractor` happens within a ROI,
@@ -19,7 +24,7 @@ class SubRoiDrawer(BaseDrawer):
         :param draw_frames: Whether frames should be displayed on the screen (a new window will be created).
         :type draw_frames: bool
         """
-        super(SubRoiDrawer,self).__init__(video_out=video_out, draw_frames=draw_frames)
+        super(SubRoiDrawer,self).__init__(video_out=video_out, draw_frames=draw_frames, video_out_fps = video_out_fps)
 
     def _annotate_frame(self,img, positions, tracking_units):
         if img is None:
@@ -32,10 +37,9 @@ class SubRoiDrawer(BaseDrawer):
             cv2.putText(img, str(track_u.roi.idx), (x,y), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,0))
             black_colour = (0, 0,0)
             roi_colour = (0, 255,0)
-            cv2.drawContours(img,[track_u.roi.polygon],-1, black_colour, 3, LINE_AA)
+            cv2.drawContours(img,[track_u.roi.polygon],-1, black_colour, 3, cv2.sv.LIN)
             cv2.drawContours(img,[track_u.roi.polygon],-1, roi_colour, 1, LINE_AA)
-            x, y, w ,h = track_u.roi._rectangle
-            cv2.circle(img, (x+w/2, y+h/2), 10,(255, 255, 0), thickness=3)
+
 
             if (np.array_equal(track_u.roi._sub_rois, track_u.roi._mask)):
                 continue

@@ -170,7 +170,7 @@ class ROI(object):
 
     def find_sub_roi(self, x, y):
         try:
-            grey_value = self._sub_rois[x, y]
+            grey_value = self._sub_rois[y, x]
         except Exception as e:
             logging.exception(e)
             grey_value = 0
