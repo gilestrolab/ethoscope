@@ -53,22 +53,19 @@ def removeBG(frame, learningRate):
 
 def get_distance(contour_a, contour_b):
     M_a = cv2.moments(contour_a)
-    print "-------------------------"
-    print contour_a
-    print(M_a['m10'])
-    print(M_a['m00'])
     cX_a = int(M_a['m10'] /M_a['m00'])
     cY_a = int(M_a['m01'] /M_a['m00'])
     M_b = cv2.moments(contour_b)
     cX_b = int(M_b['m10'] /M_b['m00'])
     cY_b = int(M_b['m01'] /M_b['m00'])
-
-    distance = np.sqrt((cX_a - cX_b)^2 + (cY_a-cY_b)^2)
+    distance = np.sqrt((cX_a - cX_b)**2 + (cY_a-cY_b)**2)
     return distance
+
 i = 0
 coloredcontours = []
 past_contours = []
 cont = 0
+all_flies_found = False
 
 while(1):
     ret, frame = cap.read()
@@ -81,7 +78,6 @@ while(1):
         learningRate = 0.001
     else:
         learningRate = 0.0
-    print learningRate
     img = removeBG(frame, learningRate)
     cv2.imshow('mask', img)
 
@@ -113,42 +109,49 @@ while(1):
 
     ids = range(1, 8)
 
-    # if len(past_contours) > 0:
-    #     print 'nimic'
-    #     # for contour, color, id in coloredcontours:
-    #     #     distances_to_old_contours = []
-    #     #     for new_contour in contours:
-    #     #         d = get_distance(new_contour, contour)
-    #     #         distances_to_old_contours.append(d)
-    #     #         new_contour_index = distances_to_old_contours.index(min(distances_to_old_contours))
-    #     # #coloredcontours[i] = [contours[new_contour_index], color, id]
-    # else:
 
-    coloredcontours = zip(contours, colors, ids)
+    if all_flies_found is False and (len(contours) != 7):
+        consec_contor = 0
 
-    if len(contours) > 7:
-        areaArray = []
-        for j, c in enumerate(contours):
-            area = cv2.contourArea(c)
-            if len(contours) > 1:
-                areaArray.append(area)
-        #
-        # sorteddata = sorted(zip(areaArray, contours), key=lambda x: x[0], reverse=True)
-        #
-        # #find the nth largest contour [n-1][1], in this case 2
-        # secondlargestcontour = sorteddata[1][1]
-        #
-        # flies = []
-        # for k in range(0, 15):
-        #     flies.append(sorteddata[k][1])
-        #     cv2.drawContours(frame, flies, -1, (0, 0, 255), 2)
+    if len(coloredcontours) > 0:
+        #tuple_list = [(a, some_process(b)) for (a, b) in tuple_list]
+        for m, tuple in enumerate(coloredcontours):
+            contour, color, id = tuple
+            distances_to_old_contours = []
+            for new_contour in contours:
+                d = get_distance(new_contour, contour)
+                distances_to_old_contours.append(d)
+            closest_contour_index = distances_to_old_contours.index(min(distances_to_old_contours))
+            coloredcontours[m] = (contours[closest_contour_index], color, id)
+
     else:
-        for contour, color, id in coloredcontours:
-            cv2.drawContours(frame, [contour], -1, color, 2)
+        consec_contor = consec_contor + 1
+        if (consec_contor > 5):
+            coloredcontours = zip(contours, colors, ids)
+            all_flies_found = True
+
+
+    # if len(contours) > 7:
+    #     areaArray = []
+    #     for j, c in enumerate(contours):
+    #         area = cv2.contourArea(c)
+    #         if len(contours) > 1:
+    #             areaArray.append(area)
+    #     #
+    #     # sorteddata = sorted(zip(areaArray, contours), key=lambda x: x[0], reverse=True)
+    #     #
+    #     # #find the nth largest contour [n-1][1], in this case 2
+    #     # secondlargestcontour = sorteddata[1][1]
+    #     #
+    #     # flies = []
+    #     # for k in range(0, 15):
+    #     #     flies.append(sorteddata[k][1])
+    #     #     cv2.drawContours(frame, flies, -1, (0, 0, 255), 2)
+    # else:
+    for contouri, color, id in coloredcontours:
+        cv2.drawContours(frame, [contouri], -1, color, 2)
 
     cv2.imshow('output', frame)
-    past_contours = contours
-
 
 
     # if len(contours) > 1:
