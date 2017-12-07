@@ -3,6 +3,7 @@ __author__ = 'diana'
 import numpy as np
 import cv2
 import copy
+from random import randint
 
 try:
     CV_VERSION = int(cv2.__version__.split(".")[0])
@@ -28,9 +29,12 @@ cap = cv2.VideoCapture("/data/Diana/data_node/ethoscope_videos/026c6ba04e534be48
 # cv2.imshow('background', bg)
 # cv2.waitKey(0)
 #cap = cv2.VideoCapture("/data/Diana/data_node/ethoscope_videos_y_maze/024aeeee10184bb39b0754e75cef7900/ETHOSCOPE_024/2016-05-03_11-08-02/whole_2016-05-03_11-08-02_024aeeee10184bb39b0754e75cef7900_diana-dam-3-fly-10-etho-24-ctrl_1280x960@25_00000_clean.mp4")
-#cap = cv2.VideoCapture("/data/Diana/data_node/ethoscope_videos/065d6ba04e534be486069c3db7b10827/ETHOSCOPE_065/2017-05-24_09-08-49/whole_2017-05-24_09-08-49_065d6ba04e534be486069c3db7b10827_SD20_1280x960@25_00000_clean.mp4")
+cap = cv2.VideoCapture("/data/Diana/data_node/ethoscope_videos/065d6ba04e534be486069c3db7b10827/ETHOSCOPE_065/2017-05-24_09-08-49/whole_2017-05-24_09-08-49_065d6ba04e534be486069c3db7b10827_SD20_1280x960@25_00000_clean.mp4")
 
 #cap = cv2.VideoCapture("/data/Diana/data_node/ethoscope_videos/008d6ba04e534be486069c3db7b10827/ETHOSCOPE_008/2017-05-04_08-07-38/whole_2017-05-04_08-07-38_008d6ba04e534be486069c3db7b10827_3male_1280x960@25_00000_clean.mp4")
+
+#cap = cv2.VideoCapture("/data/long.mp4")
+
 
 if (CV_VERSION == 3):
     bgModel = cv2.createBackgroundSubtractorMOG2(0, bgSubThreshold)
@@ -47,8 +51,24 @@ def removeBG(frame, learningRate):
     res = cv2.bitwise_and(frame, frame, mask=fgmask)
     return res
 
+def get_distance(contour_a, contour_b):
+    M_a = cv2.moments(contour_a)
+    print "-------------------------"
+    print contour_a
+    print(M_a['m10'])
+    print(M_a['m00'])
+    cX_a = int(M_a['m10'] /M_a['m00'])
+    cY_a = int(M_a['m01'] /M_a['m00'])
+    M_b = cv2.moments(contour_b)
+    cX_b = int(M_b['m10'] /M_b['m00'])
+    cY_b = int(M_b['m01'] /M_b['m00'])
 
+    distance = np.sqrt((cX_a - cX_b)^2 + (cY_a-cY_b)^2)
+    return distance
 i = 0
+coloredcontours = []
+past_contours = []
+cont = 0
 
 while(1):
     ret, frame = cap.read()
@@ -57,7 +77,7 @@ while(1):
     ret, frame = cap.read()
     if i < 100:
         learningRate = 0.01
-    elif len(contours) > 5:
+    elif len(contours) > 7:
         learningRate = 0.001
     else:
         learningRate = 0.0
@@ -86,26 +106,47 @@ while(1):
         contours, hierarchy = cv2.findContours(thresh1, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
 
-    if len(contours) > 5:
+    colors = [(0, 0, 0), (255, 255, 255), (255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255)]
+    # colors = [(0, 0, 0), (255, 255, 255), (255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255),
+    #           (255, 0, 255),(192, 192, 192),(128, 128, 128),(128, 0, 0),(128, 128, 0),(0, 128, 0),(128, 0, 128),
+    #           (0, 128, 128),(0, 0, 128), (21, 21, 0)]
+
+    ids = range(1, 8)
+
+    # if len(past_contours) > 0:
+    #     print 'nimic'
+    #     # for contour, color, id in coloredcontours:
+    #     #     distances_to_old_contours = []
+    #     #     for new_contour in contours:
+    #     #         d = get_distance(new_contour, contour)
+    #     #         distances_to_old_contours.append(d)
+    #     #         new_contour_index = distances_to_old_contours.index(min(distances_to_old_contours))
+    #     # #coloredcontours[i] = [contours[new_contour_index], color, id]
+    # else:
+
+    coloredcontours = zip(contours, colors, ids)
+
+    if len(contours) > 7:
         areaArray = []
         for j, c in enumerate(contours):
             area = cv2.contourArea(c)
             if len(contours) > 1:
                 areaArray.append(area)
-
-        sorteddata = sorted(zip(areaArray, contours), key=lambda x: x[0], reverse=True)
-
-        #find the nth largest contour [n-1][1], in this case 2
-        secondlargestcontour = sorteddata[1][1]
-
-        flies = []
-        for k in range(0, 4):
-            flies.append(sorteddata[k][1])
-            cv2.drawContours(img, flies, -1, (0, 0, 255), 2)
+        #
+        # sorteddata = sorted(zip(areaArray, contours), key=lambda x: x[0], reverse=True)
+        #
+        # #find the nth largest contour [n-1][1], in this case 2
+        # secondlargestcontour = sorteddata[1][1]
+        #
+        # flies = []
+        # for k in range(0, 15):
+        #     flies.append(sorteddata[k][1])
+        #     cv2.drawContours(frame, flies, -1, (0, 0, 255), 2)
     else:
-        cv2.drawContours(img, contours, -1, (0, 0, 255), 2)
+        for contour, color, id in coloredcontours:
+            cv2.drawContours(frame, [contour], -1, color, 2)
 
-
+    cv2.imshow('output', frame)
     past_contours = contours
 
 
@@ -117,7 +158,6 @@ while(1):
     # else:
     #         cv2.drawContours(img, contours, -1, (0, 255, 0), 2)
 
-    cv2.imshow('output', img)
 
 
 
