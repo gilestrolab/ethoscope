@@ -193,23 +193,27 @@ while(1):
                     old_contours_touched_indexes.append(b)
             counts_intersesctions.append(old_contours_touched_indexes)
 
+        for n, el in enumerate(counts_intersesctions):
+            if len(el) == 1:
+                coloredcontours[el[0]] == contours[n]
+            if len(el) > 1:
+                'write needs splitting'
 
 
-
-        for m, tuple in enumerate(coloredcontours):
-            contour, color, id = tuple
-            intersections_with_old_contours = []
-            # print 'here'
-            for n, new_contour in enumerate(contours):
-                c_intersection, n_px_intersection = get_n_px_intersection(new_contour, contour)
-                intersections_with_old_contours.append((c_intersection, n_px_intersection))
-
-            max_intersection = max(intersections_with_old_contours, key=lambda x:x[1])
-            if (max_intersection[1] > 0):
-                coloredcontours[m] = (max_intersection[0], color, id)
-            else:
-                'Olala'
-                # print 'Olalalalalalalalalalalala'
+        # for m, tuple in enumerate(coloredcontours):
+        #     contour, color, id = tuple
+        #     intersections_with_old_contours = []
+        #     # print 'here'
+        #     for n, new_contour in enumerate(contours):
+        #         c_intersection, n_px_intersection = get_n_px_intersection(new_contour, contour)
+        #         intersections_with_old_contours.append((c_intersection, n_px_intersection))
+        #
+        #     max_intersection = max(intersections_with_old_contours, key=lambda x:x[1])
+        #     if (max_intersection[1] > 0):
+        #         coloredcontours[m] = (max_intersection[0], color, id)
+        #     else:
+        #         'Olala'
+        #         # print 'Olalalalalalalalalalalala'
     else:
         consec_contor = consec_contor + 1
         if (consec_contor > 5):
