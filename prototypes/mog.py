@@ -3,6 +3,7 @@ __author__ = 'diana'
 import numpy as np
 import cv2
 import copy
+from scipy import ndimage
 from random import randint
 
 try:
@@ -50,6 +51,72 @@ def removeBG(frame, learningRate):
     fgmask = cv2.erode(fgmask, kernel, iterations=1)
     res = cv2.bitwise_and(frame, frame, mask=fgmask)
     return res
+
+
+
+def get_n_px_intersection_2(contour_a, contour_b):
+    grey= cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    mask_a = np.zeros_like(grey, np.uint8)
+    cv2.drawContours(mask_a, [contour_a], 0, 255, -1)
+    n_px_a = np.count_nonzero(mask_a)
+
+    mask_b = np.zeros_like(grey, np.uint8)
+    cv2.drawContours(mask_b, [contour_b], 0, 200, -1)
+    n_px_b = np.count_nonzero(mask_b)
+
+    intersection = cv2.bitwise_and(mask_a, mask_b)
+    n_px_intersection = np.count_nonzero(intersection)
+
+    return n_px_intersection
+
+def get_n_px_intersection(contour_a, contour_b):
+    grey= cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    mask_a = np.zeros_like(grey, np.uint8)
+    cv2.drawContours(mask_a, [contour_a], 0, 255, -1)
+    n_px_a = np.count_nonzero(mask_a)
+
+    mask_b = np.zeros_like(grey, np.uint8)
+    cv2.drawContours(mask_b, [contour_b], 0, 200, -1)
+    n_px_b = np.count_nonzero(mask_b)
+
+    diff = abs(n_px_b - n_px_a)
+    # print 'a', n_px_a
+    # print 'b', n_px_b
+    # print 'diff', diff
+    intersection = cv2.bitwise_and(mask_a, mask_b)
+    n_px_intersection = np.count_nonzero(intersection)
+    #print 'intersection', n_px_intersection
+
+    if n_px_intersection > 0 and diff > 250:
+        if (CV_VERSION == 3):
+            #print 'problemo'
+            _, contours, hierarchy = cv2.findContours(intersection, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            c_intersection = max(contours, key = cv2.contourArea)
+            y,x = ndimage.measurements.center_of_mass(mask_a)
+            cv2.circle(mask_a, (int(x), int(y)), 10, (0, 0, 0), 3)
+            cv2.imshow('mask_a', mask_a)
+            cv2.imshow('mask_b', mask_b)
+            cv2.imshow('intersection', intersection)
+            cv2.imshow('frame', frame)
+            cv2.waitKey(0)
+
+        else:
+            contours, hierarchy = cv2.findContours(intersection, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            c_intersection = max(contours, key = cv2.contourArea)
+
+    elif n_px_intersection == 0:
+        #print 'baaaa'
+        c_intersection = None
+    else:
+       # print 'icccci'
+        c_intersection= contour_a
+        n_px_intersection = n_px_a
+
+
+
+    return c_intersection, n_px_intersection
+
+
 
 def get_distance(contour_a, contour_b):
     M_a = cv2.moments(contour_a)
@@ -102,7 +169,7 @@ while(1):
         contours, hierarchy = cv2.findContours(thresh1, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
 
-    colors = [(0, 0, 0), (255, 255, 255), (255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255)]
+    colors = [(255, 255, 255), (255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (0, 0, 0)]
     # colors = [(0, 0, 0), (255, 255, 255), (255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255),
     #           (255, 0, 255),(192, 192, 192),(128, 128, 128),(128, 0, 0),(128, 128, 0),(0, 128, 0),(128, 0, 128),
     #           (0, 128, 128),(0, 0, 128), (21, 21, 0)]
@@ -110,20 +177,39 @@ while(1):
     ids = range(1, 8)
 
 
-    if all_flies_found is False and (len(contours) != 7):
+    if all_flies_found is False and len(contours) != 7:
         consec_contor = 0
+
 
     if len(coloredcontours) > 0:
         #tuple_list = [(a, some_process(b)) for (a, b) in tuple_list]
+
+        counts_intersesctions = []
+        for new_contour in contours:
+            old_contours_touched_indexes = []
+            for b, tuple  in enumerate(coloredcontours):
+                old_contour, color, id = tuple
+                if get_n_px_intersection_2(new_contour, old_contour) > 0:
+                    old_contours_touched_indexes.append(b)
+            counts_intersesctions.append(old_contours_touched_indexes)
+
+
+
+
         for m, tuple in enumerate(coloredcontours):
             contour, color, id = tuple
-            distances_to_old_contours = []
-            for new_contour in contours:
-                d = get_distance(new_contour, contour)
-                distances_to_old_contours.append(d)
-            closest_contour_index = distances_to_old_contours.index(min(distances_to_old_contours))
-            coloredcontours[m] = (contours[closest_contour_index], color, id)
+            intersections_with_old_contours = []
+            # print 'here'
+            for n, new_contour in enumerate(contours):
+                c_intersection, n_px_intersection = get_n_px_intersection(new_contour, contour)
+                intersections_with_old_contours.append((c_intersection, n_px_intersection))
 
+            max_intersection = max(intersections_with_old_contours, key=lambda x:x[1])
+            if (max_intersection[1] > 0):
+                coloredcontours[m] = (max_intersection[0], color, id)
+            else:
+                'Olala'
+                # print 'Olalalalalalalalalalalala'
     else:
         consec_contor = consec_contor + 1
         if (consec_contor > 5):
