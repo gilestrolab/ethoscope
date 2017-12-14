@@ -144,21 +144,26 @@ while(1):
 
                 distances = np.transpose(min_distance(x_ind, y_ind, center_of_mass_old_contours))
 
-
+                copy_mask_new_cnt = copy(mask_new_contour)
                 fly_index = [np.argmin(row) + 10 for row in distances]
 
-                mask_new_contour[x_ind, y_ind] = fly_index
+                copy_mask_new_cnt[x_ind, y_ind] = fly_index
 
 
+                # for m, tuple in enumerate(old_colored_contours):
+                #
+                #     coloredcontours[old_contours_touched_indexes[m]] =
+                #
 
 
-                fly_1_pixels = mask_new_contour == 10
-                mask_new_contour[fly_1_pixels] = 255
+                fly_1_pixels = copy_mask_new_cnt == 10
+                copy_mask_new_cnt[fly_1_pixels] = 255
 
-                fly_2_pixels = mask_new_contour == 11
-                mask_new_contour[fly_2_pixels] = 50
+                fly_2_pixels = copy_mask_new_cnt == 11
+                copy_mask_new_cnt[fly_2_pixels] = 50
 
-                cv2.imshow('final', mask_new_contour)
+
+                cv2.imshow('final', copy_mask_new_cnt)
 
 
                 #cv2.drawContours(mask_old_contours, ocs, 0, 255, -1)
