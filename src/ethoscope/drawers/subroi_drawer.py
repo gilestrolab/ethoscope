@@ -37,7 +37,7 @@ class SubRoiDrawer(BaseDrawer):
             cv2.putText(img, str(track_u.roi.idx), (x,y), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,0))
             black_colour = (0, 0,0)
             roi_colour = (0, 255,0)
-            cv2.drawContours(img,[track_u.roi.polygon],-1, black_colour, 3, cv2.sv.LIN)
+            cv2.drawContours(img,[track_u.roi.polygon],-1, black_colour, 3, LINE_AA)
             cv2.drawContours(img,[track_u.roi.polygon],-1, roi_colour, 1, LINE_AA)
 
 
