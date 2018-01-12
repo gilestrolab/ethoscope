@@ -1,7 +1,5 @@
 __author__ = 'diana'
 
-__author__ = 'diana'
-
 import numpy as np
 import cv2
 import copy
@@ -42,12 +40,16 @@ def removeBG(frame, learningRate):
     res = cv2.bitwise_and(frame, frame, mask=fgmask)
     return res
 
-contours = []
-
 i=0
-ret, frame = cap.read()
-(h, w) = frame.shape[:2]
-vw = cv2.VideoWriter("/home/diana/Desktop/hugo.avi", VideoWriter_fourcc(*"DIVX"), 25, (w,h), False)
+consec_contor =0
+all_flies_found = False
+
+new_contours = []
+labeleld_contours = []
+
+
+def track
+
 
 while(1):
     ret, frame = cap.read()
@@ -56,25 +58,36 @@ while(1):
     ret, frame = cap.read()
     if i < 100:
         learningRate = 0.01
-    elif len(contours) > 7:
+    elif len(new_contours) > 7:
         learningRate = 0.001
     else:
         learningRate = 0.0
     img = removeBG(frame, learningRate)
 
-     # convert the image into binary image
+    # convert the image into binary image
     grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     blur = cv2.GaussianBlur(grey, (blurValue, blurValue), 0)
     ret, thresh = cv2.threshold(blur, threshold, 255, cv2.THRESH_BINARY)
 
+    cv2.imshow('thresh', thresh)
+    cv2.waitKey(30)
 
-    if i > 35 and i < 400:
-        vw.write(thresh)
+    white_flies = copy.deepcopy(thresh)
+    if (CV_VERSION == 3):
+        _, new_contours, hierarchy = cv2.findContours(white_flies, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    else:
+        new_contours, hierarchy = cv2.findContours(white_flies, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-    if i > 300:
-        print 'Gata'
-        break
+    #consec_contour waits for 5 consecutive frame in which the flies are found
+    if all_flies_found is False and len(new_contours) != 7:
+        consec_contor = 0
 
-vw.release()
-cv2.destroyAllWindows()
+
+    if (len(labeleld_contours) > 0):
+
+    else:
+        consec_contor = consec_contor + 1
+        if (consec_contor > 5):
+            labeleld_contours = zip(new_contours, colors, ids)
+            all_flies_found = True
