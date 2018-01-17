@@ -7,7 +7,8 @@ CV_VERSION = int(cv2.__version__.split(".")[0])
 
 import numpy as np
 from scipy import ndimage
-from ethoscope.core.variables import XPosVariable, YPosVariable, XYDistance, WidthVariable, HeightVariable, PhiVariable, Label
+from ethoscope.core.variables import XPosVariable, YPosVariable, XYDistance, WidthVariable, HeightVariable, PhiVariable, \
+    IDVariable
 from ethoscope.core.data_point import DataPoint
 from ethoscope.trackers.trackers import BaseTracker, NoPositionError
 from ethoscope.utils.debug import EthoscopeException
@@ -342,7 +343,7 @@ class MultiFlyTrackerWithIds(BaseTracker):
 
             cv2.ellipse(self._buff_fg ,((x,y), (int(w*1.5),int(h*1.5)),angle),255,-1)
 
-
+            id_var = IDVariable(id)
             x_var = XPosVariable(int(round(x)))
             y_var = YPosVariable(int(round(y)))
             # distance = XYDistance(int(xy_dist))
@@ -352,7 +353,7 @@ class MultiFlyTrackerWithIds(BaseTracker):
             phi_var = PhiVariable(int(round(angle)))
             # mlogl =   mLogLik(int(distance*1000))
 
-            out = DataPoint([x_var, y_var, w_var, h_var,
+            out = DataPoint([id_var, x_var, y_var, w_var, h_var,
                              phi_var,
                              #mlogl,
                              # distance,

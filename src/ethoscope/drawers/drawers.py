@@ -10,6 +10,9 @@ except ImportError:
 
 from ethoscope.utils.description import DescribedObject
 import os
+import matplotlib.cm as cm
+import matplotlib
+import math
 
 class BaseDrawer(object):
     def __init__(self, video_out=None, draw_frames=True, video_out_fourcc="DIVX", video_out_fps=2):
@@ -107,6 +110,7 @@ class NullDrawer(BaseDrawer):
         pass
 
 
+
 class DefaultDrawer(BaseDrawer):
     def __init__(self, video_out= None, draw_frames=False):
         """
@@ -119,7 +123,16 @@ class DefaultDrawer(BaseDrawer):
         :param draw_frames: Whether frames should be displayed on the screen (a new window will be created).
         :type draw_frames: bool
         """
+        self._colormap = {0: (255, 0, 0),
+                          1: (255, 255, 0),
+                          2: (0, 255, 0),
+                          3: (0, 255, 255),
+                          4: (0, 0, 255),
+                          5: (255, 0, 255),
+                          6: (128, 0, 255),
+                          7: (255, 128, 0)}
         super(DefaultDrawer,self).__init__(video_out=video_out, draw_frames=draw_frames)
+
 
     def _annotate_frame(self,img, positions, tracking_units):
         if img is None:
@@ -148,5 +161,6 @@ class DefaultDrawer(BaseDrawer):
                 except KeyError:
                     pass
 
-                cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),black_colour,3, LINE_AA)
-                cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),colour,1, LINE_AA)
+                cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]), self._colormap[pos["fly_id"]],  3, LINE_AA)
+                cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]), black_colour, 1, LINE_AA)
+

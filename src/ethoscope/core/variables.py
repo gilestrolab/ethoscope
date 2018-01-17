@@ -139,3 +139,10 @@ class SubRoiValueObjectCenterVariable(BaseIntVariable):
     header_name = "sub_roi"
     functional_type = "grey_value"
 
+
+class IDVariable(BaseIntVariable):
+    """
+    Type encoding a unique id for the flies, when there are multiple flies in the same roi.
+    """
+    header_name = "fly_id"
+    functional_type = "fly_id_in_roi"
