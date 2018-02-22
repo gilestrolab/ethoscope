@@ -18,6 +18,7 @@ from ethoscope.hardware.input.cameras import MovieVirtualCamera
 from ethoscope.drawers.subroi_drawer import SubRoiDrawer
 from ethoscope.drawers.drawers import DefaultDrawer
 from optparse import OptionParser
+from ethoscope.trackers.simple_tracker import SimpleTracker
 import os
 
 from ethoscope.roi_builders.arena_mask_roi_builder import ArenaMaskROIBuilder
@@ -51,7 +52,11 @@ if __name__ == '__main__':
     #MASK = "/data/Diana/data_node/InkscapeFiles/different_regions.png"
     #MASK = "/data/Diana/data_node/InkscapeFiles/arena_binary_final.png"
     #MASK = "/data/Diana/data_node/InkscapeFiles/image_2.png"
-    MASK = "/data/Diana/data_node/InkscapeFiles/image_7.png"
+    #MASK = "/data/Diana/data_node/InkscapeFiles/image_7.png"
+
+    #MASK = "/data/Diana/data_node/InkscapeFiles/arena_many_holes.png"
+
+    MASK = "/data/Diana/data_node/InkscapeFiles/arena_24flies.png"
 
     # We use a video input file as if it was a "camera"
     cam = MovieVirtualCamera(INPUT_VIDEO, drop_each=1)

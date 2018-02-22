@@ -38,7 +38,7 @@ class ArenaMaskROIBuilder(ImgMaskROIBuilder):
 
         # Filter by Inertia
         params.filterByInertia = True
-        params.minInertiaRatio = 0.7
+        params.minInertiaRatio = 0.6
 
         if(CV_VERSION == 3):
             detector = cv2.SimpleBlobDetector_create(params)
@@ -64,7 +64,9 @@ class ArenaMaskROIBuilder(ImgMaskROIBuilder):
             img = cv2.bitwise_not(img)
 
         #get an image that contains the pixels values that are black. The pixels values > 10 become white.
-        ret, thresh = cv2.threshold(img, 10, 255, cv2.THRESH_BINARY)
+        ret, thresh = cv2.threshold(img, 30, 255, cv2.THRESH_BINARY)
+        cv2.imshow('thresh', thresh)
+        cv2.waitKey(0)
         return thresh
 
     def _remove_targets(self, img):
@@ -131,6 +133,13 @@ class ArenaMaskROIBuilder(ImgMaskROIBuilder):
 
     def _rois_from_img(self,img):
         corrected_mask = self._get_corrected_mask_without_targets(img)
+
+        cv2.imshow('corrcted mask', corrected_mask)
+        cv2.waitKey(0)
+
+        bordersize=1
+        corrected_mask = cv2.copyMakeBorder(corrected_mask, top=bordersize, bottom=bordersize, left=bordersize, right=bordersize, borderType= cv2.BORDER_CONSTANT, value=[0,0,0] )
+
         corrected_mask_edged = cv2.Canny(corrected_mask, 50, 100)
         cv2.GaussianBlur(corrected_mask_edged,(5,5),1.2, corrected_mask_edged)
 
@@ -153,6 +162,7 @@ class ArenaMaskROIBuilder(ImgMaskROIBuilder):
             contours_original_mask, hierarchy_original_mask = cv2.findContours(np.copy(original_mask_edged),
                                                                                   cv2.RETR_EXTERNAL,
                                                                                   cv2.CHAIN_APPROX_SIMPLE)
+
 
         if (len(contours_corrected_mask) != len(contours_original_mask)):
             raise ValueError('The mask does not fit the video! The proportions of distances are not right! '

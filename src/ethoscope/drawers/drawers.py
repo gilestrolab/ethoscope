@@ -8,14 +8,10 @@ except ImportError:
     from cv2 import VideoWriter_fourcc
     from cv2 import LINE_AA
 
-from ethoscope.utils.description import DescribedObject
 import os
-import matplotlib.cm as cm
-import matplotlib
-import math
 
 class BaseDrawer(object):
-    def __init__(self, video_out=None, draw_frames=True, video_out_fourcc="DIVX", video_out_fps=2):
+    def __init__(self, video_out=None, draw_frames=True, video_out_fourcc="DIVX", video_out_fps=25):
         """
         A template class to annotate and save the processed frames. It can also save the annotated frames in a video
         file and/or display them in a new window. The :meth:`~ethoscope.drawers.drawers.BaseDrawer._annotate_frame`
@@ -123,14 +119,19 @@ class DefaultDrawer(BaseDrawer):
         :param draw_frames: Whether frames should be displayed on the screen (a new window will be created).
         :type draw_frames: bool
         """
-        self._colormap = {0: (255, 0, 0),
-                          1: (255, 255, 0),
-                          2: (0, 255, 0),
-                          3: (0, 255, 255),
-                          4: (0, 0, 255),
-                          5: (255, 0, 255),
-                          6: (128, 0, 255),
-                          7: (255, 128, 0)}
+        self._colormap = {0: (255, 0, 0),1: (255, 255, 0), 2: (0, 255, 0), 3: (0, 255, 255), 4: (0, 0, 255),
+                          5: (255, 0, 255), 6: (128, 0, 255), 7: (255, 128, 0), 8: (128, 0, 0), 9: (128, 128, 0),
+                          10: (0, 128, 0), 11: (0, 128, 128), 12: (0, 0, 128), 13: (128, 0, 128), 14: (128, 0, 128),
+                          15: (0, 64, 0), 16: (0, 64, 64), 17: (0, 0, 64), 18: (64, 0, 64), 19: (64, 0, 64),
+                          20: (0, 192, 0), 21: (0, 192, 192), 22: (0, 0, 192), 23: (192, 0, 192), 24: (192, 0, 192),
+                          25: (255, 153, 153), 26: (255, 204, 153), 27: (255, 255, 153), 28: (204, 255, 153),
+                          29: (153, 255, 153), 30: (153, 255, 204), 31: (153, 255, 255), 32: (153, 204, 255),
+                          33: (153, 153, 255), 34: (204, 153, 255), 35: (255, 102, 102), 36: (255, 178, 102),
+                          37: (255, 255, 102), 38: (178, 255, 102), 39: (102, 255, 102), 40: (102, 255, 178),
+                          41: (102, 255, 255), 42: (102, 178, 255), 43: (102, 102, 255), 44: (178, 102, 255),
+                          45: (255, 204, 204), 46: (255, 229, 204), 47: (255, 255, 204), 48: (229, 255, 204),
+                          49: (204, 255, 204), 50: (204, 255, 229),
+        }
         super(DefaultDrawer,self).__init__(video_out=video_out, draw_frames=draw_frames)
 
 
@@ -161,6 +162,12 @@ class DefaultDrawer(BaseDrawer):
                 except KeyError:
                     pass
 
-                cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]), self._colormap[pos["fly_id"]],  3, LINE_AA)
-                cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]), black_colour, 1, LINE_AA)
+
+                if (pos["fly_id"] is not None and self._colormap[pos["fly_id"]]):
+                    cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]), self._colormap[pos["fly_id"]],  3, LINE_AA)
+                    cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]), black_colour, 1, LINE_AA)
+
+                else:
+                    cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]), colour,  3, LINE_AA)
+                    cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]), black_colour, 1, LINE_AA)
 

@@ -1,18 +1,27 @@
+__author__ = 'diana'
 
+
+from collections import deque
+from math import log10, sqrt, pi
 import cv2
+
 try:
     CV_VERSION = int(cv2.__version__.split(".")[0])
 except:
     CV_VERSION = 2
 
+
 import numpy as np
 from scipy import ndimage
-from ethoscope.core.variables import XPosVariable, YPosVariable, XYDistance, WidthVariable, HeightVariable, PhiVariable, \
-                                        SubRoiValueObjectCenterVariable
+from ethoscope.core.variables import XPosVariable, YPosVariable, XYDistance, WidthVariable, HeightVariable, \
+                                    PhiVariable,SubRoiValueObjectCenterVariable
 from ethoscope.core.data_point import DataPoint
-from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel, NoPositionError
-from math import log10
+from ethoscope.trackers.trackers import BaseTracker, NoPositionError
+from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.core.variables import BaseIntVariable
+
+
+import logging
 
 ##Extra variables to be added in the database for this tracker
 class SubRoi1ValueVariable(BaseIntVariable):
@@ -57,7 +66,7 @@ class NPxObjectVariable(BaseIntVariable):
     functional_type = "nr_pixels"
 
 
-class AdaptiveBGModelExtraObjectPosInfo(AdaptiveBGModel):
+class SimpleTracker(AdaptiveBGModel):
     _description = {"overview": "The default tracker for fruit flies. One animal per ROI.",
                     "arguments": []}
 
@@ -75,12 +84,16 @@ class AdaptiveBGModelExtraObjectPosInfo(AdaptiveBGModel):
 
         bg = self._bg_model.bg_img.astype(np.uint8)
         cv2.subtract(grey, bg, self._buff_fg)
-        cv2.threshold(self._buff_fg,20,255,cv2.THRESH_TOZERO, dst=self._buff_fg)
+
+        cv2.threshold(self._buff_fg,100,255,cv2.THRESH_TOZERO, dst=self._buff_fg)
 
         # cv2.bitwise_and(self._buff_fg_backup,self._buff_fg,dst=self._buff_fg_diff)
         # sum_fg = cv2.countNonZero(self._buff_fg)
 
         self._buff_fg_backup = np.copy(self._buff_fg)
+
+        cv2.imshow('fg', self._buff_fg_backup)
+       #cv2.waitKey(0)
 
         n_fg_pix = np.count_nonzero(self._buff_fg)
         prop_fg_pix  = n_fg_pix / (1.0 * grey.shape[0] * grey.shape[1])
@@ -106,39 +119,7 @@ class AdaptiveBGModelExtraObjectPosInfo(AdaptiveBGModel):
             self._bg_model.increase_learning_rate()
             raise NoPositionError
 
-        elif len(contours) > 1:
-            if not self.fg_model.is_ready:
-                raise NoPositionError
-            # hulls = [cv2.convexHull( c) for c in contours]
-            hulls = contours
-            #hulls = merge_blobs(hulls)
-
-            hulls = [h for h in hulls if h.shape[0] >= 3]
-
-            if len(hulls) < 1:
-                raise NoPositionError
-
-            elif len(hulls) > 1:
-                is_ambiguous = True
-            cluster_features = [self.fg_model.compute_features(img, h) for h in hulls]
-            all_distances = [self.fg_model.distance(cf,t) for cf in cluster_features]
-            good_clust = np.argmin(all_distances)
-
-            hull = hulls[good_clust]
-            distance = all_distances[good_clust]
-        else:
-            hull = contours[0]
-            if hull.shape[0] < 3:
-                self._bg_model.increase_learning_rate()
-                raise NoPositionError
-
-            features = self.fg_model.compute_features(img, hull)
-            distance = self.fg_model.distance(features,t)
-
-        if distance > self._max_m_log_lik:
-            self._bg_model.increase_learning_rate()
-            raise NoPositionError
-
+        hull = max(contours, key = cv2.contourArea)
 
         (x,y) ,(w,h), angle  = cv2.minAreaRect(hull)
 
