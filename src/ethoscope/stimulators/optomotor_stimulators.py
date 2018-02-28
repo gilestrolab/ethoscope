@@ -35,4 +35,9 @@ class MotoMidlineCrossStimulator (MiddleCrossingStimulator):
                                    ]}
     _HardwareInterfaceClass = OptoMotor
     _roi_to_channel = {1:0, 3:2, 5:4, 7:6, 9:8,
-    12:22, 14:20, 16:18, 18:16, 20:14}
+                       12:22, 14:20, 16:18, 18:16, 20:14}
+    _duration = 2000 #ms
+
+    def _decide(self):
+        out = super(MotoMidlineCrossStimulator, self)._decide()
+        out["duration"] = self._duration
