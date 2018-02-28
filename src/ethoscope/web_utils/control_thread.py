@@ -81,6 +81,7 @@ class ControlThread(Thread):
                                             IsMovingStimulator,
                                             DynamicOdourSleepDepriver,
                                             OptoMidlineCrossStimulator,
+                                            MotoMidlineCrossStimulator,
                                             OptomotorSleepDepriverSystematic,
                                             MiddleCrossingOdourStimulator,
                                             MiddleCrossingOdourStimulatorFlushed
