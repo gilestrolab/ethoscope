@@ -39,5 +39,6 @@ class MotoMidlineCrossStimulator (MiddleCrossingStimulator):
     _duration = 2000 #ms
 
     def _decide(self):
-        out = super(MotoMidlineCrossStimulator, self)._decide()
-        out["duration"] = self._duration
+        has_interacted, dic = super(MotoMidlineCrossStimulator, self)._decide()
+        dic["duration"] = self._duration
+        return has_interacted, dic
