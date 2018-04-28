@@ -335,7 +335,7 @@ if __name__ == '__main__':
         device_scanner = DeviceScanner(LOCAL_IP, results_dir=RESULTS_DIR)
         #device_scanner = DeviceScanner( results_dir=RESULTS_DIR)
         device_scanner.start()
-        run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='cherrypy')
+        run(app, host='0.0.0.0', port=PORT, debug=DEBUG)
 
     except KeyboardInterrupt:
         logging.info("Stopping server cleanly")
