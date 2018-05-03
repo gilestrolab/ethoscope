@@ -356,6 +356,7 @@ if __name__ == '__main__':
         device_scanner = DeviceScanner(LOCAL_IP, results_dir=RESULTS_DIR)
         #device_scanner = DeviceScanner( results_dir=RESULTS_DIR)
         device_scanner.start()
+        SERVER = "cheroot"
         #######To be remove when bottle changes to version 0.13
         try:
             #This checks if the patch has to be applied or not. We check if bottle has declared cherootserver
@@ -364,11 +365,12 @@ if __name__ == '__main__':
         except:
             #Trick bottle to think that cheroot is actulay cherrypy server, modifies the server_names allowed in bottle
             #so we use cheroot in background.
+            SERVER="cherrypy"
             server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
             logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
             pass
         #########
-        run(app, host='0.0.0.0', port=PORT, debug=DEBUG)
+        run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server=SERVER)
 
     except KeyboardInterrupt:
         logging.info("Stopping server cleanly")
