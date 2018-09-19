@@ -4,9 +4,7 @@ Ethoscope
 ============
 
 This is the github repository of the software part of the [ethoscope platform](http://gilestrolab.github.io/ethoscope/).
-The harware repository lives [here](https://github.com/PolygonalTree/ethoscope_hardware)
-The [rethomics](https://github.com/gilestrolab/rethomics) `R` package is designed to analyse results.
-
+All technical information regarding ethoscope is compiled in [our documentation](https://qgeissmann.gitbooks.io/ethoscope-manual/content/).
 
 Organisation of the code
 --------------------------
@@ -14,7 +12,7 @@ Organisation of the code
 * `src` contains the main python package named `ethoscope`. It is installed on video monitors (devices), but it can be used as a standalone off-line tracking tool.
 * `node-src` contains the software stack running on the 'node'. Node is a unique computer that syncs and controls devices.
 * `prototypes` contains (often unsuccessful) developmental trials.
-* `scripts` contains a toolbox of scripts mainly to install the software on target devices.
+* `scripts` contains a toolbox of scripts. For instance to install the software on target device or to convert aquiered videos to a handy format.
 
 
 Branching system
