@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/bin/bash
 #================================================================
 # HEADER
 #================================================================
@@ -12,6 +12,7 @@
 #% OPTIONS
 #%    -o [path]                 Set the pat to the SD CARD
 #%    -i [id]                   Specify the ethoscope ID (integer)
+#%    -f [filename]             Use the specidied filename
 #%    -h                        Print this help
 #%
 #% EXAMPLES
@@ -27,6 +28,7 @@
 #================================================================
 #  HISTORY
 #     2018/10/03 : ggilestro : Script created and released
+#     2018/10/07 : ggilestro : added automatic check for BSD and changed shebang
 # 
 #================================================================
 # END_OF_HEADER
@@ -48,6 +50,8 @@ TMP_DIR=/tmp
 MIN_CARD_SIZE=8589934592 #8GB
 
 
+TAR_CMD=`which bsdtar || which tar || exit 127`
+
 prompt_confirm() {
   while true; do
     read -r -n 1 -p "${1:-Continue?} [y/n]: " REPLY
@@ -60,12 +64,13 @@ prompt_confirm() {
 }
 
 #Check if options were passed
-while getopts o:i:h: option
+while getopts o:i:f:h: option
   do
     case "${option}"
     in
       o) SDCARD=${OPTARG};;
       i) ID=${OPTARG};;
+      i) LOCAL_FILE=${OPTARG};;
       h) usagefull;;
     esac
   done
@@ -96,9 +101,8 @@ if [[ -z $SDCARD ]]; then
 
    NUMCARD=`diff ${TMP_DIR}/before-sd ${TMP_DIR}/after-sd | grep "^>" | wc -l`
    SDCARD=`diff ${TMP_DIR}/before-sd ${TMP_DIR}/after-sd | egrep "^>" | sed "s/> //"`
-   CARDSIZE=`blockdev --getsize64 $SDCARD`
     
-   if [[ $NUMCARD != 1 ]]; then
+   if (( $NUMCARD > 1 )); then
       echo "Something is wrong. I found more than 1 card. Exiting now"
       exit 1
    fi
@@ -107,12 +111,12 @@ if [[ -z $SDCARD ]]; then
       echo "I could not find any card. Exiting now."
       exit 1
    fi
-   
+
+   CARDSIZE=`blockdev --getsize64 $SDCARD`
    if (( $CARDSIZE <= $MIN_CARD_SIZE )); then
       echo "The card size is too small. You should be using a card with at least 8GB capacity (32GB reccomended). Exiting now."
       exit 1
    fi
-   
    
    echo "I found a card on path $SDCARD with size ${CARDSIZE} byte"
    prompt_confirm "Do you want to continue using this card?" || exit 0
@@ -136,6 +140,7 @@ ID=`printf "%03d" $ID`
 
 #All the info are gathered, proceed.
 echo "I will now create a card for ethoscope $ID using the card in $SDCARD"
+echo "The current content of the card is going to be completely erased"
 prompt_confirm "Are you sure this is what you want to do?" || exit 0
 
 #Create partitions
@@ -153,9 +158,9 @@ n
 p
 2
 
-
 w"| fdisk $SDCARD || exit 1
 
+sync
 echo -e "Partitions succesfully created\n"
 
 #Formatting partitions
@@ -184,15 +189,15 @@ mount ${PART1} ${TMP_DIR}/boot || exit 1
 mkfs.ext4 ${PART2} || exit 1 
 mount ${PART2} ${TMP_DIR}/root || exit 1
 
-
-echo "Downloading last version of the file if not yet present. This may take a while"
-
-cd ${TMP_DIR}
-wget -c ${WEB_URL}${OS_FILE} || exit 1
+if [[ -z $LOCAL_FILE ]]; then
+  echo "Downloading latest version of the ethoscope OS (if not already present). This may take a while"
+  wget -c ${WEB_URL}${OS_FILE} -P ${TMP_DIR} || exit 1
+  LOCAL_FILE=${TMP_DIR}/${OS_FILE}
+fi
 
 echo "Uncompressing the file - this may take some time. Please wait"
 
-bsdtar -vxpf ${TMP_DIR}/${OS_FILE} -C ${TMP_DIR}/root || exit 1
+${TAR_CMD} -vxpf ${LOCAL_FILE} -C ${TMP_DIR}/root || exit 1
 sync
 mv ${TMP_DIR}/root/boot/* ${TMP_DIR}/boot/
 
@@ -206,4 +211,3 @@ umount ${TMP_DIR}/{boot,root}
 rm -f ${TMP_DIR}/{before-sd,after-sd}
 
 echo "All done! You can now remove the card and insert it into your new ethoscope"
-
