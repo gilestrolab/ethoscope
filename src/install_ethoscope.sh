@@ -145,22 +145,32 @@ prompt_confirm "Are you sure this is what you want to do?" || exit 0
 
 #Create partitions
 echo -e "Creating partitions\n"
-echo "o
-p
-n
-p
-1
 
-+100M
-t
-c
-n
-p
-2
+# to create the partitions programatically (rather than manually)
+# we're going to simulate the manual input to fdisk
+# The sed script strips off all the comments so that we can 
+# document what we're doing in-line with the actual commands
+# Note that a blank line (commented as "default" will send a empty
+# line terminated with a newline to take the fdisk default.
+sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk ${SDCARD}
+  o # clear the in memory partition table
+  n # new partition
+  p # primary partition
+  1 # partition number 1
+    # default - start at beginning of disk 
+  +100M # 100 MB boot parttion
+  t # set partition type to
+  c # DOS
+  n # new partition
+  p # primary partition
+  2 # partion number 2
+    # default, start immediately after preceding partition
+    # default, extend partition to end of disk
+  p # print the in-memory partition table
+  w # write the partition table
+  q # and we're done
+EOF
 
-w"| fdisk $SDCARD || exit 1
-
-sync
 echo -e "Partitions succesfully created\n"
 
 #Formatting partitions
@@ -182,7 +192,8 @@ if [[ -z $PART1 ]]; then
    exit 1
 fi
 
-umount /dev/mmcblk0* || [ $? -eq 1 ]
+umount ${PART1} || [ $? -eq 1 ]
+umount ${PART2} || [ $? -eq 1 ]
 
 mkfs.vfat ${PART1} || exit 1
 mount ${PART1} ${TMP_DIR}/boot || exit 1
