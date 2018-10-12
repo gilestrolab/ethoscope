@@ -215,8 +215,8 @@ mv ${TMP_DIR}/root/boot/* ${TMP_DIR}/boot/
 echo "now writing the information regarding ID"
 UUID=`blkid $PART1 | egrep '[0-9A-F]{4}-[0-9A-F]{4}' -o`
 echo ${ID}-${UUID} > ${TMP_DIR}/root/etc/machine-id
-echo "ethoscope_$ID" > ${TMP_DIR}/root/etc/machine-name
-echo "ethoscope_$ID" > ${TMP_DIR}/root/etc/hostname
+echo "ETHOSCOPE_$ID" > ${TMP_DIR}/root/etc/machine-name
+echo "ETHOSCOPE_$ID" > ${TMP_DIR}/root/etc/hostname
 
 umount ${TMP_DIR}/{boot,root}
 rm -f ${TMP_DIR}/{before-sd,after-sd}
