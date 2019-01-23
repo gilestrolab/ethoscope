@@ -9,6 +9,8 @@ from ethoscope.web_utils.helpers import get_machine_info, get_version, file_in_d
 from ethoscope.web_utils.record import ControlThreadVideoRecording
 from subprocess import call
 import json
+import os
+import glob
 
 api = Bottle()
 
@@ -46,6 +48,17 @@ def server_static(filepath):
 @error_decorator
 def name():
     return {"id": control.info["id"]}
+
+
+@api.get('/make_index')
+@error_decorator
+def make_index():
+    index_file = os.path.join(ETHOSCOPE_DIR, "index.html")
+    all_video_files = [y for x in os.walk(ETHOSCOPE_DIR) for y in glob.glob(os.path.join(x[0], '*.h264'))]
+    with open(index_file, "w") as index:
+        for f in all_video_files:
+            index.write(f + "\n")
+    return {}
 
 
 
@@ -161,6 +174,30 @@ def close(exit_status=0):
         control = None
     os._exit(exit_status)
 
+#======================================================================================================================#
+#############
+### CLASSS TO BE REMOVED IF BOTTLE CHANGES TO 0.13
+############
+class CherootServer(ServerAdapter):
+    def run(self, handler): # pragma: no cover
+        from cheroot import wsgi
+        from cheroot.ssl import builtin
+        self.options['bind_addr'] = (self.host, self.port)
+        self.options['wsgi_app'] = handler
+        certfile = self.options.pop('certfile', None)
+        keyfile = self.options.pop('keyfile', None)
+        chainfile = self.options.pop('chainfile', None)
+        server = wsgi.Server(**self.options)
+        if certfile and keyfile:
+            server.ssl_adapter = builtin.BuiltinSSLAdapter(
+                    certfile, keyfile, chainfile)
+        try:
+            server.start()
+        finally:
+            server.stop()
+#############
+
+
 if __name__ == '__main__':
 
     ETHOSCOPE_DIR = "/ethoscope_data/results"
@@ -224,7 +261,21 @@ if __name__ == '__main__':
         control.start()
 
     try:
-        run(api, host='0.0.0.0', port=port, server='cherrypy',debug=option_dict["debug"])
+        device_scanner = DeviceScanner(LOCAL_IP, results_dir=RESULTS_DIR)
+        #device_scanner = DeviceScanner( results_dir=RESULTS_DIR)
+        device_scanner.start()
+        #######TO be remove when bottle changes to version 0.13
+        server = "cherrypy"
+        try:
+            from cherrypy import wsgiserver
+        except:
+            #Trick bottle to think that cheroot is actulay cherrypy server adds the pacth to BOTTLE
+            server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
+            logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
+            pass
+        #########
+        run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='cherrypy')
+
     except Exception as e:
         logging.error(e)
         close(1)

@@ -215,21 +215,22 @@ def node_info(req):#, device):
         df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout=subprocess.PIPE)
         disk_free = df.communicate()[0]
         disk_usage = RESULTS_DIR+" Not Found on disk"
-        # ip = "No IP assigned, check cable"
-        # MAC_addr = "Not detected"
-        # local_ip = ""
-        # try:
-        #     disk_usage = disk_free.split("\n")[1].split()
-        #     addrs = ifaddresses(INTERNET_DEVICE)
-        #     MAC_addr = addrs[AF_LINK][0]["addr"]
-        #
-        #     ip = addrs[AF_INET][0]["addr"]
-        #     local_addrs = ifaddresses(SUBNET_DEVICE)
-        #     local_ip = local_addrs[AF_INET][0]["addr"]
-        # except Exception as e:
-        #     logging.error(e)
+        ip = "No IP assigned, check cable"
+        MAC_addr = "Not detected"
+        local_ip = ""
+        try:
+            disk_usage = disk_free.split("\n")[1].split()
+            net_info = subprocess.Popen(['ip','a'], stdout=subprocess.PIPE)
+            net_info = net_info.communicate()[0].split("\n")
+            WWW_MAC_addr = net_info[net_info.index([s for s in net_info if WWW_IP in s][0])-1].split("\t")[1].split(" ")[2]
+            LOCAL_MAC_addr = net_info[net_info.index([s for s in net_info if LOCAL_IP in s][0])-1].split("\t")[1].split(" ")[2]
+        except Exception as e:
+            logging.error(e)
         #fixme
-        MAC_addr = "TODO"
+        #MAC_addr = "TODO"
+        return {'disk_usage': disk_usage, 'MAC_addr': WWW_MAC_addr, 'ip': WWW_IP,
+                'local_ip':LOCAL_IP}
+
         return {'disk_usage': disk_usage, 'MAC_addr': MAC_addr, 'ip': WWW_IP,
                 'local_ip':LOCAL_IP}
     if req == 'time':
@@ -297,9 +298,30 @@ def redirection_to_more(action):
 def close(exit_status=0):
     logging.info("Closing server")
     os._exit(exit_status)
-    
+
 
 #======================================================================================================================#
+#############
+### CLASSS TO BE REMOVED IF BOTTLE CHANGES TO 0.13
+############
+class CherootServer(ServerAdapter):
+    def run(self, handler): # pragma: no cover
+        from cheroot import wsgi
+        from cheroot.ssl import builtin
+        self.options['bind_addr'] = (self.host, self.port)
+        self.options['wsgi_app'] = handler
+        certfile = self.options.pop('certfile', None)
+        keyfile = self.options.pop('keyfile', None)
+        chainfile = self.options.pop('chainfile', None)
+        server = wsgi.Server(**self.options)
+        if certfile and keyfile:
+            server.ssl_adapter = builtin.BuiltinSSLAdapter(
+                    certfile, keyfile, chainfile)
+        try:
+            server.start()
+        finally:
+            server.stop()
+#############
 
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
@@ -308,7 +330,7 @@ if __name__ == '__main__':
     parser.add_option("-p", "--port", dest="port", default=80,help="port")
     parser.add_option("-l", "--local", dest="local", default=False, help="Run on localhost (run a node and device on the same machine, for development)", action="store_true")
     parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_results",help="Where temporary result files are stored")
-    parser.add_option("-r", "--subnet-ip", dest="subnet_ip", default="192.169.123.0", help="the ip of the router in your setup")
+    parser.add_option("-r", "--subnet-ip", dest="subnet_ip", default="192.168.123.0", help="the ip of the router in your setup")
 
 
 
@@ -334,6 +356,16 @@ if __name__ == '__main__':
         device_scanner = DeviceScanner(LOCAL_IP, results_dir=RESULTS_DIR)
         #device_scanner = DeviceScanner( results_dir=RESULTS_DIR)
         device_scanner.start()
+        #######TO be remove when bottle changes to version 0.13
+        server = "cherrypy"
+        try:
+            from cherrypy import wsgiserver
+        except:
+            #Trick bottle to think that cheroot is actulay cherrypy server adds the pacth to BOTTLE
+            server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
+            logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
+            pass
+        #########
         run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='cherrypy')
 
     except KeyboardInterrupt:
