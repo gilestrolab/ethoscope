@@ -261,20 +261,17 @@ if __name__ == '__main__':
         control.start()
 
     try:
-        device_scanner = DeviceScanner(LOCAL_IP, results_dir=RESULTS_DIR)
-        #device_scanner = DeviceScanner( results_dir=RESULTS_DIR)
-        device_scanner.start()
         #######TO be remove when bottle changes to version 0.13
         server = "cherrypy"
         try:
             from cherrypy import wsgiserver
         except:
             #Trick bottle to think that cheroot is actulay cherrypy server adds the pacth to BOTTLE
-            server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
+            server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=port)
             logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
             pass
         #########
-        run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='cherrypy')
+        run(app, host='0.0.0.0', port=port, debug=option_dict["debug"], server='cherrypy')
 
     except Exception as e:
         logging.error(e)
