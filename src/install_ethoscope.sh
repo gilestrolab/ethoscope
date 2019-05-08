@@ -213,8 +213,8 @@ sync
 mv ${TMP_DIR}/root/boot/* ${TMP_DIR}/boot/
 
 echo "now writing the information regarding ID"
-UUID=`blkid $PART1 | egrep '[0-9A-F]{4}-[0-9A-F]{4}' -o`
-echo ${ID}-${UUID} > ${TMP_DIR}/root/etc/machine-id
+mid="$ID`uuidgen`"
+echo ${mid//-/} | cut -c 1-32 > ${TMP_DIR}/root/etc/machine-id
 echo "ETHOSCOPE_$ID" > ${TMP_DIR}/root/etc/machine-name
 echo "ETHOSCOPE_$ID" > ${TMP_DIR}/root/etc/hostname
 
