@@ -12,6 +12,7 @@ import datetime
 import fnmatch
 import tempfile
 import shutil
+import netifaces
 
 app = Bottle()
 STATIC_DIR = "../static"
@@ -141,6 +142,7 @@ def post_device_instructions(id, instruction):
     device = device_scanner.get_device(id)
     device.send_instruction(instruction, post_data)
     return get_device_info(id)
+
 @app.post('/device/<id>/log')
 @error_decorator
 def get_log(id):
@@ -215,24 +217,24 @@ def node_info(req):#, device):
         df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout=subprocess.PIPE)
         disk_free = df.communicate()[0]
         disk_usage = RESULTS_DIR+" Not Found on disk"
-        ip = "No IP assigned, check cable"
-        MAC_addr = "Not detected"
-        local_ip = ""
+
+        CARDS = []
+        GIT_BRANCH = "Not detected"
+        NEEDS_UPDATE = False
+
         try:
             disk_usage = disk_free.split("\n")[1].split()
-            net_info = subprocess.Popen(['ip','a'], stdout=subprocess.PIPE)
-            net_info = net_info.communicate()[0].split("\n")
-            WWW_MAC_addr = net_info[net_info.index([s for s in net_info if WWW_IP in s][0])-1].split("\t")[1].split(" ")[2]
-            LOCAL_MAC_addr = net_info[net_info.index([s for s in net_info if LOCAL_IP in s][0])-1].split("\t")[1].split(" ")[2]
+
+            #the following returns something like this: [['eno1', 'ec:b1:d7:66:2e:3a', '192.169.123.1'], ['enp0s20u12', '74:da:38:49:f8:2a', '155.198.232.206']]
+            CARDS = [ [i, netifaces.ifaddresses(i)[17][0]['addr'], netifaces.ifaddresses(i)[2][0]['addr']] for i in netifaces.interfaces() if 17 in netifaces.ifaddresses(i) and 2 in netifaces.ifaddresses(i) and netifaces.ifaddresses(i)[17][0]['addr'] != '00:00:00:00:00:00' ]
+            GIT_BRANCH = os.popen("git rev-parse --abbrev-ref HEAD").read().strip()
+            NEEDS_UPDATE = os.popen("git status -s -uno").read().strip() != ""
+            
         except Exception as e:
             logging.error(e)
-        #fixme
-        #MAC_addr = "TODO"
-        return {'disk_usage': disk_usage, 'MAC_addr': WWW_MAC_addr, 'ip': WWW_IP,
-                'local_ip':LOCAL_IP}
 
-        return {'disk_usage': disk_usage, 'MAC_addr': MAC_addr, 'ip': WWW_IP,
-                'local_ip':LOCAL_IP}
+        return {'disk_usage': disk_usage, 'CARDS': CARDS, 'GIT_BRANCH': GIT_BRANCH, 'NEEDS_UPDATE': NEEDS_UPDATE}
+                
     if req == 'time':
         return {'time':datetime.datetime.now().isoformat()}
     if req == 'timestamp':
