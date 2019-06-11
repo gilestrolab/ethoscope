@@ -11,7 +11,7 @@ import pickle
 
 import trace
 from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera, DummyPiCameraAsync, V4L2Camera
-from ethoscope.roi_builders.target_roi_builder import OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder
+from ethoscope.roi_builders.target_roi_builder import OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder, ElectricShockAssayROIBuilder
 from ethoscope.roi_builders.roi_builders import  DefaultROIBuilder
 from ethoscope.core.monitor import Monitor
 from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
@@ -25,7 +25,7 @@ from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulat
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
 from ethoscope.utils.description import DescribedObject
-from ethoscope.web_utils.helpers import isMachinePI
+from ethoscope.web_utils.helpers import isMachinePI, hasPiCamera, isExperimental
 
 class ExperimentalInformations(DescribedObject):
         _description  = {   "overview": "Optional information about your experiment",
@@ -64,7 +64,7 @@ class ControlThread(Thread):
     _evanescent = False
     _option_dict = {
         "roi_builder":{
-                "possible_classes":[DefaultROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder, OlfactionAssayROIBuilder],
+                "possible_classes":[DefaultROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder, OlfactionAssayROIBuilder, ElectricShockAssayROIBuilder],
             },
         "tracker":{
                 "possible_classes":[AdaptiveBGModel],
@@ -101,7 +101,7 @@ class ControlThread(Thread):
     
     #some classes do not need to be offered as choices to the user in normal conditions
     #these are shown only if the machine is not a PI
-    _is_a_rPi = isMachinePI()
+    _is_a_rPi = isMachinePI() and hasPiCamera() and not isExperimental()
     _hidden_options = {'camera', 'result_writer'}
     
     for k in _option_dict:
@@ -135,8 +135,9 @@ class ControlThread(Thread):
         self._last_info_t_stamp = 0
         self._last_info_frame_idx = 0
 
-        # We wipe off previous data
 
+        # We wipe off previous data
+        # DOES THIS MAKE SENSE? WE LOST LOTS OF DATA DOING THIS in THE PAST!! [TODO]
         try:
             os.remove(os.path.join(ethoscope_dir, self._log_file))
         except OSError:
@@ -286,7 +287,7 @@ class ControlThread(Thread):
         self._last_info_frame_idx = frame_idx
 
 
-    def _start_tracking(self, camera, result_writer, rois,   TrackerClass, tracker_kwargs,
+    def _start_tracking(self, camera, result_writer, rois, TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs):
 
         #Here the stimulator passes args. Hardware connection was previously open as thread.

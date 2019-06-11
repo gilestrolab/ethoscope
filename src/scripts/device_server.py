@@ -37,6 +37,32 @@ def error_decorator(func):
             return {'error': traceback.format_exc(e)}
     return func_wrapper
 
+@api.route('/upload/<id>', method='POST')
+def do_upload(id):
+    
+    if id != machine_id:
+        raise WrongMachineID
+    
+    upload = request.files.get('upload')
+    name, ext = os.path.splitext(upload.filename)
+
+    if ext in ('.mp4', '.avi'):
+        category = 'video'
+    elif ext in ('.jpg', '.png'):
+        category = 'images'
+    elif ext in ('.msk'):
+        category = 'masks'
+    else:
+        return {'result' : 'fail', 'comment' : "File extension not allowed. You can upload only movies, images, or masks"}
+
+    save_path = os.path.join(ETHOSCOPE_UPLOAD, "{category}".format(category=category))
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    file_path = "{path}/{file}".format(path=save_path, file=upload.filename)
+    upload.save(file_path)
+    return { 'result' : 'success', 'path' : file_path }
+
 @api.route('/static/<filepath:path>')
 def server_static(filepath):
     return static_file(filepath, root="/")
@@ -45,12 +71,10 @@ def server_static(filepath):
 def server_static(filepath):
     return static_file(filepath, root="/", download=filepath)
 
-
 @api.get('/id')
 @error_decorator
 def name():
     return {"id": control.info["id"]}
-
 
 @api.get('/make_index')
 @error_decorator
@@ -61,8 +85,6 @@ def make_index():
         for f in all_video_files:
             index.write(f + "\n")
     return {}
-
-
 
 @api.post('/rm_static_file/<id>')
 @error_decorator
@@ -83,8 +105,6 @@ def rm_static_file(id):
         logging.error(msg)
         raise Exception(msg)
     return data
-
-
 
 @api.post('/controls/<id>/<action>')
 @error_decorator
@@ -144,6 +164,21 @@ def controls(id, action):
     else:
         raise Exception("No such action: %s" % action)
 
+@api.get('/data/listfiles/<category>/<id>')
+@error_decorator
+def list_data_files(category, id):
+    '''
+    provides a list of files in the ethoscope data folders, that were either uploaded or generated
+    '''
+    if id != machine_id:
+        raise WrongMachineID
+
+    path = os.path.join (ETHOSCOPE_UPLOAD, category)
+
+    if os.path.exists(path):
+        return {'filelist' : [{'filename': i, 'fullpath' : os.path.abspath(os.path.join(path,i))} for i in os.listdir(path)]}
+
+    return {}
 
 @api.get('/data/<id>')
 @error_decorator
@@ -162,7 +197,19 @@ def user_options(id):
         raise WrongMachineID
     return {
         "tracking":ControlThread.user_options(),
-        "recording":ControlThreadVideoRecording.user_options()}
+        "recording":ControlThreadVideoRecording.user_options(),
+        "streaming":ControlThreadVideoRecording.user_options()}
+
+@api.get('/data/log/<id>')
+@error_decorator
+def get_log(id):
+    output = "No log available"
+    try:
+        output = os.popen('journalctl -u ethoscope_device.service -rb').read()
+    except Exception as e:
+        logging.error(e)
+    return {'message' : output}
+
 
 def close(exit_status=0):
     global control
@@ -201,6 +248,7 @@ class CherootServer(ServerAdapter):
 if __name__ == '__main__':
 
     ETHOSCOPE_DIR = "/ethoscope_data/results"
+    ETHOSCOPE_UPLOAD = "/ethoscope_data/upload"
     MACHINE_ID_FILE = '/etc/machine-id'
     MACHINE_NAME_FILE = '/etc/machine-name'
 
@@ -209,7 +257,7 @@ if __name__ == '__main__':
     parser.add_option("-s", "--stop-after-run", dest="stop_after_run", default=False, help="When -r, stops immediately after. otherwise, server waits", action="store_true")
     parser.add_option("-v", "--record-video", dest="record_video", default=False, help="Records video instead of tracking", action="store_true")
     parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
-    parser.add_option("-p", "--port", dest="port", default=9000,help="port")
+    parser.add_option("-p", "--port", dest="port", default=9000, help="port")
     parser.add_option("-e", "--results-dir", dest="results_dir", default=ETHOSCOPE_DIR, help="Where temporary result files are stored")
     parser.add_option("-D", "--debug", dest="debug", default=False, help="Shows all logging messages", action="store_true")
 

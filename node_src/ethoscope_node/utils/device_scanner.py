@@ -257,6 +257,8 @@ class Device(Thread):
 
     _id_page = "id"
     _user_options_page = "user_options"
+    _videofiles_page = "data/listfiles/video"
+    _log_page = "data/log"
     _static_page = "static"
     _controls_page = "controls"
     _allowed_instructions_status = { "stream": ["stopped"],
@@ -320,17 +322,29 @@ class Device(Thread):
 
     def ip(self):
         return self._ip
+        
     def id(self):
         return self._id
+        
     def info(self):
         return self._info
 
     def skip_scanning(self, value):
         self._skip_scanning = value
 
+    def videofiles(self):
+        videofiles_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._videofiles_page, self._id)
+        out = self._get_json(videofiles_url)
+        return out
+
     def user_options(self):
         user_options_url= "http://%s:%i/%s/%s" % (self._ip, self._port, self._user_options_page, self._id)
         out = self._get_json(user_options_url)
+        return out
+
+    def get_log(self):
+        log_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._log_page, self._id)
+        out = self._get_json(log_url)
         return out
 
     def last_image(self):

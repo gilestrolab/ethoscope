@@ -15,7 +15,7 @@
 
         <div class= "last_drawn_img">
         <img ng-if="device.status == 'running' || device.status == 'recording'"  ng-src="{{device.url_img}}" alt="" width="480"></img>
-        <img ng-if="device.status == 'streaming'"  ng-src="{{device.stream}}" alt="" width=""></img>
+        <img ng-if="device.status == 'streaming'"  ng-src="{{device.url_stream}}" alt="" width=""></img>
         </div>
 
 
@@ -62,10 +62,25 @@
         </div>
 
         <div ng-if="device.status != 'not_in_use'">
-            <button class="btn btn-info btn-xl" ng-if="device.status == 'stopped'"  data-toggle="modal" ng-click="ethoscope.stream()">Stream</button>
 
             <button class="btn btn-success btn-xl" ng-if="device.status == 'stopped'"  data-toggle="modal" data-target="#startModal">Start tracking</button>
-            <button class="btn btn-info" ng-if="device.status == 'stopped'" data-toggle="modal" data-target="#recordModal">Record video</button>
+
+            <label class="dropdown" ng-if="device.status == 'stopped'">
+              <div class="dd-button">
+                Video
+              </div>
+              <input type="checkbox" class="dd-input" id="test">
+              <ul class="dd-menu">
+                <li data-toggle="modal" data-target="#recordModal">Record Video</li>
+                <li data-toggle="modal" ng-click="ethoscope.stream()">Start Streaming</li>
+<!--                <li>Something else here</li>
+                <li class="divider"></li>
+                <li>
+                  <a href="http://rane.io">Link to Rane.io</a>
+                </li> -->
+              </ul>
+            </label>
+
             <button class="btn btn-danger" ng-if="device.status == 'running' || device.status == 'recording' || device.status == 'streaming'"   data-toggle="modal" data-target="#stopTrackingModal">Stop</button>
 
             <button class="btn btn-info disable" ng-if="device.status == 'stopping'" ng-click="ethoscope.alert('Please wait, system is stopping')">Stopping</button>
@@ -152,8 +167,18 @@
                   <ul ng-if="selected_options.tracking[name]['name']==opt.name">
                         <li  ng-repeat="arg in opt.arguments">
                             <label for="input-{{arg.name}}">{{arg.description}}</label>
+
                             
-                            <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=file name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  >
+                            <select ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" > <option value="">Available Movies</option><option ng:repeat="entry in videofiles" value="{{entry.fullpath}}">{{entry.filename | limitTo: 40}}{{entry.filename.length < 40 ? '' : '...'}}</option> </select>
+                            
+                            <div ng-if="arg.type == 'filepath'" id="input-{{arg.name}}">
+
+
+                            </div>
+                            
+<!--                            <select ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" ng-options="entry.filename for entry in videofiles"><option value=""></option></select> -->
+<!--                            <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=file name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  > -->
+<!--                            <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  > -->
                             <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]" >
                             <input ng-if="arg.type == 'str'" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  >
 

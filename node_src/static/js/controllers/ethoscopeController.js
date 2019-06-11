@@ -17,18 +17,24 @@ app.directive('tooltip', function(){
 });
 
 app.controller('ethoscopeController', function($scope, $http, $routeParams, $interval, $timeout, $location)  {
+    
         device_id = $routeParams.device_id;
 //        var device_ip;
         $scope.device = {}; //the info about the device
         $scope.ethoscope = {}; // to control the device
+        $scope.showLog = false;
         var refresh_data = false;
         var spStart= new Spinner(opts).spin();
         var starting_tracking= document.getElementById('starting');
 
-
         $http.get('/device/'+device_id+'/data').success(function(data){
             $scope.device = data;
         });
+
+        $http.get('/device/'+device_id+'/videofiles').success(function(data){
+            $scope.videofiles = data.filelist;
+        });
+
 
         $http.get('/device/'+device_id+'/user_options').success(function(data){
             $scope.user_options = {};
@@ -134,6 +140,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
             $http.post('/device/'+device_id+'/controls/start', data=option)
                  .success(function(data){$scope.device.status = data.status;});
+
             $http.get('/devices').success(function(data){
                     $http.get('/device/'+device_id+'/data').success(function(data){
                         $scope.device = data;
@@ -258,7 +265,9 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 		             });
 		        }
 		        $scope.device.url_img = "/device/"+ $scope.device.id  + "/last_img" + '?' + Math.floor(new Date().getTime()/1000.0);
-                $scope.device.stream = "http://"+$scope.device.ip+":8008/stream.mjpg";
+                $scope.device.url_stream = "http://"+$scope.device.ip+":8008/stream.mjpg";
+                $scope.device.url_upload = "http://"+$scope.device.ip+":9000/upload/"+$scope.device.id ;
+                
 			//$scope.device.ip = device_ip;
 		        status = $scope.device.status
 		        if (typeof spStart != undefined){

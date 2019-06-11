@@ -34,33 +34,33 @@ class CamHandler(BaseHTTPRequestHandler):
     '''
     def do_GET(self):
         if self.path.endswith('.mjpg'):
-          self.send_response(200)
-          self.send_header('Content-type','multipart/x-mixed-replace; boundary=--jpgboundary')
-          self.end_headers()
-          stream=io.BytesIO()
-          try:
-            start=time.time()
-            for foo in self.server.camera.capture_continuous(stream,'jpeg',use_video_port=True):
-              self.wfile.write("--jpgboundary")
-              self.send_header('Content-type','image/jpeg')
-              self.send_header('Content-length',len(stream.getvalue()))
-              self.end_headers()
-              self.wfile.write(stream.getvalue())
-              stream.seek(0)
-              stream.truncate()
-              time.sleep(.1)
-          except KeyboardInterrupt:
-            pass
-          return
+            self.send_response(200)
+            self.send_header('Content-type','multipart/x-mixed-replace; boundary=--jpgboundary')
+            self.end_headers()
+            stream=io.BytesIO()
+            try:
+              start=time.time()
+              for foo in self.server.camera.capture_continuous(stream,'jpeg',use_video_port=True):
+                self.wfile.write("--jpgboundary")
+                self.send_header('Content-type','image/jpeg')
+                self.send_header('Content-length',len(stream.getvalue()))
+                self.end_headers()
+                self.wfile.write(stream.getvalue())
+                stream.seek(0)
+                stream.truncate()
+                time.sleep(.1)
+            except KeyboardInterrupt:
+                pass
+            return
         else:
-          self.send_response(200)
-          self.send_header('Content-type','text/html')
-          self.end_headers()
-          self.wfile.write("""<html><head></head><body>
-            <img src="/cam.mjpg"/>
-          </body></html>""")
-          return
-
+            self.send_response(200)
+            self.send_header('Content-type','text/html')
+            self.end_headers()
+            self.wfile.write("""<html><head></head><body>
+              <img src="/cam.mjpg"/>
+            </body></html>""")
+            return
+  
 class PiCameraProcess(multiprocessing.Process):
     '''
     This opens a PiCamera process for recording or streaming video
