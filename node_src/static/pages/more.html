@@ -201,11 +201,21 @@
             <li class="list-group-item">% used: {{nodeManagement.info.disk_usage[4]}}</li>
             <li class="list-group-item">Mounted on: {{nodeManagement.info.disk_usage[5]}}</li>
         </ul>
-        <p>Internet Network: </p>
+        <p>Version info: </p>
         <ul class="list-group col-xs-6">
-            <li class="list-group-item">Device IP: {{nodeManagement.info.ip}}</li>
-            <li class="list-group-item">Ethernet MAC Address: {{nodeManagement.info.MAC_addr}}</li>
+            <li class="list-group-item">Current GIT branch: {{nodeManagement.info.GIT_BRANCH}}</li>
+            <li class="list-group-item">Needs update: {{nodeManagement.info.NEEDS_UPDATE}}</li>
         </ul>
+        <p>Network data: </p>
+        <ul class="list-group col-xs-6">
+            <li class="list-group-item">Device Name (1): {{nodeManagement.info.CARDS[0][0]}}</li>
+            <li class="list-group-item">Device MAC (1): {{nodeManagement.info.CARDS[0][1]}}</li>
+            <li class="list-group-item">IP Address (1): {{nodeManagement.info.CARDS[0][2]}}</li>
+            <li class="list-group-item">Device Name (2): {{nodeManagement.info.CARDS[1][0]}}</li>
+            <li class="list-group-item">Device MAC (2): {{nodeManagement.info.CARDS[1][1]}}</li>
+            <li class="list-group-item">IP Address (2): {{nodeManagement.info.CARDS[1][2]}}</li>
+        </ul>
+
     </div>
 
 <div class="col-xs-12">
