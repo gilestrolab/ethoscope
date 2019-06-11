@@ -110,4 +110,25 @@ def cpu_serial():
     return serial
         
         
+def hasPiCamera():
+    """
+    return True if a piCamera is supported and detected
+    """
+    if isMachinePI():
+        cmd = os.popen('/opt/vc/bin/vcgencmd get_camera').read().strip()
+        out = dict(x.split('=') for x in cmd.split(' '))
+        
+        return out["detected"] == out["supported"] == "1"
+    
+    else:
+        return false
+    
+    
+def isExperimental():
+    """
+    return true if the machine is to be used as experimental
+    this mymics a non-PI or a PI without plugged in camera
+    to activate, create an empty file called /etc/isexperimental
+    """
+    return os.path.exists('/etc/isexperimental')
     

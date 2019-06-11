@@ -121,7 +121,7 @@ class BaseCamera(object):
 class MovieVirtualCamera(BaseCamera):
     _description = {"overview":  "Class to acquire frames from a video file.",
                     "arguments": [
-                                    {"type": "filepath", "name": "path", "description": "The path to the video file to use as virtual camera","default":"/home/gg/Desktop/demo_monitor_x5.avi.mp4"},
+                                    {"type": "filepath", "name": "path", "description": "The *LOCAL* path to the video file to use as virtual camera","default":""},
                                    ]}
                                    
 

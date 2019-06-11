@@ -88,12 +88,17 @@ def get_device_info(id):
 
     return device.info()
 
-
 @app.get('/device/<id>/user_options')
 @error_decorator
 def get_device_options(id):
     device = device_scanner.get_device(id)
     return device.user_options()
+
+@app.get('/device/<id>/videofiles')
+@error_decorator
+def get_device_videofiles(id):
+    device = device_scanner.get_device(id)
+    return device.videofiles()
 
 
 #Get the information of one Sleep Monitor
@@ -146,7 +151,8 @@ def post_device_instructions(id, instruction):
 @app.post('/device/<id>/log')
 @error_decorator
 def get_log(id):
-    raise NotImplementedError()
+    device = device_scanner.get_device(id)
+    return device.get_log()
 
 
 #################################
