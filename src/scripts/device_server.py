@@ -108,7 +108,7 @@ def controls(id, action):
         return info(id)
 
     elif action in ['stop', 'close', 'poweroff']:
-        if control.info['status'] == 'running' or control.info['status'] == "recording" :
+        if control.info['status'] == 'running' or control.info['status'] == "recording" or control.info['status'] == "streaming" :
             # logging.info("Stopping monitor")
             logging.warning("Stopping monitor")
             control.stop()
@@ -128,12 +128,10 @@ def controls(id, action):
 
         return info(id)
 
-    elif action == 'start_record':
-        data = request.json
-        #json_data.update(data)
-        logging.warning("Recording video, data is %s" % str(data))
+    elif action in ['start_record', 'stream']:
         data = request.json
         recording_json_data.update(data)
+        logging.warning("Recording or Streaming video, data is %s" % str(data))
         control = None
         control = ControlThreadVideoRecording(machine_id=machine_id,
                                               name=machine_name,

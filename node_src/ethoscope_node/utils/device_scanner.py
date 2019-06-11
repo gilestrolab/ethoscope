@@ -114,7 +114,7 @@ class ActiveDeviceScanner(Thread):
     _refresh_period = 1.0
     _filter_device_period = 5
 
-    def __init__(self, local_ip = "192.169.123.1", ip_range = (6,100),device_refresh_period = 5, results_dir="/ethoscope_results"):
+    def __init__(self, local_ip = "192.169.123.1", ip_range = (6,254), device_refresh_period = 5, results_dir="/ethoscope_results"):
         self._is_active = True
         self._devices = []
         # "id" -> "info", "dev"
@@ -124,7 +124,7 @@ class ActiveDeviceScanner(Thread):
         self._ip_range = ip_range
         self._use_scapy = _use_scapy
 
-        for ip in self._subnet_ips(local_ip, (6,254)):
+        for ip in self._subnet_ips(local_ip, ip_range):
             d =  Device(ip, device_refresh_period, results_dir=results_dir)
             d.start()
             self._devices.append(d)
@@ -259,9 +259,10 @@ class Device(Thread):
     _user_options_page = "user_options"
     _static_page = "static"
     _controls_page = "controls"
-    _allowed_instructions_status = { "start": ["stopped"],
+    _allowed_instructions_status = { "stream": ["stopped"],
+                                     "start": ["stopped"],
                                      "start_record": ["stopped"],
-                                     "stop": ["running", "recording"],
+                                     "stop": ["streaming", "running", "recording"],
                                      "poweroff": ["stopped"],
                                      "not_in_use": []}
 
