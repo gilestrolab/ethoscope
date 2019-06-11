@@ -189,10 +189,11 @@ class StandardVideoRecorder(GeneralVideoRecorder):
                                         width=1280, height=960,fps=25,bitrate=500000)
 
 class Streamer(GeneralVideoRecorder):
-    _description  = { "overview": "A preset 640 x 480, 25fps, bitrate = 2e5 streamer. Active on port 8008.", "arguments": []}
+    #hiding the description field will not pass this class information to the node UI
+    _hidden_description  = { "overview": "A preset 640 x 480, 25fps, bitrate = 2e5 streamer. Active on port 8008.", "arguments": []}
     def __init__(self, video_prefix, video_dir, img_path):
         super(Streamer, self).__init__(video_prefix, video_dir, img_path,
-                                        width=1280/2, height=960/2,fps=20,bitrate=500000,stream=True)
+                                        width=640, height=480,fps=20,bitrate=500000,stream=True)
 
 class ControlThreadVideoRecording(ControlThread):
 
