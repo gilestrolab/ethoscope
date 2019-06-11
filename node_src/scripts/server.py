@@ -340,8 +340,8 @@ if __name__ == '__main__':
     PORT = option_dict["port"]
     DEBUG = option_dict["debug"]
     RESULTS_DIR = option_dict["results_dir"]
-    max_address = 255 if DEBUG else 5
-    LOCAL_IP = get_local_ip(option_dict["subnet_ip"], max_node_subnet_address=max_address, localhost=option_dict["local"])
+    MAX_ADDRESS = 255 if DEBUG else 5 # in normal conditions, the node's ip address is one of the first five of its subnet
+    LOCAL_IP = get_local_ip(option_dict["subnet_ip"], max_node_subnet_address=MAX_ADDRESS, localhost=option_dict["local"])
 
     try:
         WWW_IP = get_internet_ip()
@@ -354,7 +354,6 @@ if __name__ == '__main__':
     device_scanner = None
     try:
         device_scanner = DeviceScanner(LOCAL_IP, results_dir=RESULTS_DIR)
-        #device_scanner = DeviceScanner( results_dir=RESULTS_DIR)
         device_scanner.start()
         SERVER = "cheroot"
         #######To be remove when bottle changes to version 0.13

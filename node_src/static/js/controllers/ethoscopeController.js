@@ -102,6 +102,15 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
             }
         }
 
+        $scope.ethoscope.stream = function(option){
+            console.log("getting real time stream")
+            $http.post('/device/'+device_id+'/controls/stream', data= {"recorder":{"name":"Streamer","arguments":{}}} )
+            .success(function(data){
+                $scope.device.status = data.status;
+                console.log(data);
+            });
+        };
+
         $scope.ethoscope.start_tracking = function(option){
             $("#startModal").modal('hide');
             spStart= new Spinner(opts).spin();
@@ -249,6 +258,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 		             });
 		        }
 		        $scope.device.url_img = "/device/"+ $scope.device.id  + "/last_img" + '?' + Math.floor(new Date().getTime()/1000.0);
+                $scope.device.stream = "http://"+$scope.device.ip+":8008/stream.mjpg";
 			//$scope.device.ip = device_ip;
 		        status = $scope.device.status
 		        if (typeof spStart != undefined){

@@ -14,7 +14,8 @@
 
 
         <div class= "last_drawn_img">
-        <img ng-if="device.status == 'running'  || device.status == 'recording'"  ng-src="{{device.url_img}}" alt="" width="480"></img>
+        <img ng-if="device.status == 'running' || device.status == 'recording'"  ng-src="{{device.url_img}}" alt="" width="480"></img>
+        <img ng-if="device.status == 'streaming'"  ng-src="{{device.stream}}" alt="" width=""></img>
         </div>
 
 
@@ -61,9 +62,11 @@
         </div>
 
         <div ng-if="device.status != 'not_in_use'">
+            <button class="btn btn-info btn-xl" ng-if="device.status == 'stopped'"  data-toggle="modal" ng-click="ethoscope.stream()">Stream</button>
+
             <button class="btn btn-success btn-xl" ng-if="device.status == 'stopped'"  data-toggle="modal" data-target="#startModal">Start tracking</button>
             <button class="btn btn-info" ng-if="device.status == 'stopped'" data-toggle="modal" data-target="#recordModal">Record video</button>
-            <button class="btn btn-danger" ng-if="device.status == 'running' || device.status == 'recording'"   data-toggle="modal" data-target="#stopTrackingModal">Stop</button>
+            <button class="btn btn-danger" ng-if="device.status == 'running' || device.status == 'recording' || device.status == 'streaming'"   data-toggle="modal" data-target="#stopTrackingModal">Stop</button>
 
             <button class="btn btn-info disable" ng-if="device.status == 'stopping'" ng-click="ethoscope.alert('Please wait, system is stopping')">Stopping</button>
             <button class="btn btn-danger disable" ng-if="device.status == 'initialising'"  ng-click="ethoscope.alert('Please wait, system is starting')">Starting</button>
