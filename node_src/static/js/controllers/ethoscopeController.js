@@ -23,6 +23,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
         $scope.device = {}; //the info about the device
         $scope.ethoscope = {}; // to control the device
         $scope.showLog = false;
+        $scope.can_stream = false;
         var refresh_data = false;
         var spStart= new Spinner(opts).spin();
         var starting_tracking= document.getElementById('starting');
@@ -33,9 +34,11 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
         $http.get('/device/'+device_id+'/videofiles').success(function(data){
             $scope.videofiles = data.filelist;
+            $scope.can_stream = true;
+        }).error(function() {
+            $scope.can_stream = false;
         });
-
-
+        
         $http.get('/device/'+device_id+'/user_options').success(function(data){
             $scope.user_options = {};
             $scope.user_options.tracking= data.tracking;
@@ -109,12 +112,13 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
         }
 
         $scope.ethoscope.stream = function(option){
-            console.log("getting real time stream")
-            $http.post('/device/'+device_id+'/controls/stream', data= {"recorder":{"name":"Streamer","arguments":{}}} )
-            .success(function(data){
-                $scope.device.status = data.status;
-                console.log(data);
-            });
+            if ($scope.can_stream) {
+                console.log("getting real time stream")
+                $http.post('/device/'+device_id+'/controls/stream', data= {"recorder":{"name":"Streamer","arguments":{}}} )
+                .success(function(response){
+                    $scope.device.status = response.status;
+                });
+            }
         };
 
         $scope.ethoscope.start_tracking = function(option){
