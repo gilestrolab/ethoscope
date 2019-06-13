@@ -6,16 +6,13 @@
         <h3>Time for device: {{device_datetime}}</h3>
 
         <div ng-if="delta_t_min > 5">
-        <h2 id="dt_warning"><span class="fa fa-warning"></span> There is more than 5min difference between node and this device!!</h2>
+            <h2 id="dt_warning"><span class="fa fa-warning"></span> There is more than 5min difference between node and this device!!</h2>
         </div>
 
 
-
-
-
         <div class= "last_drawn_img">
-        <img ng-if="device.status == 'running' || device.status == 'recording'"  ng-src="{{device.url_img}}" alt="" width="480"></img>
-        <img ng-if="device.status == 'streaming'"  ng-src="{{device.url_stream}}" alt="" width=""></img>
+            <img ng-if="device.status == 'running' || device.status == 'recording'"  ng-src="{{device.url_img}}" alt="" width="480"></img>
+            <img ng-if="device.status == 'streaming'"  ng-src="{{device.url_stream}}" alt="" width=""></img>
         </div>
 
 
@@ -65,6 +62,7 @@
 
             <button class="btn btn-success btn-xl" ng-if="device.status == 'stopped'"  data-toggle="modal" data-target="#startModal">Start tracking</button>
 
+            <!-- Dropdown button code from https://codepen.io/raneio/pen/NbbZEM -->
             <label class="dropdown" ng-if="device.status == 'stopped'">
               <div class="dd-button">
                 Video
@@ -72,12 +70,7 @@
               <input type="checkbox" class="dd-input" id="test">
               <ul class="dd-menu">
                 <li data-toggle="modal" data-target="#recordModal">Record Video</li>
-                <li data-toggle="modal" ng-click="ethoscope.stream()">Start Streaming</li>
-<!--                <li>Something else here</li>
-                <li class="divider"></li>
-                <li>
-                  <a href="http://rane.io">Link to Rane.io</a>
-                </li> -->
+                <li data-toggle="modal" ng-class="{'disabled':!can_stream}" ng-click="!can_stream || ethoscope.stream()">Start Streaming</li>
               </ul>
             </label>
 
@@ -170,15 +163,6 @@
 
                             
                             <select ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" > <option value="">Available Movies</option><option ng:repeat="entry in videofiles" value="{{entry.fullpath}}">{{entry.filename | limitTo: 40}}{{entry.filename.length < 40 ? '' : '...'}}</option> </select>
-                            
-                            <div ng-if="arg.type == 'filepath'" id="input-{{arg.name}}">
-
-
-                            </div>
-                            
-<!--                            <select ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" ng-options="entry.filename for entry in videofiles"><option value=""></option></select> -->
-<!--                            <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=file name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  > -->
-<!--                            <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  > -->
                             <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]" >
                             <input ng-if="arg.type == 'str'" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  >
 
