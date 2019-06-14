@@ -34,8 +34,12 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
         $http.get('/device/'+device_id+'/videofiles').success(function(data){
             $scope.videofiles = data.filelist;
+            $scope.can_stream = true;
+        }).error(function() {
+            $scope.can_stream = false;
         });
         
+<<<<<<< HEAD
         
         $http.post('/device/'+device_id+'/controls/stream').success(function(data, status, headers, config){
             if (status == 200) { $scope.can_stream = true; }
@@ -43,6 +47,8 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
             console.log(status);
         });
         
+=======
+>>>>>>> afc213965290a4425a23a1ae0b991c80564e14ae
         $http.get('/device/'+device_id+'/user_options').success(function(data){
             $scope.user_options = {};
             $scope.user_options.tracking= data.tracking;
