@@ -196,7 +196,7 @@ class ControlThread(Thread):
     @classmethod
     def user_options(self):
         out = {}
-        for key, value in self._option_dict.items():
+        for key, value in list(self._option_dict.items()):
             # check if the options for the remote class will be visible
             # they will be visible only if they have a description, and if we are on a PC or they are not hidden
             if (self._is_a_rPi and key not in self._hidden_options) or not self._is_a_rPi:
@@ -211,7 +211,7 @@ class ControlThread(Thread):
                     out[key].append(d)
 
         out_curated = {}
-        for key, value in out.items():
+        for key, value in list(out.items()):
             if len(value) >0:
                 out_curated[key] = value
 
@@ -240,7 +240,7 @@ class ControlThread(Thread):
         logging.warning("Starting control thread with data:")
         logging.warning(str(data))
 
-        for key in self._option_dict.keys():
+        for key in list(self._option_dict.keys()):
 
             Class, kwargs = self._parse_one_user_option(key, data)
             # when no field is present in the JSON config, we get the default class

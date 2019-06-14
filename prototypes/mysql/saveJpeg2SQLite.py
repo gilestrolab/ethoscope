@@ -30,7 +30,7 @@ with open(ORIGINAL_IMG, 'rb') as input_file:
         VALUES(?);'''
     conn.execute(sql,[sqlite3.Binary(ablob)])
     conn.commit()
-    print "boom"
+    print("boom")
 
 conn.close()
 

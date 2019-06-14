@@ -23,11 +23,11 @@ for t,frame in cam:
 cam = V4L2Camera(0,target_fps=1)
 
 for t,frame in cam:
-    print t, frame.shape
+    print(t, frame.shape)
     if t > 5:
          break
 
 for t,frame in cam:
-    print t, frame.shape
+    print(t, frame.shape)
     if t > 5:
          break

@@ -157,7 +157,7 @@ class AdvancedTracker(BaseTracker):
         grey = cv2.cvtColor(f,cv2.COLOR_BGR2GRAY)
 
         blur_rad = int(self._object_expected_size * np.max(grey.shape) * 2.0)
-        print blur_rad
+        print(blur_rad)
         if blur_rad % 2 == 0:
             blur_rad += 1
 
@@ -174,7 +174,7 @@ class AdvancedTracker(BaseTracker):
         # fixme this should NOT be needed !
         if self._bg_mean is None:
             self._update_bg_model(grey)
-            print "fixme"
+            print("fixme")
             raise NoPositionError
 
         # fixme use preallocated buffers next line ?
@@ -214,7 +214,7 @@ class AdvancedTracker(BaseTracker):
         if len(contours) == 0:
             self._learning_rate *= self._increment
             self._update_bg_model(grey)
-            print "npe", 0
+            print("npe", 0)
 
             raise NoPositionError
 
@@ -223,7 +223,7 @@ class AdvancedTracker(BaseTracker):
             self._learning_rate *= self._increment
             self._update_bg_model(grey)
             if self._fg_features is None:
-                print "npe", ">1"
+                print("npe", ">1")
 
                 raise NoPositionError
 

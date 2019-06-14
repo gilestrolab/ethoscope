@@ -1,2 +1,2 @@
 __author__ = 'quentin'
-import cameras
+from . import cameras

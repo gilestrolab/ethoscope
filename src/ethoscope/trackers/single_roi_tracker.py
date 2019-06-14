@@ -100,12 +100,12 @@ class AdaptiveBGModelOneObject(BaseTracker):
 
         if  prop_fg_pix > self._max_area:
             self._bg_model.increase_learning_rate()
-            print "too big"
+            print("too big")
             raise NoPositionError
 
         if  prop_fg_pix == 0:
             self._bg_model.increase_learning_rate()
-            print "no pixs"
+            print("no pixs")
             raise NoPositionError
         # show(self._buff_fg,100)
         if CV_VERSION == 3:
@@ -115,7 +115,7 @@ class AdaptiveBGModelOneObject(BaseTracker):
 
         if len(contours) == 0:
             self._bg_model.increase_learning_rate()
-            print "No contours"
+            print("No contours")
             raise NoPositionError
 
 
@@ -126,11 +126,11 @@ class AdaptiveBGModelOneObject(BaseTracker):
             hulls = merge_blobs(hulls)
 
             hulls = [h for h in hulls if h.shape[0] >= 3]
-            print "before exclusion", len(hulls)
+            print("before exclusion", len(hulls))
 
             hulls = self._exclude_incorrect_hull(hulls)
 
-            print "after exclusion", len(hulls)
+            print("after exclusion", len(hulls))
 
             if len(hulls) == 0:
                 raise NoPositionError

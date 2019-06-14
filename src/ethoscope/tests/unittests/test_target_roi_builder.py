@@ -33,14 +33,14 @@ class TestTargetROIBuilder(unittest.TestCase):
         rois = self.roi_builder.build(img)
         self._draw(img, rois)
         cv2.imwrite(out,img)
-        self.assertEquals(len(rois),20)
+        self.assertEqual(len(rois),20)
 
 
     def test_all(self):
 
-        for k,i in images.items():
+        for k,i in list(images.items()):
             out = os.path.join(LOG_DIR,k+".png")
-            print out
+            print(out)
             self._test_one_img(i,out)
 
 

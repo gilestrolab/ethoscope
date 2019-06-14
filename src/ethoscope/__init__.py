@@ -83,13 +83,13 @@ we developed an ``R`` package named `rethomics <https://github.com/gilestrolab/r
 """
 
 
-import core
-import hardware
-import stimulators
-import roi_builders
-import trackers
-import utils
-import web_utils
+from . import core
+from . import hardware
+from . import stimulators
+from . import roi_builders
+from . import trackers
+from . import utils
+from . import web_utils
 
 
 

@@ -50,7 +50,7 @@ if __name__ == "__main__":
     cv2.namedWindow("window")
     cv2.setMouseCallback("window", position)
 
-    print len(lst), "videos to annotate"
+    print(len(lst), "videos to annotate")
 
     while len(lst) > 0:
         f = lst[-1]
@@ -81,32 +81,32 @@ if __name__ == "__main__":
             cv2.waitKey(10)
 
         cv2.imshow("window",instruction_array)
-        print "Saving " + out
+        print("Saving " + out)
         k1 = cv2.waitKey(-1) & 0xFF
 
         if k1 not in allowed_keys:
-            print k1
-            print "replaying"
+            print(k1)
+            print("replaying")
             continue
 
 
 
         cv2.imshow("window",instruction_array/3)
-        print "You have pressed: " + chr(k1)
-        print "CONFIRM using ENTER"
+        print("You have pressed: " + chr(k1))
+        print("CONFIRM using ENTER")
 
         k2 = cv2.waitKey(-1) & 0xFF
         if k2 != 10:
-            print "NOT confirmed. REPLAYING"
+            print("NOT confirmed. REPLAYING")
             continue
         with open(out, "w") as o:
             tpl = (chr(k1),rel_pos[0], rel_pos[1])
-            print tpl
+            print(tpl)
             o.write("%s,%f,%f" % tpl)
 
 
         lst.pop()
 
-    print "FINISHED!! BOOM!!!"
+    print("FINISHED!! BOOM!!!")
 
 

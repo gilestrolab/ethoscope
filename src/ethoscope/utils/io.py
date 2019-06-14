@@ -278,7 +278,7 @@ class DAMFileHelper(object):
         m  = min(self._activity_accum.keys())
         todel = []
         for i in range(m, tick ):
-            if i not in self._activity_accum.keys():
+            if i not in list(self._activity_accum.keys()):
                 self._activity_accum[i] = OrderedDict()
                 for r in range(1, self._n_rois +1):
                     self._activity_accum[i][r] = 0
@@ -297,7 +297,7 @@ class DAMFileHelper(object):
         if tick - m > 1:
             logging.warning("DAM file writer skipping a tick. No data for more than one period!")
 
-        out = [self._make_sql_command(v) for v in out.values()]
+        out = [self._make_sql_command(v) for v in list(out.values())]
 
         return out
 
@@ -375,7 +375,7 @@ class ResultWriter(object):
         self._write_async_command(command)
 
 
-        for k,v in self.metadata.items():
+        for k,v in list(self.metadata.items()):
             command = "INSERT INTO METADATA VALUES %s" % str((k, v))
             self._write_async_command(command)
         while not self._queue.empty():
@@ -415,7 +415,7 @@ class ResultWriter(object):
             if c_args is not None:
                 self._write_async_command(*c_args)
 
-        for k, v in self._insert_dict.items():
+        for k, v in list(self._insert_dict.items()):
             if len(v) > self._max_insert_string_len:
                 self._write_async_command(v)
                 self._insert_dict[k] = ""
@@ -442,7 +442,7 @@ class ResultWriter(object):
         # we recreate var map so we do not have duplicate entries
         self._write_async_command("DELETE FROM VAR_MAP")
 
-        for dt in data_row.values():
+        for dt in list(data_row.values()):
             command = "INSERT INTO VAR_MAP VALUES %s"% str((dt.header_name, dt.sql_data_type, dt.functional_type))
             self._write_async_command(command)
         self._var_map_initialised = True
@@ -452,7 +452,7 @@ class ResultWriter(object):
     def _initialise(self, roi, data_row):
         # We make a new dir to store results
         fields = ["id INT  NOT NULL AUTO_INCREMENT PRIMARY KEY" ,"t INT"]
-        for dt in data_row.values():
+        for dt in list(data_row.values()):
             fields.append("%s %s" % (dt.header_name, dt.sql_data_type))
         fields = ", ".join(fields)
         table_name = "ROI_%i" % roi.idx
@@ -464,7 +464,7 @@ class ResultWriter(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         logging.info("Closing result writer...")
-        for k, v in self._insert_dict.items():
+        for k, v in list(self._insert_dict.items()):
             self._write_async_command(v)
             self._insert_dict[k] = ""
 
@@ -535,7 +535,7 @@ class AsyncSQLiteWriter(multiprocessing.Process):
 
             c = conn.cursor()
             logging.info("Setting DB parameters'")
-            for k,v in self._pragmas.items():
+            for k,v in list(self._pragmas.items()):
                 command = "PRAGMA %s = %s" %(str(k), str(v))
                 c.execute(command)
 

@@ -1,3 +1,3 @@
 __author__ = 'quentin'
 
-import  control_thread
+from . import  control_thread

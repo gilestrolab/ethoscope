@@ -1,2 +1,2 @@
 __author__ = 'pepelisu'
-import utils
+from . import utils

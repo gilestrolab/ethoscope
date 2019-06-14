@@ -5,7 +5,7 @@ from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVaria
 from ethoscope.utils.scheduler import Scheduler
 from ethoscope.hardware.interfaces.interfaces import  DefaultInterface
 from ethoscope.hardware.interfaces.odour_delivery_device import OdourDelivererInterface, OdourDepriverInterface
-import sleep_depriver_stimulators
+from . import sleep_depriver_stimulators
 import random
 
 class HasChangedSideStimulator(BaseStimulator):

@@ -69,7 +69,7 @@ if __name__ == "__main__":
                     img = cv2.imread("/home/quentin/Desktop/Screenshot from 2015-02-14 14:21:13.png")
                     t += random.uniform(100,100 * 75)
                     rt = t
-                    print "rt", rt/1000
+                    print("rt", rt/1000)
                     # if t % (t_max/100) == 0:
                     #     logging.info("filling with dummy variables: %f percent" % (100.*float(t)/float(n)))
                     for r in rois:
@@ -78,11 +78,11 @@ if __name__ == "__main__":
 
                     rw.flush(rt, img=img)
 
-                print "OK"
+                print("OK")
 
             except KeyboardInterrupt:
                 return
-        print "OK"
+        print("OK")
 
     test_dbwriter(ResultWriter, db_name="psv_test_io")
 

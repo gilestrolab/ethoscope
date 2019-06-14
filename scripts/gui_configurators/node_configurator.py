@@ -38,8 +38,8 @@ def getNetworkinfo():
     nmcli_info = nmcli_info.decode("utf-8").strip().split("\n")[1:]
     for entry in nmcli_info:
         entry = entry.split(' ')
-        filtered = list(filter(None, entry))
-        for id,obj in interfaces_info.items():
+        filtered = list([_f for _f in entry if _f])
+        for id,obj in list(interfaces_info.items()):
             if id in filtered[0]:
                 obj["status"] = filtered[2]
                 obj["type"] = filtered[1]
@@ -213,7 +213,7 @@ def configure():
 
     # updater for node software
     UPDATER_LOCATION_IN_GIT = "scripts/ethoscope_updater"
-    instruction = "cp {0}/{1} {2} -r".format(TARGET_GIT_INSTALL, UPDATER_LOCATION_IN_GIT, TARGET_UPDATER_DIR)
+    instruction = "ln -s {0}/{1} {2} -r".format(TARGET_GIT_INSTALL, UPDATER_LOCATION_IN_GIT, TARGET_UPDATER_DIR)
     subprocess.call(instruction.split(" "))
 
     with open(TARGET_UPDATER_DIR + "/ethoscope_update_node.service", "r+") as f:
@@ -272,7 +272,7 @@ if __name__ == "__main__":
 
     #ROW 1
     available_interfaces = []
-    for ifname, info in netinfo.items():
+    for ifname, info in list(netinfo.items()):
         if info["ifname"] != "lo" and info["mac"] != None and info["status"] != "connected":
             # available interface
             available_interfaces.append(info["name"] + ":(" + info["ifname"] + ")")

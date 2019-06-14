@@ -34,7 +34,7 @@ class RecordVideo(Thread):
 
             while not self.camera.closed:
                 time.sleep(2)
-                print "capturing here"
+                print("capturing here")
 
         except Exception as e:
             logging.error("Error or starting video record:" + traceback.format_exc(e))

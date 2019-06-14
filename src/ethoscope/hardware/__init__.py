@@ -1,6 +1,6 @@
 __author__ = 'quentin'
 
-import input
-import interfaces
+from . import input
+from . import interfaces
 
-from input import cameras
+from .input import cameras

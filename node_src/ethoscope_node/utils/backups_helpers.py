@@ -37,16 +37,19 @@ class GenericBackupWrapper(object):
 
                 dev_map = self._device_scanner.get_all_devices_info()
 
-                dev_list =  str([d for d in sorted(dev_map.keys())])
+                dev_list = str([d for d in sorted(dev_map.keys())])
                 logging.info("device map is: %s" %dev_list)
 
                 args = []
-                for d in dev_map.values():
+                for d in list(dev_map.values()):
                     if d["status"] != "not_in_use":
                         args.append((d, self._results_dir))
 
                 if self._safe:
-                    map(self._backup_job, args)
+                    for arg in args:
+                        self._backup_job(arg)
+
+                    #map(self._backup_job, args)
                 else:
                     pool = multiprocessing.Pool(4)
                     _ = pool.map(self._backup_job, args)

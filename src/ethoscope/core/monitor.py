@@ -1,6 +1,6 @@
 __author__ = 'quentin'
 
-from tracking_unit import TrackingUnit
+from .tracking_unit import TrackingUnit
 import logging
 import traceback
 

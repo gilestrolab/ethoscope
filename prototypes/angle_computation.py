@@ -23,7 +23,7 @@ for i in range(1,s):
 
     angle = angle % 180
 
-    print (w,h,angle)
+    print((w,h,angle))
 
     # cv2.ellipse(frame_cp,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),black_colour,3,cv2.CV_AA)
     cv2.ellipse(im,((x,y),(w,h),angle),color=(i*5 %200) + 55)

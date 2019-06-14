@@ -50,7 +50,7 @@ def backup_job(args):
         device_info, results_dir = args
         logging.info("Initiating backup for device  %s" % device_info["id"])
 
-        backup_job = BackupClass(device_info, results_dir= results_dir)
+        backup_job = BackupClass(device_info, results_dir=results_dir)
         logging.info("Running backup for device  %s" % device_info["id"])
         backup_job.run()
         logging.info("Backup done for for device  %s" % device_info["id"])
@@ -78,7 +78,6 @@ if __name__ == '__main__':
         option_dict = vars(options)
 
         local_ip = get_local_ip(option_dict["subnet_ip"], localhost=option_dict["local"])
-
 
         gbw = GenericBackupWrapper(backup_job,
                                    option_dict["results_dir"],

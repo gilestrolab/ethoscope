@@ -1,6 +1,6 @@
 __author__ = 'quentin'
 
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import logging
 import optparse
 import  traceback
@@ -36,9 +36,9 @@ def wget_mirror_wrapper(target, target_prefix, output_dir, cut_dirs=3):
 def get_video_list(ip, port=9000,static_dir = "static", index_file="ethoscope_data/results/index.html"):
     url = "/".join(["%s:%i"%(ip,port), static_dir, index_file])
     try:
-        response = urllib2.urlopen(url)
+        response = urllib.request.urlopen(url)
         return [r.rstrip() for r in response]
-    except urllib2.HTTPError as e:
+    except urllib.error.HTTPError as e:
         logging.warning("No index file could be found for device %s" % ip)
         return None
 
@@ -46,8 +46,8 @@ def remove_video_from_host(ip, id, target, port=9000):
     request_url = "{ip}:{port}/rm_static_file/{id}".format(ip=ip, id=id, port=port)
     data = {"file": target}
     data =json.dumps(data)
-    req = urllib2.Request(url=request_url, data= data, headers={'Content-Type': 'application/json'})
-    _ = urllib2.urlopen(req, timeout=5)
+    req = urllib.request.Request(url=request_url, data= data, headers={'Content-Type': 'application/json'})
+    _ = urllib.request.urlopen(req, timeout=5)
 
 
 

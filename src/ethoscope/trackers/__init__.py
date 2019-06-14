@@ -1,3 +1,3 @@
 __author__ = 'quentin'
 
-import trackers
+from . import trackers

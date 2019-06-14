@@ -1,5 +1,5 @@
 __author__ = 'quentin'
-from adaptive_bg_tracker import AdaptiveBGModel, BackgroundModel, ObjectModel
+from .adaptive_bg_tracker import AdaptiveBGModel, BackgroundModel, ObjectModel
 from collections import deque
 from math import log10
 import cv2

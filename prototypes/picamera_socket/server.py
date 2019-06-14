@@ -57,7 +57,7 @@ class PiFrameGrabber(multiprocessing.Process):
                         TODO
                     self._frame_cb.analyse(None)
 
-                    print "running222"
+                    print("running222")
                     # with picamera.PiCamera() as camera:
                     #     with DetectMotion(camera) as output:
                     #             self._img = output.get_array()
@@ -203,10 +203,10 @@ try:
 
             if time.time() - ttt0 > 3:
                 loop=False
-                print "OUTOFLOOP"
+                print("OUTOFLOOP")
 except:
     pass
 finally:
     p.stop()
-    print "join"
+    print("join")
     p.join()

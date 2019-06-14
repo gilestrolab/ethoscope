@@ -8,4 +8,4 @@ This will typically be done when new arenas (hardware components) is defined.
 
 __author__ = 'quentin'
 
-import roi_builders
+from . import roi_builders

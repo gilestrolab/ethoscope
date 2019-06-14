@@ -27,7 +27,7 @@ if __name__ == '__main__':
         os.makedirs(os.path.dirname(OUTPUT))
     except OSError:
         pass
-    print INPUT + " ===> " + OUTPUT
+    print(INPUT + " ===> " + OUTPUT)
 
     cam  = MovieVirtualCamera(INPUT)
     rois = SleepMonitorWithTargetROIBuilder().build(cam)

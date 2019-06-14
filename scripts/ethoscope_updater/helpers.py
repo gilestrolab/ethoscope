@@ -4,7 +4,7 @@ __author__ = 'quentin'
 import os
 import logging
 import datetime
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import json
 import traceback
 import random
@@ -64,20 +64,20 @@ def scan_one_device(ip, timeout=2, port=8888, page="id"):
 
     url="%s:%i/%s" % (ip, port, page)
     try:
-        req = urllib2.Request(url)
-        f = urllib2.urlopen(req, timeout=timeout)
+        req = urllib.request.Request(url)
+        f = urllib.request.urlopen(req, timeout=timeout)
         message = f.read()
 
         if not message:
             logging.error("URL error whist scanning url: %s. No message back." % url )
-            raise urllib2.URLError("No message back")
+            raise urllib.error.URLError("No message back")
         try:
             resp = json.loads(message)
             return (resp['id'],ip)
         except ValueError:
             logging.error("Could not parse response from %s as JSON object" % url )
 
-    except urllib2.URLError:
+    except urllib.error.URLError:
         pass
         # logging.error("URL error whist scanning url: %s. Server down?" % url )
 
@@ -106,12 +106,12 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
         request_url = request_url + "/" + type
 
 
-    req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
+    req = urllib.request.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
 
     logging.info("requesting %s" % request_url)
 
     try:
-        f = urllib2.urlopen(req)
+        f = urllib.request.urlopen(req)
         message = f.read()
 
         if message:
@@ -132,7 +132,7 @@ def update_dev_map_wrapped (devices_map,id, what="data",type=None, port=9000, da
         logging.error('BadlineSatus, most probably due to update device and auto-reset')
         raise e
 
-    except urllib2.URLError as e:
+    except urllib.error.URLError as e:
         if hasattr(e, 'reason'):
             logging.error('We failed to reach a server.')
             logging.error('Reason: '+ str(e.reason))
@@ -178,14 +178,14 @@ def generate_new_device_map(local_ip, ip_range=(6, 128)):
             logging.warning("No device detected")
             return  devices_map
 
-        logging.info("Detected %i devices:\n%s" % (len(devices_map), str(devices_map.keys())))
+        logging.info("Detected %i devices:\n%s" % (len(devices_map), str(list(devices_map.keys()))))
 
 
         # We can use a with statement to ensure threads are cleaned up promptly
         with futures.ThreadPoolExecutor(max_workers=128) as executor:
             # Start the load operations and mark each future with its URL
             fs = {}
-            for id in devices_map.keys():
+            for id in list(devices_map.keys()):
                 fs[executor.submit(update_dev_map_wrapped,devices_map, id)] = id
 
             for f in concurrent.futures.as_completed(fs):
@@ -201,7 +201,7 @@ def generate_new_device_map(local_ip, ip_range=(6, 128)):
         with futures.ThreadPoolExecutor(max_workers=128) as executor:
             # Start the load operations and mark each future with its URL
             fs={}
-            for id in devices_map.keys():
+            for id in list(devices_map.keys()):
                 fs[executor.submit(update_dev_map_wrapped,devices_map, id,what='device/active_branch',port='8888')] = id
             for f in concurrent.futures.as_completed(fs):
                 id = fs[f]
@@ -216,7 +216,7 @@ def generate_new_device_map(local_ip, ip_range=(6, 128)):
         with futures.ThreadPoolExecutor(max_workers=128) as executor:
             # Start the load operations and mark each future with its URL
             fs={}
-            for id in devices_map.keys():
+            for id in list(devices_map.keys()):
                 fs[executor.submit(update_dev_map_wrapped,devices_map, id,what='device/check_update',port='8888')] = id
             for f in concurrent.futures.as_completed(fs):
                 id = fs[f]
@@ -240,12 +240,12 @@ def updates_api_wrapper(ip,id, what="check_update",type=None, port=8888, data=No
     if data is not None:
         data= json.dumps(data)
 
-    req = urllib2.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
+    req = urllib.request.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
 
     logging.info("requesting %s" %request_url)
 
     try:
-        f = urllib2.urlopen(req)
+        f = urllib.request.urlopen(req)
         message = f.read()
 
         if message:
@@ -255,7 +255,7 @@ def updates_api_wrapper(ip,id, what="check_update",type=None, port=8888, data=No
         logging.error('BadlineSatus, most probably due to update device and auto-reset')
         raise e
 
-    except urllib2.URLError as e:
+    except urllib.error.URLError as e:
         if hasattr(e, 'reason'):
             logging.error('We failed to reach a server.')
             logging.error('Reason: '+ str(e.reason))

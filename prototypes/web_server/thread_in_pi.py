@@ -103,7 +103,7 @@ class ControlThread(Thread):
 
 
         pos = {}
-        for k,v in p.items():
+        for k,v in list(p.items()):
             pos[k] = dict(v)
             pos[k]["roi_idx"] = k
 
@@ -204,5 +204,5 @@ while True:
 
 
     time.sleep(1)
-    print "main thread looping", i
+    print("main thread looping", i)
     i +=1

@@ -1,5 +1,5 @@
 from threading import Thread
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import os
 import datetime
 import json
@@ -90,7 +90,7 @@ class DeviceScanner(Thread):
             interface = None
             for inter in netifaces.interfaces():
                 candidate = netifaces.ifaddresses(inter)
-                if 2 in candidate.keys():
+                if 2 in list(candidate.keys()):
                     ip = candidate[2][0]["addr"]
                     if ip.split(".")[0:3] == subnet_list:
                         interface = inter
@@ -139,7 +139,7 @@ class DeviceScanner(Thread):
             for d in self._devices:
                 id = d.id()
 
-                if id and  (id not in self._device_id_map.keys()):
+                if id and  (id not in list(self._device_id_map.keys())):
                     logging.info("New device detected with id = %s" % id)
                     self._device_id_map[id]= {}
                     self._device_id_map[id]["dev"] = d
@@ -147,7 +147,7 @@ class DeviceScanner(Thread):
 
             # can we find a device fo this each id
             detected_ids = [d.id() for d in self._devices if d.id()]
-            for id in self._device_id_map.keys():
+            for id in list(self._device_id_map.keys()):
 
                 status = self._device_id_map[id]["info"]["status"]
                 # this default time is now. if device get out of use, their time is not updated
@@ -169,7 +169,7 @@ class DeviceScanner(Thread):
 
     def get_all_devices_info(self):
         out = {}
-        for k, v in self._device_id_map.items():
+        for k, v in list(self._device_id_map.items()):
             out[k] =  v["info"]
         return out
 
@@ -278,8 +278,8 @@ class Device(Thread):
 
         img_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._static_page, img_path)
         try:
-            return urllib2.urlopen(img_url,timeout=5)
-        except  urllib2.HTTPError:
+            return urllib.request.urlopen(img_url,timeout=5)
+        except  urllib.error.HTTPError:
             logging.error("Could not get image for ip = %s (id = %s)" % (self._ip, self._id))
             raise Exception("Could not get image for ip = %s (id = %s)" % (self._ip, self._id))
 
@@ -291,7 +291,7 @@ class Device(Thread):
 
         img_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._static_page, img_path)
         try:
-            file_like = urllib2.urlopen(img_url)
+            file_like = urllib.request.urlopen(img_url)
             return file_like
         except Exception as e:
             logging.warning(traceback.format_exc(e))
@@ -303,8 +303,8 @@ class Device(Thread):
     def _get_json(self, url,timeout=5, post_data=None):
 
         try:
-            req = urllib2.Request(url, data=post_data, headers={'Content-Type': 'application/json'})
-            f = urllib2.urlopen(req, timeout=timeout)
+            req = urllib.request.Request(url, data=post_data, headers={'Content-Type': 'application/json'})
+            f = urllib.request.urlopen(req, timeout=timeout)
             message = f.read()
             if not message:
                 # logging.error("URL error whist scanning url: %s. No message back." % self._id_url)
@@ -315,7 +315,7 @@ class Device(Thread):
             except ValueError:
                 # logging.error("Could not parse response from %s as JSON object" % self._id_url)
                 raise ScanException("Could not parse Json object")
-        except urllib2.URLError as e:
+        except urllib.error.URLError as e:
             raise ScanException(str(e))
         except Exception as e:
             raise ScanException("Unexpected error" + str(e))

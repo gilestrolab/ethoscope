@@ -1,7 +1,7 @@
 import sqlite3
 import sys
 import base64
-import cStringIO
+import io
 import shutil
 import cv2
 import tempfile
@@ -19,7 +19,7 @@ def annotate_image(args):
     input, time, t0 = args
     label = datetime.datetime.fromtimestamp(time/1000 + t0).strftime('%Y-%m-%d %H:%M:%S')
     out = input+"_tmp.jpg"
-    print label
+    print(label)
     command = "convert %s -pointsize 50  -font Courier -background Khaki  label:'%s' +swap -gravity Center -append %s" % (input, label, out)
     os.system(command)
     shutil.move(out,input)
@@ -59,7 +59,7 @@ if __name__ == '__main__':
                 id, t, blob = c
                 file_name = os.path.join(dir,"%05d_%i.jpg" % (id, t))
 
-                file_like = cStringIO.StringIO(blob)
+                file_like = io.StringIO(blob)
                 out_file = open(file_name, "wb")
                 file_like.seek(0)
                 shutil.copyfileobj(file_like, out_file)
@@ -83,6 +83,6 @@ if __name__ == '__main__':
 
     finally:
         shutil.rmtree(dir)
-        print dir
+        print(dir)
 
 
