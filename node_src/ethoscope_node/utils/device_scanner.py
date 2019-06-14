@@ -268,9 +268,30 @@ class Device(Thread):
         self._skip_scanning = value
 
     def videofiles(self):
+        '''
+        '''
         videofiles_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._videofiles_page, self._id)
         out = self._get_json(videofiles_url)
         return out
+
+    def relay_stream(self):
+        '''
+        '''
+        stream_url = "http://%s:%i/stream.mjpg" % (self._ip, 8008)
+        #stream_url = "http://217.7.233.140:80/cgi-bin/faststream.jpg?stream=full&fps=0"
+
+        req = urllib2.Request(stream_url)
+        stream = urllib2.urlopen(req, timeout=5)
+        bytes = b''
+        while True:
+            bytes += stream.read(1024)
+            a = bytes.find(b'\xff\xd8') #frame starting 
+            b = bytes.find(b'\xff\xd9') #frame ending
+            if a != -1 and b != -1:
+                frame = bytes[a:b+2]
+                bytes = bytes[b+2:]
+                yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
     def user_options(self):
         user_options_url= "http://%s:%i/%s/%s" % (self._ip, self._port, self._user_options_page, self._id)
@@ -318,7 +339,7 @@ class Device(Thread):
     def _get_json(self, url,timeout=5, post_data=None):
 
         try:
-            req = urllib2.Request(url, data=post_data, headers={'Content-Type': 'application/json'})
+            req = urllib2.Request(url, data=post_data, headers={'Content-Type': 'application/json'})            
             f = urllib2.urlopen(req, timeout=timeout)
             message = f.read()
             if not message:
@@ -330,11 +351,15 @@ class Device(Thread):
             except ValueError:
                 # logging.error("Could not parse response from %s as JSON object" % self._id_url)
                 raise ScanException("Could not parse Json object")
+        except urllib2.HTTPError as e:
+            #raise ScanException("Error" + str(e.code))
+            return e
         except urllib2.URLError as e:
-            raise ScanException(str(e))
+            #raise ScanException("Error" + str(e.reason))
+            return e
         except Exception as e:
             raise ScanException("Unexpected error" + str(e))
-
+        
 
     def _update_id(self):
         if self._skip_scanning:

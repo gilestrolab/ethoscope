@@ -3,7 +3,6 @@ __author__ = 'luis'
 import logging
 import traceback
 from optparse import OptionParser
-from bottle import *
 from ethoscope.web_utils.control_thread import ControlThread
 from ethoscope.web_utils.helpers import get_machine_info, get_version, file_in_dir_r
 from ethoscope.web_utils.record import ControlThreadVideoRecording
@@ -11,6 +10,14 @@ from subprocess import call
 import json
 import os
 import glob
+
+from bottle import *
+
+try:
+    from cheroot.wsgi import Server as WSGIServer
+except ImportError:
+    from cherrypy.wsgiserver import CherryPyWSGIServer as WSGIServer
+
 
 api = Bottle()
 
@@ -191,12 +198,15 @@ def info(id):
 @api.get('/user_options/<id>')
 @error_decorator
 def user_options(id):
+    '''
+    Passing back options regarding the capabilities of the device
+    '''
     if machine_id != id:
         raise WrongMachineID
     return {
         "tracking":ControlThread.user_options(),
         "recording":ControlThreadVideoRecording.user_options(),
-        "streaming":ControlThreadVideoRecording.user_options()}
+        "streaming": {} }
 
 @api.get('/data/log/<id>')
 @error_decorator
@@ -219,6 +229,30 @@ def close(exit_status=0):
         control = None
     os._exit(exit_status)
 
+
+#======================================================================================================================#
+#############
+### CLASSS TO BE REMOVED IF BOTTLE CHANGES TO 0.13
+############
+class CherootServer(ServerAdapter):
+    def run(self, handler): # pragma: no cover
+        from cheroot import wsgi
+        from cheroot.ssl import builtin
+        self.options['bind_addr'] = (self.host, self.port)
+        self.options['wsgi_app'] = handler
+        certfile = self.options.pop('certfile', None)
+        keyfile = self.options.pop('keyfile', None)
+        chainfile = self.options.pop('chainfile', None)
+        server = wsgi.Server(**self.options)
+        if certfile and keyfile:
+            server.ssl_adapter = builtin.BuiltinSSLAdapter(
+                    certfile, keyfile, chainfile)
+        try:
+            server.start()
+        finally:
+            server.stop()
+#############
+
 if __name__ == '__main__':
 
     ETHOSCOPE_DIR = "/ethoscope_data/results"
@@ -238,7 +272,9 @@ if __name__ == '__main__':
 
     (options, args) = parser.parse_args()
     option_dict = vars(options)
-    port = option_dict["port"]
+
+    PORT = option_dict["port"]
+    DEBUG = option_dict["debug"]
 
     machine_id = get_machine_info(MACHINE_ID_FILE)
     machine_name = get_machine_info(MACHINE_NAME_FILE)
@@ -272,7 +308,7 @@ if __name__ == '__main__':
                                 data=tracking_json_data)
 
 
-    if option_dict["debug"]:
+    if DEBUG:
         logging.basicConfig(level=logging.DEBUG)
         logging.info("Logging using DEBUG SETTINGS")
 
@@ -282,8 +318,28 @@ if __name__ == '__main__':
     if option_dict["run"] or control.was_interrupted:
         control.start()
 
+#    try:
+#        run(api, host='0.0.0.0', port=port, server='cherrypy',debug=option_dict["debug"])
+        
     try:
-        run(api, host='0.0.0.0', port=port, server='cherrypy',debug=option_dict["debug"])
+        SERVER = "cheroot"
+        #######To be remove when bottle changes to version 0.13
+        try:
+            #This checks if the patch has to be applied or not. We check if bottle has declared cherootserver
+            #we assume that we are using cherrypy > 9
+            from bottle import CherootServer
+        except:
+            #Trick bottle to think that cheroot is actulay cherrypy server, modifies the server_names allowed in bottle
+            #so we use cheroot in background.
+            SERVER="cherrypy"
+            server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
+            logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
+            pass
+        #########
+        run(api, host='0.0.0.0', port=PORT, debug=DEBUG, server=SERVER)
+        
+        
+        
     except Exception as e:
         logging.error(e)
         close(1)
