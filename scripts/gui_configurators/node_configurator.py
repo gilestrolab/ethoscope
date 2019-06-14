@@ -175,6 +175,8 @@ def configure():
     # 6. specif daemons
     # modify .service file to add the desired local ip range.
     LOCAL_IP = "{}.{}.{}.0".format(ip_entry[0].get(), ip_entry[2].get(), ip_entry[4].get())
+
+
     with open(TARGET_GIT_INSTALL + "/scripts/ethoscope_node.service", "r+") as f:
         content = f.read()
         content = content.replace("ExecStart=/usr/bin/python2  /opt/ethoscope-git/node_src/scripts/server.py",
@@ -213,13 +215,15 @@ def configure():
 
     # updater for node software
     UPDATER_LOCATION_IN_GIT = "scripts/ethoscope_updater"
+    ROUTER_IP = "{}.{}.{}.254".format(ip_entry[0].get(), ip_entry[2].get(), ip_entry[4].get())
+
     instruction = "ln -s {0}/{1} {2} -r".format(TARGET_GIT_INSTALL, UPDATER_LOCATION_IN_GIT, TARGET_UPDATER_DIR)
     subprocess.call(instruction.split(" "))
 
     with open(TARGET_UPDATER_DIR + "/ethoscope_update_node.service", "r+") as f:
         content = f.read()
         content = content.replace("ExecStart=/usr/bin/python2  /opt/ethoscope_updater/update_server.py -g /opt/ethoscope-git -b /srv/git/ethoscope.git",
-                        "ExecStart=/usr/bin/python2  /opt/ethoscope_updater/update_server.py -g /opt/ethoscope-git -b /srv/git/ethoscope.git -r {}".format(LOCAL_IP))
+                        "ExecStart=/usr/bin/python2  /opt/ethoscope_updater/update_server.py -g /opt/ethoscope-git -b /srv/git/ethoscope.git -r {}".format(ROUTER_IP))
         f.write(content)
 
     instruction = "cp ethoscope_update_node.service /etc/systemd/system/ethoscope_update_node.service"

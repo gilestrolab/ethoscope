@@ -263,10 +263,7 @@ if __name__ == '__main__':
         WWW_IP = None
 
     try:
-        device_scanner = DeviceScanner(LOCAL_IP, results_dir=RESULTS_DIR)
-        # device_scanner = DeviceScanner( results_dir=RESULTS_DIR)
-        device_scanner.start()
-        #######TO be remove when bottle changes to version 0.13
+        ####### TO be remove when bottle changes to version 0.13
         server = "cherrypy"
         try:
             from cherrypy import wsgiserver
