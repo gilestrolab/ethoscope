@@ -1,6 +1,6 @@
 __author__ = 'quentin'
 
-import MySQLdb
+import mysql.connector
 import sqlite3
 import os
 import logging
@@ -12,12 +12,13 @@ class DBNotReadyError(Exception):
 class MySQLdbToSQlite(object):
     _max_n_rows_to_insert = 10000
 
-    def     __init__(self, dst_path,
-                            remote_db_name="ethoscope_db",
-                            remote_host="localhost",
-                            remote_user="ethoscope",
-                            remote_pass="ethoscope",
-                            overwrite=False):
+    def __init__(self,
+                 dst_path,
+                 remote_db_name="ethoscope_db",
+                 remote_host="localhost",
+                 remote_user="ethoscope",
+                 remote_pass="ethoscope",
+                 overwrite=False):
         """
 
         A class to backup remote psv MySQL data base into a local sqlite3 one.
@@ -39,9 +40,11 @@ class MySQLdbToSQlite(object):
         self._remote_pass = remote_pass
         self._remote_db_name = remote_db_name
 
-        src = MySQLdb.connect(host=self._remote_host, user=self._remote_user,
-                                         passwd=self._remote_pass, db=self._remote_db_name,
-                                        connect_timeout= 45)
+        src = mysql.coonector.connect(host=self._remote_host,
+                                      user=self._remote_user,
+                                      passwd=self._remote_pass,
+                                      db=self._remote_db_name,
+                                      connect_timeout=45)
 
 
         self._dst_path=dst_path
@@ -83,7 +86,7 @@ class MySQLdbToSQlite(object):
             pass
 
         with sqlite3.connect(self._dst_path, check_same_thread=False) as conn:
-            src_cur = src.cursor()
+            src_cur = src.cursor(buffered=True)
 
             command = "SELECT * FROM VAR_MAP"
             src_cur.execute(command)
@@ -105,10 +108,8 @@ class MySQLdbToSQlite(object):
         logging.info("Database mirroring initialised")
 
     def _copy_table(self,table_name, src, dst, dump_in_csv=False):
-
-
-        src_cur = src.cursor()
-        dst_cur = dst.cursor()
+        src_cur = src.cursor(buffered=True)
+        dst_cur = dst.cursor(buffered=True)
 
         src_command = "SHOW COLUMNS FROM %s " % table_name
 
@@ -138,13 +139,14 @@ class MySQLdbToSQlite(object):
 
         :return:
         """
-
-        src = MySQLdb.connect(host=self._remote_host, user=self._remote_user,
-                                         passwd=self._remote_pass, db=self._remote_db_name)
+        src = mysql.connector.connect(host=self._remote_host,
+                                      user=self._remote_user,
+                                      passwd=self._remote_pass,
+                                      db=self._remote_db_name)
 
         with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
 
-            dst_cur = src.cursor()
+            dst_cur = src.cursor(buffered=True)
             command = "SELECT roi_idx FROM ROI_MAP"
             dst_cur.execute(command)
             rois_in_src = set([c[0] for c in dst_cur])
@@ -155,7 +157,8 @@ class MySQLdbToSQlite(object):
             self._update_one_roi_table("CSV_DAM_ACTIVITY", src, dst, dump_in_csv=True)
             try:
                 self._update_one_roi_table("START_EVENTS", src, dst)
-            except MySQLdb.ProgrammingError:
+            except mysql.connector.errors.ProgrammingError:
+                logging.error("Programming Error")
                 pass
 
             try:
@@ -167,8 +170,8 @@ class MySQLdbToSQlite(object):
 
 
     def _replace_table(self,table_name, src, dst, dump_in_csv=False):
-        src_cur = src.cursor()
-        dst_cur = dst.cursor()
+        src_cur = src.cursor(buffered=True)
+        dst_cur = dst.cursor(buffered=True)
 
         src_command = "SELECT * FROM %s " % table_name
 
@@ -200,13 +203,13 @@ class MySQLdbToSQlite(object):
 
 
     def _update_one_roi_table(self, table_name, src, dst, dump_in_csv=False):
-        src_cur = src.cursor()
-        dst_cur = dst.cursor()
+        src_cur = src.cursor(buffered=True)
+        dst_cur = dst.cursor(buffered=True)
 
         try:
             dst_command= "SELECT MAX(id) FROM %s" % table_name
             dst_cur.execute(dst_command)
-        except (sqlite3.OperationalError, MySQLdb.ProgrammingError):
+        except (sqlite3.OperationalError, mysql.connector.errors.ProgrammingError):
             logging.warning("Local table %s appears empty. Rebuilding it from source" % table_name)
             self._replace_table(table_name, src, dst)
             return
@@ -249,13 +252,13 @@ class MySQLdbToSQlite(object):
 
     def _update_img_snapshot_table(self, table_name, src, dst):
 
-        src_cur = src.cursor()
-        dst_cur = dst.cursor()
+        src_cur = src.cursor(buffered=True)
+        dst_cur = dst.cursor(buffered=True)
 
         try:
             dst_command= "SELECT MAX(id) FROM %s" % table_name
             dst_cur.execute(dst_command)
-        except (sqlite3.OperationalError, MySQLdb.ProgrammingError):
+        except (sqlite3.OperationalError, mysql.connector.errors.ProgrammingError):
             logging.warning("Local table %s appears empty. Rebuilding it from source" % table_name)
             self._replace_img_snapshot_table(table_name, src, dst)
             return
@@ -277,8 +280,8 @@ class MySQLdbToSQlite(object):
             dst.commit()
 
     def _replace_img_snapshot_table(self,table_name, src, dst):
-        src_cur = src.cursor()
-        dst_cur = dst.cursor()
+        src_cur = src.cursor(buffered=True)
+        dst_cur = dst.cursor(buffered=True)
 
         src_command = "SELECT id,t,img FROM %s" % table_name
         src_cur.execute(src_command)

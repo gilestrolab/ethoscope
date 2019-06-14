@@ -1,8 +1,8 @@
 __author__ = 'quentin'
 
-import MySQLdb
+import mysql.connector
 
-db = MySQLdb.connect(host="localhost",
+db = mysql.connector.connect(host="localhost",
                      user="root",
                       passwd="",
                       db="psv_db")

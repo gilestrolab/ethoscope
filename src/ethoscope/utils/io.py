@@ -26,11 +26,13 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
 
     def _delete_my_sql_db(self):
-        import MySQLdb
+        import mysql.connector
         try:
-            db =   MySQLdb.connect(host="localhost",
-                 user=self._db_user_name, passwd=self._db_user_pass, db=self._db_name)
-        except MySQLdb.OperationalError:
+            db = mysql.connector.connect(host="localhost",
+                                         user=self._db_user_name,
+                                         passwd=self._db_user_pass,
+                                         db=self._db_name)
+        except mysql.connector.errors.OperationalError:
             logging.warning("Database does not exist. Cannot delete it")
             return
 
@@ -66,16 +68,16 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
 
     def _create_mysql_db(self):
-        import MySQLdb
-        db =   MySQLdb.connect(host="localhost",
-                 user=self._db_user_name, passwd=self._db_user_pass)
+        import mysql.connector
+        db = mysql.connector.connect(host="localhost",
+                                     user=self._db_user_name,
+                                     passwd=self._db_user_pass)
 
         c = db.cursor()
 
         cmd = "CREATE DATABASE %s" % self._db_name
         c.execute(cmd)
         logging.info("Database created")
-
         cmd = "SET GLOBAL innodb_file_per_table=1"
         c.execute(cmd)
         cmd = "SET GLOBAL innodb_file_format=Barracuda"
@@ -85,10 +87,11 @@ class AsyncMySQLWriter(multiprocessing.Process):
         db.close()
 
     def _get_connection(self):
-        import MySQLdb
-        db =   MySQLdb.connect(host="localhost",
-                 user=self._db_user_name, passwd=self._db_user_pass,
-                  db=self._db_name)
+        import mysql.connector
+        db = mysql.connector.connect(host="localhost",
+                                     user=self._db_user_name,
+                                     passwd=self._db_user_pass,
+                                     db=self._db_name)
         return db
 
     def run(self):

@@ -1,7 +1,7 @@
 __author__ = 'quentin'
 
 
-import MySQLdb
+import mysql.connector
 import sqlite3
 import os
 import logging
@@ -28,7 +28,7 @@ class MySQLdbToSQlite(object):
         self._remote_pass = remote_pass
         self._remote_db_name = remote_db_name
 
-        src = MySQLdb.connect(host=self._remote_host, user=self._remote_user,
+        src = mysql.connector.connect(host=self._remote_host, user=self._remote_user,
                                          passwd=self._remote_pass, db=self._remote_db_name)
 
         self._dst_path=dst_path
@@ -63,7 +63,7 @@ class MySQLdbToSQlite(object):
 
         :return:
         """
-        src = MySQLdb.connect(host=self._remote_host, user=self._remote_user,
+        src = mysql.connector.connect(host=self._remote_host, user=self._remote_user,
                                          passwd=self._remote_pass, db=self._remote_db_name)
 
         with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
@@ -111,7 +111,7 @@ class MySQLdbToSQlite(object):
         try:
             dst_command= "SELECT t FROM %s ORDER BY t DESC LIMIT 1" % table_name
             dst_cur.execute(dst_command)
-        except (sqlite3.OperationalError, MySQLdb.ProgrammingError):
+        except (sqlite3.OperationalError, mysql.connector.errors.ProgrammingError):
             self._copy_table(table_name, src, dst)
             return
 

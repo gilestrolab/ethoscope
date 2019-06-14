@@ -156,12 +156,12 @@ class Device(Thread):
     def _make_backup_path(self, result_main_dir, timeout=30):
 
         try:
-            import MySQLdb
+            import mysql.connector
             device_id = self._info["id"]
             device_name = self._info["name"]
             com = "SELECT value from METADATA WHERE field = 'date_time'"
 
-            mysql_db = MySQLdb.connect(host=self._ip,
+            mysql_db = mysql.connector.connect(host=self._ip,
                                        connect_timeout=timeout,
                                        **self._ethoscope_db_credentials)
             cur = mysql_db.cursor()

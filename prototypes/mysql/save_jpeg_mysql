@@ -1,11 +1,11 @@
-import MySQLdb
+import mysql.connector
 import sys
 import base64
 import cStringIO
 import shutil
 import cv2
 
-db = MySQLdb.connect(user='root', passwd='mysql',
+db = mysql.connector.connect(user='root', passwd='mysql',
                               host='localhost',
                               db='testdb')
 

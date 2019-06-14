@@ -9,12 +9,12 @@ try:
     from tkinter import *
     import tkinter.ttk as ttk
 except Exception as e:
-    subprocess.call(["sudo", "pacman", "-Sy", "tk"])
+    print(e)
+    subprocess.call(["sudo", "pacman", "-Sy", "tk", "--noconfirm"])
 
 finally:
     from tkinter import *
     import tkinter.ttk as ttk
-
 
 def getNetworkinfo():
     with subprocess.Popen(["ifconfig"], stdout=subprocess.PIPE) as proc:
@@ -39,66 +39,49 @@ def getNetworkinfo():
     for entry in nmcli_info:
         entry = entry.split(' ')
         filtered = list(filter(None, entry))
-        interfaces_info[filtered[0]]["status"] = filtered[2]
-        interfaces_info[filtered[0]]["type"] = filtered[1]
-        interfaces_info[filtered[0]]["name"] = " ".join(filtered[3:])
+        for id,obj in interfaces_info.items():
+            if id in filtered[0]:
+                obj["status"] = filtered[2]
+                obj["type"] = filtered[1]
+                obj["name"] = " ".join(filtered[3:])
     return interfaces_info
 
 
-def get_networmanager_file(ifname, mac):
-    unique = uuid.uuid4()
+def get_networmanager_file(ifname):
+    local_ip = "{0}.{1}.{2}".format(ip_entry[0].get(), ip_entry[2].get(), ip_entry[4].get())
     if ifname[0] == "w":
-        file = """[connection]
-        id=ETHOSCOPE_WIFI
-        uuid={0}
-        type=wifi
-        permissions=
-
-        [wifi]
-        mac-address={1}
-        mac-address-blacklist=
-        mode=infrastructure
-        ssid=ETHOSCOPE_WIFI
-
-        [wifi-security]
-        auth-alg=open
-        key-mgmt=wpa-psk
-        psk=ETHOSCOPE_1234
-
-        [ipv4]
-        dns-search=
-        method=auto
-
-        [ipv6]
-        addr-gen-mode=stable-privacy
-        dns-search=
-        method=auto
-        """.format(unique, mac)
+        instruction = "nmcli connection add type wifi connection.autoconnect-priority -999 conection.id wifi_local \
+connection.interface-name {0} ipv4.method manual ipv4.addr {1}.1/24 ipv4.dns 8.8.8.8 ipv4.dns-search {1}.1 wifi.ssid={2} \
+wifi-security.auth-alg open wifi-security.key-mgmt wpa-psk wifi-security.psk {3}"\
+        .format(ifname, local_ip,entry_ssid.get(),entry_pass.get())
+        subprocess.call(instruction.split(" "))
+        instruction = "nmcli connection reload"
+        subprocess.call(instruction.split(" "))
     elif ifname[0] == "e":
-        file = """
-        [connection]
-        id=Wired_local
-        uuid={0}
-        type=ethernet
-        autoconnect-priority=-999
-        permissions=
+        instruction = "nmcli connection add type ethernet connection.autoconnect-priority -999 \
+connection.id wired_local connection.interface-name {0} ipv4.method manual ipv4.addr {1}.1/24 ipv4.dns 8.8.8.8 \
+ipv4.dns-search {1}.1".format(ifname.strip(" "),local_ip.strip())
+        subprocess.call(instruction.split(" "))
+        instruction = "nmcli connection reload"
+        subprocess.call(instruction.split(" "))
+    
+def get_dhcpd_conf():
+    local_ip = "{0}.{1}.{2}".format(ip_entry[0].get(), ip_entry[2].get(), ip_entry[4].get())
+    text = """
+option domain-name-servers 8.8.8.8, 8.8.4.4;
+option subnet-mask 255.255.255.0;
+option routers {0}.1;
+subnet {0}.0 netmask 255.255.255.0 {{
+  range {0}.5 {0}.105;
 
-        [ethernet]
-        mac-address={1}
-        mac-address-blacklist=
+  host unifi{{
+        hardware ethernet {1};
+        fixed-address {0}.254;
+  }}
+}}
+""".format(local_ip,entry_unifi_mac.get())
 
-        [ipv4]
-        address1=192.168.123.1/24
-        dns-search=
-        method=manual
-
-        [ipv6]
-        addr-gen-mode=stable-privacy
-        dns-search=
-        method=auto
-        """.format(unique, mac)
-
-    return file
+    return text
 
 
 def configure():
@@ -115,7 +98,7 @@ def configure():
     instruction = "pacman -S dnsmasq --noconfirm --needed"
     subprocess.call(instruction.split(" "))
     # 1.5 pre-installing dependencies will save compiling time on python packages
-    instruction = "pacman -S python2-pip python2-numpy python2-bottle python2-pyserial mysql-python python2-netifaces python2-cherrypy python2-futures --noconfirm --needed"
+    instruction = "pacman -S python-pip python-numpy python-bottle python-pyserial mysql-python python-netifaces python-cherrypy --noconfirm --needed"
     subprocess.call(instruction.split(" "))
     # 1.6 mariadb
     instruction = "pacman -S mariadb --noconfirm --needed"
@@ -146,27 +129,23 @@ def configure():
 
     # IMPORTANT this is if you want to work on the "dev" branch otherwise, you are using "master"
     instruction = "git checkout -b master"
-    subprocess.Popen(instruction.split(" "), cwd=TARGET_GIT_INSTALL)
+    subprocess.Popen(instruction.split(" "), cwd=TARGET_GIT_INSTALL).wait()
 
     # we install with pip
     instruction = "pip2 install -e ."
-    subprocess.Popen(instruction.split(" "), cwd=TARGET_GIT_INSTALL + "/node_src")
+    subprocess.Popen(instruction.split(" "), cwd=TARGET_GIT_INSTALL + "/node_src").wait()
 
     # 4. Network
     # see how to setup router
     NODE_IP = "{0}.{1}.{2}.1".format(ip_entry[0].get(), ip_entry[2].get(), ip_entry[4].get())
 
     # configure interface for local network
-    INTERFACE = interfaces_var.get().split("-")[1].strip("(").strip(")")
+    INTERFACE = interfaces_var.get().split(":")[1].strip("(").strip(")")
     MAC = netinfo[INTERFACE]["mac"]
-    if INTERFACE[0] == "w":
-        wifi_file = get_networmanager_file(INTERFACE, MAC)
-        with open("/etc/NetworkManager/system-connections/ETHOSCOPE_WIFI", "w") as f:
-            f.write(wifi_file)
-    elif INTERFACE[0] == "e":
-        eth_file = get_networmanager_file(INTERFACE, MAC)
-        with open("/etc/NetworkManager/system-connections/Wired_local", "w") as f:
-            f.write(eth_file)
+    get_networmanager_file(INTERFACE)
+
+    #network manager reload
+    subprocess.call(["nmcli", "connection", "reload"])
 
     # configuring dns server:
     with open("/etc/dnsmasq.conf", "w") as f:
@@ -198,27 +177,33 @@ def configure():
     LOCAL_IP = "{}.{}.{}.0".format(ip_entry[0].get(), ip_entry[2].get(), ip_entry[4].get())
     with open(TARGET_GIT_INSTALL + "/scripts/ethoscope_node.service", "r+") as f:
         content = f.read()
-        content.replace("ExecStart=/usr/bin/python2  /opt/ethoscope-git/node_src/scripts/server.py",
+        content = content.replace("ExecStart=/usr/bin/python2  /opt/ethoscope-git/node_src/scripts/server.py",
                         "ExecStart=/usr/bin/python2  /opt/ethoscope-git/node_src/scripts/server.py -r {}".format(LOCAL_IP))
+        f.seek(0)
+        f.write(content)
 
     with open(TARGET_GIT_INSTALL + "/scripts/ethoscope_backup.service", "r+") as f:
         content = f.read()
-        content.replace("ExecStart=/usr/bin/python2  /opt/ethoscope-git/node_src/scripts/backup_tool.py",
+        content = content.replace("ExecStart=/usr/bin/python2  /opt/ethoscope-git/node_src/scripts/backup_tool.py",
                         "ExecStart=/usr/bin/python2  /opt/ethoscope-git/node_src/scripts/backup_tool.py -r {}".format(LOCAL_IP))
+        f.seek(0)
+        f.write(content)
 
     with open(TARGET_GIT_INSTALL + "/scripts/ethoscope_video_backup.service", "r+") as f:
         content = f.read()
-        content.replace("ExecStart=/usr/bin/python2  /opt/ethoscope-git/node_src/scripts/video_backup_tool.py",
+        content = content.replace("ExecStart=/usr/bin/python2  /opt/ethoscope-git/node_src/scripts/video_backup_tool.py",
                         "ExecStart=/usr/bin/python2  /opt/ethoscope-git/node_src/scripts/video_backup_tool.py -r {}".format(LOCAL_IP))
+        f.seek(0)
+        f.write(content)
 
 
 
     instruction = "cp ./ethoscope_node.service /etc/systemd/system/ethoscope_node.service"
-    subprocess.Popen(instruction.split(" "), cwd=TARGET_GIT_INSTALL + "/scripts")
+    subprocess.Popen(instruction.split(" "), cwd=TARGET_GIT_INSTALL + "/scripts").wait()
     instruction = "cp ./ethoscope_backup.service /etc/systemd/system/ethoscope_backup.service"
-    subprocess.Popen(instruction.split(" "), cwd=TARGET_GIT_INSTALL + "/scripts")
+    subprocess.Popen(instruction.split(" "), cwd=TARGET_GIT_INSTALL + "/scripts").wait()
     instruction = "cp ./ethoscope_video_backup.service /etc/systemd/system/ethoscope_video_backup.service"
-    subprocess.Popen(instruction.split(" "), cwd=TARGET_GIT_INSTALL + "/scripts")
+    subprocess.Popen(instruction.split(" "), cwd=TARGET_GIT_INSTALL + "/scripts").wait()
     instruction = "systemctl daemon-reload"
     subprocess.call(instruction.split(" "))
     instruction = "systemctl enable ethoscope_node.service"
@@ -233,11 +218,12 @@ def configure():
 
     with open(TARGET_UPDATER_DIR + "/ethoscope_update_node.service", "r+") as f:
         content = f.read()
-        content.replace("ExecStart=/usr/bin/python2  /opt/ethoscope_updater/update_server.py -g /opt/ethoscope-git -b /srv/git/ethoscope.git",
+        content = content.replace("ExecStart=/usr/bin/python2  /opt/ethoscope_updater/update_server.py -g /opt/ethoscope-git -b /srv/git/ethoscope.git",
                         "ExecStart=/usr/bin/python2  /opt/ethoscope_updater/update_server.py -g /opt/ethoscope-git -b /srv/git/ethoscope.git -r {}".format(LOCAL_IP))
+        f.write(content)
 
     instruction = "cp ethoscope_update_node.service /etc/systemd/system/ethoscope_update_node.service"
-    subprocess.Popen(instruction.split(" "), cwd=TARGET_UPDATER_DIR)
+    subprocess.Popen(instruction.split(" "), cwd=TARGET_UPDATER_DIR).wait()
 
     instruction = "systemctl daemon-reload"
     subprocess.call(instruction.split(" "))
@@ -253,10 +239,22 @@ def configure():
         f.write("server 127.127.1.1\n")
         f.write("fudge 127.127.1.1 stratum 12\n")
 
+    # 9. CONFIGURING DHCPD (only if not router)
+    if router.get() == "unifi":
+        #set up and enable dhcpd
+        instruction = "pacman -S dhcp --noconfirm --needed"
+        subprocess.call(instruction.split(" "))
+        with open("/etc/dhcpd.conf","w") as f:
+            t = get_dhcpd_conf()
+            f.write(t)
+        instruction = "systemctl enable dhcpd4.service"
+        subprocess.call(instruction.split(" "))
+
+    time.sleep(10)
     print("All done, system will reboot in one minute, or reboot manually now.")
     time.sleep(60)
-    subprocess.run("reboot")
-
+    #subprocess.run("reboot")
+    exit()
 
 if __name__ == "__main__":
     # get the network information
@@ -264,42 +262,45 @@ if __name__ == "__main__":
 
     window = Tk()
     window.title("Node configuration tool")
-    window.geometry("1024x600")
+    window.geometry("400x350")
     frame_network = Frame(window)
-    frame_network.grid(column=0, row=0, columnspan=3)
-    lb_network = Label(frame_network, text="Network parameters for local network (ethoscopes):", font=("verdana", 15))
-    lb_network.grid(column=0, row=0, columnspan=3, sticky=W)
 
+    #ROW 0
+    frame_network.pack() #.grid(column=0, row=0, columnspan=3)
+    lb_network = Label(frame_network, text="Local Network:", font=("verdana", 15))
+    lb_network.grid(column=0, row=0, columnspan=3)
+
+    #ROW 1
     available_interfaces = []
     for ifname, info in netinfo.items():
-        if info["ifname"] != "lo" and info["mac"] != None and info["status"] == "connected":
+        if info["ifname"] != "lo" and info["mac"] != None and info["status"] != "connected":
             # available interface
-            available_interfaces.append(info["name"] + "-(" + info["ifname"] + ")")
+            available_interfaces.append(info["name"] + ":(" + info["ifname"] + ")")
 
     if len(available_interfaces) < 1:
         print("No available interfaces detected. Please attach a new ethernet card or wifi dongle to the computer.")
         exit()
 
-    interfaces_var = StringVar(window)
+    interfaces_var = StringVar(frame_network)
     interfaces_var.set(available_interfaces[0])
 
-    option_interface = OptionMenu(window, interfaces_var, *available_interfaces)
-    option_interface.grid(column=0, row=1)
+    lb_option_interface = Label(frame_network,text="Select interface to use:").grid(column=0,row=1)
+    option_interface = OptionMenu(frame_network, interfaces_var, *available_interfaces)
+    option_interface.grid(column=1, row=1, sticky=W)
 
-    interface = StringVar()
-    interface.set("eth")
-    r = 2
-    for text, value in [("Wifi", "wifi"), ("Ethernet", "eth")]:
-        Radiobutton(frame_network, text=text, value=value, variable=interface).grid(column=0, row=r, sticky=W)
-        r += 1
+    # ROW 5
+    lb_ssid = Label(frame_network, text="SSID").grid(column=0, row=2)
+    lb_pass = Label(frame_network, text="Password:").grid(column=0, row=3)
+    entry_ssid = Entry(frame_network, width=20)
+    entry_ssid.grid(column=1, row=2, sticky=W)
+    entry_pass = Entry(frame_network, width=20)
+    entry_pass.grid(column=1, row=3, sticky=W)
+    entry_ssid.insert(END,"ETHOSCOPE_WIFI")
+    entry_pass.insert(END,"ETHOSCOPE_1234")
 
-    lb_ssid = Label(frame_network, text="SSID").grid(column=1, row=1, sticky=E)
-    lb_pass = Label(frame_network, text="Pass").grid(column=3, row=1, sticky=W)
-    entry_ssid = Entry(frame_network, width=20).grid(column=2, row=1, sticky=W)
-    entry_pass = Entry(frame_network, width=20).grid(column=4, row=1, sticky=W)
-
-    lb_ip = ttk.LabelFrame(frame_network, text="Subnet ip range:")
-    lb_ip.grid(column=0, row=4, padx=1)
+    #ROW 2
+    lb_ip = ttk.LabelFrame(frame_network, text="Local ip range:")
+    lb_ip.grid(column=0, row=4,columnspan=2)
     ip_entry = [Entry(lb_ip, width=3), Label(lb_ip, text="."), Entry(lb_ip, width=3), Label(lb_ip, text="."),
                 Entry(lb_ip, width=3), Label(lb_ip, text=".0")]
     c = 0
@@ -309,21 +310,46 @@ if __name__ == "__main__":
         if isinstance(range, Entry):
             range.insert(END, defaultip[i])
             i += 1
-        range.grid(column=c, row=0)
+        range.grid(column=c, row=2)
         c += 1
 
-    lb_directories = Label(window, text="Directories:", font=("verdana", 15), anchor=W).grid(column=0, row=5, sticky=W)
-    lb_result_dir = Label(window, text="Results directory:").grid(column=0, row=6, sticky=W)
-    entry_result_dir = Entry(window)
-    entry_result_dir.insert(END, "/ethoscope_results")
-    entry_result_dir.grid(column=1, row=6, sticky=W)
 
-    lb_timezone = Label(window, text="Time Zone: GMT").grid(column=0, row=7, sticky=W)
-    entry_timezone = Entry(window, width=4)
+
+    # ROW 4
+    lb_router = Label(window,text="Type of access point for local network:").pack(pady=10)
+    frame_router = Frame(window)
+    frame_router.pack() #.grid(column=0,row=4,columnspan=4)
+
+
+    router = StringVar()
+    router.set("unifi")
+    default_MAC = "00:AB:CD:EF:00:00"
+    r = 5
+    for text, value in [("Unifi -> Unifi MAC_Address:", "unifi"), ("Router", "router")]:
+        Radiobutton(frame_router, text=text, value=value, variable=router, anchor=W).grid(column=0, row=r)
+        r += 1
+
+
+    entry_unifi_mac = Entry(frame_router,width=15)
+    entry_unifi_mac.grid(column=1,row=5)
+    entry_unifi_mac.insert(END,default_MAC)
+
+
+    #lb_directories = Label(window, text="Directories:", font=("verdana", 15), anchor=W).grid(column=0, row=5, sticky=W)
+    #lb_result_dir = Label(window, text="Results directory:").grid(column=0, row=6, sticky=E)
+    #entry_result_dir = Entry(window)
+    #entry_result_dir.insert(END, "/ethoscope_results")
+    #entry_result_dir.grid(column=1, row=6, sticky=W)
+
+    frame_time = Frame(window)
+    frame_time.pack() #.grid(column=0, row=5, columnspan=4)
+    lb_time = Label(frame_time,text="Local time for the system:",font=("verdana", 15)).grid(column=0,row=0, columnspan=4)
+    lb_timezone = Label(frame_time, text="Time Zone: GMT").grid(column=0, row=7, sticky=E)
+    entry_timezone = Entry(frame_time, width=4)
     entry_timezone.insert(END, "+0")
-    entry_timezone.grid(column=1, row=7, padx=0)
-    lb_timezone_help = Label(window, text="Format + or - differene with GMT i.e +5,-1,...").grid(column=2, row=7)
+    entry_timezone.grid(column=1, row=7, padx=0,sticky=W)
+    lb_timezone_help = Label(frame_time, text="+ or - differene with GMT i.e +5,-1,...").grid(column=2, row=7, sticky=W)
 
     btn_configure = Button(window, text="Configure", command=configure)
-    btn_configure.grid(column=4, row=8)
+    btn_configure.pack(pady=10) #.grid(column=2, row=8)
     window.mainloop()

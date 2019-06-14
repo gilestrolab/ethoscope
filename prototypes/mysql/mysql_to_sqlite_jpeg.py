@@ -1,8 +1,8 @@
 __author__ = 'diana'
 import sqlite3
-import MySQLdb
+import mysql.connector
 
-src = MySQLdb.connect(user='root', passwd='mysql',
+src = mysql.connector.connect(user='root', passwd='mysql',
                               host='localhost',
                               db='testdb')
 table_name = 'img'

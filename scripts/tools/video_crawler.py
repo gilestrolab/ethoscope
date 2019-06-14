@@ -25,7 +25,7 @@ for f in sorted(files):
         if last_tstamp > db_tstamp:
         #if  True:
             output = os.path.splitext(f)[0] + ".mp4"
-            print "generating " + output
+            print("generating " + output)
             try:
                 db2video.make_video_file(f, output)
 
