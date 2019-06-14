@@ -190,6 +190,28 @@ def close(exit_status=0):
     logging.info("Closing server")
     os._exit(exit_status)
 
+#======================================================================================================================#
+#############
+### CLASSS TO BE REMOVED IF BOTTLE CHANGES TO 0.13
+############
+class CherootServer(ServerAdapter):
+    def run(self, handler): # pragma: no cover
+        from cheroot import wsgi
+        from cheroot.ssl import builtin
+        self.options['bind_addr'] = (self.host, self.port)
+        self.options['wsgi_app'] = handler
+        certfile = self.options.pop('certfile', None)
+        keyfile = self.options.pop('keyfile', None)
+        chainfile = self.options.pop('chainfile', None)
+        server = wsgi.Server(**self.options)
+        if certfile and keyfile:
+            server.ssl_adapter = builtin.BuiltinSSLAdapter(
+                    certfile, keyfile, chainfile)
+        try:
+            server.start()
+        finally:
+            server.stop()
+#############
 
 if __name__ == '__main__':
 
@@ -213,7 +235,7 @@ if __name__ == '__main__':
         raise Exception("Where is the git wd to update?. use -g")
 
     bare_repo = option_dict["bare_repo"]
-    port = option_dict["port"]
+    PORT = option_dict["port"]
 
     MACHINE_ID_FILE = '/etc/machine-id'
     DEBUG = option_dict["debug"]
@@ -240,9 +262,21 @@ if __name__ == '__main__':
             logging.warning(traceback.format_exc(e))
         WWW_IP = None
 
-
     try:
-        run(app, host='0.0.0.0', port=port, debug=debug, server='cherrypy')
+        device_scanner = DeviceScanner(LOCAL_IP, results_dir=RESULTS_DIR)
+        # device_scanner = DeviceScanner( results_dir=RESULTS_DIR)
+        device_scanner.start()
+        #######TO be remove when bottle changes to version 0.13
+        server = "cherrypy"
+        try:
+            from cherrypy import wsgiserver
+        except:
+            # Trick bottle to think that cheroot is actulay cherrypy server adds the pacth to BOTTLE
+            server_names["cherrypy"] = CherootServer(host='0.0.0.0', port=PORT)
+            logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
+            pass
+        #########
+        run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='cherrypy')
 
     except KeyboardInterrupt:
         logging.info("Stopping update server cleanly")
