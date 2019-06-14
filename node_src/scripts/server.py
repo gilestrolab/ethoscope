@@ -114,6 +114,14 @@ def get_device_last_img(id):
     return cache_img(file_like, basename)
 
 
+@app.get('/device/<id>/stream')
+@error_decorator
+def get_device_stream(id):
+  
+    device = device_scanner.get_device(id)
+    response.set_header('Content-type', 'multipart/x-mixed-replace; boundary=frame')
+    return device.relay_stream()
+
 
 #Get the information of one Sleep Monitor
 @app.get('/device/<id>/dbg_img')
