@@ -149,9 +149,10 @@ def prepare_basic_arch(sd_card_path, subnet, ethoscope_id, wlan_ssid, wlan_pass)
         f.write("realtime=yes\n")
         f.write("priority=1\n")
 
-    #disable power management for wifi
-    with open("/tmp/root/etc/modprobe.d/8192cu.conf", "w") as f:
-        f.write("options 8192cu rtw_power_mgnt=0")
+    # Does not work in recent versions
+    # disable power management for wifi
+    #with open("/tmp/root/etc/modprobe.d/8192cu.conf", "w") as f:
+    #    f.write("options 8192cu rtw_power_mgnt=0")
 
     #ramdisk as temporary storage
     with open("/tmp/root/etc/fstab","a") as f:
@@ -184,10 +185,11 @@ def prepare_basic_arch(sd_card_path, subnet, ethoscope_id, wlan_ssid, wlan_pass)
 
     #list of dependencies or packages to install
     pkglist = ["archlinux-keyring","archlinuxarm-keyring","base-devel","git","gcc-fortran","rsync", "wget",
+               "hdf5",
                "opencv", "ocl-icd","eigen","mplayer","ffmpeg", "gstreamer", "mencoder",
                "ntp","bash-completion","firmware-raspberrypi","raspberrypi-bootloader",
                "python-pip","python-numpy","python-bottle","python-pyserial","mysql-python","python-cherrypy",
-               "python-scipy","python-pillow",
+               "python-scipy","python-pillow", "python-mysql-connector"
                "glibc","mariadb",
                "fake-hwclock",
                "wpa_supplicant","ifplugd",
@@ -210,7 +212,7 @@ def prepare_basic_arch(sd_card_path, subnet, ethoscope_id, wlan_ssid, wlan_pass)
         else:
             break
 
-    execute_instruction("pip2 download -d /tmp/root/home/alarm/python picamera GitPython MySQL-python")
+    execute_instruction("pip download -d /tmp/root/home/alarm/python picamera GitPython")
 
     # modify and copy file first boot and my.cnf
     content = first_boot
@@ -219,7 +221,7 @@ def prepare_basic_arch(sd_card_path, subnet, ethoscope_id, wlan_ssid, wlan_pass)
     content = content.replace("NODE_SUBNET", subnet)
     content = content.replace("BARE_GIT_NAME", BARE_GIT_NAME)
     content = content.replace("UPSTREAM_GIT_REPO", UPSTREAM_GIT_REPO)
-    content = content.replace("BRANCH", "master")
+    content = content.replace("BRANCH", "python3.7")
     content = content.replace("TARGET_GIT_INSTALL", "/opt/ethoscope-git")
     content = content.replace("MACHINE_ID", MACHINE_ID)
     with open("/tmp/root/opt/first_boot.sh", "w") as f:
@@ -498,11 +500,11 @@ git remote set-url origin --add UPSTREAM_GIT_REPO
 git remote get-url --all origin
 
 ##Reserved for future use
-#cd $TARGET_GIT_INSTALL/src
-#git checkout BRANCH
+cd TARGET_GIT_INSTALL/src
+git checkout BRANCH
 
 cd TARGET_GIT_INSTALL/src
-pip2 install -e .[device]
+pip install -e .[device]
 
 echo MACHINE_ID > /etc/machine-id
 

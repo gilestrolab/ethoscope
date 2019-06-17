@@ -1,10 +1,7 @@
 from bottle import *
-
 from optparse import OptionParser
-
 import updater
 from helpers import *
-
 
 app = Bottle()
 STATIC_DIR = "./static"
@@ -46,8 +43,6 @@ def device(action,id):
         if action == 'check_update':
             local_commit, origin_commit = ethoscope_updater.get_local_and_origin_commits()
             up_to_date = local_commit == origin_commit
-
-
             # @pepelisu you can get
             #data["local_commit"]["id"] -> a34fac...
             #data["local_commit"]["date"] -> 2015-01-24 12:23:00

@@ -128,7 +128,7 @@ def configure():
     subprocess.call(instruction.split(" "))
 
     # IMPORTANT this is if you want to work on the "dev" branch otherwise, you are using "master"
-    instruction = "git checkout -b master"
+    instruction = "git checkout python3.7"
     subprocess.Popen(instruction.split(" "), cwd=TARGET_GIT_INSTALL).wait()
 
     # we install with pip
