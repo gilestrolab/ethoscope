@@ -305,11 +305,6 @@ if __name__ == '__main__':
         logging.error(e)
         close(1)
     finally:
-        try:
-            zeroconf.unregister_service(serviceInfo)
-            zeroconf.close()
-        except:
-            pass
         close()
 
 

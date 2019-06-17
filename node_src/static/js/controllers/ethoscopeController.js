@@ -232,30 +232,32 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
         };
 
         var refresh = function(){
-            $http.get('/device/'+device_id+'/data')
-             .success(function(data){
-                $scope.device= data;
-                $scope.node_datetime = "TODO"
-                $scope.device_datetime = "TODO"
-                if("current_timestamp" in data){
-                    $scope.device_timestamp = new Date(data.current_timestamp*1000);
-                    $scope.device_datetime = $scope.device_timestamp.toUTCString();
-                    $http.get('/node/timestamp').success(function(data_node){
-                        node_t = data_node.timestamp;
-                        node_time = new Date(node_t*1000);
-                        $scope.node_datetime = node_time.toUTCString();
-                        $scope.delta_t_min = (node_t - data.current_timestamp) / 60;
-                     });
-                }
-                $scope.device.url_img = "/device/"+ $scope.device.id  + "/last_img" + '?' + Math.floor(new Date().getTime()/1000.0);
-//                    $scope.device.ip = device_ip;
-                status = $scope.device.status
-                if (typeof spStart != undefined){
-                    if(status != 'initialising' && status !='stopping'){
-                        spStart.stop();
-                    }
-                }
-             });
+		if (document.visibilityState=="visible"){
+		    $http.get('/device/'+device_id+'/data')
+		     .success(function(data){
+		        $scope.device= data;
+		        $scope.node_datetime = "TODO"
+		        $scope.device_datetime = "TODO"
+		        if("current_timestamp" in data){
+		            $scope.device_timestamp = new Date(data.current_timestamp*1000);
+		            $scope.device_datetime = $scope.device_timestamp.toUTCString();
+		            $http.get('/node/timestamp').success(function(data_node){
+		                node_t = data_node.timestamp;
+		                node_time = new Date(node_t*1000);
+		                $scope.node_datetime = node_time.toUTCString();
+		                $scope.delta_t_min = (node_t - data.current_timestamp) / 60;
+		             });
+		        }
+		        $scope.device.url_img = "/device/"+ $scope.device.id  + "/last_img" + '?' + Math.floor(new Date().getTime()/1000.0);
+			//$scope.device.ip = device_ip;
+		        status = $scope.device.status
+		        if (typeof spStart != undefined){
+		            if(status != 'initialising' && status !='stopping'){
+		                spStart.stop();
+		            }
+		        }
+		     });
+		}
         }
 
         refresh_data = $interval(refresh, 3000);

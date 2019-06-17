@@ -34,13 +34,18 @@ def wget_mirror_wrapper(target, target_prefix, output_dir, cut_dirs=3):
 
 
 def get_video_list(ip, port=9000,static_dir = "static", index_file="ethoscope_data/results/index.html"):
+
     url = "/".join(["%s:%i"%(ip,port), static_dir, index_file])
+
     try:
         response = urllib.request.urlopen(url)
-        return [r.rstrip() for r in response]
+        out = [r.rstrip() for r in response]
     except urllib.error.HTTPError as e:
         logging.warning("No index file could be found for device %s" % ip)
-        return None
+        out = None
+    finally:
+        make_index(ip, port)
+        return out
 
 def remove_video_from_host(ip, id, target, port=9000):
     request_url = "{ip}:{port}/rm_static_file/{id}".format(ip=ip, id=id, port=port)
@@ -50,8 +55,17 @@ def remove_video_from_host(ip, id, target, port=9000):
     _ = urllib.request.urlopen(req, timeout=5)
 
 
+def make_index(ip, port=9000, page="make_index"):
+    url = "/".join(["%s:%i"%(ip,port), page])
+    try:
+        response = urllib2.urlopen(url)
+        return True
+    except urllib.error.HTTPError as e:
+        logging.warning("No index file could be found for device %s" % ip)
+        return False
 
-def get_all_videos(device_info,out_dir, port=9000, static_dir="static"):
+
+def get_all_videos(device_info, out_dir, port=9000, static_dir="static"):
     url = "http://" + device_info["ip"]
     id = device_info["id"]
     video_list = get_video_list(url, port=port, static_dir=static_dir)

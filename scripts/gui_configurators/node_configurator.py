@@ -98,7 +98,7 @@ def configure():
     instruction = "pacman -S dnsmasq --noconfirm --needed"
     subprocess.call(instruction.split(" "))
     # 1.5 pre-installing dependencies will save compiling time on python packages
-    instruction = "pacman -S python-pip python-numpy python-bottle python-pyserial mysql-python python-netifaces python-cherrypy --noconfirm --needed"
+    instruction = "pacman -S python-pip python-numpy python-bottle python-pyserial mysql-python python-netifaces python-cherrypy python-zeroconf --noconfirm --needed"
     subprocess.call(instruction.split(" "))
     # 1.6 mariadb
     instruction = "pacman -S mariadb --noconfirm --needed"
