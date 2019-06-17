@@ -11,6 +11,8 @@ from subprocess import call
 import json
 import os
 import glob
+import socket
+from zeroconf import ServiceInfo, Zeroconf
 
 api = Bottle()
 
@@ -263,8 +265,34 @@ if __name__ == '__main__':
     try:
         #######TO be remove when bottle changes to version 0.13
         server = "cherrypy"
+        # Register the ethoscope using zeroconf so that the node knows about it.
+        # I need an address to register the service, but I don't understand which one (different
+        # interfaces will have different addresses). The python module zeroconf fails if I don't
+        # provide one, and the way it gets supplied doesn't appear to be IPv6 compatible. I'll put
+        # in whatever I get from "gethostbyname" but not trust that in the code on the node side.
+        hostname=socket.gethostname()
+        address=socket.gethostbyname(hostname+".local")
+        serviceInfo = ServiceInfo("_ethoscope._tcp.local.",
+                        hostname+"._ethoscope._tcp.local.",
+                        address=socket.inet_aton(address),
+                        port=port,
+                        properties={
+                            'version': '0.0.1',
+                            'id_page': '/id',
+                            'user_options_page': '/user_options',
+                            'static_page': '/static',
+                            'controls_page': '/controls',
+                            'user_options_page': '/user_options'
+                        } )
+        zeroconf = Zeroconf()
+        zeroconf.register_service(serviceInfo)
+        run(api, host='0.0.0.0', port=port, debug=option_dict["debug"])
+    except Exception as e:
+        logging.error(e)
         try:
             from cherrypy import wsgiserver
+            zeroconf.unregister_service(serviceInfo)
+            zeroconf.close()
         except:
             #Trick bottle to think that cheroot is actulay cherrypy server adds the pacth to BOTTLE
             server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=port)
@@ -277,6 +305,11 @@ if __name__ == '__main__':
         logging.error(e)
         close(1)
     finally:
+        try:
+            zeroconf.unregister_service(serviceInfo)
+            zeroconf.close()
+        except:
+            pass
         close()
 
 

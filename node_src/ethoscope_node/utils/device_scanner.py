@@ -7,6 +7,8 @@ import time
 import logging
 import traceback
 from functools import wraps
+import socket
+from zeroconf import ServiceBrowser, Zeroconf
 
 try:
     from scapy.all import srp, Ether, ARP
@@ -44,8 +46,71 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
     return deco_retry
 
 
+class DeviceScanner(object):
+    """
+    Uses zeroconf (aka Bonjour, aka Avahi etc) to passively listen for ethoscope devices registering themselves on the network.
+    """
+    def __init__(self, local_ip = "192.169.123.1", ip_range = (6,100),device_refresh_period = 5, results_dir="/ethoscope_results"):
+        self.zeroconf = Zeroconf()
+        self.devices = []
+        self.device_refresh_period = device_refresh_period
+        self.results_dir = results_dir
+    def start(self):
+        # Use self as the listener class because I have add_service and remove_service methods
+        self.browser = ServiceBrowser(self.zeroconf, "_ethoscope._tcp.local.", self)
+    def stop(self):
+        self.zeroconf.close()
+    def get_all_devices_info(self):
+        out = {}
+        for device in self.devices:
+            out[device.id()]=device.info()
+        return out
+    def get_device(self, id):
+        for device in self.devices:
+            if device.id()==id:
+                return device
+        # Not found, so produce an error
+        raise KeyError("No such device: %s" % id)
+    def add_service(self, zeroconf, type, name):
+        """
+        Method required to be a Zeroconf listener. Called by Zeroconf when a "_ethoscope._tcp" service
+        is registered on the network. Don't call directly.
+        """
+        try:
+            info = zeroconf.get_service_info(type, name)
+            # Note that I don't trust the address given in the info. When registering, the
+            # service doesn't know which interface it will be accessed by and hence which IP
+            # address to use (src/scripts/device_server.py puts gibberish in this field for
+            # this reason).
+            # Query the IP address just using the services hostname and zeroconf.
+            if info:
+                ip=socket.gethostbyname(info.get_name()+".local")
+            else:
+                ip=socket.gethostbyname(name.split(".")[0]+".local")
+            device = Device(ip, self.device_refresh_period, results_dir=self.results_dir)
+            device.zeroconf_name = name
+            device.start()
+            logging.info("New device detected with id = %s at IP = %s" % (device.id(), ip))
+            self.devices.append(device)
+        except Exception as error:
+            logging.error("Exception trying to add zeroconf service '"+name+"' of type '"+type+"': "+str(error))
+    def remove_service(self, zeroconf, type, name):
+        """
+        Method required to be a Zeroconf listener. Called by Zeroconf when a "_ethoscope._tcp" service
+        unregisters itself. Don't call directly.
+        """
+        for device in self.devices:
+            if device.zeroconf_name==name:
+                logging.info("Device with id = %s has gone down" % device.id())
+                self.devices.remove(device)
+                return
 
-class DeviceScanner(Thread):
+class ActiveDeviceScanner(Thread):
+    """
+    The older version of DeviceScanner that actively scans a range of IP addresses on the local
+    subnet. Currently not used but kept in place in case the functionality is required for older
+    ethoscopes that don't publish their service with zeroconf.
+    """
     _refresh_period = 1.0
     _filter_device_period = 5
 
@@ -63,7 +128,7 @@ class DeviceScanner(Thread):
             d =  Device(ip, device_refresh_period, results_dir=results_dir)
             d.start()
             self._devices.append(d)
-        super(DeviceScanner, self).__init__()
+        super(ActiveDeviceScanner, self).__init__()
 
     def _available_ips(self, local_ip, ip_range):
         if self._use_scapy :
