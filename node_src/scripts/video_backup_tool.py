@@ -58,7 +58,7 @@ def remove_video_from_host(ip, id, target, port=9000):
 def make_index(ip, port=9000, page="make_index"):
     url = "/".join(["%s:%i"%(ip,port), page])
     try:
-        response = urllib2.urlopen(url)
+        response = urllib.request.urlopen(url)
         return True
     except urllib.error.HTTPError as e:
         logging.warning("No index file could be found for device %s" % ip)
