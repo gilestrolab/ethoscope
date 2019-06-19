@@ -14,9 +14,10 @@ def pi_version():
     Raspberry Pi 2 (model B+), Raspberry Pi 3 or not a Raspberry Pi.
     """
     # Check /proc/cpuinfo for the Hardware field value.
-    # As of September 2016
+    # As of June 2019
     # 2708 is pi 1
     # 2709 is pi 2 or 3 depending on revision
+    # 2835 is pi 3
     # Anything else is not a pi.
     
     with open('/proc/cpuinfo', 'r') as infile:
@@ -40,9 +41,12 @@ def pi_version():
     elif hardware.group(1) == 'BCM2709' and '2082' in revision.group(1):
         # Pi 3
         return 3
+    elif hardware.group(1) == 'BCM2835' and '2082' in revision.group(1):
+        # Pi 3
+        return 3
     else:
         # Something else, not a pi.
-        return None
+        return 0
 
 def isMachinePI():
     """
