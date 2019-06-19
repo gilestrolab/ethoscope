@@ -13,7 +13,7 @@ import glob
 import datetime
 
 #For streaming
-from BaseHTTPServer import BaseHTTPRequestHandler,HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import io
 
 class CamStreamHTTPServer(HTTPServer):
@@ -41,7 +41,7 @@ class CamHandler(BaseHTTPRequestHandler):
             try:
               start=time.time()
               for foo in self.server.camera.capture_continuous(stream,'jpeg',use_video_port=True):
-                self.wfile.write("--jpgboundary")
+                self.wfile.write(b"--jpgboundary")
                 self.send_header('Content-type','image/jpeg')
                 self.send_header('Content-length',len(stream.getvalue()))
                 self.end_headers()
@@ -138,7 +138,7 @@ class PiCameraProcess(multiprocessing.Process):
                 camera.stop_recording()
 
         except Exception as e:
-            logging.error("Error or starting video record:" + traceback.format_exc(e))
+            logging.error("Error on starting video recording process:" + traceback.format_exc(e))
 
 
 class GeneralVideoRecorder(DescribedObject):
