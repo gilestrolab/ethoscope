@@ -48,7 +48,7 @@ def get_machine_info(path):
             info = f.readline().rstrip()
         return info
     except Exception as e:
-        logging.warning(traceback.format_exc(e))
+        logging.warning(traceback.format_exc())
         return 'Debug-'+str(random.randint(1,100))
 
 
@@ -173,7 +173,7 @@ def generate_new_device_map(local_ip, ip_range=(6, 128)):
 
                 except Exception as e:
                     logging.error("Error whilst pinging url")
-                    logging.error(traceback.format_exc(e))
+                    logging.error(traceback.format_exc())
         if len(devices_map) < 1:
             logging.warning("No device detected")
             return  devices_map
@@ -195,7 +195,7 @@ def generate_new_device_map(local_ip, ip_range=(6, 128)):
                     devices_map[id].update(data)
                 except Exception as e:
                     logging.error("Could not get data from device %s :" % id)
-                    logging.error(traceback.format_exc(e))
+                    logging.error(traceback.format_exc())
 
         # Adds the active_branch to devices_,map
         with futures.ThreadPoolExecutor(max_workers=128) as executor:
@@ -210,7 +210,7 @@ def generate_new_device_map(local_ip, ip_range=(6, 128)):
                     devices_map[id].update(data)
                 except Exception as e:
                     logging.error("Could not get data from device %s :" % id)
-                    logging.error(traceback.format_exc(e))
+                    logging.error(traceback.format_exc())
 
         # Adds the check_update to devices_,map
         with futures.ThreadPoolExecutor(max_workers=128) as executor:
@@ -225,7 +225,7 @@ def generate_new_device_map(local_ip, ip_range=(6, 128)):
                     devices_map[id].update(data)
                 except Exception as e:
                     logging.error("Could not get data from device %s :" % id)
-                    logging.error(traceback.format_exc(e))
+                    logging.error(traceback.format_exc())
 
 
         return devices_map

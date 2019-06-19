@@ -138,7 +138,7 @@ class PiCameraProcess(multiprocessing.Process):
                 camera.stop_recording()
 
         except Exception as e:
-            logging.error("Error on starting video recording process:" + traceback.format_exc(e))
+            logging.error("Error on starting video recording process:" + traceback.format_exc())
 
 
 class GeneralVideoRecorder(DescribedObject):
@@ -327,7 +327,7 @@ class ControlThreadVideoRecording(ControlThread):
 
 
         except Exception as e:
-            self.stop(traceback.format_exc(e))
+            self.stop(traceback.format_exc())
 
         #for testing purposes
         if self._evanescent:

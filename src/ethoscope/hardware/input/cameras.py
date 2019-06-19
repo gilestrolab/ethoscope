@@ -489,7 +489,7 @@ class OurPiCameraAsync(BaseCamera):
             cv2.cvtColor(g,cv2.COLOR_GRAY2BGR,self._frame)
             return self._frame
         except Exception as e:
-            raise EthoscopeException("Could not get frame from camera\n%s", traceback.format_exc(e))
+            raise EthoscopeException("Could not get frame from camera\n%s", traceback.format_exc())
 
 
 class DummyFrameGrabber(multiprocessing.Process):

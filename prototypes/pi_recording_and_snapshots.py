@@ -37,7 +37,7 @@ class RecordVideo(Thread):
                 print("capturing here")
 
         except Exception as e:
-            logging.error("Error or starting video record:" + traceback.format_exc(e))
+            logging.error("Error or starting video record:" + traceback.format_exc())
         finally:
             self._is_recording = False
 
@@ -48,6 +48,6 @@ class RecordVideo(Thread):
             self.camera.close()
             return self.save_dir
         except Exception as e:
-            logging.error("Error stopping video record:" + traceback.format_exc(e))
+            logging.error("Error stopping video record:" + traceback.format_exc())
 
 

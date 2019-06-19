@@ -307,9 +307,15 @@ class ControlThread(Thread):
         self._monit.run(result_writer, self._drawer)
 
     def _set_tracking_from_pickled(self):
-        with open(self._persistent_state_file, "r") as f:
-            time.sleep(15)
-            return pickle.load(f)
+        """
+        """
+        try:
+            with open(self._persistent_state_file, "r") as f:
+                time.sleep(15)
+                return pickle.load(f)
+                
+        except Exception as e:
+            raise e
 
     def _save_pickled_state(self, camera, result_writer, rois,   TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs):
@@ -326,8 +332,6 @@ class ControlThread(Thread):
             logging.warning("No cache dir detected. making one")
             os.makedirs(os.path.dirname(self._persistent_state_file))
 
-
-        # with open("/tmp/test.pkl", "w") as f:
         with open(self._persistent_state_file, "w") as f:
             return pickle.dump(tpl, f)
 
@@ -351,6 +355,7 @@ class ControlThread(Thread):
         cam = CameraClass(**camera_kwargs)
 
         roi_builder = ROIBuilderClass(**roi_builder_kwargs)
+        
         try:
             rois = roi_builder.build(cam)
         except EthoscopeException as e:
@@ -402,12 +407,12 @@ class ControlThread(Thread):
             try:
                 cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_pickled()
 
-            except IOError:
+            except FileNotFoundError:
                 cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
+                
             except Exception as e:
                 logging.error("Could not load previous state for unexpected reason:")
                 raise e
-                #cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
             
             with rw as result_writer:
                 if cam.canbepickled:
@@ -420,9 +425,10 @@ class ControlThread(Thread):
         except EthoscopeException as e:
             if e.img is not  None:
                 cv2.imwrite(self._info["dbg_img"], e.img)
-            self.stop(traceback.format_exc(e))
+            self.stop(traceback.format_exc())
+        
         except Exception as e:
-            self.stop(traceback.format_exc(e))
+            self.stop(traceback.format_exc())
 
         finally:
 

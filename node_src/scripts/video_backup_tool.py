@@ -120,4 +120,4 @@ if __name__ == '__main__':
                                     )
         gbw.run()
     except Exception as e:
-        logging.error(traceback.format_exc(e))
+        logging.error(traceback.format_exc())

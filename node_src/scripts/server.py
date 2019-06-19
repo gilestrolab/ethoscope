@@ -25,8 +25,8 @@ def error_decorator(func):
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            logging.error(traceback.format_exc(e))
-            return {'error': traceback.format_exc(e)}
+            logging.error(traceback.format_exc())
+            return {'error': traceback.format_exc()}
     return func_wrapper
 
 @app.route('/static/<filepath:path>')
@@ -367,7 +367,7 @@ if __name__ == '__main__':
         WWW_IP = get_internet_ip()
     except Exception as e:
         logging.warning("Could not access internet!")
-        logging.warning(traceback.format_exc(e))
+        logging.warning(traceback.format_exc())
         WWW_IP = None
 
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
@@ -392,11 +392,11 @@ if __name__ == '__main__':
         pass
 
     except socket.error as e:
-        logging.error(traceback.format_exc(e))
+        logging.error(traceback.format_exc())
         logging.error("Port %i is probably not accessible for you. Maybe use another one e.g.`-p 8000`" % PORT)
 
     except Exception as e:
-        logging.error(traceback.format_exc(e))
+        logging.error(traceback.format_exc())
         close(1)
     finally:
         device_scanner.stop()

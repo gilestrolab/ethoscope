@@ -185,7 +185,7 @@ class ActiveDeviceScanner(Thread):
 
         except Exception as e:
             logging.error("Cannot use scapy. Defaulting to subnet")
-            logging.error(traceback.format_exc(e))
+            logging.error(traceback.format_exc())
             self._use_scapy = False
             return []
 
@@ -200,7 +200,7 @@ class ActiveDeviceScanner(Thread):
         except KeyError:
             return
         except Exception as e:
-            logging.error(traceback.format_exc(e))
+            logging.error(traceback.format_exc())
             return
 
     def run(self):
@@ -410,7 +410,7 @@ class Device(Thread):
             file_like = urllib.request.urlopen(img_url)
             return file_like
         except Exception as e:
-            logging.warning(traceback.format_exc(e))
+            logging.warning(traceback.format_exc())
 
 
 
@@ -511,7 +511,7 @@ class Device(Thread):
 
         except Exception as e:
             logging.error("Could not generate backup path for device. Probably a MySQL issue")
-            logging.error(traceback.format_exc(e))
+            logging.error(traceback.format_exc())
             return {"backup_path": "None"}
 
         return {"backup_path": output_db_file}

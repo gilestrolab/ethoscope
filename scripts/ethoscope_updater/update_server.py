@@ -73,8 +73,8 @@ def device(action,id):
             raise UnexpectedAction()
 
     except Exception as e:
-        logging.error(traceback.format_exc(e))
-        return {'error': traceback.format_exc(e)}
+        logging.error(traceback.format_exc())
+        return {'error': traceback.format_exc()}
 
 
 @app.post('/device/<action>/<id>')
@@ -89,14 +89,14 @@ def change_branch(action, id):
         return {"new_branch": branch}
 
     except Exception as e:
-        logging.error(traceback.format_exc(e))
-        return {'error': traceback.format_exc(e)}
+        logging.error(traceback.format_exc())
+        return {'error': traceback.format_exc()}
 @app.get('/id')
 def name():
     try:
         return {"id": device_id}
     except Exception as e:
-        return {'error':traceback.format_exc(e)}
+        return {'error':traceback.format_exc()}
 
 
 ###############################
@@ -120,8 +120,8 @@ def bare(action):
             raise UnexpectedAction()
 
     except Exception as e:
-        logging.error(traceback.format_exc(e))
-        return {'error': traceback.format_exc(e)}
+        logging.error(traceback.format_exc())
+        return {'error': traceback.format_exc()}
 
 
 
@@ -135,7 +135,7 @@ def node_info():#, device):
 
     except Exception as e:
         logging.error(e)
-        return {'error': traceback.format_exc(e)}
+        return {'error': traceback.format_exc()}
 
 @app.get('/devices')
 def scan_subnet(ip_range=(6,253)):
@@ -145,8 +145,8 @@ def scan_subnet(ip_range=(6,253)):
         return devices_map
     except Exception as e:
         logging.error("Unexpected exception when scanning for devices:")
-        logging.error(traceback.format_exc(e))
-        return {'error': traceback.format_exc(e)}
+        logging.error(traceback.format_exc())
+        return {'error': traceback.format_exc()}
 
 
 
@@ -178,8 +178,8 @@ def group(what):
         return {'response':responses}
     except Exception as e:
         logging.error("Unexpected exception when updating devices:")
-        logging.error(traceback.format_exc(e))
-        return {'error': traceback.format_exc(e)}
+        logging.error(traceback.format_exc())
+        return {'error': traceback.format_exc()}
 
 def close(exit_status=0):
     logging.info("Closing server")
@@ -254,7 +254,7 @@ if __name__ == '__main__':
     except Exception as e:
         if is_node:
             logging.warning("Could not access internet!")
-            logging.warning(traceback.format_exc(e))
+            logging.warning(traceback.format_exc())
         WWW_IP = None
 
     try:
@@ -275,11 +275,11 @@ if __name__ == '__main__':
         pass
 
     except socket.error as e:
-        logging.error(traceback.format_exc(e))
+        logging.error(traceback.format_exc())
         logging.error("Port %i is probably not accessible for you. Maybe use another one e.g.`-p 8000`" % port)
 
     except Exception as e:
-        logging.error(traceback.format_exc(e))
+        logging.error(traceback.format_exc())
         close(1)
     finally:
         close()

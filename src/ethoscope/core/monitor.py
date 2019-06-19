@@ -130,7 +130,7 @@ class Monitor(object):
                 self._last_t = t
 
         except Exception as e:
-            logging.error("Monitor closing with an exception: '%s'" % traceback.format_exc(e))
+            logging.error("Monitor closing with an exception: '%s'" % traceback.format_exc())
             raise e
 
         finally:

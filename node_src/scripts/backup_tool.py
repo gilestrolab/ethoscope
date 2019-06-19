@@ -43,7 +43,7 @@ class BackupClass(object):
             pass
 
         except Exception as e:
-            logging.error(traceback.format_exc(e))
+            logging.error(traceback.format_exc())
 
 def backup_job(args):
     try:
@@ -56,7 +56,7 @@ def backup_job(args):
         logging.info("Backup done for for device  %s" % device_info["id"])
     except Exception as e:
         logging.error("Unexpected error in backup. args are: %s" % str(args))
-        logging.error(traceback.format_exc(e))
+        logging.error(traceback.format_exc())
 
 
 
@@ -86,4 +86,4 @@ if __name__ == '__main__':
         gbw.run()
 
     except Exception as e:
-        logging.error(traceback.format_exc(e))
+        logging.error(traceback.format_exc())

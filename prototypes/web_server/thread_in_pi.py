@@ -134,9 +134,9 @@ class ControlThread(Thread):
         except EthoscopeException as e:
             if e.img is not  None:
                 cv2.imwrite(self._info["dbg_img"], e.img)
-            self.stop(traceback.format_exc(e))
+            self.stop(traceback.format_exc())
         except Exception as e:
-            self.stop(traceback.format_exc(e))
+            self.stop(traceback.format_exc())
 
     def thread_init(self):
         logging.info("Starting camera")

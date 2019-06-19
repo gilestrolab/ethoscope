@@ -41,8 +41,8 @@ def error_decorator(func):
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            logging.error(traceback.format_exc(e))
-            return {'error': traceback.format_exc(e)}
+            logging.error(traceback.format_exc())
+            return {'error': traceback.format_exc()}
     return func_wrapper
 
 @api.route('/upload/<id>', method='POST')

@@ -477,7 +477,7 @@ class ResultWriter(object):
 
         except Exception as e:
             logging.error("Error writing metadata stop time:")
-            logging.error(traceback.format_exc(e))
+            logging.error(traceback.format_exc())
         finally:
 
             logging.info("Closing mysql async queue")

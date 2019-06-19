@@ -64,7 +64,7 @@ def get_machine_info(path):
                 info = f.readline().rstrip()
             return info
         except Exception as e:
-            logging.warning(traceback.format_exc(e))
+            logging.warning(traceback.format_exc())
             return 'Debug-'+str(random.randint(1,100))
     else:
         return "ETHOSCOPE_000"

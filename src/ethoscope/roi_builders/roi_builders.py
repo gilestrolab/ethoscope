@@ -43,7 +43,7 @@ class BaseROIBuilder(DescribedObject):
         except Exception as e:
             if not isinstance(input, np.ndarray):
                 del input
-            logging.error(traceback.format_exc(e))
+            logging.error(traceback.format_exc())
             raise e
 
         rois_w_no_value = [r for r in rois if r.value is None]
