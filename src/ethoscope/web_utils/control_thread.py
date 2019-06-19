@@ -309,13 +309,9 @@ class ControlThread(Thread):
     def _set_tracking_from_pickled(self):
         """
         """
-        try:
-            with open(self._persistent_state_file, "r") as f:
+        with open(self._persistent_state_file, "rb") as f:
                 time.sleep(15)
                 return pickle.load(f)
-                
-        except Exception as e:
-            raise e
 
     def _save_pickled_state(self, camera, result_writer, rois,   TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs):
@@ -332,7 +328,7 @@ class ControlThread(Thread):
             logging.warning("No cache dir detected. making one")
             os.makedirs(os.path.dirname(self._persistent_state_file))
 
-        with open(self._persistent_state_file, "w") as f:
+        with open(self._persistent_state_file, "wb") as f:
             return pickle.dump(tpl, f)
 
     def _set_tracking_from_scratch(self):

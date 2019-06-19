@@ -31,9 +31,14 @@ class AsyncMySQLWriter(multiprocessing.Process):
             db = mysql.connector.connect(host="localhost",
                                          user=self._db_user_name,
                                          passwd=self._db_user_pass,
-                                         db=self._db_name)
+                                         db=self._db_name,
+                                         buffered=True)
         except mysql.connector.errors.OperationalError:
             logging.warning("Database does not exist. Cannot delete it")
+            return
+            
+        except Exception as e:
+            logging.error(traceback.format_exc())
             return
 
         logging.info("connecting to mysql db")
@@ -42,7 +47,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
         command = "SHOW TABLES"
         c.execute(command)
 
-        # we remove bin logs o save space!
+        # we remove bin logs to save space!
         command = "RESET MASTER"
         c.execute(command)
 
@@ -71,7 +76,8 @@ class AsyncMySQLWriter(multiprocessing.Process):
         import mysql.connector
         db = mysql.connector.connect(host="localhost",
                                      user=self._db_user_name,
-                                     passwd=self._db_user_pass)
+                                     passwd=self._db_user_pass,
+                                     buffered=True)
 
         c = db.cursor()
 
@@ -80,8 +86,9 @@ class AsyncMySQLWriter(multiprocessing.Process):
         logging.info("Database created")
         cmd = "SET GLOBAL innodb_file_per_table=1"
         c.execute(cmd)
-        cmd = "SET GLOBAL innodb_file_format=Barracuda"
-        c.execute(cmd)
+        #"Variable 'innodb_file_format' is a read only variable"
+        #cmd = "SET GLOBAL innodb_file_format=Barracuda"
+        #c.execute(cmd)
         cmd = "SET GLOBAL autocommit=0"
         c.execute(cmd)
         db.close()
@@ -91,7 +98,8 @@ class AsyncMySQLWriter(multiprocessing.Process):
         db = mysql.connector.connect(host="localhost",
                                      user=self._db_user_name,
                                      passwd=self._db_user_pass,
-                                     db=self._db_name)
+                                     db=self._db_name,
+                                     buffered=True)
         return db
 
     def run(self):
@@ -306,6 +314,7 @@ class ResultWriter(object):
     _max_insert_string_len = 1000
     _async_writing_class = AsyncMySQLWriter
     _null = 0
+    
     def __init__(self, db_credentials, rois, metadata=None, make_dam_like_table=True, take_frame_shots=False, erase_old_db=True, *args, **kwargs):
         self._queue = multiprocessing.JoinableQueue()
         self._async_writer = self._async_writing_class(db_credentials, self._queue, erase_old_db)
@@ -335,6 +344,7 @@ class ResultWriter(object):
 
         self._var_map_initialised = False
         if erase_old_db:
+            logging.warning("RECREATING ALL TABLES")
             self._create_all_tables()
         else:
             event = "crash_recovery"
@@ -342,6 +352,7 @@ class ResultWriter(object):
             self._write_async_command(command)
 
         logging.info("Result writer initialised")
+        
     def _create_all_tables(self):
         logging.info("Creating master table 'ROI_MAP'")
         self._create_table("ROI_MAP", "roi_idx SMALLINT, roi_value SMALLINT, x SMALLINT,y SMALLINT,w SMALLINT,h SMALLINT")
@@ -498,7 +509,7 @@ class ResultWriter(object):
         self._queue.put((command, args))
 
     def _create_table(self, name, fields, engine="InnoDB"):
-        command = "CREATE TABLE IF NOT EXISTS %s (%s) ENGINE %s KEY_BLOCK_SIZE=16" % (name, fields, engine)
+        command = "CREATE TABLE IF NOT EXISTS %s (%s) ENGINE %s KEY_BLOCK_SIZE=16;" % (name, fields, engine)
         logging.info("Creating database table with: " + command)
         self._write_async_command(command)
 
@@ -580,7 +591,7 @@ class AsyncSQLiteWriter(multiprocessing.Process):
 
                 finally:
                     if self._queue.empty():
-                        #we sleep iff we have an empty queue. this way, we don't over use a cpu
+                        #we sleep if we have an empty queue. this way, we don't over use a cpu
                         time.sleep(.1)
 
         except KeyboardInterrupt as e:

@@ -493,7 +493,8 @@ class Device(Thread):
 
             mysql_db = mysql.connector.connect(host=self._ip,
                                                connect_timeout=timeout,
-                                               **self._ethoscope_db_credentials)
+                                               **self._ethoscope_db_credentials,
+                                               buffered=True)
             cur = mysql_db.cursor()
             cur.execute(com)
             query = [c for c in cur]
