@@ -58,13 +58,16 @@ def get_machine_info(path):
     """
     Reads the machine NAME file and returns the value.
     """
-    try:
-        with open(path,'r') as f:
-            info = f.readline().rstrip()
-        return info
-    except Exception as e:
-        logging.warning(traceback.format_exc(e))
-        return 'Debug-'+str(random.randint(1,100))
+    if os.path.exists(path):
+        try:
+            with open(path,'r') as f:
+                info = f.readline().rstrip()
+            return info
+        except Exception as e:
+            logging.warning(traceback.format_exc(e))
+            return 'Debug-'+str(random.randint(1,100))
+    else:
+        return "ETHOSCOPE_000"
 
 
 def get_commit_version(commit):
