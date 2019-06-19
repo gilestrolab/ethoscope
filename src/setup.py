@@ -4,7 +4,7 @@ setup(
     name='ethoscope',
     version='1.0.0',
     author=['Quentin Geissmann', 'Giorgio Gilestro', 'Luis Garcia'],
-    author_email= ['quentin.geissmann13@imperial.ac.uk','g.gilestro@imperial.ac.uk', 'luis.garcia@polygonaltree.co.uk'],
+    author_email=['quentin.geissmann@gmail.com', 'giorgio@gilest.ro', 'luis.garcia@uni-muenster.de'],
     packages=find_packages(),
     url="https://github.com/gilestrolab/ethoscope",
     license="GPL3",
@@ -24,7 +24,7 @@ setup(
     # package_data={'ethoscope': ['data/classifiers/*.pkl']},
     extras_require={
          'device': ['picamera>=1.8', "GitPython >=1.0.1",
-                    "MySQL-python >= 1.2.5", "cherrypy >= 3.6.0", "pyserial>=2.7","bottle>=0.12.8"],
+                    "mysql-connector-python >= 8.0.16", "cherrypy >= 3.6.0", "pyserial>=2.7", "bottle>=0.12.8"],
          'dev': ['Sphinx >= 1.4.4', "sphinx_rtd_theme >= 0.1.9", "mock >= 2.0.0"]
      },
     setup_requires=[
