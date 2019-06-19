@@ -13,6 +13,9 @@ import glob
 
 from bottle import *
 
+import socket
+from zeroconf import ServiceInfo, Zeroconf
+
 try:
     from cheroot.wsgi import Server as WSGIServer
 except ImportError:
@@ -320,10 +323,33 @@ if __name__ == '__main__':
 
 #    try:
 #        run(api, host='0.0.0.0', port=port, server='cherrypy',debug=option_dict["debug"])
-        
+
     try:
+        # Register the ethoscope using zeroconf so that the node knows about it.
+        # I need an address to register the service, but I don't understand which one (different
+        # interfaces will have different addresses). The python module zeroconf fails if I don't
+        # provide one, and the way it gets supplied doesn't appear to be IPv6 compatible. I'll put
+        # in whatever I get from "gethostbyname" but not trust that in the code on the node side.
+        hostname=socket.gethostname()
+        address=socket.gethostbyname(hostname+".local")
+        serviceInfo = ServiceInfo("_ethoscope._tcp.local.",
+                        hostname+"._ethoscope._tcp.local.",
+                        address=socket.inet_aton(address),
+                        port=PORT,
+                        properties={
+                            'version': '0.0.1',
+                            'id_page': '/id',
+                            'user_options_page': '/user_options',
+                            'static_page': '/static',
+                            'controls_page': '/controls',
+                            'user_options_page': '/user_options'
+                        } )
+        zeroconf = Zeroconf()
+        zeroconf.register_service(serviceInfo)
+
+        ####### THIS IS A BIG MESS AND NEEDS TO BE FIXED. To be remove when bottle changes to version 0.13
+
         SERVER = "cheroot"
-        #######To be remove when bottle changes to version 0.13
         try:
             #This checks if the patch has to be applied or not. We check if bottle has declared cherootserver
             #we assume that we are using cherrypy > 9
@@ -336,15 +362,22 @@ if __name__ == '__main__':
             logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
             pass
         #########
+
         run(api, host='0.0.0.0', port=PORT, debug=DEBUG, server=SERVER)
-        
-        
-        
+
     except Exception as e:
         logging.error(e)
+        try:
+            zeroconf.unregister_service(serviceInfo)
+            zeroconf.close()
+        except:
+            pass
         close(1)
+        
     finally:
+        try:
+            zeroconf.unregister_service(serviceInfo)
+            zeroconf.close()
+        except:
+            pass
         close()
-
-
-#
