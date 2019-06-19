@@ -229,7 +229,7 @@ def download(what):
 def node_info(req):#, device):
     if req == 'info':
         df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout=subprocess.PIPE)
-        disk_free = df.communicate()[0]
+        disk_free = df.communicate()[0].decode('utf-8')
         disk_usage = RESULTS_DIR+" Not Found on disk"
 
         CARDS = []
@@ -241,9 +241,13 @@ def node_info(req):#, device):
 
             #the following returns something like this: [['eno1', 'ec:b1:d7:66:2e:3a', '192.169.123.1'], ['enp0s20u12', '74:da:38:49:f8:2a', '155.198.232.206']]
             CARDS = [ [i, netifaces.ifaddresses(i)[17][0]['addr'], netifaces.ifaddresses(i)[2][0]['addr']] for i in netifaces.interfaces() if 17 in netifaces.ifaddresses(i) and 2 in netifaces.ifaddresses(i) and netifaces.ifaddresses(i)[17][0]['addr'] != '00:00:00:00:00:00' ]
-            GIT_BRANCH = os.popen("git rev-parse --abbrev-ref HEAD").read().strip()
-            NEEDS_UPDATE = os.popen("git status -s -uno").read().strip() != ""
-            
+           
+            df = subprocess.Popen(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], stdout=subprocess.PIPE)
+            GIT_BRANCH = df.communicate()[0].decode('utf-8')
+
+            df = subprocess.Popen(['git', 'status', '-s', '-uno'], stdout=subprocess.PIPE)
+            NEEDS_UPDATE = df.communicate()[0].decode('utf-8') != ""
+
         except Exception as e:
             logging.error(e)
 
