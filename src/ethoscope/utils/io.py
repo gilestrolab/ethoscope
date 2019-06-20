@@ -194,7 +194,9 @@ class ImgToMySQLHelper(object):
 
         cv2.imwrite(self._tmp_file, img, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
 
-        bstring = open(self._tmp_file, "rb").read()
+        with open(self._tmp_file, "rb") as f:
+                bstring = f.read()
+                
         cmd = 'INSERT INTO ' + self._table_name + '(id,t,img) VALUES(%s,%s,%s)'
 
         args = (0, int(t), bstring)
