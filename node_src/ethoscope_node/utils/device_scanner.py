@@ -67,11 +67,25 @@ class DeviceScanner(object):
         
     def stop(self):
         self.zeroconf.close()
+
+    def _get_last_backup_time(self, device):
+        try:
+            backup_path = device.info()["backup_path"]
+            time_since_backup = time.time() - os.path.getmtime(backup_path)
+            return time_since_backup
+        except OSError:
+            return
+        except KeyError:
+            return
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            return
         
     def get_all_devices_info(self):
         out = {}
         for device in self.devices:
-            out[device.id()]=device.info()
+            out[device.id()] = device.info()
+            out[device.id()]["time_since_backup"] = self._get_last_backup_time(device)
         return out
         
     def get_device(self, id):
