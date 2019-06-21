@@ -40,7 +40,7 @@ class MySQLdbToSQlite(object):
         self._remote_pass = remote_pass
         self._remote_db_name = remote_db_name
 
-        src = mysql.coonector.connect(host=self._remote_host,
+        src = mysql.connector.connect(host=self._remote_host,
                                       user=self._remote_user,
                                       passwd=self._remote_pass,
                                       db=self._remote_db_name,
@@ -109,7 +109,7 @@ class MySQLdbToSQlite(object):
 
     def _copy_table(self,table_name, src, dst, dump_in_csv=False):
         src_cur = src.cursor(buffered=True)
-        dst_cur = dst.cursor(buffered=True)
+        dst_cur = dst.cursor()
 
         src_command = "SHOW COLUMNS FROM %s " % table_name
 
@@ -146,7 +146,7 @@ class MySQLdbToSQlite(object):
 
         with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
 
-            dst_cur = src.cursor(buffered=True)
+            dst_cur = src.cursor()
             command = "SELECT roi_idx FROM ROI_MAP"
             dst_cur.execute(command)
             rois_in_src = set([c[0] for c in dst_cur])
@@ -171,7 +171,7 @@ class MySQLdbToSQlite(object):
 
     def _replace_table(self,table_name, src, dst, dump_in_csv=False):
         src_cur = src.cursor(buffered=True)
-        dst_cur = dst.cursor(buffered=True)
+        dst_cur = dst.cursor()
 
         src_command = "SELECT * FROM %s " % table_name
 
@@ -204,7 +204,7 @@ class MySQLdbToSQlite(object):
 
     def _update_one_roi_table(self, table_name, src, dst, dump_in_csv=False):
         src_cur = src.cursor(buffered=True)
-        dst_cur = dst.cursor(buffered=True)
+        dst_cur = dst.cursor()
 
         try:
             dst_command= "SELECT MAX(id) FROM %s" % table_name
@@ -253,7 +253,7 @@ class MySQLdbToSQlite(object):
     def _update_img_snapshot_table(self, table_name, src, dst):
 
         src_cur = src.cursor(buffered=True)
-        dst_cur = dst.cursor(buffered=True)
+        dst_cur = dst.cursor()
 
         try:
             dst_command= "SELECT MAX(id) FROM %s" % table_name
@@ -281,7 +281,7 @@ class MySQLdbToSQlite(object):
 
     def _replace_img_snapshot_table(self,table_name, src, dst):
         src_cur = src.cursor(buffered=True)
-        dst_cur = dst.cursor(buffered=True)
+        dst_cur = dst.cursor()
 
         src_command = "SELECT id,t,img FROM %s" % table_name
         src_cur.execute(src_command)
