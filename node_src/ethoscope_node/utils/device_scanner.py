@@ -10,15 +10,6 @@ from functools import wraps
 import socket
 from zeroconf import ServiceBrowser, Zeroconf
 
-try:
-    from scapy.all import srp, Ether, ARP
-    import netifaces
-    raise ImportError("Not using scapy until issue #75 (https://github.com/gilestrolab/ethoscope/issues/75) is fixed")
-    _use_scapy = True
-except ImportError:
-    logging.warning("Cannot import scapy to scan subnet")
-    _use_scapy = False
-
 
 class ScanException(Exception):
     pass
@@ -151,7 +142,6 @@ class ActiveDeviceScanner(Thread):
         # self._device_id_list = {}
         self._local_ip = local_ip
         self._ip_range = ip_range
-        self._use_scapy = _use_scapy
 
         for ip in self._subnet_ips(local_ip, ip_range):
             d =  Device(ip, device_refresh_period, results_dir=results_dir)
@@ -160,48 +150,14 @@ class ActiveDeviceScanner(Thread):
         super(ActiveDeviceScanner, self).__init__()
 
     def _available_ips(self, local_ip, ip_range):
-        if self._use_scapy :
-            for c in self._arp_alive(local_ip):
-                yield c
-        else:
-            for c in self._subnet_ips(local_ip, ip_range):
-                yield c
+        for c in self._subnet_ips(local_ip, ip_range):
+            yield c
 
     def _subnet_ips(self,local_ip, ip_range):
         for i in range(ip_range[0], ip_range[1] + 1):
             subnet_ip = local_ip.split(".")[0:3]
             subnet_ip = ".".join(subnet_ip)
             yield "%s.%i" % (subnet_ip, i)
-
-    def _arp_alive(self, local_ip):
-
-        try:
-            if not self._use_scapy:
-                raise Exception("Arp table can only be uses using scapy package")
-
-            # find interface in use for the given local ip/subnet
-            subnet_list = local_ip.split(".")[0:3]
-            interface = None
-            for inter in netifaces.interfaces():
-                candidate = netifaces.ifaddresses(inter)
-                if 2 in list(candidate.keys()):
-                    ip = candidate[2][0]["addr"]
-                    if ip.split(".")[0:3] == subnet_list:
-                        interface = inter
-                        break
-            subnet_ip = local_ip.split(".")[0:3]
-            subnet_address = ".".join(subnet_ip) + ".0/24"
-            ans, unans = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=subnet_address), timeout=3, verbose=False, iface=interface)
-            collection = [rcv.sprintf(r"%ARP.psrc%") for snd, rcv in ans]
-            if len(collection) == 0:
-                raise Exception("Empty ip list")
-            return collection
-
-        except Exception as e:
-            logging.error("Cannot use scapy. Defaulting to subnet")
-            logging.error(traceback.format_exc())
-            self._use_scapy = False
-            return []
 
 
     def _get_last_backup_time(self, device):

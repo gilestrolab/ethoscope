@@ -216,9 +216,12 @@ def user_options(id):
 def get_log(id):
     output = "No log available"
     try:
-        output = os.popen('journalctl -u ethoscope_device.service -rb').read()
+        with os.popen('journalctl -u ethoscope_device.service -rb') as p:
+            output = p.read()
+
     except Exception as e:
-        logging.error(e)
+        logging.error(traceback.format_exc())
+
     return {'message' : output}
 
 
@@ -366,7 +369,7 @@ if __name__ == '__main__':
         run(api, host='0.0.0.0', port=PORT, debug=DEBUG, server=SERVER)
 
     except Exception as e:
-        logging.error(e)
+        logging.error(traceback.format_exc())
         try:
             zeroconf.unregister_service(serviceInfo)
             zeroconf.close()
