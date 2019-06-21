@@ -240,24 +240,31 @@ class Device(Thread):
                                 "passwd": "ethoscope",
                                 "db":"ethoscope_db"}
 
-    _id_page = "id"
-    _user_options_page = "user_options"
-    _videofiles_page = "data/listfiles/video"
-    _log_page = "data/log"
-    _static_page = "static"
-    _controls_page = "controls"
+    _remote_pages = {
+            'id' : "id",
+            'videofiles' :  "data/listfiles/video",
+            'stream' : "stream.mjpg",
+            'user_options' : "user_options",
+            'log' : "data/log",
+            'static' : "static",
+            'controls' : "controls",
+            'machine_info' : "machine",
+            'update' : "update"
+            }
+    
     _allowed_instructions_status = { "stream": ["stopped"],
                                      "start": ["stopped"],
                                      "start_record": ["stopped"],
                                      "stop": ["streaming", "running", "recording"],
                                      "poweroff": ["stopped"],
+                                     "reboot" : ["stopped"],
                                      "not_in_use": []}
 
     def __init__(self, ip, refresh_period= 2, port = 9000, results_dir="/ethoscope_results"):
         self._results_dir = results_dir
         self._ip = ip
         self._port = port
-        self._id_url = "http://%s:%i/%s" % (ip, port, self._id_page)
+        self._id_url = "http://%s:%i/%s" % (ip, port, self._remote_pages['id'])
         self._reset_info()
 
         self._is_active = True
@@ -280,11 +287,11 @@ class Device(Thread):
                 last_refresh = time.time()
 
     def send_instruction(self,instruction,post_data):
-        post_url = "http://%s:%i/%s/%s/%s" % (self._ip, self._port, self._controls_page,self._id, instruction)
+        post_url = "http://%s:%i/%s/%s/%s" % (self._ip, self._port, self._remote_pages['controls'], self._id, instruction)
         self._check_instructions_status(instruction)
 
         # we do not expect any data back when device is powered off.
-        if instruction == "poweroff":
+        if instruction == "poweroff" or instruction == "reboot":
             try:
                 self._get_json(post_url, 3, post_data)
             except ScanException:
@@ -292,6 +299,11 @@ class Device(Thread):
 
         else:
             self._get_json(post_url, 3, post_data)
+        self._update_info()
+        
+    def send_settings(self, post_data):
+        post_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_pages['update'], self._id)
+        self._get_json(post_url, 3, post_data)
         self._update_info()
 
     def _check_instructions_status(self, instruction):
@@ -315,20 +327,31 @@ class Device(Thread):
     def info(self):
         return self._info
 
+    def machine_info(self):
+        '''
+        Retrieves private machine info from the ethoscope
+        This is used to check if the ethoscope is a new installation
+        '''
+        machine_info_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_pages['machine_info'], self._id)
+        out = self._get_json(machine_info_url)
+        return out
+        
+
     def skip_scanning(self, value):
         self._skip_scanning = value
 
     def videofiles(self):
         '''
+        Return a list of file videos available on the ethoscope or virtuascope
         '''
-        videofiles_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._videofiles_page, self._id)
+        videofiles_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_page['videofiles'], self._id)
         out = self._get_json(videofiles_url)
         return out
 
     def relay_stream(self):
         '''
         '''
-        stream_url = "http://%s:%i/stream.mjpg" % (self._ip, 8008)
+        stream_url = "http://%s:%i/%s" % (self._ip, 8008, self._remote_pages['stream'])
         #stream_url = "http://217.7.233.140:80/cgi-bin/faststream.jpg?stream=full&fps=0"
 
         req = urllib.request.Request(stream_url)
@@ -345,12 +368,12 @@ class Device(Thread):
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
     def user_options(self):
-        user_options_url= "http://%s:%i/%s/%s" % (self._ip, self._port, self._user_options_page, self._id)
+        user_options_url= "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_pages['user_options'], self._id)
         out = self._get_json(user_options_url)
         return out
 
     def get_log(self):
-        log_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._log_page, self._id)
+        log_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_pages['log'], self._id)
         out = self._get_json(log_url)
         return out
 
@@ -363,7 +386,7 @@ class Device(Thread):
         except KeyError:
             raise KeyError("Cannot find last image for device %s" % self._id)
 
-        img_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._static_page, img_path)
+        img_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_pages['static'], img_path)
         try:
             return urllib.request.urlopen(img_url,timeout=5)
         except  urllib.error.HTTPError:
@@ -376,7 +399,7 @@ class Device(Thread):
         except KeyError:
             raise KeyError("Cannot find dbg img path for device %s" % self._id)
 
-        img_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._static_page, img_path)
+        img_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_pages['static'], img_path)
         try:
             file_like = urllib.request.urlopen(img_url)
             return file_like

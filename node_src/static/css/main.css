@@ -156,6 +156,16 @@ label.dropdown {
   background-color: #4cA84c;
 }
 
+.dd-button#options-btn{
+  background-color: #5FA4E7;
+  border: 1px solid #5FA4E7;
+}
+
+.dd-button#power-btn{
+  background-color: #F15051;
+  border: 1px solid #F15051;
+}
+
 .dd-input {
   display: none;
 }

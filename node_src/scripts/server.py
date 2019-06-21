@@ -87,6 +87,27 @@ def get_device_info(id):
 
     return device.info()
 
+#Get the private machine information of one device
+@app.get('/device/<id>/machineinfo')
+@error_decorator
+def get_device_machine_info(id):
+    device = device_scanner.get_device(id)
+    # if we fail to access directly the device, we have the old info map
+    if not device:
+        return device_scanner.get_all_devices_info()[id]
+
+    return device.machine_info()
+
+@app.post('/device/<id>/machineinfo')
+@error_decorator
+def set_device_machine_info(id):
+
+    post_data = request.body.read()
+    device = device_scanner.get_device(id)
+    device.send_settings(post_data)
+
+    return device.machine_info()
+
 @app.get('/device/<id>/user_options')
 @error_decorator
 def get_device_options(id):

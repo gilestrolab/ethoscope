@@ -4,14 +4,15 @@ import logging
 import traceback
 from optparse import OptionParser
 from ethoscope.web_utils.control_thread import ControlThread
-from ethoscope.web_utils.helpers import get_machine_info, get_version, file_in_dir_r
+from ethoscope.web_utils.helpers import get_machine_id, get_machine_name, get_git_version, file_in_dir_r, get_etc_hostnames, pi_version, set_machine_name, set_machine_id, set_etc_hostname, get_WIFI, set_WIFI
 from ethoscope.web_utils.record import ControlThreadVideoRecording
 from subprocess import call
 import json
 import os
 import glob
 
-from bottle import *
+#from bottle import Bottle, ServerAdapter, request, server_names
+import bottle
 
 import socket
 from zeroconf import ServiceInfo, Zeroconf
@@ -22,10 +23,11 @@ except ImportError:
     from cherrypy.wsgiserver import CherryPyWSGIServer as WSGIServer
 
 
-api = Bottle()
+api = bottle.Bottle()
 
 tracking_json_data = {}
 recording_json_data = {}
+update_machine_json_data = {}
 ETHOSCOPE_DIR = None
 
 
@@ -51,7 +53,7 @@ def do_upload(id):
     if id != machine_id:
         raise WrongMachineID
     
-    upload = request.files.get('upload')
+    upload = bottle.request.files.get('upload')
     name, ext = os.path.splitext(upload.filename)
 
     if ext in ('.mp4', '.avi'):
@@ -73,11 +75,11 @@ def do_upload(id):
 
 @api.route('/static/<filepath:path>')
 def server_static(filepath):
-    return static_file(filepath, root="/")
+    return bottle.static_file(filepath, root="/")
 
 @api.route('/download/<filepath:path>')
 def server_static(filepath):
-    return static_file(filepath, root="/", download=filepath)
+    return bottle.static_file(filepath, root="/", download=filepath)
 
 @api.get('/id')
 @error_decorator
@@ -100,7 +102,7 @@ def rm_static_file(id):
     global control
     global record
 
-    data = request.body.read()
+    data = bottle.request.body.read()
     data = json.loads(data)
     file_to_del = data["file"]
     if id != machine_id:
@@ -114,6 +116,25 @@ def rm_static_file(id):
         raise Exception(msg)
     return data
 
+@api.post('/update/<id>')
+def update_machine_info(id):
+    '''
+    Updates the private machine informations
+    '''
+    if id != machine_id:
+        raise WrongMachineID
+        
+    data = bottle.request.json
+    update_machine_json_data.update(data['machine_options']['arguments'])
+    
+    set_etc_hostname(update_machine_json_data['node_ip'])
+    set_machine_name(update_machine_json_data['etho_number'])
+    set_machine_id(update_machine_json_data['etho_number'])
+    set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'])
+
+    return get_machine_info(id)
+    
+
 @api.post('/controls/<id>/<action>')
 @error_decorator
 def controls(id, action):
@@ -123,8 +144,9 @@ def controls(id, action):
         raise WrongMachineID
 
     if action == 'start':
-        data = request.json
+        data = bottle.request.json
         tracking_json_data.update(data)
+        
         control = None
         control = ControlThread(machine_id=machine_id,
                                 name=machine_name,
@@ -135,7 +157,7 @@ def controls(id, action):
         control.start()
         return info(id)
 
-    elif action in ['stop', 'close', 'poweroff']:
+    elif action in ['stop', 'close', 'poweroff', 'reboot']:
         if control.info['status'] == 'running' or control.info['status'] == "recording" or control.info['status'] == "streaming" :
             # logging.info("Stopping monitor")
             logging.warning("Stopping monitor")
@@ -154,10 +176,16 @@ def controls(id, action):
             logging.info("Powering off Device.")
             call('poweroff')
 
+        if action == 'reboot':
+            logging.info("Stopping monitor due to reboot request")
+            logging.info("Powering off Device.")
+            call('reboot')
+
+
         return info(id)
 
     elif action in ['start_record', 'stream']:
-        data = request.json
+        data = bottle.request.json
         recording_json_data.update(data)
         logging.warning("Recording or Streaming video, data is %s" % str(data))
         control = None
@@ -188,14 +216,39 @@ def list_data_files(category, id):
 
     return {}
 
+@api.get('/machine/<id>')
+@error_decorator
+def get_machine_info(id):
+
+    if machine_id != id:
+        raise WrongMachineID
+
+    machine_info = {}
+    machine_info['node_ip'] = bottle.request.environ.get('HTTP_X_FORWARDED_FOR') or bottle.request.environ.get('REMOTE_ADDR')
+    machine_info['etc_node_ip'] = get_etc_hostnames()['node']
+
+    machine_info['knows_node_ip'] = ( machine_info['node_ip'] == machine_info['etc_node_ip'] )
+    machine_info['hostname'] = os.uname()[1]
+    machine_info['machine-name'] = get_machine_name()
+    machine_info['machine-id'] = get_machine_id()
+    machine_info['kernel'] = os.uname()[2]
+    machine_info['pi_version'] = pi_version()
+    machine_info['WIFI_SSID'] = get_WIFI()['ESSID']
+    machine_info['WIFI_PASSWORD'] = get_WIFI()['Key']
+    
+    return machine_info
+
+
 @api.get('/data/<id>')
 @error_decorator
 def info(id):
 
     if machine_id != id:
         raise WrongMachineID
+        
     info = control.info
-    info["current_timestamp"] = time.time()
+    info["current_timestamp"] = bottle.time.time()
+    
     return info
 
 @api.get('/user_options/<id>')
@@ -209,7 +262,16 @@ def user_options(id):
     return {
         "tracking":ControlThread.user_options(),
         "recording":ControlThreadVideoRecording.user_options(),
-        "streaming": {} }
+        "streaming": {},
+        "update_machine": { "machine_options": [{"overview": "Machine information that can be set by the user",
+                            "arguments": [
+                                {"type": "number", "name":"etho_number", "description": "An ID number (1-999) unique to this ethoscope","default": int(info(id)['name'].split("_")[1]) },
+                                {"type": "str", "name":"node_ip", "description": "The IP address that you want to record as node","default": get_machine_info(id)['node_ip']},
+                                {"type": "str", "name":"ESSID", "description": "The name of the WIFI SSID","default":"ETHOSCOPE_WIFI"},
+                                {"type": "str", "name":"Key", "description": "The WPA password for the WIFI SSID","default":"ETHOSCOPE_1234"}],
+                            "name" : "Ethoscope Options"}],
+
+                               } }
 
 @api.get('/data/log/<id>')
 @error_decorator
@@ -240,7 +302,7 @@ def close(exit_status=0):
 #############
 ### CLASSS TO BE REMOVED IF BOTTLE CHANGES TO 0.13
 ############
-class CherootServer(ServerAdapter):
+class CherootServer(bottle.ServerAdapter):
     def run(self, handler): # pragma: no cover
         from cheroot import wsgi
         from cheroot.ssl import builtin
@@ -263,8 +325,6 @@ if __name__ == '__main__':
 
     ETHOSCOPE_DIR = "/ethoscope_data/results"
     ETHOSCOPE_UPLOAD = "/ethoscope_data/upload"
-    MACHINE_ID_FILE = '/etc/machine-id'
-    MACHINE_NAME_FILE = '/etc/machine-name'
 
     parser = OptionParser()
     parser.add_option("-r", "--run", dest="run", default=False, help="Runs tracking directly", action="store_true")
@@ -282,10 +342,9 @@ if __name__ == '__main__':
     PORT = option_dict["port"]
     DEBUG = option_dict["debug"]
 
-    machine_id = get_machine_info(MACHINE_ID_FILE)
-    machine_name = get_machine_info(MACHINE_NAME_FILE)
-
-    version = get_version()
+    machine_id = get_machine_id()
+    machine_name = get_machine_name()
+    version = get_git_version()
 
 
     if option_dict["json"]:
@@ -361,12 +420,12 @@ if __name__ == '__main__':
             #Trick bottle to think that cheroot is actulay cherrypy server, modifies the server_names allowed in bottle
             #so we use cheroot in background.
             SERVER="cherrypy"
-            server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
+            bottle.server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
             logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
             pass
         #########
 
-        run(api, host='0.0.0.0', port=PORT, debug=DEBUG, server=SERVER)
+        bottle.run(api, host='0.0.0.0', port=PORT, debug=DEBUG, server=SERVER)
 
     except Exception as e:
         logging.error(traceback.format_exc())
