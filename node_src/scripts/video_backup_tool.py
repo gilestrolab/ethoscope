@@ -39,7 +39,7 @@ def get_video_list(ip, port=9000,static_dir = "static", index_file="ethoscope_da
 
     try:
         response = urllib.request.urlopen(url)
-        out = [r.rstrip() for r in response]
+        out = [r.decode('utf-8').rstrip() for r in response]
     except urllib.error.HTTPError as e:
         logging.warning("No index file could be found for device %s" % ip)
         out = None
