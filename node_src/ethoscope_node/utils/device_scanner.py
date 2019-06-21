@@ -45,7 +45,7 @@ class DeviceScanner(object):
     #TODO: check if this is going to be a problem
     _suffix = ".local" 
     
-    def __init__(self, local_ip = "192.169.123.1", ip_range = (6, 254), device_refresh_period = 5, results_dir="/ethoscope_results"):
+    def __init__(self, device_refresh_period = 5, results_dir="/ethoscope_results"):
         self.zeroconf = Zeroconf()
         self.devices = []
         self.device_refresh_period = device_refresh_period
@@ -253,7 +253,7 @@ class Device(Thread):
                                      "poweroff": ["stopped"],
                                      "not_in_use": []}
 
-    def __init__(self,ip, refresh_period= 2, port = 9000, results_dir="/ethoscope_results"):
+    def __init__(self, ip, refresh_period= 2, port = 9000, results_dir="/ethoscope_results"):
         self._results_dir = results_dir
         self._ip = ip
         self._port = port
@@ -263,6 +263,7 @@ class Device(Thread):
         self._is_active = True
         self._skip_scanning = False
         self._refresh_period = refresh_period
+        self._update_info()
 
         super(Device,self).__init__()
 

@@ -9,13 +9,13 @@ import multiprocessing
 
 
 class GenericBackupWrapper(object):
-    def __init__(self,backup_job, results_dir,safe, local_ip="192.169.123.1"):
+    def __init__(self,backup_job, results_dir, safe):
         self._TICK = 1.0  # s
         self._BACKUP_DT = 5 * 60  # 5min
         self._results_dir = results_dir
         self._safe = safe
         self._backup_job = backup_job
-        self._device_scanner = DeviceScanner(local_ip, device_refresh_period=60, results_dir=self._results_dir)
+        self._device_scanner = DeviceScanner(device_refresh_period=60, results_dir=self._results_dir)
         for d in self._device_scanner.get_all_devices_info():
             d._update_info()
 

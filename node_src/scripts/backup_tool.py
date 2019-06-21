@@ -6,7 +6,6 @@ import logging
 import optparse
 import  traceback
 import os
-from ethoscope_node.utils.helpers import  get_local_ip
 
 class BackupClass(object):
     _db_credentials = {
@@ -68,8 +67,6 @@ if __name__ == '__main__':
         parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
         parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_results",
                           help="Where temporary result files are stored")
-        parser.add_option("-r", "--subnet-ip", dest="subnet_ip", default="192.169.123.0",
-                          help="the ip of the router in your setup")
         parser.add_option("-s", "--safe", dest="safe", default=False,help="Set Safe mode ON", action="store_true")
         parser.add_option("-l", "--local", dest="local", default=False,
                           help="Run on localhost (run a node and device on the same machine, for development)",
@@ -77,12 +74,9 @@ if __name__ == '__main__':
         (options, args) = parser.parse_args()
         option_dict = vars(options)
 
-        local_ip = get_local_ip(option_dict["subnet_ip"], localhost=option_dict["local"])
-
         gbw = GenericBackupWrapper(backup_job,
                                    option_dict["results_dir"],
-                                   option_dict["safe"], local_ip
-                                   )
+                                   option_dict["safe"])
         gbw.run()
 
     except Exception as e:

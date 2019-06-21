@@ -3,7 +3,6 @@ import subprocess
 import socket
 import logging
 import traceback
-from ethoscope_node.utils.helpers import  get_local_ip, get_internet_ip
 from ethoscope_node.utils.device_scanner import DeviceScanner
 from os import walk
 import optparse
@@ -239,7 +238,7 @@ def node_info(req):#, device):
         try:
             disk_usage = disk_free.split("\n")[1].split()
 
-            #the following returns something like this: [['eno1', 'ec:b1:d7:66:2e:3a', '192.169.123.1'], ['enp0s20u12', '74:da:38:49:f8:2a', '155.198.232.206']]
+            #the following returns something like this: [['eno1', 'ec:b1:d7:66:2e:3a', '192.168.1.1'], ['enp0s20u12', '74:da:38:49:f8:2a', '155.198.232.206']]
             CARDS = [ [i, netifaces.ifaddresses(i)[17][0]['addr'], netifaces.ifaddresses(i)[2][0]['addr']] for i in netifaces.interfaces() if 17 in netifaces.ifaddresses(i) and 2 in netifaces.ifaddresses(i) and netifaces.ifaddresses(i)[17][0]['addr'] != '00:00:00:00:00:00' ]
            
             df = subprocess.Popen(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], stdout=subprocess.PIPE)
@@ -350,9 +349,6 @@ if __name__ == '__main__':
     parser.add_option("-p", "--port", dest="port", default=80,help="port")
     parser.add_option("-l", "--local", dest="local", default=False, help="Run on localhost (run a node and device on the same machine, for development)", action="store_true")
     parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_results",help="Where temporary result files are stored")
-    parser.add_option("-r", "--subnet-ip", dest="subnet_ip", default="192.169.123.0", help="the ip of the router in your setup")
-
-
 
     (options, args) = parser.parse_args()
 
@@ -360,20 +356,11 @@ if __name__ == '__main__':
     PORT = option_dict["port"]
     DEBUG = option_dict["debug"]
     RESULTS_DIR = option_dict["results_dir"]
-    MAX_ADDRESS = 255 if DEBUG else 5 # in normal conditions, the node's ip address is one of the first five of its subnet
-    LOCAL_IP = get_local_ip(option_dict["subnet_ip"], max_node_subnet_address=MAX_ADDRESS, localhost=option_dict["local"])
-
-    try:
-        WWW_IP = get_internet_ip()
-    except Exception as e:
-        logging.warning("Could not access internet!")
-        logging.warning(traceback.format_exc())
-        WWW_IP = None
 
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
     device_scanner = None
     try:
-        device_scanner = DeviceScanner(LOCAL_IP, results_dir=RESULTS_DIR)
+        device_scanner = DeviceScanner(results_dir=RESULTS_DIR)
         device_scanner.start()
         #######TO be remove when bottle changes to version 0.13
         server = "cherrypy"
