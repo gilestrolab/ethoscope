@@ -7,13 +7,22 @@
         $scope.options = [{name:"Browse / Download Files",
                             icon:"fa fa-folder-open-o",
                             color:"alert alert-info",
+                            style:"font-size:36px; padding:10px",
                             opt: "browse"
                             },
                           {name:"Manage Node",
                            icon:"fa fa-cog",
                            color:"alert alert-success",
+                           style:"font-size:36px; padding:10px",
                            opt:"nodeManage",
+                           },
+                          {name:"View Node Log",
+                           icon:"fa fa-book",
+                           color:"alert alert-success",
+                           style:"font-size:36px; padding:10px",
+                           opt:"viewLog",
                           },
+
                          ];
 
         $scope.exec_option = function(opt){
@@ -27,6 +36,9 @@
                     break;
                 case "nodeManage":
                     get_node_info();
+                    break;
+                case "viewLog":
+                    viewLog();
                     break;
                 case "all":
                     break;
@@ -133,6 +145,19 @@
                });
         };
 
+
+///  View Server Logs
+        var viewLog = function(){
+            ///var log_file_path = $scope.device.log_file;
+                $http.get('/node/log')
+                     .success(function(data, status, headers, config){
+                        $scope.log = data;
+                        $scope.showLog = true;
+                     });
+            
+            
+        };
+        
 }
  angular.module('flyApp').controller('moreController',moreController);
 })()

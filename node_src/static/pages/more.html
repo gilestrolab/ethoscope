@@ -1,15 +1,24 @@
 <div ng-if="showOptions" class="col-xs-12" ng-cloak>
     <div ng-repeat="option in options">
-    <a href=""  ng-click="exec_option(option.opt)" class="col-xs-1 option {{option.color}}"  >
+    <a href=""  ng-click="exec_option(option.opt)" data-toggle="tooltip" class="col-xs-1 option {{option.color}}" style={{option.style}} title="{{option.name}}" >
                 <p class="{{option.icon}}"></p>
-                <p>{{option.name}}</p>
+<!--                <p>{{option.name}}</p> -->
         </a>
     </div>
 </div>
 <div id="loading" class="spinner"></div>
 
+<div ng-if="showOption == 'viewLog'" class="col-xs-12" ng-cloak>
+<h2>Server Log</h2>
+<div>
+    <pre>
+    <p class="log" ng-repeat="(key,entry) in log | toArray |orderBy: 'key'">{{key}}: {{entry}}</p></pre>
+</div>
+</div>
+
+
 <div ng-show="showOption == 'browse'" class="col-xs-12" ng-cloak>
-    <h2>Files to be dowloaded:</h2>
+    <h2>Files on the node</h2>
     <div class="alert alert-info ">
         <p>Actions for selected files:</p>
         <button  class="btn btn-success" ng-click="browse.dowload()"  data-target="#downloadModal">Download</button>
@@ -188,9 +197,8 @@
 
 
 <div ng-if="showOption == 'nodeManage'" class="col-xs-12">
-    <hr></hr>
     <div>
-        <h3>Node Parameters</h3>
+        <h2>Node Parameters</h2>
         <p>Time on Network: {{nodeManagement.time}}</p>
         <p>Disk Usage: </p>
         <ul class="list-group col-xs-6">

@@ -275,8 +275,15 @@ def node_info(req):#, device):
                 
     if req == 'time':
         return {'time':datetime.datetime.now().isoformat()}
+        
     if req == 'timestamp':
         return {'timestamp': time.time()}
+    
+    if req == 'log':
+        with os.popen("journalctl -u ethoscope_node -rb") as log:
+            l = log.read()
+        return {'log': l}
+        
     else:
         raise NotImplementedError()
 
@@ -312,9 +319,11 @@ def remove_files():
 @app.get('/list/<type>')
 def redirection_to_home(type):
     return redirect('/#/list/'+type)
+
 @app.get('/more')
 def redirection_to_home():
     return redirect('/#/more/')
+    
 @app.get('/ethoscope/<id>')
 def redirection_to_home(id):
     return redirect('/#/ethoscope/'+id)
