@@ -30,7 +30,7 @@ def pi_version():
                
     if not hardware:
         # Couldn't find the hardware, assume it isn't a pi.
-        return None
+        return 0
     if hardware.group(1) == 'BCM2708':
         # Pi 1
         return 1
