@@ -233,7 +233,14 @@ def get_machine_info(id):
 
     machine_info['knows_node_ip'] = ( machine_info['node_ip'] == machine_info['etc_node_ip'] )
     machine_info['hostname'] = os.uname()[1]
+    
     machine_info['machine-name'] = get_machine_name()
+    try:
+        machine_info['machine-number'] = int ( machine_info['machine-name'].split("_")[1] )
+    except:
+        machine_info['machine-number'] = 0
+        
+        
     machine_info['machine-id'] = get_machine_id()
     machine_info['kernel'] = os.uname()[2]
     machine_info['pi_version'] = pi_version()
@@ -278,10 +285,10 @@ def user_options(id):
         "streaming": {},
         "update_machine": { "machine_options": [{"overview": "Machine information that can be set by the user",
                             "arguments": [
-                                {"type": "number", "name":"etho_number", "description": "An ID number (1-999) unique to this ethoscope","default": int(info(id)['name'].split("_")[1]) },
+                                {"type": "number", "name":"etho_number", "description": "An ID number (1-999) unique to this ethoscope","default": get_machine_info['machine_number'] },
                                 {"type": "str", "name":"node_ip", "description": "The IP address that you want to record as the node (do not change this value unless you know what you are doing!)","default": get_machine_info(id)['node_ip']},
-                                {"type": "str", "name":"ESSID", "description": "The name of the WIFI SSID","default":"ETHOSCOPE_WIFI"},
-                                {"type": "str", "name":"Key", "description": "The WPA password for the WIFI SSID","default":"ETHOSCOPE_1234"}],
+                                {"type": "str", "name":"ESSID", "description": "The name of the WIFI SSID","default": get_machine_info(id)['ESSID'] },
+                                {"type": "str", "name":"Key", "description": "The WPA password for the WIFI SSID","default": get_machine_info(id)['Key'] }],
                             "name" : "Ethoscope Options"}],
 
                                } }
