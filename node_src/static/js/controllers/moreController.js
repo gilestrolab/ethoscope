@@ -156,10 +156,12 @@
                });
         };
         $scope.nodeManagement.toggleDaemon = function(daemon_name, status){
-            console.log(daemon_name, status);
+            var spinner= new Spinner(opts).spin();
             $http.post('/node-actions', data = {'action': 'toggledaemon', 'daemon_name': daemon_name, 'status': status} )
                 .success(function(data){
                     //$scope.daemons = data;
+                    spinner.stop();
+
             });
         };
 
