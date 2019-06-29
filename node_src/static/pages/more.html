@@ -263,6 +263,7 @@
                   <input type="checkbox" class="toggle-check-input" ng-model="isActive" ng-checked="entry.active == 'active'" ng-click="nodeManagement.toggleDaemon(key, isActive != undefined ? isActive : entry.active == 'inactive')" >
                   <span class="toggle-check-text"></span>
                 </label>
+                <p>{{entry.description}}</p>
                 <!-- <input type=text value={{entry.exec}}> -->
             </li>
         </ul>

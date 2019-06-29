@@ -18,7 +18,11 @@ app = bottle.Bottle()
 STATIC_DIR = "../static"
 
 #names of the backup services
-BACKUP_DAEMONS = {"ethoscope_node": {}, "ethoscope_backup" : {}, "ethoscope_video_backup" : {}, "ethoscope_update_node" : {}}
+BACKUP_DAEMONS = {"ethoscope_node": {'description' : 'The main Ethoscope node server interface. It is used to control the ethoscopes.'}, 
+                  "ethoscope_backup" : {'description' : 'The service that collects data from the ethoscopes and syncs them with the node.'}, 
+                  "ethoscope_video_backup" : {'description' : 'The service that collects VIDEOs from the ethoscopes and syncs them with the node'}, 
+                  "ethoscope_update_node" : {'description' : 'The service used to update the nodes and the ethoscopes.'}
+                  }
 
 
 def error_decorator(func):
