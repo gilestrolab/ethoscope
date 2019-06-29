@@ -10,17 +10,23 @@
                             style:"font-size:36px; padding:10px",
                             opt: "browse"
                             },
-                          {name:"Manage Node",
-                           icon:"fa fa-cog",
-                           color:"alert alert-success",
+                          {name:"Node information",
+                           icon:"fa fa-info",
+                           color:"alert alert-info",
                            style:"font-size:36px; padding:10px",
-                           opt:"nodeManage",
+                           opt: "nodeInfo",
                            },
                           {name:"View Node Log",
                            icon:"fa fa-book",
+                           color:"alert alert-info",
+                           style:"font-size:36px; padding:10px",
+                           opt: "viewLog",
+                          },
+                          {name:"Node Management",
+                           icon:"fa fa-cog",
                            color:"alert alert-success",
                            style:"font-size:36px; padding:10px",
-                           opt:"viewLog",
+                           opt: "nodeManage",
                           },
 
                          ];
@@ -34,16 +40,20 @@
                 case "browse":
                     $scope.browse();
                     break;
-                case "nodeManage":
+                case "nodeInfo":
                     get_node_info();
                     break;
                 case "viewLog":
                     viewLog();
                     break;
+                case "nodeManage":
+                    admin();
+                    break;
                 case "all":
                     break;
             };
         };
+        
         console.log($routeParams.option);
         if ($routeParams.option != 'undefined'){
         $scope.$on('$viewContentLoaded',$scope.exec_option);
@@ -121,12 +131,13 @@
                 $scope.selected_all = false;
             }
         };
+        
         bytesToSize = function (bytes) {
-   if(bytes == 0) return '0 Byte';
-   var k = 1000;
-   var sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-   var i = Math.floor(Math.log(bytes) / Math.log(k));
-   return (bytes / Math.pow(k, i)).toPrecision(3) + ' ' + sizes[i];
+           if(bytes == 0) return '0 Byte';
+           var k = 1000;
+           var sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+           var i = Math.floor(Math.log(bytes) / Math.log(k));
+           return (bytes / Math.pow(k, i)).toPrecision(3) + ' ' + sizes[i];
 }
 
 /// Node Management update
@@ -144,6 +155,14 @@
                 $scope.nodeManagement[action]=res;
                });
         };
+        $scope.nodeManagement.toggleDaemon = function(daemon_name, status){
+            console.log(daemon_name, status);
+            $http.post('/node-actions', data = {'action': 'toggledaemon', 'daemon_name': daemon_name, 'status': status} )
+                .success(function(data){
+                    //$scope.daemons = data;
+            });
+        };
+
 
 
 ///  View Server Logs
@@ -158,6 +177,17 @@
             
         };
         
+///  Admin
+        var admin = function(){
+            ///var log_file_path = $scope.device.log_file;
+            $http.get('/node/daemons')
+                 .success(function(data, status, headers, config){
+                    $scope.daemons = data;
+            });
+        };
+        
 }
+
  angular.module('flyApp').controller('moreController',moreController);
+
 })()

@@ -1,10 +1,10 @@
-from bottle import *
+import bottle
 import subprocess
 import socket
 import logging
 import traceback
 from ethoscope_node.utils.device_scanner import DeviceScanner
-from os import walk
+import os
 import optparse
 import zipfile
 import datetime
@@ -12,13 +12,18 @@ import fnmatch
 import tempfile
 import shutil
 import netifaces
+import json
 
-app = Bottle()
+app = bottle.Bottle()
 STATIC_DIR = "../static"
+
+#names of the backup services
+BACKUP_DAEMONS = {"ethoscope_node": {}, "ethoscope_backup" : {}, "ethoscope_video_backup" : {} }
+
 
 def error_decorator(func):
     """
-    A simple decorator to return an error dict so we can display it the ui
+    A simple decorator to return an error dict so we can display it in the webUI
     """
     def func_wrapper(*args, **kwargs):
         try:
@@ -30,19 +35,19 @@ def error_decorator(func):
 
 @app.route('/static/<filepath:path>')
 def server_static(filepath):
-    return static_file(filepath, root=STATIC_DIR)
+    return bottle.static_file(filepath, root=STATIC_DIR)
 
 @app.route('/tmp_static/<filepath:path>')
 def server_tmp_static(filepath):
-    return static_file(filepath, root=tmp_imgs_dir)
+    return bottle.bottle.static_file(filepath, root=tmp_imgs_dir)
 
 @app.route('/download/<filepath:path>')
 def server_download(filepath):
-    return static_file(filepath, root="/", download=filepath)
+    return bottle.static_file(filepath, root="/", download=filepath)
 
 @app.route('/')
 def index():
-    return static_file('index.html', root=STATIC_DIR)
+    return bottle.static_file('index.html', root=STATIC_DIR)
 
 
 @app.hook('after_request')
@@ -51,15 +56,40 @@ def enable_cors():
     You need to add some headers to each request.
     Don't use the wildcard '*' for Access-Control-Allow-Origin in production.
     """
-    response.headers['Access-Control-Allow-Origin'] = 'http://localhost:8888'
-    response.headers['Access-Control-Allow-Methods'] = 'PUT, GET, POST, DELETE, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Origin, Accept, Content-Type, X-Requested-With, X-CSRF-Token'
+    bottle.response.headers['Access-Control-Allow-Origin'] = 'http://localhost:8888'
+    bottle.response.headers['Access-Control-Allow-Methods'] = 'PUT, GET, POST, DELETE, OPTIONS'
+    bottle.response.headers['Access-Control-Allow-Headers'] = 'Origin, Accept, Content-Type, X-Requested-With, X-CSRF-Token'
 
 
 #################################
 # API to connect with ethoscopes
 #################################
 
+"""
+/devices                                GET     returns info about devices
+/device/<id>/data                       GET
+/device/<id>/machineinfo                GET, POST
+/device/<id>/user_options               GET
+/device/<id>/videofiles                 GET
+/device/<id>/last_img                   GET
+/device/<id>/dbg_img                    GET
+/device/<id>/stream                     GET
+/device/<id>/controls/<instruction>     POST
+/device/<id>/log                        GET
+
+
+/results_file
+/browse/<folder:path>
+/request-download
+/node/<req>
+/node-actions
+/remove_files
+/list/<type>
+/more
+/ethoscope/<id>
+/device/<id>/ip
+/more/<action>
+"""
 
 @app.get('/favicon.ico')
 def get_favicon():
@@ -102,7 +132,7 @@ def get_device_machine_info(id):
 @error_decorator
 def set_device_machine_info(id):
 
-    post_data = request.body.read()
+    post_data = bottle.request.body.read()
     device = device_scanner.get_device(id)
     device.send_settings(post_data)
 
@@ -134,17 +164,6 @@ def get_device_last_img(id):
     basename = os.path.join(tmp_imgs_dir, id + "_last_img.jpg")
     return cache_img(file_like, basename)
 
-
-@app.get('/device/<id>/stream')
-@error_decorator
-def get_device_stream(id):
-  
-    device = device_scanner.get_device(id)
-    response.set_header('Content-type', 'multipart/x-mixed-replace; boundary=frame')
-    return device.relay_stream()
-
-
-#Get the information of one Sleep Monitor
 @app.get('/device/<id>/dbg_img')
 @error_decorator
 def get_device_dbg_img(id):
@@ -154,6 +173,14 @@ def get_device_dbg_img(id):
     basename = os.path.join(tmp_imgs_dir, id + "_debug.png")
     return cache_img(file_like, basename)
 
+
+@app.get('/device/<id>/stream')
+@error_decorator
+def get_device_stream(id):
+  
+    device = device_scanner.get_device(id)
+    bottle.response.set_header('Content-type', 'multipart/x-mixed-replace; boundary=frame')
+    return device.relay_stream()
 
 
 def cache_img(file_like, basename):
@@ -171,7 +198,7 @@ def cache_img(file_like, basename):
 @app.post('/device/<id>/controls/<instruction>')
 @error_decorator
 def post_device_instructions(id, instruction):
-    post_data = request.body.read()
+    post_data = bottle.request.body.read()
     device = device_scanner.get_device(id)
     device.send_instruction(instruction, post_data)
     return get_device_info(id)
@@ -217,7 +244,7 @@ def browse(folder):
     else:
         directory = '/'+folder
     files = []
-    for (dirpath, dirnames, filenames) in walk(directory):
+    for (dirpath, dirnames, filenames) in os.walk(directory):
         for name in filenames:
             abs_path = os.path.join(dirpath,name)
             size = os.path.getsize(abs_path)
@@ -231,7 +258,7 @@ def browse(folder):
 def download(what):
     # zip the files and provide a link to download it
     if what == 'files':
-        req_files = request.json
+        req_files = bottle.request.json
         t = datetime.datetime.now()
         #FIXME change the route for this? and old zips need to be erased
         zip_file_name = os.path.join(RESULTS_DIR,'results_'+t.strftime("%y%m%d_%H%M%S")+'.zip')
@@ -248,8 +275,10 @@ def download(what):
 @error_decorator
 def node_info(req):#, device):
     if req == 'info':
-        df = subprocess.Popen(['df', RESULTS_DIR, '-h'], stdout=subprocess.PIPE)
-        disk_free = df.communicate()[0].decode('utf-8')
+       
+        with os.popen('df %s -h' % RESULTS_DIR) as df:
+            disk_free = df.read()
+        
         disk_usage = RESULTS_DIR+" Not Found on disk"
 
         CARDS = []
@@ -262,27 +291,51 @@ def node_info(req):#, device):
             #the following returns something like this: [['eno1', 'ec:b1:d7:66:2e:3a', '192.168.1.1'], ['enp0s20u12', '74:da:38:49:f8:2a', '155.198.232.206']]
             CARDS = [ [i, netifaces.ifaddresses(i)[17][0]['addr'], netifaces.ifaddresses(i)[2][0]['addr']] for i in netifaces.interfaces() if 17 in netifaces.ifaddresses(i) and 2 in netifaces.ifaddresses(i) and netifaces.ifaddresses(i)[17][0]['addr'] != '00:00:00:00:00:00' ]
            
-            df = subprocess.Popen(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], stdout=subprocess.PIPE)
-            GIT_BRANCH = df.communicate()[0].decode('utf-8')
+            with os.popen('git rev-parse --abbrev-ref HEAD') as df:
+                GIT_BRANCH = df.read()
+            #df = subprocess.Popen(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], stdout=subprocess.PIPE)
+            #GIT_BRANCH = df.communicate()[0].decode('utf-8')
+            
+            with os.popen('git status -s -uno') as df:
+                NEEDS_UPDATE = df.read() != ""
 
-            df = subprocess.Popen(['git', 'status', '-s', '-uno'], stdout=subprocess.PIPE)
-            NEEDS_UPDATE = df.communicate()[0].decode('utf-8') != ""
+            #df = subprocess.Popen(['git', 'status', '-s', '-uno'], stdout=subprocess.PIPE)
+            #NEEDS_UPDATE = df.communicate()[0].decode('utf-8') != ""
 
         except Exception as e:
             logging.error(e)
 
         return {'disk_usage': disk_usage, 'CARDS': CARDS, 'GIT_BRANCH': GIT_BRANCH, 'NEEDS_UPDATE': NEEDS_UPDATE}
                 
-    if req == 'time':
+    elif req == 'time':
         return {'time':datetime.datetime.now().isoformat()}
         
-    if req == 'timestamp':
+    elif req == 'timestamp':
         return {'timestamp': time.time()}
     
-    if req == 'log':
+    elif req == 'log':
         with os.popen("journalctl -u ethoscope_node -rb") as log:
             l = log.read()
         return {'log': l}
+    
+    elif req == 'daemons':
+        #returns active or inactive
+        for daemon_name in BACKUP_DAEMONS.keys():
+        
+            with os.popen("systemctl is-active %s" % daemon_name) as df:
+                BACKUP_DAEMONS[daemon_name]['active'] = df.read().strip()
+            
+            #cmdline = "systemctl show --no-page %s | jq --slurp --raw-input 'split(\"\n\") | map(select(. != \"\") | split(\"=\") | {\"key\": .[0], \"value\": (.[1:] | join(\"=\"))}) | from_entries'"
+            cmdline = "systemctl status %s --output=json --plain"
+            
+            with os.popen(cmdline % daemon_name) as df:
+                a = df.read()
+
+            json_component = a[a.find("{"):]
+            BACKUP_DAEMONS[daemon_name]['exec'] = json.loads(json_component.split("\n")[0])['_CMDLINE']
+            
+        
+        return BACKUP_DAEMONS
         
     else:
         raise NotImplementedError()
@@ -290,21 +343,38 @@ def node_info(req):#, device):
 @app.post('/node-actions')
 @error_decorator
 def node_actions():
-    action = request.json
+    action = bottle.request.json
+    
     if action['action'] == 'poweroff':
         logging.info('User request a poweroff, shutting down system. Bye bye.')
-
         close()
         #poweroff = subprocess.Popen(['poweroff'], stdout=subprocess.PIPE)
+    
     elif action['action'] == 'close':
         close()
+    
+    elif action['action'] == 'toggledaemon':
+
+        if action['status'] == True:
+            cmd = "systemctl start %s" % action['daemon_name']
+            logging.info ("Starting daemon %s" % action['daemon_name'])
+            
+        elif  action['status'] == False:
+            cmd = "systemctl stop %s" % action['daemon_name']
+            logging.info ("Stopping daemon %s" % action['daemon_name'])
+            
+        with os.popen(cmd) as po:
+            r = po.read()
+           
+        return r
+    
     else:
         raise NotImplementedError()
 
 @app.post('/remove_files')
 @error_decorator
 def remove_files():
-    req = request.json
+    req = bottle.request.json
     res = []
     for f in req['files']:
         rm = subprocess.Popen(['rm', f['url']],
@@ -318,31 +388,19 @@ def remove_files():
 
 @app.get('/list/<type>')
 def redirection_to_home(type):
-    return redirect('/#/list/'+type)
+    return bottle.redirect('/#/list/'+type)
 
 @app.get('/more')
 def redirection_to_home():
-    return redirect('/#/more/')
+    return bottle.redirect('/#/more/')
     
 @app.get('/ethoscope/<id>')
 def redirection_to_home(id):
-    return redirect('/#/ethoscope/'+id)
-
-@app.get('/device/<id>/ip')
-@error_decorator
-def redirection_to_home(id):
-    raise NotImplementedError
-    #
-    # dev_list = device_scanner.get_device_list()
-    # for id, data  in dev_list.items():
-    #     if id == id:
-    #         return data["ip"]
-    # return "None"
-
+    return bottle.redirect('/#/ethoscope/'+id)
 
 @app.get('/more/<action>')
 def redirection_to_more(action):
-    return redirect('/#/more/'+action)
+    return bottle.redirect('/#/more/'+action)
 
 def close(exit_status=0):
     logging.info("Closing server")
@@ -353,7 +411,7 @@ def close(exit_status=0):
 #############
 ### CLASSS TO BE REMOVED IF BOTTLE CHANGES TO 0.13
 ############
-class CherootServer(ServerAdapter):
+class CherootServer(bottle.ServerAdapter):
     def run(self, handler): # pragma: no cover
         from cheroot import wsgi
         from cheroot.ssl import builtin
@@ -395,14 +453,14 @@ if __name__ == '__main__':
         #######TO be remove when bottle changes to version 0.13
         server = "cherrypy"
         try:
-            from cherrypy import wsgiserver
+            from bottle.cherrypy import wsgiserver
         except:
             #Trick bottle to think that cheroot is actulay cherrypy server adds the pacth to BOTTLE
-            server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
+            bottle.server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
             logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
             pass
         #########
-        run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='cherrypy')
+        bottle.run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='cherrypy')
 
     except KeyboardInterrupt:
         logging.info("Stopping server cleanly")

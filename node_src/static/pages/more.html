@@ -196,12 +196,12 @@
 </div>
 
 
-<div ng-if="showOption == 'nodeManage'" class="col-xs-12">
+<div ng-if="showOption == 'nodeInfo'" class="col-xs-12">
     <div>
         <h2>Node Parameters</h2>
         <p>Time on Network: {{nodeManagement.time}}</p>
-        <p>Disk Usage: </p>
         <ul class="list-group col-xs-6">
+        <p>Disk Usage:</p>
             <li class="list-group-item">Device: {{nodeManagement.info.disk_usage[0]}}</li>
             <li class="list-group-item">Total Size: {{nodeManagement.info.disk_usage[1]}}</li>
             <li class="list-group-item">Used: {{nodeManagement.info.disk_usage[2]}}</li>
@@ -209,12 +209,11 @@
             <li class="list-group-item">% used: {{nodeManagement.info.disk_usage[4]}}</li>
             <li class="list-group-item">Mounted on: {{nodeManagement.info.disk_usage[5]}}</li>
         </ul>
-        <p>Version info: </p>
         <ul class="list-group col-xs-6">
+        <p>Version info: </p>
             <li class="list-group-item">Current GIT branch: {{nodeManagement.info.GIT_BRANCH}}</li>
             <li class="list-group-item">Needs update: {{nodeManagement.info.NEEDS_UPDATE}}</li>
         </ul>
-        <p>Network data: </p>
         <ul class="list-group col-xs-6">
             <li class="list-group-item">Device Name (1): {{nodeManagement.info.CARDS[0][0]}}</li>
             <li class="list-group-item">Device MAC (1): {{nodeManagement.info.CARDS[0][1]}}</li>
@@ -226,9 +225,8 @@
 
     </div>
 
-<div class="col-xs-12">
-
-    <button class="btn btn-danger" data-toggle="modal" data-target="#powerOffAlert">Power off Node</button>
+    <div class="col-xs-12">
+        <button class="btn btn-danger" data-toggle="modal" data-target="#powerOffAlert">Power off Node</button>
     </div>
 
 </div>
@@ -253,6 +251,39 @@
     </div>
   </div>
 </div>
+
+<div ng-if="showOption == 'nodeManage'" class="col-xs-8">
+    <div>
+        <h2>Node Administration</h2>
+        <ul class="list-group col-xs-12">
+        <h3>Backup daemons and settings:</h3>
+            <!-- <p class="log" ng-repeat="(key,entry) in daemons | toArray |orderBy: 'key'">{{key}}: {{entry}}</p></pre> -->
+
+            <li class="list-group-item" ng-repeat="(key, entry) in daemons">
+                <label class="toggle-check">{{key}}
+                  <input type="checkbox" class="toggle-check-input" ng-model="isActive" ng-checked="entry.active == 'active'" ng-click="nodeManagement.toggleDaemon(key, isActive != undefined ? isActive : entry.active == 'inactive')" >
+                  <span class="toggle-check-text"></span>
+                </label>
+                <!-- <input type=text value={{entry.exec}}> -->
+            </li>
+        </ul>
+        <ul class="list-group col-xs-12">
+        <h3>Users</h3>
+            <li class="list-group-item" ng-repeat="(key, entry) in users">
+            </li>
+        </ul>
+        <ul class="list-group col-xs-12">
+        <h3>Incubators</h3>
+            <li class="list-group-item" ng-repeat="(key, entry) in incubators">
+            </li>
+        </ul>
+
+    </div>
+
+</div>
+
+
+
 <script>
     (function(){
         console.log("table");
