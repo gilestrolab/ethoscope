@@ -281,7 +281,7 @@ def node_info(req):#, device):
         
         disk_usage = RESULTS_DIR+" Not Found on disk"
 
-        CARDS = []
+        CARDS = {}
         GIT_BRANCH = "Not detected"
         NEEDS_UPDATE = False
 
@@ -289,7 +289,10 @@ def node_info(req):#, device):
             disk_usage = disk_free.split("\n")[1].split()
 
             #the following returns something like this: [['eno1', 'ec:b1:d7:66:2e:3a', '192.168.1.1'], ['enp0s20u12', '74:da:38:49:f8:2a', '155.198.232.206']]
-            CARDS = [ [i, netifaces.ifaddresses(i)[17][0]['addr'], netifaces.ifaddresses(i)[2][0]['addr']] for i in netifaces.interfaces() if 17 in netifaces.ifaddresses(i) and 2 in netifaces.ifaddresses(i) and netifaces.ifaddresses(i)[17][0]['addr'] != '00:00:00:00:00:00' ]
+            adapters_list = [ [i, netifaces.ifaddresses(i)[17][0]['addr'], netifaces.ifaddresses(i)[2][0]['addr']] for i in netifaces.interfaces() if 17 in netifaces.ifaddresses(i) and 2 in netifaces.ifaddresses(i) and netifaces.ifaddresses(i)[17][0]['addr'] != '00:00:00:00:00:00' ]
+            for ad in adapters_list:
+                CARDS [ ad[0] ] = {'MAC' : ad[1], 'IP' : ad[2]}
+            
            
             with os.popen('git rev-parse --abbrev-ref HEAD') as df:
                 GIT_BRANCH = df.read()

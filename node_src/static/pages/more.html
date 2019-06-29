@@ -215,12 +215,11 @@
             <li class="list-group-item">Needs update: {{nodeManagement.info.NEEDS_UPDATE}}</li>
         </ul>
         <ul class="list-group col-xs-6">
-            <li class="list-group-item">Device Name (1): {{nodeManagement.info.CARDS[0][0]}}</li>
-            <li class="list-group-item">Device MAC (1): {{nodeManagement.info.CARDS[0][1]}}</li>
-            <li class="list-group-item">IP Address (1): {{nodeManagement.info.CARDS[0][2]}}</li>
-            <li class="list-group-item">Device Name (2): {{nodeManagement.info.CARDS[1][0]}}</li>
-            <li class="list-group-item">Device MAC (2): {{nodeManagement.info.CARDS[1][1]}}</li>
-            <li class="list-group-item">IP Address (2): {{nodeManagement.info.CARDS[1][2]}}</li>
+        <div ng-repeat="(key, entry) in nodeManagement.info.CARDS">
+            <li class="list-group-item">Device Name: {{key}}</li>
+            <li class="list-group-item">Device MAC: {{entry.MAC}}</li>
+            <li class="list-group-item">IP Address: {{entry.IP}}</li>
+        </div>
         </ul>
 
     </div>
