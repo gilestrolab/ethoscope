@@ -6,7 +6,7 @@ from optparse import OptionParser
 from ethoscope.web_utils.control_thread import ControlThread
 from ethoscope.web_utils.helpers import get_machine_id, get_machine_name, get_git_version, file_in_dir_r, get_etc_hostnames, pi_version, set_machine_name, set_machine_id, set_etc_hostname, get_WIFI, set_WIFI
 from ethoscope.web_utils.record import ControlThreadVideoRecording
-from subprocess import call
+import subprocess
 import json
 import os
 import glob
@@ -174,12 +174,12 @@ def controls(id, action):
         if action == 'poweroff':
             logging.info("Stopping monitor due to poweroff request")
             logging.info("Powering off Device.")
-            call('poweroff')
+            subprocess.call('poweroff')
 
         if action == 'reboot':
             logging.info("Stopping monitor due to reboot request")
             logging.info("Powering off Device.")
-            call('reboot')
+            subprocess.call('reboot')
 
 
         return info(id)
@@ -197,6 +197,7 @@ def controls(id, action):
 
         control.start()
         return info(id)
+        
     else:
         raise Exception("No such action: %s" % action)
 
