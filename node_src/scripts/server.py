@@ -440,7 +440,7 @@ if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
     parser = optparse.OptionParser()
     parser.add_option("-D", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
-    parser.add_option("-p", "--port", dest="port", default=80,help="port")
+    parser.add_option("-p", "--port", dest="port", default=80, help="port")
     parser.add_option("-l", "--local", dest="local", default=False, help="Run on localhost (run a node and device on the same machine, for development)", action="store_true")
     parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_results",help="Where temporary result files are stored")
 
