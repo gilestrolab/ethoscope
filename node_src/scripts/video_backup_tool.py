@@ -92,18 +92,13 @@ def backup_job(args):
 
 if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
+    
     try:
         parser = optparse.OptionParser()
         parser = optparse.OptionParser()
         parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
-        parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_videos",
-                          help="Where temporary result files are stored")
+        parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_videos", help="Where video files are stored")
         parser.add_option("-s", "--safe", dest="safe", default=False,help="Set Safe mode ON", action="store_true")
-        parser.add_option("-l", "--local", dest="local", default=False,
-                          help="Run on localhost (run a node and device on the same machine, for development)",
-                          action="store_true")
-        (options, args) = parser.parse_args()
-        option_dict = vars(options)
 
         (options, args) = parser.parse_args()
         option_dict = vars(options)
@@ -112,5 +107,6 @@ if __name__ == '__main__':
                                     option_dict["results_dir"],
                                     option_dict["safe"] )
         gbw.run()
+        
     except Exception as e:
         logging.error(traceback.format_exc())

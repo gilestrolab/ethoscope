@@ -189,7 +189,7 @@ def get_device_stream(id):
 
 def cache_img(file_like, basename):
     if not file_like:
-        #todo return link to "broken img"
+        #TODO return link to "broken img"
         return ""
     local_file = os.path.join(tmp_imgs_dir, basename)
     tmp_file = tempfile.mktemp(prefix="ethoscope_", suffix=".jpg")
@@ -441,7 +441,6 @@ if __name__ == '__main__':
     parser = optparse.OptionParser()
     parser.add_option("-D", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-p", "--port", dest="port", default=80, help="port")
-    parser.add_option("-l", "--local", dest="local", default=False, help="Run on localhost (run a node and device on the same machine, for development)", action="store_true")
     parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_results",help="Where temporary result files are stored")
 
     (options, args) = parser.parse_args()
