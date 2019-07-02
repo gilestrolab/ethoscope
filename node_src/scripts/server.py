@@ -332,14 +332,13 @@ def node_info(req):#, device):
             with os.popen("systemctl is-active %s" % daemon_name) as df:
                 BACKUP_DAEMONS[daemon_name]['active'] = df.read().strip()
             
-            #cmdline = "systemctl show --no-page %s | jq --slurp --raw-input 'split(\"\n\") | map(select(. != \"\") | split(\"=\") | {\"key\": .[0], \"value\": (.[1:] | join(\"=\"))}) | from_entries'"
-            cmdline = "systemctl status %s --output=json --plain"
-            
-            with os.popen(cmdline % daemon_name) as df:
-                a = df.read()
-
-            json_component = a[a.find("{"):]
-            BACKUP_DAEMONS[daemon_name]['exec'] = json.loads(json_component.split("\n")[0])['_CMDLINE']
+#            #cmdline = "systemctl show --no-page %s | jq --slurp --raw-input 'split(\"\n\") | map(select(. != \"\") | split(\"=\") | {\"key\": .[0], \"value\": (.[1:] | join(\"=\"))}) | from_entries'"
+#            cmdline = "systemctl status %s --output=json --plain"
+#            
+#            with os.popen(cmdline % daemon_name) as df:
+#                a = df.read()
+#            json_component = a[a.find("{"):]
+#            BACKUP_DAEMONS[daemon_name]['exec'] = json.loads(json_component.split("\n")[0])['_CMDLINE']
             
         
         return BACKUP_DAEMONS
