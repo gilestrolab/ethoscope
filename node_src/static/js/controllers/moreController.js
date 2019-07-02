@@ -1,7 +1,12 @@
 (function(){
     var moreController = function($scope, $http, $timeout, $routeParams, $window){
 
-        $scope.selected = {'files':[]};
+        $scope.selected = { 'files': [],
+                            'folders' : {} 
+                          };
+                          
+        $scope.selected.folders = {};
+                          
         $scope.selected_all = false;
         $scope.showOptions = true;
         $scope.options = [{name:"Browse / Download Files",
@@ -155,14 +160,23 @@
                 $scope.nodeManagement[action]=res;
                });
         };
+
         $scope.nodeManagement.toggleDaemon = function(daemon_name, status){
             var spinner= new Spinner(opts).spin();
             $http.post('/node-actions', data = {'action': 'toggledaemon', 'daemon_name': daemon_name, 'status': status} )
                 .success(function(data){
                     //$scope.daemons = data;
-                    spinner.stop();
-
             });
+            spinner.stop();
+        };
+
+        $scope.nodeManagement.saveFolders = function(){
+            var spinner= new Spinner(opts).spin();
+            $http.post('/node-actions', data = {'action': 'updatefolders', 'folders' : $scope.folders} )
+                .success(function(data){
+                    $scope.folders = data;
+            });
+            spinner.stop();
         };
 
 
@@ -175,8 +189,6 @@
                         $scope.log = data;
                         $scope.showLog = true;
                      });
-            
-            
         };
         
 ///  Admin
@@ -186,6 +198,13 @@
                  .success(function(data, status, headers, config){
                     $scope.daemons = data;
             });
+
+            $http.get('/node/folders')
+                 .success(function(data, status, headers, config){
+                    $scope.folders = data;
+                    $scope.selected['folders'] = data;
+            });
+        
         };
         
 }

@@ -7,6 +7,7 @@ import  traceback
 import subprocess
 import json
 from ethoscope_node.utils.backups_helpers import GenericBackupWrapper
+from ethoscope_node.utils.configuration import EthoscopeConfiguration
 
 class WGetERROR(Exception):
     pass
@@ -91,21 +92,26 @@ def backup_job(args):
 
 
 if __name__ == '__main__':
-    logging.getLogger().setLevel(logging.INFO)
     
+    CFG = EthoscopeConfiguration()
+
+    logging.getLogger().setLevel(logging.INFO)
     try:
         parser = optparse.OptionParser()
         parser = optparse.OptionParser()
         parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
-        parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_videos", help="Where video files are stored")
+        parser.add_option("-e", "--results-dir", dest="video_dir", help="Where video files are stored")
         parser.add_option("-s", "--safe", dest="safe", default=False,help="Set Safe mode ON", action="store_true")
 
         (options, args) = parser.parse_args()
         option_dict = vars(options)
+        VIDEO_DIR = option_dict["video_dir"] or CFG.content['folders']['video']['path']
+        SAFE_MODE = option_dict["safe"]
+
 
         gbw = GenericBackupWrapper( backup_job,
-                                    option_dict["results_dir"],
-                                    option_dict["safe"] )
+                                    VIDEO_DIR,
+                                    SAFE_MODE )
         gbw.run()
         
     except Exception as e:

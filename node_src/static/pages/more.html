@@ -268,14 +268,28 @@
             </li>
         </ul>
         <ul class="list-group col-xs-12">
+        <h3>Folders</h3>
+            <form>
+            <li class="list-group-item" ng-repeat="(name, entry) in folders">
+<!--                <input type="file" onchange="angular.element(this).scope().nodeManagement.updateFolder(event)" name="{{name}}" id="{{name}}-btn" style="display: visible;" webkitdirectory mozdirectory msdirectory odirectory directory multiple >   -->
+                <label style="display: inline;" title={{entry.description}}>{{name}}</label><input type="text" ng-model="folders[name].path" class="w3-input" style="display: inline-block; position: relative; float: right; width: 260px; bg-color: gray;" size="40" title={{entry.description}}> <!--<button style="display: inline-block; position: relative; float: right;" ng-click="nodeManagement.browseFolder(name);"><i class="fa fa-folder-open-o" ></i></button>-->
+                <p>{{entry.description}}</p>
+            </li>
+            <br>
+            <input class="btn btn-success btn-xl" type=submit value="Save" ng-click="nodeManagement.saveFolders()">
+            </form>
+        </ul>
+        <ul class="list-group col-xs-12">
         <h3>Users</h3>
             <li class="list-group-item" ng-repeat="(key, entry) in users">
             </li>
+            <p>Not yet implemented</p>
         </ul>
         <ul class="list-group col-xs-12">
         <h3>Incubators</h3>
             <li class="list-group-item" ng-repeat="(key, entry) in incubators">
             </li>
+            <p>Not yet implemented</p>
         </ul>
 
     </div>

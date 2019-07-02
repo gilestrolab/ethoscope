@@ -3,7 +3,6 @@ import subprocess
 import socket
 import logging
 import traceback
-from ethoscope_node.utils.device_scanner import DeviceScanner
 import os
 import optparse
 import zipfile
@@ -13,6 +12,10 @@ import tempfile
 import shutil
 import netifaces
 import json
+
+from ethoscope_node.utils.device_scanner import DeviceScanner
+from ethoscope_node.utils.configuration import EthoscopeConfiguration
+
 
 app = bottle.Bottle()
 STATIC_DIR = "../static"
@@ -43,7 +46,7 @@ def server_static(filepath):
 
 @app.route('/tmp_static/<filepath:path>')
 def server_tmp_static(filepath):
-    return bottle.bottle.static_file(filepath, root=tmp_imgs_dir)
+    return bottle.static_file(filepath, root=tmp_imgs_dir)
 
 @app.route('/download/<filepath:path>')
 def server_download(filepath):
@@ -331,18 +334,13 @@ def node_info(req):#, device):
         
             with os.popen("systemctl is-active %s" % daemon_name) as df:
                 BACKUP_DAEMONS[daemon_name]['active'] = df.read().strip()
-            
-#            #cmdline = "systemctl show --no-page %s | jq --slurp --raw-input 'split(\"\n\") | map(select(. != \"\") | split(\"=\") | {\"key\": .[0], \"value\": (.[1:] | join(\"=\"))}) | from_entries'"
-#            cmdline = "systemctl status %s --output=json --plain"
-#            
-#            with os.popen(cmdline % daemon_name) as df:
-#                a = df.read()
-#            json_component = a[a.find("{"):]
-#            BACKUP_DAEMONS[daemon_name]['exec'] = json.loads(json_component.split("\n")[0])['_CMDLINE']
-            
-        
         return BACKUP_DAEMONS
-        
+
+    elif req == 'folders':
+        CFG.load()
+        folders = CFG.content['folders']
+        return folders
+
     else:
         raise NotImplementedError()
 
@@ -358,6 +356,15 @@ def node_actions():
     
     elif action['action'] == 'close':
         close()
+    
+    elif action['action'] == 'updatefolders':
+        for folder in action['folders'].keys():
+            if os.path.exists(action['folders'][folder]['path']): 
+                CFG.content['folders'][folder]['path'] = action['folders'][folder]['path']
+                CFG.save()
+                
+        return CFG.content['folders']
+        
     
     elif action['action'] == 'toggledaemon':
 
@@ -437,18 +444,21 @@ class CherootServer(bottle.ServerAdapter):
 #############
 
 if __name__ == '__main__':
+
+    CFG = EthoscopeConfiguration()
+
     logging.getLogger().setLevel(logging.INFO)
     parser = optparse.OptionParser()
     parser.add_option("-D", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-p", "--port", dest="port", default=80, help="port")
-    parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_results",help="Where temporary result files are stored")
+    parser.add_option("-e", "--temporary-results-dir", dest="temp_results_dir", help="Where temporary result files are stored")
 
     (options, args) = parser.parse_args()
 
     option_dict = vars(options)
     PORT = option_dict["port"]
     DEBUG = option_dict["debug"]
-    RESULTS_DIR = option_dict["results_dir"]
+    RESULTS_DIR = option_dict["temp_results_dir"] or CFG.content['folders']['temporary']['path']
 
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
     device_scanner = None
