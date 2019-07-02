@@ -318,7 +318,7 @@ def node_info(req):#, device):
         return {'time':datetime.datetime.now().isoformat()}
         
     elif req == 'timestamp':
-        return {'timestamp': time.time()}
+        return {'timestamp': datetime.datetime.now().timestamp() }
     
     elif req == 'log':
         with os.popen("journalctl -u ethoscope_node -rb") as log:
