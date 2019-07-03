@@ -15,7 +15,8 @@ class EthoscopeConfiguration(object):
                       
                       {'results' : {'path' : '/ethoscope_data/results', 'description' : 'Where tracking data will be saved by the backup daemon.'},
                        'video' : {'path' : '/ethoscope_data/videos', 'description' : 'Where video chunks (h264) will be saved by the backup daemon'},
-                       'temporary' : {'path' : '/ethoscope_data/tmp', 'description' : 'A temporary location for downloading data.'} },
+                       'temporary' : {'path' : '/ethoscope_data/results', 'description' : 'A temporary location for downloading data.'} },
+                        #Do we even need a temporary folder - should not just be the same as results anyway?
                         
                   'users' : 
                       
