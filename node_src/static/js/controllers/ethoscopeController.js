@@ -309,8 +309,8 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
             $http.get('/device/'+device_id+'/data')
              .success(function(data){
                 $scope.device= data;
-                $scope.node_datetime = "TODO"
-                $scope.device_datetime = "TODO"
+                $scope.node_datetime = "Node Time"
+                $scope.device_datetime = "Device Time"
                 if("current_timestamp" in data){
                     $scope.device_timestamp = new Date(data.current_timestamp*1000);
                     $scope.device_datetime = $scope.device_timestamp.toUTCString();

@@ -17,7 +17,17 @@
 }
 
 .last_drawn_img{
-    margin-bottom: 1em;
+    margin-top: 2em;
+    margin-bottom: 2em;
+    width: 55%;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.last_drawn_img img{
+    height: 480px;
+    background-image: url("https://thumbs.gfycat.com/FaintSpicyAnnashummingbird-small.gif")
 }
 
 
@@ -94,6 +104,14 @@ label {
    }
 
 
+.control-box {
+      margin: 0 auto;
+      width: 100px;
+      display: inline;
+      text-align: center;
+}
+
+
 /* Dropdown Button */
 /* https://codepen.io/raneio/pen/NbbZEM */
 
@@ -164,6 +182,16 @@ label.dropdown {
   background-color: #4cA84c;
 }
 
+.dd-button#tracking-btn{
+  background-color: #5cb85c;
+  border: 1px solid #4cae4c;
+}
+
+.dd-button#video-btn{
+  background-color: #5cb85c;
+  border: 1px solid #4cae4c;
+}
+
 .dd-button#options-btn{
   background-color: #5FA4E7;
   border: 1px solid #5FA4E7;
@@ -227,3 +255,74 @@ label.dropdown {
   padding: 0;
   border-bottom: 1px solid #cccccc;
 }
+
+/*
+ * Adapted from: https://codepen.io/nazarelen/pen/rLgLrA
+ * 
+ * 
+ */
+ 
+.header ul {
+  margin: 0;
+  width: 100%;
+  list-style: none;
+  position: unset;
+  bottom: 30px;
+  left: 0;
+  padding: 0 1%;
+}
+.header ul:after {
+  content: '';
+  display: table;
+  clear: both;
+}
+.header li {
+  width: 31.3333333333%;
+  margin: 0 1%;
+  float: left;
+  padding: 10px;
+  border: 2px solid #363636;
+  border-radius: 4px;
+  position: relative;
+  text-align: center;
+  color: #4E203C;
+}
+.header li:before {
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  margin-left: -15px;
+  width: 30px;
+  height:30px;
+  background: #363636;
+  color: white;
+  line-height: 30px;
+  text-align: center;
+  border-radius: 50%;
+  font-family: FontAwesome;
+}
+.header li:nth-child(1):before {content: "\f1eb"}
+.header li:nth-child(2):before {content: "\f017"}
+.header li:nth-child(3):before {content: "\f0eb"}
+
+.header h1 {
+  text-transform: uppercase;
+  font-weight: 400;
+  line-height: 1;
+  margin-top: 10px;
+  margin-bottom: 40px;
+  text-align: center;
+  font-size: 40px;
+}
+.header h1 span {
+  color: #4E203C;
+  display: block;
+  font-size: .45em;
+  letter-spacing: 3px;
+}
+.header h1 i {
+  font-style: normal;
+  text-transform: none;
+  font-family: 'Playfair Display', serif;
+}
+
