@@ -139,6 +139,14 @@ label.dropdown {
   color: white;
 }
 
+.dd-button.disabled {
+  opacity: 0.6;
+}
+
+.dd-button.disabled:hover {
+  background-color: none;
+}
+
 .dd-button:after {
   content: '';
   position: absolute;

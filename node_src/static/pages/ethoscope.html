@@ -60,26 +60,36 @@
 
         <div ng-if="device.status != 'not_in_use'">
 
-            <button class="btn btn-success btn-xl" ng-class="{'disabled':!isActive}" ng-if="device.status == 'stopped'"  data-toggle="modal" data-target="#startModal">Start tracking</button>
+            <!-- Dropdown Button for Tracking actions -->
+            <label class="dropdown" ng-if="device.status == 'stopped'" >
+              <div class="dd-button" id="tracking-btn" ng-class="{'disabled':!isActive}" >
+                Track
+              </div>
+              <input type="checkbox" class="dd-input" id="track-drop">
+              <ul class="dd-menu">
+                <li ng-class="{'disabled':!isActive}" data-toggle="{{isActive ? 'modal' : ''}}" data-target="#startModal">Start Tracking</li>
+                <li class="disabled">New Mask</li>
+              </ul>
+            </label>
 
-            <!-- Dropdown button code from https://codepen.io/raneio/pen/NbbZEM -->
-            <label class="dropdown" ng-if="device.status == 'stopped'">
-              <div class="dd-button">
+            <!-- Dropdown Button for Video actions -->
+            <label class="dropdown" ng-if="device.status == 'stopped'" >
+              <div class="dd-button" id="video-btn" ng-class="{'disabled':!isActive}" >
                 Video
               </div>
-              <input type="checkbox" class="dd-input" id="test">
+              <input type="checkbox" class="dd-input" id="video-drop">
               <ul class="dd-menu">
                 <li ng-class="{'disabled':!isActive}" data-toggle="{{isActive ? 'modal' : ''}}" data-target="#recordModal">Record Video</li>
                 <li ng-class="{'disabled':!can_stream || !isActive}" ng-click="!can_stream || !isActive || ethoscope.stream()">Start Streaming</li>
               </ul>
             </label>
 
+            <!-- Stop Buttons / visible only when device is active -->
             <button class="btn btn-danger" ng-if="device.status == 'running' || device.status == 'recording' || device.status == 'streaming'"   data-toggle="modal" data-target="#stopTrackingModal">Stop</button>
-
             <button class="btn btn-info disable" ng-if="device.status == 'stopping'" ng-click="ethoscope.alert('Please wait, system is stopping')">Stopping</button>
             <button class="btn btn-danger disable" ng-if="device.status == 'initialising'"  ng-click="ethoscope.alert('Please wait, system is starting')">Starting</button>
 
-        <!--<a href="/#/more/browse" class="btn btn-info">Download Data</a>-->
+            <!-- Dropdown Button for Options -->
             <label class="dropdown" ng-if="device.status == 'stopped'">
               <div class="dd-button" id="options-btn">
                 Options
@@ -91,6 +101,7 @@
               </ul>
             </label>
 
+            <!-- Dropdown Button for Power actions -->
             <label class="dropdown" ng-if="device.status == 'stopped'">
               <div class="dd-button" id="power-btn">
                 Power
