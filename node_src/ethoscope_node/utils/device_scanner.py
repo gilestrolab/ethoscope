@@ -44,9 +44,10 @@ class DeviceScanner(object):
     #avahi requires local but some routers may have .lan or .home
     #TODO: check if this is going to be a problem
     _suffix = ".local" 
+    _service_type = "_ethoscope._tcp.local." 
     
     def __init__(self, device_refresh_period = 5, results_dir="/ethoscope_results"):
-        self.zeroconf = Zeroconf()
+        self._zeroconf = Zeroconf()
         self.devices = []
         self.device_refresh_period = device_refresh_period
         self.results_dir = results_dir
@@ -54,10 +55,10 @@ class DeviceScanner(object):
         
     def start(self):
         # Use self as the listener class because I have add_service and remove_service methods
-        self.browser = ServiceBrowser(self.zeroconf, "_ethoscope._tcp" + self._suffix + ".", self)
+        self.browser = ServiceBrowser(self._zeroconf, self._service_type, self)
         
     def stop(self):
-        self.zeroconf.close()
+        self._zeroconf.close()
 
     def _get_last_backup_time(self, device):
         try:
@@ -90,7 +91,13 @@ class DeviceScanner(object):
         """
         Method required to be a Zeroconf listener. Called by Zeroconf when a "_ethoscope._tcp" service
         is registered on the network. Don't call directly.
+        
+        sample values:
+        type = '_ethoscope._tcp.local.'
+        name = 'ETHOSCOPE000._ethoscope._tcp.local.'
         """
+
+        
         try:
             info = zeroconf.get_service_info(type, name)
             # Note that I don't trust the address given in the info. When registering, the
@@ -100,16 +107,14 @@ class DeviceScanner(object):
             # Query the IP address just using the services hostname and zeroconf.
 
             if info:
-                #ip=socket.gethostbyname(info.get_name() + self._suffix)
-                ip=socket.gethostbyname(info.get_name())
-            else:
-                ip=socket.gethostbyname(name.split(".")[0] + self._suffix)
+                ip = socket.inet_ntoa(info.address)
+                #ip = socket.inet_ntoa(info.addresses[0])
                 
-            device = Device(ip, self.device_refresh_period, results_dir=self.results_dir)
-            device.zeroconf_name = name
-            device.start()
-            logging.info("New device detected with id = %s at IP = %s" % (device.id(), ip))
-            self.devices.append(device)
+                device = Device(ip, self.device_refresh_period, results_dir=self.results_dir)
+                device.zeroconf_name = name
+                device.start()
+                logging.info("New device detected with id = %s at IP = %s" % (device.id(), ip))
+                self.devices.append(device)
         
         except Exception as error:
             logging.error("Exception trying to add zeroconf service '"+name+"' of type '"+type+"': "+str(error))
