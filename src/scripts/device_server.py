@@ -127,9 +127,13 @@ def update_machine_info(id):
     data = bottle.request.json
     update_machine_json_data.update(data['machine_options']['arguments'])
     
-    set_etc_hostname(update_machine_json_data['node_ip'])
-    set_machine_name(update_machine_json_data['etho_number'])
-    set_machine_id(update_machine_json_data['etho_number'])
+    if update_machine_json_data['node_ip'] != get_machine_info(id)['etc_node_ip']
+        set_etc_hostname(update_machine_json_data['node_ip'])
+    
+    if int(update_machine_json_data['etho_number']) != int(get_machine_info(id)['machine-number']):
+        set_machine_name(update_machine_json_data['etho_number'])
+        set_machine_id(update_machine_json_data['etho_number'])
+    
     set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'])
 
     return get_machine_info(id)
