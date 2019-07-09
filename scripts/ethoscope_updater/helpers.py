@@ -273,7 +273,7 @@ def updates_api_wrapper(ip, id, what="check_update", type=None, port=8888, data=
     # if type is not None:
     #     request_url = request_url + "/" + type
     if data is not None:
-        data= json.dumps(data)
+        data = json.dumps(data).encode('utf-8')
 
     req = urllib.request.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
 

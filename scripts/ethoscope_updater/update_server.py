@@ -46,8 +46,8 @@ def device(action, id):
     :param action: what to do
     :return:
     """
-    # if id != device_id:
-        # raise WrongMachineID("Not the same ID")
+    if id != device_id:
+        raise WrongMachineID("Not the same ID")
     
     try:
         if action == 'check_update':
@@ -183,8 +183,7 @@ def group(what):
         elif what == "swBranch":
             for device in data["devices"]:
                 data_one_dev = {'new_branch': device['new_branch']}
-                response = updates_api_wrapper(device['ip'], device['id'], what='device/change_branch',
-                                               data=data_one_dev)
+                response = updates_api_wrapper(device['ip'], device['id'], what='device/change_branch', data=data_one_dev)
                 responses.append(response)
             for device in data["devices"]:
                 response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
@@ -273,7 +272,7 @@ if __name__ == '__main__':
     if bare_repo is not None:
         bare_repo_updater = updater.BareRepoUpdater(bare_repo)
         is_node = True
-        device_id = "Node"
+        device_id = "node"
 
     else:
         bare_repo_updater = None
