@@ -4,12 +4,15 @@ __author__ = 'quentin'
 import os
 import logging
 import datetime
-import urllib.request, urllib.error, urllib.parse
 import json
 import traceback
 import random
 import subprocess
 import time
+
+import urllib.request, urllib.error, urllib.parse
+import http.client
+
 
 class WrongMachineID(Exception):
     pass
@@ -103,7 +106,7 @@ def scan_one_device(ip, timeout=2, port=8888, page="id"):
     return None, ip
 
 
-def update_dev_map_wrapped (devices_map, id, what="data", type=None, port=9000, data=None, result_main_dir="/ethoscope_results"):
+def update_dev_map_wrapped (devices_map, id, what="data", type=None, port=9000, data=None, result_main_dir="/ethoscope_data/results"):
     """
     Just a routine to format our GET urls. This improves readability whilst allowing us to change convention (e.g. port) without rewriting everything.
 
@@ -143,7 +146,7 @@ def update_dev_map_wrapped (devices_map, id, what="data", type=None, port=9000, 
                 logging.error("Device %s is not detected" % id)
                 raise KeyError("Device %s is not detected" % id)
 
-    except urllib2.httplib.BadStatusLine as e:
+    except http.client.BadStatusLine as e:
         logging.error('BadlineSatus, most probably due to update device and auto-reset')
         raise e
 
@@ -172,7 +175,7 @@ def receive_device_IPs():
         js = json.load(f)
         devices = ["http://" + js[key]['ip'] for key in js.keys()]
     except:
-        logging.error("The node server is not running or cannot be reached.")
+        logging.error("The node ethoscope server is not running or cannot be reached. A list of available ethoscopes could not be found.")
         logging.error(traceback.format_exc())
         
     return devices
@@ -180,8 +183,7 @@ def receive_device_IPs():
 def generate_new_device_map():
     '''
     Generate the device map as JSON dictionary
-    Interrogates only IPs passed on by the NODE, thus piggybacking on the node
-    knowledge of the subnet
+    Interrogates only IPs passed on by the NODE, thus piggybacking on the node's knowledge of the subnet
     '''
     devices_map = {}
     urls = receive_device_IPs()
@@ -261,9 +263,12 @@ def generate_new_device_map():
     return devices_map
 
 
-def updates_api_wrapper(ip,id, what="check_update",type=None, port=8888, data=None):
+def updates_api_wrapper(ip, id, what="check_update", type=None, port=8888, data=None):
     response = ''
-    request_url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
+    
+    hn = urllib.parse.urlparse(ip).hostname
+    
+    request_url = "http://{ip}:{port}/{what}/{id}".format(ip=hn, port=port, what=what, id=id)
 
     # if type is not None:
     #     request_url = request_url + "/" + type
@@ -281,7 +286,7 @@ def updates_api_wrapper(ip,id, what="check_update",type=None, port=8888, data=No
         if message:
             response = json.loads(message)
 
-    except urllib2.httplib.BadStatusLine as e:
+    except http.client.BadStatusLine as e:
         logging.error('BadlineSatus, most probably due to update device and auto-reset')
         raise e
 

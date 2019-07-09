@@ -7,8 +7,8 @@ import socket
 
 from optparse import OptionParser
 from helpers import get_machine_id, assert_node, WrongMachineID
+from helpers import get_commit_version, generate_new_device_map, updates_api_wrapper, reload_node_daemon, reload_device_daemon
 
-from helpers import get_commit_version, generate_new_device_map, updates_api_wrapper
 
 app = bottle.Bottle()
 STATIC_DIR = "./static"

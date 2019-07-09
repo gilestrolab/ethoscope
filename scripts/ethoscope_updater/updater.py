@@ -10,8 +10,7 @@ import traceback
 
 class DeviceUpdater(object):
 
-    def __init__(self,
-                 git_working_dir):
+    def __init__(self, git_working_dir):
         self._git_working_dir = git_working_dir
         self._working_repo = Repo(git_working_dir)
         self._origin = self._working_repo.remotes.origin
