@@ -46,7 +46,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
         $http.get('/device/'+device_id+'/data').success(function(data){
             $scope.device = data;
-            $scope.isActive = ( $scope.device['name'].split("_").pop() != "0000" );
+            $scope.isActive = ( $scope.device['name'].split("_").pop() != "000" );
         });
 
         $http.get('/device/'+device_id+'/user_options').success(function(data){
