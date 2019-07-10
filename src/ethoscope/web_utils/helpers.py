@@ -108,7 +108,7 @@ def set_machine_id(id, path="/etc/machine-id"):
     except:
         raise
 
-def get_WIFI(path="/etc/netctl/wlan0"):
+def get_WIFI(path="/etc/netctl/wlan"):
     """
     """
     if os.path.exists(path):
@@ -125,18 +125,18 @@ def get_WIFI(path="/etc/netctl/wlan0"):
         return {'error' : 'No WIFI Settings were found in path %s' % path}
     
 
-def set_WIFI(ssid="ETHOSCOPE_WIFI", wpakey="ETHOSCOPE_1234", path="/etc/netctl/wlan0"):
+def set_WIFI(ssid="ETHOSCOPE_WIFI", wpakey="ETHOSCOPE_1234", path="/etc/netctl/wlan"):
     """
     """
 
     wlan_settings = '''Description=ethoscope_wifi network
-    Interface=wlan0
-    Connection=wireless
-    Security=wpa
-    IP=dhcp
-    TimeoutDHCP=60
-    ESSID=%s
-    Key=%s
+Interface=wlan0
+Connection=wireless
+Security=wpa
+IP=dhcp
+TimeoutDHCP=60
+ESSID=%s
+Key=%s
     ''' % (ssid, wpakey)
             
     try:
