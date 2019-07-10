@@ -20,6 +20,21 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
     
         device_id = $routeParams.device_id;
 //        var device_ip;
+
+        $scope.node = {'users' : {},
+                       'incubators' : {}
+                      }
+                      
+        $http.get('/node/users')
+             .success(function(data, status, headers, config){
+                $scope.node['users'] = data;
+        });
+
+        $http.get('/node/incubators')
+             .success(function(data, status, headers, config){
+                $scope.node['incubators'] = data;
+        });
+
         $scope.device = {}; //the info about the device
         $scope.ethoscope = {}; // to control the device
         $scope.showLog = false;
@@ -31,7 +46,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
         $http.get('/device/'+device_id+'/data').success(function(data){
             $scope.device = data;
-            $scope.isActive = ( $scope.device['name'].split("_").pop() != "000" );
+            $scope.isActive = ( $scope.device['name'].split("_").pop() != "0000" );
         });
 
         $http.get('/device/'+device_id+'/user_options').success(function(data){
