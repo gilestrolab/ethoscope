@@ -15,6 +15,7 @@ import json
 
 from ethoscope_node.utils.device_scanner import DeviceScanner
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
+from ethoscope_node.utils.backups_helpers import GenericBackupWrapper, BackupClass
 
 
 app = bottle.Bottle()
@@ -190,6 +191,25 @@ def get_device_stream(id):
     device = device_scanner.get_device(id)
     bottle.response.set_header('Content-type', 'multipart/x-mixed-replace; boundary=frame')
     return device.relay_stream()
+
+@app.post('/device/<id>/backup')
+@error_decorator
+def force_device_backup(id):
+    '''
+    Forces backup on device with specified id
+    '''
+    results_dir = CFG.content['folders']['results']['path']
+    device_info = get_device_info(id)
+    
+    try:
+        logging.info("Initiating backup for device  %s" % device_info["id"])
+        backup_job = BackupClass(device_info, results_dir=results_dir)
+        logging.info("Running backup for device  %s" % device_info["id"])
+        backup_job.run()
+        logging.info("Backup done for for device  %s" % device_info["id"])
+    except Exception as e:
+        logging.error("Unexpected error in backup. args are: %s" % str(args))
+        logging.error(traceback.format_exc())
 
 
 def cache_img(file_like, basename):

@@ -87,6 +87,7 @@
               <ul class="dd-menu">
                 <li ng-click="ethoscope.log()">Logs</li>
                 <li data-toggle="modal" data-target="#changeInfo">Settings</li>
+                <li ng-click="ethoscope.backup()">Backup</li>
               </ul>
             </label>
 
@@ -209,8 +210,8 @@
                             
                             <select ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" > <option value="">Available Movies</option><option ng-repeat="entry in videofiles" value="{{entry.fullpath}}">{{entry.filename | limitTo: 40}}{{entry.filename.length < 40 ? '' : '...'}}</option> </select>
                             <input  ng-if="arg.type == 'number'"   id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]" >
-                            <input  ng-if="arg.type == 'str'"      id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  >
-                            <select ng-if="arg.type == 'array'"    id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]"> <option ng-repeat="entry in arg.default" value="{{entry}}">{{entry}}</option> </select>
+                            <input  ng-if="(arg.type == 'str' && arg.asknode == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  >
+                            <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]"> <option ng-repeat="entry in node[arg.asknode]" value="{{entry.name}}">{{entry.name}}</option> </select>
 
                             <div ng-if="arg.type == 'date_range'" class="input-group">
                                 <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-drp" type=hidden readonly ng-model="selected_options.tracking[name]['arguments'][arg.name]" options="{timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss', separator : ' > ' }}" > 
@@ -320,8 +321,8 @@
                             
                             <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=file name={{arg.name}}  ng-model="selected_options.recording[name]['arguments'][arg.name]"  >
                             <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.recording[name]['arguments'][arg.name]" >
-                            <input ng-if="arg.type == 'str'" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.recording[name]['arguments'][arg.name]"  >
-                            <select ng-if="arg.type == 'array'"    id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]"> <option ng-repeat="entry in arg.default" value="{{entry}}">{{entry}}</option> </select>
+                            <input  ng-if="(arg.type == 'str' && arg.asknode == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.recording[name]['arguments'][arg.name]"  >
+                            <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]"> <option ng-repeat="entry in node[arg.asknode]" value="{{entry.name}}">{{entry.name}}</option> </select>
 
                             <div ng-if="arg.type == 'date_range'" class="input-group">
                                 <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]" options="{timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss', separator : ' > ' }}" > 

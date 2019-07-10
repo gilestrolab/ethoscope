@@ -158,6 +158,13 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
             }
         }
 
+        $scope.ethoscope.backup = function(){
+                $http.post('/device/'+device_id+'/backup', data={}).success(function(data) {
+                        $scope.device = data;
+                })
+
+        }
+
         $scope.ethoscope.stream = function(option){
             if ($scope.can_stream) {
                 console.log("getting real time stream")
