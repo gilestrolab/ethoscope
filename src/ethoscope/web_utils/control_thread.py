@@ -27,16 +27,12 @@ from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
 from ethoscope.utils.description import DescribedObject
 from ethoscope.web_utils.helpers import isMachinePI, hasPiCamera, isExperimental
 
-from ethoscope_node.utils.configuration import EthoscopeConfiguration
-
 class ExperimentalInformations(DescribedObject):
-    
-        CFG = EthoscopeConfiguration()
     
         _description  = {   "overview": "Optional information about your experiment",
                             "arguments": [
-                                    {"type": "array", "name": "name", "description": "Who are you?", "default" : CFG.listSubSection('users')},
-                                    {"type": "array", "name": "location", "description": "Where is your device","default" : CFG.listSubSection('incubators')},
+                                    {"type": "str", "name": "name", "description": "Who are you?", "default" : "", 'asknode' : 'users'},
+                                    {"type": "str", "name": "location", "description": "Where is your device","default" : "", 'asksnode' : 'incubators'},
                                     {"type": "str", "name": "code", "description": "Would you like to add any particular information in the video file name?", "default" : ""}
 
                                    ]}
