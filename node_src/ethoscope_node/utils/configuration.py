@@ -1,8 +1,8 @@
 import os, json, datetime
 import logging
 
-users_keys = ['name', 'fullname', 'PIN', 'email', 'active', 'isAdmin', 'created']
-incubators_keys = ['name', 'location', 'owner', 'description']
+users_keys = ['name', 'fullname', 'PIN', 'email', 'telephone',  'group', 'active', 'isAdmin', 'created']
+incubators_keys = ['id', 'name', 'location', 'owner', 'description']
 
 
 class EthoscopeConfiguration(object):
@@ -11,21 +11,19 @@ class EthoscopeConfiguration(object):
     Data are stored in and retrieved from a JSON configuration file
     '''
     _settings = { 
-                  'folders' : 
-                      
-                      {'results' : {'path' : '/ethoscope_data/results', 'description' : 'Where tracking data will be saved by the backup daemon.'},
-                       'video' : {'path' : '/ethoscope_data/videos', 'description' : 'Where video chunks (h264) will be saved by the backup daemon'},
-                       'temporary' : {'path' : '/ethoscope_data/results', 'description' : 'A temporary location for downloading data.'} },
-                        #Do we even need a temporary folder - should not just be the same as results anyway?
+                  'folders' : {
+                                    'results' : {'path' : '/ethoscope_data/results', 'description' : 'Where tracking data will be saved by the backup daemon.'},
+                                    'video' : {'path' : '/ethoscope_data/videos', 'description' : 'Where video chunks (h264) will be saved by the backup daemon'},
+                                    'temporary' : {'path' : '/ethoscope_data/results', 'description' : 'A temporary location for downloading data.'} 
+                        },
                         
-                  'users' : 
-                      
-                      {'id' : 1, 'name' : 'admin', 'fullname' : '', 'PIN' : '0000', 'email' : '', 'active' : False, 'isAdmin' : True, 'created' : datetime.datetime.now().timestamp() },
-                  
-                  'incubators': 
-                      
-                      {'name' : '1', 'location' : '', 'owner' : '', 'description' : ''}
-                }
+                  'users' :   {
+                                    'admin' : {'id' : 1, 'name' : 'admin', 'fullname' : '', 'PIN' : 9999, 'email' : '', 'telephone' : '', 'group': '', 'active' : False, 'isAdmin' : True, 'created' : datetime.datetime.now().timestamp() }
+                        },
+                        
+                  'incubators': {
+                                    'incubator 1' : {'id' : 1, 'name' : 'Incubator 1', 'location' : '', 'owner' : '', 'description' : ''}
+                        } }
 
     def __init__(self, config_file = "/etc/ethoscope.conf"):
         self._config_file = config_file
@@ -39,10 +37,36 @@ class EthoscopeConfiguration(object):
             
     def listSections(self):
         return [k for k in self._settings.keys()]
+
+    def listSubSection(self, section):
+        return [k for k in self._settings[section].keys()]
+
     
     def addKey(self, section, obj):
         self._settings[section] = obj
-        
+    
+    def addUser(self, userdata):
+        name = userdata['name']
+        try:
+            self._settings['users'][name] = userdata
+            self._settings['users'][name]['created'] = datetime.datetime.now().timestamp()
+            self.save()
+            return {'result' : 'success', 'data' : self._settings['users'] }
+        except:   
+            raise Exception ("Some issue assigning the values")
+            return {'result' : 'success', 'data' : "Some issue assigning the values" }
+
+
+    def addIncubator(self, incubatordata):
+        name = incubatordata['name']
+        try:
+            self._settings['incubators'][name] = incubatordata
+            self.save()
+            return {'result' : 'success', 'data' : self._settings['incubators'] }
+        except:   
+            raise Exception ("Some issue assigning the values")
+            return {'result' : 'success', 'data' : "Some issue assigning the values" }
+    
     @property
     def content(self):
         return self._settings

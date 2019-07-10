@@ -21,10 +21,12 @@ app = bottle.Bottle()
 STATIC_DIR = "../static"
 
 #names of the backup services
-BACKUP_DAEMONS = {"ethoscope_node": {'description' : 'The main Ethoscope node server interface. It is used to control the ethoscopes.'}, 
+SYSTEM_DAEMONS = {"ethoscope_node": {'description' : 'The main Ethoscope node server interface. It is used to control the ethoscopes.'}, 
                   "ethoscope_backup" : {'description' : 'The service that collects data from the ethoscopes and syncs them with the node.'}, 
                   "ethoscope_video_backup" : {'description' : 'The service that collects VIDEOs from the ethoscopes and syncs them with the node'}, 
-                  "ethoscope_update_node" : {'description' : 'The service used to update the nodes and the ethoscopes.'}
+                  "ethoscope_update_node" : {'description' : 'The service used to update the nodes and the ethoscopes.'},
+                  "git-daemon" : {'description' : 'The GIT server that handles git updates for the node and ethoscopes.'},
+                  "ntpd" : {'description': 'The NTPd service is syncing time with the ethoscopes.'}
                   }
 
 
@@ -292,6 +294,8 @@ def node_info(req):#, device):
         GIT_BRANCH = "Not detected"
         NEEDS_UPDATE = False
 
+        CFG.load()
+
         try:
             disk_usage = disk_free.split("\n")[1].split()
 
@@ -330,16 +334,20 @@ def node_info(req):#, device):
     
     elif req == 'daemons':
         #returns active or inactive
-        for daemon_name in BACKUP_DAEMONS.keys():
+        for daemon_name in SYSTEM_DAEMONS.keys():
         
             with os.popen("systemctl is-active %s" % daemon_name) as df:
-                BACKUP_DAEMONS[daemon_name]['active'] = df.read().strip()
-        return BACKUP_DAEMONS
+                SYSTEM_DAEMONS[daemon_name]['active'] = df.read().strip()
+        return SYSTEM_DAEMONS
 
     elif req == 'folders':
-        CFG.load()
-        folders = CFG.content['folders']
-        return folders
+        return CFG.content['folders']
+
+    elif req == 'users':
+        return CFG.content['users']
+
+    elif req == 'incubators':
+        return CFG.content['incubators']
 
     else:
         raise NotImplementedError()
@@ -356,6 +364,13 @@ def node_actions():
     
     elif action['action'] == 'close':
         close()
+    
+    elif action['action'] == 'adduser':
+        return CFG.addUser(action['userdata'])
+
+
+    elif action['action'] == 'addincubator':
+        return CFG.addIncubator(action['incubatordata'])
     
     elif action['action'] == 'updatefolders':
         for folder in action['folders'].keys():

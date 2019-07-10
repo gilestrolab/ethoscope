@@ -1,11 +1,21 @@
+function maxLengthCheck(object) {
+    if (object.value.length > object.maxLength)
+        object.value = object.value.slice(0, object.maxLength)
+}
+
 (function(){
     var moreController = function($scope, $http, $timeout, $routeParams, $window){
 
+        $scope.folders = {};
+        $scope.users = {};
+        $scope.incubators = {};
+        
+        $scope.phoneNumbr = /^\+((?:9[679]|8[035789]|6[789]|5[90]|42|3[578]|2[1-689])|9[0-58]|8[1246]|6[0-6]|5[1-8]|4[013-9]|3[0-469]|2[70]|7|1)(?:\W*\d){0,13}\d$/;
+
         $scope.selected = { 'files': [],
-                            'folders' : {} 
+                            'folders' : {},
+                            'user' : {}
                           };
-                          
-        $scope.selected.folders = {};
                           
         $scope.selected_all = false;
         $scope.showOptions = true;
@@ -147,6 +157,7 @@
 
 /// Node Management update
         $scope.nodeManagement = {};
+        
         var get_node_info = function(){
             $http.get('/node/info').success(function(res){
                 $scope.nodeManagement.info = res;
@@ -154,8 +165,9 @@
         }
         $scope.nodeManagement.time = new Date();
         $scope.nodeManagement.time = $scope.nodeManagement.time.toString();
+        
         $scope.nodeManagement.action = function(action){
-               $http.post('/node-actions', data = {'action':action})
+               $http.post('/node-actions', data = {'action': action})
                .success(function(res){
                 $scope.nodeManagement[action]=res;
                });
@@ -180,6 +192,38 @@
         };
 
 
+        $scope.nodeManagement.adduser = function(){
+            var spinner = new Spinner(opts).spin();
+            $http.post('/node-actions', data = {'action': 'adduser', 'userdata' : $scope.selected['user']} )
+                .success(function(data){
+                    if ( data['result'] == 'success' ) { $scope.users = data['data'] };
+            });
+            spinner.stop();
+        };
+
+        $scope.nodeManagement.createUsername = function(){
+            if($scope.selected['user'].fullname != '') {
+                 var username = $scope.selected['user'].fullname.split(' ')[0].substr(0,1) + $scope.selected['user'].fullname.split(' ')[1].substr(0,49);
+                 username = username.replace(/\s+/g, '');
+                 username = username.replace(/\'+/g, '');
+                 username = username.replace(/-+/g, '');
+                 username = username.toLowerCase();
+                 $scope.selected['user'].name = username;}
+        };
+
+        $scope.nodeManagement.loadUserData = function () {
+            $scope.selected['user'] = $scope.users[$scope.selected['user'].name];
+        };
+
+
+        $scope.nodeManagement.addincubator = function(){
+            var spinner = new Spinner(opts).spin();
+            $http.post('/node-actions', data = {'action': 'addincubator', 'incubatordata' : $scope.selected['incubator']} )
+                .success(function(data){
+                    if ( data['result'] == 'success' ) { $scope.incubators = data['data'] };
+            });
+            spinner.stop();
+        };
 
 ///  View Server Logs
         var viewLog = function(){
@@ -203,6 +247,16 @@
                  .success(function(data, status, headers, config){
                     $scope.folders = data;
                     $scope.selected['folders'] = data;
+            });
+
+            $http.get('/node/users')
+                 .success(function(data, status, headers, config){
+                    $scope.users = data;
+            });
+
+            $http.get('/node/incubators')
+                 .success(function(data, status, headers, config){
+                    $scope.incubators = data;
             });
         
         };

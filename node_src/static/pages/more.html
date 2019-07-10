@@ -236,7 +236,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="myModalLabel">Modal title</h4>
+        <h4 class="modal-title" id="myModalLabel">Power off the node</h4>
       </div>
       <div class="modal-body">
        <p>Do you want to power off the Node?</p>
@@ -270,7 +270,7 @@
         <ul class="list-group col-xs-12">
         <h3>Folders</h3>
             <form>
-            <li class="list-group-item" ng-repeat="(name, entry) in folders">
+            <li class="list-group-item input" ng-repeat="(name, entry) in folders">
 <!--                <input type="file" onchange="angular.element(this).scope().nodeManagement.updateFolder(event)" name="{{name}}" id="{{name}}-btn" style="display: visible;" webkitdirectory mozdirectory msdirectory odirectory directory multiple >   -->
                 <label style="display: inline;" title={{entry.description}}>{{name}}</label><input type="text" ng-model="folders[name].path" class="w3-input" style="display: inline-block; position: relative; float: right; width: 260px; bg-color: gray;" size="40" title={{entry.description}}> <!--<button style="display: inline-block; position: relative; float: right;" ng-click="nodeManagement.browseFolder(name);"><i class="fa fa-folder-open-o" ></i></button>-->
                 <p>{{entry.description}}</p>
@@ -280,22 +280,91 @@
             </form>
         </ul>
         <ul class="list-group col-xs-12">
-        <h3>Users</h3>
-            <li class="list-group-item" ng-repeat="(key, entry) in users">
-            </li>
-            <p>Not yet implemented</p>
+            <h3>Users</h3>
+            <div class="input">
+                <select ng-model="selected['user'].name" ng-change="nodeManagement.loadUserData()">
+                  <option ng-repeat="(key, entry) in users" value="{{key}}" >{{key}}</option>
+                </select>
+                    <button class="btn btn-info" data-toggle="modal" data-target="#addUserModal"><i class="fa fa-lg fa-edit"></i></button>
+                    <button class="btn btn-info" data-toggle="modal" data-target="#addUserModal" ng-click="selected['user'] = {}; "><i class="fa fa-lg fa-plus"></i></button>
+            </div>
         </ul>
         <ul class="list-group col-xs-12">
-        <h3>Incubators</h3>
-            <li class="list-group-item" ng-repeat="(key, entry) in incubators">
-            </li>
-            <p>Not yet implemented</p>
+            <h3>Incubators</h3>
+            <div class="input">
+                <select ng-model="selected['incubator'].name" ng-change="nodeManagement.loadIncubatorData()">
+                  <option ng-repeat="(key, entry) in incubators" value="{{key}}" >{{key}}</option>
+                </select>
+                    <button class="btn btn-info" data-toggle="modal" data-target="#addIncubatorModal"><i class="fa fa-lg fa-edit"></i></button>
+                    <button class="btn btn-info" data-toggle="modal" data-target="#addIncubatorModal" ng-click="selected['incubator'] = {}; "><i class="fa fa-lg fa-plus"></i></button>
+            </div>
+
         </ul>
 
     </div>
 
 </div>
 
+
+<!-- Modal ADD or EDIT User -->
+<div class="modal fade" id="addUserModal" tabindex="-1" role="dialog" aria-labelledby="addUserLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">User Editor</h4>
+      </div>
+      <div class="modal-body">
+        <form name="adduserForm">
+            <div class="form-group" hidden>
+                <label class="input"><span>ID</span><input type="number" min="1" name='id' readonly="readonly" ng-model="selected['user'].id" style="display:inline"></label>
+                <label class="input"><span>name</span><input type="text" name='name' readonly="readonly" ng-model="selected['user'].name" style="display:inline" required ng-required="true" ></label>
+            </div>
+            <label class="input"><span ng-hide="selected['user'].fullname != null">Full Name</span><input type="text" name="fullname" ng-model="selected['user'].fullname" ng-blur="nodeManagement.createUsername()" required ng-required="true" style="width: 240px;" title="Firstname Lastname"></label>
+            <label class="input"><span ng-hide="selected['user'].PIN != null">PIN</span><input type="number" name="PIN" ng-model="selected['user'].PIN" maxlength="4" required oninput="maxLengthCheck(this)" required ng-required="true"  title="A four digits number"></label>
+            <label class="input"><span ng-hide="selected['user'].email != null">Email address</span><input type="email" name="email" ng-model="selected['user'].email" required ng-required="true" required ng-required="true" style="width: 240px;"  title="A working email for notifications"></label>
+            <label class="input"><span ng-hide="selected['user'].telephone != null">Telephone number</span><input type="tel" name="telephone" ng-model="selected['user'].telephone" ng-pattern="phoneNumbr" style="width: 240px;" title="Phone number with internationl prefix"></label>
+            <label class="input"><span ng-hide="selected['user'].group != null">Laboratory or team</span><input type="text" name="group" ng-model="selected['user'].group" style="width: 240px;"  title="The name of the lab, team, research group"></label>
+            <label><input type="checkbox" name='active' ng-model="selected['user'].active" title="Can this user use ethoscopes?"><span> is Active?</span></label>
+            <label><input type="checkbox" name='isAdmin' ng-model="selected['user'].isAdmin" title="Does this user have admin priviledges?"><span> is Admin?</span></label>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button class="btn btn-danger" ng-click="nodeManagement.adduser()"  data-dismiss="modal" ng-disabled="adduserForm.$invalid">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Modal ADD or EDIT Incubator -->
+<div class="modal fade" id="addIncubatorModal" tabindex="-1" role="dialog" aria-labelledby="addIncubatorLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Incubator Editor</h4>
+      </div>
+      <div class="modal-body">
+        <form name="addIncubatorForm">
+            <div class="form-group" hidden>
+                <label class="input"><span>ID</span><input type="number" min="1" name='id' readonly="readonly" ng-model="selected['incubator'].id" style="display:inline"></label>
+            </div>
+            <label class="input"><span ng-hide="selected['incubator'].name != null">Incubator Name</span><input type="text" name="name" ng-model="selected['incubator'].name" required ng-required="true" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['incubator'].location != null">Location</span><input type="text" name="location" ng-model="selected['incubator'].location" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['incubator'].owner != null">The lab or team owning</span><input type="text" name="owner" ng-model="selected['incubator'].owner" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['incubator'].description != null">Description</span><textarea name="description" ng-model="selected['incubator'].description" style="width: 240px;"></textarea></label>
+            <label><input type="checkbox" name="active" ng-model="selected['incubator'].active"><span>is Active?</span></label>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button class="btn btn-danger" ng-click="nodeManagement.addincubator()"  data-dismiss="modal" ng-disabled="addIncubatorForm.$invalid">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 
 <script>

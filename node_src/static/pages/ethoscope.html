@@ -191,8 +191,8 @@
         <h3 class="modal-title" id="startModalLabel">Select tracking type</h3>
       </div>
       <div class="modal-body">
-          <form name="optionsform">
-          <div id="user_options" ng-repeat="(name,option) in user_options.tracking">
+          <form name="trackingoptionsform" class="input">
+          <div id="user_options" ng-repeat="(name, option) in user_options.tracking">
             <h4>{{name}}</h4>
               <ul class="option-list">
                 <li ng-repeat="opt in option">
@@ -207,9 +207,10 @@
                             <label for="input-{{arg.name}}">{{arg.description}}</label>
 
                             
-                            <select ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" > <option value="">Available Movies</option><option ng:repeat="entry in videofiles" value="{{entry.fullpath}}">{{entry.filename | limitTo: 40}}{{entry.filename.length < 40 ? '' : '...'}}</option> </select>
-                            <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]" >
-                            <input ng-if="arg.type == 'str'" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  >
+                            <select ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" > <option value="">Available Movies</option><option ng-repeat="entry in videofiles" value="{{entry.fullpath}}">{{entry.filename | limitTo: 40}}{{entry.filename.length < 40 ? '' : '...'}}</option> </select>
+                            <input  ng-if="arg.type == 'number'"   id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]" >
+                            <input  ng-if="arg.type == 'str'"      id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  >
+                            <select ng-if="arg.type == 'array'"    id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]"> <option ng-repeat="entry in arg.default" value="{{entry}}">{{entry}}</option> </select>
 
                             <div ng-if="arg.type == 'date_range'" class="input-group">
                                 <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-drp" type=hidden readonly ng-model="selected_options.tracking[name]['arguments'][arg.name]" options="{timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss', separator : ' > ' }}" > 
@@ -248,7 +249,7 @@
         <h3 class="modal-title" id="recordModalLabel">Machine Information</h3>
       </div>
       <div class="modal-body">
-          <form>
+          <form name="machineinfoform" class="input">
           <div id="user_options" ng-repeat="(name,option) in user_options.update_machine">
 <!--            <h4>{{name}}</h4> -->
               <ul class="option-list">
@@ -302,7 +303,7 @@
         <h3 class="modal-title" id="recordModalLabel">Select recording type</h3>
       </div>
       <div class="modal-body">
-          <form>
+          <form name="recordingoptionsform" class="input">
           <div id="user_options" ng-repeat="(name,option) in user_options.recording">
             <h4>{{name}}</h4>
               <ul class="option-list">
@@ -320,6 +321,7 @@
                             <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=file name={{arg.name}}  ng-model="selected_options.recording[name]['arguments'][arg.name]"  >
                             <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.recording[name]['arguments'][arg.name]" >
                             <input ng-if="arg.type == 'str'" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.recording[name]['arguments'][arg.name]"  >
+                            <select ng-if="arg.type == 'array'"    id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]"> <option ng-repeat="entry in arg.default" value="{{entry}}">{{entry}}</option> </select>
 
                             <div ng-if="arg.type == 'date_range'" class="input-group">
                                 <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]" options="{timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss', separator : ' > ' }}" > 
