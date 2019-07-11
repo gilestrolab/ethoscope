@@ -311,6 +311,7 @@ def node_info(req):#, device):
         disk_usage = RESULTS_DIR+" Not Found on disk"
 
         CARDS = {}
+        IPs = []
         GIT_BRANCH = "Not detected"
         NEEDS_UPDATE = False
 
@@ -323,6 +324,7 @@ def node_info(req):#, device):
             adapters_list = [ [i, netifaces.ifaddresses(i)[17][0]['addr'], netifaces.ifaddresses(i)[2][0]['addr']] for i in netifaces.interfaces() if 17 in netifaces.ifaddresses(i) and 2 in netifaces.ifaddresses(i) and netifaces.ifaddresses(i)[17][0]['addr'] != '00:00:00:00:00:00' ]
             for ad in adapters_list:
                 CARDS [ ad[0] ] = {'MAC' : ad[1], 'IP' : ad[2]}
+                IPs.append (ad[2])
             
            
             with os.popen('git rev-parse --abbrev-ref HEAD') as df:
@@ -339,7 +341,7 @@ def node_info(req):#, device):
         except Exception as e:
             logging.error(e)
 
-        return {'disk_usage': disk_usage, 'CARDS': CARDS, 'GIT_BRANCH': GIT_BRANCH, 'NEEDS_UPDATE': NEEDS_UPDATE}
+        return {'disk_usage': disk_usage, 'IPs' : IPs , 'CARDS': CARDS, 'GIT_BRANCH': GIT_BRANCH, 'NEEDS_UPDATE': NEEDS_UPDATE}
                 
     elif req == 'time':
         return {'time':datetime.datetime.now().isoformat()}

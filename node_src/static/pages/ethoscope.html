@@ -4,7 +4,22 @@
         <div class="header">
           <h1>{{device.name}}</h1>
           <ul>
-            <li title="Device IP address">{{device.ip}}</li>
+            <li title="Device IP address"><a href="ssh://alarm@{{device.ip}}">{{device.ip}}</a></li>
+<!--                The default SSH password for ethoscopes is alarm
+                    The default root password is root
+                    To associate the xdg protocol to SSH run the following in a terminal on the client computer:
+
+                    xdg-mime default ssh.desktop x-scheme-handler/ssh
+                    cat << EOF > ~/.local/share/applications/ssh.desktop
+                    [Desktop Entry]
+                    Version=1.0
+                    Name=SSH Launcher
+                    Exec=bash -c '(URL="%U" HOST="\${URL:6}"; ssh \$HOST); bash'
+                    Terminal=true
+                    Type=Application
+                    Icon=utilities-terminal
+                    EOF
+-->
 
             <li ng-if="delta_t_min <= 3" title="Current time on the device">{{device_datetime}}</li>
             <li ng-if="delta_t_min > 3" title="There is more than 3 minutes difference between node and this device" style="color: #FF431F;"><span class="fa fa-warning"></span>{{device_datetime}}</li>

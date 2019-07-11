@@ -16,6 +16,10 @@ app.directive('tooltip', function(){
     };
 });
 
+app.config(['$compileProvider', function ($compileProvider) {
+    $compileProvider.aHrefSanitizationWhitelist(/^\s*(https?|ftp|mailto|file|sms|tel|ssh):/);
+}]);
+
 app.controller('ethoscopeController', function($scope, $http, $routeParams, $interval, $timeout, $location)  {
     
         device_id = $routeParams.device_id;

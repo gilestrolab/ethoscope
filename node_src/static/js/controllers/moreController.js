@@ -163,6 +163,7 @@ function maxLengthCheck(object) {
                 $scope.nodeManagement.info = res;
             })
         }
+        
         $scope.nodeManagement.time = new Date();
         $scope.nodeManagement.time = $scope.nodeManagement.time.toString();
         
