@@ -26,7 +26,7 @@ SYSTEM_DAEMONS = {"ethoscope_node": {'description' : 'The main Ethoscope node se
                   "ethoscope_backup" : {'description' : 'The service that collects data from the ethoscopes and syncs them with the node.'}, 
                   "ethoscope_video_backup" : {'description' : 'The service that collects VIDEOs from the ethoscopes and syncs them with the node'}, 
                   "ethoscope_update_node" : {'description' : 'The service used to update the nodes and the ethoscopes.'},
-                  "git-daemon" : {'description' : 'The GIT server that handles git updates for the node and ethoscopes.'},
+                  "git-daemon.socket" : {'description' : 'The GIT server that handles git updates for the node and ethoscopes.'},
                   "ntpd" : {'description': 'The NTPd service is syncing time with the ethoscopes.'}
                   }
 
