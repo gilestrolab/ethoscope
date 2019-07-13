@@ -155,6 +155,7 @@ def set_etc_hostname(ip_address, nodename = "node", path="/etc/hosts"):
     
     try:
         with open(path, 'w') as f:
+            f.write("127.0.0.1\tlocalhost\n")
             f.write("%s\t%s\n" % (ip_address, nodename))
         logging.warning("Wrote new information in file: %s" % path)
     except:
