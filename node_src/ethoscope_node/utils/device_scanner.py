@@ -41,17 +41,17 @@ class DeviceScanner(object):
     """
     Uses zeroconf (aka Bonjour, aka Avahi etc) to passively listen for ethoscope devices registering themselves on the network.
     """
-    #avahi requires local but some routers may have .lan or .home
+    #avahi requires .local but some routers may have .lan
     #TODO: check if this is going to be a problem
+    
     _suffix = ".local" 
     _service_type = "_ethoscope._tcp.local." 
     
-    def __init__(self, device_refresh_period = 5, results_dir="/ethoscope_results"):
+    def __init__(self, device_refresh_period = 5, results_dir="/ethoscope_data/results"):
         self._zeroconf = Zeroconf()
         self.devices = []
         self.device_refresh_period = device_refresh_period
         self.results_dir = results_dir
-        #iprange is not used
         
     def start(self):
         # Use self as the listener class because I have add_service and remove_service methods
@@ -74,6 +74,8 @@ class DeviceScanner(object):
             return
         
     def get_all_devices_info(self):
+        '''
+        '''
         out = {}
         for device in self.devices:
             out[device.id()] = device.info()
@@ -110,7 +112,7 @@ class DeviceScanner(object):
                 ip = socket.inet_ntoa(info.address)
                 #ip = socket.inet_ntoa(info.addresses[0])
                 
-                device = Device(ip, self.device_refresh_period, results_dir=self.results_dir)
+                device = Device(ip, self.device_refresh_period, results_dir = self.results_dir )
                 device.zeroconf_name = name
                 device.start()
                 logging.info("New device detected with id = %s at IP = %s" % (device.id(), ip))
@@ -125,120 +127,11 @@ class DeviceScanner(object):
         unregisters itself. Don't call directly.
         """
         for device in self.devices:
-            if device.zeroconf_name==name:
+            if device.zeroconf_name == name:
                 logging.info("Device with id = %s has gone down" % device.id())
-                self.devices.remove(device)
+                #we do not remove devices from the list when they go down so that keep a record of them in the node
+                #self.devices.remove(device)
                 return
-
-class ActiveDeviceScanner(Thread):
-    """
-    The older version of DeviceScanner that actively scans a range of IP addresses on the local
-    subnet. Currently not used but kept in place in case the functionality is required for older
-    ethoscopes that don't publish their service with zeroconf.
-    """
-    _refresh_period = 1.0
-    _filter_device_period = 5
-
-    def __init__(self, local_ip = "192.169.123.1", ip_range = (6,254), device_refresh_period = 5, results_dir="/ethoscope_results"):
-        self._is_active = True
-        self._devices = []
-        # "id" -> "info", "dev"
-        self._device_id_map = {}
-        # self._device_id_list = {}
-        self._local_ip = local_ip
-        self._ip_range = ip_range
-
-        for ip in self._subnet_ips(local_ip, ip_range):
-            d =  Device(ip, device_refresh_period, results_dir=results_dir)
-            d.start()
-            self._devices.append(d)
-        super(ActiveDeviceScanner, self).__init__()
-
-    def _available_ips(self, local_ip, ip_range):
-        for c in self._subnet_ips(local_ip, ip_range):
-            yield c
-
-    def _subnet_ips(self,local_ip, ip_range):
-        for i in range(ip_range[0], ip_range[1] + 1):
-            subnet_ip = local_ip.split(".")[0:3]
-            subnet_ip = ".".join(subnet_ip)
-            yield "%s.%i" % (subnet_ip, i)
-
-
-    def _get_last_backup_time(self, device):
-        try:
-            backup_path = device.info()["backup_path"]
-            time_since_backup = time.time() - os.path.getmtime(backup_path)
-            return time_since_backup
-        except OSError:
-            return
-        except KeyError:
-            return
-        except Exception as e:
-            logging.error(traceback.format_exc())
-            return
-
-    def run(self):
-        last_device_filter_time = 0
-        valid_ips = [ip for ip in self._available_ips(self._local_ip, self._ip_range)]
-
-        while self._is_active :
-            if time.time() - last_device_filter_time > self._filter_device_period:
-                valid_ips = [ip for ip in self._available_ips(self._local_ip, self._ip_range)]
-                last_device_filter_time = time.time()
-            for d in self._devices:
-                if d.ip() in valid_ips:
-                    d.skip_scanning(False)
-                else:
-                    d.skip_scanning(True)
-            for d in self._devices:
-                id = d.id()
-
-                if id and  (id not in list(self._device_id_map.keys())):
-                    logging.info("New device detected with id = %s" % id)
-                    self._device_id_map[id]= {}
-                    self._device_id_map[id]["dev"] = d
-                    self._device_id_map[id]["info"] = d.info().copy()
-
-            # can we find a device fo this each id
-            detected_ids = [d.id() for d in self._devices if d.id()]
-            for id in list(self._device_id_map.keys()):
-
-                status = self._device_id_map[id]["info"]["status"]
-                # this default time is now. if device get out of use, their time is not updated
-                if status != "not_in_use":
-                    self._device_id_map[id]["info"]["time"] = time.time()
-                self._device_id_map[id]["dev"] = None
-                # special status for devices that are not detected anymore
-                self._device_id_map[id]["info"]["status"] = "not_in_use"
-
-                for d in self._devices:
-                    if d.id() == id and d.id() in detected_ids:
-                        self._device_id_map[id] = {}
-                        self._device_id_map[id]["dev"] = d
-                        self._device_id_map[id]["info"] = d.info().copy()
-                        self._device_id_map[id]["info"]["time_since_backup"] = self._get_last_backup_time(d)
-                        continue
-
-            time.sleep(self._refresh_period)
-
-    def get_all_devices_info(self):
-        out = {}
-        for k, v in list(self._device_id_map.items()):
-            out[k] =  v["info"]
-        return out
-
-    def get_device(self, id):
-        try:
-            return self._device_id_map[id]["dev"]
-        except KeyError:
-            raise KeyError("No such device: %s" % id)
-
-
-    def stop(self):
-        for d in self._devices:
-            d.stop()
-        self._is_active = False
 
 class Device(Thread):
     _ethoscope_db_credentials = {"user": "ethoscope",
@@ -263,25 +156,39 @@ class Device(Thread):
                                      "stop": ["streaming", "running", "recording"],
                                      "poweroff": ["stopped"],
                                      "reboot" : ["stopped"],
-                                     "not_in_use": []}
+                                     "offline": []}
 
-    def __init__(self, ip, refresh_period= 2, port = 9000, results_dir="/ethoscope_results"):
+    def __init__(self, ip, refresh_period = 2, port = 9000, results_dir = "/ethoscope_data/results"):
+        '''
+        Initialises the info gathering and controlling activity of a Device by the node
+        The server will interrogate the status of the device with frequency of refresh_period
+        '''
+        
         self._results_dir = results_dir
         self._ip = ip
         self._port = port
         self._id_url = "http://%s:%i/%s" % (ip, port, self._remote_pages['id'])
+
+        self._info = {"status": "offline"}
+        self._id = ""
         self._reset_info()
 
-        self._is_active = True
+        self._is_online = True
         self._skip_scanning = False
         self._refresh_period = refresh_period
+        
         self._update_info()
 
         super(Device,self).__init__()
 
     def run(self):
+        '''
+        while the device is active (i.e. online and communicating)
+        interrogates periodically on the status and info
+        '''
+        
         last_refresh = 0
-        while self._is_active:
+        while self._is_online:
             time.sleep(.2)
             if time.time() - last_refresh > self._refresh_period:
 
@@ -304,6 +211,7 @@ class Device(Thread):
 
         else:
             self._get_json(post_url, 3, post_data)
+            
         self._update_info()
         
     def send_settings(self, post_data):
@@ -355,6 +263,7 @@ class Device(Thread):
 
     def relay_stream(self):
         '''
+        The node uses this function to relay the stream of images from the device to the node client
         '''
         stream_url = "http://%s:%i/%s" % (self._ip, 8008, self._remote_pages['stream'])
         #stream_url = "http://217.7.233.140:80/cgi-bin/faststream.jpg?stream=full&fps=0"
@@ -383,6 +292,10 @@ class Device(Thread):
         return out
 
     def last_image(self):
+        """
+        Collects the last drawn image fromt the device
+        TODO: on the device side, this should not rely on an actuale image file but be fished from memory
+        """
         # we return none if the device is not in a stoppable status (e.g. running, recording)
         if self._info["status"] not in self._allowed_instructions_status["stop"]:
             return None
@@ -410,9 +323,6 @@ class Device(Thread):
             return file_like
         except Exception as e:
             logging.warning(traceback.format_exc())
-
-
-
 
     @retry(ScanException, tries=3, delay=1, backoff=1)
     def _get_json(self, url,timeout=5, post_data=None):
@@ -461,8 +371,11 @@ class Device(Thread):
 
 
     def _reset_info(self):
-        self._info = {"status": "not_in_use"}
-        self._id = ""
+        '''
+        This is called whenever the device goes offline
+        '''
+        self._info['status'] = "offline"
+        self._info['ip'] = "offline"
 
     def _update_info(self):
         '''
@@ -517,4 +430,4 @@ class Device(Thread):
         return {"backup_path": output_db_file}
 
     def stop(self):
-        self._is_active = False
+        self._is_online = False

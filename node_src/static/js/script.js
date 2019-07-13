@@ -160,11 +160,11 @@
 
 
         var refresh = function(){
-	if (document.visibilityState=="visible"){
+    if (document.visibilityState=="visible"){
             $scope.get_devices();
             get_date();
             console.log("refresh");
-	}
+    }
        }
 
        refresh_data = $interval(refresh, 3000);
