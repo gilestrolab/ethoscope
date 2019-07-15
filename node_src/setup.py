@@ -18,13 +18,10 @@ setup(
     # },
     install_requires=[
         "bottle>=0.12.8",
-        "mysql-connector-python >= 8.0.16",
+        "mysql-connector-python >= 8.0.15",
         "netifaces >= 0.10.4",
         "cherrypy >= 3.6.0",
-        "eventlet >= 0.17.1",
-        "python-nmap >= 0.3.4",
         "GitPython >=1.0.1",
-        "bjoern >= 1.4.2",
         "zeroconf >= 0.23.0"
     ]
 )
