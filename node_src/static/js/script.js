@@ -55,7 +55,10 @@
 //        });
         $http.get('/devices_list').success(function(data){
             $scope.devices = data;
-            
+        });
+
+        $http.get('/sensors').success(function(data){
+            $scope.sensors = data;
         });
         
 

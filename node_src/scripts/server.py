@@ -13,7 +13,7 @@ import shutil
 import netifaces
 import json
 
-from ethoscope_node.utils.device_scanner import DeviceScanner
+from ethoscope_node.utils.device_scanner import DeviceScanner, SensorScanner
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
 from ethoscope_node.utils.backups_helpers import GenericBackupWrapper, BackupClass
 
@@ -116,6 +116,12 @@ def devices():
 @app.get('/devices_list')
 def get_devices_list():
     devices()
+
+@app.get('/sensors')
+@error_decorator
+def sensors():
+    return sensor_scanner.get_all_devices_info()
+
 
 #Get the information of one device
 @app.get('/device/<id>/data')
@@ -503,6 +509,10 @@ if __name__ == '__main__':
     try:
         device_scanner = DeviceScanner(results_dir=RESULTS_DIR)
         device_scanner.start()
+        
+        sensor_scanner = SensorScanner()
+        sensor_scanner.start()
+        
         #######TO be remove when bottle changes to version 0.13
         server = "cherrypy"
         try:
@@ -528,5 +538,6 @@ if __name__ == '__main__':
         close(1)
     finally:
         device_scanner.stop()
+        sensor_scanner.stop()
         shutil.rmtree(tmp_imgs_dir)
         close()

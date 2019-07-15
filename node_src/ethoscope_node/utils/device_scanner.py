@@ -37,101 +37,120 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
     return deco_retry
 
 
-class DeviceScanner(object):
+class Sensor(Thread):
     """
-    Uses zeroconf (aka Bonjour, aka Avahi etc) to passively listen for ethoscope devices registering themselves on the network.
     """
-    #avahi requires .local but some routers may have .lan
-    #TODO: check if this is going to be a problem
-    
-    _suffix = ".local" 
-    _service_type = "_ethoscope._tcp.local." 
-    
-    def __init__(self, device_refresh_period = 5, results_dir="/ethoscope_data/results"):
-        self._zeroconf = Zeroconf()
-        self.devices = []
-        self.device_refresh_period = device_refresh_period
-        self.results_dir = results_dir
-        
-    def start(self):
-        # Use self as the listener class because I have add_service and remove_service methods
-        self.browser = ServiceBrowser(self._zeroconf, self._service_type, self)
-        
-    def stop(self):
-        self._zeroconf.close()
+    def __init__(self, ip, refresh_period = 5, port = 80, results_dir = ""):
+        self._ip = ip
+        self._port = port
+        self._data_url = "http://%s:%i/" % (ip,port)
+        self._id_url = "http://%s:%i/id" % (ip, port)
 
-    def _get_last_backup_time(self, device):
+        self._info = {"status": "offline"}
+        self._id = ""
+        self._reset_info()
+
+        self._is_online = True
+        self._skip_scanning = False
+        self._refresh_period = refresh_period
+        self._update_info()
+        super(Sensor,self).__init__()
+
+
+    def run(self):
+        '''
+        while the device is active (i.e. online and communicating)
+        interrogates periodically on the status and info
+        '''
+        
+        last_refresh = 0
+        while self._is_online:
+            time.sleep(.2)
+            if time.time() - last_refresh > self._refresh_period:
+
+                if not self._skip_scanning:
+                    self._update_info()
+                else:
+                    self._reset_info()
+                last_refresh = time.time()
+
+    def _update_id(self):
+        """
+        """
+        if self._skip_scanning:
+            raise ScanException("Not scanning this ip (%s)." % self._ip)
+
+        old_id = self._id
+        resp = self._get_json(self._id_url)
+        self._id = resp['id']
+        if self._id != old_id:
+            if old_id:
+                logging.warning("Device id changed at %s. %s ===> %s" % (self._ip, old_id, self._id))
+            self._reset_info()
+
+        self._info["ip"] = self._ip
+        self._id = resp['id']
+
+
+    @retry(ScanException, tries=3, delay=1, backoff=1)
+    def _get_json(self, url,timeout=5, post_data=None):
+
         try:
-            backup_path = device.info()["backup_path"]
-            time_since_backup = time.time() - os.path.getmtime(backup_path)
-            return time_since_backup
-        except OSError:
-            return
-        except KeyError:
-            return
+            req = urllib.request.Request(url, data=post_data, headers={'Content-Type': 'application/json'})
+            f = urllib.request.urlopen(req, timeout=timeout)
+            message = f.read()
+            if not message:
+                # logging.error("URL error whist scanning url: %s. No message back." % self._id_url)
+                raise ScanException("No message back")
+            try:
+                resp = json.loads(message)
+                return resp
+            except ValueError:
+                # logging.error("Could not parse response from %s as JSON object" % self._id_url)
+                raise ScanException("Could not parse Json object")
+        
+        except urllib.error.HTTPError as e:
+            raise ScanException("Error" + str(e.code))
+            #return e
+        
+        except urllib.error.URLError as e:
+            raise ScanException("Error" + str(e.reason))
+            #return e
+        
         except Exception as e:
-            logging.error(traceback.format_exc())
+            raise ScanException("Unexpected error" + str(e))
+
+    def _reset_info(self):
+        '''
+        This is called whenever the device goes offline
+        '''
+        self._info['status'] = "offline"
+        self._info['ip'] = "offline"
+
+    def _update_info(self):
+        '''
+        '''
+        try:
+            self._update_id()
+        except ScanException:
+            self._reset_info()
             return
         
-    def get_all_devices_info(self):
-        '''
-        '''
-        out = {}
-        for device in self.devices:
-            out[device.id()] = device.info()
-            out[device.id()]["time_since_backup"] = self._get_last_backup_time(device)
-        return out
-        
-    def get_device(self, id):
-        for device in self.devices:
-            if device.id()==id:
-                return device
-        # Not found, so produce an error
-        raise KeyError("No such device: %s" % id)
-        
-    def add_service(self, zeroconf, type, name):
-        """
-        Method required to be a Zeroconf listener. Called by Zeroconf when a "_ethoscope._tcp" service
-        is registered on the network. Don't call directly.
-        
-        sample values:
-        type = '_ethoscope._tcp.local.'
-        name = 'ETHOSCOPE000._ethoscope._tcp.local.'
-        """
-
-        
         try:
-            info = zeroconf.get_service_info(type, name)
-            # Note that I don't trust the address given in the info. When registering, the
-            # service doesn't know which interface it will be accessed by and hence which IP
-            # address to use (src/scripts/device_server.py puts gibberish in this field for
-            # this reason).
-            # Query the IP address just using the services hostname and zeroconf.
+            resp = self._get_json(self._data_url)
+            self._info.update(resp)
+            self._info['status'] = 'online'
+        except ScanException:
+            pass
 
-            if info:
-                ip = socket.inet_ntoa(info.address)
-                #ip = socket.inet_ntoa(info.addresses[0])
-                
-                device = Device(ip, self.device_refresh_period, results_dir = self.results_dir )
-                device.zeroconf_name = name
-                device.start()
-                logging.info("New device detected with id = %s at IP = %s" % (device.id(), ip))
-                self.devices.append(device)
+    def ip(self):
+        return self._ip
         
-        except Exception as error:
-            logging.error("Exception trying to add zeroconf service '"+name+"' of type '"+type+"': "+str(error))
-            
-    def remove_service(self, zeroconf, type, name):
-        """
-        Method required to be a Zeroconf listener. Called by Zeroconf when a "_ethoscope._tcp" service
-        unregisters itself. Don't call directly.
-        """
-        for device in self.devices:
-            if device.zeroconf_name == name:
-                logging.info("Device with id = %s has gone down" % device.id())
-                #we do not remove devices from the list when they go down so that keep a record of them in the node
-                #self.devices.remove(device)
-                return
+    def id(self):
+        return self._id
+        
+    def info(self):
+        return self._info
 
 class Device(Thread):
     _ethoscope_db_credentials = {"user": "ethoscope",
@@ -178,7 +197,6 @@ class Device(Thread):
         self._refresh_period = refresh_period
         
         self._update_info()
-
         super(Device,self).__init__()
 
     def run(self):
@@ -355,6 +373,8 @@ class Device(Thread):
         
 
     def _update_id(self):
+        """
+        """
         if self._skip_scanning:
             raise ScanException("Not scanning this ip (%s)." % self._ip)
 
@@ -431,3 +451,124 @@ class Device(Thread):
 
     def stop(self):
         self._is_online = False
+
+
+class DeviceScanner(object):
+    """
+    Uses zeroconf (aka Bonjour, aka Avahi etc) to passively listen for ethoscope devices registering themselves on the network.
+    """
+    #avahi requires .local but some routers may have .lan
+    #TODO: check if this is going to be a problem
+    
+    _suffix = ".local" 
+    _service_type = "_ethoscope._tcp.local." 
+    
+    def __init__(self, device_refresh_period = 5, results_dir="/ethoscope_data/results", deviceClass=Device):
+        self._zeroconf = Zeroconf()
+        self.devices = []
+        self.device_refresh_period = device_refresh_period
+        self.results_dir = results_dir
+        self._Device = deviceClass
+        
+    def start(self):
+        # Use self as the listener class because I have add_service and remove_service methods
+        self.browser = ServiceBrowser(self._zeroconf, self._service_type, self)
+        
+    def stop(self):
+        self._zeroconf.close()
+
+    def _get_last_backup_time(self, device):
+        try:
+            backup_path = device.info()["backup_path"]
+            time_since_backup = time.time() - os.path.getmtime(backup_path)
+            return time_since_backup
+        except OSError:
+            return
+        except KeyError:
+            return
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            return
+        
+    def get_all_devices_info(self):
+        '''
+        '''
+        out = {}
+        for device in self.devices:
+            out[device.id()] = device.info()
+            out[device.id()]["time_since_backup"] = self._get_last_backup_time(device)
+        return out
+        
+    def get_device(self, id):
+        for device in self.devices:
+            if device.id()==id:
+                return device
+        # Not found, so produce an error
+        raise KeyError("No such device: %s" % id)
+        
+    def add_service(self, zeroconf, type, name):
+        """
+        Method required to be a Zeroconf listener. Called by Zeroconf when a "_ethoscope._tcp" service
+        is registered on the network. Don't call directly.
+        
+        sample values:
+        type = '_ethoscope._tcp.local.'
+        name = 'ETHOSCOPE000._ethoscope._tcp.local.'
+        """
+
+        
+        try:
+            info = zeroconf.get_service_info(type, name)
+            # Note that I don't trust the address given in the info. When registering, the
+            # service doesn't know which interface it will be accessed by and hence which IP
+            # address to use (src/scripts/device_server.py puts gibberish in this field for
+            # this reason).
+            # Query the IP address just using the services hostname and zeroconf.
+
+            if info:
+                #ip = socket.inet_ntoa(info.address)
+                ip = socket.inet_ntoa(info.addresses[0])
+                
+                device = self._Device(ip, self.device_refresh_period, results_dir = self.results_dir )
+                device.zeroconf_name = name
+                device.start()
+                logging.info("New device detected with id = %s at IP = %s" % (device.id(), ip))
+                self.devices.append(device)
+        
+        except Exception as error:
+            logging.error("Exception trying to add zeroconf service '"+name+"' of type '"+type+"': "+str(error))
+            
+    def remove_service(self, zeroconf, type, name):
+        """
+        Method required to be a Zeroconf listener. Called by Zeroconf when a "_ethoscope._tcp" service
+        unregisters itself. Don't call directly.
+        """
+        for device in self.devices:
+            if device.zeroconf_name == name:
+                logging.info("Device with id = %s has gone down" % device.id())
+                #we do not remove devices from the list when they go down so that keep a record of them in the node
+                #self.devices.remove(device)
+                return
+
+class SensorScanner(DeviceScanner):
+    """
+    """
+    _suffix = ".local" 
+    _service_type = "_sensor._tcp.local." 
+    
+    def __init__(self, device_refresh_period = 60, deviceClass=Sensor):
+        self._zeroconf = Zeroconf()
+        self.devices = []
+        self.device_refresh_period = device_refresh_period
+        self._Device = deviceClass
+        self.results_dir = ""
+        super(SensorScanner, self).__init__(device_refresh_period=self.device_refresh_period, deviceClass=self._Device)
+        
+    def start(self):
+        # Use self as the listener class because I have add_service and remove_service methods
+        self.browser = ServiceBrowser(self._zeroconf, self._service_type, self)
+        
+    def stop(self):
+        self._zeroconf.close()
+
+
