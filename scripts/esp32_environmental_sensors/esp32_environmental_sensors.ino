@@ -1,8 +1,15 @@
-/*
+board /*
   ESP32 mDNS responder sample
 
   This is an example of an HTTP server that is accessible
   via http://esp32.local URL thanks to mDNS responder.
+
+  Soldier together the two sensors boards, using the same header
+  then connect to the ESP32 
+  VCC -> 3.3V
+  Gnd -> Gnd
+  SDA -> D21
+  SCL -> D22
 
   Instructions:
   - Update WiFi SSID and password as necessary.
@@ -11,7 +18,7 @@
     - For Linux, install Avahi (http://avahi.org/).
     - For Windows, install Bonjour (http://www.apple.com/support/bonjour/).
     - For Mac OSX and iOS support is built in through Bonjour already.
-  - Point your browser to http://esp32.local, you should see a response.
+  - Point your browser to http://etho_sensor.local, you should see a response.
 
  */
 
@@ -25,18 +32,34 @@
 #include <Adafruit_BME280.h>
 #include <BH1750FVI.h>
 
-
 #include <WebServer.h>
+
+// To save data in the EEPROM use the following
+// http://tronixstuff.com/2011/03/16/tutorial-your-arduinos-inbuilt-eeprom/
+#include <EEPROM.h>
+int addr = 0;
+#define EEPROM_SIZE 64
 
 Adafruit_BME280 bme;
 BH1750FVI LightSensor(BH1750FVI::k_DevModeContLowRes);
 
-float temperature, humidity, pressure;
-uint16_t lux;
+typedef struct {
+  float temperature;
+  float humidity;
+  float pressure;
+  uint16_t lux;  
+} environment;
+
+typedef struct {
+  char location[20];
+  char sensor_name[20];
+} configuration;
+
+configuration cfg = {"", "etho_sensor"};
+environment env;
 
 const char* ssid = "ETHOSCOPE_WIFI";
 const char* password = "ETHOSCOPE_1234";
-const char* sensor_name = "esp32";
 
 // TCP server at port 80 will respond to HTTP requests
 //WiFiServer server(80);
@@ -44,7 +67,16 @@ WebServer server(80);
 
 void setup(void)
 {  
-    Serial.begin(115200);
+    Serial.begin(57600);
+
+    if (!EEPROM.begin(EEPROM_SIZE)) {
+        Serial.println("Failed to initialise EEPROM");
+        Serial.println("Restarting...");
+        delay(1000);
+        ESP.restart();
+    }
+    
+    loadConfiguration();
 
     // Connect to WiFi network
     WiFi.begin(ssid, password);
@@ -66,7 +98,7 @@ void setup(void)
     //   the fully-qualified domain name is "esp8266.local"
     // - second argument is the IP address to advertise
     //   we send our IP address on the WiFi network
-    if (!MDNS.begin(sensor_name)) {
+    if (!MDNS.begin(cfg.sensor_name)) {
         Serial.println("Error setting up MDNS responder!");
         while(1) {
             delay(1000);
@@ -79,6 +111,7 @@ void setup(void)
     server.on("/", handle_OnConnect);
     server.on("/id", handle_OnID);
     server.onNotFound(handle_NotFound);
+    server.on("/set", handlePost);
     server.begin();
     Serial.println("HTTP server started");
 
@@ -92,6 +125,44 @@ void setup(void)
     
 }
 
+void loadConfiguration()
+{
+// on the very first flash, byte 9 is set to 255
+// we use this to save the default values to the arduino
+  if (EEPROM.read(0) != 1) { saveConfiguration(); } 
+  EEPROM.get(1, cfg);
+  Serial.println("Configuration loaded.");
+
+}
+
+void saveConfiguration()
+{
+//saves values to EEPROM
+
+  EEPROM.write(0, 1);
+  EEPROM.put(1, cfg);
+  EEPROM.commit();
+  Serial.println("Configuration saved.");
+
+}
+
+//GET http://url/set?location=test
+void handlePost() {
+  if (server.hasArg("location")) {
+    //cfg.location = (char*) server.arg("location").c_str();
+    server.arg("location").toCharArray(cfg.location, 20);
+    Serial.println("Changed the value of location");
+    }
+  if (server.hasArg("sensor_name")) {
+    //cfg.sensor_name = (char*) server.arg("name").c_str(); 
+    server.arg("sensor_name").toCharArray(cfg.sensor_name, 20); 
+    Serial.println("Changed the value of sensor_name");
+  }
+  saveConfiguration();
+  server.send(200, "application/json", "OK\n");
+}
+
+
 void handle_OnID(void) {
     String ptr = "{\"id\": \"";
     ptr += getMacAddress();
@@ -100,12 +171,12 @@ void handle_OnID(void) {
 }
 
 void handle_OnConnect(void) {
-    temperature = bme.readTemperature();
-    humidity = bme.readHumidity();
-    pressure = bme.readPressure() / 100.0F;
-    lux = LightSensor.GetLightIntensity();
-//  server.send(200, "text/html", SendHTML(temperature,humidity,pressure,lux));
-    server.send(200, "application/json", SendJSON(temperature,humidity,pressure,lux));
+    env.temperature = bme.readTemperature();
+    env.humidity = bme.readHumidity();
+    env.pressure = bme.readPressure() / 100.0F;
+    env.lux = LightSensor.GetLightIntensity();
+//  server.send(200, "text/html", SendHTML());
+    server.send(200, "application/json", SendJSON());
 
 }
 
@@ -118,24 +189,28 @@ void loop(void)
     server.handleClient();
 }
 
-String SendJSON(float temperature, float humidity, float pressure, uint16_t lux){
+String SendJSON(){
   String ptr = "{\"id\": \"";
   ptr += getMacAddress();
   ptr += "\", \"ip\" : \"";
   ptr += WiFi.localIP().toString();
+  ptr += "\", \"name\" : \"";
+  ptr += cfg.sensor_name;
+  ptr += "\", \"location\" : \"";
+  ptr += cfg.location;
   ptr += "\", \"temperature\" : \"";
-  ptr += temperature;
+  ptr += env.temperature;
   ptr += "\", \"humidity\" : \"";
-  ptr += humidity;
+  ptr += env.humidity;
   ptr += "\", \"pressure\" : \"";
-  ptr += pressure;
+  ptr += env.pressure;
   ptr += "\", \"light\" : \"";
-  ptr += lux;
+  ptr += env.lux;
   ptr += "\"}";
   return ptr; 
 }
 
-String SendHTML(float temperature, float humidity, float pressure, uint16_t lux){
+String SendHTML(){
   String ptr = "<!DOCTYPE html> <html>\n";
   ptr +="<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
   ptr +="<title>ESP8266 Weather Station</title>\n";
@@ -147,17 +222,23 @@ String SendHTML(float temperature, float humidity, float pressure, uint16_t lux)
   ptr +="<body>\n";
   ptr +="<div id=\"webpage\">\n";
   ptr +="<h1>ESP32 Based WIFI sensor</h1>\n";
+  ptr +="<p>ID: ";
+  ptr +=getMacAddress();
+  ptr +="</p>";
+  ptr +="<p>IP: ";
+  ptr +=WiFi.localIP().toString();
+  ptr +="</p>";
   ptr +="<p>Temperature: ";
-  ptr +=temperature;
+  ptr +=env.temperature;
   ptr +="&deg;C</p>";
   ptr +="<p>Humidity: ";
-  ptr +=humidity;
+  ptr +=env.humidity;
   ptr +="%</p>";
   ptr +="<p>Pressure: ";
-  ptr +=pressure;
+  ptr +=env.pressure;
   ptr +="hPa</p>";
   ptr +="<p>Lux: ";
-  ptr +=lux;
+  ptr +=env.lux;
   ptr +="hPa</p>";
   ptr +="</div>\n";
   ptr +="</body>\n";

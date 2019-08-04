@@ -53,6 +53,10 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
             $scope.isActive = ( $scope.device['name'].split("_").pop() != "000" );
         });
 
+        $http.get('/device/'+device_id+'/videofiles').success(function(data){
+            $scope.videofiles = data.filelist;
+        });
+
         $http.get('/device/'+device_id+'/user_options').success(function(data){
             $scope.can_stream = (typeof data.streaming !== 'undefined');
         });
@@ -193,7 +197,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                     //}
                     
                     //get the "formatted" field only from daterangepicker if it exist
-                    if(option[opt].arguments[arg].hasOwnProperty('formatted')) {
+                    if(option[opt].arguments[arg] != undefined && option[opt].arguments[arg].hasOwnProperty('formatted')) {
                         option[opt].arguments[arg] = option[opt].arguments[arg].formatted;
                     }
                 }

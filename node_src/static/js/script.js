@@ -59,6 +59,7 @@
 
         $http.get('/sensors').success(function(data){
             $scope.sensors = data;
+            console.log($scope.sensors.length);
         });
         
 

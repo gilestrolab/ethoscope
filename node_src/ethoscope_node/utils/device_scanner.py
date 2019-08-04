@@ -43,8 +43,9 @@ class Sensor(Thread):
     def __init__(self, ip, refresh_period = 5, port = 80, results_dir = ""):
         self._ip = ip
         self._port = port
-        self._data_url = "http://%s:%i/" % (ip,port)
+        self._data_url = "http://%s:%i/" % (ip, port)
         self._id_url = "http://%s:%i/id" % (ip, port)
+        self._post_url = "http://%s:%i/set" % (ip, port)
 
         self._info = {"status": "offline"}
         self._id = ""
@@ -91,6 +92,15 @@ class Sensor(Thread):
         self._info["ip"] = self._ip
         self._id = resp['id']
 
+    def set(self, data):
+        """
+        Set remote variables 
+        data is a dict
+        set key to value
+        Value can be char[20]
+        """
+        args = urllib.parse.urlencode(data).encode("utf-8")
+        self._get_json(self._post_url, 3, args)
 
     @retry(ScanException, tries=3, delay=1, backoff=1)
     def _get_json(self, url,timeout=5, post_data=None):
@@ -456,6 +466,7 @@ class Device(Thread):
 class DeviceScanner(object):
     """
     Uses zeroconf (aka Bonjour, aka Avahi etc) to passively listen for ethoscope devices registering themselves on the network.
+    From: https://github.com/jstasiak/python-zeroconf
     """
     #avahi requires .local but some routers may have .lan
     #TODO: check if this is going to be a problem
@@ -506,6 +517,16 @@ class DeviceScanner(object):
         # Not found, so produce an error
         raise KeyError("No such device: %s" % id)
         
+    def add(self, name, url):
+        """
+        Manually add a device to the list
+        """
+        device = self._Device(url, self.device_refresh_period, results_dir = self.results_dir )
+        device.zeroconf_name = name
+        device.start()
+        logging.info("New device manually added with id = %s at URL = %s" % (device.id(), url))
+        self.devices.append(device)
+        
     def add_service(self, zeroconf, type, name):
         """
         Method required to be a Zeroconf listener. Called by Zeroconf when a "_ethoscope._tcp" service
@@ -552,6 +573,7 @@ class DeviceScanner(object):
 
 class SensorScanner(DeviceScanner):
     """
+    Scans the network for avahi announced sensors
     """
     _suffix = ".local" 
     _service_type = "_sensor._tcp.local." 

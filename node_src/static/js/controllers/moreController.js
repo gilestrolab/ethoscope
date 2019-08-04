@@ -9,12 +9,15 @@ function maxLengthCheck(object) {
         $scope.folders = {};
         $scope.users = {};
         $scope.incubators = {};
+        $scope.sensors = {};
         
         $scope.phoneNumbr = /^\+((?:9[679]|8[035789]|6[789]|5[90]|42|3[578]|2[1-689])|9[0-58]|8[1246]|6[0-6]|5[1-8]|4[013-9]|3[0-469]|2[70]|7|1)(?:\W*\d){0,13}\d$/;
 
         $scope.selected = { 'files': [],
                             'folders' : {},
-                            'user' : {}
+                            'users' : {},
+                            'incubators' : {},
+                            'sensors' : {}
                           };
                           
         $scope.selected_all = false;
@@ -195,7 +198,7 @@ function maxLengthCheck(object) {
 
         $scope.nodeManagement.adduser = function(){
             var spinner = new Spinner(opts).spin();
-            $http.post('/node-actions', data = {'action': 'adduser', 'userdata' : $scope.selected['user']} )
+            $http.post('/node-actions', data = {'action': 'adduser', 'userdata' : $scope.selected['users']} )
                 .success(function(data){
                     if ( data['result'] == 'success' ) { $scope.users = data['data'] };
             });
@@ -203,25 +206,36 @@ function maxLengthCheck(object) {
         };
 
         $scope.nodeManagement.createUsername = function(){
-            if($scope.selected['user'].fullname != '') {
-                 var username = $scope.selected['user'].fullname.split(' ')[0].substr(0,1) + $scope.selected['user'].fullname.split(' ')[1].substr(0,49);
+            if($scope.selected['users'].fullname != '') {
+                 var username = $scope.selected['users'].fullname.split(' ')[0].substr(0,1) + $scope.selected['users'].fullname.split(' ')[1].substr(0,49);
                  username = username.replace(/\s+/g, '');
                  username = username.replace(/\'+/g, '');
                  username = username.replace(/-+/g, '');
                  username = username.toLowerCase();
-                 $scope.selected['user'].name = username;}
+                 $scope.selected['users'].name = username;}
         };
 
-        $scope.nodeManagement.loadUserData = function () {
-            $scope.selected['user'] = $scope.users[$scope.selected['user'].name];
+
+        $scope.nodeManagement.loadData = function (type) {
+            $scope.selected[type] = $scope[type][$scope.selected[type].name];
+            console.log($scope.selected[type]);
         };
 
 
         $scope.nodeManagement.addincubator = function(){
             var spinner = new Spinner(opts).spin();
-            $http.post('/node-actions', data = {'action': 'addincubator', 'incubatordata' : $scope.selected['incubator']} )
+            $http.post('/node-actions', data = {'action': 'addincubator', 'incubatordata' : $scope.selected['incubators']} )
                 .success(function(data){
                     if ( data['result'] == 'success' ) { $scope.incubators = data['data'] };
+            });
+            spinner.stop();
+        };
+
+        $scope.nodeManagement.addsensor = function(){
+            var spinner = new Spinner(opts).spin();
+            $http.post('/node-actions', data = {'action': 'addsensor', 'sensordata' : $scope.selected['sensors']} )
+                .success(function(data){
+                    if ( data['result'] == 'success' ) { $scope.sensors = data['data'] };
             });
             spinner.stop();
         };
@@ -258,6 +272,11 @@ function maxLengthCheck(object) {
             $http.get('/node/incubators')
                  .success(function(data, status, headers, config){
                     $scope.incubators = data;
+            });
+
+            $http.get('/node/sensors')
+                 .success(function(data, status, headers, config){
+                    $scope.sensors = data;
             });
         
         };

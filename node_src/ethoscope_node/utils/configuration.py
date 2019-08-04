@@ -23,7 +23,11 @@ class EthoscopeConfiguration(object):
                         
                   'incubators': {
                                     'incubator 1' : {'id' : 1, 'name' : 'Incubator 1', 'location' : '', 'owner' : '', 'description' : ''}
-                        } }
+                        },
+                        
+                  'sensors' : {} 
+                                    
+                        }
 
     def __init__(self, config_file = "/etc/ethoscope.conf"):
         self._config_file = config_file
@@ -54,7 +58,7 @@ class EthoscopeConfiguration(object):
             return {'result' : 'success', 'data' : self._settings['users'] }
         except:   
             raise Exception ("Some issue assigning the values")
-            return {'result' : 'success', 'data' : "Some issue assigning the values" }
+            return {'result' : 'failure', 'data' : "Some issue assigning the values" }
 
 
     def addIncubator(self, incubatordata):
@@ -65,7 +69,18 @@ class EthoscopeConfiguration(object):
             return {'result' : 'success', 'data' : self._settings['incubators'] }
         except:   
             raise Exception ("Some issue assigning the values")
-            return {'result' : 'success', 'data' : "Some issue assigning the values" }
+            return {'result' : 'failure', 'data' : "Some issue assigning the values" }
+
+    def addSensor(self, sensordata):
+        name = sensordata['name']
+        try:
+            self._settings['sensors'][name] = sensordata
+            self.save()
+            return {'result' : 'success', 'data' : self._settings['sensors'] }
+        except:   
+            raise Exception ("Some issue assigning the values")
+            return {'result' : 'failure', 'data' : "Some issue assigning the values" }
+
     
     @property
     def content(self):
@@ -101,7 +116,7 @@ class EthoscopeConfiguration(object):
         else:
             try:
                 with open(self._config_file, 'r') as json_data_file:
-                    self._settings = json.load(json_data_file)
+                    self._settings.update ( json.load(json_data_file) )
             except:
                 raise ValueError("File %s is not a valid configuration file" % self._config_file)
                 

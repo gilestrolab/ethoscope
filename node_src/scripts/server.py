@@ -377,6 +377,9 @@ def node_info(req):#, device):
 
     elif req == 'incubators':
         return CFG.content['incubators']
+        
+    elif req == 'sensors':
+        return CFG.content['sensors']
 
     else:
         raise NotImplementedError()
@@ -397,9 +400,11 @@ def node_actions():
     elif action['action'] == 'adduser':
         return CFG.addUser(action['userdata'])
 
-
     elif action['action'] == 'addincubator':
         return CFG.addIncubator(action['incubatordata'])
+    
+    elif action['action'] == 'addsensor':
+        return CFG.addSensor(action['sensordata'])
     
     elif action['action'] == 'updatefolders':
         for folder in action['folders'].keys():
@@ -512,6 +517,10 @@ if __name__ == '__main__':
         
         sensor_scanner = SensorScanner()
         sensor_scanner.start()
+        
+        #manually adds the sensors saved in the configuration file
+        for sensor in CFG.content['sensors']:
+            sensor_scanner.add(CFG.content['sensors'][sensor]['name'], CFG.content['sensors'][sensor]['URL'])
         
         #######TO be remove when bottle changes to version 0.13
         server = "cherrypy"

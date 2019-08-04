@@ -22,17 +22,8 @@
         </div>
 
     </div>
-  <form>
-    <div class="form-group">
-      <div class="input-group">
-        <div class="input-group-addon"><i class="fa fa-search"></i></div>
 
-        <input type="text" class="form-control" placeholder="Filter devices " ng-model="filterEthoscopes">
-
-      </div>      
-    </div>
-  </form>
-
+<div ng-if="sensors[0] != undefined">
 <table class="table table-striped" ng-cloak>
             <thead>
             <th>
@@ -104,7 +95,18 @@
             </tr>
         </tbody>
 </table>
+</div>
 
+  <form>
+    <div class="form-group">
+      <div class="input-group">
+        <div class="input-group-addon"><i class="fa fa-search"></i></div>
+
+        <input type="text" class="form-control" placeholder="Filter devices " ng-model="filterEthoscopes">
+
+      </div>      
+    </div>
+  </form>
 
 <table class="table table-striped" ng-cloak>
             <thead>

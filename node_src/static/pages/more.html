@@ -283,23 +283,32 @@
         <ul class="list-group col-xs-12">
             <h3>Users</h3>
             <div class="input">
-                <select ng-model="selected['user'].name" ng-change="nodeManagement.loadUserData()">
+                <select ng-model="selected['users'].name" ng-change="nodeManagement.loadData('users')">
                   <option ng-repeat="(key, entry) in users" value="{{key}}" >{{key}}</option>
                 </select>
                     <button class="btn btn-info" data-toggle="modal" data-target="#addUserModal"><i class="fa fa-lg fa-edit"></i></button>
-                    <button class="btn btn-info" data-toggle="modal" data-target="#addUserModal" ng-click="selected['user'] = {}; "><i class="fa fa-lg fa-plus"></i></button>
+                    <button class="btn btn-info" data-toggle="modal" data-target="#addUserModal" ng-click="selected['users'] = {}; "><i class="fa fa-lg fa-plus"></i></button>
             </div>
         </ul>
         <ul class="list-group col-xs-12">
             <h3>Incubators</h3>
             <div class="input">
-                <select ng-model="selected['incubator'].name" ng-change="nodeManagement.loadIncubatorData()">
+                <select ng-model="selected['incubators'].name" ng-change="nodeManagement.loadData('incubators')">
                   <option ng-repeat="(key, entry) in incubators" value="{{key}}" >{{key}}</option>
                 </select>
                     <button class="btn btn-info" data-toggle="modal" data-target="#addIncubatorModal"><i class="fa fa-lg fa-edit"></i></button>
-                    <button class="btn btn-info" data-toggle="modal" data-target="#addIncubatorModal" ng-click="selected['incubator'] = {}; "><i class="fa fa-lg fa-plus"></i></button>
+                    <button class="btn btn-info" data-toggle="modal" data-target="#addIncubatorModal" ng-click="selected['incubators'] = {}; "><i class="fa fa-lg fa-plus"></i></button>
             </div>
-
+        </ul>
+        <ul class="list-group col-xs-12">
+            <h3>Sensors</h3>
+            <div class="input">
+                <select ng-model="selected['sensors'].name" ng-change="nodeManagement.loadData('sensors')">
+                  <option ng-repeat="(key, entry) in sensors" value="{{key}}" >{{key}}</option>
+                </select>
+                    <button class="btn btn-info" data-toggle="modal" data-target="#addSensorModal"><i class="fa fa-lg fa-edit"></i></button>
+                    <button class="btn btn-info" data-toggle="modal" data-target="#addSensorModal" ng-click="selected['sensor'] = {}; "><i class="fa fa-lg fa-plus"></i></button>
+            </div>
         </ul>
 
     </div>
@@ -318,16 +327,16 @@
       <div class="modal-body">
         <form name="adduserForm">
             <div class="form-group" hidden>
-                <label class="input"><span>ID</span><input type="number" min="1" name='id' readonly="readonly" ng-model="selected['user'].id" style="display:inline"></label>
-                <label class="input"><span>name</span><input type="text" name='name' readonly="readonly" ng-model="selected['user'].name" style="display:inline" required ng-required="true" ></label>
+                <label class="input"><span>ID</span><input type="number" min="1" name='id' readonly="readonly" ng-model="selected['users'].id" style="display:inline"></label>
+                <label class="input"><span>name</span><input type="text" name='name' readonly="readonly" ng-model="selected['users'].name" style="display:inline" required ng-required="true" ></label>
             </div>
-            <label class="input"><span ng-hide="selected['user'].fullname != null">Full Name</span><input type="text" name="fullname" ng-model="selected['user'].fullname" ng-blur="nodeManagement.createUsername()" required ng-required="true" style="width: 240px;" title="Firstname Lastname"></label>
-            <label class="input"><span ng-hide="selected['user'].PIN != null">PIN</span><input type="number" name="PIN" ng-model="selected['user'].PIN" maxlength="4" required oninput="maxLengthCheck(this)" required ng-required="true"  title="A four digits number"></label>
-            <label class="input"><span ng-hide="selected['user'].email != null">Email address</span><input type="email" name="email" ng-model="selected['user'].email" required ng-required="true" required ng-required="true" style="width: 240px;"  title="A working email for notifications"></label>
-            <label class="input"><span ng-hide="selected['user'].telephone != null">Telephone number</span><input type="tel" name="telephone" ng-model="selected['user'].telephone" ng-pattern="phoneNumbr" style="width: 240px;" title="Phone number with internationl prefix"></label>
-            <label class="input"><span ng-hide="selected['user'].group != null">Laboratory or team</span><input type="text" name="group" ng-model="selected['user'].group" style="width: 240px;"  title="The name of the lab, team, research group"></label>
-            <label><input type="checkbox" name='active' ng-model="selected['user'].active" title="Can this user use ethoscopes?"><span> is Active?</span></label>
-            <label><input type="checkbox" name='isAdmin' ng-model="selected['user'].isAdmin" title="Does this user have admin priviledges?"><span> is Admin?</span></label>
+            <label class="input"><span ng-hide="selected['users'].fullname != null">Full Name</span><input type="text" name="fullname" ng-model="selected['users'].fullname" ng-blur="nodeManagement.createUsername()" required ng-required="true" style="width: 240px;" title="Firstname Lastname"></label>
+            <label class="input"><span ng-hide="selected['users'].PIN != null">PIN</span><input type="number" name="PIN" ng-model="selected['users'].PIN" maxlength="4" required oninput="maxLengthCheck(this)" required ng-required="true"  title="A four digits number"></label>
+            <label class="input"><span ng-hide="selected['users'].email != null">Email address</span><input type="email" name="email" ng-model="selected['users'].email" required ng-required="true" required ng-required="true" style="width: 240px;"  title="A working email for notifications"></label>
+            <label class="input"><span ng-hide="selected['users'].telephone != null">Telephone number</span><input type="tel" name="telephone" ng-model="selected['users'].telephone" ng-pattern="phoneNumbr" style="width: 240px;" title="Phone number with internationl prefix"></label>
+            <label class="input"><span ng-hide="selected['users'].group != null">Laboratory or team</span><input type="text" name="group" ng-model="selected['users'].group" style="width: 240px;"  title="The name of the lab, team, research group"></label>
+            <label><input type="checkbox" name='active' ng-model="selected['users'].active" title="Can this user use ethoscopes?"><span> is Active?</span></label>
+            <label><input type="checkbox" name='isAdmin' ng-model="selected['users'].isAdmin" title="Does this user have admin priviledges?"><span> is Admin?</span></label>
         </form>
       </div>
       <div class="modal-footer">
@@ -350,18 +359,46 @@
       <div class="modal-body">
         <form name="addIncubatorForm">
             <div class="form-group" hidden>
-                <label class="input"><span>ID</span><input type="number" min="1" name='id' readonly="readonly" ng-model="selected['incubator'].id" style="display:inline"></label>
+                <label class="input"><span>ID</span><input type="number" min="1" name='id' readonly="readonly" ng-model="selected['incubators'].id" style="display:inline"></label>
             </div>
-            <label class="input"><span ng-hide="selected['incubator'].name != null">Incubator Name</span><input type="text" name="name" ng-model="selected['incubator'].name" required ng-required="true" style="width: 240px;"></label>
-            <label class="input"><span ng-hide="selected['incubator'].location != null">Location</span><input type="text" name="location" ng-model="selected['incubator'].location" style="width: 240px;"></label>
-            <label class="input"><span ng-hide="selected['incubator'].owner != null">The lab or team owning</span><input type="text" name="owner" ng-model="selected['incubator'].owner" style="width: 240px;"></label>
-            <label class="input"><span ng-hide="selected['incubator'].description != null">Description</span><textarea name="description" ng-model="selected['incubator'].description" style="width: 240px;"></textarea></label>
-            <label><input type="checkbox" name="active" ng-model="selected['incubator'].active"><span>is Active?</span></label>
+            <label class="input"><span ng-hide="selected['incubators'].name != null">Incubator Name</span><input type="text" name="name" ng-model="selected['incubators'].name" required ng-required="true" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['incubators'].location != null">Location</span><input type="text" name="location" ng-model="selected['incubators'].location" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['incubators'].owner != null">The lab or team owning</span><input type="text" name="owner" ng-model="selected['incubators'].owner" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['incubators'].description != null">Description</span><textarea name="description" ng-model="selected['incubators'].description" style="width: 240px;"></textarea></label>
+            <label><input type="checkbox" name="active" ng-model="selected['incubators'].active"><span>is Active?</span></label>
         </form>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
         <button class="btn btn-danger" ng-click="nodeManagement.addincubator()"  data-dismiss="modal" ng-disabled="addIncubatorForm.$invalid">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal ADD or EDIT Incubator -->
+<div class="modal fade" id="addSensorModal" tabindex="-1" role="dialog" aria-labelledby="addSensorLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Incubator Editor</h4>
+      </div>
+      <div class="modal-body">
+        <form name="addSensorForm">
+            <div class="form-group" hidden>
+                <label class="input"><span>ID</span><input type="number" min="1" name='id' readonly="readonly" ng-model="selected['sensors'].id" style="display:inline"></label>
+            </div>
+            <label class="input"><span ng-hide="selected['sensors'].name != null">Sensor Name</span><input type="text" name="name" ng-model="selected['sensors'].name" required ng-required="true" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['sensors'].URL != null">URL</span><input type="url" name="url" ng-model="selected['sensors'].URL" required ng-required="true" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['sensors'].location != null">Location</span><input type="text" name="location" ng-model="selected['sensors'].location" required ng-required="true" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['sensors'].description != null">Description</span><textarea name="description" ng-model="selected['sensors'].description" style="width: 240px;"></textarea></label>
+            <label><input type="checkbox" name="active" ng-model="selected['sensors'].active"><span>is Active?</span></label>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button class="btn btn-danger" ng-click="nodeManagement.addsensor()"  data-dismiss="modal" ng-disabled="addSensorForm.$invalid">Save</button>
       </div>
     </div>
   </div>
