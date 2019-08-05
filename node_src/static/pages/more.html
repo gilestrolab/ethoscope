@@ -225,28 +225,26 @@
     </div>
 
     <div class="col-xs-12">
-        <button class="btn btn-danger" data-toggle="modal" data-target="#powerOffAlert">Power off Node</button>
+        <button class="btn btn-danger" data-toggle="modal" data-target="#RestartAlert">Restart Node</button>
         <a href="ssh://node@{{nodeManagement.info.IPs[0]}}"><button class="btn btn-info">SSH in the Node</button></a>
     </div>
 
 </div>
 
 <!-- Modal power off -->
-<div class="modal fade" id="powerOffAlert" tabindex="-1" role="dialog" aria-labelledby="powerOffAlertLabel" aria-hidden="true">
+<div class="modal fade" id="RestartAlert" tabindex="-1" role="dialog" aria-labelledby="RestartAlertLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="myModalLabel">Power off the node</h4>
+        <h4 class="modal-title" id="myModalLabel">Restart the node</h4>
       </div>
       <div class="modal-body">
-       <p>Do you want to power off the Node?</p>
-       <p>You won't be able to connect to this website anymore.</p>
-       <p>To power on Node again, you need to physically push the ON button.</p>
+       <p>Do you want to restart the Node?</p>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
-        <button class="btn btn-danger" ng-click="nodeManagement.action('poweroff')">Power off Node</button>
+        <button class="btn btn-danger" ng-click="nodeManagement.action('restart')">Restart Node</button>
       </div>
     </div>
   </div>
@@ -390,7 +388,7 @@
                 <label class="input"><span>ID</span><input type="number" min="1" name='id' readonly="readonly" ng-model="selected['sensors'].id" style="display:inline"></label>
             </div>
             <label class="input"><span ng-hide="selected['sensors'].name != null">Sensor Name</span><input type="text" name="name" ng-model="selected['sensors'].name" required ng-required="true" style="width: 240px;"></label>
-            <label class="input"><span ng-hide="selected['sensors'].URL != null">URL</span><input type="url" name="url" ng-model="selected['sensors'].URL" required ng-required="true" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['sensors'].URL != null">URL</span><input type="text" name="url" ng-model="selected['sensors'].URL" required ng-required="true" style="width: 240px;"></label>
             <label class="input"><span ng-hide="selected['sensors'].location != null">Location</span><input type="text" name="location" ng-model="selected['sensors'].location" required ng-required="true" style="width: 240px;"></label>
             <label class="input"><span ng-hide="selected['sensors'].description != null">Description</span><textarea name="description" ng-model="selected['sensors'].description" style="width: 240px;"></textarea></label>
             <label><input type="checkbox" name="active" ng-model="selected['sensors'].active"><span>is Active?</span></label>

@@ -389,11 +389,13 @@ def node_info(req):#, device):
 def node_actions():
     action = bottle.request.json
     
-    if action['action'] == 'poweroff':
-        logging.info('User request a poweroff, shutting down system. Bye bye.')
-        close()
-        #poweroff = subprocess.Popen(['poweroff'], stdout=subprocess.PIPE)
-    
+    if action['action'] == 'restart':
+        logging.info('User requested a service restart.')
+        with os.popen("systemctl restart ethoscope_node.service") as po:
+            r = po.read()
+        
+        return r
+            
     elif action['action'] == 'close':
         close()
     
