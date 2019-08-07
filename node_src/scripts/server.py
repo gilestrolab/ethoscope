@@ -319,8 +319,6 @@ def node_info(req):#, device):
 
         CARDS = {}
         IPs = []
-        GIT_BRANCH = "Not detected"
-        NEEDS_UPDATE = False
 
         CFG.load()
 
@@ -335,7 +333,7 @@ def node_info(req):#, device):
             
            
             with os.popen('git rev-parse --abbrev-ref HEAD') as df:
-                GIT_BRANCH = df.read()
+                GIT_BRANCH = df.read() or "Not detected"
             #df = subprocess.Popen(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], stdout=subprocess.PIPE)
             #GIT_BRANCH = df.communicate()[0].decode('utf-8')
             
@@ -344,11 +342,14 @@ def node_info(req):#, device):
 
             #df = subprocess.Popen(['git', 'status', '-s', '-uno'], stdout=subprocess.PIPE)
             #NEEDS_UPDATE = df.communicate()[0].decode('utf-8') != ""
+            
+            with os.popen('systemctl status ethoscope_node.service | grep Active') as df:
+                ACTIVE_SINCE = df.read() or "Not running trough systemd"
 
         except Exception as e:
             logging.error(e)
 
-        return {'disk_usage': disk_usage, 'IPs' : IPs , 'CARDS': CARDS, 'GIT_BRANCH': GIT_BRANCH, 'NEEDS_UPDATE': NEEDS_UPDATE}
+        return {'active_since': ACTIVE_SINCE, 'disk_usage': disk_usage, 'IPs' : IPs , 'CARDS': CARDS, 'GIT_BRANCH': GIT_BRANCH, 'NEEDS_UPDATE': NEEDS_UPDATE}
                 
     elif req == 'time':
         return {'time':datetime.datetime.now().isoformat()}
