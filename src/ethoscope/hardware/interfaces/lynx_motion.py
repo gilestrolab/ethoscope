@@ -143,7 +143,7 @@ class SimpleLynxMotionInterface(BaseInterface):
         if channel < 1:
             raise Exception("idx must be greater or equal to one")
         pulse = self._angle_to_pulse(angle)
-        instruction = "# %i P %i T %i\r" % (channel - 1,pulse,duration)
+        instruction = b"# %i P %i T %i\r" % (channel - 1,pulse,duration)
         o = self._serial.write(instruction)
         time.sleep(float(duration)/1000.0)
         return o
@@ -164,7 +164,7 @@ class SimpleLynxMotionInterface(BaseInterface):
         if channel < 1:
             raise Exception("idx must be greater or equal to one")
         pulse = self._speed_to_pulse(speed)
-        instruction = "# %i P %i T %i\r" % (channel - 1,pulse,duration)
+        instruction = b"# %i P %i T %i\r" % (channel - 1,pulse,duration)
         o = self._serial.write(instruction)
         time.sleep(float(duration)/1000.0)
         return o        
