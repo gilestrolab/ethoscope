@@ -1,4 +1,4 @@
-board /*
+/*
   ESP32 mDNS responder sample
 
   This is an example of an HTTP server that is accessible
@@ -20,7 +20,7 @@ board /*
     - For Mac OSX and iOS support is built in through Bonjour already.
   - Point your browser to http://etho_sensor.local, you should see a response.
 
- */
+*/
 
 
 #include <WiFi.h>
@@ -117,7 +117,7 @@ void setup(void)
 
     // Add service to MDNS-SD
     //MDNS.addService("http", "tcp", 80);
-    MDNS.addService("sensor", "tcp", 80);
+    MDNS.addService("_sensor", "_tcp", 80);
 
     // Initialise BME 280 I2C sensor
     bme.begin(0x76);
@@ -146,7 +146,10 @@ void saveConfiguration()
 
 }
 
-//GET http://url/set?location=test
+//to rename from commandline use the following command
+//curl -d location=Incubator_1A -d sensor_name=etho_sensor_1A -G http://DEVICE_IP/set
+//DEVICE_IP can be found opening the serial port
+
 void handlePost() {
   if (server.hasArg("location")) {
     //cfg.location = (char*) server.arg("location").c_str();
