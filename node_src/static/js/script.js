@@ -59,8 +59,10 @@
 
         $http.get('/sensors').success(function(data){
             $scope.sensors = data;
-            console.log($scope.sensors.length);
+            $scope.has_sensors = Object.keys($scope.sensors).length;
         });
+        
+        
         
 
         var get_date = function(){

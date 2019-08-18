@@ -524,7 +524,7 @@ class DeviceScanner(object):
         device = self._Device(url, self.device_refresh_period, results_dir = self.results_dir )
         device.zeroconf_name = name
         device.start()
-        logging.info("New device manually added with id = %s at URL = %s" % (device.id(), url))
+        logging.info("New device manually added with name = %s, id = %s at URL = %s" % (name, device.id(), url))
         self.devices.append(device)
         
     def add_service(self, zeroconf, type, name):

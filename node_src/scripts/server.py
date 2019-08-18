@@ -524,10 +524,10 @@ if __name__ == '__main__':
         sensor_scanner = SensorScanner()
         sensor_scanner.start()
         
-        #manually adds the sensors saved in the configuration file
-        for sensor in CFG.content['sensors']:
-            if CFG.content['sensors'][sensor]['active']:
-                sensor_scanner.add(CFG.content['sensors'][sensor]['name'], CFG.content['sensors'][sensor]['URL'])
+#        #manually adds the sensors saved in the configuration file
+#        for sensor in CFG.content['sensors']:
+#            if CFG.content['sensors'][sensor]['active']:
+#                sensor_scanner.add(CFG.content['sensors'][sensor]['name'], CFG.content['sensors'][sensor]['URL'])
         
         #######TO be remove when bottle changes to version 0.13
         server = "cherrypy"
