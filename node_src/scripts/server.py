@@ -343,8 +343,11 @@ def node_info(req):#, device):
             #df = subprocess.Popen(['git', 'status', '-s', '-uno'], stdout=subprocess.PIPE)
             #NEEDS_UPDATE = df.communicate()[0].decode('utf-8') != ""
             
-            with os.popen('systemctl status ethoscope_node.service | grep Active') as df:
-                ACTIVE_SINCE = df.read() or "Not running trough systemd"
+            with os.popen('systemctl status ethoscope_node.service') as df:
+                try:
+                    ACTIVE_SINCE = df.read().split("\n")[2] 
+                except:
+                    ACTIVE_SINCE = "Not running through systemd"
 
         except Exception as e:
             logging.error(e)
