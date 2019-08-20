@@ -82,6 +82,9 @@ void setup(void)
     WiFi.begin(ssid, password);
     Serial.println("");
 
+    // We remove power save functions on WiFi to try and solve the mDNS disappearance issue
+    WiFi.setSleep(false);
+
     // Wait for connection
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
