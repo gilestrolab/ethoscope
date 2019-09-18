@@ -4,7 +4,7 @@
   This is an example of an HTTP server that is accessible
   via http://esp32.local URL thanks to mDNS responder.
 
-  Soldier together the two sensors boards, using the same header
+  Soldier together the two sensors boards (BME280 and BH1750), using the same header
   then connect to the ESP32 
   VCC -> 3.3V
   Gnd -> Gnd
@@ -124,7 +124,10 @@ void setup(void)
 
     // Initialise BME 280 I2C sensor
     bme.begin(0x76);
-    LightSensor.begin();  
+    LightSensor.begin();
+
+    readEnv();
+    Serial.println(SendJSON());
     
 }
 
@@ -176,12 +179,16 @@ void handle_OnID(void) {
     server.send(200, "application/json", ptr);
 }
 
-void handle_OnConnect(void) {
+void readEnv(void){
     env.temperature = bme.readTemperature();
     env.humidity = bme.readHumidity();
     env.pressure = bme.readPressure() / 100.0F;
     env.lux = LightSensor.GetLightIntensity();
+  }
+
+void handle_OnConnect(void) {
 //  server.send(200, "text/html", SendHTML());
+    readEnv();
     server.send(200, "application/json", SendJSON());
 
 }
