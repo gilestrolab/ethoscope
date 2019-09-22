@@ -1,5 +1,6 @@
 (function(){
     var app = angular.module('flyApp', ['ngRoute','daterangepicker']);
+    
     app.filter("toArray", function(){
         return function(obj) {
             var result = [];
@@ -8,6 +9,20 @@
             });
             return result;
         };
+    });
+
+    app.filter('orderObjectBy', function() {
+      return function(items, field, reverse) {
+        var filtered = [];
+        angular.forEach(items, function(item) {
+          filtered.push(item);
+        });
+        filtered.sort(function (a, b) {
+          return (a[field] > b[field] ? 1 : -1);
+        });
+        if(reverse) filtered.reverse();
+        return filtered;
+      };
     });
 
     // configure our routes
@@ -53,7 +68,8 @@
 //            t = new Date(data.time);
 //            $scope.time = t.toString();
 //        });
-        $http.get('/devices_list').success(function(data){
+
+        $http.get('/devices').success(function(data){
             $scope.devices = data;
         });
 

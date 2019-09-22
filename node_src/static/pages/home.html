@@ -27,7 +27,7 @@
 <table class="table table-striped" ng-cloak>
             <thead>
             <th>
-                <a href="#" ng-click="sortType = 'name'; sortReverse = !sortReverse">
+                <a href="#" ng-click="sortType = 'name'; sortReverse = !sortReverse; orderSensors = True">
                 Name
                 <span ng-show="sortType == 'name' && !sortReverse" class="fa fa-caret-down"></span>
                 <span ng-show="sortType == 'name' && sortReverse" class="fa fa-caret-up"></span>
@@ -76,7 +76,7 @@
             </th>
             </thead>
             <tbody>
-            <tr ng-repeat="sensor in sensors |  orderBy:sortType:sortReverse">
+            <tr ng-repeat="sensor in sensors |  orderObjectBy:sortType:sortReverse:orderSensors">
                 <td>
                     <div ng-if="sensor.status != 'offline'">
                         <a ng-href="/#sensor/{{sensor.id}}" target="_blank">
@@ -111,7 +111,7 @@
 <table class="table table-striped" ng-cloak>
             <thead>
             <th>
-                <a href="#" ng-click="sortType = 'name'; sortReverse = !sortReverse">
+                <a href="#" ng-click="sortType = 'name'; sortReverse = !sortReverse; orderEthoscopes = True">
                 Name
                 <span ng-show="sortType == 'name' && !sortReverse" class="fa fa-caret-down"></span>
                 <span ng-show="sortType == 'name' && sortReverse" class="fa fa-caret-up"></span>
@@ -161,7 +161,7 @@
             <th><center>Select</center></th>
             </thead>
             <tbody>
-            <tr ng-repeat="device in devices |  orderBy:sortType:sortReverse | filter:filterEthoscopes">
+            <tr ng-repeat="device in devices |  orderObjectBy:sortType:sortReverse:orderEthoscopes | filter:filterEthoscopes">
                 <td>
                     <div ng-if="device.status != 'offline'">
                         <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
