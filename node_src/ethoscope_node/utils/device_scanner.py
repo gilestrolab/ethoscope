@@ -473,6 +473,8 @@ class DeviceScanner(object):
     
     _suffix = ".local" 
     _service_type = "_ethoscope._tcp.local." 
+    _device_type = "ethoscope"
+
     
     def __init__(self, device_refresh_period = 5, results_dir="/ethoscope_data/results", deviceClass=Device):
         self._zeroconf = Zeroconf()
@@ -515,7 +517,7 @@ class DeviceScanner(object):
             if device.id()==id:
                 return device
         # Not found, so produce an error
-        raise KeyError("No such device: %s" % id)
+        raise KeyError("No such %s device: %s" % (self._device_type, id) )
         
     def add(self, name, url):
         """
@@ -524,7 +526,7 @@ class DeviceScanner(object):
         device = self._Device(url, self.device_refresh_period, results_dir = self.results_dir )
         device.zeroconf_name = name
         device.start()
-        logging.info("New device manually added with name = %s, id = %s at URL = %s" % (name, device.id(), url))
+        logging.info("New %s manually added with name = %s, id = %s at URL = %s" % (self._device_type, name, device.id(), url))
         self.devices.append(device)
         
     def add_service(self, zeroconf, type, name):
@@ -553,7 +555,7 @@ class DeviceScanner(object):
                 device = self._Device(ip, self.device_refresh_period, results_dir = self.results_dir )
                 device.zeroconf_name = name
                 device.start()
-                logging.info("New device detected with id = %s at IP = %s" % (device.id(), ip))
+                logging.info("New %s detected with id = %s at IP = %s" % (self._device_type, device.id(), ip))
                 self.devices.append(device)
         
         except Exception as error:
@@ -566,7 +568,7 @@ class DeviceScanner(object):
         """
         for device in self.devices:
             if device.zeroconf_name == name:
-                logging.info("Device with id = %s has gone down" % device.id())
+                logging.info("%s with id = %s has gone down" % (self._device_type.capitalize(), device.id() ))
                 #we do not remove devices from the list when they go down so that keep a record of them in the node
                 #self.devices.remove(device)
                 return
@@ -577,6 +579,7 @@ class SensorScanner(DeviceScanner):
     """
     _suffix = ".local" 
     _service_type = "_sensor._tcp.local." 
+    _device_type = "sensor"
     
     def __init__(self, device_refresh_period = 60, deviceClass=Sensor):
         self._zeroconf = Zeroconf()
