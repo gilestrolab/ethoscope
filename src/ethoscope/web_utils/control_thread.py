@@ -307,6 +307,11 @@ class ControlThread(Thread):
 
         self._monit.run(result_writer, self._drawer)
 
+    def _has_pickle_file(self):
+        """
+        """
+        return os.path.exists(self._persistent_state_file)
+
     def _set_tracking_from_pickled(self):
         """
         """
@@ -401,15 +406,18 @@ class ControlThread(Thread):
             self._last_info_t_stamp = 0
             self._last_info_frame_idx = 0
 
-            try:
-                cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_pickled()
 
-            except FileNotFoundError:
+            if self._has_pickle_file():
+                try:
+                    cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_pickled()
+
+                except Exception as e:
+                    logging.error("Could not load previous state for unexpected reason:")
+                    raise e
+
+            else:
                 cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
                 
-            except Exception as e:
-                logging.error("Could not load previous state for unexpected reason:")
-                raise e
             
             with rw as result_writer:
                 if cam.canbepickled:
