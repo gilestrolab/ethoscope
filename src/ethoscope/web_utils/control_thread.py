@@ -31,8 +31,8 @@ class ExperimentalInformations(DescribedObject):
     
         _description  = {   "overview": "Optional information about your experiment",
                             "arguments": [
-                                    {"type": "str", "name": "name", "description": "Who are you?", "default" : "", 'asknode' : 'users'},
-                                    {"type": "str", "name": "location", "description": "Where is your device","default" : "", 'asknode' : 'incubators'},
+                                    {"type": "str", "name": "name", "description": "Who are you?", "default" : "", "asknode" : "users"},
+                                    {"type": "str", "name": "location", "description": "Where is your device","default" : "", "asknode" : "incubators"},
                                     {"type": "str", "name": "code", "description": "Would you like to add any code to the resulting filename?", "default" : ""}
 
                                    ]}
