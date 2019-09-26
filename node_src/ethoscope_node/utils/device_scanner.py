@@ -285,7 +285,7 @@ class Device(Thread):
         '''
         Return a list of file videos available on the ethoscope or virtuascope
         '''
-        videofiles_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_page['videofiles'], self._id)
+        videofiles_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_pages['videofiles'], self._id)
         out = self._get_json(videofiles_url)
         return out
 
