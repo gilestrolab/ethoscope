@@ -23,7 +23,7 @@ function maxLengthCheck(object) {
         $scope.selected_all = false;
         $scope.showOptions = true;
         $scope.options = [{name:"Browse / Download Files",
-                            icon:"fa fa-folder-open-o",
+                            icon:"fa fa-folder-open",
                             color:"alert alert-info",
                             style:"font-size:36px; padding:10px",
                             opt: "browse"

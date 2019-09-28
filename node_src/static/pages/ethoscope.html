@@ -39,7 +39,11 @@
                 <br>
                 <span class="fa fa-map-marker"></span> Location: {{device.experimental_info.location}}
                 <br>
-                <span ng-if="device.status == 'running'" class="fa fa-tachometer"></span> {{device.monitor_info.fps}} FPS
+                <span ng-if="device.status == 'running'" class="fas fa-tachometer-alt"></span> {{device.monitor_info.fps}} FPS
+                <br>
+                <span ng-if="device.CPU_temp > 70" class="fas fa-temperature-high"></span>
+                <span ng-if="device.CPU_temp <= 70" class="fas fa-temperature-low"></span> {{device.CPU_temp}} &#8451
+                
             </p>
 
         </div>
