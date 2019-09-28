@@ -354,7 +354,9 @@ class PiFrameGrabber(multiprocessing.Process):
                 logging.warning(capture)
                 capture.resolution = self._target_resolution
                 #disable auto white balance to address the following issue: https://github.com/raspberrypi/firmware/issues/1167
-                capture.awb_mode = 'off'
+                #however setting this to off would have to be coupled with custom gains
+                #capture.awb_mode = 'off'
+                capture.awb_mode = 'auto'
 
                 capture.framerate = self._target_fps
                 raw_capture = PiRGBArray(capture, size=self._target_resolution)

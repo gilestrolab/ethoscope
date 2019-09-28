@@ -103,7 +103,9 @@ class PiCameraProcess(multiprocessing.Process):
                 camera.resolution = self._resolution
                 camera.framerate = self._fps
                 #disable auto white balance to address the following issue: https://github.com/raspberrypi/firmware/issues/1167
-                camera.awb_mode = 'off'             
+                #however setting this to off would have to be coupled with custom gains
+                #camera.awb_mode = 'off'             
+                camera.awb_mode = 'auto'             
                 
                 if not self._stream:
                     output = self._make_video_name(i)
