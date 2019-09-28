@@ -4,7 +4,7 @@ import logging
 import traceback
 from optparse import OptionParser
 from ethoscope.web_utils.control_thread import ControlThread
-from ethoscope.web_utils.helpers import get_machine_id, get_machine_name, get_git_version, file_in_dir_r, get_etc_hostnames, pi_version, set_machine_name, set_machine_id, set_etc_hostname, get_WIFI, set_WIFI
+from ethoscope.web_utils.helpers import get_machine_id, get_machine_name, get_git_version, file_in_dir_r, get_etc_hostnames, pi_version, set_machine_name, set_machine_id, set_etc_hostname, get_WIFI, set_WIFI, get_core_temperature
 from ethoscope.web_utils.record import ControlThreadVideoRecording
 import subprocess
 import json
@@ -271,7 +271,8 @@ def info(id):
         
     info = control.info
     info["current_timestamp"] = bottle.time.time()
-    
+    info["CPU_temp"] = get_core_temperature()
+        
     return info
 
 @api.get('/user_options/<id>')
