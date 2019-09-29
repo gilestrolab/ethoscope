@@ -269,9 +269,12 @@ def get_core_temperature():
     """
     Returns the internal core temperature in degrees celsius
     """
-    try:
-        with os.popen("/opt/vc/bin/vcgencmd measure_temp") as df:
-            temp = float("".join(filter(lambda d: str.isdigit(d) or d == '.', df.read())))
-        return temp
-    except:
+    if isMachinePI():
+        try:
+            with os.popen("/opt/vc/bin/vcgencmd measure_temp") as df:
+                temp = float("".join(filter(lambda d: str.isdigit(d) or d == '.', df.read())))
+            return temp
+        except:
+            return 0
+    else: 
         return 0
