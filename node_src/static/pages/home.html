@@ -168,7 +168,9 @@
                         <span>{{device.name}}</span>
                         </a>
                     </div>
-                    <div ng-if="device.status == 'offline'"><span class="fa fa-circle"></span><span> {{device.name}}</span></div>
+                    <div ng-if="device.status == 'offline'">
+                        <span>{{device.name}}</span>
+                    </div>
                 </td>
                 <td>
                 <span ng-if="device.status == 'initialising'" class="fas fa-spinner" title={{device.status}}></span>
