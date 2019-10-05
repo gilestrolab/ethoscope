@@ -3,7 +3,7 @@ from os import path
 import traceback
 import logging
 import time
-from ethoscope.web_utils.control_thread import ControlThread, ExperimentalInformations
+from ethoscope.web_utils.control_thread import ControlThread, ExperimentalInformation
 from ethoscope.utils.description import DescribedObject
 import os
 import tempfile
@@ -102,10 +102,14 @@ class PiCameraProcess(multiprocessing.Process):
             with picamera.PiCamera() as camera:
                 camera.resolution = self._resolution
                 camera.framerate = self._fps
+                
                 #disable auto white balance to address the following issue: https://github.com/raspberrypi/firmware/issues/1167
                 #however setting this to off would have to be coupled with custom gains
-                #camera.awb_mode = 'off'             
-                camera.awb_mode = 'auto'             
+                #some suggestion on how to set the gains can be found here: https://picamera.readthedocs.io/en/release-1.12/recipes1.html
+                #and here: https://github.com/waveform80/picamera/issues/182
+                #capture.awb_mode = 'off'
+                #capture.awb_gains = (1.8, 1.5)
+                capture.awb_mode = 'auto'
                 
                 if not self._stream:
                     output = self._make_video_name(i)
@@ -208,7 +212,7 @@ class ControlThreadVideoRecording(ControlThread):
                 "possible_classes":[StandardVideoRecorder, HDVideoRecorder, GeneralVideoRecorder, Streamer],
             },
         "experimental_info":{
-                        "possible_classes":[ExperimentalInformations],
+                        "possible_classes":[ExperimentalInformation],
                 }
      }
     for k in _option_dict:
