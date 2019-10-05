@@ -13,6 +13,8 @@ import os
 import urllib.request, urllib.error, urllib.parse
 import json
 
+#from ethoscope.web_utils.helpers import get_core_temperature
+
 class ScanException(Exception):
     pass
         
@@ -199,13 +201,24 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
 class SensorDataToMySQLHelper(object):
     _table_name = "SENSORS"
-    
+    _table_headers = {"id" : "INT NOT NULL AUTO_INCREMENT PRIMARY KEY", 
+                      "t"  : "INT",
+                      "temperature" : "FLOAT",
+                      "humidity": "FLOAT",
+                      "light": "INT",
+                      "cpu": "FLOAT"}
+   
     @property
     def table_name (self):
         return self._table_name
 
-    def __init__(self, sensor_url, period=300.0):
+    @property
+    def create_command(self):
+        return ",".join([ "%s %s" % (key, self._table_headers[key]) for key in self._table_headers])
+
+    def __init__(self, sensor_url, period=150):
         """
+        :param sensor_url: the URL of the sensor to be interrogated
         :param period: how often sensor data are saved, in seconds
         :return:
         """
@@ -226,23 +239,37 @@ class SensorDataToMySQLHelper(object):
         if tick == self._last_tick:
             return
 
-        sensor_data = get_json_from_url(self._sensor_url)
-                
-        cmd = 'INSERT INTO ' + self._table_name + '(id, t, temperature, humidity, light) VALUES (%s, %s, %s, %s, %s)'
-        args = (0, int(t), sensor_data["temperature"], sensor_data["humidity"], sensor_data["light"])
-
         self._last_tick = tick
 
-        return cmd, args
+        try:
+            sensor_data = get_json_from_url(self._sensor_url)
+            #cpu_temperature = get_core_temperature()
+            
+            cmd = 'INSERT INTO ' + self._table_name + '(id, t, temperature, humidity, light) VALUES (%s, %s, %s, %s, %s)'
+            args = (0, int(t), sensor_data["temperature"], sensor_data["humidity"], sensor_data["light"])
+
+            return cmd, args
+        
+        except:
+
+            logging.error("The sensor has gone offline or cannot be reached")
+            return None, None
   
 
 
 class ImgToMySQLHelper(object):
     _table_name = "IMG_SNAPSHOTS"
+    _table_headers = {"id" : "INT NOT NULL AUTO_INCREMENT PRIMARY KEY", 
+                      "t"  : "INT",
+                      "img" : "LONGBLOB"}
 
     @property
     def table_name (self):
         return self._table_name
+
+    @property
+    def create_command(self):
+        return ",".join([ "%s %s" % (key, self._table_headers[key]) for key in self._table_headers])
     
     def __init__(self, period=300.0):
         """
@@ -459,10 +486,10 @@ class ResultWriter(object):
         self._create_table("VAR_MAP", "var_name CHAR(100), sql_type CHAR(100), functional_type CHAR(100)")
 
         if self._shot_saver is not None:
-            self._create_table(self._shot_saver.table_name, "id INT  NOT NULL AUTO_INCREMENT PRIMARY KEY , t INT, img LONGBLOB")
+            self._create_table(self._shot_saver.table_name, self._shot_saver.create_command)
 
         if self._sensor_saver is not None:
-            self._create_table(self._sensor_saver.table_name, "id INT  NOT NULL AUTO_INCREMENT PRIMARY KEY , t INT, temperature FLOAT, humidity FLOAT, light INT")
+            self._create_table(self._sensor_saver.table_name, self._sensor_saver.create_command)
 
 
         logging.info("Creating 'CSV_DAM_ACTIVITY' table")
