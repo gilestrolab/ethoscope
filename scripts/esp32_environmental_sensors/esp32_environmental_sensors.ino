@@ -32,6 +32,8 @@
 #include <Adafruit_BME280.h>
 #include <BH1750FVI.h>
 
+#include "esp_system.h"
+
 #include <WebServer.h>
 
 // To save data in the EEPROM use the following
@@ -39,6 +41,16 @@
 #include <EEPROM.h>
 int addr = 0;
 #define EEPROM_SIZE 64
+
+
+//Watchdog
+const int button = 0;         //gpio to use to trigger delay
+const int wdtTimeout = 3000;  //time in ms to trigger the watchdog
+hw_timer_t *timer = NULL;
+
+void IRAM_ATTR resetModule() {
+  esp_restart();
+}
 
 Adafruit_BME280 bme;
 BH1750FVI LightSensor(BH1750FVI::k_DevModeContLowRes);
@@ -128,7 +140,18 @@ void setup(void)
 
     readEnv();
     Serial.println(SendJSON());
-    
+
+    //Adding a watchdog timer
+    timer = timerBegin(0, 80, true);                  //timer 0, div 80
+    timerAttachInterrupt(timer, &resetModule, true);  //attach callback
+    timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
+    timerAlarmEnable(timer);                          //enable interrupt
+}
+
+void loop(void)
+{
+    server.handleClient();
+    timerWrite(timer, 0); //reset timer (feed watchdog)
 }
 
 void loadConfiguration()
@@ -197,10 +220,6 @@ void handle_NotFound(){
     server.send(404, "text/plain", "Not found");
 }
 
-void loop(void)
-{
-    server.handleClient();
-}
 
 String SendJSON(){
   String ptr = "{\"id\": \"";
