@@ -9,6 +9,43 @@ import tempfile
 import os
 
 
+#this code is reused from device_scanner
+import urllib.request, urllib.error, urllib.parse
+import json
+
+class ScanException(Exception):
+    pass
+        
+#@retry(ScanException, tries=3, delay=1, backoff=1)
+def get_json_from_url(url, timeout=5, post_data=None):
+
+    try:
+        if not url.startswith("http://"): url = "http://" + url
+        req = urllib.request.Request(url, data=post_data, headers={'Content-Type': 'application/json'})
+        f = urllib.request.urlopen(req, timeout=timeout)
+        message = f.read()
+        if not message:
+            # logging.error("URL error whist scanning url: %s. No message back." % self._id_url)
+            raise ScanException("No message back")
+        try:
+            resp = json.loads(message)
+            return resp
+        except ValueError:
+            # logging.error("Could not parse response from %s as JSON object" % self._id_url)
+            raise ScanException("Could not parse Json object")
+    
+    except urllib.error.HTTPError as e:
+        raise ScanException("Error" + str(e.code))
+        #return e
+    
+    except urllib.error.URLError as e:
+        raise ScanException("Error" + str(e.reason))
+        #return e
+    
+    except Exception as e:
+        raise ScanException("Unexpected error" + str(e))
+
+
 class AsyncMySQLWriter(multiprocessing.Process):
 
     def __init__(self, db_credentials, queue, erase_old_db=True):
@@ -160,8 +197,53 @@ class AsyncMySQLWriter(multiprocessing.Process):
             if db is not None:
                 db.close()
 
+class SensorDataToMySQLHelper(object):
+    _table_name = "SENSORS"
+    
+    @property
+    def table_name (self):
+        return self._table_name
+
+    def __init__(self, sensor_url, period=300.0):
+        """
+        :param period: how often sensor data are saved, in seconds
+        :return:
+        """
+
+        self._period = period
+        self._last_tick = 0
+        self._sensor_url = sensor_url
+
+    def flush(self, t):
+        """
+        :param t: the time since start of the experiment, in ms
+        :param sensor_data: a dict containing the sensor data
+        :type sensor_data: dict
+        :return:
+        """
+
+        tick = int(round((t/1000.0)/self._period))
+        if tick == self._last_tick:
+            return
+
+        sensor_data = get_json_from_url(self._sensor_url)
+                
+        cmd = 'INSERT INTO ' + self._table_name + '(id, t, temperature, humidity, light) VALUES (%s, %s, %s, %s, %s)'
+        args = (0, int(t), sensor_data["temperature"], sensor_data["humidity"], sensor_data["light"])
+
+        self._last_tick = tick
+
+        return cmd, args
+  
+
+
 class ImgToMySQLHelper(object):
     _table_name = "IMG_SNAPSHOTS"
+
+    @property
+    def table_name (self):
+        return self._table_name
+    
     def __init__(self, period=300.0):
         """
         :param period: how often snapshots are saved, in seconds
@@ -197,7 +279,7 @@ class ImgToMySQLHelper(object):
         with open(self._tmp_file, "rb") as f:
                 bstring = f.read()
                 
-        cmd = 'INSERT INTO ' + self._table_name + '(id,t,img) VALUES(%s,%s,%s)'
+        cmd = 'INSERT INTO ' + self._table_name + '(id,t,img) VALUES (%s,%s,%s)'
 
         args = (0, int(t), bstring)
 
@@ -343,6 +425,14 @@ class ResultWriter(object):
         self._insert_dict = {}
         if self._metadata is None:
             self._metadata  = {}
+        
+        #experimental infos are a string represeantation of a dict
+        e_info = json.loads(self._metadata["experimental_info"].replace("'","\""))
+        
+        if "sensor" in e_info.keys() and e_info["sensor"] != "":
+            self._sensor_saver = SensorDataToMySQLHelper(sensor_url=e_info["sensor"])
+        else:
+            self._sensor_saver = None
 
         self._var_map_initialised = False
         if erase_old_db:
@@ -369,7 +459,10 @@ class ResultWriter(object):
         self._create_table("VAR_MAP", "var_name CHAR(100), sql_type CHAR(100), functional_type CHAR(100)")
 
         if self._shot_saver is not None:
-            self._create_table("IMG_SNAPSHOTS", "id INT  NOT NULL AUTO_INCREMENT PRIMARY KEY , t INT, img LONGBLOB")
+            self._create_table(self._shot_saver.table_name, "id INT  NOT NULL AUTO_INCREMENT PRIMARY KEY , t INT, img LONGBLOB")
+
+        if self._sensor_saver is not None:
+            self._create_table(self._sensor_saver.table_name, "id INT  NOT NULL AUTO_INCREMENT PRIMARY KEY , t INT, temperature FLOAT, humidity FLOAT, light INT")
 
 
         logging.info("Creating 'CSV_DAM_ACTIVITY' table")
@@ -418,6 +511,10 @@ class ResultWriter(object):
             self._dam_file_helper.input_roi_data(t, roi, dr)
 
     def flush(self, t, img=None):
+        """
+        This is were we actually write SQL commands
+        """
+        
         if self._dam_file_helper is not None:
             out = self._dam_file_helper.flush(t)
             for c in out:
@@ -425,6 +522,11 @@ class ResultWriter(object):
 
         if self._shot_saver is not None and img is not None:
             c_args = self._shot_saver.flush(t, img)
+            if c_args is not None:
+                self._write_async_command(*c_args)
+
+        if self._sensor_saver is not None:
+            c_args = self._sensor_saver.flush(t)
             if c_args is not None:
                 self._write_async_command(*c_args)
 

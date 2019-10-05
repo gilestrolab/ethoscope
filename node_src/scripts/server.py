@@ -384,7 +384,7 @@ def node_info(req):#, device):
         return CFG.content['incubators']
         
     elif req == 'sensors':
-        return CFG.content['sensors']
+        return sensor_scanner.get_all_devices_info()
 
     else:
         raise NotImplementedError()

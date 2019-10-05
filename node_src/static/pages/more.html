@@ -381,7 +381,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="myModalLabel">Incubator Editor</h4>
+        <h4 class="modal-title" id="myModalLabel">Sensor Editor</h4>
       </div>
       <div class="modal-body">
         <form name="addSensorForm">
@@ -390,7 +390,11 @@
             </div>
             <label class="input"><span ng-hide="selected['sensors'].name != null">Sensor Name</span><input type="text" name="name" ng-model="selected['sensors'].name" required ng-required="true" style="width: 240px;"></label>
             <label class="input"><span ng-hide="selected['sensors'].URL != null">URL</span><input type="text" name="url" ng-model="selected['sensors'].URL" required ng-required="true" style="width: 240px;"></label>
+            
+<!--
             <label class="input"><span ng-hide="selected['sensors'].location != null">Location</span><input type="text" name="location" ng-model="selected['sensors'].location" required ng-required="true" style="width: 240px;"></label>
+-->
+            <label class="input"><span ng-hide="selected['sensors'].location != null">Location</span><select name="location" required  ng-model="selected['sensors'].location" required ng-required="true" style="width: 240px;"> <option ng-repeat="(key, entry) in incubators" value="{{key}}" >{{key}}</option> </select></label>
             <label class="input"><span ng-hide="selected['sensors'].description != null">Description</span><textarea name="description" ng-model="selected['sensors'].description" style="width: 240px;"></textarea></label>
             <label><input type="checkbox" name="active" ng-model="selected['sensors'].active"><span>is Active?</span></label>
         </form>

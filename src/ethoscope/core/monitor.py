@@ -119,8 +119,8 @@ class Monitor(object):
                     # if abs_pos is not None:
                     self._last_positions[track_u.roi.idx] = abs_pos
 
-                    if not result_writer is None:
-                        result_writer.write(t,track_u.roi, data_rows)
+                    if result_writer is not None:
+                        result_writer.write(t, track_u.roi, data_rows)
 
                 if result_writer is not None:
                     result_writer.flush(t, frame)

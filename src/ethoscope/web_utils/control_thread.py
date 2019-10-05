@@ -27,20 +27,22 @@ from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
 from ethoscope.utils.description import DescribedObject
 from ethoscope.web_utils.helpers import isMachinePI, hasPiCamera, isExperimental
 
-class ExperimentalInformations(DescribedObject):
+class ExperimentalInformation(DescribedObject):
     
         _description  = {   "overview": "Optional information about your experiment",
                             "arguments": [
                                     {"type": "str", "name": "name", "description": "Who are you?", "default" : "", "asknode" : "users"},
                                     {"type": "str", "name": "location", "description": "Where is your device","default" : "", "asknode" : "incubators"},
-                                    {"type": "str", "name": "code", "description": "Would you like to add any code to the resulting filename?", "default" : ""}
+                                    {"type": "str", "name": "code", "description": "Would you like to add any code to the resulting filename?", "default" : ""},
+                                    {"type": "str", "name": "sensor", "description": "url to access the relevant ethoscope sensor", "default": "", "asknode" : "sensors", "hidden" : "true"}
 
                                    ]}
-        def __init__(self, name="", location="", code=""):
+        def __init__(self, name="", location="", code="", sensor=""):
             self._check_code(code)
             self._info_dic = {"name":name,
                               "location":location,
-                              "code":code}
+                              "code":code,
+                              "sensor":sensor}
 
         def _check_code(self, code):
             r = re.compile(r"[^a-zA-Z0-9-]")
@@ -96,7 +98,7 @@ class ControlThread(Thread):
                         "possible_classes":[ResultWriter, SQLiteResultWriter],
                 },
         "experimental_info":{
-                        "possible_classes":[ExperimentalInformations],
+                        "possible_classes":[ExperimentalInformation],
                 }
      }
     

@@ -39,6 +39,12 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                 $scope.node['incubators'] = data;
         });
 
+        $http.get('/sensors')
+             .success(function(data, status, headers, config){
+                $scope.node['sensors'] = data;
+        });
+
+
         $scope.device = {}; //the info about the device
         $scope.ethoscope = {}; // to control the device
         $scope.showLog = false;
@@ -183,6 +189,15 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
             }
         };
 
+        $scope.get_ip_of_sensor = function(location){
+            location=location.replace(/\s+/g, '_');
+            for (sensor in $scope.node['sensors']) {
+                if ($scope.node['sensors'][sensor]["location"] == location) {
+                    return $scope.node['sensors'][sensor]["ip"];
+                }
+            }
+        }
+        
         $scope.ethoscope.start_tracking = function(option){
             $("#startModal").modal('hide');
             spStart= new Spinner(opts).spin();
@@ -203,9 +218,16 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                 }
             }
 
+           
+            //gets info about the sensor, if it is linked to a location            
+            option["experimental_info"].arguments["sensor"] = $scope.get_ip_of_sensor(option["experimental_info"].arguments["location"]);
+            console.log(option);
+
+            //send options to the ethoscope and starts tracking
             $http.post('/device/'+device_id+'/controls/start', data=option)
                  .success(function(data){$scope.device.status = data.status;});
 
+            //refresh status
             $http.get('/devices').success(function(data){
                     $http.get('/device/'+device_id+'/data').success(function(data){
                         $scope.device = data;
