@@ -16,7 +16,7 @@ from ethoscope.roi_builders.roi_builders import  DefaultROIBuilder
 from ethoscope.core.monitor import Monitor
 from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
-from ethoscope.hardware.interfaces.interfaces import HardwareConnection
+from ethoscope.hardware.interfaces.interfaces import HardwareConnection, EthoscopeSensor
 from ethoscope.stimulators.stimulators import DefaultStimulator
 from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator, OptomotorSleepDepriver, ExperimentalSleepDepStimulator, MiddleCrossingStimulator, OptomotorSleepDepriverSystematic
 from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver, MiddleCrossingOdourStimulator, MiddleCrossingOdourStimulatorFlushed
@@ -25,7 +25,7 @@ from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulat
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
 from ethoscope.utils.description import DescribedObject
-from ethoscope.web_utils.helpers import isMachinePI, hasPiCamera, isExperimental
+from ethoscope.web_utils.helpers import isMachinePI, hasPiCamera, isExperimental, get_machine_name
 
 class ExperimentalInformation(DescribedObject):
     
@@ -115,7 +115,9 @@ class ControlThread(Thread):
     _tmp_last_img_file = "last_img.jpg"
     _dbg_img_file = "dbg_img.png"
     _log_file = "ethoscope.log"
-    _db_credentials = {"name": "ethoscope_db",
+    #give the database an ethoscope specific name
+    #future proof in case we want to use a remote server
+    _db_credentials = {"name": "%s_db" % get_machine_name(),
                       "user": "ethoscope",
                       "password": "ethoscope"}
 
@@ -139,8 +141,7 @@ class ControlThread(Thread):
         self._last_info_frame_idx = 0
 
 
-        # We wipe off previous data
-        # DOES THIS MAKE SENSE? WE LOST LOTS OF DATA DOING THIS in THE PAST!! [TODO]
+        # We wipe off previous logs and debug images
         try:
             os.remove(os.path.join(ethoscope_dir, self._log_file))
         except OSError:
@@ -381,6 +382,13 @@ class ControlThread(Thread):
         hardware_connection = HardwareConnection(HardWareInterfaceClass)
         
         
+        if self._info["experimental_info"]["sensor"]:
+            #if is URL:
+            sensor = EthoscopeSensor(self._info["experimental_info"]["sensor"])
+            logging.info("Using sensor with URL %s" % self._info["experimental_info"]["sensor"])
+        else:
+            sensor = None
+        
         self._metadata = {
             "machine_id": self._info["id"],
             "machine_name": self._info["name"],
@@ -392,7 +400,7 @@ class ControlThread(Thread):
             "selected_options": str(self._option_dict),
         }
         # hardware_interface is a running thread
-        rw = ResultWriter(self._db_credentials, rois, self._metadata, take_frame_shots=True)
+        rw = ResultWriter(self._db_credentials, rois, self._metadata, take_frame_shots=True, sensor=sensor)
 
         return  (cam, rw, rois, TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs)

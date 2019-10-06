@@ -13,42 +13,8 @@ import os
 import urllib.request, urllib.error, urllib.parse
 import json
 
-#from ethoscope.web_utils.helpers import get_core_temperature
-
-class ScanException(Exception):
-    pass
-        
-#@retry(ScanException, tries=3, delay=1, backoff=1)
-def get_json_from_url(url, timeout=5, post_data=None):
-
-    try:
-        if not url.startswith("http://"): url = "http://" + url
-        req = urllib.request.Request(url, data=post_data, headers={'Content-Type': 'application/json'})
-        f = urllib.request.urlopen(req, timeout=timeout)
-        message = f.read()
-        if not message:
-            # logging.error("URL error whist scanning url: %s. No message back." % self._id_url)
-            raise ScanException("No message back")
-        try:
-            resp = json.loads(message)
-            return resp
-        except ValueError:
-            # logging.error("Could not parse response from %s as JSON object" % self._id_url)
-            raise ScanException("Could not parse Json object")
-    
-    except urllib.error.HTTPError as e:
-        raise ScanException("Error" + str(e.code))
-        #return e
-    
-    except urllib.error.URLError as e:
-        raise ScanException("Error" + str(e.reason))
-        #return e
-    
-    except Exception as e:
-        raise ScanException("Unexpected error" + str(e))
-
-
 class AsyncMySQLWriter(multiprocessing.Process):
+    _db_host = "localhost"
 
     def __init__(self, db_credentials, queue, erase_old_db=True):
         self._db_name = db_credentials["name"]
@@ -67,11 +33,12 @@ class AsyncMySQLWriter(multiprocessing.Process):
     def _delete_my_sql_db(self):
         import mysql.connector
         try:
-            db = mysql.connector.connect(host="localhost",
+            db = mysql.connector.connect(host=self._db_host,
                                          user=self._db_user_name,
                                          passwd=self._db_user_pass,
                                          db=self._db_name,
                                          buffered=True)
+                                         
         except mysql.connector.errors.OperationalError:
             logging.warning("Database does not exist. Cannot delete it")
             return
@@ -113,7 +80,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
     def _create_mysql_db(self):
         import mysql.connector
-        db = mysql.connector.connect(host="localhost",
+        db = mysql.connector.connect(host=self._db_host,
                                      user=self._db_user_name,
                                      passwd=self._db_user_pass,
                                      buffered=True)
@@ -134,7 +101,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
     def _get_connection(self):
         import mysql.connector
-        db = mysql.connector.connect(host="localhost",
+        db = mysql.connector.connect(host=self._db_host,
                                      user=self._db_user_name,
                                      passwd=self._db_user_pass,
                                      db=self._db_name,
@@ -179,7 +146,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
                 finally:
                     if self._queue.empty():
-                        #we sleep iff we have an empty queue. this way, we don't over use a cpu
+                        #we sleep if we have an empty queue. this way, we don't over use a cpu
                         time.sleep(.1)
 
         except KeyboardInterrupt as e:
@@ -201,32 +168,29 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
 class SensorDataToMySQLHelper(object):
     _table_name = "SENSORS"
-    _table_headers = {"id" : "INT NOT NULL AUTO_INCREMENT PRIMARY KEY", 
-                      "t"  : "INT",
-                      "temperature" : "FLOAT",
-                      "humidity": "FLOAT",
-                      "light": "INT",
-                      "cpu": "FLOAT"}
-   
-    @property
-    def table_name (self):
-        return self._table_name
-
-    @property
-    def create_command(self):
-        return ",".join([ "%s %s" % (key, self._table_headers[key]) for key in self._table_headers])
-
-    def __init__(self, sensor_url, period=150):
+    _base_headers = {"id" : "INT NOT NULL AUTO_INCREMENT PRIMARY KEY", 
+                     "t"  : "INT" }
+                          
+    def __init__(self, sensor, period=120.0):
         """
-        :param sensor_url: the URL of the sensor to be interrogated
+        :param sensor: the sensor object to be interrogated
         :param period: how often sensor data are saved, in seconds
         :return:
         """
-
         self._period = period
         self._last_tick = 0
-        self._sensor_url = sensor_url
-
+        self.sensor = sensor
+        self._table_headers = {**self._base_headers, **self.sensor.sensor_types}
+        ns = len(self._table_headers)
+        
+        self._insert_cmd = ("INSERT INTO " 
+                            + self._table_name 
+                            + " ( " 
+                            + ', '.join(self._table_headers) 
+                            + " ) VALUES ( " 
+                            + ', '.join(['%s']*ns)
+                            + " )" )
+                            
     def flush(self, t):
         """
         :param t: the time since start of the experiment, in ms
@@ -239,22 +203,26 @@ class SensorDataToMySQLHelper(object):
         if tick == self._last_tick:
             return
 
-        self._last_tick = tick
-
         try:
-            sensor_data = get_json_from_url(self._sensor_url)
-            #cpu_temperature = get_core_temperature()
-            
-            cmd = 'INSERT INTO ' + self._table_name + '(id, t, temperature, humidity, light) VALUES (%s, %s, %s, %s, %s)'
-            args = (0, int(t), sensor_data["temperature"], sensor_data["humidity"], sensor_data["light"])
+            args = (0, int(t)) + self.sensor.read_all()
 
-            return cmd, args
-        
+            self._last_tick = tick
+            return self._insert_cmd, args
+    
         except:
+            logging.error("The sensor data are not available")
 
-            logging.error("The sensor has gone offline or cannot be reached")
+            self._last_tick = tick
             return None, None
   
+    @property
+    def table_name (self):
+        return self._table_name
+
+    @property
+    def create_command(self):
+        return ",".join([ "%s %s" % (key, self._table_headers[key]) for key in self._table_headers])
+
 
 
 class ImgToMySQLHelper(object):
@@ -426,7 +394,7 @@ class ResultWriter(object):
     _async_writing_class = AsyncMySQLWriter
     _null = 0
     
-    def __init__(self, db_credentials, rois, metadata=None, make_dam_like_table=True, take_frame_shots=False, erase_old_db=True, *args, **kwargs):
+    def __init__(self, db_credentials, rois, metadata=None, make_dam_like_table=True, take_frame_shots=False, erase_old_db=True, sensor=None, *args, **kwargs):
         self._queue = multiprocessing.JoinableQueue()
         self._async_writer = self._async_writing_class(db_credentials, self._queue, erase_old_db)
         self._async_writer.start()
@@ -452,18 +420,16 @@ class ResultWriter(object):
         self._insert_dict = {}
         if self._metadata is None:
             self._metadata  = {}
-        
-        #experimental infos are a string represeantation of a dict
-        e_info = json.loads(self._metadata["experimental_info"].replace("'","\""))
-        
-        if "sensor" in e_info.keys() and e_info["sensor"] != "":
-            self._sensor_saver = SensorDataToMySQLHelper(sensor_url=e_info["sensor"])
+
+        if sensor is not None:
+            self._sensor_saver = SensorDataToMySQLHelper(sensor)
+            logging.info("Creating connection to a sensor to store its data in the db")
         else:
             self._sensor_saver = None
-
+        
         self._var_map_initialised = False
         if erase_old_db:
-            logging.warning("RECREATING ALL TABLES")
+            logging.warning("Erasing the old database and recreating the tables")
             self._create_all_tables()
         else:
             event = "crash_recovery"
@@ -486,14 +452,16 @@ class ResultWriter(object):
         self._create_table("VAR_MAP", "var_name CHAR(100), sql_type CHAR(100), functional_type CHAR(100)")
 
         if self._shot_saver is not None:
+            logging.info("Creating table for IMG_screenshots")
             self._create_table(self._shot_saver.table_name, self._shot_saver.create_command)
 
         if self._sensor_saver is not None:
+            logging.info("Creating table for SENSORS data")
             self._create_table(self._sensor_saver.table_name, self._sensor_saver.create_command)
 
 
-        logging.info("Creating 'CSV_DAM_ACTIVITY' table")
         if self._dam_file_helper is not None:
+            logging.info("Creating 'CSV_DAM_ACTIVITY' table")
             fields = self._dam_file_helper.make_dam_file_sql_fields()
             self._create_table("CSV_DAM_ACTIVITY", fields)
 
@@ -511,6 +479,7 @@ class ResultWriter(object):
         for k,v in list(self.metadata.items()):
             command = "INSERT INTO METADATA VALUES %s" % str((k, v))
             self._write_async_command(command)
+        
         while not self._queue.empty():
             logging.info("waiting for queue to be processed")
             time.sleep(.1)

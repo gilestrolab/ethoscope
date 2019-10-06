@@ -431,6 +431,8 @@ class Device(Thread):
             import mysql.connector
             device_id = self._info["id"]
             device_name = self._info["name"]
+            self._ethoscope_db_credentials["db"] = self._info["db_name"]
+            
             com = "SELECT value from METADATA WHERE field = 'date_time'"
 
             mysql_db = mysql.connector.connect(host=self._ip,

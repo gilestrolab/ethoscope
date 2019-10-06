@@ -265,14 +265,16 @@ def get_machine_info(id):
 @api.get('/data/<id>')
 @error_decorator
 def info(id):
-
+    
+    info = {}
     if machine_id != id:
         raise WrongMachineID
+    
+    if control is not None: 
+        info = control.info
         
-    info = control.info
     info["current_timestamp"] = bottle.time.time()
     info["CPU_temp"] = get_core_temperature()
-        
     return info
 
 @api.get('/user_options/<id>')

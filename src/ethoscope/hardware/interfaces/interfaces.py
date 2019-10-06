@@ -4,7 +4,11 @@ from threading import Thread
 import time
 import collections
 
-class   HardwareConnection(Thread):
+import urllib.request, urllib.error, urllib.parse
+import json
+
+
+class HardwareConnection(Thread):
     def __init__(self, interface_class, *args, **kwargs):
         """
         A class to build a connection to arbitrary hardware.
@@ -101,3 +105,95 @@ class DefaultInterface(BaseInterface):
         pass
     def send(self, **kwargs):
         pass
+
+class ScanException(Exception):
+    pass
+
+class EthoscopeSensor(object):
+    """
+    Class providing access to an ESP32 based WIFI ethoscope sensor
+    """
+    
+    _sensor_values = {"temperature" : "FLOAT",
+                      "humidity": "FLOAT",
+                      "light": "INT",
+                      "pressure" : "FLOAT"}
+
+
+    def __init__(self, sensor_url):
+        self._sensor_url = sensor_url
+        self._last_read = 0
+        self._update(True)
+
+    def _get_json_from_url(self, url, timeout=5, post_data=None):
+        try:
+            if not url.startswith("http://"): url = "http://" + url
+            req = urllib.request.Request(url, data=post_data, headers={'Content-Type': 'application/json'})
+            f = urllib.request.urlopen(req, timeout=timeout)
+            message = f.read()
+            if not message:
+                # logging.error("URL error whist scanning url: %s. No message back." % self._id_url)
+                raise ScanException("No message back")
+            try:
+                resp = json.loads(message)
+                return resp
+            except ValueError:
+                # logging.error("Could not parse response from %s as JSON object" % self._id_url)
+                raise ScanException("Could not parse Json object")
+        
+        except urllib.error.HTTPError as e:
+            raise ScanException("Error" + str(e.code))
+            #return e
+        
+        except urllib.error.URLError as e:
+            raise ScanException("Error" + str(e.reason))
+            #return e
+        
+        except Exception as e:
+            raise ScanException("Unexpected error" + str(e))
+
+    def _update(self, force=False, freq=5):
+        """
+        Refresh sensor values
+        It is usually a good idea not to interrogate the sensors too often
+        to avoid overheating
+        freq is the max interval in seconds
+        """
+        if (time.time() - self._last_read) > freq or force:
+            self._sensor_data = self._get_json_from_url(self._sensor_url)
+            self._last_read = time.time()
+
+    def read_all(self):
+        self._update()
+        return tuple( [self._sensor_data[name] for name in self.sensor_properties] )
+
+    @property
+    def sensor_properties(self):
+        self._update()
+        return self._sensor_values.keys()
+
+    @property
+    def sensor_types(self):
+        self._update()
+        return self._sensor_values
+
+    @property
+    def temperature(self):
+        self._update()
+        return self._sensor_data["temperature"]
+
+    @property
+    def humidity(self):
+        self._update()
+        return self._sensor_data["humidity"]
+
+    @property
+    def light(self):
+        self._update()
+        return self._sensor_data["light"]
+
+    @property
+    def pressure(self):
+        self._update()
+        return self._sensor_data["pressure"]
+
