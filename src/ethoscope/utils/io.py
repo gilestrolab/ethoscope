@@ -109,7 +109,10 @@ class AsyncMySQLWriter(multiprocessing.Process):
         return db
 
     def run(self):
-
+        """
+        Processes the queue to commit changes to the db
+        """
+        
         db = None
         do_run = True
         try:
@@ -127,7 +130,6 @@ class AsyncMySQLWriter(multiprocessing.Process):
                         continue
 
                     command, args = msg
-
 
                     c = db.cursor()
                     if args is None:
@@ -181,15 +183,7 @@ class SensorDataToMySQLHelper(object):
         self._last_tick = 0
         self.sensor = sensor
         self._table_headers = {**self._base_headers, **self.sensor.sensor_types}
-        ns = len(self._table_headers)
         
-        self._insert_cmd = ("INSERT INTO " 
-                            + self._table_name 
-                            + " ( " 
-                            + ', '.join(self._table_headers) 
-                            + " ) VALUES ( " 
-                            + ', '.join(['%s']*ns)
-                            + " )" )
                             
     def flush(self, t):
         """
@@ -204,16 +198,22 @@ class SensorDataToMySQLHelper(object):
             return
 
         try:
-            args = (0, int(t)) + self.sensor.read_all()
+            values = [str(v) for v in ((0, int(t)) + self.sensor.read_all())]
+            cmd = (
+                    "INSERT into "
+                    + self._table_name
+                    + " VALUES (" 
+                    + ','.join(values) 
+                    + ")"
+                   )
 
             self._last_tick = tick
-            return self._insert_cmd, args
+            return cmd, None
     
         except:
             logging.error("The sensor data are not available")
-
             self._last_tick = tick
-            return None, None
+            return
   
     @property
     def table_name (self):
