@@ -107,9 +107,9 @@ class PiCameraProcess(multiprocessing.Process):
                 #however setting this to off would have to be coupled with custom gains
                 #some suggestion on how to set the gains can be found here: https://picamera.readthedocs.io/en/release-1.12/recipes1.html
                 #and here: https://github.com/waveform80/picamera/issues/182
-                #capture.awb_mode = 'off'
-                #capture.awb_gains = (1.8, 1.5)
-                capture.awb_mode = 'auto'
+                #camera.awb_mode = 'off'
+                #camera.awb_gains = (1.8, 1.5)
+                camera.awb_mode = 'auto'
                 
                 if not self._stream:
                     output = self._make_video_name(i)
