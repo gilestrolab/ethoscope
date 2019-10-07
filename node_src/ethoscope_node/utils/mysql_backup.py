@@ -162,13 +162,14 @@ class MySQLdbToSQlite(object):
                 logging.error("Programming Error")
                 pass
 
-            try:
-                self._update_img_snapshot_table("IMG_SNAPSHOTS", src, dst)
-                self._update_sensors_table("SENSORS", src, dst)
 
-            except Exception as e:
-                logging.error("Cannot mirror snapshots. Probably no snapshot table")
-                logging.error(e)
+            for table in ["IMG_SNAPSHOTS", "SENSORS"]:
+                try:
+                    self._update_table(table, src, dst)
+
+                except Exception as e:
+                    logging.error("Cannot mirror the '%s' table" % table)
+                    logging.error(e)
 
 
     def _replace_table(self,table_name, src, dst, dump_in_csv=False):
@@ -252,92 +253,61 @@ class MySQLdbToSQlite(object):
         dst.commit()
 
 
-    def _update_img_snapshot_table(self, table_name, src, dst):
+    def _update_table(self, table_name, src, dst, replace=False):
         """
-        Updates the contents of the img_snapshots_table
+        Updates the contents of a custom table
         """
 
         src_cur = src.cursor(buffered=True)
         dst_cur = dst.cursor()
 
+        #find info about the datatype for each column in the source
+        h = {}
+        src_command = "SHOW COLUMNS FROM %s " % table_name
+        src_cur.execute(src_command)
+        for c in src_cur:
+            h[c[0]] = c[1]
+
+        #check what is the status in the destination
         try:
             dst_command= "SELECT MAX(id) FROM %s" % table_name
             dst_cur.execute(dst_command)
         except (sqlite3.OperationalError, mysql.connector.errors.ProgrammingError):
             logging.warning("Local table %s appears empty. Rebuilding it from source" % table_name)
-            self._replace_img_snapshot_table(table_name, src, dst)
-            return
+            replace = True
 
-        last_id_in_dst = 0
-        for c in dst_cur:
-            last_id_in_dst = c[0]
-            if last_id_in_dst is None:
-                logging.warning("There seem to be no data in %s, %s stopping here" % (os.path.basename(self._dst_path), table_name))
-                return
-        src_command = "SELECT id,t,img FROM %s WHERE id > %d" % (table_name, last_id_in_dst)
+        if not replace:
+
+            last_id_in_dst = 0
+            for c in dst_cur:
+                last_id_in_dst = c[0]
+                if last_id_in_dst is None:
+                    logging.warning("There seem to be no data in %s, %s stopping here" % (os.path.basename(self._dst_path), table_name))
+                    return
+
+            #retrieve only new data
+            src_command = "SELECT * FROM %s WHERE id > %d" % (table_name, last_id_in_dst)
+        
+        if replace:
+
+            #retrieve all data, not just the new ones
+            src_command = "SELECT * FROM %s" % table_name
+
+        #grab the data from src
         src_cur.execute(src_command)
-
-
+        #go through it row by row
         for sc in src_cur:
-            id,t,img = sc
-            command = "INSERT INTO %s (id,t,img) VALUES(?,?,?);" % table_name
-            dst_cur.execute(command, [id,t,sqlite3.Binary(img)])
-            dst.commit()
-
-    def _replace_img_snapshot_table(self, table_name, src, dst):
-        src_cur = src.cursor(buffered=True)
-        dst_cur = dst.cursor()
-
-        src_command = "SELECT id,t,img FROM %s" % table_name
-        src_cur.execute(src_command)
-
-        for sc in src_cur:
-            id,t,img = sc
-            command = "INSERT INTO %s (id,t,img) VALUES(?,?,?);" % table_name
-            dst_cur.execute(command, [id,t,sqlite3.Binary(img)])
-            dst.commit()
-
-    def _update_sensors_table(self, table_name, src, dst):
-        """
-        Updates the contents of the sensors_table
-        """
-
-        src_cur = src.cursor(buffered=True)
-        dst_cur = dst.cursor()
-
-        try:
-            dst_command= "SELECT MAX(id) FROM %s" % table_name
-            dst_cur.execute(dst_command)
+            nv = len(sc)
+            command = "INSERT INTO " + table_name + " VALUES(" + ','.join(['?']*nv) + ");"
             
-        except (sqlite3.OperationalError, mysql.connector.errors.ProgrammingError):
-            logging.warning("Local table %s appears empty. Rebuilding it from source" % table_name)
-            self._replace_sensors_table(table_name, src, dst)
-            return
-
-        last_id_in_dst = 0
-        for c in dst_cur:
-            last_id_in_dst = c[0]
-            if last_id_in_dst is None:
-                logging.warning("There seem to be no data in %s, %s stopping here" % (os.path.basename(self._dst_path), table_name))
-                return
-        src_command = "SELECT * FROM %s WHERE id > %d" % (table_name, last_id_in_dst)
-        src_cur.execute(src_command)
-
-
-        for sc in src_cur:
-            command = "INSERT INTO "+ table_name +" VALUES("+ ','.join([str(v) for v in sc]) +");"
-            dst_cur.execute(command)
+            args = []
+            #populate args taking datatype into account
+            for d,k in zip(sc, h):
+                if h[k] == "longblob":
+                    args.append(sqlite3.Binary(d))
+                else:
+                    args.append(d)
+            
+            #and add them row by row to destination 
+            dst_cur.execute(command, args)
             dst.commit()
-
-    def _replace_sensors_table(self, table_name, src, dst):
-        src_cur = src.cursor(buffered=True)
-        dst_cur = dst.cursor()
-
-        src_command = "SELECT * FROM %s" % table_name
-        src_cur.execute(src_command)
-
-        for sc in src_cur:
-            command = "INSERT INTO "+ table_name +" VALUES("+ ','.join([str(v) for v in sc]) +");"
-            dst_cur.execute(command)
-            dst.commit()
-
