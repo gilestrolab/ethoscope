@@ -23,6 +23,7 @@
 
     </div>
 
+<!-- **** SENSORS LIST TABLE **** -->
 <div ng-if="has_sensors" >
 <table class="table table-striped" ng-cloak>
             <thead>
@@ -108,6 +109,7 @@
     </div>
   </form>
 
+<!-- **** ETHOSCOPE LIST TABLE **** -->
 <table class="table table-striped" ng-cloak>
             <thead>
             <th>
@@ -176,6 +178,7 @@
                 <span ng-if="device.status == 'initialising'" class="fas fa-spinner" title={{device.status}}></span>
                 <span ng-if="device.status == 'running'" class="fa fa-play-circle color-green" title={{device.status}}></span>
                 <span ng-if="device.status == 'recording'" class="fa fa-play-circle color-red" title={{device.status}}></span>
+                <span ng-if="device.status == 'streaming'" class="fa fa-play-circle color-red" title={{device.status}}></span>
                 <span ng-if="device.status == 'stopped'" class="fa fa-stop-circle" title={{device.status}}></span></td>
                 <td>{{secToDate(device.time)}}</td>
                 <td>{{elapsedtime(device.time_since_backup)}}</td>
