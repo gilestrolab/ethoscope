@@ -432,10 +432,18 @@ if __name__ == '__main__':
         hostname = socket.gethostname()
         uid = "%s-%s" % ( hostname, get_machine_id() )
         
-        try:
-            address = socket.gethostbyname(hostname+".local")
-        except:
-            address = socket.gethostbyname(hostname)
+        address = False
+        logging.warning("Waiting for a network connection")
+        
+        while address is False:
+            try:
+                address = socket.gethostbyname(hostname+".local")
+                #this returns something like '192.168.1.4' - when both connected, ethernet IP has priority over wifi IP
+            except:
+                pass
+                #address = socket.gethostbyname(hostname)
+                #this returns '127.0.1.1' and it is useless
+            
             
         serviceInfo = ServiceInfo("_ethoscope._tcp.local.",
                         uid + "._ethoscope._tcp.local.",
