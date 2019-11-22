@@ -172,6 +172,19 @@ class MySQLdbToSQlite(object):
                     logging.error(e)
 
 
+    def _replace_img_snapshot_table(self, table_name, src, dst):
+        src_cur = src.cursor(buffered=True)
+        dst_cur = dst.cursor()
+
+        src_command = "SELECT id,t,img FROM %s" % table_name
+        src_cur.execute(src_command)
+
+        for sc in src_cur:
+            id,t,img = sc
+            command = "INSERT INTO %s (id,t,img) VALUES(?,?,?);" % table_name
+            dst_cur.execute(command, [id,t,sqlite3.Binary(img)])
+            dst.commit()
+
     def _replace_table(self,table_name, src, dst, dump_in_csv=False):
         src_cur = src.cursor(buffered=True)
         dst_cur = dst.cursor()
