@@ -16,6 +16,16 @@ class BackupClass(object):
             "user":"ethoscope",
             "password":"ethoscope"
         }
+    
+    # #the db name is specific to the ethoscope being interrogated
+    # #the user remotely accessing it is node/node
+    
+    # _db_credentials = {
+            # "name":"ETHOSCOPE_000_db",
+            # "user":"node",
+            # "password":"node"
+        # }
+        
     def __init__(self, device_info, results_dir):
 
         self._device_info = device_info
@@ -43,7 +53,7 @@ class BackupClass(object):
 
         except DBNotReadyError as e:
             logging.warning(e)
-            logging.warning("Database not ready, will try later")
+            logging.warning("Database %s on IP %s not ready, will try later" % (self._db_credentials["name"], self._database_ip) )
             pass
 
         except Exception as e:

@@ -14,7 +14,9 @@ import urllib.request, urllib.error, urllib.parse
 import json
 
 class AsyncMySQLWriter(multiprocessing.Process):
+    
     _db_host = "localhost"
+    #_db_host = "node" #uncomment this to save data on the node
 
     def __init__(self, db_credentials, queue, erase_old_db=True):
         self._db_name = db_credentials["name"]
@@ -40,7 +42,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
                                          buffered=True)
                                          
         except mysql.connector.errors.OperationalError:
-            logging.warning("Database does not exist. Cannot delete it")
+            logging.warning("Database %s does not exist. Cannot delete it" % self._db_name)
             return
             
         except Exception as e:
@@ -90,6 +92,15 @@ class AsyncMySQLWriter(multiprocessing.Process):
         cmd = "CREATE DATABASE %s" % self._db_name
         c.execute(cmd)
         logging.info("Database created")
+        
+        #create a read-only node user that the node will use to get data from
+        #it's better to have a second user for remote operation for reasons of debug and have better control
+        cmd = "GRANT SELECT ON %s.* to 'node' identified by 'node'" % self._db_name
+        c.execute(cmd)
+        logging.info("Node user created")
+        
+
+        #set some innodb specific values that cannot be set on the config file
         cmd = "SET GLOBAL innodb_file_per_table=1"
         c.execute(cmd)
         #"Variable 'innodb_file_format' is a read only variable"
