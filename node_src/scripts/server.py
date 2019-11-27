@@ -396,7 +396,7 @@ def node_actions():
     
     if action['action'] == 'restart':
         logging.info('User requested a service restart.')
-        with os.popen("systemctl restart ethoscope_node.service") as po:
+        with os.popen("sleep 1; systemctl restart ethoscope_node.service") as po:
             r = po.read()
         
         return r
