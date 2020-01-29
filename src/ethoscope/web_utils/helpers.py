@@ -1,7 +1,7 @@
 import random
 import logging
 import traceback
-import datetime
+import datetime, time
 import os
 import re
 from uuid import uuid4
@@ -278,3 +278,31 @@ def get_core_temperature():
             return 0
     else: 
         return 0
+
+def get_SD_CARD_AGE():
+    """
+    Given the machine_id file is created at the first boot, it assumes the SD card is as old as the file itself
+    :return: timestamp of the card
+    """
+    try:
+        return time.time() - os.path.getmtime("/etc/machine-id")
+        
+    except:
+        return
+        
+        
+def get_partition_infos():
+    """
+    Returns information about mounted partition and their free availble space
+    """
+    try:
+        with os.popen('df -Th') as df:
+            df_info = df.read().strip().split('\n')
+        keys = df_info[0]
+        values = df_info[1:]
+        
+        return [dict([(key, value) for key, value in zip(keys.split(), line.split())]) for line in values]
+        
+    except:
+        return
+    

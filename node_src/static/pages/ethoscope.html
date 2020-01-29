@@ -104,7 +104,7 @@
               </div>
               <input type="checkbox" class="dd-input" id="options-drop">
               <ul class="dd-menu">
-                <li ng-click="ethoscope.log()">Logs</li>
+                <li ng-click="ethoscope.log()">Info and Logs</li>
                 <li data-toggle="modal" data-target="#changeInfo">Settings</li>
                 <li ng-click="ethoscope.backup()">Backup</li>
               </ul>
@@ -119,6 +119,7 @@
               <ul class="dd-menu">
                 <li data-toggle="modal" data-target="#powerOffAlert">Shutdown</li>
                 <li data-toggle="modal" data-target="#rebootAlert">Reboot</li>
+                <li data-toggle="modal" data-target="#restartAlert">Restart</li>
               </ul>
             </label>
 
@@ -138,7 +139,30 @@
          <img  ng-src="/device/{{device.id}}/dbg_img?{{device.time}}" alt="No Debug Image" ng-if="device.dbg_img != null" width="480">
     </div>
 
+<!-- Box for LOG, normally hidden -->
     <div ng-if="showLog == true">
+
+        <h4>Ethoscope Partition information</h4>
+        <table id="" class="table table-striped">
+        <thead>
+            <th ng-repeat="(key, value) in machine_info.partitions[0]">
+            {{key}}
+            </th>
+        </thead>
+         <tbody>
+          <tr ng-repeat="partition in machine_info.partitions">
+            <td ng-repeat="(key, value) in partition">
+              {{value}}
+            </td>
+          </tr>
+         </tbody>
+        </table>
+        
+        <h4>SD card AGE</h4>
+        <pre>{{elapsedtime(machine_info.SD_CARD_AGE)}}</pre>
+
+
+        <h4>Ethoscope LOG from last boot</h4>
         <pre>
         <p class="log" ng-repeat="(key,entry) in log | toArray |orderBy: 'key'">{{key}}: {{entry}}</p></pre>
     </div>
@@ -176,6 +200,25 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">No</button>
         <button type="button" class="btn btn-primary" ng-click="ethoscope.reboot()" data-dismiss="modal">Yes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Restart -->
+<div class="modal fade" id="restartAlert" tabindex="-1" role="dialog" aria-labelledby="restartAlertLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Restarting</h4>
+      </div>
+      <div class="modal-body">
+       <p>Do you really want to restart the service on the device “{{device.name}}”? Any ongoing acquisition will end.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">No</button>
+        <button type="button" class="btn btn-primary" ng-click="ethoscope.restart()" data-dismiss="modal">Yes</button>
       </div>
     </div>
   </div>
@@ -229,8 +272,8 @@
                             
                             <select ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" > <option value="">Available Movies</option><option ng-repeat="entry in videofiles" value="{{entry.fullpath}}">{{entry.filename | limitTo: 40}}{{entry.filename.length < 40 ? '' : '...'}}</option> </select>
                             <input  ng-if="arg.type == 'number'"   id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]" >
-                            <input  ng-if="(arg.type == 'str' && arg.asknode == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]"  >
-                            <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]"> <option ng-repeat="entry in node[arg.asknode]  | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option> </select>
+                            <input  ng-if="(arg.type == 'str' && arg.asknode == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]">
+                            <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" required ><option value="">-- choose {{arg.name}} --</option><option ng-repeat="entry in node[arg.asknode]  | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option> </select>
 
                             <div ng-if="arg.type == 'date_range'" class="input-group">
                                 <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-drp" type=hidden readonly ng-model="selected_options.tracking[name]['arguments'][arg.name]" options="{timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss', separator : ' > ' }}" > 
@@ -250,11 +293,12 @@
               </ul>
               <hr>
           </div>
-        </form>
-      </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
-        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_tracking(selected_options.tracking)" data-toggle="modal">Start Tracking</button>
+        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_tracking(selected_options.tracking)" data-toggle="modal" >Start Tracking</button>
+      </div>
+
+        </form>
       </div>
     </div>
   </div>

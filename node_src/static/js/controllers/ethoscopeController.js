@@ -286,6 +286,12 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
         };
 
         $scope.ethoscope.log = function(){
+            
+            $http.get('/device/'+device_id+'/machineinfo').success(function(data){
+                        $scope.machine_info = data;
+                    });
+            
+            
             var log_file_path = ''
             if ($scope.showLog == false){
                 log_file_path = $scope.device.log_file;
@@ -318,6 +324,17 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                 })
 
         };
+
+        $scope.ethoscope.restart = function(){
+                console.log("restarting");
+                $http.post('/device/'+device_id+'/controls/restart', data={})
+                     .success(function(data){
+                        $scope.device = data;
+                        //window.close()
+                })
+
+        };
+
         
         $scope.ethoscope.alert= function(message){alert(message);};
 

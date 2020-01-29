@@ -4,7 +4,7 @@ import logging
 import traceback
 from optparse import OptionParser
 from ethoscope.web_utils.control_thread import ControlThread
-from ethoscope.web_utils.helpers import get_machine_id, get_machine_name, get_git_version, file_in_dir_r, get_etc_hostnames, pi_version, set_machine_name, set_machine_id, set_etc_hostname, get_WIFI, set_WIFI, get_core_temperature
+from ethoscope.web_utils.helpers import *
 from ethoscope.web_utils.record import ControlThreadVideoRecording
 import subprocess
 import json
@@ -161,16 +161,15 @@ def controls(id, action):
         control.start()
         return info(id)
 
-    elif action in ['stop', 'close', 'poweroff', 'reboot']:
-        if control.info['status'] == 'running' or control.info['status'] == "recording" or control.info['status'] == "streaming" :
-            # logging.info("Stopping monitor")
-            logging.warning("Stopping monitor")
+    elif action in ['stop', 'close', 'poweroff', 'reboot', 'restart']:
+        
+        if control.info['status'] in ['running', 'recording', 'streaming'] :
+            logging.info("Stopping monitor")
             control.stop()
-            logging.warning("Joining monitor")
+            logging.info("Joining monitor")
             control.join()
-            logging.warning("Monitor joined")
-            logging.warning("Monitor stopped")
-            # logging.info("Monitor stopped")
+            logging.info("Monitor joined")
+            logging.info("Monitor stopped")
 
         if action == 'close':
             close()
@@ -184,6 +183,10 @@ def controls(id, action):
             logging.info("Stopping monitor due to reboot request")
             logging.info("Powering off Device.")
             subprocess.call('reboot')
+
+        if action == 'restart':
+            logging.info("Restarting service")
+            subprocess.call(['systemctl', 'restart', 'ethoscope_device'])
 
 
         return info(id)
@@ -221,9 +224,13 @@ def list_data_files(category, id):
 
     return {}
 
+
 @api.get('/machine/<id>')
 @error_decorator
 def get_machine_info(id):
+    """
+    This is information about the ethoscope that is not changing in time such as hardware specs and configuration parameters
+    """
 
     if id is not None and id != machine_id:
         raise WrongMachineID
@@ -259,12 +266,18 @@ def get_machine_info(id):
     except:
         machine_info['WIFI_PASSWORD'] = "not set"
     
+    machine_info['SD_CARD_AGE'] = get_SD_CARD_AGE()
+    machine_info['partitions'] = get_partition_infos()
+    
     return machine_info
 
 
 @api.get('/data/<id>')
 @error_decorator
 def info(id):
+    """
+    This is information that is changing in time as the machine operates, such as FPS during tracking, CPU temperature etc
+    """
     
     info = {}
     if machine_id != id:

@@ -185,6 +185,7 @@ class Device(Thread):
                                      "stop": ["streaming", "running", "recording"],
                                      "poweroff": ["stopped"],
                                      "reboot" : ["stopped"],
+                                     "restart" : ["stopped"],
                                      "offline": []}
 
     def __init__(self, ip, refresh_period = 2, port = 9000, results_dir = "/ethoscope_data/results"):
@@ -231,7 +232,7 @@ class Device(Thread):
         self._check_instructions_status(instruction)
 
         # we do not expect any data back when device is powered off.
-        if instruction == "poweroff" or instruction == "reboot":
+        if instruction in ["poweroff", "reboot", "restart"]:
             try:
                 self._get_json(post_url, 3, post_data)
             except ScanException:
