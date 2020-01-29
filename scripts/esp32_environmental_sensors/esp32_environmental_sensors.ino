@@ -1,8 +1,8 @@
 /*
-  ESP32 mDNS responder sample
+  ESP32/8266 mDNS based environmental sensor
 
   This is an example of an HTTP server that is accessible
-  via http://esp32.local URL thanks to mDNS responder.
+  via mDNS responder.
 
   Soldier together the two sensors boards (BME280 and BH1750), using the same header
   then connect to the ESP32 
@@ -11,49 +11,85 @@
   SDA -> D21
   SCL -> D22
 
+  or ESP8266 D1 mini Pro
+  VCC -> 3.3V
+  Gnd -> Gnd
+  SDA -> D1
+  SCL -> D2
+
   Instructions:
   - Update WiFi SSID and password as necessary.
-  - Flash the sketch to the ESP32 board
+  - Flash the sketch to the board
   - Install host software:
     - For Linux, install Avahi (http://avahi.org/).
     - For Windows, install Bonjour (http://www.apple.com/support/bonjour/).
     - For Mac OSX and iOS support is built in through Bonjour already.
   - Point your browser to http://etho_sensor.local, you should see a response.
 
+  - To memorize multiple SSIDs options instead of only one
+ https://tttapa.github.io/ESP8266/Chap10%20-%20Simple%20Web%20Server.html
+
+
 */
 
+#if defined(ESP32)
+  #include <WiFi.h>
+  #include <ESPmDNS.h>
+  #include <WiFiClient.h>
+  #include "esp_system.h"
+  #include <WebServer.h>  
 
-#include <WiFi.h>
-#include <ESPmDNS.h>
-#include <WiFiClient.h>
+  WebServer server(80);    
 
+  // Ideally, on ESP32 we would also use EEPROM rotate for consistency
+  // https://github.com/xoseperez/eeprom32_rotate
+  // but it seems to be too buggy
+  //#include <EEPROM32_Rotate.h>
+  //EEPROM32_Rotate EEPROMr;
+
+  // To save data in the EEPROM use the following
+  // http://tronixstuff.com/2011/03/16/tutorial-your-arduinos-inbuilt-eeprom/
+  #include <EEPROM.h>
+
+#elif defined(ESP8266)
+  #include <ESP8266WiFi.h>
+  #include <ESP8266mDNS.h>
+  #include <WiFiClient.h>
+  #include <ESP8266WebServer.h>
+
+  ESP8266WebServer server(80);
+
+  // For ESP8266, EEPROM rotate seems the only library that actually works
+  // https://github.com/xoseperez/eeprom_rotate
+  #include <EEPROM_Rotate.h>
+  EEPROM_Rotate EEPROMr;
+#endif
+
+#define EEPROM_SIZE 4096 //total size of the eeprom we want to use
+#define EEPROM_START 128 //from which byte on we start writing data
+
+//For I2C communication
 #include <Wire.h>
+
+//For sensor-specific routines
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
 #include <BH1750FVI.h>
 
-#include "esp_system.h"
-
-#include <WebServer.h>
-
-// To save data in the EEPROM use the following
-// http://tronixstuff.com/2011/03/16/tutorial-your-arduinos-inbuilt-eeprom/
-#include <EEPROM.h>
-int addr = 0;
-#define EEPROM_SIZE 64
-
-
-//Watchdog
-const int button = 0;         //gpio to use to trigger delay
-const int wdtTimeout = 3000;  //time in ms to trigger the watchdog
-hw_timer_t *timer = NULL;
-
-void IRAM_ATTR resetModule() {
-  esp_restart();
-}
-
+//Initialise the I2C environmental sensors
 Adafruit_BME280 bme;
 BH1750FVI LightSensor(BH1750FVI::k_DevModeContLowRes);
+
+//We want to use a watchdog for ESP32 to avoid recurrent crashes
+#if defined(ESP32)
+  const int button = 0;         //gpio to use to trigger delay
+  const int wdtTimeout = 3000;  //time in ms to trigger the watchdog
+  hw_timer_t *timer = NULL;
+
+  void IRAM_ATTR resetModule() {
+    esp_restart();
+  }
+#endif
 
 typedef struct {
   float temperature;
@@ -73,29 +109,31 @@ environment env;
 const char* ssid = "ETHOSCOPE_WIFI";
 const char* password = "ETHOSCOPE_1234";
 
-// TCP server at port 80 will respond to HTTP requests
-//WiFiServer server(80);
-WebServer server(80);    
-
 void setup(void)
 {  
     Serial.begin(57600);
 
+#if defined(ESP8266)    
+    Serial.println("Initialising EEPROM.");
+    EEPROMr.begin(EEPROM_SIZE);
+    delay(1000);
+    Serial.println("EEPROM initialised.");
+#endif
+
+#if defined(ESP32)
     if (!EEPROM.begin(EEPROM_SIZE)) {
         Serial.println("Failed to initialise EEPROM");
         Serial.println("Restarting...");
         delay(1000);
         ESP.restart();
     }
-    
+#endif
+
     loadConfiguration();
 
     // Connect to WiFi network
     WiFi.begin(ssid, password);
     Serial.println("");
-
-    // We remove power save functions on WiFi to try and solve the mDNS disappearance issue
-    WiFi.setSleep(false);
 
     // Wait for connection
     while (WiFi.status() != WL_CONNECTED) {
@@ -109,10 +147,6 @@ void setup(void)
     Serial.println(WiFi.localIP());
 
     // Set up mDNS responder:
-    // - first argument is the domain name, in this example
-    //   the fully-qualified domain name is "esp8266.local"
-    // - second argument is the IP address to advertise
-    //   we send our IP address on the WiFi network
     if (!MDNS.begin(cfg.sensor_name)) {
         Serial.println("Error setting up MDNS responder!");
         while(1) {
@@ -122,7 +156,7 @@ void setup(void)
     Serial.println("mDNS responder started");
 
     // Start TCP (HTTP) server
-    //server.begin();
+    server.begin();
     server.on("/", handle_OnConnect);
     server.on("/id", handle_OnID);
     server.onNotFound(handle_NotFound);
@@ -130,49 +164,78 @@ void setup(void)
     server.begin();
     Serial.println("HTTP server started");
 
-    // Add service to MDNS-SD
-    //MDNS.addService("http", "tcp", 80);
-    MDNS.addService("_sensor", "_tcp", 80);
+    // Advertise service to MDNS-SD
+    MDNS.addService("sensor", "tcp", 80);
 
-    // Initialise BME 280 I2C sensor
+    // Initialise BME280 and BH1750 I2C sensors
     bme.begin(0x76);
     LightSensor.begin();
 
     readEnv();
     Serial.println(SendJSON());
 
-    //Adding a watchdog timer
+#if defined(ESP32)
+    //Starting a watchdog timer
     timer = timerBegin(0, 80, true);                  //timer 0, div 80
     timerAttachInterrupt(timer, &resetModule, true);  //attach callback
     timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
     timerAlarmEnable(timer);                          //enable interrupt
+
+    // We remove power save functions on WiFi to try and solve the mDNS disappearance issue
+    WiFi.setSleep(false);
+#endif
 }
 
 void loop(void)
 {
-    server.handleClient();
+  
+#if defined(ESP8266)
+    MDNS.update();
+#endif
+
+#if defined(ESP32)
     timerWrite(timer, 0); //reset timer (feed watchdog)
+#endif
+
+    server.handleClient();
+
 }
 
 void loadConfiguration()
 {
-// on the very first flash, byte 9 is set to 255
-// we use this to save the default values to the arduino
-  if (EEPROM.read(0) != 1) { saveConfiguration(); } 
-  EEPROM.get(1, cfg);
-  Serial.println("Configuration loaded.");
+
+#if defined(ESP8266)
+    if (EEPROMr.read(EEPROM_START) != 1) { saveConfiguration(); }
+    EEPROMr.get(EEPROM_START+2, cfg);
+    delay(500);
+#endif
+
+#if defined(ESP32)
+    if (EEPROM.read(EEPROM_START) != 1) { saveConfiguration(); } 
+    EEPROM.get(EEPROM_START+2, cfg);
+#endif
+
+    Serial.println("Configuration loaded.");
 
 }
 
 void saveConfiguration()
 {
-//saves values to EEPROM
+#if defined(ESP8266)
+    EEPROMr.write(EEPROM_START, 1);
+    delay(250);
+    EEPROMr.put(EEPROM_START+2, cfg);
+    delay(250);
+    EEPROMr.commit();
+#endif
 
-  EEPROM.write(0, 1);
-  EEPROM.put(1, cfg);
-  EEPROM.commit();
-  Serial.println("Configuration saved.");
+#if defined(ESP32)
+    EEPROM.write(EEPROM_START, 1);
+    EEPROM.put(EEPROM_START+2, cfg);
+    EEPROM.commit();
+#endif
 
+    Serial.println("Configuration saved.");
 }
 
 //to rename from commandline use the following command
@@ -180,18 +243,20 @@ void saveConfiguration()
 //DEVICE_IP can be found opening the serial port
 
 void handlePost() {
-  if (server.hasArg("location")) {
-    //cfg.location = (char*) server.arg("location").c_str();
-    server.arg("location").toCharArray(cfg.location, 20);
-    Serial.println("Changed the value of location");
+    if (server.hasArg("location")) {
+      //cfg.location = (char*) server.arg("location").c_str();
+      server.arg("location").toCharArray(cfg.location, 20);
+      Serial.print("New value of location: ");
+      Serial.println(cfg.location);
     }
-  if (server.hasArg("sensor_name")) {
-    //cfg.sensor_name = (char*) server.arg("name").c_str(); 
-    server.arg("sensor_name").toCharArray(cfg.sensor_name, 20); 
-    Serial.println("Changed the value of sensor_name");
+    if (server.hasArg("sensor_name")) {
+      //cfg.sensor_name = (char*) server.arg("name").c_str(); 
+      server.arg("sensor_name").toCharArray(cfg.sensor_name, 20); 
+      Serial.print("New value of sensor_name: ");
+      Serial.println(cfg.sensor_name);
   }
-  saveConfiguration();
-  server.send(200, "application/json", "OK\n");
+    saveConfiguration();
+    server.send(200, "application/json", "OK\n");
 }
 
 
@@ -222,66 +287,72 @@ void handle_NotFound(){
 
 
 String SendJSON(){
-  String ptr = "{\"id\": \"";
-  ptr += getMacAddress();
-  ptr += "\", \"ip\" : \"";
-  ptr += WiFi.localIP().toString();
-  ptr += "\", \"name\" : \"";
-  ptr += cfg.sensor_name;
-  ptr += "\", \"location\" : \"";
-  ptr += cfg.location;
-  ptr += "\", \"temperature\" : \"";
-  ptr += env.temperature;
-  ptr += "\", \"humidity\" : \"";
-  ptr += env.humidity;
-  ptr += "\", \"pressure\" : \"";
-  ptr += env.pressure;
-  ptr += "\", \"light\" : \"";
-  ptr += env.lux;
-  ptr += "\"}";
-  return ptr; 
+    String ptr = "{\"id\": \"";
+    ptr += getMacAddress();
+    ptr += "\", \"ip\" : \"";
+    ptr += WiFi.localIP().toString();
+    ptr += "\", \"name\" : \"";
+    ptr += cfg.sensor_name;
+    ptr += "\", \"location\" : \"";
+    ptr += cfg.location;
+    ptr += "\", \"temperature\" : \"";
+    ptr += env.temperature;
+    ptr += "\", \"humidity\" : \"";
+    ptr += env.humidity;
+    ptr += "\", \"pressure\" : \"";
+    ptr += env.pressure;
+    ptr += "\", \"light\" : \"";
+    ptr += env.lux;
+    ptr += "\"}";
+    return ptr; 
 }
 
 String SendHTML(){
-  String ptr = "<!DOCTYPE html> <html>\n";
-  ptr +="<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
-  ptr +="<title>ESP8266 Weather Station</title>\n";
-  ptr +="<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}\n";
-  ptr +="body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;}\n";
-  ptr +="p {font-size: 24px;color: #444444;margin-bottom: 10px;}\n";
-  ptr +="</style>\n";
-  ptr +="</head>\n";
-  ptr +="<body>\n";
-  ptr +="<div id=\"webpage\">\n";
-  ptr +="<h1>ESP32 Based WIFI sensor</h1>\n";
-  ptr +="<p>ID: ";
-  ptr +=getMacAddress();
-  ptr +="</p>";
-  ptr +="<p>IP: ";
-  ptr +=WiFi.localIP().toString();
-  ptr +="</p>";
-  ptr +="<p>Temperature: ";
-  ptr +=env.temperature;
-  ptr +="&deg;C</p>";
-  ptr +="<p>Humidity: ";
-  ptr +=env.humidity;
-  ptr +="%</p>";
-  ptr +="<p>Pressure: ";
-  ptr +=env.pressure;
-  ptr +="hPa</p>";
-  ptr +="<p>Lux: ";
-  ptr +=env.lux;
-  ptr +="hPa</p>";
-  ptr +="</div>\n";
-  ptr +="</body>\n";
-  ptr +="</html>\n";
-  return ptr;
+    String ptr = "<!DOCTYPE html> <html>\n";
+    ptr +="<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
+    ptr +="<title>ESP based Environmental Station</title>\n";
+    ptr +="<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}\n";
+    ptr +="body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;}\n";
+    ptr +="p {font-size: 24px;color: #444444;margin-bottom: 10px;}\n";
+    ptr +="</style>\n";
+    ptr +="</head>\n";
+    ptr +="<body>\n";
+    ptr +="<div id=\"webpage\">\n";
+    ptr +="<h1>ESP32 Based WIFI sensor</h1>\n";
+    ptr +="<p>ID: ";
+    ptr +=getMacAddress();
+    ptr +="</p>";
+    ptr +="<p>IP: ";
+    ptr +=WiFi.localIP().toString();
+    ptr +="</p>";
+    ptr +="<p>Temperature: ";
+    ptr +=env.temperature;
+    ptr +="&deg;C</p>";
+    ptr +="<p>Humidity: ";
+    ptr +=env.humidity;
+    ptr +="%</p>";
+    ptr +="<p>Pressure: ";
+    ptr +=env.pressure;
+    ptr +="hPa</p>";
+    ptr +="<p>Lux: ";
+    ptr +=env.lux;
+    ptr +="hPa</p>";
+    ptr +="</div>\n";
+    ptr +="</body>\n";
+    ptr +="</html>\n";
+    return ptr;
 }
 
 String getMacAddress(void) {
     uint8_t baseMac[6];
-    // Get MAC address for WiFi station
-    esp_read_mac(baseMac, ESP_MAC_WIFI_STA);
+
+    // Get the MAC address as UID
+    #if defined(ESP32)
+      esp_read_mac(baseMac, ESP_MAC_WIFI_STA);
+    #elif defined(ESP8266)
+      WiFi.macAddress(baseMac);
+    #endif
+    
     char baseMacChr[18] = {0};
     sprintf(baseMacChr, "%02X:%02X:%02X:%02X:%02X:%02X", baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
     return String(baseMacChr);
