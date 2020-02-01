@@ -22,7 +22,7 @@
 -->
 
             <li ng-if="delta_t_min <= 3" title="Current time on the device">{{device_datetime}}</li>
-            <li ng-if="delta_t_min > 3" title="There is more than 3 minutes difference between node and this device" style="color: #FF431F;"><span class="fa fa-warning"></span>{{device_datetime}}</li>
+            <li ng-if="delta_t_min > 3" title="There is a difference of more than 3 minutes between node and this device" style="color: #FF431F;"><span class="fa fa-warning"></span>{{device_datetime}}</li>
 
             <li ng-if="device.status == 'stopped'">Last used on {{ethoscope.start_date_time(device.time)}}</li>
             <li ng-if="device.status == 'not_in_use'">Last seen on {{ethoscope.start_date_time(device.time)}}</li>
@@ -75,12 +75,12 @@
 
             <!-- Dropdown Button for Tracking actions -->
             <label class="dropdown" ng-if="device.status == 'stopped'" >
-              <div class="dd-button" id="tracking-btn" ng-class="{'disabled':!isActive}" >
+              <div class="dd-button" id="tracking-btn" ng-class="{ 'disabled' : !isActive }" >
                 Track
               </div>
               <input type="checkbox" class="dd-input" id="track-drop" ng-disabled="!isActive">
               <ul class="dd-menu">
-                <li ng-class="{'disabled':!isActive}" data-toggle="{{isActive ? 'modal' : ''}}" data-target="#startModal">Start Tracking</li>
+                <li ng-class="{'disabled':!isActive || (delta_t_min > 3)}" data-toggle="{{isActive ? 'modal' : ''}}" data-target="#startModal">Start Tracking</li>
                 <li class="disabled">New Mask</li>
               </ul>
             </label>
