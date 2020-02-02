@@ -323,15 +323,13 @@ class ControlThread(Thread):
                 time.sleep(15)
                 return pickle.load(f)
 
-    def _save_pickled_state(self, camera, result_writer, rois,   TrackerClass, tracker_kwargs,
-                        hardware_connection, StimulatorClass, stimulator_kwargs):
-                            
+    def _save_pickled_state(self, camera, result_writer, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, running_info):
         """
         note that cv2.videocapture is not a serializable object and cannot be pickled
         """
 
         tpl = (camera, result_writer, rois, TrackerClass, tracker_kwargs,
-                        hardware_connection, StimulatorClass, stimulator_kwargs)
+                        hardware_connection, StimulatorClass, stimulator_kwargs, running_info)
 
 
         if not os.path.exists(os.path.dirname(self._persistent_state_file)):
@@ -342,6 +340,8 @@ class ControlThread(Thread):
             return pickle.dump(tpl, f)
 
     def _set_tracking_from_scratch(self):
+        """
+        """
         CameraClass = self._option_dict["camera"]["class"]
         camera_kwargs = self._option_dict["camera"]["kwargs"]
 
@@ -423,7 +423,7 @@ class ControlThread(Thread):
 
             if self._has_pickle_file():
                 try:
-                    cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_pickled()
+                    cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, self._info = self._set_tracking_from_pickled()
 
                 except Exception as e:
                     logging.error("Could not load previous state for unexpected reason:")
@@ -435,7 +435,7 @@ class ControlThread(Thread):
             
             with rw as result_writer:
                 if cam.canbepickled:
-                    self._save_pickled_state(cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
+                    self._save_pickled_state(cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, self._info)
                 
                 self._start_tracking(cam, result_writer, rois, TrackerClass, tracker_kwargs,
                                      hardware_connection, StimulatorClass, stimulator_kwargs)
