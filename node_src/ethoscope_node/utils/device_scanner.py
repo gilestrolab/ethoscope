@@ -10,6 +10,8 @@ from functools import wraps
 import socket
 from zeroconf import ServiceBrowser, Zeroconf
 
+from ethoscope_node.utils.etho_db import ExperimentalDB
+
 
 class ScanException(Exception):
     pass
@@ -206,6 +208,8 @@ class Device(Thread):
         self._is_online = True
         self._skip_scanning = False
         self._refresh_period = refresh_period
+        
+        self._edb = ExperimentalDB()
         
         self._update_info()
         super(Device,self).__init__()
@@ -416,18 +420,51 @@ class Device(Thread):
         except ScanException:
             self._reset_info()
             return
+
+        previous_status = self._info['status']
         
         try:
             data_url = "http://%s:%i/data/%s" % (self._ip, self._port, self._id)
-            resp = self._get_json(data_url)
-            self._info.update(resp)
+            new_info = self._get_json(data_url)
+
+            new_status = new_info['status']
+            self._info.update(new_info)
+
             resp = self._make_backup_path()
             self._info.update(resp)
+
         except ScanException:
-            pass
+            new_status = 'unreached'
+
+
+        # The only way for this to work consistently is to treat each run with a run_id which is passed by the ethoscope
+        # To keep compatibility with older version of the ethoscopes, we do not implement the experiment db unless the ethoscope
+        # is aware of its run_id
+        
+        if 'name' in self._info['experimental_info']:
+            user_name = self._info['experimental_info']['name']
+            location = self._info['experimental_info']['location']
+        else:
+            user_name = ""
+            location = ""
+
+        if 'run_id' in self._info['experimental_info']:
+            run_id = self._info['experimental_info']['run_id']
+            
+            #TODO
+            user_uid = "" 
+            send_alerts = True
+            
+            if previous_status == 'stopped'      and new_status == 'initialising': pass #started tracking, looking for targets, no need to log this step
+            if previous_status == 'initialising' and new_status == 'running': self._edb.addRun( run_id = run_id, experiment_type = "tracking", ethoscope_name = self._info['name'], ethoscope_id = self._id, username = user_name, user_id = user_uid, location = location, alert = send_alerts, comments = "", experimental_data = "" ) #tracking started succesfully
+            if previous_status == 'running'      and new_status == 'unreached': self._edb.flagProblem( run_id = run_id, message = "unreached" ) #ethoscope went offline during tracking!
+            if previous_status == 'running'      and new_status == 'stopped': self._edb.stopRun( run_id = run_id ) #ethoscope manually stopped
 
 
     def _make_backup_path(self,  timeout=30):
+        '''
+        '''
+        
         try:
             import mysql.connector
             device_id = self._info["id"]
@@ -456,8 +493,8 @@ class Device(Thread):
                                           )
 
         except Exception as e:
-            logging.error("Could not generate backup path for device. Probably a MySQL issue")
-            logging.error(traceback.format_exc())
+            #logging.error("Could not generate backup path for device. Probably a MySQL issue")
+            #logging.error(traceback.format_exc())
             return {"backup_path": "None"}
 
         return {"backup_path": output_db_file}

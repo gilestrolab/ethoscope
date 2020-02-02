@@ -8,6 +8,7 @@ import re
 import cv2
 from threading import Thread
 import pickle
+import secrets
 
 import trace
 from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera, DummyPiCameraAsync, V4L2Camera
@@ -381,6 +382,9 @@ class ControlThread(Thread):
         #here the hardwareconnection call the interface class without passing any argument!
         hardware_connection = HardwareConnection(HardWareInterfaceClass)
         
+        #creates a unique tracking id to label this tracking run
+        self._info["experimental_info"]["run_id"] = secrets.token_hex(8)
+        
         
         if self._info["experimental_info"]["sensor"]:
             #if is URL:
@@ -475,7 +479,10 @@ class ControlThread(Thread):
     def stop(self, error=None):
         self._info["status"] = "stopping"
         self._info["time"] = time.time()
-        self._info["experimental_info"] = {}
+        
+        # we reset all the user data of the latest experiment except the run_id
+        # a new run_id will be created when we start another experiment
+        self._info["experimental_info"] = { "run_id" : self._info["experimental_info"]["run_id"] }
 
         logging.info("Stopping monitor")
         if not self._monit is None:

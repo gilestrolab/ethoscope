@@ -32,8 +32,8 @@
 
         <div ng-if="device.status == 'running' || device.status == 'recording'" >
         <div id="node-info" class="intro">
-            <p><span class="fa fa-clock-o"></span> Running since {{ethoscope.start_date_time(device.time)}}
-                (i.e. {{ethoscope.elapsedtime(device.monitor_info.last_time_stamp)}} ago)
+            <p><span class="fa fa-clock"></span> Running since {{ethoscope.start_date_time(device.time)}}
+                (i.e. {{ethoscope.elapsedtime(device.monitor_info.last_time_stamp)}} ago) - Run ID: {{device.experimental_info.run_id}}
                 <br>
                 <span class="fa fa-user"></span> User: {{device.experimental_info.name}}
                 <br>
@@ -42,7 +42,7 @@
                 <span ng-if="device.status == 'running'" class="fas fa-tachometer-alt"></span> {{device.monitor_info.fps}} FPS
                 <br>
                 <span ng-if="device.CPU_temp > 70" class="fas fa-temperature-high"></span>
-                <span ng-if="device.CPU_temp <= 70" class="fas fa-temperature-low"></span> {{device.CPU_temp}} &#8451
+                <span ng-if="device.CPU_temp <= 70" class="fas fa-temperature-low"></span> CPU temperature: {{device.CPU_temp}} &#8451
                 
             </p>
 
