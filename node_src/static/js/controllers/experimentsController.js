@@ -1,9 +1,9 @@
 (function(){
-    var experimentsController = function($scope, $http, $timeout, $routeParams, $window, $interval){
+    
+    var experimentsController = function($scope, $http, $timeout, $routeParams, $window, $interval) {
 
-        $http.get('/browse/null').success(function(data){
-            $scope.backup_files = data.files;
-        });
+        // We need to make this call syncronous because the server may take a while to generate these data
+        $scope.getBackupInfo = function () { return $http.get('/browse/null') };
 
         $http.get('/devices').success(function(data){
             $scope.devices = data;
@@ -11,23 +11,30 @@
         
         $http.get('/runs_list').success(function(data){
             $scope.runs = data;
-            for (ix in $scope.runs) {
-                
-                // reformat start and end times in a js compatible format
-                if ( $scope.runs[ix].end_time != '' ) { $scope.runs[ix].end_time = $scope.runs[ix].end_time.split(".")[0].replace(/-/g,'/') };
-                $scope.runs[ix].start_time = $scope.runs[ix]['start_time'].split(".")[0].replace(/-/g,'/') ;
 
-                // check the mtime of the associated db file and records whether a backup file is on the node
-                var db_name = $scope.runs[ix].experimental_data.split('\\').pop().split('/').pop();
-                if ( $scope.backup_files[db_name] != undefined ) 
-                    { $scope.runs[ix].last_backup = $scope.backup_files[db_name]['mtime'];
-                      $scope.runs[ix].has_backup = true;
-                    }
-                else
-                    { $scope.runs[ix].has_backup = false };
-            }
+            // we work syncronously so we get this data and then we process the rest
+            $scope.getBackupInfo().then(function(data) {
+                $scope.backup_files =  data.data.files;
 
-        });
+                for (ix in $scope.runs) {
+                    
+                    // reformat start and end times in a js compatible format
+                    if ( $scope.runs[ix].end_time != '' ) { $scope.runs[ix].end_time = $scope.runs[ix].end_time.split(".")[0].replace(/-/g,'/') };
+                    $scope.runs[ix].start_time = $scope.runs[ix]['start_time'].split(".")[0].replace(/-/g,'/') ;
+
+                    // check the mtime of the associated db file and records whether a backup file is on the node
+                    var db_name = $scope.runs[ix].experimental_data.split('\\').pop().split('/').pop();
+                    if ( $scope.backup_files[db_name] != undefined ) 
+                        { $scope.runs[ix].last_backup = $scope.backup_files[db_name]['mtime'];
+                          $scope.runs[ix].has_backup = true;
+                        }
+                    else
+                        { $scope.runs[ix].has_backup = false };
+                }
+
+            });
+
+                });
 
         $scope.compare_time = function (t1, t2) {
             //compare two dates
