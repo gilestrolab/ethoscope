@@ -17,6 +17,7 @@ from ethoscope_node.utils.device_scanner import DeviceScanner, SensorScanner
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
 from ethoscope_node.utils.backups_helpers import GenericBackupWrapper, BackupClass
 
+from ethoscope_node.utils.etho_db import ExperimentalDB
 
 app = bottle.Bottle()
 STATIC_DIR = "../static"
@@ -90,6 +91,7 @@ def enable_cors():
 /device/<id>/log                        GET
 
 
+# RESOURCES ON NODE
 /results_file
 /browse/<folder:path>
 /request-download
@@ -98,6 +100,7 @@ def enable_cors():
 /remove_files
 /list/<type>
 /more
+/experiments
 /ethoscope/<id>
 /device/<id>/ip
 /more/<action>
@@ -108,11 +111,17 @@ def get_favicon():
     return server_static(STATIC_DIR+'/img/favicon.ico')
 
 
+@app.get('/runs_list')
+@error_decorator
+def experiments_list():
+    #response.content_type = 'application/json'
+    return json.dumps( edb.getRun('all', asdict=True) )
+
+
 @app.get('/devices')
 @error_decorator
 def devices():
     return device_scanner.get_all_devices_info()
-
 
 @app.get('/devices_list')
 def get_devices_list():
@@ -270,7 +279,7 @@ def result_file(type):
     for root, dirnames, filenames in os.walk(RESULTS_DIR):
         for f in fnmatch.filter(filenames, pattern):
             matches.append(os.path.join(root, f))
-        return {"files":matches}
+        return {"files": matches}
 
 
 @app.get('/browse/<folder:path>')
@@ -280,13 +289,14 @@ def browse(folder):
         directory = RESULTS_DIR
     else:
         directory = '/'+folder
-    files = []
+    files = {}
     for (dirpath, dirnames, filenames) in os.walk(directory):
         for name in filenames:
             abs_path = os.path.join(dirpath,name)
             size = os.path.getsize(abs_path)
+            mtime = os.path.getmtime(abs_path)
             #rel_path = os.path.relpath(abs_path,directory)
-            files.append({'abs_path':abs_path, 'size':size})
+            files[name] = {'abs_path':abs_path, 'size':size, 'mtime': mtime}
     return {'files': files}
 
 
@@ -456,20 +466,24 @@ def remove_files():
     return {'result': res}
 
 @app.get('/list/<type>')
-def redirection_to_home(type):
+def redirection_to_list(type):
     return bottle.redirect('/#/list/'+type)
 
-@app.get('/more')
-def redirection_to_home():
-    return bottle.redirect('/#/more/')
+#@app.get('/more')
+#def redirection_to_more():
+#    return bottle.redirect('/#/more/')
     
 @app.get('/ethoscope/<id>')
-def redirection_to_home(id):
+def redirection_to_ethoscope(id):
     return bottle.redirect('/#/ethoscope/'+id)
 
 @app.get('/more/<action>')
 def redirection_to_more(action):
     return bottle.redirect('/#/more/'+action)
+
+@app.get('/experiments')
+def redirection_to_experiments():
+    return bottle.redirect('/#/experiments')
 
 def close(exit_status=0):
     logging.info("Closing server")
@@ -524,6 +538,8 @@ if __name__ == '__main__':
         
         sensor_scanner = SensorScanner()
         sensor_scanner.start()
+        
+        edb = ExperimentalDB()
         
 #        #manually adds the sensors saved in the configuration file
 #        for sensor in CFG.content['sensors']:

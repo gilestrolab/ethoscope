@@ -160,7 +160,6 @@
                 <span ng-show="sortType == 'id' && !sortReverse" class="fa fa-caret-down"></span>
                 <span ng-show="sortType == 'id' && sortReverse" class="fa fa-caret-up"></span>
             </th>
-            <th><center>Select</center></th>
             </thead>
             <tbody>
             <tr ng-repeat="device in devices |  orderObjectBy:sortType:sortReverse:orderEthoscopes | filter:filterEthoscopes">
@@ -186,9 +185,6 @@
                 <td>{{device.experimental_info.location}}</td>
                 <td>{{device.ip}}</td>
                 <td title="{{device.id}}">{{device.id.substring(0,6)}}</td>
-                <td><center>
-                    <input type="checkbox" checklist-model="devices_selected" checklist-value="device"></center>
-                </td>
             </tr>
         </tbody>
 </table>

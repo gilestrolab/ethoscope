@@ -32,7 +32,7 @@ class ExperimentalInformation(DescribedObject):
     
         _description  = {   "overview": "Optional information about your experiment",
                             "arguments": [
-                                    {"type": "str", "name": "name", "description": "Who are you?", "default" : "", "asknode" : "users"},
+                                    {"type": "str", "name": "name", "description": "Who are you?", "default" : "", "asknode" : "users", "required" : "required"},
                                     {"type": "str", "name": "location", "description": "Where is your device","default" : "", "asknode" : "incubators"},
                                     {"type": "str", "name": "code", "description": "Would you like to add any code to the resulting filename?", "default" : ""},
                                     {"type": "str", "name": "sensor", "description": "url to access the relevant ethoscope sensor", "default": "", "asknode" : "sensors", "hidden" : "true"}

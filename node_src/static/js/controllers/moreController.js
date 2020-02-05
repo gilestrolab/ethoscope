@@ -105,7 +105,7 @@ function maxLengthCheck(object) {
                         $scope.abs_path = res.absolute_path;
                 //$scope.browse_table.clear();
                 //$scope.browse_table.rows.add(filesObj).draw();
-                console.log($scope.filesObj);
+                //console.log($scope.filesObj);
                      })
         };
         $scope.browse.dowload = function(){

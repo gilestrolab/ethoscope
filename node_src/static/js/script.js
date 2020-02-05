@@ -45,8 +45,15 @@
             // route for the management page
             .when('/more/:option', {
                 templateUrl : '/static/pages/more.html',
-                controller  : 'moreController as ctrl',
+                controller  : 'moreController',
             })
+
+            // route for the experiments database page
+            .when('/experiments', {
+                templateUrl : '/static/pages/experiments.html',
+                controller  : 'experimentsController',
+            })
+
             // route for the help page
             /*.when('/help', {
                 templateUrl : '/static/pages/help.html',
@@ -81,13 +88,13 @@
         
         
 
-        var get_date = function(){
+        var update_local_times = function(){
             $http.get('/node/time').success(function(data){
-            t = new Date(data.time);
-            $scope.time = t.toString();
-            });
-            var t= new Date();
-            $scope.localtime =t.toString();
+                t = new Date(data.time);
+                $scope.time = t.toString();
+                });
+            var t = new Date();
+            $scope.localtime = t.toString();
         };
 
         $scope.get_devices = function(){
@@ -181,23 +188,21 @@
         $scope.$on('$viewContentLoaded',$scope.get_devices);
 
 
-        var refresh = function(){
-    if (document.visibilityState=="visible"){
-            $scope.get_devices();
-            get_date();
-            console.log("refresh");
-    }
-       }
+       var refresh_platform = function(){
+            if (document.visibilityState=="visible"){
+                    $scope.get_devices();
+                    update_local_times();
+                    //console.log("refresh platform", new Date());
+            }
+       };
 
-       refresh_data = $interval(refresh, 3000);
+       refresh_data = $interval(refresh_platform, 10 * 1000);
+        
         //clear interval when scope is destroyed
         $scope.$on("$destroy", function(){
             $interval.cancel(refresh_data);
             //clearInterval(refresh_data);
         });
-
-
     });
-
 }
 )()

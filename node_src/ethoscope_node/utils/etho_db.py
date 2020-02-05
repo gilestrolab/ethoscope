@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-#  users.py
+#  etho_db.py
 #  
 #  Copyright 2019 Giorgio <giorgio@gilest.ro>
 #  
@@ -38,10 +38,13 @@ import logging, traceback
 class ExperimentalDB(multiprocessing.Process):
     
     
-    _run_table_name = "runs"
     _db_name = "/etc/ethoscope-node.db"
     #_db_name = "/tmp/ethoscope-node.db"
     #_db_name = ":memory:"
+
+    _runs_table_name = "runs"
+    _users_table_name = "users"
+    _experiments_table_name = "experiments"
     
     def __init__(self):
         self.create_tables()
@@ -58,18 +61,19 @@ class ExperimentalDB(multiprocessing.Process):
                 db.row_factory = sqlite3.Row
 
             try:
-                #print ('executing command: \n %s' % command) 
                 c = db.cursor()
                 c.execute(command)
                 
                 lid = c.lastrowid # the last id inserted / 0 if not an INSERT command
-                #print ('last inserted row was %s' % lid)
-                
                 rows = c.fetchall() # return the result of a SELECT query / [] if not a SELECT query
-                #print ('select entries are %s' % rows)
-                
+               
                 db.commit()
                 db.close()
+
+                #print ('executing command: \n %s' % command) 
+                #print ('last inserted row was %s' % lid)
+                #print ('select entries are %s' % rows)
+
 
             except Exception as e:
                 logging.error(traceback.format_exc())
@@ -87,7 +91,7 @@ class ExperimentalDB(multiprocessing.Process):
         Create the necessary tables in the database if they do not exist.
         """
         
-        sql_create_experiments_table = """CREATE TABLE IF NOT EXISTS %s (
+        sql_create_runs_table = """CREATE TABLE IF NOT EXISTS %s (
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 run_id TEXT NOT NULL,
                                 type TEXT NOT NULL,
@@ -103,16 +107,47 @@ class ExperimentalDB(multiprocessing.Process):
                                 experimental_data TEXT,
                                 comments TEXT,
                                 status TEXT
-                            );""" % self._run_table_name
+                            );""" % self._runs_table_name
 
+
+        sql_create_experiments_table = """CREATE TABLE IF NOT EXISTS %s (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                runs TEXT,
+                                metadata BLOB,
+                                comments TEXT
+                            );""" % self._experiments_table_name
+    
+
+        sql_create_users_table = """CREATE TABLE IF NOT EXISTS %s (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                username TEXT NOT NULL,
+                                fullname TEXT NOT NULL,
+                                pin TEXT,
+                                email TEXT NOT NULL,
+                                labname TEXT,
+                                active INTEGER,
+                                isadmin INTEGER,
+                                created TIMESTAMP
+                            );""" % self._users_table_name
+
+
+        self.executeSQL ( sql_create_runs_table )
         self.executeSQL ( sql_create_experiments_table )
+        self.executeSQL ( sql_create_users_table )
 
     def getRun (self, run_id, asdict=False):
         """
-        Gather experiment with given ID
+        Gather experiment with given ID if provided, if run_id equals 'all', it will collect all available experiments
+        :param run_id: the ID of the run to be interrogated
+        :param asdict: returns the rows as dictionaries
+        :return: either a sqlite3 row object or a dictionary
         """
         
-        sql_get_experiment = "SELECT * FROM %s WHERE run_id = '%s'" % (self._run_table_name, run_id)
+        if run_id == 'all':
+            sql_get_experiment = "SELECT * FROM %s" % (self._runs_table_name)
+        else:
+            sql_get_experiment = "SELECT * FROM %s WHERE run_id = '%s'" % (self._runs_table_name, run_id)
+        
         row = self.executeSQL(sql_get_experiment)
         
         if asdict:
@@ -123,7 +158,6 @@ class ExperimentalDB(multiprocessing.Process):
             return row
                     
 
-     
     def addRun (self, run_id="", experiment_type="tracking", ethoscope_name="", ethoscope_id="n/a", username="n/a", user_id=0, location="", alert=False, comments="", experimental_data=""):
         """
         Add a new row with a new experiment
@@ -149,9 +183,8 @@ class ExperimentalDB(multiprocessing.Process):
 
         problems = ""
         
-        sql_enter_new_experiment = "INSERT INTO %s VALUES( NULL, '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % ( self._run_table_name, run_id, experiment_type, ethoscope_name, ethoscope_id, username, user_id, location, start_time, end_time, alert, problems, experimental_data, comments, status)
+        sql_enter_new_experiment = "INSERT INTO %s VALUES( NULL, '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % ( self._runs_table_name, run_id, experiment_type, ethoscope_name, ethoscope_id, username, user_id, location, start_time, end_time, alert, problems, experimental_data, comments, status)
         return self.executeSQL ( sql_enter_new_experiment )
-        
     
     
     def stopRun (self, run_id):
@@ -164,7 +197,7 @@ class ExperimentalDB(multiprocessing.Process):
         end_time = datetime.datetime.now()
         status = "stopped"
         
-        sql_update_experiment = "UPDATE %s SET end_time = '%s', status = '%s' WHERE run_id = '%s'" % ( self._run_table_name, end_time, status, run_id )
+        sql_update_experiment = "UPDATE %s SET end_time = '%s', status = '%s' WHERE run_id = '%s'" % ( self._runs_table_name, end_time, status, run_id )
         self.executeSQL(sql_update_experiment)
         return self.getRun(run_id)[0]['status']
             
@@ -176,7 +209,7 @@ class ExperimentalDB(multiprocessing.Process):
 
         problems = self.getRun(run_id)[0]['problems']
         problems += "%s, %s;" % (ct, message)
-        sql_update_experiment = "UPDATE %s SET problems = '%s', WHERE run_id = %s" % ( self._run_table_name, problems, run_id )
+        sql_update_experiment = "UPDATE %s SET problems = '%s', WHERE run_id = %s" % ( self._runs_table_name, problems, run_id )
         return self.getRun(run_id)[0]['problems']
         
         
@@ -288,7 +321,8 @@ if __name__ == '__main__':
         edb.addRun(run_id, "tracking", "ethoscope_101", secrets.token_hex(8), "ggilestro", 101, "Home", True, "", "")
         
         
-        print ("added row: ", edb.getRun(run_id))
+        print ("added row: ", edb.getRun(run_id, asdict=True))
         ro = edb.stopRun(run_id)
         print ("stopped row: ", ro)
+        print (edb.getRun("all", asdict=True))
             
