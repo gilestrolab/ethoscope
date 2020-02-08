@@ -84,12 +84,12 @@
                                 <li ng-class="{disabled: currentPage == 0}">
                                     <a href ng-click="prevPage()">« Prev</a>
                                 </li>
-                                <li ng-repeat="n in range(runs.length)"
-                                    ng-class="{active: n == currentPage}"
-                                ng-click="setPage()">
+                                
+                                <li ng-repeat="n in pageRange" ng-class="{active: n == currentPage}" ng-click="setPage()">
                                     <a href ng-bind="n + 1">1</a>
                                 </li>
-                                <li ng-class="{disabled: currentPage == runs.length - 1}">
+                                
+                                <li ng-class="{disabled: currentPage == pageNumber - 1}">
                                     <a href ng-click="nextPage()">Next »</a>
                                 </li>
                             </ul>
@@ -97,7 +97,7 @@
                     </td>
                 </tfoot>
             <tbody>
-            <tr ng-repeat="run in runs |  orderObjectBy:sortType:sortReverse:orderRuns | filter:filterRuns">
+            <tr ng-repeat="run in pages[currentPage] |  orderObjectBy:sortType:sortReverse:orderRuns | filter:filterRuns">
                 <td>
                     <span ng-if="run.status == 'running'" class="fa fa-play-circle color-green" title={{run.status}}></span>
                     <span ng-if="run.status == 'unreached'" class="fa fa-stop-circle color-red" title={{run.status}}></span>
