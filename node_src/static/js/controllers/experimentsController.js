@@ -2,6 +2,26 @@
     
     var experimentsController = function($scope, $http, $timeout, $routeParams, $window, $interval) {
 
+        $scope.currentPage = 0;
+        
+        $scope.prevPage = function () {
+            if ($scope.currentPage > 0) {
+                $scope.currentPage--;
+            }
+        };
+        
+        $scope.nextPage = function () {
+            if ($scope.currentPage < $scope.pagedRuns.length - 1) {
+                $scope.currentPage++;
+            }
+        };
+        
+        $scope.setPage = function () {
+            $scope.currentPage = this.n;
+        };
+
+
+
         // We need to make this call syncronous because the server may take a while to generate these data
         $scope.getBackupInfo = function () { return $http.get('/browse/null') };
 
@@ -53,15 +73,15 @@
             }
 
 
-       refresh_data = $interval(function () {
-              console.log("refresh");
-          }, 10000);
+        refresh_data = $interval(function () {
+               console.log("refresh");
+           }, 10000);
           
-        //clear interval when scope is destroyed
-        $scope.$on("$destroy", function(){
-            $interval.cancel(refresh_data);
-            //clearInterval(refresh_data);
-        });
+         //clear interval when scope is destroyed
+         $scope.$on("$destroy", function(){
+             $interval.cancel(refresh_data);
+             //clearInterval(refresh_data);
+         });
 
 }
 

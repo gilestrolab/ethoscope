@@ -244,6 +244,28 @@ class TargetGridROIBuilder(BaseROIBuilder):
         return rois
 
 
+class ThirtyFliesMonitorWithTargetROIBuilder(TargetGridROIBuilder):
+
+    _description = {"overview": "The default sleep monitor arena with ten rows of two tubes.",
+                    "arguments": []}
+
+    def __init__(self):
+        r"""
+        Class to build ROIs for a two-columns, ten-rows for the sleep monitor
+        (`see here <https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_10x2_shortTubes>`_).
+        """
+        #`sleep monitor tube holder arena <todo>`_
+
+        super(SleepMonitorWithTargetROIBuilder, self).__init__(n_rows=10,
+                                                               n_cols=3,
+                                                               top_margin= 6.99 / 111.00,
+                                                               bottom_margin = 6.99 / 111.00,
+                                                               left_margin = -.033,
+                                                               right_margin = -.033,
+                                                               horizontal_fill = .975,
+                                                               vertical_fill= .7
+                                                               )
+
 class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilder):
 
     _description = {"overview": "The default sleep monitor arena with ten rows of two tubes.",

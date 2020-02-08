@@ -315,9 +315,14 @@ class Device(Thread):
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
     def user_options(self):
+        """
+        """
         user_options_url= "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_pages['user_options'], self._id)
-        out = self._get_json(user_options_url)
-        return out
+        try:
+            out = self._get_json(user_options_url)
+            return out
+        except:
+            return
 
     def get_log(self):
         log_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_pages['log'], self._id)
@@ -415,14 +420,23 @@ class Device(Thread):
     def _update_info(self):
         '''
         '''
+        previous_status = self._info['status']
+
         try:
             self._update_id()
+            
         except ScanException:
+            
+            if previous_status == 'running':
+                self._edb.flagProblem( run_id = run_id, message = "unreached" ) #ethoscope went offline while running
+                self._edb.updateEthoscopes(ethoscope_id = self._id, status="unreached")
+                
+            elif previous_status == 'stopped':
+                self._edb.updateEthoscopes(ethoscope_id = self._id, status="offline")
+                
             self._reset_info()
             return
 
-        previous_status = self._info['status']
-        
         try:
             data_url = "http://%s:%i/data/%s" % (self._ip, self._port, self._id)
             new_info = self._get_json(data_url)
@@ -461,6 +475,9 @@ class Device(Thread):
             if previous_status == 'running'      and new_status == 'unreached': self._edb.flagProblem( run_id = run_id, message = "unreached" ) #ethoscope went offline during tracking!
             if previous_status == 'running'      and new_status == 'stopped': self._edb.stopRun( run_id = run_id ) #ethoscope manually stopped
 
+        # update the record on the ethoscope table
+        if new_status != previous_status and previous_status != "offline":
+            self._edb.updateEthoscopes(ethoscope_id = self._id, status=new_status)
 
     def _make_backup_path(self,  timeout=30):
         '''
@@ -523,6 +540,7 @@ class DeviceScanner(object):
         self.device_refresh_period = device_refresh_period
         self.results_dir = results_dir
         self._Device = deviceClass
+        self._edb = ExperimentalDB()
         
     def start(self):
         # Use self as the listener class because I have add_service and remove_service methods
@@ -598,6 +616,11 @@ class DeviceScanner(object):
                 device.start()
                 logging.info("New %s detected with id = %s at IP = %s" % (self._device_type, device.id(), ip))
                 self.devices.append(device)
+                
+                machine_info = "%s on pi%s" % (device.machine_info()['kernel'], device.machine_info()['pi_version'])
+                ethoscope_name = device.info()['name']
+                self._edb.updateEthoscopes(ethoscope_id = device.id(), ethoscope_name = ethoscope_name, last_ip = ip, machineinfo = machine_info)
+
         
         except Exception as error:
             logging.error("Exception trying to add zeroconf service '"+name+"' of type '"+type+"': "+str(error))
@@ -610,6 +633,8 @@ class DeviceScanner(object):
         for device in self.devices:
             if device.zeroconf_name == name:
                 logging.info("%s with id = %s has gone down" % (self._device_type.capitalize(), device.id() ))
+                self._edb.updateEthoscopes(ethoscope_id = device.id(), status="offline")
+                
                 #we do not remove devices from the list when they go down so that keep a record of them in the node
                 #self.devices.remove(device)
                 return

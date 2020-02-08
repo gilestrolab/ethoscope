@@ -45,6 +45,7 @@ class ExperimentalDB(multiprocessing.Process):
     _runs_table_name = "runs"
     _users_table_name = "users"
     _experiments_table_name = "experiments"
+    _ethoscopes_table_name = "ethoscopes"
     
     def __init__(self):
         self.create_tables()
@@ -109,11 +110,13 @@ class ExperimentalDB(multiprocessing.Process):
                                 status TEXT
                             );""" % self._runs_table_name
 
+        #self.executeSQL ( "DROP TABLE ethoscopes;" )
 
         sql_create_experiments_table = """CREATE TABLE IF NOT EXISTS %s (
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 runs TEXT,
                                 metadata BLOB,
+                                tags TEXT,
                                 comments TEXT
                             );""" % self._experiments_table_name
     
@@ -131,13 +134,28 @@ class ExperimentalDB(multiprocessing.Process):
                             );""" % self._users_table_name
 
 
+        sql_create_ethoscopes_table = """CREATE TABLE IF NOT EXISTS %s (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                ethoscope_id TEXT NOT NULL,
+                                ethoscope_name TEXT NOT NULL,
+                                first_seen TIMESTAMP NOT NULL,
+                                last_seen TIMESTAMP NOT NULL,
+                                active INTEGER,
+                                last_ip TEXT,
+                                machineinfo TEXT,
+                                problems TEXT,
+                                comments TEXT,
+                                status TEXT
+                            );""" % self._ethoscopes_table_name
+
         self.executeSQL ( sql_create_runs_table )
         self.executeSQL ( sql_create_experiments_table )
         self.executeSQL ( sql_create_users_table )
+        self.executeSQL ( sql_create_ethoscopes_table )
 
     def getRun (self, run_id, asdict=False):
         """
-        Gather experiment with given ID if provided, if run_id equals 'all', it will collect all available experiments
+        Gather runs with given ID if provided, if run_id equals 'all', it will collect all available runs
         :param run_id: the ID of the run to be interrogated
         :param asdict: returns the rows as dictionaries
         :return: either a sqlite3 row object or a dictionary
@@ -150,9 +168,10 @@ class ExperimentalDB(multiprocessing.Process):
         
         row = self.executeSQL(sql_get_experiment)
         
-        if asdict:
+        if asdict and row != 0:
             keys = row[0].keys()
-            return [dict([(key, value) for key, value in zip(keys, line)]) for line in row]
+            #return [dict([(key, value) for key, value in zip(keys, line)]) for line in row]
+            return {line['run_id'] : {key: value for key, value in zip(keys, line)} for line in row}
             
         else:
             return row
@@ -209,9 +228,97 @@ class ExperimentalDB(multiprocessing.Process):
 
         problems = self.getRun(run_id)[0]['problems']
         problems += "%s, %s;" % (ct, message)
-        sql_update_experiment = "UPDATE %s SET problems = '%s', WHERE run_id = %s" % ( self._runs_table_name, problems, run_id )
-        return self.getRun(run_id)[0]['problems']
+        sql_update_experiment = "UPDATE %s SET problems = '%s' WHERE run_id = '%s'" % ( self._runs_table_name, problems, run_id )
+        return self.executeSQL ( sql_update_experiment )
+
+    def addToExperiment(self, experiment_id=None, runs=None, metadata=None, comments=None):
+        '''
+        '''
+        if type(runs) == list:
+            runs = ";".join(runs)
         
+        if experiment_id == None:
+            sql_enter_new_experiment = "INSERT INTO %s VALUES( NULL, '%s', '%s', '%s')" % ( self._experiments_table_name, runs, metadata, comments)
+        else:
+            updates = {name: value for (name, value) in zip(['runs', 'metadata', 'comments'], [runs, metadata, comments]) if value != None}
+            values = " , ".join(["%s = '%s'" % (name, updates[name]) for name in updates.keys()])
+            sql_enter_new_experiment = "UPDATE "+ self._experiments_table_name +" SET "+ values + " WHERE experiment_id = '"+str(experiment_id)+"'"
+            
+        return self.executeSQL ( sql_enter_new_experiment )
+            
+
+    def getExperiment(self, experiment_id, asdict=False):
+        """
+        Gather experiments with given ID if provided, if experiment_id equals 'all', it will collect all available experiments
+        :param experiment_id: the ID of the experiment to be interrogated
+        :param asdict: returns the rows as dictionaries
+        :return: either a sqlite3 row object or a dictionary
+        """
+        
+        if experiment_id == 'all':
+            sql_get_experiment = "SELECT * FROM %s" % (self._experiments_table_name)
+        else:
+            sql_get_experiment = "SELECT * FROM %s WHERE run_id = '%s'" % (self._experiments_table_name, experiment_id)
+        
+        row = self.executeSQL(sql_get_experiment)
+        
+        if asdict and row != 0:
+            keys = row[0].keys()
+            #return [dict([(key, value) for key, value in zip(keys, line)]) for line in row]
+            return {line['id'] : {key: value for key, value in zip(keys, line)} for line in row}
+            
+        else:
+            return row
+    
+    def getEthoscope (self, ethoscope_id, asdict=False):
+        """
+        Gather ethoscope with given ID if provided, if experiment_id equals 'all', it will collect all available ethoscopes
+        :param ethoscope_id: the ID of the ethoscope to be interrogated
+        :param asdict: returns the rows as dictionaries
+        :return: either a sqlite3 row object or a dictionary
+
+        """
+
+        if ethoscope_id == 'all':
+            sql_get_ethoscope = "SELECT * FROM %s" % (self._ethoscopes_table_name)
+        else:
+            sql_get_ethoscope = "SELECT * FROM %s WHERE ethoscope_id = '%s'" % (self._ethoscopes_table_name, ethoscope_id)
+        
+        row = self.executeSQL(sql_get_ethoscope)
+        
+        if asdict and row != 0:
+            keys = row[0].keys()
+            #return [dict([(key, value) for key, value in zip(keys, line)]) for line in row]
+            return {line['id'] : {key: value for key, value in zip(keys, line)} for line in row}
+            
+        else:
+            return row
+        
+    
+    def updateEthoscopes (self, ethoscope_id, ethoscope_name=None, active=None, last_ip=None, problems=None, machineinfo=None, comments=None, status=None):
+        """
+        Updates the parameters of a given ethoscope
+        if an ethoscope with the same ID is not found in the current database
+        it will create a new entry for it
+        """
+        e = self.getEthoscope(ethoscope_id, True)
+        now = datetime.datetime.now()
+        
+        if type(e) is dict and e != {}:
+            
+            updates = {name: value for (name, value) in zip(['ethoscope_name', 'active', 'last_ip', 'machineinfo', 'problems', 'comments', 'status'], [ethoscope_name, active, last_ip, machineinfo, problems, comments, status]) if value != None}
+            values = " , ".join(["%s = '%s'" % (name, updates[name]) for name in updates.keys()])
+            sql_update_ethoscope = "UPDATE "+ self._ethoscopes_table_name +" SET last_seen = '"+ str(now) +"', "+ values + " WHERE ethoscope_id = '"+str(ethoscope_id)+"'"
+            
+        else:
+            active = True
+            sql_update_ethoscope = "INSERT INTO %s VALUES( NULL, '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % ( self._ethoscopes_table_name, ethoscope_id, ethoscope_name, now, now, active, last_ip, machineinfo, problems, comments, status)
+            logging.warning("Adding a new ethoscope to the db. Welcome %s with id %s" % (ethoscope_name, ethoscope_id))
+            
+            
+        return self.executeSQL(sql_update_ethoscope)
+
+
         
 class simpleDB(object):
     '''
@@ -300,6 +407,45 @@ class Incubators(simpleDB):
         '''
         keys = ['name', 'set_temperature', 'set_humidity', 'set_light', 'lat_temperature', 'lat_humidity', 'lat_light', 'lat_reading']
         super(Incubators, self).__init__(dbfile, keys)                
+
+
+def random_date(start, end):
+    """
+    This function will return a random datetime between two datetime 
+    objects.
+    """
+    delta = end - start
+    int_delta = (delta.days * 24 * 60 * 60) + delta.seconds
+    random_second = random.randrange(int_delta)
+    return start + datetime.timedelta(seconds=random_second)
+
+
+def createRandomRuns(number):
+
+    edb = ExperimentalDB()
+    users = ["ggilestro", "afrench", "hjones", "mjoyce", "ebeckwith", "qgeissmann"]
+    ethoscopes = {"ETHOSCOPE_%03d" % num : eid for (num, eid) in zip (range(1,150), [secrets.token_hex(8) for i in range(149)] ) }
+    
+    for run in [secrets.token_hex(8) for i in range(number)]:
+        user = random.choice(users)
+        user_id = users.index(user)
+        ethoscope_name = random.choice([n for n in ethoscopes.keys()])
+        ethoscope_id = ethoscopes[ethoscope_name]
+        location = random.choice(["Incubator_%02d" % i for i in range(1,11)])
+        date = random_date(datetime.datetime(2020,1,1), datetime.datetime(2020,12,31)).strftime("%Y-%m-%d_%H-%M-%S")
+        database = "%s_%s.db" % (date, ethoscope_id)
+        filepath = "/ethoscope_data/results/%s/%s/%s/%s" % (ethoscope_id, ethoscope_name, date, database)
+        r = edb.addRun(run, "tracking", ethoscope_name, ethoscope_id, user, user_id, location, random.choice([1,0]), "", filepath)
+        print (r)
+
+def createRandomEthoscopes(number):
+
+    edb = ExperimentalDB()
+    ethoscopes = {"ETHOSCOPE_%03d" % num : eid for (num, eid) in zip (range(1,number+1), [secrets.token_hex(8) for i in range(number)] ) }
+    
+    for etho in [name for name in ethoscopes.keys()]:
+        print (edb.updateEthoscopes(ethoscopes[etho], etho))
+
                 
 if __name__ == '__main__':
 
@@ -316,13 +462,21 @@ if __name__ == '__main__':
         db.save()
     
     if test_experiments:
-        edb = ExperimentalDB()
-        run_id = secrets.token_hex(8)
-        edb.addRun(run_id, "tracking", "ethoscope_101", secrets.token_hex(8), "ggilestro", 101, "Home", True, "", "")
+        
+        #createRandomRuns(350)
+        createRandomEthoscopes(100)
+        
+        #print ("added row: ", edb.getRun(run_id, asdict=True))
+        #ro = edb.stopRun(run_id)
+        #print ("stopped row: ", ro)
+        #print (edb.getRun("all", asdict=True))
+
         
         
-        print ("added row: ", edb.getRun(run_id, asdict=True))
-        ro = edb.stopRun(run_id)
-        print ("stopped row: ", ro)
-        print (edb.getRun("all", asdict=True))
+        
+        #edb.addToExperiment(runs=run_id)
+        #edb.addToExperiment(runs=run_id, comments = "some random comment")
+        #edb.addToExperiment(runs=more_runs, metadata = "here should go some file content")
+        #print (edb.getExperiment('all', asdict=True))
+        
             

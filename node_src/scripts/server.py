@@ -113,9 +113,16 @@ def get_favicon():
 
 @app.get('/runs_list')
 @error_decorator
-def experiments_list():
+def runs_list():
     #response.content_type = 'application/json'
     return json.dumps( edb.getRun('all', asdict=True) )
+
+@app.get('/experiments_list')
+@error_decorator
+def experiments_list():
+    #response.content_type = 'application/json'
+    return json.dumps( edb.getExperiment('all', asdict=True) )
+
 
 
 @app.get('/devices')

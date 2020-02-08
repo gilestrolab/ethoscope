@@ -39,6 +39,7 @@ class BaseCamera(object):
     def __exit__(self):
         logging.info("Closing camera")
         self._close()
+        
     def _close(self):
         pass
 
