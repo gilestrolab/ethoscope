@@ -1,5 +1,5 @@
 (function(){
-    var app = angular.module('flyApp', ['ngRoute','daterangepicker']);
+    var app = angular.module('flyApp', ['ngRoute', 'daterangepicker', 'angularUtils.directives.dirPagination']);
     
     app.filter("toArray", function(){
         return function(obj) {

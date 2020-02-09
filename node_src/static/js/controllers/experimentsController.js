@@ -2,41 +2,9 @@
     
     var experimentsController = function($scope, $http, $timeout, $routeParams, $window, $interval) {
 
-        $scope.currentPage = 0;
+        $scope.currentPage = 1;
         $scope.itemsPerPage = 20;
 
-        const range = (start, stop, step = 1) =>
-          Array(Math.ceil((stop - start) / step)).fill(start).map((x, y) => x + y * step)
-
-        updateRange = function () {
-            var start = 0;
-            var end = start + 7;
-            
-            ($scope.currentPage < 3) ? (start = 0) : (start = $scope.currentPage - 3);
-            ($scope.pageNumber - $scope.currentPage < 4) ? (end = $scope.pageNumber) : (end = start + 7);
-            $scope.pageRange = range(start, end);
-        }
-        
-        $scope.prevPage = function () {
-            if ($scope.currentPage > 0) {
-                $scope.currentPage--;
-                updateRange();
-            }
-        };
-        
-        $scope.nextPage = function () {
-            if ($scope.currentPage < $scope.pageNumber - 1) {
-                $scope.currentPage++;
-                updateRange();
-            }
-        };
-
-        $scope.setPage = function () {
-            $scope.currentPage = this.n;
-            updateRange();
-        };
-
-        
         // We need to make this call syncronous because the server may take a while to generate these data
         $scope.getBackupInfo = function () { return $http.get('/browse/null') };
 
@@ -46,12 +14,15 @@
         
         $http.get('/runs_list').success(function(data){
             $scope.runs = data;
+            $scope.totalRuns = 0;
 
             // we work syncronously so we get this data and then we process the rest
             $scope.getBackupInfo().then(function(data) {
                 $scope.backup_files =  data.data.files;
 
                 for (ix in $scope.runs) {
+                    
+                    $scope.totalRuns++;
                     
                     // reformat start and end times in a js compatible format
                     if ( $scope.runs[ix].end_time != '' ) { $scope.runs[ix].end_time = $scope.runs[ix].end_time.split(".")[0].replace(/-/g,'/') };
@@ -66,30 +37,18 @@
                     else
                         { $scope.runs[ix].has_backup = false };
                 }
-                $scope.groupToPages();
             });
         });
 
-        // calculate page in place
-        $scope.groupToPages = function () {
 
-            $scope.pages = [];
+        $scope.runstoArray = function () {
             $scope.runsArray = [];
-            
             //transform runs from dict to array
             for (var run in $scope.runs) {
                 if ($scope.runs.hasOwnProperty(run)) {
                     $scope.runsArray.push( $scope.runs[run] );
                 }
             }
-
-            $scope.pageNumber = Math.ceil ( $scope.runsArray.length / $scope.itemsPerPage );
-            updateRange();
-            
-            for (var p = 0; p < $scope.pageNumber; p++) {
-                $scope.pages[p] = $scope.runsArray.slice(p * $scope.itemsPerPage, (p+1) * $scope.itemsPerPage -1 );
-            }
-            
         };
 
         $scope.compare_time = function (t1, t2) {
@@ -122,5 +81,6 @@
 }
 
  angular.module('flyApp').controller('experimentsController', experimentsController);
+ 
 
 })()

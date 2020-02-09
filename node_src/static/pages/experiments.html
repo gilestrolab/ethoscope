@@ -1,16 +1,16 @@
 <!-- experiments.html -->
 <!-- **** ETHOSCOPE LIST TABLE **** -->
 
-  <form>
-    <div class="form-group">
-      <div class="input-group">
-        <div class="input-group-addon"><i class="fa fa-search"></i></div>
+<form>
+<div class="form-group">
+  <div class="input-group">
+    <div class="input-group-addon"><i class="fa fa-search"></i></div>
 
-        <input type="text" class="form-control" placeholder="Filter runs" ng-model="filterRuns" id="filterRuns">
+    <input type="text" class="form-control" placeholder="Filter runs" ng-model="filterRuns" id="filterRuns">
 
-      </div>      
-    </div>
-  </form>
+  </div>      
+</div>
+</form>
 
 
 <table class="table table-striped" ng-cloak>
@@ -77,27 +77,8 @@
             </th>
             <th><center>Select</center></th>
             </thead>
-            <tfoot>
-                    <td colspan="6">
-                        <div class="pagination pull-right">
-                            <ul>
-                                <li ng-class="{disabled: currentPage == 0}">
-                                    <a href ng-click="prevPage()">« Prev</a>
-                                </li>
-                                
-                                <li ng-repeat="n in pageRange" ng-class="{active: n == currentPage}" ng-click="setPage()">
-                                    <a href ng-bind="n + 1">1</a>
-                                </li>
-                                
-                                <li ng-class="{disabled: currentPage == pageNumber - 1}">
-                                    <a href ng-click="nextPage()">Next »</a>
-                                </li>
-                            </ul>
-                        </div>
-                    </td>
-                </tfoot>
             <tbody>
-            <tr ng-repeat="run in pages[currentPage] |  orderObjectBy:sortType:sortReverse:orderRuns | filter:filterRuns">
+            <tr dir-paginate="run in runs | orderObjectBy:sortType:sortReverse:orderRuns | filter:filterRuns| itemsPerPage: itemsPerPage" current-page="currentPage">
                 <td>
                     <span ng-if="run.status == 'running'" class="fa fa-play-circle color-green" title={{run.status}}></span>
                     <span ng-if="run.status == 'unreached'" class="fa fa-stop-circle color-red" title={{run.status}}></span>
@@ -140,4 +121,8 @@
             </tr>
         </tbody>
 </table>
-
+<dir-pagination-controls
+                max-size="5"
+                direction-links="true"
+                boundary-links="true" >
+</dir-pagination-controls>
