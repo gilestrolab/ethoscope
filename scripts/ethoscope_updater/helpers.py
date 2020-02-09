@@ -173,7 +173,7 @@ def receive_device_IPs():
         req = urllib.request.Request(url, headers={'Content-Type': 'application/json'})            
         f = urllib.request.urlopen(req, timeout=10)
         js = json.load(f)
-        devices = ["http://" + js[key]['ip'] for key in js.keys()]
+        devices = [ "http://" + js[key]['ip'] for key in js.keys() if js[key]['status'] != "offline" ]
     except:
         logging.error("The node ethoscope server is not running or cannot be reached. A list of available ethoscopes could not be found.")
         logging.error(traceback.format_exc())
