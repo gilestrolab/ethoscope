@@ -276,7 +276,6 @@ class ExperimentalDB(multiprocessing.Process):
         :param ethoscope_id: the ID of the ethoscope to be interrogated
         :param asdict: returns the rows as dictionaries
         :return: either a sqlite3 row object or a dictionary
-
         """
 
         if ethoscope_id == 'all':

@@ -451,7 +451,7 @@ class Device(Thread):
             new_status = 'unreached'
 
 
-        # The only way for this to work consistently is to treat each run with a run_id which is passed by the ethoscope
+        # The only way for this to work consistently is to treat each run with a run_id which is generated on and passed by the ethoscope
         # To keep compatibility with older version of the ethoscopes, we do not implement the experiment db unless the ethoscope
         # is aware of its run_id
         
@@ -468,6 +468,7 @@ class Device(Thread):
             #TODO
             user_uid = "" 
             send_alerts = True
+
             db_file_name = self._info['backup_path']
             
             if previous_status == 'stopped'      and new_status == 'initialising': pass #started tracking, looking for targets, no need to log this step
@@ -564,8 +565,20 @@ class DeviceScanner(object):
         
     def get_all_devices_info(self):
         '''
+        Returns a dictionary in which each entry has key of device_id
         '''
         out = {}
+
+        # First we generate a dictionary of active ethoscopes in the database. In this way we account for those that are in use but offline
+        all_known_ethoscopes = self._edb.getEthoscope ('all', asdict=True)
+        for dv_db in all_known_ethoscopes:
+            ethoscope = all_known_ethoscopes[dv_db]
+            if ethoscope['active']:
+                out[ethoscope['ethoscope_id']] = { 'name': ethoscope['ethoscope_name'], 
+                                                   'id': ethoscope['ethoscope_id'],
+                                                   'status' : "offline"}
+
+        # Then we update that list with those ethoscopes that are actually online
         for device in self.devices:
             out[device.id()] = device.info()
             out[device.id()]["time_since_backup"] = self._get_last_backup_time(device)
@@ -578,15 +591,28 @@ class DeviceScanner(object):
         # Not found, so produce an error
         raise KeyError("No such %s device: %s" % (self._device_type, id) )
         
-    def add(self, name, url):
+    def add(self, ip, name=None, device_id=None):
         """
         Manually add a device to the list
         """
-        device = self._Device(url, self.device_refresh_period, results_dir = self.results_dir )
-        device.zeroconf_name = name
+        
+        device = self._Device(ip, self.device_refresh_period, results_dir = self.results_dir )
+        if name: device.zeroconf_name = name
+        
         device.start()
-        logging.info("New %s manually added with name = %s, id = %s at URL = %s" % (self._device_type, name, device.id(), url))
+        
+        if not device_id:
+            device_id = device.id()
+         
         self.devices.append(device)
+
+        logging.info("New %s manually added with name = %s, id = %s at IP = %s" % (self._device_type, name, device.id(), ip))
+
+        if 'kernel' in device.machine_info().keys() :
+            machine_info = "%s on pi%s" % (device.machine_info()['kernel'], device.machine_info()['pi_version'])
+            
+        self._edb.updateEthoscopes(ethoscope_id = device.id(), ethoscope_name = device.info()['name'], last_ip = ip, machineinfo = machine_info)
+
         
     def add_service(self, zeroconf, type, name):
         """
@@ -601,26 +627,11 @@ class DeviceScanner(object):
         
         try:
             info = zeroconf.get_service_info(type, name)
-            # Note that I don't trust the address given in the info. When registering, the
-            # service doesn't know which interface it will be accessed by and hence which IP
-            # address to use (src/scripts/device_server.py puts gibberish in this field for
-            # this reason).
-            # Query the IP address just using the services hostname and zeroconf.
 
             if info:
                 #ip = socket.inet_ntoa(info.address)
                 ip = socket.inet_ntoa(info.addresses[0])
-                
-                device = self._Device(ip, self.device_refresh_period, results_dir = self.results_dir )
-                device.zeroconf_name = name
-                device.start()
-                logging.info("New %s detected with id = %s at IP = %s" % (self._device_type, device.id(), ip))
-                self.devices.append(device)
-                
-                machine_info = "%s on pi%s" % (device.machine_info()['kernel'], device.machine_info()['pi_version'])
-                ethoscope_name = device.info()['name']
-                self._edb.updateEthoscopes(ethoscope_id = device.id(), ethoscope_name = ethoscope_name, last_ip = ip, machineinfo = machine_info)
-
+                self.add( ip, name )
         
         except Exception as error:
             logging.error("Exception trying to add zeroconf service '"+name+"' of type '"+type+"': "+str(error))
@@ -633,7 +644,6 @@ class DeviceScanner(object):
         for device in self.devices:
             if device.zeroconf_name == name:
                 logging.info("%s with id = %s has gone down" % (self._device_type.capitalize(), device.id() ))
-                self._edb.updateEthoscopes(ethoscope_id = device.id(), status="offline")
                 
                 #we do not remove devices from the list when they go down so that keep a record of them in the node
                 #self.devices.remove(device)
@@ -662,4 +672,29 @@ class SensorScanner(DeviceScanner):
     def stop(self):
         self._zeroconf.close()
 
+    def get_all_devices_info(self):
+        '''
+        Returns a dictionary in which each entry has key of device_id
+        '''
+        out = {}
 
+        for device in self.devices:
+            out[device.id()] = device.info()
+            out[device.id()]["time_since_backup"] = self._get_last_backup_time(device)
+        return out
+
+    def add(self, ip, name=None, device_id=None):
+        """
+        Manually add a device to the list
+        """
+        
+        device = self._Device(ip, self.device_refresh_period, results_dir = self.results_dir )
+        if name: device.zeroconf_name = name
+        
+        device.start()
+        
+        if not device_id: device_id = device.id()
+         
+        self.devices.append(device)
+
+        logging.info("New %s manually added with name = %s, id = %s at IP = %s" % (self._device_type, name, device.id(), ip))

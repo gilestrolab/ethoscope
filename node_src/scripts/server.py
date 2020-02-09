@@ -123,8 +123,6 @@ def experiments_list():
     #response.content_type = 'application/json'
     return json.dumps( edb.getExperiment('all', asdict=True) )
 
-
-
 @app.get('/devices')
 @error_decorator
 def devices():
