@@ -168,7 +168,10 @@ class ExperimentalDB(multiprocessing.Process):
         
         row = self.executeSQL(sql_get_experiment)
         
-        if asdict and row != 0:
+        if row == 0:
+            return {}
+        
+        if asdict:
             keys = row[0].keys()
             #return [dict([(key, value) for key, value in zip(keys, line)]) for line in row]
             return {line['run_id'] : {key: value for key, value in zip(keys, line)} for line in row}
@@ -262,7 +265,10 @@ class ExperimentalDB(multiprocessing.Process):
         
         row = self.executeSQL(sql_get_experiment)
         
-        if asdict and row != 0:
+        if row == 0:
+            return {}
+        
+        if asdict:
             keys = row[0].keys()
             #return [dict([(key, value) for key, value in zip(keys, line)]) for line in row]
             return {line['id'] : {key: value for key, value in zip(keys, line)} for line in row}
@@ -285,7 +291,10 @@ class ExperimentalDB(multiprocessing.Process):
         
         row = self.executeSQL(sql_get_ethoscope)
         
-        if asdict and row != 0:
+        if row == 0:
+            return {}
+        
+        if asdict:
             keys = row[0].keys()
             #return [dict([(key, value) for key, value in zip(keys, line)]) for line in row]
             return {line['id'] : {key: value for key, value in zip(keys, line)} for line in row}

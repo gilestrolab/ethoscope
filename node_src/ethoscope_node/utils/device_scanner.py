@@ -39,6 +39,10 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
     return deco_retry
 
 
+class Device():
+    pass
+
+
 class Sensor(Thread):
     """
     """
@@ -164,7 +168,7 @@ class Sensor(Thread):
     def info(self):
         return self._info
 
-class Device(Thread):
+class Ethoscope(Thread):
     _ethoscope_db_credentials = {"user": "ethoscope",
                                 "passwd": "ethoscope",
                                 "db":"ethoscope_db"}
@@ -212,7 +216,7 @@ class Device(Thread):
         self._edb = ExperimentalDB()
         
         self._update_info()
-        super(Device,self).__init__()
+        super(Ethoscope,self).__init__()
 
     def run(self):
         '''
@@ -415,7 +419,6 @@ class Device(Thread):
         This is called whenever the device goes offline
         '''
         self._info['status'] = "offline"
-        self._info['ip'] = "offline"
 
     def _update_info(self):
         '''
@@ -531,17 +534,15 @@ class DeviceScanner(object):
     #TODO: check if this is going to be a problem
     
     _suffix = ".local" 
-    _service_type = "_ethoscope._tcp.local." 
-    _device_type = "ethoscope"
+    _service_type = "_device._tcp.local." 
+    _device_type = "device"
 
     
-    def __init__(self, device_refresh_period = 5, results_dir="/ethoscope_data/results", deviceClass=Device):
+    def __init__(self, device_refresh_period = 5, deviceClass=Device):
         self._zeroconf = Zeroconf()
         self.devices = []
         self.device_refresh_period = device_refresh_period
-        self.results_dir = results_dir
         self._Device = deviceClass
-        self._edb = ExperimentalDB()
         
     def start(self):
         # Use self as the listener class because I have add_service and remove_service methods
@@ -550,38 +551,14 @@ class DeviceScanner(object):
     def stop(self):
         self._zeroconf.close()
 
-    def _get_last_backup_time(self, device):
-        try:
-            backup_path = device.info()["backup_path"]
-            time_since_backup = time.time() - os.path.getmtime(backup_path)
-            return time_since_backup
-        except OSError:
-            return
-        except KeyError:
-            return
-        except Exception as e:
-            logging.error(traceback.format_exc())
-            return
-        
     def get_all_devices_info(self):
         '''
         Returns a dictionary in which each entry has key of device_id
         '''
         out = {}
 
-        # First we generate a dictionary of active ethoscopes in the database. In this way we account for those that are in use but offline
-        all_known_ethoscopes = self._edb.getEthoscope ('all', asdict=True)
-        for dv_db in all_known_ethoscopes:
-            ethoscope = all_known_ethoscopes[dv_db]
-            if ethoscope['active']:
-                out[ethoscope['ethoscope_id']] = { 'name': ethoscope['ethoscope_name'], 
-                                                   'id': ethoscope['ethoscope_id'],
-                                                   'status' : "offline"}
-
-        # Then we update that list with those ethoscopes that are actually online
         for device in self.devices:
             out[device.id()] = device.info()
-            out[device.id()]["time_since_backup"] = self._get_last_backup_time(device)
         return out
         
     def get_device(self, id):
@@ -601,27 +578,21 @@ class DeviceScanner(object):
         
         device.start()
         
-        if not device_id:
-            device_id = device.id()
+        if not device_id: device_id = device.id()
          
         self.devices.append(device)
 
         logging.info("New %s manually added with name = %s, id = %s at IP = %s" % (self._device_type, name, device.id(), ip))
 
-        if 'kernel' in device.machine_info().keys() :
-            machine_info = "%s on pi%s" % (device.machine_info()['kernel'], device.machine_info()['pi_version'])
-            
-        self._edb.updateEthoscopes(ethoscope_id = device.id(), ethoscope_name = device.info()['name'], last_ip = ip, machineinfo = machine_info)
-
         
     def add_service(self, zeroconf, type, name):
         """
-        Method required to be a Zeroconf listener. Called by Zeroconf when a "_ethoscope._tcp" service
+        Method required to be a Zeroconf listener. Called by Zeroconf when a "_device._tcp" service
         is registered on the network. Don't call directly.
         
         sample values:
-        type = '_ethoscope._tcp.local.'
-        name = 'ETHOSCOPE000._ethoscope._tcp.local.'
+        type = '_device._tcp.local.'
+        name = 'DEVICE000._device._tcp.local.'
         """
 
         
@@ -649,9 +620,90 @@ class DeviceScanner(object):
                 #self.devices.remove(device)
                 return
 
+class EthoscopeScanner(DeviceScanner):
+    """
+    Ethoscope specific Scanner
+    """
+    _suffix = ".local" 
+    _service_type = "_ethoscope._tcp.local." 
+    _device_type = "ethoscope"
+
+    
+    def __init__(self, device_refresh_period = 5, results_dir="/ethoscope_data/results", deviceClass=Ethoscope):
+        self._zeroconf = Zeroconf()
+        self.devices = []
+        self.device_refresh_period = device_refresh_period
+        self.results_dir = results_dir
+        self._Device = deviceClass
+        
+        self._edb = ExperimentalDB()
+
+    def _get_last_backup_time(self, device):
+        try:
+            backup_path = device.info()["backup_path"]
+            time_since_backup = time.time() - os.path.getmtime(backup_path)
+            return time_since_backup
+        except OSError:
+            return
+        except KeyError:
+            return
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            return
+
+    def get_all_devices_info(self):
+        '''
+        Returns a dictionary in which each entry has key of device_id
+        '''
+        out = {}
+
+        # First we generate a dictionary of active ethoscopes in the database. In this way we account for those that are in use but are actually offline
+        all_known_ethoscopes = self._edb.getEthoscope ('all', asdict=True)
+        
+        for dv_db in all_known_ethoscopes:
+            ethoscope = all_known_ethoscopes[dv_db]
+            if ethoscope['active']:
+                out[ethoscope['ethoscope_id']] = { 'name': ethoscope['ethoscope_name'], 
+                                                   'id': ethoscope['ethoscope_id'],
+                                                   'status' : "offline",
+                                                   'ip' : ethoscope['last_ip'],
+                                                   'time' : ethoscope['last_seen']}
+
+        # Then we update that list with those ethoscopes that are actually online
+        for device in self.devices:
+            if device.name != "ETHOSCOPE_000":
+                out[device.id()] = device.info()
+                out[device.id()]["time_since_backup"] = self._get_last_backup_time(device)
+            else:
+                out[device.name] = device.info()
+                
+        return out
+
+    def add(self, ip, name):
+        """
+        Manually add a device to the list
+        """
+        
+        #initialised the device and start it
+        device = self._Device(ip, self.device_refresh_period, results_dir = self.results_dir )
+        if name: device.zeroconf_name = name
+        device.start()
+
+        self.devices.append(device)
+        logging.info("New %s manually added with name = %s, id = %s at IP = %s" % (self._device_type, name, device.id(), ip))
+
+        if 'kernel' in device.machine_info().keys():
+            machine_info = "%s on pi%s" % (device.machine_info()['kernel'], device.machine_info()['pi_version'])
+
+        #We add the device to the database or update its record but only if it is not a 000 device
+        if device.info()['name'] != "ETHOSCOPE_OOO":
+            self._edb.updateEthoscopes(ethoscope_id = device.id(), ethoscope_name = device.info()['name'], last_ip = ip, machineinfo = machine_info)
+    
+
+
 class SensorScanner(DeviceScanner):
     """
-    Scans the network for avahi announced sensors
+    Sensor specific scanner
     """
     _suffix = ".local" 
     _service_type = "_sensor._tcp.local." 
@@ -671,30 +723,3 @@ class SensorScanner(DeviceScanner):
         
     def stop(self):
         self._zeroconf.close()
-
-    def get_all_devices_info(self):
-        '''
-        Returns a dictionary in which each entry has key of device_id
-        '''
-        out = {}
-
-        for device in self.devices:
-            out[device.id()] = device.info()
-            out[device.id()]["time_since_backup"] = self._get_last_backup_time(device)
-        return out
-
-    def add(self, ip, name=None, device_id=None):
-        """
-        Manually add a device to the list
-        """
-        
-        device = self._Device(ip, self.device_refresh_period, results_dir = self.results_dir )
-        if name: device.zeroconf_name = name
-        
-        device.start()
-        
-        if not device_id: device_id = device.id()
-         
-        self.devices.append(device)
-
-        logging.info("New %s manually added with name = %s, id = %s at IP = %s" % (self._device_type, name, device.id(), ip))

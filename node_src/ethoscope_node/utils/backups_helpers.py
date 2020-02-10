@@ -1,6 +1,6 @@
 __author__ = 'quentin'
 
-from ethoscope_node.utils.device_scanner import DeviceScanner
+from ethoscope_node.utils.device_scanner import EthoscopeScanner
 from ethoscope_node.utils.mysql_backup import MySQLdbToSQlite, DBNotReadyError
 
 import os
@@ -67,7 +67,7 @@ class GenericBackupWrapper(object):
         self._results_dir = results_dir
         self._safe = safe
         self._backup_job = backup_job
-        self._device_scanner = DeviceScanner(device_refresh_period=60, results_dir=self._results_dir)
+        self._device_scanner = EthoscopeScanner(device_refresh_period=60, results_dir=self._results_dir)
         for d in self._device_scanner.get_all_devices_info():
             d._update_info()
 

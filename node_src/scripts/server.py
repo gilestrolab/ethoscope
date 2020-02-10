@@ -13,7 +13,7 @@ import shutil
 import netifaces
 import json
 
-from ethoscope_node.utils.device_scanner import DeviceScanner, SensorScanner
+from ethoscope_node.utils.device_scanner import EthoscopeScanner, SensorScanner
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
 from ethoscope_node.utils.backups_helpers import GenericBackupWrapper, BackupClass
 
@@ -538,7 +538,7 @@ if __name__ == '__main__':
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
     device_scanner = None
     try:
-        device_scanner = DeviceScanner(results_dir=RESULTS_DIR)
+        device_scanner = EthoscopeScanner(results_dir=RESULTS_DIR)
         device_scanner.start()
         
         sensor_scanner = SensorScanner()

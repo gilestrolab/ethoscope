@@ -85,8 +85,6 @@
             $scope.has_sensors = Object.keys($scope.sensors).length;
         });
         
-        
-        
 
         var update_local_times = function(){
             $http.get('/node/time').success(function(data){
@@ -124,7 +122,8 @@
             })
         };
         $scope.secToDate = function(secs){
-            d = new Date(secs*1000);
+            d = new Date (isNaN(secs) ? secs : secs * 1000 );
+
             return d.toString();
         };
         $scope.elapsedtime = function(t){
