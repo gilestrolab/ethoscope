@@ -67,9 +67,6 @@ class GenericBackupWrapper(object):
         self._results_dir = results_dir
         self._safe = safe
         self._backup_job = backup_job
-        self._device_scanner = EthoscopeScanner(device_refresh_period=60, results_dir=self._results_dir)
-        for d in self._device_scanner.get_all_devices_info():
-            d._update_info()
 
 
     def run(self):
@@ -94,7 +91,7 @@ class GenericBackupWrapper(object):
 
                 args = []
                 for d in list(dev_map.values()):
-                    if d["status"] != "not_in_use":
+                    if d["status"] not in ["not_in_use", "offline"]:
                         args.append((d, self._results_dir))
 
                 if self._safe:
