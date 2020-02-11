@@ -1,5 +1,3 @@
-__author__ = 'quentin'
-
 from ethoscope_node.utils.device_scanner import EthoscopeScanner
 from ethoscope_node.utils.mysql_backup import MySQLdbToSQlite, DBNotReadyError
 

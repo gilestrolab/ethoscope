@@ -501,6 +501,11 @@ def redirection_to_more(action):
 def redirection_to_experiments():
     return bottle.redirect('/#/experiments')
 
+@app.get('/resources')
+def redirection_to_resources():
+    return bottle.redirect('/#/resources')
+
+
 def close(exit_status=0):
     logging.info("Closing server")
     os._exit(exit_status)
