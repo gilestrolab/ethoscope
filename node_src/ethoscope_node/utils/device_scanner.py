@@ -662,7 +662,7 @@ class EthoscopeScanner(DeviceScanner):
         
         for dv_db in all_known_ethoscopes:
             ethoscope = all_known_ethoscopes[dv_db]
-            if ethoscope['active']:
+            if ethoscope['active'] == 1:
                 out[ethoscope['ethoscope_id']] = { 'name': ethoscope['ethoscope_name'], 
                                                    'id': ethoscope['ethoscope_id'],
                                                    'status' : "offline",
@@ -699,6 +699,15 @@ class EthoscopeScanner(DeviceScanner):
         if device.info()['name'] != "ETHOSCOPE_OOO":
             self._edb.updateEthoscopes(ethoscope_id = device.id(), ethoscope_name = device.info()['name'], last_ip = ip, machineinfo = machine_info)
     
+    def retire_device (self, id, active=0):
+        """
+        Retire the device by changing its status to inactive in the database
+        """
+        self._edb.updateEthoscopes(ethoscope_id = id, active = active)
+        new_data = self._edb.getEthoscope(id, asdict=True)[id]
+        return {'id' : new_data['ethoscope_id'], 'active' : new_data['active']}
+        
+        
 
 
 class SensorScanner(DeviceScanner):

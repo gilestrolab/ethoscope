@@ -297,7 +297,7 @@ class ExperimentalDB(multiprocessing.Process):
         if asdict:
             keys = row[0].keys()
             #return [dict([(key, value) for key, value in zip(keys, line)]) for line in row]
-            return {line['id'] : {key: value for key, value in zip(keys, line)} for line in row}
+            return {line['ethoscope_id'] : {key: value for key, value in zip(keys, line)} for line in row}
             
         else:
             return row
@@ -319,7 +319,7 @@ class ExperimentalDB(multiprocessing.Process):
             sql_update_ethoscope = "UPDATE "+ self._ethoscopes_table_name +" SET last_seen = '"+ str(now) +"', "+ values + " WHERE ethoscope_id = '"+str(ethoscope_id)+"'"
             
         else:
-            active = True
+            active = 1
             sql_update_ethoscope = "INSERT INTO %s VALUES( NULL, '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % ( self._ethoscopes_table_name, ethoscope_id, ethoscope_name, now, now, active, last_ip, machineinfo, problems, comments, status)
             logging.warning("Adding a new ethoscope to the db. Welcome %s with id %s" % (ethoscope_name, ethoscope_id))
             

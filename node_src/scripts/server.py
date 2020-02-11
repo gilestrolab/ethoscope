@@ -234,6 +234,17 @@ def force_device_backup(id):
         logging.error(traceback.format_exc())
 
 
+@app.get('/device/<id>/retire')
+@error_decorator
+def retire_device(id):
+    '''
+    Changes the status of the device to inactive in the device database
+    '''
+    return device_scanner.retire_device(id)
+
+
+
+
 def cache_img(file_like, basename):
     if not file_like:
         #TODO return link to "broken img"
