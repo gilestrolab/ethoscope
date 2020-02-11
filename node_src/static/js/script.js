@@ -54,6 +54,13 @@
                 controller  : 'experimentsController',
             })
 
+            // route for the experiments database page
+            .when('/resources', {
+                templateUrl : '/static/pages/resources.html',
+                controller  : 'resourcesController',
+            })
+
+
             // route for the help page
             /*.when('/help', {
                 templateUrl : '/static/pages/help.html',
