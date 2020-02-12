@@ -303,7 +303,7 @@ class ExperimentalDB(multiprocessing.Process):
             return row
         
     
-    def updateEthoscopes (self, ethoscope_id, ethoscope_name=None, active=None, last_ip=None, problems=None, machineinfo=None, comments=None, status=None):
+    def updateEthoscopes (self, ethoscope_id, ethoscope_name=None, active=None, last_ip=None, problems=None, machineinfo=None, comments=None, status=None, blacklist=['ETHOSCOPE_000']):
         """
         Updates the parameters of a given ethoscope
         if an ethoscope with the same ID is not found in the current database
@@ -311,6 +311,9 @@ class ExperimentalDB(multiprocessing.Process):
         """
         e = self.getEthoscope(ethoscope_id, True)
         now = datetime.datetime.now()
+        
+        if ethoscope_name in blacklist:
+            return 
         
         if type(e) is dict and e != {}:
             
