@@ -7,10 +7,18 @@ import optparse
 import traceback
 import os
 
+
+server = "localhost"
+info_file = "/var/run/ethoscope_backup"
+
+
 def backup_job(args):
     try:
         device_info, results_dir = args
         logging.info("Initiating backup for device  %s" % device_info["id"])
+        
+        with open(info_file, "w") as f:
+            f.write(device_info["id"])
 
         backup_job = BackupClass(device_info, results_dir=results_dir)
         logging.info("Running backup for device  %s" % device_info["id"])
@@ -35,6 +43,7 @@ if __name__ == '__main__':
         parser = optparse.OptionParser()
         parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
         parser.add_option("-r", "--results-dir", dest="results_dir", help="Where result files are stored")
+        parser.add_option("-i", "--server", dest="server", default="localhost", help="The server on which the node is running")
         parser.add_option("-s", "--safe", dest="safe", default=False, help="Set Safe mode ON", action="store_true")
         parser.add_option("-e", "--ethoscope", dest="ethoscope", help="Force backup of given ethoscope number (eg: 007)")
         
@@ -43,23 +52,25 @@ if __name__ == '__main__':
         RESULTS_DIR = option_dict["results_dir"] or CFG.content['folders']['results']['path']
         SAFE_MODE = option_dict["safe"]
         ethoscope = option_dict["ethoscope"]
+        server = option_dict["server"]
 
         if ethoscope:
             ethoscope = int(ethoscope)
             print ("Forcing backup for ethoscope %03d" % ethoscope)
-            all_devices = receive_devices()
+            all_devices = receive_devices(server)
             
             bj = None
             for devID in all_devices:
                 if all_devices[devID]['name'] == ("ETHOSCOPE_%03d" % ethoscope) and all_devices[devID]['status'] != "offline":
-                    bj = backup_job((all_devices[devID], RESULTS_DIR))
+                    bj = backup_job((all_devices[devID], RESULTS_DIR, s))
             if bj == None: exit("ETHOSCOPE_%03d is not online or not detected" % ethoscope)
 
         else:
         
             gbw = GenericBackupWrapper(backup_job,
                                        RESULTS_DIR,
-                                       SAFE_MODE)
+                                       SAFE_MODE,
+                                       server)
             gbw.run()
 
     except Exception as e:
