@@ -416,19 +416,10 @@ class Ethoscope(Thread):
 
     def _reset_info(self):
         '''
-        This is called whenever the device goes offline
+        This is called whenever the device goes offline or when it is first added
         '''
         self._info['status'] = "offline"
         
-        if 'run_id' in self._info['experimental_info']:
-            run_id = self._info['experimental_info']['run_id']
-            self._edb.flagProblem( run_id = run_id, message = "unreached" ) #ethoscope went offline while running
-        
-        if previous_status == 'running':
-            self._edb.updateEthoscopes(ethoscope_id = self._id, status="unreached")
-            
-        elif previous_status == 'stopped':
-            self._edb.updateEthoscopes(ethoscope_id = self._id, status="offline")
 
     def _update_info(self):
         '''
@@ -440,6 +431,11 @@ class Ethoscope(Thread):
 
         except ScanException:
             self._reset_info()
+
+            if 'run_id' in self._info['experimental_info']:
+                run_id = self._info['experimental_info']['run_id']
+                self._edb.flagProblem( run_id = run_id, message = "unreached" ) #ethoscope went offline while running
+
             return
 
         try:
@@ -453,11 +449,7 @@ class Ethoscope(Thread):
             self._info.update(resp)
 
         except ScanException:
-            #should we do a reset info here too?
-            self._reset_info()
-            return
-            #new_status = 'unreached'
-
+            new_status = 'unreached'
 
         #if ethoscope is online and returning data
 
@@ -481,6 +473,10 @@ class Ethoscope(Thread):
             if previous_status == 'initialising' and new_status == 'running': self._edb.addRun( run_id = run_id, experiment_type = "tracking", ethoscope_name = self._info['name'], ethoscope_id = self._id, username = user_name, user_id = user_uid, location = location, alert = send_alerts, comments = "", experimental_data = db_file_name ) #tracking started succesfully
             if previous_status == 'initialising' and new_status == 'stopping': self._edb.flagProblem( run_id = run_id, message = "self-stopped" )
             if previous_status == 'running'      and new_status == 'stopped': self._edb.stopRun( run_id = run_id ) #ethoscope manually stopped
+            #not sure the unreach ones actually ever happen
+            if previous_status == 'running'      and new_status == 'unreached': self._edb.updateEthoscopes(ethoscope_id = self._id, status="unreached")
+            if previous_status == 'stopped'      and new_status == 'unreached': self._edb.updateEthoscopes(ethoscope_id = self._id, status="offline")
+
             
             #if previous_status == 'running'      and new_status == 'unreached': self._edb.flagProblem( run_id = run_id, message = "unreached" ) #ethoscope went offline during tracking!
 
