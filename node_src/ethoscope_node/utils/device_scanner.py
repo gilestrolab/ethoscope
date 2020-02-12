@@ -429,7 +429,8 @@ class Ethoscope(Thread):
             self._update_id()
             
         except ScanException:
-            
+
+            run_id = self._info['experimental_info']['run_id']
             if previous_status == 'running':
                 self._edb.flagProblem( run_id = run_id, message = "unreached" ) #ethoscope went offline while running
                 self._edb.updateEthoscopes(ethoscope_id = self._id, status="unreached")
