@@ -269,7 +269,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
             $http.post('/device/'+device_id+'/machineinfo', data=option)
                  .success(function(data){
                     $scope.machine_info = data;
-                    $scope.ethoscope.alert("Settings changed. Please restart your ethoscope now.");
+                    $scope.ethoscope.alert("Settings changed. Please REBOOT your ethoscope now.");
             })            
             };
 
