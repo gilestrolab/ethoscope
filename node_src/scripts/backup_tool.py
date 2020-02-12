@@ -1,5 +1,5 @@
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
-from ethoscope_node.utils.backups_helpers import GenericBackupWrapper, BackupClass
+from ethoscope_node.utils.backups_helpers import GenericBackupWrapper, BackupClass, receive_devices
 from ethoscope_node.utils.device_scanner import EthoscopeScanner
 
 import logging
@@ -16,9 +16,12 @@ def backup_job(args):
         logging.info("Running backup for device  %s" % device_info["id"])
         backup_job.run()
         logging.info("Backup done for for device  %s" % device_info["id"])
+        return 1
+        
     except Exception as e:
         logging.error("Unexpected error in backup. args are: %s" % str(args))
         logging.error(traceback.format_exc())
+        return
 
 
 
@@ -31,22 +34,20 @@ if __name__ == '__main__':
         parser = optparse.OptionParser()
         parser = optparse.OptionParser()
         parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
-        parser.add_option("-e", "--results-dir", dest="results_dir", help="Where result files are stored")
+        parser.add_option("-r", "--results-dir", dest="results_dir", help="Where result files are stored")
         parser.add_option("-s", "--safe", dest="safe", default=False, help="Set Safe mode ON", action="store_true")
-        parser.add_option("-f", "--ethoscope", dest="ethoscope", help="Force backup of given ethoscope number (eg: 007)")
+        parser.add_option("-e", "--ethoscope", dest="ethoscope", help="Force backup of given ethoscope number (eg: 007)")
         
         (options, args) = parser.parse_args()
         option_dict = vars(options)
         RESULTS_DIR = option_dict["results_dir"] or CFG.content['folders']['results']['path']
         SAFE_MODE = option_dict["safe"]
-        ethoscope = int(option_dict["ethoscope"])
+        ethoscope = option_dict["ethoscope"]
 
         if ethoscope:
+            ethoscope = int(ethoscope)
             print ("Forcing backup for ethoscope %03d" % ethoscope)
-            es = EthoscopeScanner(results_dir = RESULTS_DIR)
-            es.start()
-            
-            all_devices = es.get_all_devices_info()
+            all_devices = receive_devices()
             
             bj = None
             for devID in all_devices:

@@ -7,6 +7,27 @@ import time
 import multiprocessing
 import traceback
 
+import urllib.request
+import json
+
+def receive_devices():
+    '''
+    Interrogates the NODE on its current knowledge of devices, then extracts from the JSON record
+    only the IPs
+    '''
+    devices = []
+    try:
+        url = "http://localhost/devices"
+        req = urllib.request.Request(url, headers={'Content-Type': 'application/json'})            
+        f = urllib.request.urlopen(req, timeout=10)
+        devices = json.load(f)
+        return devices
+
+    except:
+        logging.error("The node ethoscope server is not running or cannot be reached. A list of available ethoscopes could not be found.")
+        logging.error(traceback.format_exc())
+        
+    return devices
 
 class BackupClass(object):
     _db_credentials = {
@@ -65,12 +86,22 @@ class GenericBackupWrapper(object):
         self._results_dir = results_dir
         self._safe = safe
         self._backup_job = backup_job
+        
+        self.devices = receive_devices()
+        
+        self._device_scanner = EthoscopeScanner(results_dir = results_dir)
+            
+            
 
 
     def run(self):
         try:
-            self._device_scanner.start()
-            time.sleep(5)
+            devices = receive_devices()
+            
+            if not devices:
+                self._device_scanner.start()
+                time.sleep(20)
+
             t0 = time.time()
             t1 = t0 + self._BACKUP_DT
 
@@ -82,15 +113,18 @@ class GenericBackupWrapper(object):
 
                 logging.info("Starting backup")
 
-                dev_map = self._device_scanner.get_all_devices_info()
+                if not devices:
+                    devices = self._device_scanner.get_all_devices_info()
 
-                dev_list = str([d for d in sorted(dev_map.keys())])
+                dev_list = str([d for d in sorted(devices.keys())])
                 logging.info("device map is: %s" %dev_list)
 
                 args = []
-                for d in list(dev_map.values()):
+                for d in list(devices.values()):
                     if d["status"] not in ["not_in_use", "offline"]:
                         args.append((d, self._results_dir))
+
+                logging.info("Found %s devices online" % len(args))
 
                 if self._safe:
                     for arg in args:
@@ -109,4 +143,5 @@ class GenericBackupWrapper(object):
                 t0 = t1
 
         finally:
-            self._device_scanner.stop()
+            if not devices:
+                self._device_scanner.stop()
