@@ -10,24 +10,25 @@ import traceback
 import urllib.request
 import json
 
-def receive_devices():
+def receive_devices(server = "localhost"):
     '''
     Interrogates the NODE on its current knowledge of devices, then extracts from the JSON record
     only the IPs
     '''
+    url = "http://%s/devices" % server
     devices = []
+    
     try:
-        url = "http://localhost/devices"
         req = urllib.request.Request(url, headers={'Content-Type': 'application/json'})            
         f = urllib.request.urlopen(req, timeout=10)
         devices = json.load(f)
         return devices
 
     except:
-        logging.error("The node ethoscope server is not running or cannot be reached. A list of available ethoscopes could not be found.")
-        logging.error(traceback.format_exc())
+        logging.error("The node ethoscope server %s is not running or cannot be reached. A list of available ethoscopes could not be found." % server)
+        return
+        #logging.error(traceback.format_exc())
         
-    return devices
 
 class BackupClass(object):
     _db_credentials = {
@@ -80,15 +81,15 @@ class BackupClass(object):
 
 
 class GenericBackupWrapper(object):
-    def __init__(self, backup_job, results_dir, safe):
+    def __init__(self, backup_job, results_dir, safe, server):
         self._TICK = 1.0  # s
         self._BACKUP_DT = 5 * 60  # 5min
         self._results_dir = results_dir
         self._safe = safe
         self._backup_job = backup_job
-        
-        self.devices = receive_devices()
-        
+        self._server = server
+
+        # for safety, starts device scanner too in case the node will go down at later stage
         self._device_scanner = EthoscopeScanner(results_dir = results_dir)
             
             
@@ -96,9 +97,10 @@ class GenericBackupWrapper(object):
 
     def run(self):
         try:
-            devices = receive_devices()
+            devices = receive_devices(self._server)
             
             if not devices:
+                logging.info("Using Ethoscope Scanner to look for devices")
                 self._device_scanner.start()
                 time.sleep(20)
 
