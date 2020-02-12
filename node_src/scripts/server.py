@@ -45,6 +45,19 @@ def error_decorator(func):
             return {'error': traceback.format_exc()}
     return func_wrapper
 
+def warning_decorator(func):
+    """
+    A simple decorator to return an error dict so we can display it in the webUI
+    Less verbose than error
+    """
+    def func_wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            return {'error': str(e)}
+    return func_wrapper
+
 @app.route('/static/<filepath:path>')
 def server_static(filepath):
     return bottle.static_file(filepath, root=STATIC_DIR)
@@ -140,12 +153,16 @@ def sensors():
 
 #Get the information of one device
 @app.get('/device/<id>/data')
-@error_decorator
+@warning_decorator
 def get_device_info(id):
     device = device_scanner.get_device(id)
-    # if we fail to access directly the device, we have the old info map
+    
+    # if we fail to access directly the device, we try the old info map
     if not device:
-        return device_scanner.get_all_devices_info()[id]
+        try:
+            return device_scanner.get_all_devices_info()[id]
+        except:
+            raise Exception("A device with ID %s is unknown to the system" % id)
 
     return device.info()
 
@@ -173,8 +190,11 @@ def set_device_machine_info(id):
 @app.get('/device/<id>/user_options')
 @error_decorator
 def get_device_options(id):
-    device = device_scanner.get_device(id)
-    return device.user_options()
+    try:
+        device = device_scanner.get_device(id)
+        return device.user_options()
+    except:
+        return
 
 @app.get('/device/<id>/videofiles')
 @error_decorator

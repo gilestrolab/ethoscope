@@ -419,6 +419,16 @@ class Ethoscope(Thread):
         This is called whenever the device goes offline
         '''
         self._info['status'] = "offline"
+        
+        if 'run_id' in self._info['experimental_info']:
+            run_id = self._info['experimental_info']['run_id']
+            self._edb.flagProblem( run_id = run_id, message = "unreached" ) #ethoscope went offline while running
+        
+        if previous_status == 'running':
+            self._edb.updateEthoscopes(ethoscope_id = self._id, status="unreached")
+            
+        elif previous_status == 'stopped':
+            self._edb.updateEthoscopes(ethoscope_id = self._id, status="offline")
 
     def _update_info(self):
         '''
@@ -427,17 +437,8 @@ class Ethoscope(Thread):
 
         try:
             self._update_id()
-            
-        except ScanException:
 
-            run_id = self._info['experimental_info']['run_id']
-            if previous_status == 'running':
-                self._edb.flagProblem( run_id = run_id, message = "unreached" ) #ethoscope went offline while running
-                self._edb.updateEthoscopes(ethoscope_id = self._id, status="unreached")
-                
-            elif previous_status == 'stopped':
-                self._edb.updateEthoscopes(ethoscope_id = self._id, status="offline")
-                
+        except ScanException:
             self._reset_info()
             return
 
@@ -452,13 +453,14 @@ class Ethoscope(Thread):
             self._info.update(resp)
 
         except ScanException:
-            new_status = 'unreached'
+            #should we do a reset info here too?
+            self._reset_info()
+            return
+            #new_status = 'unreached'
 
 
-        # The only way for this to work consistently is to treat each run with a run_id which is generated on and passed by the ethoscope
-        # To keep compatibility with older version of the ethoscopes, we do not implement the experiment db unless the ethoscope
-        # is aware of its run_id
-        
+        #if ethoscope is online and returning data
+
         if 'name' in self._info['experimental_info']:
             user_name = self._info['experimental_info']['name']
             location = self._info['experimental_info']['location']
@@ -477,8 +479,11 @@ class Ethoscope(Thread):
             
             if previous_status == 'stopped'      and new_status == 'initialising': pass #started tracking, looking for targets, no need to log this step
             if previous_status == 'initialising' and new_status == 'running': self._edb.addRun( run_id = run_id, experiment_type = "tracking", ethoscope_name = self._info['name'], ethoscope_id = self._id, username = user_name, user_id = user_uid, location = location, alert = send_alerts, comments = "", experimental_data = db_file_name ) #tracking started succesfully
-            if previous_status == 'running'      and new_status == 'unreached': self._edb.flagProblem( run_id = run_id, message = "unreached" ) #ethoscope went offline during tracking!
+            if previous_status == 'initialising' and new_status == 'stopping': self._edb.flagProblem( run_id = run_id, message = "self-stopped" )
             if previous_status == 'running'      and new_status == 'stopped': self._edb.stopRun( run_id = run_id ) #ethoscope manually stopped
+            
+            #if previous_status == 'running'      and new_status == 'unreached': self._edb.flagProblem( run_id = run_id, message = "unreached" ) #ethoscope went offline during tracking!
+
 
         # update the record on the ethoscope table
         if new_status != previous_status and previous_status != "offline":
@@ -563,11 +568,19 @@ class DeviceScanner(object):
         return out
         
     def get_device(self, id):
+        """
+        return info in memory for given device
+        :param id: The ID of the device
+        :return: the device instance
+        """
+        
         for device in self.devices:
             if device.id()==id:
                 return device
+        #if not found return none
+        return
         # Not found, so produce an error
-        raise KeyError("No such %s device: %s" % (self._device_type, id) )
+        #raise KeyError("No such %s device: %s" % (self._device_type, id) )
         
     def add(self, ip, name=None, device_id=None):
         """
