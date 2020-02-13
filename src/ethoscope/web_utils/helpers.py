@@ -19,14 +19,14 @@ def pi_version():
     # 2835 is pi 3
     # Anything else is not a pi.
     
-    with open('/proc/cpuinfo', 'r') as infile:
-        cpuinfo = infile.read()
-    # Match a line like 'Hardware   : BCM2709'
-    hardware = re.search('^Hardware\s+:\s+(\w+)$', cpuinfo,
-                      flags=re.MULTILINE | re.IGNORECASE)
-                      
-    revision = re.search('^Revision\s+:\s+(\w+)$', cpuinfo,
-                      flags=re.MULTILINE | re.IGNORECASE)
+with open('/proc/cpuinfo', 'r') as infile:
+    cpuinfo = infile.read()
+# Match a line like 'Hardware   : BCM2709'
+hardware = re.search('^Hardware\s+:\s+(\w+)$', cpuinfo,
+                  flags=re.MULTILINE | re.IGNORECASE)
+                  
+revision = re.search('^Revision\s+:\s+(\w+)$', cpuinfo,
+                  flags=re.MULTILINE | re.IGNORECASE)
                
     if not hardware:
         # Couldn't find the hardware, assume it isn't a pi.
@@ -41,6 +41,9 @@ def pi_version():
         # Pi 3
         return 3
     elif hardware.group(1) == 'BCM2835' and '2082' in revision.group(1):
+        # Pi 3
+        return 3
+    elif hardware.group(1) == 'BCM2835' and '1041' in revision.group(1):
         # Pi 3
         return 3
     else:
