@@ -482,7 +482,9 @@ class ControlThread(Thread):
         
         # we reset all the user data of the latest experiment except the run_id
         # a new run_id will be created when we start another experiment
-        self._info["experimental_info"] = { "run_id" : self._info["experimental_info"]["run_id"] }
+        
+        if "experimental_info" in self._info and "run_id" in self._info["experimental_info"]:
+            self._info["experimental_info"] = { "run_id" : self._info["experimental_info"]["run_id"] }
 
         logging.info("Stopping monitor")
         if not self._monit is None:
