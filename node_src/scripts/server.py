@@ -127,7 +127,7 @@ def get_favicon():
 @app.get('/runs_list')
 @error_decorator
 def runs_list():
-    #response.content_type = 'application/json'
+    #bottle.response.content_type = 'application/json'
     return json.dumps( edb.getRun('all', asdict=True) )
 
 @app.get('/experiments_list')
@@ -592,7 +592,7 @@ if __name__ == '__main__':
         try:
             from bottle.cherrypy import wsgiserver
         except:
-            #Trick bottle to think that cheroot is actulay cherrypy server adds the pacth to BOTTLE
+            #Trick bottle into thinking that cheroot is cherrypy
             bottle.server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
             logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
             pass

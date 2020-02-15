@@ -100,6 +100,7 @@ if __name__ == '__main__':
         parser = optparse.OptionParser()
         parser = optparse.OptionParser()
         parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
+        parser.add_option("-i", "--server", dest="server", default="localhost", help="The server on which the node is running will be interrogated first for the device list")        
         parser.add_option("-e", "--results-dir", dest="video_dir", help="Where video files are stored")
         parser.add_option("-s", "--safe", dest="safe", default=False,help="Set Safe mode ON", action="store_true")
 
@@ -107,11 +108,13 @@ if __name__ == '__main__':
         option_dict = vars(options)
         VIDEO_DIR = option_dict["video_dir"] or CFG.content['folders']['video']['path']
         SAFE_MODE = option_dict["safe"]
+        server = option_dict["server"]
 
 
         gbw = GenericBackupWrapper( backup_job,
                                     VIDEO_DIR,
-                                    SAFE_MODE )
+                                    SAFE_MODE,
+                                    server )
         gbw.run()
         
     except Exception as e:
