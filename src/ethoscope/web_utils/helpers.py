@@ -19,8 +19,8 @@ def pi_version():
     # 2835 is pi 3
     # Anything else is not a pi.
     
-with open('/proc/cpuinfo', 'r') as infile:
-    cpuinfo = infile.read()
+    with open('/proc/cpuinfo', 'r') as infile:
+        cpuinfo = infile.read()
     # Match a line like 'Hardware   : BCM2709'
     hardware = re.search('^Hardware\s+:\s+(\w+)$', cpuinfo,
                       flags=re.MULTILINE | re.IGNORECASE)
