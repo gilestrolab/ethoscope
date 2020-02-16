@@ -342,12 +342,11 @@ class PiFrameGrabber(multiprocessing.Process):
         Run stops if the _stop_queue is not empty.
         """
 
-        # lazy import should only use those on devices
-        # from picamera.array import PiRGBArray
-        # from picamera import PiCamera
-
         try:
             # lazy import should only use those on devices
+            
+            # Warning: the following causes a major issue with Python 3.8.1
+            # https://www.bountysource.com/issues/86094172-python-3-8-1-typeerror-vc_dispmanx_element_add-argtypes-item-9-in-_argtypes_-passes-a-union-by-value-which-is-unsupported
             from picamera.array import PiRGBArray
             from picamera import PiCamera
 
