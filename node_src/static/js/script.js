@@ -202,7 +202,8 @@
             }
        };
 
-       refresh_data = $interval(refresh_platform, 10 * 1000);
+       // refresh every 5 seconds
+       refresh_data = $interval(refresh_platform, 5 * 1000);
         
         //clear interval when scope is destroyed
         $scope.$on("$destroy", function(){
