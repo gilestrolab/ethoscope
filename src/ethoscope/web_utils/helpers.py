@@ -21,12 +21,12 @@ def pi_version():
     
 with open('/proc/cpuinfo', 'r') as infile:
     cpuinfo = infile.read()
-# Match a line like 'Hardware   : BCM2709'
-hardware = re.search('^Hardware\s+:\s+(\w+)$', cpuinfo,
-                  flags=re.MULTILINE | re.IGNORECASE)
-                  
-revision = re.search('^Revision\s+:\s+(\w+)$', cpuinfo,
-                  flags=re.MULTILINE | re.IGNORECASE)
+    # Match a line like 'Hardware   : BCM2709'
+    hardware = re.search('^Hardware\s+:\s+(\w+)$', cpuinfo,
+                      flags=re.MULTILINE | re.IGNORECASE)
+                      
+    revision = re.search('^Revision\s+:\s+(\w+)$', cpuinfo,
+                      flags=re.MULTILINE | re.IGNORECASE)
                
     if not hardware:
         # Couldn't find the hardware, assume it isn't a pi.
