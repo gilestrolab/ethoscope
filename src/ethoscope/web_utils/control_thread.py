@@ -10,6 +10,9 @@ from threading import Thread
 import pickle
 import secrets
 
+import subprocess
+import signal
+
 import trace
 from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera, DummyPiCameraAsync, V4L2Camera
 from ethoscope.roi_builders.target_roi_builder import OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder, ElectricShockAssayROIBuilder
@@ -185,6 +188,35 @@ class ControlThread(Thread):
 
         super(ControlThread, self).__init__()
 
+    def kill_all_instances(self):
+        """
+        This is used to workaround an issue with camera access. 
+        """
+       
+        #ps = subprocess.Popen(['ps', 'aux'], stdout=subprocess.PIPE).communicate()[0]
+        ps = subprocess.Popen(['ps', '-ef'], stdout=subprocess.PIPE)
+        output = subprocess.check_output(('grep', 'device_server\.py'), stdin=ps.stdout)
+        ps.wait()
+        output_split = output.decode("utf-8").split('\n')
+        output_split = [e for e in output_split if e != '']
+        [print(e) for e in output_split]
+        
+        pids = []
+        for e in output_split:
+            f = [e for e in e.split(' ') if e != '']
+            pid = int(f[1])
+            pids.append(pid)
+        
+        pids_to_remove = pids[1:]
+        for pid in pids_to_remove:
+            logging.warning('Sending SIGTERM to {}'.format(pid))
+            os.kill(pid, signal.SIGTERM) #or signal.SIGKILL
+        else:
+            logging.info('No two extra processes found')
+
+        return len(pids_to_remove)
+
+
 
     @property
     def info(self):
@@ -359,6 +391,16 @@ class ControlThread(Thread):
         result_writer_kwargs = self._option_dict["result_writer"]["kwargs"]
 
         cam = CameraClass(**camera_kwargs)
+
+        try:
+            logging.warning('Attempting to initialize CameraClass')
+            cam = CameraClass(**camera_kwargs)
+        except Exception as e:
+            logging.warning('Could not initialize the camera. Will try removing old instances of python')
+            self.kill_all_instances()
+            time.sleep(5)
+            cam = CameraClass(**camera_kwargs)
+
 
         roi_builder = ROIBuilderClass(**roi_builder_kwargs)
         
