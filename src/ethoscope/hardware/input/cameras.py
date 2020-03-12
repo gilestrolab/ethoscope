@@ -353,13 +353,26 @@ class PiFrameGrabber(multiprocessing.Process):
             with  PiCamera() as capture:
                 logging.warning(capture)
                 capture.resolution = self._target_resolution
+                
+                camera_info = capture.exif_tags  
+
+                #PINoIR v1
+                #{'IFD0.Model': 'RP_ov5647', 'IFD0.Make': 'RaspberryPi'}
+                #PINoIR v2
+                #{'IFD0.Model': 'RP_imx219', 'IFD0.Make': 'RaspberryPi'}
+                
                 #disable auto white balance to address the following issue: https://github.com/raspberrypi/firmware/issues/1167
                 #however setting this to off would have to be coupled with custom gains
                 #some suggestion on how to set the gains can be found here: https://picamera.readthedocs.io/en/release-1.12/recipes1.html
                 #and here: https://github.com/waveform80/picamera/issues/182
-                #capture.awb_mode = 'off'
-                #capture.awb_gains = (1.8, 1.5)
-                capture.awb_mode = 'auto'
+                
+                if camera_info['IFD0.Model'] == 'RP_imx219':
+                    capture.awb_mode = 'off'
+                    capture.awb_gains = (1.8, 1.5) #TODO: allow user-specified gains
+                else:
+                    # we are disabling auto white balance for IMX219
+                    capture.awb_mode = 'auto'
+                    
 
                 capture.framerate = self._target_fps
                 raw_capture = PiRGBArray(capture, size=self._target_resolution)
