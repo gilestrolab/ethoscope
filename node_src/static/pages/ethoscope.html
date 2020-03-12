@@ -158,9 +158,12 @@
          </tbody>
         </table>
         
-        <h4>SD card AGE</h4>
-        <pre>{{elapsedtime(machine_info.SD_CARD_AGE)}}</pre>
-
+        <h4>Hardware info</h4>
+        <ul>
+            <li>SD card age: {{ethoscope.elapsedtime(machine_info.SD_CARD_AGE)}}</li>
+            <li>PI version : {{machine_info.pi_version}}</li>
+            <li>PI camera  : {{machine_info.camera}}</li>
+        </ul>
 
         <h4>Ethoscope LOG from last boot</h4>
         <pre>

@@ -230,6 +230,28 @@ def hasPiCamera():
     
     else:
         return false
+        
+def getPiCameraVersion():
+    """
+    If a PiCamera is connected, returns the model
+
+    #PINoIR v1
+    #{'IFD0.Model': 'RP_ov5647', 'IFD0.Make': 'RaspberryPi'}
+    #PINoIR v2
+    #{'IFD0.Model': 'RP_imx219', 'IFD0.Make': 'RaspberryPi'}
+    
+    """
+    
+    if hasPiCamera():
+    
+        from picamera import PiCamera
+        with  PiCamera() as capture:
+
+            camera_info = capture.exif_tags
+            return camera_info['IFD0.Model']
+    else:
+        
+        return False
     
     
 def isExperimental():

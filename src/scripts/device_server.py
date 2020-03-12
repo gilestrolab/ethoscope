@@ -257,6 +257,8 @@ def get_machine_info(id):
     machine_info['machine-id'] = get_machine_id()
     machine_info['kernel'] = os.uname()[2]
     machine_info['pi_version'] = pi_version()
+    machine_info['camera'] = getPiCameraVersion()
+    
     try:
         machine_info['WIFI_SSID'] = get_WIFI()['ESSID']
     except: 
