@@ -4,7 +4,7 @@ from git import Repo
 from git import GitCommandError
 import logging
 import traceback
-
+import os
 
 
 
@@ -37,10 +37,15 @@ class DeviceUpdater(object):
         logging.info("Pulled")
         c_local, c_orig = self.get_local_and_origin_commits()
         logging.info("local is at %s, origin at %s" % ( str(c_local), str(c_orig)))
+        
         if c_local != c_orig:
             msg = "Update failed. Local is at %s" % str(c_local)
             logging.error(msg)
             raise Exception(msg)
+            
+        else:
+            self.createPythonEgg()
+            
 
     def active_branch(self):
         return self._working_repo.active_branch
@@ -64,6 +69,27 @@ class DeviceUpdater(object):
 
         self._origin.fetch()
         self._working_repo.git.checkout(branch)
+        
+    def createPythonEgg(self):
+        """
+        We create a proper python egg after each update
+        """
+        
+        egg_dir = { 'node' : os.path.join (self._git_working_dir, '/node_src') ,
+                    'device' : os.path.join (self._git_working_dir, '/src')
+                  }
+        
+        logging.info ("Generating Python Eggs")
+
+        os.chdir(egg_dir['node'])
+        with os.popen('python setup.py develop') as df:
+            logging.info(df)
+            
+        os.chdir(egg_dir['device'])
+        with os.popen('python setup.py develop') as df:
+            logging.info(df)
+
+        
 
 
 class BareRepoUpdater(object):
