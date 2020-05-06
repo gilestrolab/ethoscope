@@ -150,8 +150,14 @@ class ControlThread(Thread):
             os.remove(os.path.join(ethoscope_dir, self._log_file))
         except OSError:
             pass
+
         try:
             os.remove(os.path.join(ethoscope_dir, self._dbg_img_file))
+        except OSError:
+            pass
+
+        try:
+            os.remove("/tmp/ethoscope_*")
         except OSError:
             pass
 
@@ -187,35 +193,6 @@ class ControlThread(Thread):
 
 
         super(ControlThread, self).__init__()
-
-    def kill_all_instances(self):
-        """
-        This is used to workaround an issue with camera access. 
-        """
-       
-        #ps = subprocess.Popen(['ps', 'aux'], stdout=subprocess.PIPE).communicate()[0]
-        ps = subprocess.Popen(['ps', '-ef'], stdout=subprocess.PIPE)
-        output = subprocess.check_output(('grep', 'device_server\.py'), stdin=ps.stdout)
-        ps.wait()
-        output_split = output.decode("utf-8").split('\n')
-        output_split = [e for e in output_split if e != '']
-        [print(e) for e in output_split]
-        
-        pids = []
-        for e in output_split:
-            f = [e for e in e.split(' ') if e != '']
-            pid = int(f[1])
-            pids.append(pid)
-        
-        pids_to_remove = pids[1:]
-        for pid in pids_to_remove:
-            logging.warning('Sending SIGTERM to {}'.format(pid))
-            os.kill(pid, signal.SIGTERM) #or signal.SIGKILL
-        else:
-            logging.info('No two extra processes found')
-
-        return len(pids_to_remove)
-
 
 
     @property
@@ -271,9 +248,6 @@ class ControlThread(Thread):
 
         if data is None:
             return
-        #FIXME DEBUG
-        logging.warning("Starting control thread with data:")
-        logging.warning(str(data))
 
         for key in list(self._option_dict.keys()):
 
@@ -392,16 +366,6 @@ class ControlThread(Thread):
 
         cam = CameraClass(**camera_kwargs)
 
-        try:
-            logging.warning('Attempting to initialize CameraClass')
-            cam = CameraClass(**camera_kwargs)
-        except Exception as e:
-            logging.warning('Could not initialize the camera. Will try removing old instances of python')
-            self.kill_all_instances()
-            time.sleep(5)
-            cam = CameraClass(**camera_kwargs)
-
-
         roi_builder = ROIBuilderClass(**roi_builder_kwargs)
         
         try:
@@ -462,25 +426,31 @@ class ControlThread(Thread):
             self._last_info_t_stamp = 0
             self._last_info_frame_idx = 0
 
-
+            #check if a previous instance exist and if it does attempts to start from there
             if self._has_pickle_file():
+                logging.warning("Attempting to resume a previously interrupted state")
+                
                 try:
                     cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, self._info = self._set_tracking_from_pickled()
 
                 except Exception as e:
                     logging.error("Could not load previous state for unexpected reason:")
                     raise e
-
+            
+            #a previous instance does not exist, hence we create a new one
             else:
                 cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
                 
             
             with rw as result_writer:
+                
+                # and we save it if we can
                 if cam.canbepickled:
                     self._save_pickled_state(cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, self._info)
                 
-                self._start_tracking(cam, result_writer, rois, TrackerClass, tracker_kwargs,
-                                     hardware_connection, StimulatorClass, stimulator_kwargs)
+                # then we start tracking
+                self._start_tracking(cam, result_writer, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
+            
             self.stop()
 
         except EthoscopeException as e:
@@ -493,10 +463,11 @@ class ControlThread(Thread):
 
         finally:
 
-            try:
-                os.remove(self._persistent_state_file)
-            except:
-                logging.warning("Failed to remove persistent file")
+            if os.path.exists(self._persistent_state_file):
+                try:
+                    os.remove(self._persistent_state_file)
+                except:
+                    logging.warning("Failed to remove persistent file")
             try:
                 if cam is not None:
                     cam._close()
