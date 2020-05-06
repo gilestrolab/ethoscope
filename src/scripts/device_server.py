@@ -213,6 +213,8 @@ def controls(id, action):
 def list_data_files(category, id):
     '''
     provides a list of files in the ethoscope data folders, that were either uploaded or generated
+    category is the name of the folder
+    this is not meant to report db files or h264 files but it's supposed to be working for things like masks and other user generated files
     '''
     if id != machine_id:
         raise WrongMachineID
@@ -420,7 +422,8 @@ if __name__ == '__main__':
 
 
     if DEBUG:
-        logging.basicConfig(level=logging.DEBUG)
+        logging.basicConfig()
+        logging.getLogger().setLevel(logging.DEBUG)
         logging.info("Logging using DEBUG SETTINGS")
 
     if option_dict["stop_after_run"]:

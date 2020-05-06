@@ -571,6 +571,11 @@ if __name__ == '__main__':
     DEBUG = option_dict["debug"]
     RESULTS_DIR = option_dict["temp_results_dir"] or CFG.content['folders']['temporary']['path']
 
+    if DEBUG:
+        logging.basicConfig()
+        logging.getLogger().setLevel(logging.DEBUG)
+        logging.info("Logging using DEBUG SETTINGS")
+
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
     device_scanner = None
     try:
