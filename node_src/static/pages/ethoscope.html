@@ -30,27 +30,38 @@
             </ul>
         </div>
 
-        <div ng-if="device.status == 'running' || device.status == 'recording'" >
-        <div id="node-info" class="intro">
-            <p><span class="fa fa-clock"></span> Running since {{ethoscope.start_date_time(device.time)}}
-                (i.e. {{ethoscope.elapsedtime(device.monitor_info.last_time_stamp)}} ago) - Run ID: {{device.experimental_info.run_id}}
-                <br>
-                <span class="fa fa-user"></span> User: {{device.experimental_info.name}}
-                <br>
-                <span class="fa fa-map-marker"></span> Location: {{device.experimental_info.location}}
-                <br>
-                <span ng-if="device.status == 'running'" class="fas fa-tachometer-alt"></span> {{device.monitor_info.fps}} FPS
-                <br>
-                <span ng-if="device.CPU_temp > 70" class="fas fa-temperature-high"></span>
-                <span ng-if="device.CPU_temp <= 70" class="fas fa-temperature-low"></span> CPU temperature: {{device.CPU_temp}} &#8451
-                
-            </p>
-
+        <div ng-if="device.status == 'running'" >
+            <div id="node-info" class="intro">
+                <p><span class="fa fa-clock"></span> Running since {{ethoscope.start_date_time(device.time)}}
+                    (i.e. {{ethoscope.elapsedtime(device.monitor_info.last_time_stamp)}} ago) - Run ID: {{device.experimental_info.run_id}}
+                    <br>
+                    <span class="fa fa-user"></span> User: {{device.experimental_info.name}}
+                    <br>
+                    <span class="fa fa-map-marker"></span> Location: {{device.experimental_info.location}}
+                    <br>
+                    <span ng-if="device.status == 'running'" class="fas fa-tachometer-alt"></span> {{device.monitor_info.fps}} FPS
+                    <br>
+                    <span ng-if="device.CPU_temp > 70" class="fas fa-temperature-high"></span>
+                    <span ng-if="device.CPU_temp <= 70" class="fas fa-temperature-low"></span> CPU temperature: {{device.CPU_temp}} &#8451
+                </p>
+                <p>Your file will be saved as: <a href="/download{{device.backup_path}}" target="_blank" data-toggle="tooltip" data-placement="top" title="{{device.backup_path}}">{{ethoscope.readable_url(device.backup_path)}}</a></p>
+            </div>
         </div>
-        </div>
 
-        <div ng-if="device.status == 'running'">
-            <p>Your file will be saved as: <a href="/download{{device.backup_path}}" target="_blank" data-toggle="tooltip" data-placement="top" title="{{device.backup_path}}">{{ethoscope.readable_url(device.backup_path)}}</a></p>
+        <div ng-if="device.status == 'recording'" >
+            <div id="node-info" class="intro">
+                <p><span class="fa fa-clock"></span> Recording video since {{ethoscope.start_date_time(device.time)}}
+                    (i.e. {{ethoscope.elapsedtime(device.monitor_info.last_time_stamp)}} ago) <!-- - Run ID: N/A -->
+                    <br>
+                    <span class="fa fa-user"></span> User: {{device.experimental_info.name}}
+                    <br>
+                    <span class="fa fa-map-marker"></span> Location: {{device.experimental_info.location}}
+                    <br>
+                    <span ng-if="device.CPU_temp > 70" class="fas fa-temperature-high"></span>
+                    <span ng-if="device.CPU_temp <= 70" class="fas fa-temperature-low"></span> CPU temperature: {{device.CPU_temp}} &#8451
+                <p>Your video files will be saved as h264 chunks on the ethoscope itself and transferred to your node automatically if your video_backup service is running.</p>
+                </p>
+            </div>
         </div>
 
         <div id="starting" class="spinner" >
