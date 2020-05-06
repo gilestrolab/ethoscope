@@ -315,8 +315,12 @@ class Ethoscope(Thread):
             if a != -1 and b != -1:
                 frame = bytes[a:b+2]
                 bytes = bytes[b+2:]
-                yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+                yield b'--frame\r\n'
+                yield b'X-Timestamp: %s\r\n' % str(time.time()).encode()
+                yield b'Content-Length: %s\r\n' % str(len(frame)).encode()
+                yield b'Content-Type: image/jpeg\r\n\r\n' 
+                yield frame
+                yield b'\r\n'
 
     def user_options(self):
         """
