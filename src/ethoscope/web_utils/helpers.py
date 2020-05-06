@@ -223,13 +223,14 @@ def hasPiCamera():
     return True if a piCamera is supported and detected
     """
     if isMachinePI():
-        cmd = os.popen('/opt/vc/bin/vcgencmd get_camera').read().strip()
-        out = dict(x.split('=') for x in cmd.split(' '))
-        
-        return out["detected"] == out["supported"] == "1"
-    
+       with os.popen('/opt/vc/bin/vcgencmd get_camera') as cmd:
+           out_cmd = cmd.read().strip()
+       out = dict(x.split('=') for x in out_cmd.split(' '))
+       
+       return out["detected"] == out["supported"] == "1"
+
     else:
-        return false
+        return False
         
 def getPiCameraVersion():
     """
@@ -242,16 +243,35 @@ def getPiCameraVersion():
     
     """
     
-    if hasPiCamera():
+    picamera_info_file = '/etc/picamera-version'
     
-        from picamera import PiCamera
-        with  PiCamera() as capture:
+    if hasPiCamera():
 
-            camera_info = capture.exif_tags
-            return camera_info['IFD0.Model']
+        try:
+            with open(picamera_info_file, 'r') as infile:
+                camera_info = infile.read()
+        
+        except:
+            camera_info = "Run tracking once to detect the camera module"
+            
+        return camera_info
     else:
         
         return False
+
+def isSuperscope():
+    """
+    The following lsusb device
+    Bus 001 Device 003: ID 05a3:9230 ARC International Camera
+    is the one we currently use for the SuperScope
+    https://www.amazon.co.uk/gp/product/B07R7JXV35/ref=ppx_yo_dt_b_asin_title_o06_s00?ie=UTF8&psc=1
+    
+    Eventually we will include the new rPI camera too
+    https://uk.farnell.com/raspberry-pi/rpi-hq-camera/rpi-high-quality-camera-12-3-mp/dp/3381605
+    
+    """
+    
+    pass
     
     
 def isExperimental():

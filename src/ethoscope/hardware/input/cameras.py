@@ -379,6 +379,11 @@ class PiFrameGrabber(threading.Thread):
                     # we are disabling auto white balance for IMX219
                     capture.awb_mode = 'auto'
                     logging.info("piNoIR v1 detected - using automatic white balance")
+                    
+                #we save this information on the filesystem so that it can be retrieved by the system - this is not ideal but accessing IFD0 from another instance creates weird issues
+                with open('/etc/picamera-version', 'w') as outfile:
+                    print(camera_info, file=outfile)
+                
 
                 capture.framerate = self._target_fps
                 stream = picamera.array.PiRGBArray(capture, size=self._target_resolution)
