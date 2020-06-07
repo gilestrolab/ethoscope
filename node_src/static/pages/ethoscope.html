@@ -345,6 +345,7 @@
                             <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=file name={{arg.name}}  ng-model="selected_options.update_machine[name]['arguments'][arg.name]"  >
                             <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.update_machine[name]['arguments'][arg.name]" >
                             <input ng-if="arg.type == 'str'" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.update_machine[name]['arguments'][arg.name]"  >
+                            <input ng-if="arg.type == 'boolean'" id="input-{{arg.name}}" type=checkbox name={{arg.name}}  ng-model="selected_options.update_machine[name]['arguments'][arg.name]"  >
 
                             <div ng-if="arg.type == 'date_range'" class="input-group">
                                 <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.update_machine[name]['arguments'][arg.name]" options="{timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss', separator : ' > ' }}" > 

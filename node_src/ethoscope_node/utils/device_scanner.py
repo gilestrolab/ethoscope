@@ -253,8 +253,9 @@ class Ethoscope(Thread):
         
     def send_settings(self, post_data):
         post_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_pages['update'], self._id)
-        self._get_json(post_url, 3, post_data)
+        haschanged = self._get_json(post_url, 3, post_data)
         self._update_info()
+        return haschanged
 
     def _check_instructions_status(self, instruction):
         self._update_info()

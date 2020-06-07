@@ -183,9 +183,9 @@ def set_device_machine_info(id):
 
     post_data = bottle.request.body.read()
     device = device_scanner.get_device(id)
-    device.send_settings(post_data)
+    response = device.send_settings(post_data)
 
-    return device.machine_info()
+    return {**device.machine_info(), "haschanged" : response['haschanged']}
 
 @app.get('/device/<id>/user_options')
 @error_decorator

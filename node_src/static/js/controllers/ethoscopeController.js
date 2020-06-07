@@ -265,12 +265,13 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
         $scope.ethoscope.update_machine= function(option){
             $("#changeInfo").modal('hide');
             
-            console.log(option);
             $http.post('/device/'+device_id+'/machineinfo', data=option)
                  .success(function(data){
                     $scope.machine_info = data;
-                    $scope.ethoscope.alert("Settings changed. Please REBOOT your ethoscope now.");
-            })            
+                    if (data.haschanged) {
+                        $scope.ethoscope.alert("Some settings have changed. Please REBOOT your ethoscope now.");
+                    }
+                })            
             };
 
         $scope.ethoscope.stop = function(){
