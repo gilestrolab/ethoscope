@@ -435,6 +435,18 @@ custom-select-wrap .select-icon svg {
       background-repeat: no-repeat;
 }
 
+input.ng-invalid{
+  border-left:solid 3px #900;
+/*
+  background-color: pink;
+*/
+}
+
+input.ng-valid{
+  border-left:solid 3px #090;
+}
+
+
 #main {
     display: flex;
     flex-direction: column;

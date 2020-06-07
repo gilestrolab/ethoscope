@@ -329,14 +329,17 @@
                 <label class="input"><span>ID</span><input type="number" min="1" name='id' readonly="readonly" ng-model="selected['users'].id" style="display:inline"></label>
                 <label class="input"><span>name</span><input type="text" name='name' readonly="readonly" ng-model="selected['users'].name" style="display:inline" required ng-required="true" ></label>
             </div>
-            <label class="input"><span ng-hide="selected['users'].fullname != null">Full Name</span><input type="text" name="fullname" ng-model="selected['users'].fullname" ng-blur="nodeManagement.createUsername()" required ng-required="true" style="width: 240px;" title="Firstname Lastname"></label>
-            <label class="input"><span ng-hide="selected['users'].PIN != null">PIN</span><input type="number" name="PIN" ng-model="selected['users'].PIN" maxlength="4" required oninput="maxLengthCheck(this)" required ng-required="true"  title="A four digits number"></label>
-            <label class="input"><span ng-hide="selected['users'].email != null">Email address</span><input type="email" name="email" ng-model="selected['users'].email" required ng-required="true" required ng-required="true" style="width: 240px;"  title="A working email for notifications"></label>
-            <label class="input"><span ng-hide="selected['users'].telephone != null">Telephone number</span><input type="tel" name="telephone" ng-model="selected['users'].telephone" ng-pattern="phoneNumbr" style="width: 240px;" title="Phone number with internationl prefix"></label>
-            <label class="input"><span ng-hide="selected['users'].group != null">Laboratory or team</span><input type="text" name="group" ng-model="selected['users'].group" style="width: 240px;"  title="The name of the lab, team, research group"></label>
+            <div class="alert alert-warning" ng-if="!adduserForm.$valid">The fields labeled by a red bar are required.</div>
+
+            <label class="input"><span ng-hide="selected['users'].fullname != null">Full Name</span><input type="text" name="fullname" ng-model="selected['users'].fullname" ng-blur="nodeManagement.createUsername()" required ng-required="true" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['users'].PIN != null">PIN</span><input type="number" name="PIN" ng-model="selected['users'].PIN" maxlength="4" required oninput="maxLengthCheck(this)" required ng-required="true"></label>
+            <label class="input"><span ng-hide="selected['users'].email != null">Email address</span><input type="email" name="email" ng-model="selected['users'].email" required ng-required="true" required ng-required="true" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['users'].telephone != null">Telephone number</span><input type="tel" name="telephone" ng-model="selected['users'].telephone" ng-pattern="phoneNumbr" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['users'].group != null">Laboratory or team</span><input type="text" name="group" ng-model="selected['users'].group" style="width: 240px;"></label>
             <label><input type="checkbox" name='active' ng-model="selected['users'].active" title="Can this user use ethoscopes?"><span> is Active?</span></label>
             <label><input type="checkbox" name='isAdmin' ng-model="selected['users'].isAdmin" title="Does this user have admin priviledges?"><span> is Admin?</span></label>
         </form>
+        
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
@@ -360,11 +363,13 @@
             <div class="form-group" hidden>
                 <label class="input"><span>ID</span><input type="number" min="1" name='id' readonly="readonly" ng-model="selected['incubators'].id" style="display:inline"></label>
             </div>
+            <div class="alert alert-warning" ng-if="!adduserForm.$valid">The fields labeled by a red bar are required.</div>
+
             <label class="input"><span ng-hide="selected['incubators'].name != null">Incubator Name</span><input type="text" name="name" ng-model="selected['incubators'].name" required ng-required="true" style="width: 240px;"></label>
             <label class="input"><span ng-hide="selected['incubators'].location != null">Location</span><input type="text" name="location" ng-model="selected['incubators'].location" style="width: 240px;"></label>
             <label class="input"><span ng-hide="selected['incubators'].owner != null">The lab or team owning</span><input type="text" name="owner" ng-model="selected['incubators'].owner" style="width: 240px;"></label>
             <label class="input"><span ng-hide="selected['incubators'].description != null">Description</span><textarea name="description" ng-model="selected['incubators'].description" style="width: 240px;"></textarea></label>
-            <label><input type="checkbox" name="active" ng-model="selected['incubators'].active"><span>is Active?</span></label>
+            <label><input type="checkbox" name="active" ng-model="selected['incubators'].active"><span> is Active?</span></label>
         </form>
       </div>
       <div class="modal-footer">
@@ -375,7 +380,7 @@
   </div>
 </div>
 
-<!-- Modal ADD or EDIT Incubator -->
+<!-- Modal ADD or EDIT Sensors -->
 <div class="modal fade" id="addSensorModal" tabindex="-1" role="dialog" aria-labelledby="addSensorLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -388,6 +393,8 @@
             <div class="form-group" hidden>
                 <label class="input"><span>ID</span><input type="number" min="1" name='id' readonly="readonly" ng-model="selected['sensors'].id" style="display:inline"></label>
             </div>
+            <div class="alert alert-warning" ng-if="!adduserForm.$valid">The fields labeled by a red bar are required.</div>
+
             <label class="input"><span ng-hide="selected['sensors'].name != null">Sensor Name</span><input type="text" name="name" ng-model="selected['sensors'].name" required ng-required="true" style="width: 240px;"></label>
             <label class="input"><span ng-hide="selected['sensors'].URL != null">URL</span><input type="text" name="url" ng-model="selected['sensors'].URL" required ng-required="true" style="width: 240px;"></label>
             
@@ -396,7 +403,7 @@
 -->
             <label class="input"><span ng-hide="selected['sensors'].location != null">Location</span><select name="location" required  ng-model="selected['sensors'].location" required ng-required="true" style="width: 240px;"> <option ng-repeat="(key, entry) in incubators" value="{{key}}" >{{key}}</option> </select></label>
             <label class="input"><span ng-hide="selected['sensors'].description != null">Description</span><textarea name="description" ng-model="selected['sensors'].description" style="width: 240px;"></textarea></label>
-            <label><input type="checkbox" name="active" ng-model="selected['sensors'].active"><span>is Active?</span></label>
+            <label><input type="checkbox" name="active" ng-model="selected['sensors'].active"><span> is Active?</span></label>
         </form>
       </div>
       <div class="modal-footer">
