@@ -110,6 +110,14 @@
   </form>
 
 <!-- **** ETHOSCOPE LIST TABLE **** -->
+
+<div class="alert alert-neutral" style="background-color:#f2f2f2;">
+<label class="toggle-check">Show all machines, even if no longer connected
+  <input name="showAll" type="checkbox" class="toggle-check-input" ng-model="showAll" ng-checked="false" >
+  <span class="toggle-check-text"></span>
+</label>
+</div>
+
 <table class="table table-striped" ng-cloak>
             <thead>
             <th>
@@ -162,7 +170,7 @@
             </th>
             </thead>
             <tbody>
-            <tr ng-repeat="device in devices |  orderObjectBy:sortType:sortReverse:orderEthoscopes | filter:filterEthoscopes">
+            <tr ng-repeat="device in devices | orderObjectBy:sortType:sortReverse:orderEthoscopes | filter:filterEthoscopes" ng-if="(device.status != 'offline') || showAll">
                 <td>
                     <div ng-if="device.status != 'offline'">
                         <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
