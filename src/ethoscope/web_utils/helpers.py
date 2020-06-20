@@ -8,53 +8,30 @@ from uuid import uuid4
 
 def pi_version():
     """
-    Detect the version of the Raspberry Pi.  Returns either 1, 2 or
-    None depending on if it's a Raspberry Pi 1 (model A, B, A+, B+),
-    Raspberry Pi 2 (model B+), Raspberry Pi 3 or not a Raspberry Pi.
-    """
-    # Check /proc/cpuinfo for the Hardware field value.
-    # As of June 2019
-    # 2708 is pi 1
-    # 2709 is pi 2 or 3 depending on revision
-    # 2835 is pi 3
-    # Anything else is not a pi.
+    Detect the version of the Raspberry Pi.
+    https://www.raspberrypi.org/documentation/hardware/raspberrypi/revision-codes/README.md
     
-    with open('/proc/cpuinfo', 'r') as infile:
-        cpuinfo = infile.read()
-    # Match a line like 'Hardware   : BCM2709'
-    hardware = re.search('^Hardware\s+:\s+(\w+)$', cpuinfo,
-                      flags=re.MULTILINE | re.IGNORECASE)
-                      
-    revision = re.search('^Revision\s+:\s+(\w+)$', cpuinfo,
-                      flags=re.MULTILINE | re.IGNORECASE)
-               
-    if not hardware:
-        # Couldn't find the hardware, assume it isn't a pi.
-        return 0
-    if hardware.group(1) == 'BCM2708':
-        # Pi 1
-        return 1
-    elif hardware.group(1) == 'BCM2709' and '1041' in revision.group(1):
-        # Pi 2
-        return 2
-    elif hardware.group(1) == 'BCM2709' and '2082' in revision.group(1):
-        # Pi 3
-        return 3
-    elif hardware.group(1) == 'BCM2835' and '2082' in revision.group(1):
-        # Pi 3
-        return 3
-    elif hardware.group(1) == 'BCM2835' and '1041' in revision.group(1):
-        # Pi 3
-        return 3
+    We used to use cat /proc/cpuinfo but as of the 4.9 kernel, all Pis report BCM2835, even those with BCM2836, BCM2837 and BCM2711 processors. 
+    You should not use this string to detect the processor. Decode the revision code using the information in the URL above, or simply cat /sys/firmware/devicetree/base/model
+    """
+    
+    info_file = '/sys/firmware/devicetree/base/model'
+    
+    if os.path.exists(info_file):
+    
+        with open (info_file, 'r') as revision_input:
+            revision_info = revision_input.read().rstrip('\x00')
+    
+        return revision_info
+        
     else:
-        # Something else, not a pi.
         return 0
 
 def isMachinePI():
     """
     Return True if we are running on a Pi - proper ethoscope
     """
-    return pi_version() > 0
+    return pi_version() != 0
 
 def get_machine_name(path="/etc/machine-name"):
     """
@@ -140,7 +117,7 @@ IP=dhcp
 TimeoutDHCP=60
 ESSID=%s
 Key=%s
-    ''' % (ssid, wpakey)
+''' % (ssid, wpakey)
             
     try:
         with open(path, 'w') as f:
@@ -274,13 +251,29 @@ def isSuperscope():
     pass
     
     
-def isExperimental():
+def isExperimental(new_value=None):
     """
     return true if the machine is to be used as experimental
     this mymics a non-PI or a PI without plugged in camera
     to activate, create an empty file called /etc/isexperimental
     """
-    return os.path.exists('/etc/isexperimental')
+    filename = '/etc/isexperimental'
+    current_value = os.path.exists(filename)
+    
+    if new_value == None:
+        return current_value
+        
+    if new_value == True and current_value == False:
+        #create file
+        with open(filename, mode='w'):
+            logging.warning("Created a new empty file in %s. The machine is now experimental." % filename)
+    
+    elif new_value == False and current_value == True:
+        #delete file
+        os.remove(filename)
+        logging.warning("Removed file %s. The machine is not experimental." % filename)
+        
+    
     
 
 def get_machine_id(path="/etc/machine-id"):
