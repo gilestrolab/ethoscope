@@ -46,6 +46,9 @@ def pi_version():
     elif hardware.group(1) == 'BCM2835' and '1041' in revision.group(1):
         # Pi 3
         return 3
+    elif hardware.group(1) == 'BCM2835' and 'a020d3' in revision.group(1):
+        # Pi 3
+        return 3
     else:
         # Something else, not a pi.
         return 0
