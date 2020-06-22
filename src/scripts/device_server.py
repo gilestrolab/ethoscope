@@ -121,6 +121,8 @@ def update_machine_info(id):
     '''
     Updates the private machine informations
     '''
+    haschanged = False
+    
     if id != machine_id:
         raise WrongMachineID
         
@@ -129,14 +131,24 @@ def update_machine_info(id):
     
     if update_machine_json_data['node_ip'] != get_machine_info(id)['etc_node_ip']:
         set_etc_hostname(update_machine_json_data['node_ip'])
+        haschanged = True
     
     if int(update_machine_json_data['etho_number']) != int(get_machine_info(id)['machine-number']):
         set_machine_name(update_machine_json_data['etho_number'])
         set_machine_id(update_machine_json_data['etho_number'])
+        haschanged = True
     
-    set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'])
+    if update_machine_json_data['ESSID'] != get_machine_info(id)['WIFI_SSID'] or update_machine_json_data['Key'] != get_machine_info(id)['WIFI_PASSWORD']:
+        set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'])
+        haschanged = True
 
-    return get_machine_info(id)
+    if update_machine_json_data['isexperimental'] != isExperimental():
+        isExperimental(update_machine_json_data['isexperimental'])
+        haschanged = True
+
+    return {"haschanged": haschanged}
+    #return get_machine_info(id)
+
     
 
 @api.post('/controls/<id>/<action>')
@@ -312,6 +324,7 @@ def user_options(id):
         "update_machine": { "machine_options": [{"overview": "Machine information that can be set by the user",
                             "arguments": [
                                 {"type": "number", "name":"etho_number", "description": "An ID number (1-999) unique to this ethoscope","default": get_machine_info(id)['machine-number'] },
+                                {"type": "boolean", "name":"isexperimental", "description": "Specify if the ethoscope is to be treated as experimental", "default": isExperimental()}, 
                                 {"type": "str", "name":"node_ip", "description": "The IP address that you want to record as the node (do not change this value unless you know what you are doing!)","default": get_machine_info(id)['node_ip']},
                                 {"type": "str", "name":"ESSID", "description": "The name of the WIFI SSID","default": get_machine_info(id)['WIFI_SSID'] },
                                 {"type": "str", "name":"Key", "description": "The WPA password for the WIFI SSID","default": get_machine_info(id)['WIFI_PASSWORD'] }],
