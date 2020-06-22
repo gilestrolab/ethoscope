@@ -230,7 +230,8 @@ class ExperimentalDB(multiprocessing.Process):
         ct = datetime.datetime.now()
 
         problems = self.getRun(run_id)[0]['problems']
-        problems += "%s, %s;" % (ct, message)
+        problems = "%s, %s;" % (ct, message) + problems # append in front
+        
         sql_update_experiment = "UPDATE %s SET problems = '%s' WHERE run_id = '%s'" % ( self._runs_table_name, problems, run_id )
         return self.executeSQL ( sql_update_experiment )
 
