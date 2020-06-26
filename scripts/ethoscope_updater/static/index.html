@@ -8,7 +8,8 @@
       <!-- load bootstrap and fontawesome via CDN -->
       <link rel="stylesheet" href="/static/css/bootstrap.min.css" />
       <link rel="stylesheet" href="/static/css/font-awesome.min.css" />
-        <link rel="stylesheet" href="/static/css/main.css" />
+      <link rel="stylesheet" href="/static/css/main.css" />
+      <link rel="stylesheet" href="/static/css/toggle_switch.css" />
 
 
     </head>
@@ -42,6 +43,15 @@
             <p>{{system.error}}</p>
         </div>
      </div>
+
+    <div class="alert alert-neutral" style="background-color:#f2f2f2;">
+    <label class="toggle-check">Show all machines, also those thare are running and up to date
+      <input name="showAll" type="checkbox" class="toggle-check-input" ng-model="showAll" ng-checked="false" >
+      <span class="toggle-check-text"></span>
+    </label>
+    </div>
+
+
     <div class="jumbotron table-background" ng-cloak>
         <h3>Select some devices to perform the actions below:</h3>
         <button class="btn btn-success btn-xl" ng-click="activate_modal(selected_devices, 'update')">Update</button>
@@ -75,7 +85,7 @@
                     <input type="checkbox" checklist-model="selected_devices" checklist-value="node"></center>
                 </td>
             </tr>
-            <tr ng-repeat="(id,device) in devices">
+            <tr ng-repeat="(id,device) in devices" ng-if="(device.status == 'stopped' && device.up_to_date == false) || showAll">
 
                 <td>
                     
