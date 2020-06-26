@@ -463,5 +463,18 @@ input.ng-valid{
     left: 0;
 }
 
-    
+.notification-badge {
+    top: 0px;
+    right: -6x;
+    padding: 0px 4px;
+    border-radius: 50%;
+    color: white;
+    position:absolute;
+    background-color: #23527C;
+    font-size:12px;
+    font-weight:normal;
+    border-radius:2px;
+    -moz-border-radius:2px; 
+    -webkit-border-radius:2px;
+    z-index:1;
 }

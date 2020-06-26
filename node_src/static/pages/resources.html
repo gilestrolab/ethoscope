@@ -1,8 +1,12 @@
 <!-- Resources -->
 <div ng-if="!hasAccess">
-    <h3>Your node must be connected to the Internet for this page to work.</h3>
+    <h3>Wait a few second while we load this. Your node must be connected to the Internet for this page to work.</h3>
 </div>
 <div ng-if="hasAccess">
+    <h2>Notifications</h2>
+    <div class="alert alert-neutral" style="background-color:#f2f2f2;" ng-repeat = "news in notifications | orderBy:date:reverse">{{news.date}} - {{news.content}}</div>
+        
+    
     <h2>Making Ethoscopes</h2>
 
     <div>

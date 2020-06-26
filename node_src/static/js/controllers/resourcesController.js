@@ -1,17 +1,23 @@
 (function(){
     var resourcesController = function($scope, $http, $timeout, $routeParams, $window){
         
-        var URL = "http://lab.gilest.ro:8001/resources";
+        var resourcesURL = "http://lab.gilest.ro:8001/resources";
+        var newsURL = "http://lab.gilest.ro:8001/news";
         $scope.resources = {};
-        $scope.announcement = "";
+        $scope.notifications = {};
         $scope.hasAccess = false;
         
-        $http.get(URL)
+        $http.get(resourcesURL)
              .success(function(data, status, headers, config){
                 $scope.resources = data;
                 $scope.hasAccess = true;
         });
-        
+
+        $http.get(newsURL)
+             .success(function(data, status, headers, config){
+                $scope.notifications = data.news;
+        });
+
 }
 
  angular.module('flyApp').controller('resourcesController',resourcesController);

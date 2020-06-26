@@ -73,11 +73,12 @@
 
     // create the controller and inject Angular's $scope
     app.controller('mainController', function($scope, $http, $interval, $timeout) {
-        $scope.sortType = 'name'; // set the default sort type
-        $scope.sortReverse = false;  // set the default sort order
-        $scope.filterEthoscopes = '';     // set the default search/filter term
+       $scope.sortType = 'name'; // set the default sort type
+       $scope.sortReverse = false;  // set the default sort order
+       $scope.filterEthoscopes = '';     // set the default search/filter term
+       $scope.notifications = {};
         
-        $scope.groupActions = {};
+       $scope.groupActions = {};
 //        $http.get('/node/time').success(function(data){
 //            t = new Date(data.time);
 //            $scope.time = t.toString();
@@ -93,7 +94,11 @@
         });
         
 
-        var update_local_times = function(){
+        $http.get("http://lab.gilest.ro:8001/news").success(function(data){
+            $scope.notifications = data.news;
+        });
+
+       var update_local_times = function(){
             $http.get('/node/time').success(function(data){
                 t = new Date(data.time);
                 $scope.time = t.toString();
@@ -102,7 +107,7 @@
             $scope.localtime = t.toString();
         };
 
-        $scope.get_devices = function(){
+       $scope.get_devices = function(){
             $http.get('/devices').success(function(data){
 
                 data_list = [];
@@ -128,12 +133,12 @@
                 $scope.status_n_summary = status_summary
             })
         };
-        $scope.secToDate = function(secs){
+       $scope.secToDate = function(secs){
             d = new Date (isNaN(secs) ? secs : secs * 1000 );
 
             return d.toString();
         };
-        $scope.elapsedtime = function(t){
+       $scope.elapsedtime = function(t){
             // Calculate the number of days left
             var days=Math.floor(t / 86400);
             // After deducting the days calculate the number of hours left
@@ -156,7 +161,7 @@
 
         };
         
-        $scope.groupActions.checkStart = function(selected_devices){
+       $scope.groupActions.checkStart = function(selected_devices){
             softwareVersion = ""; 
             device_version = "";
             checkVersionLoop: 
@@ -171,7 +176,7 @@
             }
         };
                    
-        $scope.groupActions.start = function(){
+       $scope.groupActions.start = function(){
                             $("#startModal").modal('hide');
                             spStart= new Spinner(opts).spin();
                             starting_tracking.appendChild(spStart.el);
@@ -191,7 +196,7 @@
             });
         };
 
-        $scope.$on('$viewContentLoaded',$scope.get_devices);
+       $scope.$on('$viewContentLoaded',$scope.get_devices);
 
 
        var refresh_platform = function(){
@@ -199,6 +204,14 @@
                     $scope.get_devices();
                     update_local_times();
                     //console.log("refresh platform", new Date());
+                    
+                    // For some reason that I don't understand, angularjs templates cannot access scope from the header so 
+                    // we need to use jquery to change the value of the notification badge. We do that only if news is newer than a week.
+                    //console.log($scope.notifications.length); // 1
+                    //console.log($scope.notifications[0]); // {content: "Latest news here", date: "2020-02-15"}
+                    
+                    $('.notification-badge').html($scope.notifications.length);
+
             }
        };
 
