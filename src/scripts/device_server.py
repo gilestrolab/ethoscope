@@ -30,6 +30,21 @@ recording_json_data = {}
 update_machine_json_data = {}
 ETHOSCOPE_DIR = None
 
+"""
+/upload/<id>                            POST    upload files to the ethoscope (masks, videos, etc)
+/data/listfiles/<category>/<id>         GET     provides a list of files in the ethoscope data folders, that were either uploaded or generated (masks, videos, etc).
+
+/<id>                                   GET     returns ID of the machine
+/make_index                             GET     create an index.html file with all the h264 files in the machine
+/rm_static_file/                        POST    remove file
+/update/<id>                            POST    update machine parameters (number, name, nodeIP, WIFI credentials, time)
+/controls/<id>/<action>                 POST    activate actions (tracking, recording, etc)
+/machine/<id>                           GET     information about the ethoscope that is not changing in time such as hardware specs and configuration parameters
+/data/<id>                              GET     get information regarding the current status of the machine (e.g. FPS, temperature, etc)
+/user_options/<id>                      GET     Passing back options regarding what information can be changed on the the device. This populates the form on the node GUI
+/data/log/<id>                          GET     fetch the journalctl log
+
+"""
 
 class WrongMachineID(Exception):
     pass
@@ -129,22 +144,28 @@ def update_machine_info(id):
     data = bottle.request.json
     update_machine_json_data.update(data['machine_options']['arguments'])
     
-    if update_machine_json_data['node_ip'] != get_machine_info(id)['etc_node_ip']:
+    if 'node_ip' in update_machine_json_data and update_machine_json_data['node_ip'] != get_machine_info(id)['etc_node_ip']:
         set_etc_hostname(update_machine_json_data['node_ip'])
         haschanged = True
     
-    if int(update_machine_json_data['etho_number']) != int(get_machine_info(id)['machine-number']):
+    if 'etho_number' in update_machine_json_data and int(update_machine_json_data['etho_number']) != int(get_machine_info(id)['machine-number']):
         set_machine_name(update_machine_json_data['etho_number'])
         set_machine_id(update_machine_json_data['etho_number'])
         haschanged = True
     
-    if update_machine_json_data['ESSID'] != get_machine_info(id)['WIFI_SSID'] or update_machine_json_data['Key'] != get_machine_info(id)['WIFI_PASSWORD']:
+    if 'ESSID' in update_machine_json_data and 'Key' in update_machine_json_data and (update_machine_json_data['ESSID'] != get_machine_info(id)['WIFI_SSID'] or update_machine_json_data['Key'] != get_machine_info(id)['WIFI_PASSWORD']):
         set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'])
         haschanged = True
 
-    if update_machine_json_data['isexperimental'] != isExperimental():
+    if 'isexperimental' in update_machine_json_data and update_machine_json_data['isexperimental'] != isExperimental():
         isExperimental(update_machine_json_data['isexperimental'])
         haschanged = True
+    
+    #Time comes as number of milliseconds from timestamp
+    if 'datetime' in update_machine_json_data and update_machine_json_data['datetime']:
+        tn = datetime.datetime.fromtimestamp(update_machine_json_data['datetime'])
+        set_datetime(tn)
+        
 
     return {"haschanged": haschanged}
     #return get_machine_info(id)
@@ -310,7 +331,7 @@ def info(id):
 @error_decorator
 def user_options(id):
     '''
-    Passing back options regarding the capabilities of the device
+    Passing back options regarding what information can be changed on the the device. This populates the form on the node GUI
     '''
     if machine_id != id:
         raise WrongMachineID
@@ -335,6 +356,9 @@ def user_options(id):
 @api.get('/data/log/<id>')
 @error_decorator
 def get_log(id):
+    '''
+    returns the journalctl log
+    '''
     output = "No log available"
     try:
         with os.popen('journalctl -u ethoscope_device.service -rb') as p:

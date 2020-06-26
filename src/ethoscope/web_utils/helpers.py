@@ -344,3 +344,19 @@ def get_partition_infos():
     except:
         return
     
+def set_datetime(time_on_node):
+    """
+    Set date and time on the PI
+    time_on_node is the time to be set in the datetime format
+    """
+    
+    cmd = 'date -s "%s"' % time_on_node.strftime("%d %b %Y %H:%M:%S") # 26 Jun 2020 15:04:25
+    
+    try:
+        with os.popen(cmd, 'r') as c:
+            c.read()
+        
+        return True
+        
+    except:
+        return False

@@ -264,7 +264,6 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
         $scope.ethoscope.update_machine= function(option){
             $("#changeInfo").modal('hide');
-            
             $http.post('/device/'+device_id+'/machineinfo', data=option)
                  .success(function(data){
                     $scope.machine_info = data;
@@ -388,7 +387,15 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                         node_t = data_node.timestamp;
                         node_time = new Date(node_t*1000);
                         $scope.node_datetime = node_time.toUTCString();
-                        $scope.delta_t_min = (node_t - data.current_timestamp) / 60;
+                        $scope.delta_t_min = Math.abs((node_t - data.current_timestamp) / 60);
+                        
+                        if ($scope.delta_t_min > 3) { 
+                            $scope.ethoscope.update_machine({'machine_options': {
+                                                                arguments: {'datetime' : new Date().getTime() / 1000 },
+                                                                name : 'datetime'
+                                                                }}) ;
+                            console.log("Trying to force time update on the ethoscope");
+                            };
                      });
                 }
                 
