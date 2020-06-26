@@ -371,14 +371,15 @@ class PiFrameGrabber(threading.Thread):
                 #some suggestion on how to set the gains can be found here: https://picamera.readthedocs.io/en/release-1.12/recipes1.html
                 #and here: https://github.com/waveform80/picamera/issues/182
                 
-                if camera_info['IFD0.Model'] == 'RP_imx219':
-                    capture.awb_mode = 'off'
-                    capture.awb_gains = (1.8, 1.5) #TODO: allow user-specified gains
-                    logging.info("piNoIR v2 detected - using custom awb parameters")
-                else:
-                    # we are disabling auto white balance for IMX219
-                    capture.awb_mode = 'auto'
-                    logging.info("piNoIR v1 detected - using automatic white balance")
+                # Let's disable this and use awb_auto_is_greyworld in /boot/config.txt instead (see #97  )
+                # if camera_info['IFD0.Model'] == 'RP_imx219':
+                    # capture.awb_mode = 'off'
+                    # capture.awb_gains = (1.8, 1.5) #TODO: allow user-specified gains
+                    # logging.info("piNoIR v2 detected - using custom awb parameters")
+                # else:
+                    # # we are disabling auto white balance for IMX219
+                    # capture.awb_mode = 'auto'
+                    # logging.info("piNoIR v1 detected - using automatic white balance")
                     
                 #we save this information on the filesystem so that it can be retrieved by the system - this is not ideal but accessing IFD0 from another instance creates weird issues
                 with open('/etc/picamera-version', 'w') as outfile:
