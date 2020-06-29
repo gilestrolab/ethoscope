@@ -182,9 +182,9 @@ while True:
     cap = OurPiCameraAsync()
     for t,f in cap:
         # time.sleep(1)
-        print t
+        print(t)
         if t>3000:
             break
 
     cap._close()
-    print "closed"
+    print("closed")

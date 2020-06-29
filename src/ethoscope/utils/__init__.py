@@ -1,7 +1,7 @@
 __author__ = 'quentin'
 
 
-import io
-import img_proc
-import debug
-import description
+from . import io
+from . import img_proc
+from . import debug
+from . import description

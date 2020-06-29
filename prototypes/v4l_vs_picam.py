@@ -44,14 +44,14 @@ capture.set(cv2.cv.CV_CAP_PROP_FPS, 5)
 # CV_CAP_PROP_HUE Hue of the image (only for cameras).
 # CV_CAP_PROP_GAIN Gain of the image (only for cameras).
 
-print cv2.cv.CV_CAP_PROP_BRIGHTNESS, capture.get(cv2.cv.CV_CAP_PROP_BRIGHTNESS)
+print(cv2.cv.CV_CAP_PROP_BRIGHTNESS, capture.get(cv2.cv.CV_CAP_PROP_BRIGHTNESS))
 time.sleep(0.5)
 #cv2.waitKey(2000)
 _,im = capture.read()
 
 
 NFRAMES = 1000
-print "ok, frame shape=", im.shape
+print("ok, frame shape=", im.shape)
 
 t0 = time.time()
 try:
@@ -69,8 +69,8 @@ try:
         assert(len(im.shape) == 3)
     t1= time.time()
 
-    print (t1-t0) / float(NFRAMES)
+    print((t1-t0) / float(NFRAMES))
 finally:
-    print "voila"
+    print("voila")
     capture.release()
 

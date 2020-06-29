@@ -1,5 +1,5 @@
 from threading import Thread
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import os
 import datetime
 import json
@@ -52,7 +52,7 @@ class DeviceScanner(Thread):
     def run(self):
         while self._is_active :
             time.sleep(1)
-            for d in self._devices.values():
+            for d in list(self._devices.values()):
                 id = d["id"]
                 if id:
                     self._device_id_map[id] = d
@@ -65,7 +65,7 @@ class DeviceScanner(Thread):
 
 
     def stop(self):
-        for i,d in self._devices.iteritems():
+        for i,d in self._devices.items():
             d.stop()
         self._is_active = False
 
@@ -105,15 +105,15 @@ class Device(Thread):
             raise KeyError("Cannot find last image for device %s" % self._id)
 
         img_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._static_page, img_path)
-        file_like = urllib2.urlopen(img_url)
+        file_like = urllib.request.urlopen(img_url)
         return file_like
 
     @retry(ScanException, tries=3, delay=1, backoff=1)
     def _get_json(self, url,timeout=2):
 
         try:
-            req = urllib2.Request(url)
-            f = urllib2.urlopen(req, timeout=timeout)
+            req = urllib.request.Request(url)
+            f = urllib.request.urlopen(req, timeout=timeout)
             message = f.read()
 
             if not message:
@@ -125,7 +125,7 @@ class Device(Thread):
             except ValueError:
                 # logging.error("Could not parse response from %s as JSON object" % self._id_url)
                 raise ScanException("Could not parse Json object")
-        except urllib2.URLError as e:
+        except urllib.error.URLError as e:
             raise ScanException(str(e))
         except Exception as e:
             raise ScanException("Unexpected error" + str(e))
@@ -156,12 +156,12 @@ class Device(Thread):
     def _make_backup_path(self, result_main_dir, timeout=30):
 
         try:
-            import MySQLdb
+            import mysql.connector
             device_id = self._info["id"]
             device_name = self._info["name"]
             com = "SELECT value from METADATA WHERE field = 'date_time'"
 
-            mysql_db = MySQLdb.connect(host=self._ip,
+            mysql_db = mysql.connector.connect(host=self._ip,
                                        connect_timeout=timeout,
                                        **self._ethoscope_db_credentials)
             cur = mysql_db.cursor()
@@ -181,7 +181,7 @@ class Device(Thread):
 
         except Exception as e:
             logging.error("Could not generate backup path for device. Probably a MySQL issue")
-            logging.error(traceback.format_exc(e))
+            logging.error(traceback.format_exc())
             return {}
 
         return {"backup_path": output_db_file}

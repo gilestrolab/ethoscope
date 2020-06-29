@@ -7,7 +7,7 @@ After=ntpd.service clock.service
 [Service]
 Type=simple
 WorkingDirectory=/opt/ethoscope_updater/
-ExecStart=/usr/bin/python2  /opt/ethoscope_updater/update_server.py -g /opt/ethoscope-git -b /srv/git/ethoscope.git
+ExecStart=/usr/bin/python  /opt/ethoscope_updater/update_server.py -g /opt/ethoscope-node -b /srv/git/ethoscope.git
 RestartSec=5
 Restart=always
 

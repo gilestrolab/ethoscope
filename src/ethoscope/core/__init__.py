@@ -16,7 +16,7 @@ Overview:
 __author__ = 'quentin'
 
 
-import monitor
-import tracking_unit
-import variables
-import roi
+from . import monitor
+from . import tracking_unit
+from . import variables
+from . import roi

@@ -37,7 +37,7 @@ class DataPoint(collections.OrderedDict):
         :return: a copy of this object
         :rtype: :class:`~ethoscope.core.data_point.DataPoint`
         """
-        return DataPoint(copy.deepcopy(self.values()))
+        return DataPoint(copy.deepcopy(list(self.values())))
 
     def append(self, item):
         """

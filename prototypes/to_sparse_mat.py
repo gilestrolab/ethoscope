@@ -37,7 +37,7 @@ cluster_centers = ms.cluster_centers_
 labels_unique = np.unique(labels)
 n_clusters_ = len(labels_unique)
 
-print("number of estimated clusters : %d" % n_clusters_)
+print(("number of estimated clusters : %d" % n_clusters_))
 
 ###############################################################################
 # Plot result
@@ -48,7 +48,7 @@ plt.figure(1)
 plt.clf()
 
 colors = cycle('bgrcmykbgrcmykbgrcmykbgrcmyk')
-for k, col in zip(range(n_clusters_), colors):
+for k, col in zip(list(range(n_clusters_)), colors):
     my_members = labels == k
     cluster_center = cluster_centers[k]
     plt.plot(X[my_members, 0], X[my_members, 1], col + '.')

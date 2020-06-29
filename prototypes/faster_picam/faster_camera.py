@@ -129,7 +129,7 @@ class Monitor(object):
                         self._last_positions[track_u.roi.idx] = []
                         continue
                     if j == 0:
-                        print(data_rows[0]["x"] / float(track_u.roi.get_feature_dict()["w"]))
+                        print((data_rows[0]["x"] / float(track_u.roi.get_feature_dict()["w"])))
                     abs_pos = track_u.get_last_positions(absolute=True)
 
 
@@ -151,7 +151,7 @@ class Monitor(object):
 
 
         except Exception as e:
-            logging.error("Monitor closing with an exception: '%s'" % traceback.format_exc(e))
+            logging.error("Monitor closing with an exception: '%s'" % traceback.format_exc())
             raise e
 
         finally:

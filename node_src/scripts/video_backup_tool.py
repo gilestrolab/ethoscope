@@ -1,13 +1,13 @@
 __author__ = 'quentin'
 
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import logging
 import optparse
 import  traceback
 import subprocess
 import json
 from ethoscope_node.utils.backups_helpers import GenericBackupWrapper
-from ethoscope_node.utils.helpers import  get_local_ip
+from ethoscope_node.utils.configuration import EthoscopeConfiguration
 
 class WGetERROR(Exception):
     pass
@@ -34,24 +34,38 @@ def wget_mirror_wrapper(target, target_prefix, output_dir, cut_dirs=3):
 
 
 def get_video_list(ip, port=9000,static_dir = "static", index_file="ethoscope_data/results/index.html"):
+
     url = "/".join(["%s:%i"%(ip,port), static_dir, index_file])
+
     try:
-        response = urllib2.urlopen(url)
-        return [r.rstrip() for r in response]
-    except urllib2.HTTPError as e:
+        response = urllib.request.urlopen(url)
+        out = [r.decode('utf-8').rstrip() for r in response]
+    except urllib.error.HTTPError as e:
         logging.warning("No index file could be found for device %s" % ip)
-        return None
+        out = None
+    finally:
+        make_index(ip, port)
+        return out
 
 def remove_video_from_host(ip, id, target, port=9000):
     request_url = "{ip}:{port}/rm_static_file/{id}".format(ip=ip, id=id, port=port)
     data = {"file": target}
     data =json.dumps(data)
-    req = urllib2.Request(url=request_url, data= data, headers={'Content-Type': 'application/json'})
-    _ = urllib2.urlopen(req, timeout=5)
+    req = urllib.request.Request(url=request_url, data= data, headers={'Content-Type': 'application/json'})
+    _ = urllib.request.urlopen(req, timeout=5)
 
 
+def make_index(ip, port=9000, page="make_index"):
+    url = "/".join(["%s:%i"%(ip,port), page])
+    try:
+        response = urllib.request.urlopen(url)
+        return True
+    except urllib.error.HTTPError as e:
+        logging.warning("No index file could be found for device %s" % ip)
+        return False
 
-def get_all_videos(device_info,out_dir, port=9000, static_dir="static"):
+
+def get_all_videos(device_info, out_dir, port=9000, static_dir="static"):
     url = "http://" + device_info["ip"]
     id = device_info["id"]
     video_list = get_video_list(url, port=port, static_dir=static_dir)
@@ -78,32 +92,30 @@ def backup_job(args):
 
 
 if __name__ == '__main__':
+    
+    CFG = EthoscopeConfiguration()
+
     logging.getLogger().setLevel(logging.INFO)
     try:
         parser = optparse.OptionParser()
         parser = optparse.OptionParser()
         parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
-        parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_videos",
-                          help="Where temporary result files are stored")
-
-        parser.add_option("-r", "--subnet-ip", dest="subnet_ip", default="192.169.123.0",
-                          help="the ip of the router in your setup")
+        parser.add_option("-i", "--server", dest="server", default="localhost", help="The server on which the node is running will be interrogated first for the device list")        
+        parser.add_option("-e", "--results-dir", dest="video_dir", help="Where video files are stored")
         parser.add_option("-s", "--safe", dest="safe", default=False,help="Set Safe mode ON", action="store_true")
-        parser.add_option("-l", "--local", dest="local", default=False,
-                          help="Run on localhost (run a node and device on the same machine, for development)",
-                          action="store_true")
-        (options, args) = parser.parse_args()
-        option_dict = vars(options)
-
-        local_ip= get_local_ip(option_dict["subnet_ip"],localhost = option_dict["local"])
 
         (options, args) = parser.parse_args()
         option_dict = vars(options)
+        VIDEO_DIR = option_dict["video_dir"] or CFG.content['folders']['video']['path']
+        SAFE_MODE = option_dict["safe"]
+        server = option_dict["server"]
+
 
         gbw = GenericBackupWrapper( backup_job,
-                                    option_dict["results_dir"],
-                                    option_dict["safe"], local_ip
-                                    )
+                                    VIDEO_DIR,
+                                    SAFE_MODE,
+                                    server )
         gbw.run()
+        
     except Exception as e:
-        logging.error(traceback.format_exc(e))
+        logging.error(traceback.format_exc())

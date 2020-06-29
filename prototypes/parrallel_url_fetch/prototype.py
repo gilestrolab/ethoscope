@@ -2,7 +2,7 @@ __author__ = 'quentin'
 #import futures
 import concurrent.futures as futures
 import concurrent
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import time
 import logging
 import json
@@ -26,20 +26,20 @@ def scan_one_device(ip, timeout=2.5, port=9000, page="id"):
     url="%s:%i/%s" % (ip, port, page)
     logging.info("Scanning: %s" % url)
     try:
-        req = urllib2.Request(url)
-        f = urllib2.urlopen(req, timeout=timeout)
+        req = urllib.request.Request(url)
+        f = urllib.request.urlopen(req, timeout=timeout)
         message = f.read()
 
         if not message:
             logging.error("URL error whist scanning url: %s. No message back." % url )
-            raise urllib2.URLError("No message back")
+            raise urllib.error.URLError("No message back")
         try:
             resp = json.loads(message)
             return (resp['id'],ip)
         except ValueError:
             logging.error("Could not parse response from %s as JSON object" % url )
 
-    except urllib2.URLError:
+    except urllib.error.URLError:
         logging.error("URL error whist scanning url: %s. Server down?" % url )
 
     except Exception as e:
@@ -72,11 +72,11 @@ with futures.ThreadPoolExecutor(max_workers=len(scanned)) as executor:
             data = future.result()
             if data[0] is None:
                 continue
-            print (url,data)
+            print((url,data))
         except Exception as exc:
-            print '%r generated an exception: %s' % (url, exc)
+            print('%r generated an exception: %s' % (url, exc))
 
 
-print "Elapsed Time: %ss" % (time.time() - start)
+print("Elapsed Time: %ss" % (time.time() - start))
 
 

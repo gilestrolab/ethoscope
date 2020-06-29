@@ -13,7 +13,7 @@ from ethoscope.tests.integration_api_tests._constants import VIDEO, DRAW_FRAMES
 def test_stimulator(StimulatorClass, InterfaceClass, remove_db_file = True, *args, **kwargs):
     tmp = tempfile.mkstemp(suffix="_ethoscope_test.db")[1]
 
-    print("Making a tmp db: " + tmp)
+    print(("Making a tmp db: " + tmp))
     cam = MovieVirtualCamera(VIDEO, drop_each=15)
     rb = SleepMonitorWithTargetROIBuilder()
     rois = rb.build(cam)
@@ -36,8 +36,8 @@ def test_stimulator(StimulatorClass, InterfaceClass, remove_db_file = True, *arg
 
     finally:
         if remove_db_file :
-            print("Removing temp db (" + tmp+ ")")
+            print(("Removing temp db (" + tmp+ ")"))
             os.remove(tmp)
         else:
-            print("db file lives in (" + tmp + ")")
+            print(("db file lives in (" + tmp + ")"))
         connection.stop()

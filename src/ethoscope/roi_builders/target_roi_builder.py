@@ -44,9 +44,10 @@ class TargetGridROIBuilder(BaseROIBuilder):
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "bottom_margin", "description": "Same as top_margin, but for the bottom.","default":0.0},
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "right_margin", "description": "Same as top_margin, but for the right.","default":0.0},
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "left_margin", "description": "Same as top_margin, but for the left.","default":0.0},
-                                    {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "horizontal_fill", "description": "The proportion of the grid space user by the roi, horizontally.","default":0.90},
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "horizontal_fill", "description": "The proportion of the grid space used by the roi, horizontally.","default":0.90},
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":.001, "name": "vertical_fill", "description": "Same as horizontal_margin, but vertically.","default":0.90}
                                    ]}
+                                   
     def __init__(self, n_rows=1, n_cols=1, top_margin=0, bottom_margin=0,
                  left_margin=0, right_margin=0, horizontal_fill=.9, vertical_fill=.9):
         """
@@ -243,6 +244,28 @@ class TargetGridROIBuilder(BaseROIBuilder):
         return rois
 
 
+class ThirtyFliesMonitorWithTargetROIBuilder(TargetGridROIBuilder):
+
+    _description = {"overview": "The default sleep monitor arena with ten rows of two tubes.",
+                    "arguments": []}
+
+    def __init__(self):
+        r"""
+        Class to build ROIs for a two-columns, ten-rows for the sleep monitor
+        (`see here <https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_10x2_shortTubes>`_).
+        """
+        #`sleep monitor tube holder arena <todo>`_
+
+        super(SleepMonitorWithTargetROIBuilder, self).__init__(n_rows=10,
+                                                               n_cols=3,
+                                                               top_margin= 6.99 / 111.00,
+                                                               bottom_margin = 6.99 / 111.00,
+                                                               left_margin = -.033,
+                                                               right_margin = -.033,
+                                                               horizontal_fill = .975,
+                                                               vertical_fill= .7
+                                                               )
+
 class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilder):
 
     _description = {"overview": "The default sleep monitor arena with ten rows of two tubes.",
@@ -283,6 +306,26 @@ class OlfactionAssayROIBuilder(TargetGridROIBuilder):
                                                                bottom_margin =6.99 / 111.00,
                                                                left_margin = -.033,
                                                                right_margin = -.033,
+                                                               horizontal_fill = .975,
+                                                               vertical_fill= .7
+                                                               )
+
+class ElectricShockAssayROIBuilder(TargetGridROIBuilder):
+    _description = {"overview": "A ROI layout for the automatic electric shock. 5 rows, 1 column",
+                    "arguments": []}
+    def __init__(self):
+        """
+        Class to build ROIs for a one-column, five-rows
+        (`Add gitbook URL when ready`_)
+        """
+        #`olfactory response arena <todo>`_
+
+        super(ElectricShockAssayROIBuilder, self).__init__(n_rows=5,
+                                                               n_cols=1,
+                                                               top_margin=0.1,
+                                                               bottom_margin =0.1,
+                                                               left_margin = -.065,
+                                                               right_margin = -.065,
                                                                horizontal_fill = .975,
                                                                vertical_fill= .7
                                                                )

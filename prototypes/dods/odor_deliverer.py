@@ -9,7 +9,7 @@ import time
 i = 1
 while True:
     time.sleep(1)
-    print i
+    print(i)
     i += 1
     if i == 15:
         o.interact(channel=1, pos=1)

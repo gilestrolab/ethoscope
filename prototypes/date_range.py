@@ -98,11 +98,11 @@ t2 = make_time("2015-10-04 00:00:01")
 t3 = make_time("2015-10-06 00:00:00")
 t4 = make_time("2015-10-07 12:00:00")
 t5 = make_time("2016-10-07 12:00:00")
-print s.in_range(t1) # false
-print s.in_range(t2) #true
-print s.in_range(t3) #false
-print s.in_range(t4) #true
-print s.in_range(t5) #false
+print(s.in_range(t1)) # false
+print(s.in_range(t2)) #true
+print(s.in_range(t3)) #false
+print(s.in_range(t4)) #true
+print(s.in_range(t5)) #false
 
 
 #errors:

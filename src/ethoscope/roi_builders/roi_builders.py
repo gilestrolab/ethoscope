@@ -43,7 +43,7 @@ class BaseROIBuilder(DescribedObject):
         except Exception as e:
             if not isinstance(input, np.ndarray):
                 del input
-            logging.error(traceback.format_exc(e))
+            logging.error(traceback.format_exc())
             raise e
 
         rois_w_no_value = [r for r in rois if r.value is None]
@@ -61,18 +61,16 @@ class BaseROIBuilder(DescribedObject):
         raise NotImplementedError
 
     def _spatial_sorting(self, rois):
-        out = []
-        for i, sr in enumerate(sorted(rois, lambda  a,b: a.rectangle[0] - b.rectangle[0])):
-            if sr.value is None:
-                sr.set_value(i)
-            out.append(sr)
-        return out
+        '''
+        returns a sorted list of ROIs objects it in ascending order based on the first value in the rectangle property
+        '''
+        return sorted(rois, key=lambda x: x.rectangle[0], reverse=False)
 
     def _value_sorting(self, rois):
-        out = []
-        for i, sr in enumerate(sorted(rois, lambda  a,b: a.value - b.value)):
-            out.append(sr)
-        return out
+        '''
+        returns a sorted list of ROIs objects it in ascending order based on the .value property
+        '''
+        return sorted(rois, key=lambda x: x.value, reverse=False)
 
 
 class DefaultROIBuilder(BaseROIBuilder):

@@ -1,0 +1,128 @@
+<!-- experiments.html -->
+<!-- **** ETHOSCOPE LIST TABLE **** -->
+
+<form>
+<div class="form-group">
+  <div class="input-group">
+    <div class="input-group-addon"><i class="fa fa-search"></i></div>
+
+    <input type="text" class="form-control" placeholder="Filter runs" ng-model="filterRuns" id="filterRuns">
+
+  </div>      
+</div>
+</form>
+
+
+<table class="table table-striped" ng-cloak>
+            <thead>
+            <th>
+                <a href="#" ng-click="sortType = 'status'; sortReverse = !sortReverse; orderRuns = True">
+                Status
+                <span ng-show="sortType == 'status' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'status' && sortReverse" class="fa fa-caret-up"></span>
+            </th>
+            <th>
+                <a href="#" ng-click="sortType = 'run_id'; sortReverse = !sortReverse">
+                ID
+                <span ng-show="sortType == 'run_id' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'run_id' && sortReverse" class="fa fa-caret-up"></span>
+            </th>
+            <th>
+                <a href="#" ng-click="sortType = 'ethoscope_name'; sortReverse = !sortReverse">
+                Ethoscope
+                <span ng-show="sortType == 'ethoscope_name' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'ethoscope_name' && sortReverse" class="fa fa-caret-up"></span>
+            </th>
+            <th>
+                <a href="#" ng-click="sortType = 'start_time'; sortReverse = !sortReverse">
+                Start Time
+                <span ng-show="sortType == 'start_time' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'start_time' && sortReverse" class="fa fa-caret-up"></span>    
+            </th>
+            <th>
+                <a href="#" ng-click="sortType = 'end_time'; sortReverse = !sortReverse">
+                End Time
+                <span ng-show="sortType == 'end_time' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'end_time' && sortReverse" class="fa fa-caret-up"></span>
+            </th>
+            <th>
+                <a href="#" ng-click="sortType = 'user_name'; sortReverse = !sortReverse">
+                User
+                <span ng-show="sortType == 'user_name' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'user_name' && sortReverse" class="fa fa-caret-up"></span>
+            </th>
+            <th>
+                <a href="#" ng-click="sortType = 'location'; sortReverse = !sortReverse">
+                Location
+                <span ng-show="sortType == 'location' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'location' && sortReverse" class="fa fa-caret-up"></span>    
+            </th>
+            <th>
+                <a href="#" ng-click="sortType = 'alert'; sortReverse = !sortReverse">
+                Alert
+                    <span ng-show="sortType == 'alert' && !sortReverse" class="fa fa-caret-down"></span>
+                    <span ng-show="sortType == 'alert' && sortReverse" class="fa fa-caret-up"></span>
+            </th>
+            <th>
+                <a href="#" ng-click="sortType = 'problems'; sortReverse = !sortReverse">
+                Problems
+                <span ng-show="sortType == 'problems' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'problems' && sortReverse" class="fa fa-caret-up"></span>
+            </th>
+            <th>
+                <a href="#" ng-click="sortType = 'data'; sortReverse = !sortReverse">
+                Data
+                <span ng-show="sortType == 'data' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'data' && sortReverse" class="fa fa-caret-up"></span>
+            </th>
+            <th><center>Select</center></th>
+            </thead>
+            <tbody>
+            <tr dir-paginate="run in runs | orderObjectBy:sortType:sortReverse:orderRuns | filter:filterRuns| itemsPerPage: itemsPerPage" current-page="currentPage">
+                <td>
+                    <span ng-if="run.status == 'running'" class="fa fa-play-circle color-green" title={{run.status}}></span>
+                    <span ng-if="run.status == 'unreached'" class="fa fa-stop-circle color-red" title={{run.status}}></span>
+                    <span ng-if="run.status == 'stopped'" class="fa fa-stop-circle" title={{run.status}}></span></td>
+                </td>
+                <td>{{run.run_id}}</td>
+                <td>
+                    <div ng-if="run.status != 'stopped'">
+                        <a ng-href="/#ethoscope/{{run.ethoscope_id}}" target="_blank">
+                        <span>{{run.ethoscope_name}}</span>
+                        </a>
+                    </div>
+                    <div ng-if="run.status == 'stopped'">
+                        <span>{{run.ethoscope_name}}</span>
+                    </div>
+                </td>
+                <td><span title="">{{run.start_time.split('.')[0]}}</span></td>
+                <td>{{run.end_time.split('.')[0]}}</td>
+                <td>{{run.user_name}}</td>
+                <td>{{run.location}}</td>
+                <td>{{run.alert}}</td>
+                <td title="{{run.problems}}">{{run.problems.substring(0,6)}}</td>
+                <td>
+                    <span ng-if="run.status == 'running'">
+                        <span ng-if="compare_time(run.last_backup) >= 0  && compare_time(run.last_backup) <= 20" class="fa fa-check-circle color-green" title="Last backup {{compare_time(run.last_backup)}} minutes ago in file {{run.experimental_data}}"></span>
+                        <span ng-if="compare_time(run.last_backup) > 20" class="fa fa-exclamation-triangle color-red" title="Last backup {{compare_time(run.last_backup)}} minutes ago in file {{run.experimental_data}}"></span>
+                        <span ng-if="!run.has_backup" class="fa fa-exclamation-triangle color-black" title="No backup yet!"></span>
+                    </span>
+                    <span ng-if="run.status == 'stopped'">
+                        <span ng-if="!run.has_backup" class="fa fa-exclamation-triangle color-black" title="A backup file for this run was not found on the node!"></span>
+                        <span ng-if="compare_time(run.last_backup, run.end_time) >= 0" class="fa fa-check-circle color-green" title="Run has had a full successful backup"></span>
+                        <span ng-if="compare_time(run.last_backup, run.end_time) < 0" class="fa fa-exclamation-triangle color-red" title="Last backup happened {{compare_time(run.last_backup, run.end_time)}} minutes before the end of the run! Some data may be missing."></span>
+                    </span>
+
+
+                </td>
+                <td><center>
+                    <input type="checkbox" checklist-model="devices_selected" checklist-value="device"></center>
+                </td>
+            </tr>
+        </tbody>
+</table>
+<dir-pagination-controls
+                max-size="5"
+                direction-links="true"
+                boundary-links="true" >
+</dir-pagination-controls>

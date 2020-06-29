@@ -1,8 +1,8 @@
 __author__ = 'diana'
 import sqlite3
-import MySQLdb
+import mysql.connector
 
-src = MySQLdb.connect(user='root', passwd='mysql',
+src = mysql.connector.connect(user='root', passwd='mysql',
                               host='localhost',
                               db='testdb')
 table_name = 'img'
@@ -18,7 +18,7 @@ with sqlite3.connect('output_sqlite.db', check_same_thread=False) as dst:
          col_list.append(" ".join(c[0:2]))
 
     formated_cols_names = ", ".join(col_list)
-    print formated_cols_names
+    print(formated_cols_names)
 
     dst_command = "DROP TABLE IF EXISTS %s" % table_name
     dst_cur.execute(dst_command)
@@ -45,6 +45,6 @@ with sqlite3.connect('output_sqlite.db', check_same_thread=False) as get_jpeg:
     command = "SELECT images FROM %s " % table_name
     cursor.execute(command)
     img_blob = cursor.fetchone()[0]
-    print "SAVING!!!!!!!!!!!!!"
+    print("SAVING!!!!!!!!!!!!!")
     with open("img_from_sqlite.jpg", 'wb') as output_file:
         output_file.write(img_blob)

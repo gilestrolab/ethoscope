@@ -1,0 +1,19 @@
+#!/bin/sh
+# Place this file in the /etc/cron.hourly folder of your node
+# adjust directory structure as needed
+
+echo "updating the index file remotely"
+/bin/bash /opt/ethoscope-node/scripts/tools/make_index_on_nas.sh
+
+echo "syncing results"
+rsync -arv /ethoscope_data/results/* /mnt/nas/auto_generated_data/ethoscope_results/
+
+echo "syncing videos"
+rsync -arv /ethoscope_data/videos/*  /mnt/nas/auto_generated_data/ethoscope_videos/
+
+echo "syncing configuration file"
+rsync -arv /etc/ethoscope.conf       /mnt/nas/auto_generated_data/
+rsync -arv /etc/ethoscope-node.db    /mnt/nas/auto_generated_data/
+
+echo "restarting backup daemon"
+systemctl restart ethoscope_backup.service

@@ -6,8 +6,8 @@ After=ntpd.service clock.service
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/ethoscope-git/node_src/scripts/
-ExecStart=/usr/bin/python2  /opt/ethoscope-git/node_src/scripts/video_backup_tool.py
+WorkingDirectory=/opt/ethoscope-node/node_src/scripts/
+ExecStart=/usr/bin/python  /opt/ethoscope-node/node_src/scripts/video_backup_tool.py
 RestartSec=5
 Restart=always
 

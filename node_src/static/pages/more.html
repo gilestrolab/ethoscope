@@ -1,15 +1,24 @@
 <div ng-if="showOptions" class="col-xs-12" ng-cloak>
     <div ng-repeat="option in options">
-    <a href=""  ng-click="exec_option(option.opt)" class="col-xs-1 option {{option.color}}"  >
+    <a href=""  ng-click="exec_option(option.opt)" data-toggle="tooltip" class="col-xs-1 option {{option.color}}" style={{option.style}} title="{{option.name}}" >
                 <p class="{{option.icon}}"></p>
-                <p>{{option.name}}</p>
+<!--                <p>{{option.name}}</p> -->
         </a>
     </div>
 </div>
 <div id="loading" class="spinner"></div>
 
+<div ng-if="showOption == 'viewLog'" class="col-xs-12" ng-cloak>
+<h2>Server Log</h2>
+<div>
+    <pre>
+    <p class="log" ng-repeat="(key,entry) in log | toArray |orderBy: 'key'">{{key}}: {{entry}}</p></pre>
+</div>
+</div>
+
+
 <div ng-show="showOption == 'browse'" class="col-xs-12" ng-cloak>
-    <h2>Files to be dowloaded:</h2>
+    <h2>Files on the node</h2>
     <div class="alert alert-info ">
         <p>Actions for selected files:</p>
         <button  class="btn btn-success" ng-click="browse.dowload()"  data-target="#downloadModal">Download</button>
@@ -187,13 +196,13 @@
 </div>
 
 
-<div ng-if="showOption == 'nodeManage'" class="col-xs-12">
-    <hr></hr>
+<div ng-if="showOption == 'nodeInfo'" class="col-xs-12">
     <div>
-        <h3>Node Parameters</h3>
+        <h2>Node Parameters</h2>
         <p>Time on Network: {{nodeManagement.time}}</p>
-        <p>Disk Usage: </p>
+        <p>Service running: {{nodeManagement.info.active_since}}</p>
         <ul class="list-group col-xs-6">
+        <p>Disk Usage:</p>
             <li class="list-group-item">Device: {{nodeManagement.info.disk_usage[0]}}</li>
             <li class="list-group-item">Total Size: {{nodeManagement.info.disk_usage[1]}}</li>
             <li class="list-group-item">Used: {{nodeManagement.info.disk_usage[2]}}</li>
@@ -201,40 +210,211 @@
             <li class="list-group-item">% used: {{nodeManagement.info.disk_usage[4]}}</li>
             <li class="list-group-item">Mounted on: {{nodeManagement.info.disk_usage[5]}}</li>
         </ul>
-        <p>Internet Network: </p>
         <ul class="list-group col-xs-6">
-            <li class="list-group-item">Device IP: {{nodeManagement.info.ip}}</li>
-            <li class="list-group-item">Ethernet MAC Address: {{nodeManagement.info.MAC_addr}}</li>
+        <p>Version info: </p>
+            <li class="list-group-item">Current GIT branch: {{nodeManagement.info.GIT_BRANCH}}</li>
+            <li class="list-group-item">Needs update: {{nodeManagement.info.NEEDS_UPDATE}}</li>
         </ul>
+        <ul class="list-group col-xs-6">
+        <div ng-repeat="(key, entry) in nodeManagement.info.CARDS">
+            <li class="list-group-item">Device Name: {{key}}</li>
+            <li class="list-group-item">Device MAC: {{entry.MAC}}</li>
+            <li class="list-group-item">IP Address: {{entry.IP}}</li>
+        </div>
+        </ul>
+
     </div>
 
-<div class="col-xs-12">
-
-    <button class="btn btn-danger" data-toggle="modal" data-target="#powerOffAlert">Power off Node</button>
+    <div class="col-xs-12">
+        <button class="btn btn-danger" data-toggle="modal" data-target="#RestartAlert">Restart Node</button>
+        <a href="ssh://node@{{nodeManagement.info.IPs[0]}}"><button class="btn btn-info">SSH in the Node</button></a>
     </div>
 
 </div>
 
 <!-- Modal power off -->
-<div class="modal fade" id="powerOffAlert" tabindex="-1" role="dialog" aria-labelledby="powerOffAlertLabel" aria-hidden="true">
+<div class="modal fade" id="RestartAlert" tabindex="-1" role="dialog" aria-labelledby="RestartAlertLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
         <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="myModalLabel">Modal title</h4>
+        <h4 class="modal-title" id="myModalLabel">Restart the node</h4>
       </div>
       <div class="modal-body">
-       <p>Do you want to power off the Node?</p>
-       <p>You won't be able to connect to this website anymore.</p>
-       <p>To power on Node again, you need to physically push the ON button.</p>
+       <p>Do you want to restart the Node?</p>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
-        <button class="btn btn-danger" ng-click="nodeManagement.action('poweroff')">Power off Node</button>
+        <button class="btn btn-danger" ng-click="nodeManagement.action('restart')" data-dismiss="modal">Restart Node</button>
       </div>
     </div>
   </div>
 </div>
+
+<div ng-if="showOption == 'nodeManage'" class="col-xs-8">
+    <div>
+        <h2>Node Administration</h2>
+        <ul class="list-group col-xs-12">
+        <h3>Backup daemons and settings:</h3>
+            <!-- <p class="log" ng-repeat="(key,entry) in daemons | toArray |orderBy: 'key'">{{key}}: {{entry}}</p></pre> -->
+
+            <li class="list-group-item" ng-repeat="(key, entry) in daemons">
+                <label class="toggle-check">{{key}}
+                  <input type="checkbox" class="toggle-check-input" ng-model="isActive" ng-checked="entry.active == 'active'" ng-click="nodeManagement.toggleDaemon(key, isActive != undefined ? isActive : entry.active == 'inactive')" >
+                  <span class="toggle-check-text"></span>
+                </label>
+                <p>{{entry.description}}</p>
+                <!-- <input type=text value={{entry.exec}}> -->
+            </li>
+        </ul>
+        <ul class="list-group col-xs-12">
+        <h3>Folders</h3>
+            <form>
+            <li class="list-group-item input" ng-repeat="(name, entry) in folders">
+<!--                <input type="file" onchange="angular.element(this).scope().nodeManagement.updateFolder(event)" name="{{name}}" id="{{name}}-btn" style="display: visible;" webkitdirectory mozdirectory msdirectory odirectory directory multiple >   -->
+                <label style="display: inline;" title={{entry.description}}>{{name}}</label><input type="text" ng-model="folders[name].path" class="w3-input" style="display: inline-block; position: relative; float: right; width: 260px; bg-color: gray;" size="40" title={{entry.description}}> <!--<button style="display: inline-block; position: relative; float: right;" ng-click="nodeManagement.browseFolder(name);"><i class="fa fa-folder-open-o" ></i></button>-->
+                <p>{{entry.description}}</p>
+            </li>
+            <br>
+            <input class="btn btn-success btn-xl" type=submit value="Save" ng-click="nodeManagement.saveFolders()">
+            </form>
+        </ul>
+        <ul class="list-group col-xs-12">
+            <h3>Users</h3>
+            <div class="input">
+                <select ng-model="selected['users'].name" ng-change="nodeManagement.loadData('users')">
+                  <option ng-repeat="(key, entry) in users" value="{{key}}" >{{key}}</option>
+                </select>
+                    <button class="btn btn-info" data-toggle="modal" data-target="#addUserModal"><i class="fa fa-lg fa-edit"></i></button>
+                    <button class="btn btn-info" data-toggle="modal" data-target="#addUserModal" ng-click="selected['users'] = {}; "><i class="fa fa-lg fa-plus"></i></button>
+            </div>
+        </ul>
+        <ul class="list-group col-xs-12">
+            <h3>Incubators</h3>
+            <div class="input">
+                <select ng-model="selected['incubators'].name" ng-change="nodeManagement.loadData('incubators')">
+                  <option ng-repeat="(key, entry) in incubators" value="{{key}}" >{{key}}</option>
+                </select>
+                    <button class="btn btn-info" data-toggle="modal" data-target="#addIncubatorModal"><i class="fa fa-lg fa-edit"></i></button>
+                    <button class="btn btn-info" data-toggle="modal" data-target="#addIncubatorModal" ng-click="selected['incubators'] = {}; "><i class="fa fa-lg fa-plus"></i></button>
+            </div>
+        </ul>
+        <ul class="list-group col-xs-12">
+            <h3>Sensors</h3>
+            <div class="input">
+                <select ng-model="selected['sensors'].name" ng-change="nodeManagement.loadData('sensors')">
+                  <option ng-repeat="(key, entry) in sensors" value="{{key}}" >{{key}}</option>
+                </select>
+                    <button class="btn btn-info" data-toggle="modal" data-target="#addSensorModal"><i class="fa fa-lg fa-edit"></i></button>
+                    <button class="btn btn-info" data-toggle="modal" data-target="#addSensorModal" ng-click="selected['sensor'] = {}; "><i class="fa fa-lg fa-plus"></i></button>
+            </div>
+        </ul>
+
+    </div>
+
+</div>
+
+
+<!-- Modal ADD or EDIT User -->
+<div class="modal fade" id="addUserModal" tabindex="-1" role="dialog" aria-labelledby="addUserLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">User Editor</h4>
+      </div>
+      <div class="modal-body">
+        <form name="adduserForm">
+            <div class="form-group" hidden>
+                <label class="input"><span>ID</span><input type="number" min="1" name='id' readonly="readonly" ng-model="selected['users'].id" style="display:inline"></label>
+                <label class="input"><span>name</span><input type="text" name='name' readonly="readonly" ng-model="selected['users'].name" style="display:inline" required ng-required="true" ></label>
+            </div>
+            <div class="alert alert-warning" ng-if="!adduserForm.$valid">The fields labeled by a red bar are required.</div>
+
+            <label class="input"><span ng-hide="selected['users'].fullname != null">Full Name</span><input type="text" name="fullname" ng-model="selected['users'].fullname" ng-blur="nodeManagement.createUsername()" required ng-required="true" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['users'].PIN != null">PIN</span><input type="number" name="PIN" ng-model="selected['users'].PIN" maxlength="4" required oninput="maxLengthCheck(this)" required ng-required="true"></label>
+            <label class="input"><span ng-hide="selected['users'].email != null">Email address</span><input type="email" name="email" ng-model="selected['users'].email" required ng-required="true" required ng-required="true" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['users'].telephone != null">Telephone number</span><input type="tel" name="telephone" ng-model="selected['users'].telephone" ng-pattern="phoneNumbr" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['users'].group != null">Laboratory or team</span><input type="text" name="group" ng-model="selected['users'].group" style="width: 240px;"></label>
+            <label><input type="checkbox" name='active' ng-model="selected['users'].active" title="Can this user use ethoscopes?"><span> is Active?</span></label>
+            <label><input type="checkbox" name='isAdmin' ng-model="selected['users'].isAdmin" title="Does this user have admin priviledges?"><span> is Admin?</span></label>
+        </form>
+        
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button class="btn btn-danger" ng-click="nodeManagement.adduser()"  data-dismiss="modal" ng-disabled="adduserForm.$invalid">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Modal ADD or EDIT Incubator -->
+<div class="modal fade" id="addIncubatorModal" tabindex="-1" role="dialog" aria-labelledby="addIncubatorLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Incubator Editor</h4>
+      </div>
+      <div class="modal-body">
+        <form name="addIncubatorForm">
+            <div class="form-group" hidden>
+                <label class="input"><span>ID</span><input type="number" min="1" name='id' readonly="readonly" ng-model="selected['incubators'].id" style="display:inline"></label>
+            </div>
+            <div class="alert alert-warning" ng-if="!adduserForm.$valid">The fields labeled by a red bar are required.</div>
+
+            <label class="input"><span ng-hide="selected['incubators'].name != null">Incubator Name</span><input type="text" name="name" ng-model="selected['incubators'].name" required ng-required="true" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['incubators'].location != null">Location</span><input type="text" name="location" ng-model="selected['incubators'].location" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['incubators'].owner != null">The lab or team owning</span><input type="text" name="owner" ng-model="selected['incubators'].owner" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['incubators'].description != null">Description</span><textarea name="description" ng-model="selected['incubators'].description" style="width: 240px;"></textarea></label>
+            <label><input type="checkbox" name="active" ng-model="selected['incubators'].active"><span> is Active?</span></label>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button class="btn btn-danger" ng-click="nodeManagement.addincubator()"  data-dismiss="modal" ng-disabled="addIncubatorForm.$invalid">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal ADD or EDIT Sensors -->
+<div class="modal fade" id="addSensorModal" tabindex="-1" role="dialog" aria-labelledby="addSensorLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Sensor Editor</h4>
+      </div>
+      <div class="modal-body">
+        <form name="addSensorForm">
+            <div class="form-group" hidden>
+                <label class="input"><span>ID</span><input type="number" min="1" name='id' readonly="readonly" ng-model="selected['sensors'].id" style="display:inline"></label>
+            </div>
+            <div class="alert alert-warning" ng-if="!adduserForm.$valid">The fields labeled by a red bar are required.</div>
+
+            <label class="input"><span ng-hide="selected['sensors'].name != null">Sensor Name</span><input type="text" name="name" ng-model="selected['sensors'].name" required ng-required="true" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['sensors'].URL != null">URL</span><input type="text" name="url" ng-model="selected['sensors'].URL" required ng-required="true" style="width: 240px;"></label>
+            
+<!--
+            <label class="input"><span ng-hide="selected['sensors'].location != null">Location</span><input type="text" name="location" ng-model="selected['sensors'].location" required ng-required="true" style="width: 240px;"></label>
+-->
+            <label class="input"><span ng-hide="selected['sensors'].location != null">Location</span><select name="location" required  ng-model="selected['sensors'].location" required ng-required="true" style="width: 240px;"> <option ng-repeat="(key, entry) in incubators" value="{{key}}" >{{key}}</option> </select></label>
+            <label class="input"><span ng-hide="selected['sensors'].description != null">Description</span><textarea name="description" ng-model="selected['sensors'].description" style="width: 240px;"></textarea></label>
+            <label><input type="checkbox" name="active" ng-model="selected['sensors'].active"><span> is Active?</span></label>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button class="btn btn-danger" ng-click="nodeManagement.addsensor()"  data-dismiss="modal" ng-disabled="addSensorForm.$invalid">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <script>
     (function(){
         console.log("table");

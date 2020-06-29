@@ -90,7 +90,7 @@ class OptoMotor(BaseInterface):
 
         duration = int(duration)
         intensity= int(intensity)
-        instruction = "P %i %i %i\r" % (channel, duration, intensity)
+        instruction = b"P %i %i %i\r\n" % (channel, duration, intensity)
         o = self._serial.write(instruction)
         return o
 

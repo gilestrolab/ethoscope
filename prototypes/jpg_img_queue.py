@@ -8,7 +8,7 @@ from ethoscope.utils.debug import EthoscopeException
 import multiprocessing
 from scipy.misc import toimage, imread, imsave
 from io import BytesIO
-import StringIO
+import io
 from ethoscope.hardware.input.cameras import PiFrameGrabber, OurPiCameraAsync
 
 class PiFrameGrabberJPEG(PiFrameGrabber):
@@ -58,7 +58,7 @@ cam = OurPiCameraAsyncJPEG()
 t0 = 0
 
 for t,f in cam:
-    print "dt = ", t - t0
-    print np.sum(cam)
+    print("dt = ", t - t0)
+    print(np.sum(cam))
     time.sleep(.3)
     t0 = t

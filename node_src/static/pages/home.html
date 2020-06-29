@@ -5,9 +5,6 @@
         <!--<div class="intro">Scan the network to detect connected ethoscopes</div>-->
         <!--<button class=" btn btn-default" ng-click="get_devices()">Scan Network for Devices</button>-->
 
-
-        <!--dddddddddddddddddd-->
-
         <div id="node-info" class="intro">
              <div class="row">
                  <div class="col-sm-6">
@@ -25,6 +22,82 @@
         </div>
 
     </div>
+
+<!-- **** SENSORS LIST TABLE **** -->
+<div ng-if="has_sensors" >
+<table class="table table-striped" ng-cloak>
+            <thead>
+            <th>
+                <a href="#" ng-click="sortType = 'name'; sortReverse = !sortReverse; orderSensors = True">
+                Name
+                <span ng-show="sortType == 'name' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'name' && sortReverse" class="fa fa-caret-up"></span>
+            </th>
+            <th>
+                <a href="#" ng-click="sortType = 'status'; sortReverse = !sortReverse">
+                Status
+                <span ng-show="sortType == 'status' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'status' && sortReverse" class="fa fa-caret-up"></span>
+            </th>
+            <th>
+                <a href="#" ng-click="sortType = 'location'; sortReverse = !sortReverse">
+                Location
+                <span ng-show="sortType == 'location' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'location' && sortReverse" class="fa fa-caret-up"></span>    
+            </th>
+            <th>
+                <a href="#" ng-click="sortType = 'temperature'; sortReverse = !sortReverse">
+                Temperature
+                <span ng-show="sortType == 'temperature' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'temperature' && sortReverse" class="fa fa-caret-up"></span>    
+            </th>
+            <th>
+                <a href="#" ng-click="sortType = 'humidity'; sortReverse = !sortReverse">
+                Humidity
+                <span ng-show="sortType == 'humidity' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'humidity' && sortReverse" class="fa fa-caret-up"></span>    
+            </th>
+            <th>
+                <a href="#" ng-click="sortType = 'light'; sortReverse = !sortReverse">
+                Light
+                <span ng-show="sortType == 'light' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'light' && sortReverse" class="fa fa-caret-up"></span>    
+            </th>
+            <th>
+                <a href="#" ng-click="sortType = 'ip'; sortReverse = !sortReverse">
+                ip
+                    <span ng-show="sortType == 'ip' && !sortReverse" class="fa fa-caret-down"></span>
+                    <span ng-show="sortType == 'ip' && sortReverse" class="fa fa-caret-up"></span>
+            </th>
+            <th>
+                <a href="#" ng-click="sortType = 'id'; sortReverse = !sortReverse">
+                id
+                <span ng-show="sortType == 'id' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'id' && sortReverse" class="fa fa-caret-up"></span>
+            </th>
+            </thead>
+            <tbody>
+            <tr ng-repeat="sensor in sensors |  orderObjectBy:sortType:sortReverse:orderSensors">
+                <td>
+                    <div ng-if="sensor.status != 'offline'">
+                        <a ng-href="/#sensor/{{sensor.id}}" target="_blank">
+                        <span class="fa fa-circle-o"></span><span> {{sensor.name}}</span>
+                        </a>
+                    </div>
+                    <div ng-if="sensor.status == 'offline'"><span class="fa fa-circle-o"></span><span> {{sensor.name}}</span></div>
+                </td>
+                <td>{{sensor.status}}</td>
+                <td>{{sensor.location}}</td>
+                <td>{{sensor.temperature}}</td>
+                <td>{{sensor.humidity}}</td>
+                <td>{{sensor.light}}</td>
+                <td>{{sensor.ip}}</td>
+                <td title="{{sensor.id}}">{{sensor.id}}</td>
+            </tr>
+        </tbody>
+</table>
+</div>
+
   <form>
     <div class="form-group">
       <div class="input-group">
@@ -36,10 +109,19 @@
     </div>
   </form>
 
+<!-- **** ETHOSCOPE LIST TABLE **** -->
+
+<div class="alert alert-neutral" style="background-color:#f2f2f2;">
+<label class="toggle-check">Show all machines, even if no longer connected
+  <input name="showAll" type="checkbox" class="toggle-check-input" ng-model="showAll" ng-checked="false" >
+  <span class="toggle-check-text"></span>
+</label>
+</div>
+
 <table class="table table-striped" ng-cloak>
             <thead>
             <th>
-                <a href="#" ng-click="sortType = 'name'; sortReverse = !sortReverse">
+                <a href="#" ng-click="sortType = 'name'; sortReverse = !sortReverse; orderEthoscopes = True">
                 Name
                 <span ng-show="sortType == 'name' && !sortReverse" class="fa fa-caret-down"></span>
                 <span ng-show="sortType == 'name' && sortReverse" class="fa fa-caret-up"></span>
@@ -86,70 +168,34 @@
                 <span ng-show="sortType == 'id' && !sortReverse" class="fa fa-caret-down"></span>
                 <span ng-show="sortType == 'id' && sortReverse" class="fa fa-caret-up"></span>
             </th>
-            <th><center>Select</center></th>
             </thead>
             <tbody>
-            <tr ng-repeat="device in devices |  orderBy:sortType:sortReverse | filter:filterEthoscopes">
+            <tr ng-repeat="device in devices | orderObjectBy:sortType:sortReverse:orderEthoscopes | filter:filterEthoscopes" ng-if="(device.status != 'offline') || showAll">
                 <td>
-                    <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
-                    <span class="fa fa-circle-o"></span><span> {{device.name}}</span>
-                    </a>
+                    <div ng-if="device.status != 'offline'">
+                        <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
+                        <span>{{device.name}}</span>
+                        </a>
+                    </div>
+                    <div ng-if="device.status == 'offline'">
+                        <span>{{device.name}}</span>
+                    </div>
                 </td>
-                <td><span ng-if="device.status == 'running'" class="fa fa-circle color-blue"></span>
-                <span ng-if="device.status == 'recording'" class="fa fa-circle color-green"></span>
-                <span ng-if="device.status == 'stopped'" class="fa fa-square color-red"></span> {{device.status}}</td>
+                <td>
+                <span ng-if="device.status == 'initialising'" class="fas fa-spinner" title={{device.status}}></span>
+                <span ng-if="device.status == 'running'" class="fa fa-play-circle color-green" title={{device.status}}></span>
+                <span ng-if="device.status == 'recording'" class="fa fa-play-circle color-red" title={{device.status}}></span>
+                <span ng-if="device.status == 'streaming'" class="fa fa-play-circle color-red" title={{device.status}}></span>
+                <span ng-if="device.status == 'stopped'" class="fa fa-stop-circle" title={{device.status}}></span></td>
                 <td>{{secToDate(device.time)}}</td>
                 <td>{{elapsedtime(device.time_since_backup)}}</td>
                 <td>{{device.experimental_info.name}}</td>
                 <td>{{device.experimental_info.location}}</td>
-                <td>{{device.ip}}</td>
-                <td>{{device.id.substring(0,6)}}</td>
-                <td><center>
-                    <input type="checkbox" checklist-model="devices_selected" checklist-value="device"></center>
+                <td>
+                    <span ng-if="device.status == 'offline'" title="Last known IP: {{device.ip}}">offline</span>
+                    <span ng-if="device.status != 'offline'" >{{device.ip}}</span>
                 </td>
+                <td title="{{device.id}}">{{device.id.substring(0,6)}}</td>
             </tr>
-            </tbody>
-    </table>
-
-
-<!-- Modal start tracking -->
-<!--gg: REMOVE THIS? Does not seem like it's used here any more. This is all handled by ethoscope.html instead -->
-<!--
-<div class="modal fade" id="startModal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="startModalLabel">Select tracking type</h4>
-      </div>
-      <div class="modal-body">
-          <form>
-          <div ng-repeat="(name,option) in user_options">
-            <h5>{{name}}</h5>
-              <ul>
-                <li ng-repeat="opt in option">
-                    <input type=radio name={{opt.name}}>
-                    {{opt.name}}: {{opt.overview}}
-                  <ul>
-                      <li>type: {{arg.type}}</li>
-                      <li>test</li>
-                        <li ng-repeat="arg in opt.arguments">
-                            {{arg.description}}
-                            <input ng-if="arg.type == 'number'" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}} value={{arg.default}} ngmodel="user_options.{{opt.name}}.{{arg.name}}" >
-                            <input ng-if="arg.type == 'str'" type=text name={{arg.name}} value={{arg.default}} ngmodel="user_options.{{opt.name}}.{{arg.name}}">
-                            <input ng-if="arg.type == 'datetime'" type=datetime name={{arg.name}} value={{arg.default}} ngmodel="user_options.{{opt.name}}.{{arg.name}}">
-                        </li>
-                    </ul>
-                </li>
-              </ul>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
-        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start()" data-toggle="modal">Start Tracking</button>
-      </div>
-    </div>
-  </div>
-</div>
--->
+        </tbody>
+</table>

@@ -3,7 +3,7 @@ A tool to backup incrementally one source to one destination directory.
 It copies files to the destination if and only if they are larger than in the destination
 """
 
-from __future__ import print_function
+
 from optparse import OptionParser
 import os
 import shutil

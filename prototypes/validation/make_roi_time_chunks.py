@@ -28,7 +28,7 @@ class MyMonitor(Monitor):
         for i,(t, frame) in enumerate(self._camera):
 
             if t % self._every_ms == 0:
-                print "making video at", t
+                print("making video at", t)
 
                 if vw_ls:
                     for v in vw_ls:
@@ -51,7 +51,7 @@ class MyMonitor(Monitor):
 
             if t- t0 > self._duration :
                 if i % 1000 == 0:
-                    print t/(36000*21), t, 21*1000*3600
+                    print(t/(36000*21), t, 21*1000*3600)
                 continue
 
             for j,track_u in enumerate(self._unit_trackers):

@@ -1,7 +1,7 @@
 """
 A general test to try to find out if anything is wrong with the API.
 """
-from __future__ import print_function
+
 import tempfile
 import os
 import time

@@ -1,11 +1,12 @@
-.idea
+*.idea
 *.pdf
 *.png
 *.txt
 *.pickle
 *.pkl
 *~
-
+*.ipynb
+*.bak
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

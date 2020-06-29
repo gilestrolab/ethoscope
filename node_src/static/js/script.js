@@ -1,5 +1,6 @@
 (function(){
-    var app = angular.module('flyApp', ['ngRoute','daterangepicker']);
+    var app = angular.module('flyApp', ['ngRoute', 'daterangepicker', 'angularUtils.directives.dirPagination']);
+    
     app.filter("toArray", function(){
         return function(obj) {
             var result = [];
@@ -8,6 +9,20 @@
             });
             return result;
         };
+    });
+
+    app.filter('orderObjectBy', function() {
+      return function(items, field, reverse) {
+        var filtered = [];
+        angular.forEach(items, function(item) {
+          filtered.push(item);
+        });
+        filtered.sort(function (a, b) {
+          return (a[field] > b[field] ? 1 : -1);
+        });
+        if(reverse) filtered.reverse();
+        return filtered;
+      };
     });
 
     // configure our routes
@@ -30,8 +45,22 @@
             // route for the management page
             .when('/more/:option', {
                 templateUrl : '/static/pages/more.html',
-                controller  : 'moreController as ctrl',
+                controller  : 'moreController',
             })
+
+            // route for the experiments database page
+            .when('/experiments', {
+                templateUrl : '/static/pages/experiments.html',
+                controller  : 'experimentsController',
+            })
+
+            // route for the experiments database page
+            .when('/resources', {
+                templateUrl : '/static/pages/resources.html',
+                controller  : 'resourcesController',
+            })
+
+
             // route for the help page
             /*.when('/help', {
                 templateUrl : '/static/pages/help.html',
@@ -44,31 +73,41 @@
 
     // create the controller and inject Angular's $scope
     app.controller('mainController', function($scope, $http, $interval, $timeout) {
-        $scope.sortType = 'name'; // set the default sort type
-        $scope.sortReverse = false;  // set the default sort order
-        $scope.filterEthoscopes = '';     // set the default search/filter term
+       $scope.sortType = 'name'; // set the default sort type
+       $scope.sortReverse = false;  // set the default sort order
+       $scope.filterEthoscopes = '';     // set the default search/filter term
+       $scope.notifications = {};
         
-        $scope.groupActions = {};
+       $scope.groupActions = {};
 //        $http.get('/node/time').success(function(data){
 //            t = new Date(data.time);
 //            $scope.time = t.toString();
 //        });
-        $http.get('/devices_list').success(function(data){
+
+        $http.get('/devices').success(function(data){
             $scope.devices = data;
-            
+        });
+
+        $http.get('/sensors').success(function(data){
+            $scope.sensors = data;
+            $scope.has_sensors = Object.keys($scope.sensors).length;
         });
         
 
-        var get_date = function(){
+        $http.get("http://lab.gilest.ro:8001/news").success(function(data){
+            $scope.notifications = data.news;
+        });
+
+       var update_local_times = function(){
             $http.get('/node/time').success(function(data){
-            t = new Date(data.time);
-            $scope.time = t.toString();
-            });
-            var t= new Date();
-            $scope.localtime =t.toString();
+                t = new Date(data.time);
+                $scope.time = t.toString();
+                });
+            var t = new Date();
+            $scope.localtime = t.toString();
         };
 
-        $scope.get_devices = function(){
+       $scope.get_devices = function(){
             $http.get('/devices').success(function(data){
 
                 data_list = [];
@@ -94,11 +133,12 @@
                 $scope.status_n_summary = status_summary
             })
         };
-        $scope.secToDate = function(secs){
-            d = new Date(secs*1000);
+       $scope.secToDate = function(secs){
+            d = new Date (isNaN(secs) ? secs : secs * 1000 );
+
             return d.toString();
         };
-        $scope.elapsedtime = function(t){
+       $scope.elapsedtime = function(t){
             // Calculate the number of days left
             var days=Math.floor(t / 86400);
             // After deducting the days calculate the number of hours left
@@ -121,7 +161,7 @@
 
         };
         
-        $scope.groupActions.checkStart = function(selected_devices){
+       $scope.groupActions.checkStart = function(selected_devices){
             softwareVersion = ""; 
             device_version = "";
             checkVersionLoop: 
@@ -136,7 +176,7 @@
             }
         };
                    
-        $scope.groupActions.start = function(){
+       $scope.groupActions.start = function(){
                             $("#startModal").modal('hide');
                             spStart= new Spinner(opts).spin();
                             starting_tracking.appendChild(spStart.el);
@@ -156,25 +196,33 @@
             });
         };
 
-        $scope.$on('$viewContentLoaded',$scope.get_devices);
+       $scope.$on('$viewContentLoaded',$scope.get_devices);
 
 
-        var refresh = function(){
+       var refresh_platform = function(){
+            if (document.visibilityState=="visible"){
+                    $scope.get_devices();
+                    update_local_times();
+                    //console.log("refresh platform", new Date());
+                    
+                    // For some reason that I don't understand, angularjs templates cannot access scope from the header so 
+                    // we need to use jquery to change the value of the notification badge. We do that only if news is newer than a week.
+                    //console.log($scope.notifications.length); // 1
+                    //console.log($scope.notifications[0]); // {content: "Latest news here", date: "2020-02-15"}
+                    
+                    $('.notification-badge').html($scope.notifications.length);
 
-            $scope.get_devices();
-            get_date();
-            console.log("refresh");
-       }
+            }
+       };
 
-       refresh_data = $interval(refresh, 3000);
+       // refresh every 5 seconds
+       refresh_data = $interval(refresh_platform, 5 * 1000);
+        
         //clear interval when scope is destroyed
         $scope.$on("$destroy", function(){
             $interval.cancel(refresh_data);
             //clearInterval(refresh_data);
         });
-
-
     });
-
 }
 )()

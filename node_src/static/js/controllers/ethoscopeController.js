@@ -16,28 +16,67 @@ app.directive('tooltip', function(){
     };
 });
 
+app.config(['$compileProvider', function ($compileProvider) {
+    $compileProvider.aHrefSanitizationWhitelist(/^\s*(https?|ftp|mailto|file|sms|tel|ssh):/);
+}]);
+
 app.controller('ethoscopeController', function($scope, $http, $routeParams, $interval, $timeout, $location)  {
+    
         device_id = $routeParams.device_id;
 //        var device_ip;
+
+        $scope.node = {'users' : {},
+                       'incubators' : {}
+                      }
+                      
+        $http.get('/node/users')
+             .success(function(data, status, headers, config){
+                $scope.node['users'] = data;
+        });
+
+        $http.get('/node/incubators')
+             .success(function(data, status, headers, config){
+                $scope.node['incubators'] = data;
+        });
+
+        $http.get('/sensors')
+             .success(function(data, status, headers, config){
+                $scope.node['sensors'] = data;
+        });
+
+
         $scope.device = {}; //the info about the device
         $scope.ethoscope = {}; // to control the device
+        $scope.showLog = false;
+        $scope.can_stream = false;
+        $scope.isActive = false;
         var refresh_data = false;
         var spStart= new Spinner(opts).spin();
         var starting_tracking= document.getElementById('starting');
 
-
         $http.get('/device/'+device_id+'/data').success(function(data){
             $scope.device = data;
+            $scope.isActive = ( $scope.device['name'].split("_").pop() != "000" );
+        });
+
+        $http.get('/device/'+device_id+'/videofiles').success(function(data){
+            $scope.videofiles = data.filelist;
         });
 
         $http.get('/device/'+device_id+'/user_options').success(function(data){
+            $scope.can_stream = (typeof data.streaming !== 'undefined');
+        });
+        
+        $http.get('/device/'+device_id+'/user_options').success(function(data){
             $scope.user_options = {};
-            $scope.user_options.tracking= data.tracking;
-            $scope.user_options.recording= data.recording;
+            $scope.user_options.tracking = data.tracking;
+            $scope.user_options.recording = data.recording;
+            $scope.user_options.update_machine = data.update_machine;
 
             $scope.selected_options = {};
             $scope.selected_options.tracking = {};
             $scope.selected_options.recording = {};
+            $scope.selected_options.update_machine = {};
 
             for (var k in data.tracking){
                 $scope.selected_options.tracking[k]={};
@@ -56,6 +95,16 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                         $scope.selected_options.recording[k]['arguments'][data.recording[k][0]['arguments'][j]['name']]=data.recording[k][0]['arguments'][j]['default'];
                 }
             }
+            
+            for (var k in data.update_machine){
+                $scope.selected_options.update_machine[k]={};
+                $scope.selected_options.update_machine[k]['name']=data.update_machine[k][0]['name'];
+                $scope.selected_options.update_machine[k]['arguments']={};
+                for(var j=0;j<data.update_machine[k][0]['arguments'].length; j++){
+                        $scope.selected_options.update_machine[k]['arguments'][data.update_machine[k][0]['arguments'][j]['name']]=data.update_machine[k][0]['arguments'][j]['default'];
+                }
+            }
+            
         });
 
 
@@ -102,6 +151,53 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
             }
         }
 
+
+        $scope.ethoscope.update_user_options.update_machine = function(name){
+            data=$scope.user_options;
+            for (var i=0;i<data.update_machine[name].length;i++){
+                if (data.update_machine[name][i]['name']== $scope.selected_options.update_machine[name]['name']){
+                    $scope.selected_options.update_machine[name]['arguments']={};
+                    for(var j=0;j<data.update_machine[name][i]['arguments'].length; j++){
+                        if (data.update_machine[name][i]['arguments'][j]['type']=='datetime'){
+                          $scope.selected_options.update_machine[name]['arguments'][data.update_machine[name][i]['arguments'][j]['name']]=[];
+                          $scope.selected_options.update_machine[name]['arguments'][data.update_machine[name][i]['arguments'][j]['name']][0]=moment(data.update_machine[name][i]['arguments'][j]['default']).format('LLLL');
+                            $scope.selected_options.update_machine[name]['arguments'][data.update_machine[name][i]['arguments'][j]['name']][1]=data.update_machine[name][i]['arguments'][j]['default'];
+                            console.log($scope.selected_options.update_machine[name]['arguments'][data.update_machine[name][i]['arguments'][j]['name']]);
+                        }else{
+                            $scope.selected_options.update_machine[name]['arguments'][data.update_machine[name][i]['arguments'][j]['name']]=data.update_machine[name][i]['arguments'][j]['default'];
+                        }
+
+                    }
+                }
+            }
+        }
+
+        $scope.ethoscope.backup = function(){
+                $http.post('/device/'+device_id+'/backup', data={}).success(function(data) {
+                        $scope.device = data;
+                })
+
+        }
+
+        $scope.ethoscope.stream = function(option){
+            if ($scope.can_stream) {
+                console.log("getting real time stream")
+                $http.post('/device/'+device_id+'/controls/stream', data= {"recorder":{"name":"Streamer","arguments":{}}} )
+                .success(function(response){
+                    $scope.device.status = response.status;
+                });
+            }
+        };
+
+        $scope.get_ip_of_sensor = function(location){
+            location=location.replace(/\s+/g, '_');
+            for (sensor in $scope.node['sensors']) {
+                if ($scope.node['sensors'][sensor]["location"] == location) {
+                    return $scope.node['sensors'][sensor]["ip"];
+                }
+            }
+        }
+        
         $scope.ethoscope.start_tracking = function(option){
             $("#startModal").modal('hide');
             spStart= new Spinner(opts).spin();
@@ -116,15 +212,22 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                     //}
                     
                     //get the "formatted" field only from daterangepicker if it exist
-                    if(option[opt].arguments[arg].hasOwnProperty('formatted')) {
+                    if(option[opt].arguments[arg] != undefined && option[opt].arguments[arg].hasOwnProperty('formatted')) {
                         option[opt].arguments[arg] = option[opt].arguments[arg].formatted;
                     }
-                    console.log(option[opt].arguments[arg]);
                 }
             }
 
+           
+            //gets info about the sensor, if it is linked to a location            
+            option["experimental_info"].arguments["sensor"] = $scope.get_ip_of_sensor(option["experimental_info"].arguments["location"]);
+            console.log(option);
+
+            //send options to the ethoscope and starts tracking
             $http.post('/device/'+device_id+'/controls/start', data=option)
                  .success(function(data){$scope.device.status = data.status;});
+
+            //refresh status
             $http.get('/devices').success(function(data){
                     $http.get('/device/'+device_id+'/data').success(function(data){
                         $scope.device = data;
@@ -150,6 +253,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
             $http.post('/device/'+device_id+'/controls/start_record', data=option)
                  .success(function(data){$scope.device.status = data.status;});
+                 
             $http.get('/devices').success(function(data){
                     $http.get('/device/'+device_id+'/data').success(function(data){
                         $scope.device = data;
@@ -157,6 +261,17 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                  $("#recordModal").modal('hide');
             });
         };
+
+        $scope.ethoscope.update_machine= function(option){
+            $("#changeInfo").modal('hide');
+            $http.post('/device/'+device_id+'/machineinfo', data=option)
+                 .success(function(data){
+                    $scope.machine_info = data;
+                    if (data.haschanged) {
+                        $scope.ethoscope.alert("Some settings have changed. Please REBOOT your ethoscope now.");
+                    }
+                })            
+            };
 
         $scope.ethoscope.stop = function(){
             console.log("stopping")
@@ -171,6 +286,12 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
         };
 
         $scope.ethoscope.log = function(){
+            
+            $http.get('/device/'+device_id+'/machineinfo').success(function(data){
+                        $scope.machine_info = data;
+                    });
+            
+            
             var log_file_path = ''
             if ($scope.showLog == false){
                 log_file_path = $scope.device.log_file;
@@ -193,7 +314,28 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                 })
 
         };
+        
+        $scope.ethoscope.reboot = function(){
+                console.log("rebooting");
+                $http.post('/device/'+device_id+'/controls/reboot', data={})
+                     .success(function(data){
+                        $scope.device = data;
+                        window.close()
+                })
 
+        };
+
+        $scope.ethoscope.restart = function(){
+                console.log("restarting");
+                $http.post('/device/'+device_id+'/controls/restart', data={})
+                     .success(function(data){
+                        $scope.device = data;
+                        //window.close()
+                })
+
+        };
+
+        
         $scope.ethoscope.alert= function(message){alert(message);};
 
         $scope.ethoscope.elapsedtime = function(t){
@@ -232,11 +374,12 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
         };
 
         var refresh = function(){
+        if (document.visibilityState=="visible"){
             $http.get('/device/'+device_id+'/data')
              .success(function(data){
                 $scope.device= data;
-                $scope.node_datetime = "TODO"
-                $scope.device_datetime = "TODO"
+                $scope.node_datetime = "Node Time"
+                $scope.device_datetime = "Device Time"
                 if("current_timestamp" in data){
                     $scope.device_timestamp = new Date(data.current_timestamp*1000);
                     $scope.device_datetime = $scope.device_timestamp.toUTCString();
@@ -244,11 +387,25 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                         node_t = data_node.timestamp;
                         node_time = new Date(node_t*1000);
                         $scope.node_datetime = node_time.toUTCString();
-                        $scope.delta_t_min = (node_t - data.current_timestamp) / 60;
+                        $scope.delta_t_min = Math.abs((node_t - data.current_timestamp) / 60);
+                        
+                        if ($scope.delta_t_min > 3) { 
+                            $scope.ethoscope.update_machine({'machine_options': {
+                                                                arguments: {'datetime' : new Date().getTime() / 1000 },
+                                                                name : 'datetime'
+                                                                }}) ;
+                            console.log("Trying to force time update on the ethoscope");
+                            };
                      });
                 }
+                
                 $scope.device.url_img = "/device/"+ $scope.device.id  + "/last_img" + '?' + Math.floor(new Date().getTime()/1000.0);
-//                    $scope.device.ip = device_ip;
+                $scope.device.url_stream = '/device/'+device_id+'/stream';
+                
+                //TODO: this needs to be fixed to point to local server upload!
+                $scope.device.url_upload = "http://"+$scope.device.ip+":9000/upload/"+$scope.device.id ;
+                
+            //$scope.device.ip = device_ip;
                 status = $scope.device.status
                 if (typeof spStart != undefined){
                     if(status != 'initialising' && status !='stopping'){
@@ -256,6 +413,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                     }
                 }
              });
+        }
         }
 
         refresh_data = $interval(refresh, 3000);

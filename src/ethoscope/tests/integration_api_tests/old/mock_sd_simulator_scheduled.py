@@ -1,4 +1,4 @@
-from __future__ import print_function
+
 import tempfile
 import os
 from ethoscope.core.monitor import Monitor
