@@ -16,7 +16,7 @@ Organisation of the code
 Branching system
 --------------------------
 
-* `master` is **only** used for hosting tested **stable** software.
+* `master` is **only** used for hosting tested **stable** software. As of June 2020 `master` is now fully based on Python 3
 * `dev` is a fairly stable developmental used in @gilestrolab.
 
 The workflow is to make issue branches from `dev`, test them as much a possible before merging them to `dev`.
