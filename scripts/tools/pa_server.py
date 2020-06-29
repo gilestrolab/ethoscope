@@ -2,6 +2,7 @@ import bottle
 import json
 import logging
 import os
+import datetime
 
 FILESVERSION = "1.6"
 FILESDATE = "2020-02-15"
@@ -9,21 +10,21 @@ FILESDATE = "2020-02-15"
 app = bottle.Bottle()
 STATIC_DIR = "../static"
 PORT = 8001
- 
-sd_image = {'filename' : '20200216_ethoscope_000.img.zip',
-            'url' : 'https://imperialcollegelondon.box.com/shared/static/ku704ys0p96n4oijwtk4sspsp0mmywf9.zip',
-            'date' : '16 Feb 2020',
-            'md5sum' : 'f6160a80d3acc63e1d5c91f92710e00a'
+
+sd_image = {'filename' : '20200507_ethoscope_000.img.zip',
+            'url' : 'https://imperialcollegelondon.box.com/shared/static/0tm8mbinrsq7ogqv3winmwsnncb24yq3.zip',
+            'date' : '7 May 2020',
+            'md5sum' : 'c8d568db16ca0309a2ff60c330324f66'
             }
                 
 gcodes = [
           {'filename' : '1_etho_1.6_LIGHT_BOX.2x'         , 'url' : 'https://www.dropbox.com/s/u4598hoxt2ueg5v/1_etho_1.6_LIGHT_BOX.2x.gcode?dl=0', 'prints': 'Light box only', 'material' : 'PLA White'},
-          {'filename' :  '2_etho_v1.6_CASE_AND_CAMERA.2x' , 'url' : 'https://www.dropbox.com/s/ymri52uw8wc3jwc/2_etho_v1.6_CASE_AND_CAMERA.2x.gcode?dl=0', 'prints': 'Upper case and camera case', 'material' : 'PLA Gray'},
-          {'filename' : '2.1_etho_v1.6_CASE_ONLY.1x'      , 'url' : 'https://www.dropbox.com/s/zexducfe7789yh8/2.1_etho_v1.6_CASE_ONLY.1x.gcode?dl=0', 'prints': 'Upper case only', 'material' : 'PLA Gray'},
-          {'filename' : '2.2_etho_v1.6_CASE_ONLY.2x'      , 'url' : 'https://www.dropbox.com/s/6ui47b2mw2t2p8x/2.2_etho_v1.6_CASE_ONLY.2x.gcode?dl=0', 'prints': 'Upper case only', 'material' : 'PLA Gray'},
+          {'filename' : '2.1_etho_v1.7_CASE_and_CAMERA.1x', 'url' : 'https://www.dropbox.com/s/vwubid0eazgxldj/2.1_etho_v1.7_CASE_and_CAMERA.1x.gcode?dl=0', 'prints': 'Upper case and camera lid', 'material' : 'PLA Gray'},
+          {'filename' : '2.2_etho_v1.7_CASE_ONLY.2x'      , 'url' : 'https://www.dropbox.com/s/sng0yhr9pyz66ei/2.2_etho_v1.7_CASE_ONLY.2x.gcode?dl=0', 'prints': 'Upper case only', 'material' : 'PLA Gray'},
           {'filename' : '3_etho_v1.6_LID_AND_STRIP.2x'    , 'url' : 'https://www.dropbox.com/s/a5p543hqup6li22/3_etho_v1.6_LID_AND_STRIP.2x.gcode?dl=0', 'prints': 'Case lid and camera strip', 'material' : 'PLA White'},
           {'filename' : '3.1_etho_v1.6_LID_ONLY.2x'       , 'url' : 'https://www.dropbox.com/s/97inb00c9vj2k0d/3.1_etho_v1.6_LID_ONLY.2x.gcode?dl=0', 'prints': 'Lid only', 'material' : 'PLA White'},
-          {'filename' : '3.2_etho_v1.6_light_strip.7x'    , 'url' : 'https://www.dropbox.com/s/b3tmhg097f23she/3.2_etho_v1.6_light_strip.7x.gcode?dl=0', 'prints': 'Light strip only', 'material' : 'PLA Clear or White'}
+          {'filename' : '3.2_etho_v1.6_light_strip.7x'    , 'url' : 'https://www.dropbox.com/s/b3tmhg097f23she/3.2_etho_v1.6_light_strip.7x.gcode?dl=0', 'prints': 'Light strip only', 'material' : 'PLA Clear or White'},
+          {'filename' : '3.3_etho_v1.6_CAMERA_LIDS.8x'    , 'url' : 'https://www.dropbox.com/s/8nxnbc091ce0roi/3.3_etho_v1.6_CAMERA_LIDS.8x.gcode?dl=0', 'prints': 'Upper case and camera case', 'material' : 'PLA Gray'}
               ]
                 
 onshape = [
@@ -33,12 +34,14 @@ onshape = [
             {'name': 'Stabiliser' , 'url' : 'https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/51c11b1cb511015be15336e4'}
            ]
 
-gcodes_zip = {'filename' : 'ethoscope_gcodes_v1.6.zip', 'url' : 'https://www.dropbox.com/s/i5vb7bkbfsiff9o/ethoscope_gcodes_v1.6.zip?dl=0', 'date': '2020-02-15'}              
+gcodes_zip = {'filename' : 'ethoscope_gcodes_v1.7.zip', 'url' : 'https://www.dropbox.com/s/9lskay367tpr81r/ethoscope_gcodes_v.1.7.zip?dl=0', 'date': '2020-05-07'}              
 
-
-news = [
-        {"content" : "Latest news here", "date" : "2020-02-15"}
-       ]
+news = []
+with open("news.txt", "r") as nf:
+    for line in nf.readlines():
+        if ";" in line:
+            news.append ( {"content" : line.split(";")[0], "date": line.split(";")[1]} )
+ 
 
 
 @app.hook('after_request')
@@ -64,7 +67,7 @@ def resources():
     with os.popen("host %s" % client) as p:
         resolve = p.read().split("pointer ")[1].strip()
 
-    logging.info("Receiving request from %s - %s" % (client, resolve))
+    logging.info("%s - Receiving request from %s - %s" % (datetime.datetime.now(), client, resolve))
 
     bottle.response.content_type = 'application/json'
     return json.dumps( {"sd_image" : sd_image, "gcodes" : gcodes, "onshape" : onshape, 'gcodes_zip' : gcodes_zip, 'date' : FILESDATE, 'version' : FILESVERSION} )
@@ -76,7 +79,7 @@ def announcements():
 
 
 if __name__ == '__main__':
-
-    logging.basicConfig(filename='ethoscope_pa_server.log',level=logging.INFO)    
-    bottle.run(app, host='0.0.0.0', port=PORT, debug=True)
     
+    #SSL REQUIRES GUNICORN
+    logging.basicConfig(filename='ethoscope_pa_server.log',level=logging.INFO)
+    bottle.run(app, host='0.0.0.0', port=PORT, debug=True, server='gunicorn', reloader=1, keyfile='key.pem', certfile='cert.pem')
