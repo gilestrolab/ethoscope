@@ -220,16 +220,20 @@ def getPiCameraVersion():
     
     """
     
+    known_versions = {'RP_ov5647': 'PINoIR 1', 'RP_imx219': 'PINoIR 2'}
+    
     picamera_info_file = '/etc/picamera-version'
     
     if hasPiCamera():
 
         try:
             with open(picamera_info_file, 'r') as infile:
-                camera_info = infile.read()
-        
+                camera_info = eval(infile.read())
         except:
-            camera_info = "Run tracking once to detect the camera module"
+            camera_info = "This is a new ethoscope. Run tracking once to detect the camera module"
+
+        camera_info['version'] = known_versions[ camera_info['IFD0.Model'] ]
+
             
         return camera_info
     else:
