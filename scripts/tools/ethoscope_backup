@@ -1,4 +1,7 @@
 #!/bin/sh
+# Place this file in the /etc/cron.hourly folder of your node
+# adjust directory structure as needed
+
 echo "updating the index file remotely"
 /bin/bash /opt/ethoscope-node/scripts/tools/make_index_on_nas.sh
 
