@@ -229,11 +229,11 @@ def getPiCameraVersion():
         try:
             with open(picamera_info_file, 'r') as infile:
                 camera_info = eval(infile.read())
+            
+            camera_info['version'] = known_versions[ camera_info['IFD0.Model'] ]
+            
         except:
             camera_info = "This is a new ethoscope. Run tracking once to detect the camera module"
-
-        camera_info['version'] = known_versions[ camera_info['IFD0.Model'] ]
-
             
         return camera_info
     else:
