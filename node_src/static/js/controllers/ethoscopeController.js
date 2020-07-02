@@ -373,6 +373,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
             return date.toUTCString();
         };
 
+        var $attempt = 0;
         var refresh = function(){
         if (document.visibilityState=="visible"){
             $http.get('/device/'+device_id+'/data')
@@ -389,12 +390,14 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                         $scope.node_datetime = node_time.toUTCString();
                         $scope.delta_t_min = Math.abs((node_t - data.current_timestamp) / 60);
                         
-                        if ($scope.delta_t_min > 3) { 
+                        // Tries twice to adjust time remotely - if it does not manage we assume an old ethoscope version and we give up
+                        if (($scope.delta_t_min > 3) && ($attempt < 3)) { 
                             $scope.ethoscope.update_machine({'machine_options': {
                                                                 arguments: {'datetime' : new Date().getTime() / 1000 },
                                                                 name : 'datetime'
-                                                                }}) ;
-                            console.log("Trying to force time update on the ethoscope");
+                                                                }});
+                            $attempt = $attempt + 1 ;
+                            console.log("Trying to force time update on the ethoscope. Attempt: " + $attempt);
                             };
                      });
                 }
