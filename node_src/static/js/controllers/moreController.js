@@ -65,14 +65,13 @@ function maxLengthCheck(object) {
                     viewLog();
                     break;
                 case "nodeManage":
-                    admin();
+                    getNodeConfiguration();
                     break;
                 case "all":
                     break;
             };
         };
         
-        console.log($routeParams.option);
         if ($routeParams.option != 'undefined'){
         $scope.$on('$viewContentLoaded',$scope.exec_option);
         }
@@ -218,7 +217,6 @@ function maxLengthCheck(object) {
 
         $scope.nodeManagement.loadData = function (type) {
             $scope.selected[type] = $scope[type][$scope.selected[type].name];
-            console.log($scope.selected[type]);
         };
 
 
@@ -250,8 +248,8 @@ function maxLengthCheck(object) {
                      });
         };
         
-///  Admin
-        var admin = function(){
+///  Admin configurations
+        var getNodeConfiguration = function(){
             ///var log_file_path = $scope.device.log_file;
             $http.get('/node/daemons')
                  .success(function(data, status, headers, config){
@@ -266,8 +264,20 @@ function maxLengthCheck(object) {
 
             $http.get('/node/users')
                  .success(function(data, status, headers, config){
+                     
+                    $scope.groups = [];
                     $scope.users = data;
+
+                    
+                    for (var user in $scope.users) {
+                        
+                       if (($scope.users[user]['group'] !== "") && (!$scope.groups.includes($scope.users[user]['group']))) {
+                            $scope.groups.push ( $scope.users[user]['group'] ); 
+                            }
+                      }
+                    
             });
+            
 
             $http.get('/node/incubators')
                  .success(function(data, status, headers, config){

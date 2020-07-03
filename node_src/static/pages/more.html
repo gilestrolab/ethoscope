@@ -335,7 +335,7 @@
             <label class="input"><span ng-hide="selected['users'].PIN != null">PIN</span><input type="number" name="PIN" ng-model="selected['users'].PIN" maxlength="4" required oninput="maxLengthCheck(this)" required ng-required="true"></label>
             <label class="input"><span ng-hide="selected['users'].email != null">Email address</span><input type="email" name="email" ng-model="selected['users'].email" required ng-required="true" required ng-required="true" style="width: 240px;"></label>
             <label class="input"><span ng-hide="selected['users'].telephone != null">Telephone number</span><input type="tel" name="telephone" ng-model="selected['users'].telephone" ng-pattern="phoneNumbr" style="width: 240px;"></label>
-            <label class="input"><span ng-hide="selected['users'].group != null">Laboratory or team</span><input type="text" name="group" ng-model="selected['users'].group" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="selected['users'].group != null">Laboratory or team</span><input type="text" class="form-control autocomplete"  name="group" ng-model="selected['users'].group" style="width: 240px;" uib-typeahead="group for group in groups | filter:$viewValue"></label>
             <label><input type="checkbox" name='active' ng-model="selected['users'].active" title="Can this user use ethoscopes?"><span> is Active?</span></label>
             <label><input type="checkbox" name='isAdmin' ng-model="selected['users'].isAdmin" title="Does this user have admin priviledges?"><span> is Admin?</span></label>
         </form>
