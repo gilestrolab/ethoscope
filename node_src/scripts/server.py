@@ -150,6 +150,28 @@ def get_devices_list():
 def sensors():
     return sensor_scanner.get_all_devices_info()
 
+@app.post('/device/add')
+def manual_add():
+    """
+    Try to manually add one or more ethoscopes using the provided IPs
+    Accept a single IP or a list of comma separated IPs
+    """
+    input_string = bottle.request.body.read().decode("utf-8") 
+    added = [];
+    problems = [];
+    
+    for ip_address in input_string.split(","):
+        ip_address = ip_address.replace(" ", "")
+        
+        try:
+            device_scanner.add ( ip_address, "" )
+            added.append(ip_address)
+        except:
+            problems.append(ip_address)
+        
+        
+    return {"added": added, "problems": problems }
+
 
 #Get the information of one device
 @app.get('/device/<id>/data')

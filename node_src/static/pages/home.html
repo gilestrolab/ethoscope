@@ -96,26 +96,50 @@
 </table>
 </div>
 
-  <form>
-    <div class="form-group">
+<form>
+<!-- Interface to quickly filter machines in the table -->
+    <div class="form-group" id="userInputs">
       <div class="input-group">
         <div class="input-group-addon"><i class="fa fa-search"></i></div>
-
-        <input type="text" class="form-control" placeholder="Filter devices " ng-model="filterEthoscopes">
-
+        <input type="text" class="form-control" placeholder="Filter devices " ng-model="filterEthoscopes" title="Filter ethoscopes in the table below">
       </div>      
     </div>
-  </form>
 
-<!-- **** ETHOSCOPE LIST TABLE **** -->
+<!-- Interface to manually add machines from IPs -->
+    <div class="input-group">
+       <div class="input-group-addon"><i class="fa fa-plus" ng-click="manuallyAdd()"></i></div>
+       <input type="text" class="form-control" placeholder="IP address of the device or comma separated IP addresses" ng-model="ip_to_add" ng-enter="manuallyAdd()" title="Manually add a device">
+    </div>
+</form>
 
-<div class="alert alert-neutral" style="background-color:#f2f2f2;">
+<div class="modal fade" id="IPAlertModal" role="dialog" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="alertLabel">Problems adding some IPs</h4>
+      </div>
+      <div class="modal-body">
+          {{alertMessage}}
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">OK</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Toggle to quickly filter between all machines in the db or only active ones -->
+<div class="alert alert-neutral" style="background-color:#f2f2f2; margin-top: 15px;">
 <label class="toggle-check">Show all machines, even if no longer connected
   <input name="showAll" type="checkbox" class="toggle-check-input" ng-model="showAll" ng-checked="false" >
   <span class="toggle-check-text"></span>
 </label>
 </div>
 
+<!-- **** ETHOSCOPE LIST TABLE **** -->
 <table class="table table-striped" ng-cloak>
             <thead>
             <th>

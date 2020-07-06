@@ -583,7 +583,7 @@ class DeviceScanner(object):
         # Not found, so produce an error
         #raise KeyError("No such %s device: %s" % (self._device_type, id) )
         
-    def add(self, ip, name=None, device_id=None):
+    def add (self, ip, name=None, device_id=None):
         """
         Manually add a device to the list
         """
@@ -694,7 +694,7 @@ class EthoscopeScanner(DeviceScanner):
                 
         return out
 
-    def add(self, ip, name):
+    def add (self, ip, name):
         """
         Manually add a device to the list
         """

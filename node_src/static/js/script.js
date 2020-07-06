@@ -25,6 +25,20 @@
       };
     });
 
+    app.directive('ngEnter', function () {
+        return function (scope, element, attrs) {
+            element.bind("keydown keypress", function (event) {
+                if (event.which === 13) {
+                    scope.$apply(function () {
+                        scope.$eval(attrs.ngEnter);
+                    });
+                    event.preventDefault();
+                }
+            });
+        };
+    });
+
+
     // configure our routes
 
     app.config(function($routeProvider, $locationProvider) {
@@ -83,6 +97,17 @@
 //            t = new Date(data.time);
 //            $scope.time = t.toString();
 //        });
+
+        var spin = function(action){
+            if (action=="start"){
+                     $scope.spinner= new Spinner(opts).spin();
+                    var loadingContainer = document.getElementById('userInputs');
+                    loadingContainer.appendChild($scope.spinner.el);
+                }else if (action=="stop"){
+                     $scope.spinner.stop();
+                     $scope.spinner = false;
+                }
+            }
 
         $http.get('/devices').success(function(data){
             $scope.devices = data;
@@ -198,6 +223,21 @@
 
        $scope.$on('$viewContentLoaded',$scope.get_devices);
 
+       $scope.manuallyAdd = function() {
+           
+           spin('start');
+           $http.post('/device/add', data=$scope.ip_to_add)
+                .success(function(res){
+                    spin('stop');
+                    if (res.problems && res.problems.length)  { 
+                        $scope.alertMessage =  "The following entries could not be added: " + res.problems.join();
+                        $('#IPAlertModal').modal('show');
+                        }
+                })
+                .error(function(){
+                    spin('stop');
+                })
+       };
 
        var refresh_platform = function(){
             if (document.visibilityState=="visible"){
@@ -226,3 +266,4 @@
     });
 }
 )()
+ 
