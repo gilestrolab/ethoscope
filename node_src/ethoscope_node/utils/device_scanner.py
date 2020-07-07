@@ -701,7 +701,7 @@ class EthoscopeScanner(DeviceScanner):
         
         #initialised the device and start it
         device = self._Device(ip, self.device_refresh_period, results_dir = self.results_dir )
-        if name: device.zeroconf_name = name
+        device.zeroconf_name = name
         device.start()
 
         self.devices.append(device)
@@ -709,6 +709,8 @@ class EthoscopeScanner(DeviceScanner):
 
         if 'kernel' in device.machine_info().keys():
             machine_info = "%s on pi%s" % (device.machine_info()['kernel'], device.machine_info()['pi_version'])
+        else:
+            machine_info = ""
 
         #We add the device to the database or update its record but only if it is not a 000 device
         if device.info()['name'] != "ETHOSCOPE_OOO":
