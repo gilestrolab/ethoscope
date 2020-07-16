@@ -6,6 +6,17 @@ function maxLengthCheck(object) {
 (function(){
     var moreController = function($scope, $http, $timeout, $routeParams, $window){
 
+        var spin = function(action){
+            if (action=="start"){
+                     $scope.spinner= new Spinner(opts).spin();
+                    var loadingContainer = document.getElementById('loading');
+                    loadingContainer.appendChild($scope.spinner.el);
+                }else if (action=="stop"){
+                     $scope.spinner.stop();
+                     $scope.spinner = false;
+                }
+            }
+
         $scope.folders = {};
         $scope.users = {};
         $scope.incubators = {};
@@ -241,10 +252,15 @@ function maxLengthCheck(object) {
 ///  View Server Logs
         var viewLog = function(){
             ///var log_file_path = $scope.device.log_file;
+                spin('start');
                 $http.get('/node/log')
                      .success(function(data, status, headers, config){
                         $scope.log = data;
                         $scope.showLog = true;
+                        spin('stop');
+                     })
+                      .error(function(){
+                        spin('stop');
                      });
         };
         
