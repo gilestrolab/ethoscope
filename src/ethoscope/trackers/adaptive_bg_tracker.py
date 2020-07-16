@@ -288,7 +288,10 @@ class AdaptiveBGModel(BaseTracker):
         #
         mean = cv2.mean(self._buff_grey, mask)
 
-        scale = 128. / mean[0]
+        try:
+            scale = 128. / mean[0]
+        except ZeroDivisionError:
+            raise NoPositionError
 
         cv2.multiply(self._buff_grey, scale, dst = self._buff_grey)
 
