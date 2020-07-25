@@ -6,7 +6,7 @@ import optparse
 import  traceback
 import subprocess
 import json
-from ethoscope_node.utils.backups_helpers import GenericBackupWrapper
+from ethoscope_node.utils.backups_helpers import GenericBackupWrapper, receive_devices
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
 
 class WGetERROR(Exception):
@@ -85,10 +85,18 @@ def get_all_videos(device_info, out_dir, port=9000, static_dir="static"):
             remove_video_from_host(url, id, v)
 
 def backup_job(args):
-    device_info, video_result_dir = args
-    logging.info("Initiating backup for device  %s" % device_info["id"])
-    get_all_videos(device_info, video_result_dir)
-    logging.info("Backup done for for device  %s" % device_info["id"])
+    try:
+        device_info, video_result_dir = args
+        logging.info("Initiating backup for device  %s" % device_info["id"])
+        
+        get_all_videos(device_info, video_result_dir)
+        logging.info("Backup done for for device  %s" % device_info["id"])
+        return 1
+        
+    except Exception as e:
+        logging.error("Unexpected error in backup. args are: %s" % str(args))
+        logging.error(traceback.format_exc())
+        return
 
 
 if __name__ == '__main__':
@@ -101,21 +109,36 @@ if __name__ == '__main__':
         parser = optparse.OptionParser()
         parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
         parser.add_option("-i", "--server", dest="server", default="localhost", help="The server on which the node is running will be interrogated first for the device list")        
-        parser.add_option("-e", "--results-dir", dest="video_dir", help="Where video files are stored")
+        parser.add_option("-r", "--results-dir", dest="video_dir", help="Where video files are stored")
         parser.add_option("-s", "--safe", dest="safe", default=False,help="Set Safe mode ON", action="store_true")
+        parser.add_option("-e", "--ethoscope", dest="ethoscope", help="Force backup of given ethoscope number (eg: 007)")
+
 
         (options, args) = parser.parse_args()
         option_dict = vars(options)
         VIDEO_DIR = option_dict["video_dir"] or CFG.content['folders']['video']['path']
         SAFE_MODE = option_dict["safe"]
         server = option_dict["server"]
+        ethoscope = option_dict["ethoscope"]
 
 
-        gbw = GenericBackupWrapper( backup_job,
-                                    VIDEO_DIR,
-                                    SAFE_MODE,
-                                    server )
-        gbw.run()
+        if ethoscope:
+            ethoscope = int(ethoscope)
+            print ("Forcing backup for ethoscope %03d" % ethoscope)
+            all_devices = receive_devices(server)
+            
+            bj = None
+            for devID in all_devices:
+                if all_devices[devID]['name'] == ("ETHOSCOPE_%03d" % ethoscope) and all_devices[devID]['status'] != "offline":
+                    bj = backup_job((all_devices[devID], VIDEO_DIR))
+            if bj == None: exit("ETHOSCOPE_%03d is not online or not detected" % ethoscope)
+
+        else:
+            gbw = GenericBackupWrapper( backup_job,
+                                        VIDEO_DIR,
+                                        SAFE_MODE,
+                                        server )
+            gbw.run()
         
     except Exception as e:
         logging.error(traceback.format_exc())

@@ -8,6 +8,8 @@ import traceback
 import os
 
 server = "localhost"
+
+#file currently undergoing backup
 info_file = "/var/run/ethoscope_backup"
 
 
@@ -16,6 +18,7 @@ def backup_job(args):
         device_info, results_dir = args
         logging.info("Initiating backup for device  %s" % device_info["id"])
         
+        #this is to be reviewed. it definetely does not look good and it's not used at the moment anyway
         with open(info_file, "w") as f:
             f.write(device_info["id"])
 
