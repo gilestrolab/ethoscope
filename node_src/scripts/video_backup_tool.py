@@ -106,7 +106,6 @@ if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
     try:
         parser = optparse.OptionParser()
-        parser = optparse.OptionParser()
         parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
         parser.add_option("-i", "--server", dest="server", default="localhost", help="The server on which the node is running will be interrogated first for the device list")        
         parser.add_option("-r", "--results-dir", dest="video_dir", help="Where video files are stored")
@@ -118,8 +117,15 @@ if __name__ == '__main__':
         option_dict = vars(options)
         VIDEO_DIR = option_dict["video_dir"] or CFG.content['folders']['video']['path']
         SAFE_MODE = option_dict["safe"]
-        server = option_dict["server"]
+        DEBUG = option_dict["debug"]
+
         ethoscope = option_dict["ethoscope"]
+        server = option_dict["server"]
+
+        if DEBUG:
+            logging.basicConfig()
+            logging.getLogger().setLevel(logging.DEBUG)
+            logging.info("Logging using DEBUG SETTINGS")
 
 
         if ethoscope:

@@ -42,7 +42,6 @@ if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
     try:
         parser = optparse.OptionParser()
-        parser = optparse.OptionParser()
         parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
         parser.add_option("-r", "--results-dir", dest="results_dir", help="Where result files are stored")
         parser.add_option("-i", "--server", dest="server", default="localhost", help="The server on which the node is running will be interrogated first for the device list")
@@ -51,10 +50,19 @@ if __name__ == '__main__':
         
         (options, args) = parser.parse_args()
         option_dict = vars(options)
+
         RESULTS_DIR = option_dict["results_dir"] or CFG.content['folders']['results']['path']
         SAFE_MODE = option_dict["safe"]
+        DEBUG = option_dict["debug"]
+
         ethoscope = option_dict["ethoscope"]
         server = option_dict["server"]
+
+        if DEBUG:
+            logging.basicConfig()
+            logging.getLogger().setLevel(logging.DEBUG)
+            logging.info("Logging using DEBUG SETTINGS")
+
 
         if ethoscope:
             ethoscope = int(ethoscope)
