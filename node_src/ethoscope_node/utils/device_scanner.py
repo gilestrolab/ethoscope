@@ -39,16 +39,49 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
     return deco_retry
 
 
-class Device():
-    pass
+class Device(Thread):
+
+    @retry(ScanException, tries=3, delay=1, backoff=1)
+    def _get_json(self, url, timeout=5, post_data=None):
+
+        try:
+            #req = urllib.request.Request(url, data=post_data, headers={'Content-Type': 'application/json'})
+            req = urllib.request.Request(url, data=post_data)
+  
+            f = urllib.request.urlopen(req, timeout=timeout)
+            message = f.read()
+            
+            if not message:
+                # logging.error("URL error whist scanning url: %s. No message back." % self._id_url)
+                raise ScanException("No message back")
+                
+            try:
+                resp = json.loads(message)
+                return resp
+                
+            except ValueError:
+                # logging.error("Could not parse response from %s as JSON object" % self._id_url)
+                raise ScanException("Could not parse Json object")
+    
+        except urllib.error.HTTPError as e:
+           raise ScanException("Error" + str(e.code))
+            #return e
+        
+        except urllib.error.URLError as e:
+           raise ScanException("Error" + str(e.reason))
+            #return e
+        
+        except Exception as e:
+           raise ScanException("Unexpected error" + str(e))
 
 
-class Sensor(Thread):
+class Sensor(Device):
     """
     """
-    def __init__(self, ip, refresh_period = 5, port = 80, results_dir = ""):
+    def __init__(self, ip, port = 80, refresh_period = 5, results_dir = ""):
         self._ip = ip
         self._port = port
+        
         self._data_url = "http://%s:%i/" % (ip, port)
         self._id_url = "http://%s:%i/id" % (ip, port)
         self._post_url = "http://%s:%i/set" % (ip, port)
@@ -98,43 +131,20 @@ class Sensor(Thread):
         self._info["ip"] = self._ip
         self._id = resp['id']
 
-    def set(self, data):
+    def set(self, post_data):
         """
         Set remote variables 
-        data is a dict
+        data is a dict e.g. {"location" : "Incubator_1A", "sensor_name" : "etho_sensor1A"} 
         set key to value
         Value can be char[20]
         """
-        args = urllib.parse.urlencode(data).encode("utf-8")
-        self._get_json(self._post_url, 3, args)
+        
+        if type(post_data) == type({}):
+            args = urllib.parse.urlencode(post_data).encode("utf-8")
+        else:
+            args = post_data
 
-    @retry(ScanException, tries=3, delay=1, backoff=1)
-    def _get_json(self, url,timeout=5, post_data=None):
-
-        try:
-            req = urllib.request.Request(url, data=post_data, headers={'Content-Type': 'application/json'})
-            f = urllib.request.urlopen(req, timeout=timeout)
-            message = f.read()
-            if not message:
-                # logging.error("URL error whist scanning url: %s. No message back." % self._id_url)
-                raise ScanException("No message back")
-            try:
-                resp = json.loads(message)
-                return resp
-            except ValueError:
-                # logging.error("Could not parse response from %s as JSON object" % self._id_url)
-                raise ScanException("Could not parse Json object")
-        
-        except urllib.error.HTTPError as e:
-            raise ScanException("Error" + str(e.code))
-            #return e
-        
-        except urllib.error.URLError as e:
-            raise ScanException("Error" + str(e.reason))
-            #return e
-        
-        except Exception as e:
-            raise ScanException("Unexpected error" + str(e))
+        return self._get_json( url = self._post_url, timeout = 10, post_data = args )
 
     def _reset_info(self):
         '''
@@ -168,7 +178,7 @@ class Sensor(Thread):
     def info(self):
         return self._info
 
-class Ethoscope(Thread):
+class Ethoscope(Device):
     _ethoscope_db_credentials = {"user": "ethoscope",
                                 "passwd": "ethoscope",
                                 "db":"ethoscope_db"}
@@ -194,7 +204,7 @@ class Ethoscope(Thread):
                                      "restart" : ["stopped"],
                                      "offline": []}
 
-    def __init__(self, ip, refresh_period = 2, port = 9000, results_dir = "/ethoscope_data/results"):
+    def __init__(self, ip, port = 9000, refresh_period = 2, results_dir = "/ethoscope_data/results"):
         '''
         Initialises the info gathering and controlling activity of a Device by the node
         The server will interrogate the status of the device with frequency of refresh_period
@@ -370,36 +380,6 @@ class Ethoscope(Thread):
             return file_like
         except Exception as e:
             logging.warning(traceback.format_exc())
-
-    @retry(ScanException, tries=3, delay=1, backoff=1)
-    def _get_json(self, url,timeout=5, post_data=None):
-
-        try:
-            req = urllib.request.Request(url, data=post_data, headers={'Content-Type': 'application/json'})            
-            f = urllib.request.urlopen(req, timeout=timeout)
-            message = f.read()
-            if not message:
-                # logging.error("URL error whist scanning url: %s. No message back." % self._id_url)
-                raise ScanException("No message back")
-            try:
-                resp = json.loads(message)
-                return resp
-            except ValueError:
-                # logging.error("Could not parse response from %s as JSON object" % self._id_url)
-                raise ScanException("Could not parse Json object")
-        
-        except urllib.error.HTTPError as e:
-            raise ScanException("Error" + str(e.code))
-            #return e
-        
-        except urllib.error.URLError as e:
-            raise ScanException("Error" + str(e.reason))
-            #return e
-        
-        except Exception as e:
-            raise ScanException("Unexpected error" + str(e))
-
-        
 
     def _update_id(self):
         """
@@ -583,12 +563,12 @@ class DeviceScanner(object):
         # Not found, so produce an error
         #raise KeyError("No such %s device: %s" % (self._device_type, id) )
         
-    def add (self, ip, name=None, device_id=None):
+    def add (self, ip, port, name=None, device_id=None, zcinfo=None):
         """
-        Manually add a device to the list
+        Adds a device to the list
         """
         
-        device = self._Device(ip, self.device_refresh_period, results_dir = self.results_dir )
+        device = self._Device(ip, port=port, refresh_period = self.device_refresh_period, results_dir = self.results_dir )
         if name: device.zeroconf_name = name
         
         device.start()
@@ -597,7 +577,7 @@ class DeviceScanner(object):
          
         self.devices.append(device)
 
-        logging.info("New %s manually added with name = %s, id = %s at IP = %s" % (self._device_type, name, device.id(), ip))
+        logging.info("New %s added with name = %s, id = %s at IP = %s:%s" % (self._device_type, name, device.id(), ip, port))
 
         
     def add_service(self, zeroconf, type, name):
@@ -615,10 +595,12 @@ class DeviceScanner(object):
             info = zeroconf.get_service_info(type, name)
 
             if info:
-                #ip = socket.inet_ntoa(info.address)
+                # this is no longer working with version of zeroconf 0.27+ - see https://github.com/home-assistant/core/pull/36277
+                #ip = socket.inet_ntoa(info.address) 
                 ip = socket.inet_ntoa(info.addresses[0])
-                self.add( ip, name )
-        
+                port = info.port
+                self.add( ip, port, name, zcinfo = info )
+    
         except Exception as error:
             logging.error("Exception trying to add zeroconf service '"+name+"' of type '"+type+"': "+str(error))
             
@@ -694,18 +676,19 @@ class EthoscopeScanner(DeviceScanner):
                 
         return out
 
-    def add (self, ip, name):
+    def add (self, ip, port, name):
         """
-        Manually add a device to the list
+        Add an ethoscope to the list
+        TODO: Can be called manually or by zeroconf - it would be good to recognise which case we are in
         """
         
         #initialised the device and start it
-        device = self._Device(ip, self.device_refresh_period, results_dir = self.results_dir )
+        device = self._Device(ip, port=port, refresh_period = self.device_refresh_period, results_dir = self.results_dir )
         device.zeroconf_name = name
         device.start()
 
         self.devices.append(device)
-        logging.info("New %s manually added with name = %s, id = %s at IP = %s" % (self._device_type, name, device.id(), ip))
+        logging.info("New %s added with name = %s, id = %s at IP = %s:%s" % (self._device_type, name, device.id(), ip, port))
 
         if 'kernel' in device.machine_info().keys():
             machine_info = "%s on pi%s" % (device.machine_info()['kernel'], device.machine_info()['pi_version'])

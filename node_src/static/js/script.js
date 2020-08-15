@@ -119,7 +119,7 @@
         });
         
 
-        $http.get("http://lab.gilest.ro:8001/news").success(function(data){
+        $http.get("https://lab.gilest.ro:8001/news").success(function(data){
             $scope.notifications = data.news;
         });
 
@@ -222,6 +222,19 @@
         };
 
        $scope.$on('$viewContentLoaded',$scope.get_devices);
+
+       $('#editSensorModal').on('show.bs.modal', function(e) {
+           $scope.sensoredit = $(e.relatedTarget).data('sensor');
+           refresh_platform();
+       });
+
+       $scope.editSensor = function () {
+           console.log($scope.sensoredit);
+           $http.post('/sensor/set', data=$scope.sensoredit)
+                .success(function(res){
+                    
+                })
+       };
 
        $scope.manuallyAdd = function() {
            

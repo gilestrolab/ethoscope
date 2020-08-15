@@ -149,6 +149,18 @@ def get_devices_list():
 @error_decorator
 def sensors():
     return sensor_scanner.get_all_devices_info()
+    
+@app.post('/sensor/set')
+def edit_sensor():
+    input_string = bottle.request.body.read().decode("utf-8")
+    d = eval(input_string)
+    try:
+        sensor = sensor_scanner.get_device(d["id"])
+        return sensor.set({"location" : d["location"] , "sensor_name" : d["name"] })
+    except:
+        pass
+        # a sensor with this ID was not found
+
 
 @app.post('/device/add')
 def manual_add():
@@ -600,6 +612,7 @@ if __name__ == '__main__':
 
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
     device_scanner = None
+    
     try:
         device_scanner = EthoscopeScanner(results_dir=RESULTS_DIR)
         device_scanner.start()

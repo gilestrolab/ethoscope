@@ -78,7 +78,7 @@
             <tr ng-repeat="sensor in sensors |  orderObjectBy:sortType:sortReverse:orderSensors">
                 <td>
                     <div ng-if="sensor.status != 'offline'">
-                        <a ng-href="/#sensor/{{sensor.id}}" target="_blank">
+                        <a data-target="#editSensorModal" data-toggle="modal" data-sensor={{sensor}} href="" >
                         <span class="fa fa-circle-o"></span><span> {{sensor.name}}</span>
                         </a>
                     </div>
@@ -94,6 +94,30 @@
             </tr>
         </tbody>
 </table>
+</div>
+
+<!-- Modal EDIT Sensor -->
+<div class="modal fade" id="editSensorModal" tabindex="-1" role="dialog" aria-labelledby="editSensorLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Sensor settings</h4>
+      </div>
+      <div class="modal-body">
+        <form name="editSensorForm">
+            <div class="alert alert-warning" ng-if="!editSensorForm.$valid">The fields labeled by a red bar are required.</div>
+            <label class="input" id="sensor_details">{{sensoredit.id}} at {{sensoredit.ip}}</label>
+            <label class="input"><span ng-hide="sensoredit.name != null">Name</span><input type="text" ng-model="sensoredit.name" name="sensor-name" required ng-required="true" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="sensoredit.location != null">Location</span><input type="text" ng-model="sensoredit.location" name="sensor-location" required ng-required="true" style="width: 240px;"></label>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button class="btn btn-danger" ng-click="editSensor()"  data-dismiss="modal" ng-disabled="editSensorForm.$invalid">Save</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <form>
