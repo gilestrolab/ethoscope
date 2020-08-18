@@ -45,8 +45,11 @@ class Device(Thread):
     def _get_json(self, url, timeout=5, post_data=None):
 
         try:
-            #req = urllib.request.Request(url, data=post_data, headers={'Content-Type': 'application/json'})
-            req = urllib.request.Request(url, data=post_data)
+            #the json header is needed for talking to the ethoscopes
+            req = urllib.request.Request(url, data=post_data, headers={'Content-Type': 'application/json'})
+            
+            #but it creates troubles when talking to the sensors
+            #req = urllib.request.Request(url, data=post_data)
   
             f = urllib.request.urlopen(req, timeout=timeout)
             message = f.read()
