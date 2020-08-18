@@ -676,7 +676,7 @@ class EthoscopeScanner(DeviceScanner):
                 
         return out
 
-    def add (self, ip, port, name):
+    def add (self, ip, port, name=None, device_id=None, zcinfo=None):
         """
         Add an ethoscope to the list
         TODO: Can be called manually or by zeroconf - it would be good to recognise which case we are in
