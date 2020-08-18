@@ -113,15 +113,16 @@
             $scope.devices = data;
         });
 
-        $http.get('/sensors').success(function(data){
-            $scope.sensors = data;
-            $scope.has_sensors = Object.keys($scope.sensors).length;
-        });
-        
-
         $http.get("https://lab.gilest.ro:8001/news").success(function(data){
             $scope.notifications = data.news;
         });
+
+       var get_sensors = function() {
+            $http.get('/sensors').success(function(data){
+                $scope.sensors = data;
+                $scope.has_sensors = Object.keys($scope.sensors).length;
+            })
+        };
 
        var update_local_times = function(){
             $http.get('/node/time').success(function(data){
@@ -132,7 +133,7 @@
             $scope.localtime = t.toString();
         };
 
-       $scope.get_devices = function(){
+       var get_devices = function(){
             $http.get('/devices').success(function(data){
 
                 data_list = [];
@@ -158,6 +159,7 @@
                 $scope.status_n_summary = status_summary
             })
         };
+        
        $scope.secToDate = function(secs){
             d = new Date (isNaN(secs) ? secs : secs * 1000 );
 
@@ -225,14 +227,13 @@
 
        $('#editSensorModal').on('show.bs.modal', function(e) {
            $scope.sensoredit = $(e.relatedTarget).data('sensor');
-           refresh_platform();
        });
 
        $scope.editSensor = function () {
            console.log($scope.sensoredit);
            $http.post('/sensor/set', data=$scope.sensoredit)
                 .success(function(res){
-                    
+                    refresh_platform();
                 })
        };
 
@@ -254,8 +255,9 @@
 
        var refresh_platform = function(){
             if (document.visibilityState=="visible"){
-                    $scope.get_devices();
+                    get_devices();
                     update_local_times();
+                    get_sensors();
                     //console.log("refresh platform", new Date());
                     
                     // For some reason that I don't understand, angularjs templates cannot access scope from the header so 

@@ -45,12 +45,7 @@ class Device(Thread):
     def _get_json(self, url, timeout=5, post_data=None):
 
         try:
-            #the json header is needed for talking to the ethoscopes
             req = urllib.request.Request(url, data=post_data, headers={'Content-Type': 'application/json'})
-            
-            #but it creates troubles when talking to the sensors
-            #req = urllib.request.Request(url, data=post_data)
-  
             f = urllib.request.urlopen(req, timeout=timeout)
             message = f.read()
             
@@ -134,7 +129,7 @@ class Sensor(Device):
         self._info["ip"] = self._ip
         self._id = resp['id']
 
-    def set(self, post_data):
+    def set(self, post_data, usejson=False):
         """
         Set remote variables 
         data is a dict e.g. {"location" : "Incubator_1A", "sensor_name" : "etho_sensor1A"} 
@@ -142,12 +137,26 @@ class Sensor(Device):
         Value can be char[20]
         """
         
-        if type(post_data) == type({}):
-            args = urllib.parse.urlencode(post_data).encode("utf-8")
-        else:
-            args = post_data
+        if usejson:
+            
+            #converts the dictionary to proper json
+            args = json.dumps(post_data)
+            out = self._get_json( url = self._post_url, timeout = 10, post_data = args)
 
-        return self._get_json( url = self._post_url, timeout = 10, post_data = args )
+        else:
+
+            args = urllib.parse.urlencode(post_data).encode("utf-8")
+            # converts the dictionary to something like the following
+            # b'location=Incubator_1A&sensor_name=etho_sensor1A'
+            
+            # use a normal POST routine
+            req = urllib.request.Request( url = self._post_url, data=args )
+            out = urllib.request.urlopen(req, timeout=3)
+        
+        self._update_info()
+        
+        return out
+        
 
     def _reset_info(self):
         '''
@@ -248,7 +257,7 @@ class Ethoscope(Device):
                     self._reset_info()
                 last_refresh = time.time()
 
-    def send_instruction(self,instruction,post_data):
+    def send_instruction(self, instruction, post_data):
         post_url = "http://%s:%i/%s/%s/%s" % (self._ip, self._port, self._remote_pages['controls'], self._id, instruction)
         self._check_instructions_status(instruction)
 
