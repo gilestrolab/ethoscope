@@ -8,6 +8,9 @@ import cv2
 import tempfile
 import os
 
+from pathlib import Path
+import numpy as np
+
 
 #this code is reused from device_scanner
 import urllib.request, urllib.error, urllib.parse
@@ -755,3 +758,106 @@ class SQLiteResultWriter(ResultWriter):
                 self._insert_dict[roi_id] = command
             else:
                 self._insert_dict[roi_id] += ("," + str(tp))
+                
+
+
+class npyAppendableFile():
+    def __init__(self, fname, newfile=False):
+        '''
+        Creates a new instance of the appendable filetype
+        If newfile is True, recreate the file even if already exists
+        '''
+        self.fname=Path(fname)
+        if newfile:
+            with open(self.fname, "wb") as fh:
+                fh.close()
+        
+    def write(self, data):
+        '''
+        append a new array to the file
+        note that this will not change the header
+        '''
+        with open(self.fname, "ab") as fh:
+            np.save(fh, data)
+            
+    def load(self, axis=2):
+        '''
+        Load the whole file, returning all the arrays that were consecutively
+        saved on top of each other
+        axis defines how the arrays should be concatenated
+        '''
+        
+        with open(self.fname, "rb") as fh:
+            fsz = os.fstat(fh.fileno()).st_size
+            out = np.load(fh)
+            while fh.tell() < fsz:
+                out = np.concatenate((out, np.load(fh)), axis=axis)
+            
+        return out
+    
+    
+    def update_content(self):
+        '''
+        '''
+        content = self.load()
+        with open(self.fname, "wb") as fh:
+            np.save(fh, content)
+
+    @property
+    def _dtype(self):
+        return self.load().dtype
+
+    @property
+    def _actual_shape(self):
+        return self.load().shape
+    
+    @property
+    def header(self):
+        '''
+        Reads the header of the npy file
+        '''
+        with open(self.fname, "rb") as fh:
+            version = np.lib.format.read_magic(fh)
+            shape, fortran, dtype = np.lib.format._read_array_header(fh, version)
+        
+        return version, {'descr': dtype,
+                         'fortran_order' : fortran,
+                         'shape' : shape}
+
+class rawdatawriter():
+    '''
+    A writer used for offline data analysis
+    Writes the raw data to a np array
+    '''
+    
+    def __init__(self, basename, n_rois, entities=40):
+
+        self._basename, self._extension = os.path.splitext (basename)
+        
+        self.entities = entities
+
+        self.files = [ npyAppendableFile (os.path.join("%s_%03d" % (self._basename, n_rois) + self._extension), newfile = True ) for r in range(n_rois) ]
+        
+        self.data = dict()
+        
+    def flush(self, t, frame):
+        '''
+        Called at the end of each frame
+        Used to commit the changes to the file and close it
+        '''
+        for row, fh in zip(self.data, self.files):
+            fh.write(self.data[row])
+        
+    def write(self, t, roi, data_rows):
+        '''
+        Get data data for each roi at time t
+        
+        data_rows is something like the below:
+        DataPoint([('x', 236), ('y', 94), ('w', 23), ('h', 9), ('phi', 39), ('is_inferred', 0), ('has_interacted', 0)])]
+
+        '''
+
+        #convert data_rows to an array with shape (nf, 5) where nf is the number of flies in the ROI
+        arr = np.asarray([[fly['x'], fly['y'], fly['w'], fly['h'], fly['phi']] for fly in data_rows])
+        arr.resize((self.entities, 5, 1), refcheck=False)
+        self.data[roi] = arr
