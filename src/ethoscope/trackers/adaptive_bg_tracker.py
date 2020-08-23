@@ -492,6 +492,10 @@ class AdaptiveBGModel(BaseTracker):
 
         self.fg_model.update(img, hull,t)
 
+        # NOTE: x and y already match the centroid of the contour.
+        # rounding these values at this stage may not be necessarily a good idea because we lose information
+        # TODO: it would be better to feed the object with the raw value and return the rounding from the object itself.
+        
         x_var = XPosVariable(int(round(x)))
         y_var = YPosVariable(int(round(y)))
         distance = XYDistance(int(xy_dist))
