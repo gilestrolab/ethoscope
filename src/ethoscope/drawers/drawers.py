@@ -108,7 +108,7 @@ class NullDrawer(BaseDrawer):
 
 
 class DefaultDrawer(BaseDrawer):
-    def __init__(self, video_out= None, draw_frames=False):
+    def __init__(self, video_out= None, draw_frames=False, **kwargs):
         """
         The default drawer. It draws ellipses on the detected objects and polygons around ROIs. When an "interaction"
         see :class:`~ethoscope.stimulators.stimulators.BaseInteractor` happens within a ROI,
@@ -119,7 +119,7 @@ class DefaultDrawer(BaseDrawer):
         :param draw_frames: Whether frames should be displayed on the screen (a new window will be created).
         :type draw_frames: bool
         """
-        super(DefaultDrawer,self).__init__(video_out=video_out, draw_frames=draw_frames)
+        super(DefaultDrawer,self).__init__(video_out=video_out, draw_frames=draw_frames, **kwargs)
 
     def _annotate_frame(self,img, positions, tracking_units):
         if img is None:
