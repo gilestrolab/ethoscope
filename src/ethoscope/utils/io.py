@@ -798,6 +798,9 @@ class npyAppendableFile():
     
     def update_content(self):
         '''
+        We created the file by appending new arrays to an existing npy
+        The header, however, has remained constant and describes the very first array
+        Here we reload the all content and we save it with the appropriate array, hence transforming a .anpy file to a regular .npy one
         '''
         content = self.load()
         with open(self.fname, "wb") as fh:
@@ -827,16 +830,19 @@ class npyAppendableFile():
 class rawdatawriter():
     '''
     A writer used for offline data analysis
-    Writes the raw data to a np array
+    Writes the raw data to a np array with extension .anpy
+    Note that by default this is not a regular npy file because the header of the file
+    describe a small array. The .anpy can be converted to .npy using the update_content property
     '''
     
     def __init__(self, basename, n_rois, entities=40):
 
-        self._basename, self._extension = os.path.splitext (basename)
+        self._basename, _ = os.path.splitext (basename)
+        
         
         self.entities = entities
 
-        self.files = [ npyAppendableFile (os.path.join("%s_%03d" % (self._basename, n_rois) + self._extension), newfile = True ) for r in range(n_rois) ]
+        self.files = [ npyAppendableFile (os.path.join("%s_%03d" % (self._basename, n_rois) + ".anpy"), newfile = True ) for r in range(n_rois) ]
         
         self.data = dict()
         
@@ -857,7 +863,8 @@ class rawdatawriter():
 
         '''
 
-        #convert data_rows to an array with shape (nf, 5) where nf is the number of flies in the ROI
+        #Convert data_rows to an array with shape (nf, 5) where nf is the number of flies in the ROI
         arr = np.asarray([[fly['x'], fly['y'], fly['w'], fly['h'], fly['phi']] for fly in data_rows])
+        #The size of data_rows depends on how many contours were found. The array needs to have a fixed shape so we round it to self.entities as the max number of flies allowed
         arr.resize((self.entities, 5, 1), refcheck=False)
         self.data[roi] = arr
