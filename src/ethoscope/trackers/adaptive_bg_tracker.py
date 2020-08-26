@@ -301,6 +301,11 @@ class AdaptiveBGModel(BaseTracker):
             return self._buff_grey
 
     def _pre_process_input(self, img, mask, t):
+        '''
+        Receives the whole img, a mask describing the ROI and time t
+        Returns a grey converted image in which the tracking routine should then look for objects
+        The image returned is processed to decrease noise
+        '''
 
         blur_rad = int(self._object_expected_size * np.max(img.shape) * 2.0)
         if blur_rad % 2 == 0:
@@ -356,6 +361,11 @@ class AdaptiveBGModel(BaseTracker):
 
 
     def _find_position(self, img, mask,t):
+        '''
+        Middleman between the tracker and the actual tracking routine
+        It cuts the portion defined by mask (i.e. the ROI), converts it to grey and passes it on to the actual tracking routine
+        to look for the flies to track. The result of the tracking routine is a list of points describing the objects found in that ROI
+        '''
 
         grey = self._pre_process_input_minimal(img, mask, t)
         # grey = self._pre_process_input(img, mask, t)
