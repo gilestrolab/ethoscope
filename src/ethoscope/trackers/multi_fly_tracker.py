@@ -18,10 +18,11 @@ import logging
 import matplotlib
 import matplotlib.pyplot as plt
 
+import os
 
 class ForegroundModel(object):
     
-    def __init__( self, sample_size=400, normal_limits=(50, 200), visualise=False, tolerance = 0.8 ):
+    def __init__(self, fg_data = {'sample_size' : 400, 'normal_limits' : (50, 200), 'tolerance' : 0.8}, visualise = False ):
         '''
         set the size of the statistical sample for the running average and the hard limits to populate the sample
         :param sample_size: the size of the sample used for the statiscal model
@@ -36,19 +37,18 @@ class ForegroundModel(object):
         :return:
         '''
         
-        self.sample_size = sample_size
-        self.normal_limits = normal_limits
-        self.tolerance = tolerance
-        
-        self.limited_pool = deque(maxlen = sample_size)
-        self.total_pool = []
-        
+        self.sample_size = fg_data['sample_size']
+        self.normal_limits = fg_data['normal_limits']
+        self.tolerance = fg_data['tolerance']
         self._visualise = visualise
+        
+        self.limited_pool = deque(maxlen = self.sample_size)
+        self.total_pool = []
 
         if self._visualise:
             plt.ion()
             self.fig, (self.ax1, self.ax2)  = plt.subplots(1,2)
-            self.fig.suptitle('Live analysis of contours - sample size %s - tolerance %s' % (sample_size, tolerance))
+            self.fig.suptitle('Live analysis of contours - sample size %s - tolerance %s' % (self.sample_size, self.tolerance))
 
     def _is_outlier(self, value, tolerance=0.7):
         '''
@@ -99,9 +99,11 @@ class MultiFlyTracker(BaseTracker):
     _description = {"overview": "An experimental tracker to monitor several animals per ROI.",
                     "arguments": []}
 
-
-
-    def __init__(self, roi, data=None, maxN=50):
+    def __init__(self, roi, data = { 'maxN' : 50, 
+                                     'visualise' : False ,
+                                     'fg_data' : { 'sample_size' : 400, 'normal_limits' : (50, 200), 'tolerance' : 0.8 }
+                                   }
+                                   ):
         """
         An adaptive background subtraction model to find position of one animal in one roi.
 
@@ -110,16 +112,30 @@ class MultiFlyTracker(BaseTracker):
         :param data:
         :return:
         """
+        
+        self.maxN = data['maxN'] 
+        self._visualise = data['visualise']
+        
         self._previous_shape=None
+        
+        # TO DO: This needs to be reviewed. It's inherited from the regular bg subtraction but needs to be either homogenised with the 
+        # foreground model or removed or be made more agnostic. 
         self._object_expected_size = 0.05 # proportion of the roi main axis
         self._max_area = (5 * self._object_expected_size) ** 2
 
         self._smooth_mode = deque()
         self._smooth_mode_tstamp = deque()
         self._smooth_mode_window_dt = 30 * 1000 #miliseconds
-        self._fg_model = ForegroundModel()
 
+        
+        try:
+            self._fg_model = ForegroundModel(fg_data = data['fg_data'], visualise = self._visualise)
+        except:
+            #we roll to the default values
+            self._fg_model = ForegroundModel()
+            
         self._bg_model = BackgroundModel()
+
         self._max_m_log_lik = 6.
         self._buff_grey = None
         self._buff_object = None
@@ -131,43 +147,54 @@ class MultiFlyTracker(BaseTracker):
         self._buff_fg_diff = None
         self._old_sum_fg = 0
         
-        self.maxN = maxN
         self.last_positions = np.zeros((self.maxN,2))
 
-        self._debug = False
         
-        if self._debug:
+        if self._visualise:
             self.multi_fly_tracker_window = "tracking_preview"
             cv2.namedWindow(self.multi_fly_tracker_window, cv2.WINDOW_AUTOSIZE)
 
         super(MultiFlyTracker, self).__init__(roi, data)
 
     def _pre_process_input_minimal(self, img, mask, t, darker_fg=True):
+        '''
+        Receives the whole img, a mask describing the ROI and time t
+        Returns a grey converted image in which the tracking routine should then look for objects
+        '''
+        
+        #blur radius is a function of the object's expected size
         blur_rad = int(self._object_expected_size * np.max(img.shape) / 2.0)
 
+        #and should always be an odd number
         if blur_rad % 2 == 0:
             blur_rad += 1
 
+        #creates a buffered grey image if does not exist yet
         if self._buff_grey is None:
             self._buff_grey = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+            
             if mask is None:
                 mask = np.ones_like(self._buff_grey) * 255
 
-        cv2.cvtColor(img,cv2.COLOR_BGR2GRAY, self._buff_grey)
+        #then copy the grey version of img into it
+        cv2.cvtColor(img, cv2.COLOR_BGR2GRAY, self._buff_grey)
+        
+        #and apply gaussian blur with the radius specified above
         cv2.GaussianBlur(self._buff_grey,(blur_rad,blur_rad),1.2, self._buff_grey)
         if darker_fg:
             cv2.subtract(255, self._buff_grey, self._buff_grey)
 
+
+        #here we do some scaling of the image. why??
         mean = cv2.mean(self._buff_grey, mask)
-
         scale = 128. / mean[0]
-
         cv2.multiply(self._buff_grey, scale, dst = self._buff_grey)
 
-
+        #applies the mask if exists
         if mask is not None:
             cv2.bitwise_and(self._buff_grey, mask, self._buff_grey)
-            return self._buff_grey
+        
+        return self._buff_grey
 
     def _closest_node(self, node, nodes):
         '''
@@ -178,6 +205,11 @@ class MultiFlyTracker(BaseTracker):
         return d.min(), d.argmin()
 
     def _find_position(self, img, mask,t):
+        '''
+        Middleman between the tracker and the actual tracking routine
+        It cuts the portion defined by mask (i.e. the ROI), converts it to grey and passes it on to the actual tracking routine
+        to look for the flies to track. The result of the tracking routine is a list of points describing the objects found in that ROI
+        '''
 
         grey = self._pre_process_input_minimal(img, mask, t)
         try:
@@ -241,7 +273,7 @@ class MultiFlyTracker(BaseTracker):
 
 
         out_pos = []
-        raw_pos = []
+        #raw_pos = []
         
         for n_vc, vc in enumerate(valid_contours):
             
@@ -306,8 +338,8 @@ class MultiFlyTracker(BaseTracker):
             h_var = HeightVariable(int(round(h)))
             phi_var = PhiVariable(int(round(angle)))
             
-            raw = (x, y, w, h, angle)
-            raw_pos.append(raw)
+            #raw = (x, y, w, h, angle)
+            #raw_pos.append(raw)
             
             
             out = DataPoint([ x_var, y_var, w_var, h_var, phi_var ])
@@ -315,7 +347,7 @@ class MultiFlyTracker(BaseTracker):
 
         # end the for loop iterating within contours
 
-        if self._debug:
+        if self._visualise:
             cv2.imshow( self.multi_fly_tracker_window, self._buff_fg )
         
         if len(out_pos) == 0:
@@ -338,3 +370,109 @@ class MultiFlyTracker(BaseTracker):
 
 
         return out_pos
+
+
+class HaarTracker(BaseTracker):
+    
+    _description = {"overview": "An experimental tracker to monitor several animals per ROI using a Haar Cascade.",
+                    "arguments": []}
+
+
+
+    def __init__(self, roi, data = { 'maxN' : 50, 
+                 'cascade' : 'cascade.xml',
+                 'scaleFactor' : 1.1,
+                 'minNeighbors' : 3,
+                 'flags' : 0,
+                 'minSize' : (15,15),
+                 'maxSize' : (20,20),
+                 'visualise' : False }
+                 ):
+                     
+        """
+        An adaptive background subtraction model to find position of one animal in one roi using a Haar Cascade.
+        example of data
+        """
+        
+        if not os.path.exists(data['cascade']):
+            print ('A valid xml cascade file could not be found.')
+            raise
+
+        self.fly_cascade = cv2.CascadeClassifier(data['cascade'])
+
+
+        self._visualise = data['visualise']
+        self.maxN = data['maxN']
+        
+        self._haar_prmts = {key: data[key] for key in ['scaleFactor', 'minNeighbors', 'flags', 'minSize', 'maxSize']}
+        
+        self.last_positions = np.zeros((self.maxN,2))
+
+        if self._visualise:
+            self._multi_fly_tracker_window = "tracking_preview"
+            cv2.namedWindow(self._multi_fly_tracker_window, cv2.WINDOW_AUTOSIZE)
+
+        super(HaarTracker, self).__init__(roi, data)
+
+    def _pre_process_input(self, img, mask=None):
+        '''
+        '''
+
+        grey = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        if mask is not None:
+            cv2.bitwise_and(grey, mask, grey)
+        
+        return grey
+
+
+    def _find_position(self, img, mask, t):
+        '''
+        Middleman between the tracker and the actual tracking routine
+        It cuts the portion defined by mask (i.e. the ROI), converts it to grey and passes it on to the actual tracking routine
+        to look for the flies to track. The result of the tracking routine is a list of points describing the objects found in that ROI
+        '''
+        
+        grey = self._pre_process_input(img, mask)
+        return self._track(img, grey, mask, t)
+
+    def _track(self, img,  grey, mask, t):
+        '''
+        The tracking routine
+        Runs once per ROI
+        '''
+        pmts = self._haar_prmts
+        flies = self.fly_cascade.detectMultiScale(img, scaleFactor= pmts['scaleFactor'],
+                                                  minNeighbors= pmts['minNeighbors'], 
+                                                  flags= pmts['flags'],
+                                                  minSize= pmts['minSize'],
+                                                  maxSize= pmts['maxSize'] )
+        
+        out_pos = []
+        
+        for (x,y,w,h) in flies:
+            #cv2.rectangle(img,(x,y),(x+w,y+h),(255,255,0),2)
+            
+            x = x + w/2
+            y = y + h/2
+
+            # store the blob info in a list
+            x_var = XPosVariable(int(round(x)))
+            y_var = YPosVariable(int(round(y)))
+            w_var = WidthVariable(int(round(w)))
+            h_var = HeightVariable(int(round(h)))
+            phi_var = PhiVariable(0.0)
+            
+            
+            out = DataPoint([ x_var, y_var, w_var, h_var, phi_var ])
+            out_pos.append(out)
+
+        #and show if asked
+        if self._visualise:
+            cv2.imshow(self._multi_fly_tracker_window, img)
+            
+        return out_pos
+
+
+
+        
