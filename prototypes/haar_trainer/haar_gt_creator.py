@@ -132,9 +132,6 @@ positive_video = "/home/gg/Downloads/test_video.mp4"
 negative_video = "/home/gg/Downloads/whole_2020-08-25_13-10-07_2020f8bceb334c1c84518f62359ddc76_emptyarena_1280x960@25_00000.mp4"
 
 
-# the output video - we can save a video with the drawing of the tracking
-output_video = None
-#output_video = "/home/gg/tracked_video.mp4"
 
 camera = MovieVirtualCamera(negative_video)
 
@@ -148,14 +145,6 @@ drawer = HaarCutter(filepath="/home/gg/haar_training", draw_frames = False, crea
 roi_builder = DefaultROIBuilder()
 rois = roi_builder.build(camera)
 
-# We use the npy tracker to save data in a npy file
-rdw = rawdatawriter(basename='/home/gg/tracking_test.npy', n_rois=len(rois))
-
-
-#Choice of trackers
-# AdaptiveBGModel - The default tracker for fruit flies. One animal per ROI.
-# MultiFlyTracker - An experimental tracker to monitor several animals per ROI.
-
 # Starts the tracking monitor
 monit = Monitor(camera, MultiFlyTracker, rois, stimulators=None )
-monit.run(drawer=drawer, result_writer = rdw)
+monit.run(drawer=drawer, result_writer = None)
