@@ -769,17 +769,29 @@ class npyAppendableFile():
         filepath, extension = os.path.splitext(fname)
         self.fname=filepath + ".anpy"
         
-        if newfile:
-            with open(self.fname, "wb") as fh:
-                fh.close()
+        self._newfile = newfile
+        self._first_write = True
         
     def write(self, data):
         '''
         append a new array to the file
         note that this will not change the header
         '''
-        with open(self.fname, "ab") as fh:
-            np.save(fh, data)
+        if self._newfile and self._first_write:
+
+            with open(self.fname, "wb") as fh:
+                np.save(fh, data)
+            self._first_write = False
+            return True
+        
+        else:
+        
+            with open(self.fname, "ab") as fh:
+                np.save(fh, data)
+            
+            return True
+        
+        return False
             
     def load(self, axis=2):
         '''
