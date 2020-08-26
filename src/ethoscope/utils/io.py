@@ -8,7 +8,6 @@ import cv2
 import tempfile
 import os
 
-from pathlib import Path
 import numpy as np
 
 
@@ -762,12 +761,14 @@ class SQLiteResultWriter(ResultWriter):
 
 
 class npyAppendableFile():
-    def __init__(self, fname, newfile=False):
+    def __init__(self, fname, newfile=True):
         '''
         Creates a new instance of the appendable filetype
         If newfile is True, recreate the file even if already exists
         '''
-        self.fname=Path(fname)
+        filepath, extension = os.path.splitext(fname)
+        self.fname=filepath + ".anpy"
+        
         if newfile:
             with open(self.fname, "wb") as fh:
                 fh.close()
@@ -796,15 +797,23 @@ class npyAppendableFile():
         return out
     
     
-    def update_content(self):
+    def convert(self, filename=None):
         '''
-        We created the file by appending new arrays to an existing npy
+        We created the new file by appending new arrays to an existing npy
         The header, however, has remained constant and describes the very first array
         Here we reload the all content and we save it with the appropriate array, hence transforming a .anpy file to a regular .npy one
         '''
+        
         content = self.load()
-        with open(self.fname, "wb") as fh:
+        
+        if filename == None:
+            filepath, _ = os.path.splitext(self.fname)
+            filename = filepath + ".npy"
+        
+        with open(filename, "wb") as fh:
             np.save(fh, content)
+            
+        print ("New .npy compatible file saved with name %s. Use numpy.load to load data from it. The array has a shape of %s" % (filename, content.shape))
 
     @property
     def _dtype(self):
@@ -867,4 +876,4 @@ class rawdatawriter():
         arr = np.asarray([[fly['x'], fly['y'], fly['w'], fly['h'], fly['phi']] for fly in data_rows])
         #The size of data_rows depends on how many contours were found. The array needs to have a fixed shape so we round it to self.entities as the max number of flies allowed
         arr.resize((self.entities, 5, 1), refcheck=False)
-        self.data[roi] = arr
+        self.data[roi.idx] = arr
