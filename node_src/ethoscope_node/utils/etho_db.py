@@ -290,9 +290,10 @@ class ExperimentalDB(multiprocessing.Process):
         else:
             sql_get_ethoscope = "SELECT * FROM %s WHERE ethoscope_id = '%s'" % (self._ethoscopes_table_name, ethoscope_id)
         
+        #this returns a row if the query is successful, a 0 if no entry was found and -1 if there is an issue connecting to the db
         row = self.executeSQL(sql_get_ethoscope)
         
-        if row == 0:
+        if row <= 0:
             return {}
         
         if asdict:
