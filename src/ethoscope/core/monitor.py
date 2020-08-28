@@ -135,8 +135,7 @@ class Monitor(object):
 
         finally:
             self._is_running = False
-            logging.info("Monitor closing")
-
+            logging.info("Monitor closing - processed %s frames" % i)
 
 
 
