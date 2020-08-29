@@ -293,7 +293,7 @@ class ExperimentalDB(multiprocessing.Process):
         #this returns a row if the query is successful, a 0 if no entry was found and -1 if there is an issue connecting to the db
         row = self.executeSQL(sql_get_ethoscope)
         
-        if row <= 0:
+        if type(row) != list and row <= 0:
             return {}
         
         if asdict:
