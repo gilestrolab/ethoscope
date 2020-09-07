@@ -10,6 +10,7 @@ import subprocess
 import json
 import os
 import glob
+import time
 
 #from bottle import Bottle, ServerAdapter, request, server_names
 import bottle
@@ -488,13 +489,16 @@ if __name__ == '__main__':
         uid = "%s-%s" % ( hostname, get_machine_id() )
         
         address = False
-        logging.warning("Waiting for a network connection")
+        
         
         while address is False:
             try:
-                address = socket.gethostbyname(hostname+".local")
+                #using here hostnam+".local" does not work all the time
+                address = socket.gethostbyname(hostname)
                 #this returns something like '192.168.1.4' - when both connected, ethernet IP has priority over wifi IP
             except:
+                logging.warning("Waiting for a network connection")
+                time.sleep(1) #wait a bit to give a chance of getting an ip from dhpc server
                 pass
                 #address = socket.gethostbyname(hostname)
                 #this returns '127.0.1.1' and it is useless
