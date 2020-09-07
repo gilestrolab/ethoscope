@@ -10,6 +10,7 @@ import subprocess
 import json
 import os
 import glob
+import time
 
 #from bottle import Bottle, ServerAdapter, request, server_names
 import bottle
@@ -487,22 +488,33 @@ if __name__ == '__main__':
         hostname = socket.gethostname()
         uid = "%s-%s" % ( hostname, get_machine_id() )
         
-        address = False
+        
+        ip_attempts = 0
+        ip_address = None
         logging.warning("Waiting for a network connection")
         
-        while address is False:
+        
+        #tries for one minute or until an IP ip_address is obtained
+        while ip_address is None and ip_attempts < 60:
+
             try:
-                address = socket.gethostbyname(hostname+".local")
                 #this returns something like '192.168.1.4' - when both connected, ethernet IP has priority over wifi IP
+                #ip_address = socket.gethostbyname(hostname+".local")
+                
+                # this should be the same but does not require avahi-daemon running in the background - see https://github.com/gilestrolab/ethoscope/pull/129/commits/4086fdeabf3953f8b035dd7559259db6985f25f9
+                ip_address = socket.gethostbyname(hostname)
+                
             except:
                 pass
-                #address = socket.gethostbyname(hostname)
-                #this returns '127.0.1.1' and it is useless
+
+            ip_attempts += 1
+            time.sleep(1)
             
+        logging.info("Registering device on zeroconf with IP: %s" % ip_address)
             
         serviceInfo = ServiceInfo("_ethoscope._tcp.local.",
                         uid + "._ethoscope._tcp.local.",
-                        address = socket.inet_aton(address),
+                        address = socket.inet_aton(ip_address),
                         port = PORT,
                         properties = {
                             'version': '0.0.1',
