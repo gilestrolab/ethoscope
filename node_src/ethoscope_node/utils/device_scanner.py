@@ -42,7 +42,7 @@ def retry(ExceptionToCheck, tries=4, delay=3, backoff=2, logger=None):
 class Device(Thread):
 
     @retry(ScanException, tries=3, delay=1, backoff=1)
-    def _get_json(self, url, timeout=5, post_data=None):
+    def _get_json(self, url, timeout=10, post_data=None):
 
         try:
             req = urllib.request.Request(url, data=post_data, headers={'Content-Type': 'application/json'})

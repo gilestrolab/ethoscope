@@ -189,6 +189,7 @@ class OptomotorSleepDepriver(SleepDepStimulator):
     _HardwareInterfaceClass = OptoMotor
     _roi_to_channel_opto = {1:1, 3:3, 5:5, 7:7, 9:9,
                             12:23, 14:21,16:19, 18:17, 20:15}
+                            
     _roi_to_channel_moto = {1:0, 3:2, 5:4, 7:6, 9:8,
                             12:22, 14:20, 16:18, 18:16, 20:14}
 
@@ -395,3 +396,60 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
             return HasInteractedVariable(True), dic
 
         return HasInteractedVariable(False), {}
+
+
+class mAGO(SleepDepStimulator):
+    """
+    Motors are connected to odd channels (1-19) while valves are connected to even channels (0-18).
+    Command `D` will activate all the channels in a sequence and it's used for debugging.
+    Command `T` will teach the ethoscope what the capabilities of the module are, returning a dictionary.
+    """
+    
+    _description = {"overview": "A stimulator to sleep deprive an animal using gear motors and probe arousal using air valves. See: https://www.notion.so/giorgiogilestro/The-new-Modular-SD-Device-05bbe90b6ee04b8aa439165f69d62de8",
+                    "arguments": [
+                        {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_correction_coef", "description": "Velocity correction coef", "default": 3.0e-3},
+                                    {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken(s)","default":120},
+                                    {"type": "number", "min": 500, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
+                                    {"type": "number", "min": 0, "max": 3, "step": 1, "name": "stimulus_type",  "description": "1 = motor, 2= valves", "default": 1},
+                                    {"type": "date_range", "name": "date_range",
+                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "default": ""}
+                                   ]}
+
+    _HardwareInterfaceClass = OptoMotor
+    
+    _roi_to_channel_motor = {1:1, 3:3, 5:5, 7:7, 9:9,
+                            12:11, 14:13,16:15, 18:17, 20:19}
+                            
+    _roi_to_channel_valves= {1:0, 3:2, 5:4, 7:6, 9:8,
+                            11:10, 13:12, 15:14, 17:16, 19:18}
+
+
+    def __init__(self,
+                 hardware_connection,
+                 velocity_correction_coef=3.0e-3,
+                 min_inactive_time=120,  # s
+                 pulse_duration = 1000,  #ms
+                 stimulus_type = 2,  # 1 = opto, 2= moto, 3 = both
+                 date_range=""
+                 ):
+
+
+        self._t0 = None
+
+        # the inactive time depends on the chanel here
+        super(mAGO, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, date_range)
+
+
+
+        if stimulus_type == 2:
+            self._roi_to_channel = self._roi_to_channel_valves
+        elif stimulus_type == 1:
+            self._roi_to_channel = self._roi_to_channel_motor
+
+        self._pulse_duration= pulse_duration
+
+    def _decide(self):
+        out, dic = self._decide()
+        dic["duration"] = self._pulse_duration
+        return out,dic
