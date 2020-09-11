@@ -12,6 +12,7 @@ from zeroconf import ServiceBrowser, Zeroconf
 
 from ethoscope_node.utils.etho_db import ExperimentalDB
 
+STREAMING_PORT = 8887
 
 class ScanException(Exception):
     pass
@@ -321,29 +322,46 @@ class Ethoscope(Device):
         out = self._get_json(videofiles_url)
         return out
 
+
     def relay_stream(self):
         '''
         The node uses this function to relay the stream of images from the device to the node client
         '''
-        stream_url = "http://%s:%i/%s" % (self._ip, 8008, self._remote_pages['stream'])
-        #stream_url = "http://217.7.233.140:80/cgi-bin/faststream.jpg?stream=full&fps=0"
+        
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((self._ip, STREAMING_PORT))
 
-        req = urllib.request.Request(stream_url)
-        stream = urllib.request.urlopen(req, timeout=5)
-        bytes = b''
+        client_socket.settimeout(5)
+        client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
+        
+        rfile = client_socket.makefile('rb')
+
+        stream_bytes = b' '
+
         while True:
-            bytes += stream.read(1024)
-            a = bytes.find(b'\xff\xd8') #frame starting 
-            b = bytes.find(b'\xff\xd9') #frame ending
-            if a != -1 and b != -1:
-                frame = bytes[a:b+2]
-                bytes = bytes[b+2:]
+            
+            stream_bytes += rfile.read(1024)
+            
+            if len(stream_bytes) == 0:
+                break
+
+            first = stream_bytes.find(b'\xff\xd8')
+            last = stream_bytes.find(b'\xff\xd9')
+            
+            if first != -1 and last != -1:
+
+                jpg = stream_bytes[first:last+2]
+                stream_bytes = stream_bytes[last+2:]
+
                 yield b'--frame\r\n'
                 yield b'X-Timestamp: %s\r\n' % str(time.time()).encode()
-                yield b'Content-Length: %s\r\n' % str(len(frame)).encode()
+                yield b'Content-Length: %s\r\n' % str(len(jpg)).encode()
                 yield b'Content-Type: image/jpeg\r\n\r\n' 
-                yield frame
+                yield jpg
                 yield b'\r\n'
+
+        rfile.close()
+        client_socket.close()
 
     def user_options(self):
         """

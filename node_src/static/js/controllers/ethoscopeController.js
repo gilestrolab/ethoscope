@@ -185,6 +185,8 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                 $http.post('/device/'+device_id+'/controls/stream', data= {"recorder":{"name":"Streamer","arguments":{}}} )
                 .success(function(response){
                     $scope.device.status = response.status;
+                    window.location.reload();
+                    
                 });
             }
         };
