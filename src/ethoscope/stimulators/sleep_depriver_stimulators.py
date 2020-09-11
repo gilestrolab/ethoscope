@@ -450,6 +450,6 @@ class mAGO(SleepDepStimulator):
         self._pulse_duration= pulse_duration
 
     def _decide(self):
-        out, dic = self._decide()
+        out, dic = super(mAGO, self)._decide()
         dic["duration"] = self._pulse_duration
         return out,dic
