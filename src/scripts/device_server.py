@@ -306,6 +306,7 @@ def get_machine_info(id):
     
     machine_info['SD_CARD_AGE'] = get_SD_CARD_AGE()
     machine_info['partitions'] = get_partition_infos()
+    machine_info['SD_CARD_NAME'] = get_SD_CARD_NAME()
     
     return machine_info
 

@@ -331,6 +331,21 @@ def get_SD_CARD_AGE():
         
     except:
         return
+
+def get_SD_CARD_NAME():
+    """
+    On recent (07/2020 on) versions of the SD images we save a file called
+    /etc/sdimagename
+    that contains the name of the img file we burnt to create the ethoscope
+    """
+    fn = "/etc/sdimagename"
+    try:
+        with open(fn) as f:
+            name = f.read()
+        return name.rstrip()
+
+    except:
+        return "N/A"
         
         
 def get_partition_infos():
