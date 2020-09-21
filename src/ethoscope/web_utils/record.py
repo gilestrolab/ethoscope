@@ -182,6 +182,7 @@ class GeneralVideoRecorder(DescribedObject):
         '''
         '''
         self._p.stop_camera_activity = True
+        if self._stream: self._p.connection.close()
         self._p.join(10)
 
 class HDVideoRecorder(GeneralVideoRecorder):
