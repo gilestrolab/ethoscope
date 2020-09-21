@@ -333,6 +333,7 @@ class Ethoscope(Device):
 
         client_socket.settimeout(5)
         client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
+        client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
         
         rfile = client_socket.makefile('rb')
 
