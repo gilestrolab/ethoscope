@@ -515,7 +515,7 @@ if __name__ == '__main__':
             
         serviceInfo = ServiceInfo("_ethoscope._tcp.local.",
                         uid + "._ethoscope._tcp.local.",
-                        address = socket.inet_aton(ip_address),
+                        addresses = [socket.inet_aton(ip_address)],
                         port = PORT,
                         properties = {
                             'version': '0.0.1',
