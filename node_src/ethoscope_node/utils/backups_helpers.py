@@ -92,17 +92,20 @@ class GenericBackupWrapper(object):
         # for safety, starts device scanner too in case the node will go down at later stage
         self._device_scanner = EthoscopeScanner(results_dir = results_dir)
             
-            
 
+    def get_devices(self):
+        logging.info("Updating list of devices")
+        devices = receive_devices(self._server)
+        
+        if not devices:
+            logging.info("Using Ethoscope Scanner to look for devices")
+            self._device_scanner.start()
+            time.sleep(20)
+            
+        return devices
 
     def run(self):
         try:
-            devices = receive_devices(self._server)
-            
-            if not devices:
-                logging.info("Using Ethoscope Scanner to look for devices")
-                self._device_scanner.start()
-                time.sleep(20)
 
             t0 = time.time()
             t1 = t0 + self._BACKUP_DT
@@ -114,6 +117,7 @@ class GenericBackupWrapper(object):
                     continue
 
                 logging.info("Starting backup")
+                devices = self.get_devices()
 
                 if not devices:
                     devices = self._device_scanner.get_all_devices_info()
