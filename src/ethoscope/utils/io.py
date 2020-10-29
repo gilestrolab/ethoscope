@@ -10,7 +10,9 @@ import os
 
 import numpy as np
 
-
+import sqlite3
+import mysql.connector
+                
 #this code is reused from device_scanner
 import urllib.request, urllib.error, urllib.parse
 import json
@@ -34,7 +36,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
 
     def _delete_my_sql_db(self):
-        import mysql.connector
+
         try:
             db = mysql.connector.connect(host=self._db_host,
                                          user=self._db_user_name,
@@ -82,7 +84,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
 
     def _create_mysql_db(self):
-        import mysql.connector
+
         db = mysql.connector.connect(host=self._db_host,
                                      user=self._db_user_name,
                                      passwd=self._db_user_pass,
@@ -112,7 +114,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
         db.close()
 
     def _get_connection(self):
-        import mysql.connector
+
         db = mysql.connector.connect(host=self._db_host,
                                      user=self._db_user_name,
                                      passwd=self._db_user_pass,
@@ -668,7 +670,7 @@ class AsyncSQLiteWriter(multiprocessing.Process):
 
         
     def _get_connection(self):
-        import sqlite3
+
         db =   sqlite3.connect(self._db_name)
         return db
 
@@ -892,3 +894,120 @@ class rawdatawriter():
         #The size of data_rows depends on how many contours were found. The array needs to have a fixed shape so we round it to self.entities as the max number of flies allowed
         arr.resize((self.entities, 5, 1), refcheck=False)
         self.data[roi.idx] = arr
+
+class db_diff():
+    """
+    Class used to compare the status of a local SQLlite3 db to the remote counterpart
+    This is used to check if the db backup is in good shape
+    The same functions are duplicated in node_src/ethoscope_node/utils/mysql_backup.py
+    """
+
+    _remote_user = "node"
+    _remote_pass = "node"
+
+    def __init__(self, db_name, remote_host, filename):
+        """
+        remote_host is the IP address of the ethoscope we are supposed to check on
+        filename is the local SQLlite3 file to check
+        db_name is the name of the database
+        """
+    
+        self._remote_host = remote_host
+        self._dst_path = filename
+        self._remote_db_name = db_name
+
+    
+    def _get_remote_db_info(self):
+        """
+        """
+
+        #fetches data about the size of the remote db ( remote_local_tables_dictionary )
+        src = mysql.connector.connect(host=self._remote_host,
+                                      user=self._remote_user,
+                                      passwd=self._remote_pass)
+            
+        src_cur = src.cursor(buffered=True)
+        
+        command = 'SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.tables WHERE TABLE_SCHEMA LIKE "ETHOSCOPE%";'
+        src_cur.execute(command)
+        tables = src_cur.fetchall()
+        
+        remote_local_tables_dictionary = {dbn : {} for dbn in set([entry[0] for entry in tables])}
+        
+        for entry in tables: 
+            db_name = entry[0]
+            table_name = entry[1]
+            
+            if table_name not in ["ROI_MAP", "VAR_MAP", "METADATA"]:
+                command = 'SELECT max(id) FROM %s.%s' % (db_name, table_name)
+            else:
+                command = 'SELECT count(*) from %s.%s' % (db_name, table_name)
+            
+            src_cur.execute(command)
+            remote_local_tables_dictionary [db_name] . update ( { table_name :  src_cur.fetchone()[0] } )
+
+        src.commit()
+        src.close()
+        
+        return remote_local_tables_dictionary
+
+    def _get_local_db_info(self):
+        """
+        """
+
+        local_tables_dictionary = {}
+        
+        with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
+            dst_cur = dst.cursor()
+            command = 'SELECT name FROM sqlite_master WHERE type ="table" AND name NOT LIKE "sqlite_%";'
+            dst_cur.execute(command)
+            tables = dst_cur.fetchall()
+
+
+            
+            for entry in tables: 
+                table_name = entry[0]
+                
+                if table_name not in ["ROI_MAP", "VAR_MAP", "METADATA"]:
+                    command = 'SELECT max(id) FROM %s;' % table_name
+                else:
+                    command = 'SELECT count(*) from %s' % table_name
+                
+                dst_cur.execute(command)
+                local_tables_dictionary . update ( { table_name :  dst_cur.fetchone()[0] } )            
+            
+        return local_tables_dictionary
+        
+    def compare_databases(self):
+        """
+        """
+        total_remote = 0
+        total_local = 0
+        
+        try:
+            remote_tables_info = self._get_remote_db_info()
+        except:
+            logging.error("Problem getting info from the remote database")
+        
+        try:
+            local_tables_info = self._get_local_db_info()
+        except:
+            logging.error("Problem getting info from the local database %s" % self._dst_path)
+        
+        try:
+            for table in sorted(local_tables_info):
+                l = local_tables_info[table]
+                r = remote_tables_info[self._remote_db_name][table]
+                
+                if r == None : r = 0
+                if l == None : l = 0
+                
+                total_remote += int(r)
+                total_local += int(l)
+                
+                #print ("Transferred %s / %s for table %s (%0.2f)" % (l, r, table, l/r*100))
+                
+            return total_local/total_remote*100
+
+        except:
+            return -1

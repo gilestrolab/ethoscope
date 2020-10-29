@@ -134,7 +134,7 @@ class MySQLdbToSQlite(object):
         else:
             self._replace_table(table_name, src, dst, dump_in_csv)
 
-    def get_remote_db_info(self):
+    def _get_remote_db_info(self):
         """
         """
         #fetches data about the size of the remote db ( remote_local_tables_dictionary )
@@ -167,7 +167,7 @@ class MySQLdbToSQlite(object):
         
         return remote_local_tables_dictionary
 
-    def get_local_db_info(self):
+    def _get_local_db_info(self):
         """
         """
         local_tables_dictionary = {}
@@ -199,19 +199,34 @@ class MySQLdbToSQlite(object):
         total_remote = 0
         total_local = 0
         
-        remote_tables_info = self.get_remote_db_info()
-        local_tables_info = self.get_local_db_info()
+        try:
+            remote_tables_info = self._get_remote_db_info()
+        except:
+            logging.error("Problem getting info from the remote database")
         
-        for table in sorted(local_tables_info):
-            l = local_tables_info[table]
-            r = remote_tables_info[self._remote_db_name][table]
-            
-            total_remote += int(r)
-            total_local += int(l)
-            
-            #print ("Transferred %s / %s for table %s (%0.2f)" % (l, r, table, l/r*100))
-            
-        return total_local/total_remote*100
+        try:
+            local_tables_info = self._get_local_db_info()
+        except:
+            logging.error("Problem getting info from the local database %s" % self._dst_path)
+        
+        try:
+            for table in sorted(local_tables_info):
+                l = local_tables_info[table]
+                r = remote_tables_info[self._remote_db_name][table]
+                
+                if r == None : r = 0
+                if l == None : l = 0
+                
+                total_remote += int(r)
+                total_local += int(l)
+                
+                #print ("Transferred %s / %s for table %s (%0.2f)" % (l, r, table, l/r*100))
+                
+            return total_local/total_remote*100
+
+        except:
+            return -1
+
         
             
     def update_roi_tables(self):

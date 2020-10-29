@@ -11,6 +11,7 @@ import socket
 from zeroconf import ServiceBrowser, Zeroconf
 
 from ethoscope_node.utils.etho_db import ExperimentalDB
+from ethoscope.utils.io import db_diff
 
 STREAMING_PORT = 8887
 
@@ -239,6 +240,7 @@ class Ethoscope(Device):
         self._edb = ExperimentalDB()
         
         self._update_info()
+        
         super(Ethoscope,self).__init__()
 
     def run(self):
@@ -500,6 +502,11 @@ class Ethoscope(Device):
         # update the record on the ethoscope table
         if new_status != previous_status and previous_status != "offline":
             self._edb.updateEthoscopes(ethoscope_id = self._id, status=new_status)
+
+
+        dbd = db_diff(self._info["db_name"], self._ip, self._info['backup_path'])
+        self._info['backup_status'] = dbd.compare_databases()
+
 
     def _make_backup_path(self,  timeout=30):
         '''

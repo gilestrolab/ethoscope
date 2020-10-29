@@ -231,7 +231,7 @@
                 <span ng-if="device.status == 'streaming'" class="fa fa-play-circle color-red" title={{device.status}}></span>
                 <span ng-if="device.status == 'stopped'" class="fa fa-stop-circle" title={{device.status}}></span></td>
                 <td>{{secToDate(device.time)}}</td>
-                <td>{{elapsedtime(device.time_since_backup)}}</td>
+                <td>{{elapsedtime(device.time_since_backup)}} ({{device.backup_status | number : 0}}%) </td>
                 <td>{{device.experimental_info.name}}</td>
                 <td>{{device.experimental_info.location}}</td>
                 <td>
