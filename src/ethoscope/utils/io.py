@@ -21,6 +21,8 @@ class AsyncMySQLWriter(multiprocessing.Process):
     #_db_host = "node" #uncomment this to save data on the node
 
     def __init__(self, db_credentials, queue, erase_old_db=True):
+        """
+        """
         self._db_name = db_credentials["name"]
         self._db_user_name = db_credentials["user"]
         self._db_user_pass = db_credentials["password"]
@@ -28,9 +30,6 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
         self._queue = queue
 
-        # if erase_old_db:
-        #     self._delete_my_sql_db()
-        #     self._create_mysql_db()
         super(AsyncMySQLWriter,self).__init__()
 
 
@@ -128,12 +127,14 @@ class AsyncMySQLWriter(multiprocessing.Process):
         
         db = None
         do_run = True
+        
         try:
             if self._erase_old_db:
                 self._delete_my_sql_db()
                 self._create_mysql_db()
 
             db = self._get_connection()
+        
             while do_run:
                 try:
                     msg = self._queue.get()
@@ -638,6 +639,7 @@ class ResultWriter(object):
     def __setstate__(self, state):
         self.__init__(**state["args"])
 
+
 class AsyncSQLiteWriter(multiprocessing.Process):
     _pragmas = {"temp_store": "MEMORY",
                 "journal_mode": "OFF",
@@ -649,6 +651,7 @@ class AsyncSQLiteWriter(multiprocessing.Process):
         self._erase_old_db =  erase_old_db
 
         super(AsyncSQLiteWriter,self).__init__()
+        
         if erase_old_db:
             try:
                 os.remove(self._db_name)

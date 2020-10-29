@@ -64,12 +64,14 @@ class BackupClass(object):
 
             self._db_credentials["name"] = "%s_db" % self._device_info["name"]
 
-            mirror= MySQLdbToSQlite(backup_path, self._db_credentials["name"],
+            mirror = MySQLdbToSQlite(backup_path, self._db_credentials["name"],
                             remote_host=self._database_ip,
                             remote_pass=self._db_credentials["password"],
                             remote_user=self._db_credentials["user"])
 
             mirror.update_roi_tables()
+            
+            logging.info("Backup status for %s is %0.2f%%" %(self._device_info["id"], mirror.compare_databases() ))
 
         except DBNotReadyError as e:
             logging.warning(e)
