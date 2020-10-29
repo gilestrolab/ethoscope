@@ -11,7 +11,7 @@ import socket
 from zeroconf import ServiceBrowser, Zeroconf
 
 from ethoscope_node.utils.etho_db import ExperimentalDB
-from ethoscope.utils.io import db_diff
+from ethoscope_node.utils.mysql_backup import db_diff
 
 STREAMING_PORT = 8887
 
