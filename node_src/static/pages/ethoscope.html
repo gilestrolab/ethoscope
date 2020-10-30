@@ -117,7 +117,7 @@
               <ul class="dd-menu">
                 <li ng-click="ethoscope.log()">Info and Logs</li>
                 <li data-toggle="modal" data-target="#changeInfo">Settings</li>
-                <li ng-click="ethoscope.backup()">Backup</li>
+                <li data-toggle="modal" data-target="#backupProgress" ng-click="ethoscope.backup()">Backup</li>
               </ul>
             </label>
 
@@ -196,6 +196,31 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">No</button>
         <button type="button" class="btn btn-primary" ng-click="ethoscope.poweroff()" data-dismiss="modal">Yes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Modal Backup -->
+<div class="modal fade" id="backupProgress" tabindex="-1" role="dialog" aria-labelledby="backupProgressLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Backup progress</h4>
+      </div>
+      <div class="modal-body">
+
+        <div class="ProgressBarContainer" style="width: 100%; background-color: grey;">
+          <div class="ProgressBar" style="width: {{device.backup_status | number : 2}}%; height: 30px; background-color: #4CAF50; text-align: center; line-height: 30px; color: white;;">{{device.backup_status | number : 0}}%</div>
+        </div>
+        <br>
+        <p ng-if="device.backup_status < 100">Attempting full backup.</p>
+        <p ng-if="device.backup_status == 100">Backup terminated with success.</p>
+
+      </div>
+      <div class="modal-footer">
       </div>
     </div>
   </div>
