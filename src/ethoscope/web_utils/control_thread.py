@@ -29,7 +29,7 @@ from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulat
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
 from ethoscope.utils.description import DescribedObject
-from ethoscope.web_utils.helpers import isMachinePI, hasPiCamera, isExperimental, get_machine_name
+from ethoscope.web_utils.helpers import isMachinePI, hasPiCamera, isExperimental, get_machine_name, pi_version, getPiCameraVersion, get_SD_CARD_AGE, get_partition_infos, get_SD_CARD_NAME
 
 class ExperimentalInformation(DescribedObject):
     
@@ -120,6 +120,7 @@ class ControlThread(Thread):
     _tmp_last_img_file = "last_img.jpg"
     _dbg_img_file = "dbg_img.png"
     _log_file = "ethoscope.log"
+
     #give the database an ethoscope specific name
     #future proof in case we want to use a remote server
     _db_credentials = {"name": "%s_db" % get_machine_name(),
@@ -178,7 +179,7 @@ class ControlThread(Thread):
                         "id": machine_id,
                         "name": name,
                         "version": version,
-                        "db_name":self._db_credentials["name"],
+                        "db_name": self._db_credentials["name"],
                         "monitor_info": self._default_monitor_info,
                         #"user_options": self._get_user_options(),
                         "experimental_info": {}
@@ -194,6 +195,24 @@ class ControlThread(Thread):
 
 
         super(ControlThread, self).__init__()
+
+    
+    @property
+    def hw_info(self):
+        """
+        This is information about the ethoscope that is not changing in time such as hardware specs and configuration parameters
+        """
+
+        _hw_info = {}
+        
+        _hw_info['kernel'] = os.uname()[2]
+        _hw_info['pi_version'] = pi_version()
+        _hw_info['camera'] = getPiCameraVersion()
+        _hw_info['SD_CARD_AGE'] = get_SD_CARD_AGE()
+        _hw_info['partitions'] = get_partition_infos()
+        _hw_info['SD_CARD_NAME'] = get_SD_CARD_NAME()
+        
+        return _hw_info
 
 
     @property
@@ -313,6 +332,7 @@ class ControlThread(Thread):
         self._monit = Monitor(camera, TrackerClass, rois,
                               stimulators=stimulators,
                               *self._monit_args)
+        
         self._info["status"] = "running"
         logging.info("Setting monitor status as running: '%s'" % self._info["status"])
 
@@ -409,7 +429,9 @@ class ControlThread(Thread):
             "version": self._info["version"]["id"],
             "experimental_info": str(self._info["experimental_info"]),
             "selected_options": str(self._option_dict),
+            "hardware_info" : str(self.hw_info)
         }
+        
         # hardware_interface is a running thread
         rw = ResultWriter(self._db_credentials, rois, self._metadata, take_frame_shots=True, sensor=sensor)
 
