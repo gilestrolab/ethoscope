@@ -2,7 +2,6 @@ from ethoscope.hardware.input.cameras import *
 
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.trackers.multi_fly_tracker import MultiFlyTracker, HaarTracker
-from ethoscope.trackers.harr_bg_tracker import harr_bg_tracker
 from ethoscope.drawers.drawers import DefaultDrawer
 
 from ethoscope.core.monitor import Monitor
@@ -12,26 +11,26 @@ from ethoscope.utils.io import rawdatawriter, npyAppendableFile
 
 
 # the input video - we work on an mp4 acquired with the Record function
-input_video = "/home/gg/Downloads/test_video.mp4"
+#input_video = "/home/gg/Downloads/test_video.mp4"
+input_video= "//home/gg/Cabinet/Work/Projects/custom_devices/ethoscope/olfactometer/olfactometer_tracking/whole_2020-10-21_19-16-51_2020f8bceb334c1c84518f62359ddc76_applestarved_1280x960@25_00001.mp4"
 
 #the location of the haar cascade file (in case we want to use the haar tracking function)
-cascade = "/home/gg/haar_training/data/cascade.xml"
+cascade = "/home/gg/Cabinet/Work/Projects/custom_devices/ethoscope/olfactometer/olfactometer_tracking/data/cascade.xml"
 
 #how many flies we expect
-entities=42
+entities=35
 
 #the type of tracking we want to use
-ttype = "multi"
+ttype = "haar"
 
 #Choice of trackers
 # default - AdaptiveBGModel - The default tracker for fruit flies. One animal per ROI.
 # multi - MultiFlyTracker - An experimental tracker to monitor several animals per ROI.
 # haar - HaarTracker - An experimental tracker to monitor several animals per ROI using a Haar Cascade.
 
-
-
 # the output video - we can save a video with the drawing of the tracking
 output_video = None
+
 #output_video = "/home/gg/tracked_video_big_fly.mp4"
 
 camera = MovieVirtualCamera(input_video)
@@ -51,9 +50,8 @@ roi_builder = DefaultROIBuilder() # One Big ROI using the Default ROIBuilder
 rois = roi_builder.build(camera)
 
 # We use the npy tracker to save data in a npy file
-rdw = rawdatawriter(basename='/home/gg/tracking_%s.npy' % ttype, n_rois=len(rois), entities=entities)
-
-
+#rdw = rawdatawriter(basename='/home/gg/tracking_%s.npy' % ttype, n_rois=len(rois), entities=entities)
+rdw = None
 
 
 #for multifly tracking using BS subtraction

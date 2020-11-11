@@ -260,17 +260,13 @@ class MultiFlyTracker(BaseTracker):
 
         if len(contours) == 0:
             self._bg_model.increase_learning_rate()
+            print ("no contour detected")
             raise NoPositionError
 
         else :
             for c in contours:
                 if self._fg_model.is_contour_valid(c, img):
                     valid_contours.append(c)
-
-        if len(valid_contours) == 0:
-            self._bg_model.increase_learning_rate()
-            raise NoPositionError
-
 
         out_pos = []
         #raw_pos = []
