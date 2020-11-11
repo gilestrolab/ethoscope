@@ -483,27 +483,33 @@ class db_diff():
 
         local_tables_dictionary = {}
         
-        with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
-            dst_cur = dst.cursor()
-            command = 'SELECT name FROM sqlite_master WHERE type ="table" AND name NOT LIKE "sqlite_%";'
-            dst_cur.execute(command)
-            tables = dst_cur.fetchall()
-
-
-            
-            for entry in tables: 
-                table_name = entry[0]
-                
-                if table_name not in ["ROI_MAP", "VAR_MAP", "METADATA"]:
-                    command = 'SELECT max(id) FROM %s;' % table_name
-                else:
-                    command = 'SELECT count(*) from %s' % table_name
-                
-                dst_cur.execute(command)
-                local_tables_dictionary . update ( { table_name :  dst_cur.fetchone()[0] } )            
-            
-        return local_tables_dictionary
+        if os.path.exists(elf._dst_path):
         
+            with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
+                dst_cur = dst.cursor()
+                command = 'SELECT name FROM sqlite_master WHERE type ="table" AND name NOT LIKE "sqlite_%";'
+                dst_cur.execute(command)
+                tables = dst_cur.fetchall()
+
+
+                
+                for entry in tables: 
+                    table_name = entry[0]
+                    
+                    if table_name not in ["ROI_MAP", "VAR_MAP", "METADATA"]:
+                        command = 'SELECT max(id) FROM %s;' % table_name
+                    else:
+                        command = 'SELECT count(*) from %s' % table_name
+                    
+                    dst_cur.execute(command)
+                    local_tables_dictionary . update ( { table_name :  dst_cur.fetchone()[0] } )            
+                
+            return local_tables_dictionary
+        
+        else:
+            
+            return {} # sqlite3 file does not exist yet
+            
     def compare_databases(self):
         """
         """
@@ -513,12 +519,12 @@ class db_diff():
         try:
             remote_tables_info = self._get_remote_db_info()
         except:
-            logging.error("Problem getting info from the remote database")
+            logging.error("Problem getting info from the remote database: %s " % self._remote_db_name)
         
         try:
             local_tables_info = self._get_local_db_info()
         except:
-            logging.error("Problem getting info from the local database %s" % self._dst_path)
+            logging.error("Problem getting info from the local database %s - perhaps it's locked?" % self._dst_path)
         
         try:
             for table in sorted(local_tables_info):
