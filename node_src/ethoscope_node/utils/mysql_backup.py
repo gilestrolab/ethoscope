@@ -483,7 +483,7 @@ class db_diff():
 
         local_tables_dictionary = {}
         
-        if os.path.exists(elf._dst_path):
+        if os.path.exists(self._dst_path):
         
             with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
                 dst_cur = dst.cursor()
@@ -524,7 +524,7 @@ class db_diff():
         try:
             local_tables_info = self._get_local_db_info()
         except:
-            logging.error("Problem getting info from the local database %s - perhaps it's locked?" % self._dst_path)
+            logging.error("Problem getting info from the local database %s - perhaps it is locked?" % self._dst_path)
         
         try:
             for table in sorted(local_tables_info):
