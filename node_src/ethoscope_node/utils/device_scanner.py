@@ -206,9 +206,11 @@ class Ethoscope(Device):
             'static' : "static",
             'controls' : "controls",
             'machine_info' : "machine",
-            'update' : "update"
+            'update' : "update",
+            'dumpdb' : "dumpSQLdb"
             }
     
+    # instruction : ['when it is allowed']
     _allowed_instructions_status = { "stream": ["stopped"],
                                      "start": ["stopped"],
                                      "start_record": ["stopped"],
@@ -216,6 +218,7 @@ class Ethoscope(Device):
                                      "poweroff": ["stopped"],
                                      "reboot" : ["stopped"],
                                      "restart" : ["stopped"],
+                                     "dumpdb" : ["stopped"],
                                      "offline": []}
 
     def __init__(self, ip, port = 9000, refresh_period = 2, results_dir = "/ethoscope_data/results"):
@@ -260,7 +263,15 @@ class Ethoscope(Device):
                     self._reset_info()
                 last_refresh = time.time()
 
+    def dumpSQLdb(self):
+        
+        post_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_pages['dumpdb'], self._id)
+        
+        return self._get_json(post_url, 3)
+        
+
     def send_instruction(self, instruction, post_data):
+        
         post_url = "http://%s:%i/%s/%s/%s" % (self._ip, self._port, self._remote_pages['controls'], self._id, instruction)
         self._check_instructions_status(instruction)
 
@@ -292,7 +303,7 @@ class Ethoscope(Device):
             raise KeyError("Instruction %s is not allowed" % instruction)
 
         if status not in allowed_inst:
-            raise Exception("You cannot send the instruction '%s' to a device in status %s" %(instruction, status))
+            raise Exception("You cannot send the instruction '%s' to a device in status %s" % (instruction, status))
 
     def ip(self):
         return self._ip

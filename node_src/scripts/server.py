@@ -102,6 +102,7 @@ def enable_cors():
 /device/<id>/stream                     GET
 /device/<id>/controls/<instruction>     POST
 /device/<id>/log                        GET
+/device/<id>/databases                  GET
 
 
 # RESOURCES ON NODE
@@ -287,6 +288,16 @@ def force_device_backup(id):
         logging.error("Unexpected error in backup. args are: %s" % str(args))
         logging.error(traceback.format_exc())
 
+@app.get('/device/<id>/dumpSQLdb')
+@error_decorator
+def device_local_dump(id):
+    '''
+    Aks the device to perform a local SQL dump
+    '''
+    device = device_scanner.get_device(id)
+    return device.dumpSQLdb()
+    
+    
 
 @app.get('/device/<id>/retire')
 @error_decorator
@@ -324,6 +335,14 @@ def post_device_instructions(id, instruction):
 def get_log(id):
     device = device_scanner.get_device(id)
     return device.get_log()
+
+
+@app.get('/device/<id>/databases')
+@error_decorator
+def get_device_db_info(id):
+    device = device_scanner.get_device(id)
+    return device.db_info()
+
 
 
 #################################
@@ -424,11 +443,11 @@ def node_info(req):#, device):
             #df = subprocess.Popen(['git', 'status', '-s', '-uno'], stdout=subprocess.PIPE)
             #NEEDS_UPDATE = df.communicate()[0].decode('utf-8') != ""
             
-            with os.popen('systemctl status ethoscope_node.service') as df:
-                try:
+            try:
+                with os.popen('systemctl status ethoscope_node.service') as df:
                     ACTIVE_SINCE = df.read().split("\n")[2] 
-                except:
-                    ACTIVE_SINCE = "Not running through systemd"
+            except:
+                ACTIVE_SINCE = "Not running through systemd"
 
         except Exception as e:
             logging.error(e)

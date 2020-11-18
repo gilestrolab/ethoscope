@@ -179,9 +179,16 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
         }
 
+        $scope.ethoscope.SQLdump = function(){
+                
+                function recvinfo(){ $http.get('/device/'+device_id+'/dumpSQLdb').success(function(data) { $scope.SQLdumpStatus = data['Status']; $scope.SQLdumpStarted = data['Started']}) }
+                var timer1 = setInterval ( function() { if ($scope.SQLdumpStatus != 'Finished') { recvinfo() } else {clearInterval(timer1)} } , 2000);
+        }        
+        
+
         $scope.ethoscope.stream = function(option){
             if ($scope.can_stream) {
-                console.log("getting real time stream")
+                console.log("getting real time stream");
                 $http.post('/device/'+device_id+'/controls/stream', data= {"recorder":{"name":"Streamer","arguments":{}}} )
                 .success(function(response){
                     $scope.device.status = response.status;

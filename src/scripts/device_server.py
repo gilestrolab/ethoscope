@@ -12,6 +12,8 @@ import os
 import glob
 import time
 
+from threading import Thread 
+
 #from bottle import Bottle, ServerAdapter, request, server_names
 import bottle
 
@@ -32,12 +34,15 @@ update_machine_json_data = {}
 ETHOSCOPE_DIR = None
 
 """
+
 /upload/<id>                            POST    upload files to the ethoscope (masks, videos, etc)
 /data/listfiles/<category>/<id>         GET     provides a list of files in the ethoscope data folders, that were either uploaded or generated (masks, videos, etc).
 
 /<id>                                   GET     returns ID of the machine
 /make_index                             GET     create an index.html file with all the h264 files in the machine
 /rm_static_file/                        POST    remove file
+/dumpSQLdb/<id>                         POST    performs a SQL dump of the default database
+
 /update/<id>                            POST    update machine parameters (number, name, nodeIP, WIFI credentials, time)
 /controls/<id>/<action>                 POST    activate actions (tracking, recording, etc)
 /machine/<id>                           GET     information about the ethoscope that is not changing in time such as hardware specs and configuration parameters
@@ -131,6 +136,48 @@ def rm_static_file(id):
         logging.error(msg)
         raise Exception(msg)
     return data
+
+
+dumping_thread = {'thread': Thread() , 'time' : 0}
+
+@api.get('/dumpSQLdb/<id>')
+@error_decorator
+def db_dump(id):
+    '''
+    Asks the helper to perform a SQL dump of the database
+    If a dump was done recently under this session we do not attempt a new one
+    '''
+    gap_in_minutes = 30 #do not attempt a dump if last one was done these many minutes ago
+    
+    global dumping_thread
+    
+    if id != machine_id:
+        raise WrongMachineID
+    
+    #This is the default database name we are going to dump - something like ETHOSCOPE_149_db
+    db_name = get_machine_name() + "_db"
+    
+    now = int ( time.time() / 60 ) 
+    gap = now - dumping_thread['time']
+    
+    if not dumping_thread['thread'].is_alive() and gap > gap_in_minutes:
+
+        dumping_thread['time'] = now
+        dumping_thread['thread'] = Thread( target = SQL_dump, args = [db_name])
+        dumping_thread['thread'].start()
+       
+        return { 'Status' : 'Started', 'Started': gap }
+    
+    elif dumping_thread['thread'].is_alive():
+    
+        return { 'Status' : 'Dumping', 'Started': gap }
+
+    elif not dumping_thread['thread'].is_alive() and gap < gap_in_minutes:
+        
+        return { 'Status' : 'Finished', 'Started': gap }
+
+
+        
 
 @api.post('/update/<id>')
 def update_machine_info(id):
@@ -458,7 +505,6 @@ if __name__ == '__main__':
                                 version=version,
                                 ethoscope_dir=ETHOSCOPE_DIR,
                                 data=tracking_json_data)
-
 
     if DEBUG:
         logging.basicConfig()
