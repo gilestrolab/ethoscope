@@ -1,15 +1,14 @@
-from os import path
 import traceback
 import logging
 import time
 from ethoscope.web_utils.control_thread import ControlThread, ExperimentalInformation
 from ethoscope.utils.description import DescribedObject
-import os
 import tempfile
 import shutil
 import threading, queue
 import glob
 import datetime
+import os
 
 #streaming socket
 import socket, struct, io
@@ -43,7 +42,8 @@ class cameraCaptureThread(threading.Thread):
     @property
     def _get_video_chunk_filename(self):
         '''
-        
+        we save the files in chunks that will have to be merged togheter at a later point
+        this names the next chunck
         '''
         self.video_file_index += 1
         w,h = self._resolution
@@ -88,8 +88,18 @@ class cameraCaptureThread(threading.Thread):
 
             else:
                 
+                try:
+                    video_dirname = os.path.dirname(self._video_prefix)
+                    if not os.path.exists ( video_dirname ): os.makedirs( video_dirname )
+                        
+                except OSError as e:
+                    raise e
+
                 camera.start_recording(self._get_video_chunk_filename, bitrate=self._bitrate)
+
                 logging.info("Video recording started.")
+
+                
 
     
             while not self.stop_camera_activity:
@@ -154,6 +164,7 @@ class cameraCaptureThread(threading.Thread):
             logging.info("Camera closed.")
 
 class GeneralVideoRecorder(DescribedObject):
+
     _description  = {  "overview": "A video simple recorder",
                             "arguments": [
                                 {"type": "number", "name":"width", "description": "The width of the frame","default":1280, "min":480, "max":1980,"step":1},
@@ -162,10 +173,10 @@ class GeneralVideoRecorder(DescribedObject):
                                 {"type": "number", "name":"bitrate", "description": "The target bitrate","default":200000, "min":0, "max":10000000,"step":1000}
                                ]}
 
-    def __init__(self, video_prefix, video_dir, img_path,width=1280, height=960,fps=25,bitrate=200000,stream=False):
+    def __init__(self, video_prefix, video_dir, img_path,width=1280, height=960, fps=25, bitrate=200000, stream = False):
 
         self._stream = stream
-        
+
         #This used to be a process but it's best handled as a thread. See also commit https://github.com/gilestrolab/ethoscope/commit/c2e8a7f656611cc10379c8e93ff4205220c8807a
         self._p = cameraCaptureThread(video_prefix, video_dir, img_path, width, height,fps, bitrate, stream)
 
@@ -193,23 +204,27 @@ class HDVideoRecorder(GeneralVideoRecorder):
     _description  = { "overview": "A preset 1920 x 1080, 25fps, bitrate = 5e5 video recorder. "
                                   "At this resolution, the field of view is only partial, "
                                   "so we effectively zoom in the middle of arenas","arguments": []}
+    status = "recording"
+
     def __init__(self, video_prefix, video_dir, img_path):
-        super(HDVideoRecorder, self).__init__(video_prefix, video_dir, img_path,
-                                        width=1920, height=1080,fps=25,bitrate=1000000)
+        super(HDVideoRecorder, self).__init__(video_prefix, video_dir, img_path, width=1920, height=1080,fps=25,bitrate=1000000)
 
 
 class StandardVideoRecorder(GeneralVideoRecorder):
     _description  = { "overview": "A preset 1280 x 960, 25fps, bitrate = 2e5 video recorder.", "arguments": []}
+    status = "recording"
+    
     def __init__(self, video_prefix, video_dir, img_path):
-        super(StandardVideoRecorder, self).__init__(video_prefix, video_dir, img_path,
-                                        width=1280, height=960,fps=25,bitrate=500000)
+        super(StandardVideoRecorder, self).__init__(video_prefix, video_dir, img_path, width=1280, height=960,fps=25,bitrate=500000)
 
 class Streamer(GeneralVideoRecorder):
     #hiding the description field will not pass this class information to the node UI
     _hidden_description  = { "overview": "A preset 640 x 480, 25fps, bitrate = 2e5 streamer. Active on port 8008.", "arguments": []}
+    status = "streaming"
+    
     def __init__(self, video_prefix, video_dir, img_path):
-        super(Streamer, self).__init__(video_prefix, video_dir, img_path,
-                                        width=640, height=480,fps=20,bitrate=500000,stream=True)
+        super(Streamer, self).__init__(video_prefix, video_dir, img_path, width=640, height=480, fps=20, bitrate=500000, stream=True)
+        
 
 class ControlThreadVideoRecording(ControlThread):
 
@@ -299,7 +314,7 @@ class ControlThreadVideoRecording(ControlThread):
             self._info["time"] = time.time()
 
             date_time = datetime.datetime.fromtimestamp(self._info["time"])
-            formated_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
+            formatted_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
 
             try:
                 code = self._info["experimental_info"]["code"]
@@ -307,23 +322,9 @@ class ControlThreadVideoRecording(ControlThread):
                 code = "NA"
                 logging.warning("No code field in experimental info")
 
-            file_prefix = "%s_%s_%s" % (formated_time, self._machine_id, code)
+            file_prefix = "%s_%s_%s" % (formatted_time, self._machine_id, code)
 
-            import os
-            self._output_video_full_prefix = os.path.join(self._video_root_dir,
-                                           self._machine_id,
-                                          self._device_name,
-                                          formated_time,
-                                          file_prefix
-                                          )
-
-            try:
-                os.makedirs(os.path.dirname(self._output_video_full_prefix))
-            except OSError:
-                pass
-
-            logging.info("Start recording")
-        
+            self._output_video_full_prefix = os.path.join ( self._video_root_dir, self._machine_id, self._device_name, formatted_time, file_prefix )
 
             RecorderClass = self._option_dict["recorder"]["class"]
             recorder_kwargs = self._option_dict["recorder"]["kwargs"]
@@ -333,21 +334,16 @@ class ControlThreadVideoRecording(ControlThread):
                                        img_path=self._info["last_drawn_img"],**recorder_kwargs)
 
 
-            if self._recorder.__class__.__name__ == "Streamer":
-                self._info["status"] = "streaming"
-            else:
-                self._info["status"] = "recording"
-                
+            self._info["status"] = self._recorder.status # "recording" or "streaming"
+            logging.info( "Started %s" % self._recorder.status )
+            
             self._recorder.run()
-            logging.warning("recording RUN finished")
-
 
         except Exception as e:
             self.stop(traceback.format_exc())
 
         #for testing purposes
         if self._evanescent:
-            import os
             self.stop()
             os._exit(0)
 
