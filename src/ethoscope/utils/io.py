@@ -444,6 +444,7 @@ class ResultWriter(object):
             self._sensor_saver = None
         
         self._var_map_initialised = False
+        
         if erase_old_db:
             logging.warning("Erasing the old database and recreating the tables")
             self._create_all_tables()

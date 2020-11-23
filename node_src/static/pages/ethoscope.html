@@ -330,13 +330,14 @@
                     </div>
                   <ul ng-if="selected_options.tracking[name]['name']==opt.name">
                         <li  ng-repeat="arg in opt.arguments">
-                            <label for="input-{{arg.name}}" ng-hide="arg.hidden" >{{arg.description}}</label>
+                            <label ng-if="arg.type != 'boolean'" for="input-{{arg.name}}" ng-hide="arg.hidden" >{{arg.description}}</label>
 
                             
                             <select ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" > <option value="">Available Movies</option><option ng-repeat="entry in videofiles" value="{{entry.fullpath}}">{{entry.filename | limitTo: 40}}{{entry.filename.length < 40 ? '' : '...'}}</option> </select>
                             <input  ng-if="arg.type == 'number'"   id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]" >
                             <input  ng-if="(arg.type == 'str' && arg.asknode == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]">
                             <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" ng-required="true" ><option value="">-- choose {{arg.name}} --</option><option ng-repeat="entry in node[arg.asknode]  | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option> </select>
+                            <div ng-if="arg.type == 'boolean'" ><label for="input-{{arg.name}}"><input style="transform: scale(1.5); margin: 3px; margin-right: 10px;" id="input-{{arg.name}}" type="checkbox" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" >{{arg.description}}</label></div>
 
                             <div ng-if="arg.type == 'date_range'" class="input-group">
                                 <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-drp" type=hidden readonly ng-model="selected_options.tracking[name]['arguments'][arg.name]" options="{timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss', separator : ' > ' }}" > 

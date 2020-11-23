@@ -37,22 +37,24 @@ class ExperimentalInformation(DescribedObject):
                             "arguments": [
                                     {"type": "str", "name": "name", "description": "Who are you?", "default" : "", "asknode" : "users", "required" : "required"},
                                     {"type": "str", "name": "location", "description": "Where is your device","default" : "", "asknode" : "incubators"},
-                                    {"type": "str", "name": "code", "description": "Would you like to add any code to the resulting filename?", "default" : ""},
+                                    {"type": "str", "name": "code", "description": "Would you like to add any code to the resulting filename or metadata?", "default" : ""},
+                                    {"type": "boolean", "name": "append", "description": "Append tracking data to the existing database", "default": False},
                                     {"type": "str", "name": "sensor", "description": "url to access the relevant ethoscope sensor", "default": "", "asknode" : "sensors", "hidden" : "true"}
-
                                    ]}
-        def __init__(self, name="", location="", code="", sensor=""):
+                                   
+        def __init__(self, name="", location="", code="", append=False, sensor=""):
             self._check_code(code)
             self._info_dic = {"name":name,
                               "location":location,
                               "code":code,
-                              "sensor":sensor}
+                              "sensor":sensor,
+                              "append":append}
 
         def _check_code(self, code):
             r = re.compile(r"[^a-zA-Z0-9-]")
             clean_code = r.sub("",code)
             if len(code) != len(clean_code):
-                logging.error("the code in the video name contains unallowed characters")
+                logging.error("The provided string contains unallowed characters: %s" % code)
                 raise Exception("Code contains special characters. Please use only letters, digits or -")
 
 
@@ -419,6 +421,12 @@ class ControlThread(Thread):
             logging.info("Using sensor with URL %s" % self._info["experimental_info"]["sensor"])
         else:
             sensor = None
+
+        if "append" in self._info["experimental_info"]:
+            append_to_db = self._info["experimental_info"]["append"]
+            logging.info(["Recreating a new database", "Appending tracking data to the existing database"][append_to_db])
+        else:
+            append_to_db = False
         
         self._metadata = {
             "machine_id": self._info["id"],
@@ -432,8 +440,9 @@ class ControlThread(Thread):
             "hardware_info" : str(self.hw_info)
         }
         
+        
         # hardware_interface is a running thread
-        rw = ResultWriter(self._db_credentials, rois, self._metadata, take_frame_shots=True, sensor=sensor)
+        rw = ResultWriter(self._db_credentials, rois, self._metadata, take_frame_shots=True, erase_old_db = (not append_to_db), sensor=sensor,)
 
         return  (cam, rw, rois, TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs)
