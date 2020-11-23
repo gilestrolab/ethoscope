@@ -419,9 +419,11 @@ class Ethoscope(Device):
             raise KeyError("Cannot find dbg img path for device %s" % self._id)
 
         img_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_pages['static'], img_path)
+
         try:
             file_like = urllib.request.urlopen(img_url)
             return file_like
+
         except Exception as e:
             logging.warning(traceback.format_exc())
 
@@ -665,6 +667,13 @@ class DeviceScanner(object):
                 #we do not remove devices from the list when they go down so that keep a record of them in the node
                 #self.devices.remove(device)
                 return
+
+    def update_service(self, zconf, typ, name):
+        """
+        Callback when a service is updated.
+        """
+        pass
+
 
 class EthoscopeScanner(DeviceScanner):
     """
