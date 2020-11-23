@@ -390,7 +390,8 @@ def SQL_dump( database_name, credentials = {'username' : 'ethoscope', 'password'
         os.makedirs(output_dir)
     
     if outputfile is None:
-        outputfile = "%s.sql" % database_name
+        formatted_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        outputfile = "%s_%s.sql" % (database_name, formatted_time)
     
     fullpath = os.path.join(output_dir, outputfile)
    
