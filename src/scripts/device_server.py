@@ -154,16 +154,13 @@ def db_dump(id):
     if id != machine_id:
         raise WrongMachineID
     
-    #This is the default database name we are going to dump - something like ETHOSCOPE_149_db
-    db_name = get_machine_name() + "_db"
-    
     now = int ( time.time() / 60 ) 
     gap = now - dumping_thread['time']
     
     if not dumping_thread['thread'].is_alive() and gap > gap_in_minutes:
 
         dumping_thread['time'] = now
-        dumping_thread['thread'] = Thread( target = SQL_dump, args = [db_name])
+        dumping_thread['thread'] = Thread( target = SQL_dump )
         dumping_thread['thread'].start()
        
         return { 'Status' : 'Started', 'Started': gap }
@@ -232,13 +229,12 @@ def controls(id, action):
         data = bottle.request.json
         tracking_json_data.update(data)
         
-        control = None
+        #control = None
         control = ControlThread(machine_id=machine_id,
                                 name=machine_name,
                                 version=version,
                                 ethoscope_dir=ETHOSCOPE_DIR,
                                 data=tracking_json_data)
-
         control.start()
         return info(id)
 
@@ -460,7 +456,6 @@ if __name__ == '__main__':
 
     parser = OptionParser()
     parser.add_option("-r", "--run", dest="run", default=False, help="Runs tracking directly", action="store_true")
-    parser.add_option("-s", "--stop-after-run", dest="stop_after_run", default=False, help="When -r, stops immediately after. otherwise, server waits", action="store_true")
     parser.add_option("-v", "--record-video", dest="record_video", default=False, help="Records video instead of tracking", action="store_true")
     parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
     parser.add_option("-p", "--port", dest="port", default=9000, help="port")
@@ -480,7 +475,6 @@ if __name__ == '__main__':
     machine_name = get_machine_name()
     version = get_git_version()
 
-
     if option_dict["json"]:
         with open(option_dict["json"]) as f:
             json_data= json.loads(f.read())
@@ -488,7 +482,6 @@ if __name__ == '__main__':
         data = None
         json_data = {}
 
-    ETHOSCOPE_DIR = option_dict["results_dir"]
 
     if option_dict["record_video"]:
         recording_json_data = json_data
@@ -506,13 +499,15 @@ if __name__ == '__main__':
                                 ethoscope_dir=ETHOSCOPE_DIR,
                                 data=tracking_json_data)
 
+    ETHOSCOPE_DIR = option_dict["results_dir"]
+
     if DEBUG:
         logging.basicConfig()
         logging.getLogger().setLevel(logging.DEBUG)
         logging.info("Logging using DEBUG SETTINGS")
 
-    if option_dict["stop_after_run"]:
-         control.set_evanescent(True) # kill program after first run
+    #if option_dict["stop_after_run"]:
+    #     control.set_evanescent(True) # kill program after first run
 
     if option_dict["run"] or control.was_interrupted:
         control.start()

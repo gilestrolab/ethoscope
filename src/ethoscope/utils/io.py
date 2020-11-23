@@ -448,6 +448,7 @@ class ResultWriter(object):
         if erase_old_db:
             logging.warning("Erasing the old database and recreating the tables")
             self._create_all_tables()
+            
         else:
             event = "crash_recovery"
             command = "INSERT INTO START_EVENTS VALUES %s" % str((self._null, int(time.time()), event))

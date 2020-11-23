@@ -381,10 +381,13 @@ def set_datetime(time_on_node):
         return False
         
         
-def SQL_dump( database_name, credentials = {'username' : 'ethoscope', 'password' : 'ethoscope'}, output_dir = "/ethoscope_data/backup", outputfile=None ):
+def SQL_dump( database_name = None, credentials = {'username' : 'ethoscope', 'password' : 'ethoscope'}, output_dir = "/ethoscope_data/backup", outputfile=None ):
     """
     Creates a SQL dump of the specified database
     """
+    
+    if database_name == None:
+        database_name = get_machine_name() + "_db"
     
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)

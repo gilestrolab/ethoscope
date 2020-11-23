@@ -29,7 +29,7 @@ from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulat
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
 from ethoscope.utils.description import DescribedObject
-from ethoscope.web_utils.helpers import isMachinePI, hasPiCamera, isExperimental, get_machine_name, pi_version, getPiCameraVersion, get_SD_CARD_AGE, get_partition_infos, get_SD_CARD_NAME
+from ethoscope.web_utils.helpers import isMachinePI, hasPiCamera, isExperimental, get_machine_name, pi_version, getPiCameraVersion, get_SD_CARD_AGE, get_partition_infos, get_SD_CARD_NAME, SQL_dump
 
 class ExperimentalInformation(DescribedObject):
     
@@ -70,7 +70,9 @@ class ControlThread(Thread):
     From this thread, the PI passes option to the node.
     Note: Options are passed and shown only if the remote class contains a "_description" field!
     """
-    _evanescent = False
+
+    _auto_SQL_backup_at_stop = True
+    
     _option_dict = {
         "roi_builder":{
                 "possible_classes":[DefaultROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder, OlfactionAssayROIBuilder, ElectricShockAssayROIBuilder],
@@ -112,7 +114,7 @@ class ControlThread(Thread):
     #some classes do not need to be offered as choices to the user in normal conditions
     #these are shown only if the machine is not a PI
     _is_a_rPi = isMachinePI() and hasPiCamera() and not isExperimental()
-    _hidden_options = {'camera', 'result_writer'}
+    _hidden_options = {'camera', 'result_writer', 'tracker'}
     
     for k in _option_dict:
         _option_dict[k]["class"] =_option_dict[k]["possible_classes"][0]
@@ -136,6 +138,7 @@ class ControlThread(Thread):
                             "last_time_stamp":0,
                             "fps":0
                             }
+
     _persistent_state_file = "/var/cache/ethoscope/persistent_state.pkl"
 
     def __init__(self, machine_id, name, version, ethoscope_dir, data=None, *args, **kwargs):
@@ -171,6 +174,7 @@ class ControlThread(Thread):
             pass
 
         self._tmp_dir = tempfile.mkdtemp(prefix="ethoscope_")
+        
         #todo add 'data' -> how monitor was started to metadata
         self._info = {  "status": "stopped",
                         "time": time.time(),
@@ -189,12 +193,10 @@ class ControlThread(Thread):
         self._monit = None
 
         self._parse_user_options(data)
-
-
+        
         DrawerClass = self._option_dict["drawer"]["class"]
         drawer_kwargs = self._option_dict["drawer"]["kwargs"]
         self._drawer = DrawerClass(**drawer_kwargs)
-
 
         super(ControlThread, self).__init__()
 
@@ -225,7 +227,6 @@ class ControlThread(Thread):
     @property
     def was_interrupted(self):
         return os.path.exists(self._persistent_state_file)
-
 
     @classmethod
     def user_options(self):
@@ -483,7 +484,7 @@ class ControlThread(Thread):
                 # then we start tracking
                 self._start_tracking(cam, result_writer, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
             
-            self.stop()
+            #self.stop()
 
         except EthoscopeException as e:
             if e.img is not  None:
@@ -514,14 +515,10 @@ class ControlThread(Thread):
                 logging.warning("Could not close hardware connection properly")
                 pass
 
-            #for testing purposes
-            if self._evanescent:
-                del self._drawer
-                self.stop()
-                os._exit(0)
-
-
-    def stop(self, error=None):
+    def stop (self, error=None):
+        """
+        """
+        
         self._info["status"] = "stopping"
         self._info["time"] = time.time()
         
@@ -536,6 +533,12 @@ class ControlThread(Thread):
             self._monit.stop()
             self._monit = None
 
+            if self._auto_SQL_backup_at_stop:
+                logging.info("Performing a SQL dump of the database.")
+                t = Thread( target = SQL_dump )
+                t.start()
+
+
         self._info["status"] = "stopped"
         self._info["time"] = time.time()
         self._info["error"] = error
@@ -548,10 +551,9 @@ class ControlThread(Thread):
             logging.info("Monitor closed all right")
 
     def __del__(self):
+        """
+        """
+
         self.stop()
         shutil.rmtree(self._tmp_dir, ignore_errors=True)
         shutil.rmtree(self._persistent_state_file, ignore_errors=True)
-
-    def set_evanescent(self, value=True):
-        self._evanescent = value
-
