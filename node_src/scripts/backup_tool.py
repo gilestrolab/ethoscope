@@ -65,15 +65,22 @@ if __name__ == '__main__':
 
 
         if ethoscope:
-            ethoscope = int(ethoscope)
-            print ("Forcing backup for ethoscope %03d" % ethoscope)
-            all_devices = receive_devices(server)
             
-            bj = None
-            for devID in all_devices:
-                if all_devices[devID]['name'] == ("ETHOSCOPE_%03d" % ethoscope) and all_devices[devID]['status'] != "offline":
-                    bj = backup_job((all_devices[devID], RESULTS_DIR))
-            if bj == None: exit("ETHOSCOPE_%03d is not online or not detected" % ethoscope)
+            all_devices = receive_devices(server)
+
+            try:
+                ethoscopes = [int(ethoscope)]
+            except:
+                ethoscopes = [int(e) for e in ethoscope.split(" ")]
+                
+            for ethoscope in ethoscopes:
+                print ("Forcing backup for ethoscope %03d" % ethoscope)
+                
+                bj = None
+                for devID in all_devices:
+                    if all_devices[devID]['name'] == ("ETHOSCOPE_%03d" % ethoscope) and all_devices[devID]['status'] != "offline":
+                        bj = backup_job((all_devices[devID], RESULTS_DIR))
+                if bj == None: exit("ETHOSCOPE_%03d is not online or not detected" % ethoscope)
 
         else:
         
