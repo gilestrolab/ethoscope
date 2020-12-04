@@ -337,14 +337,6 @@ def get_log(id):
     return device.get_log()
 
 
-@app.get('/device/<id>/databases')
-@error_decorator
-def get_device_db_info(id):
-    device = device_scanner.get_device(id)
-    return device.db_info()
-
-
-
 #################################
 # NODE Functions
 #################################
