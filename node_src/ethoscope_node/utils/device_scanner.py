@@ -8,7 +8,7 @@ import logging
 import traceback
 from functools import wraps
 import socket
-from zeroconf import ServiceBrowser, Zeroconf
+from zeroconf import ServiceBrowser, Zeroconf, IPVersion
 
 from ethoscope_node.utils.etho_db import ExperimentalDB
 from ethoscope_node.utils.mysql_backup import db_diff
@@ -564,10 +564,12 @@ class Ethoscope(Device):
         self._is_online = False
 
 
-class DeviceScanner(object):
+class DeviceScanner():
     """
     Uses zeroconf (aka Bonjour, aka Avahi etc) to passively listen for ethoscope devices registering themselves on the network.
     From: https://github.com/jstasiak/python-zeroconf
+    
+    This does not need to be a thread because browser already is one
     """
     #avahi requires .local but some routers may have .lan
     #TODO: check if this is going to be a problem
@@ -578,7 +580,7 @@ class DeviceScanner(object):
 
     
     def __init__(self, device_refresh_period = 5, deviceClass=Device):
-        self._zeroconf = Zeroconf()
+        self._zeroconf = Zeroconf(ip_version = IPVersion.V4Only)
         self.devices = []
         self.device_refresh_period = device_refresh_period
         self._Device = deviceClass
@@ -686,7 +688,8 @@ class EthoscopeScanner(DeviceScanner):
 
     
     def __init__(self, device_refresh_period = 5, results_dir="/ethoscope_data/results", deviceClass=Ethoscope):
-        self._zeroconf = Zeroconf()
+        self._zeroconf = Zeroconf(ip_version = IPVersion.V4Only)
+        
         self.devices = []
         self.device_refresh_period = device_refresh_period
         self.results_dir = results_dir
@@ -778,7 +781,7 @@ class SensorScanner(DeviceScanner):
     _device_type = "sensor"
     
     def __init__(self, device_refresh_period = 60, deviceClass=Sensor):
-        self._zeroconf = Zeroconf()
+        self._zeroconf = Zeroconf(ip_version = IPVersion.V4Only)
         self.devices = []
         self.device_refresh_period = device_refresh_period
         self._Device = deviceClass
