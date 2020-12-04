@@ -14,6 +14,7 @@ from ethoscope_node.utils.etho_db import ExperimentalDB
 from ethoscope_node.utils.mysql_backup import db_diff
 
 STREAMING_PORT = 8887
+ETHOSCOPE_PORT = 9000
 
 class ScanException(Exception):
     pass
@@ -221,7 +222,7 @@ class Ethoscope(Device):
                                      "dumpdb" : ["stopped"],
                                      "offline": []}
 
-    def __init__(self, ip, port = 9000, refresh_period = 2, results_dir = "/ethoscope_data/results"):
+    def __init__(self, ip, port = ETHOSCOPE_PORT, refresh_period = 2, results_dir = "/ethoscope_data/results"):
         '''
         Initialises the info gathering and controlling activity of a Device by the node
         The server will interrogate the status of the device with frequency of refresh_period
@@ -614,7 +615,7 @@ class DeviceScanner(object):
         # Not found, so produce an error
         #raise KeyError("No such %s device: %s" % (self._device_type, id) )
         
-    def add (self, ip, port=9000, name=None, device_id=None, zcinfo=None):
+    def add (self, ip, port, name=None, device_id=None, zcinfo=None):
         """
         Adds a device to the list
         """
@@ -734,7 +735,7 @@ class EthoscopeScanner(DeviceScanner):
                 
         return out
 
-    def add (self, ip, port, name=None, device_id=None, zcinfo=None):
+    def add (self, ip, port=ETHOSCOPE_PORT, name=None, device_id=None, zcinfo=None):
         """
         Add an ethoscope to the list
         TODO: Can be called manually or by zeroconf - it would be good to recognise which case we are in
