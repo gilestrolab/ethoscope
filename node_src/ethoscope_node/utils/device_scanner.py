@@ -614,7 +614,7 @@ class DeviceScanner(object):
         # Not found, so produce an error
         #raise KeyError("No such %s device: %s" % (self._device_type, id) )
         
-    def add (self, ip, port, name=None, device_id=None, zcinfo=None):
+    def add (self, ip, port=9000, name=None, device_id=None, zcinfo=None):
         """
         Adds a device to the list
         """
