@@ -177,7 +177,7 @@ def manual_add():
         ip_address = ip_address.replace(" ", "")
         
         try:
-            device_scanner.add ( ip_address, "" )
+            device_scanner.add ( ip_address )
             added.append(ip_address)
         except:
             problems.append(ip_address)
