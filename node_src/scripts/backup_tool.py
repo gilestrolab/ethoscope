@@ -71,7 +71,7 @@ if __name__ == '__main__':
             try:
                 ethoscopes = [int(ethoscope)]
             except:
-                ethoscopes = [int(e) for e in ethoscope.split(" ")]
+                ethoscopes = [int(e) for e in ethoscope.split("-")]
                 
             for ethoscope in ethoscopes:
                 print ("Forcing backup for ethoscope %03d" % ethoscope)
