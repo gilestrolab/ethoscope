@@ -563,6 +563,7 @@ class Ethoscope(Device):
     def stop(self):
         self._is_online = False
 
+ZCF = Zeroconf(ip_version = IPVersion.V4Only)
 
 class DeviceScanner():
     """
@@ -580,14 +581,15 @@ class DeviceScanner():
 
     
     def __init__(self, device_refresh_period = 5, deviceClass=Device):
-        self._zeroconf = Zeroconf(ip_version = IPVersion.V4Only)
+        #self._zeroconf = Zeroconf(ip_version = IPVersion.V4Only)
         self.devices = []
         self.device_refresh_period = device_refresh_period
         self._Device = deviceClass
         
     def start(self):
         # Use self as the listener class because I have add_service and remove_service methods
-        self.browser = ServiceBrowser(self._zeroconf, self._service_type, self)
+        #self.browser = ServiceBrowser(self._zeroconf, self._service_type, self)
+        self.browser = ServiceBrowser(ZCF, self._service_type, self)
         
     def stop(self):
         self._zeroconf.close()
@@ -780,17 +782,7 @@ class SensorScanner(DeviceScanner):
     _service_type = "_sensor._tcp.local." 
     _device_type = "sensor"
     
-    def __init__(self, device_refresh_period = 60, deviceClass=Sensor):
-        self._zeroconf = Zeroconf(ip_version = IPVersion.V4Only)
-        self.devices = []
-        self.device_refresh_period = device_refresh_period
-        self._Device = deviceClass
+    def __init__(self, device_refresh_period = 60):
         self.results_dir = ""
-        super(SensorScanner, self).__init__(device_refresh_period=self.device_refresh_period, deviceClass=self._Device)
-        
-    def start(self):
-        # Use self as the listener class because I have add_service and remove_service methods
-        self.browser = ServiceBrowser(self._zeroconf, self._service_type, self)
-        
-    def stop(self):
-        self._zeroconf.close()
+        super(SensorScanner, self).__init__(device_refresh_period=device_refresh_period, deviceClass=Sensor)
+    
