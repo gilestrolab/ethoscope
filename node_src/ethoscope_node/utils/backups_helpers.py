@@ -31,6 +31,7 @@ def receive_devices(server = "localhost"):
         
 
 class BackupClass(object):
+    
     _db_credentials = {
             "name":"ethoscope_db",
             "user":"ethoscope",
@@ -41,7 +42,7 @@ class BackupClass(object):
     # #the user remotely accessing it is node/node
     
     # _db_credentials = {
-            # "name":"ETHOSCOPE_000_db",
+            # "name":"ETHOSCOPE_001_db",
             # "user":"node",
             # "password":"node"
         # }
@@ -127,21 +128,21 @@ class GenericBackupWrapper(object):
                 dev_list = str([d for d in sorted(devices.keys())])
                 logging.info("device map is: %s" %dev_list)
 
-                args = []
+                devices_to_backup = []
                 for d in list(devices.values()):
-                    if d["status"] not in ["not_in_use", "offline"]:
-                        args.append((d, self._results_dir))
+                    if d["status"] not in ["not_in_use", "offline"] and d["name"] != "ETHOSCOPE_000":
+                        devices_to_backup.append((d, self._results_dir))
 
-                logging.info("Found %s devices online" % len(args))
+                logging.info("Found %s devices online" % len(devices_to_backup))
 
                 if self._safe:
-                    for arg in args:
-                        self._backup_job(arg)
+                    for dtb in devices_to_backup:
+                        self._backup_job(dtb)
 
-                    #map(self._backup_job, args)
+                    #map(self._backup_job, devices_to_backup)
                 else:
                     pool = multiprocessing.Pool(4)
-                    _ = pool.map(self._backup_job, args)
+                    _ = pool.map(self._backup_job, devices_to_backup)
                     logging.info("Pool mapped")
                     pool.close()
                     logging.info("Joining now")
