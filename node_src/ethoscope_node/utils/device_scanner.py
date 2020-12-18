@@ -8,7 +8,7 @@ import logging
 import traceback
 from functools import wraps
 import socket
-from zeroconf import ServiceBrowser, Zeroconf, IPVersion
+from zeroconf import ServiceBrowser, Zeroconf
 
 from ethoscope_node.utils.etho_db import ExperimentalDB
 from ethoscope_node.utils.mysql_backup import db_diff
@@ -222,7 +222,7 @@ class Ethoscope(Device):
                                      "dumpdb" : ["stopped"],
                                      "offline": []}
 
-    def __init__(self, ip, port = ETHOSCOPE_PORT, refresh_period = 2, results_dir = "/ethoscope_data/results"):
+    def __init__(self, ip, port = ETHOSCOPE_PORT, refresh_period = 5, results_dir = "/ethoscope_data/results"):
         '''
         Initialises the info gathering and controlling activity of a Device by the node
         The server will interrogate the status of the device with frequency of refresh_period
@@ -232,20 +232,20 @@ class Ethoscope(Device):
         self._ip = ip
         self._port = port
         self._id_url = "http://%s:%i/%s" % (ip, port, self._remote_pages['id'])
+        self._is_online = True
+        self._skip_scanning = False
+        self._refresh_period = refresh_period
 
         self._info = {"status": "offline"}
         self._id = ""
         self._reset_info()
-
-        self._is_online = True
-        self._skip_scanning = False
-        self._refresh_period = refresh_period
+        self._info['ping'] = 0
         
         self._edb = ExperimentalDB()
-        
-        self._update_info()
-        
+
         super(Ethoscope,self).__init__()
+        
+
 
     def run(self):
         '''
@@ -319,10 +319,14 @@ class Ethoscope(Device):
         '''
         Retrieves private machine info from the ethoscope
         This is used to check if the ethoscope is a new installation
+        URL http://<ip>:<port>/machine/<id>
         '''
-        machine_info_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_pages['machine_info'], self._id)
-        out = self._get_json(machine_info_url)
-        return out
+        if self._id:
+            machine_info_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_pages['machine_info'], self._id)
+            out = self._get_json(machine_info_url)
+            return out
+        else:
+            return {}
         
 
     def skip_scanning(self, value):
@@ -437,9 +441,9 @@ class Ethoscope(Device):
         old_id = self._id
         resp = self._get_json(self._id_url)
         self._id = resp['id']
-        if self._id != old_id:
-            if old_id:
-                logging.warning("Device id changed at %s. %s ===> %s" % (self._ip, old_id, self._id))
+        
+        if self._id != old_id and old_id != "":
+            logging.warning("Device id changed at %s. %s ===> %s" % (self._ip, old_id, self._id))
             self._reset_info()
 
         self._info["ip"] = self._ip
@@ -456,13 +460,32 @@ class Ethoscope(Device):
     def _update_info(self):
         '''
         '''
+
         previous_status = self._info['status']
 
-        try:
+        self._info['ping'] += 1
+
+        if not self._id:
             self._update_id()
 
+
+        try:
+            
+            data_url = "http://%s:%i/data/%s" % (self._ip, self._port, self._id)
+            new_info = self._get_json(data_url)
+
+            new_status = new_info['status']
+            self._info.update(new_info)
+
+            backup_path = self._make_backup_path()
+            self._info.update(backup_path)
+
         except ScanException:
-            self._reset_info()
+
+            # first check if the problem is that we don't know what the ID is.
+            self._update_id()
+
+            new_status = 'unreached'
 
             if 'run_id' in self._info['experimental_info']:
                 run_id = self._info['experimental_info']['run_id']
@@ -470,24 +493,28 @@ class Ethoscope(Device):
 
             return
 
-        try:
-            data_url = "http://%s:%i/data/%s" % (self._ip, self._port, self._id)
-            new_info = self._get_json(data_url)
 
-            new_status = new_info['status']
-            self._info.update(new_info)
+        # Appearing online 
+        if previous_status == "offline" and new_status != "offline" and "ETHOSCOPE_OOO" not in self._info['name'].upper():
 
-            resp = self._make_backup_path()
-            self._info.update(resp)
+            mi = self.machine_info()
 
-        except ScanException:
-            new_status = 'unreached'
+            if 'kernel' in mi.keys():
+                machine_info = "%s on pi%s" % (mi['kernel'], mi['pi_version'])
+            else:
+                machine_info = ""
+
+            # #We add the device to the database or update its record but only if it is not a 000 device
+            self._edb.updateEthoscopes(ethoscope_id = self._id, ethoscope_name = self._info['name'], last_ip = self._ip, machineinfo = machine_info)
+        
+
 
         #if ethoscope is online and returning data
 
         if 'name' in self._info['experimental_info']:
             user_name = self._info['experimental_info']['name']
             location = self._info['experimental_info']['location']
+            
         else:
             user_name = ""
             location = ""
@@ -508,18 +535,17 @@ class Ethoscope(Device):
             #not sure the unreach ones actually ever happen
             if previous_status == 'running'      and new_status == 'unreached': self._edb.updateEthoscopes(ethoscope_id = self._id, status="unreached")
             if previous_status == 'stopped'      and new_status == 'unreached': self._edb.updateEthoscopes(ethoscope_id = self._id, status="offline")
-
-            
+   
             #if previous_status == 'running'      and new_status == 'unreached': self._edb.flagProblem( run_id = run_id, message = "unreached" ) #ethoscope went offline during tracking!
 
 
-        # update the record on the ethoscope table
-        if new_status != previous_status and previous_status != "offline":
-            self._edb.updateEthoscopes(ethoscope_id = self._id, status=new_status)
-
-
-        dbd = db_diff(self._info["db_name"], self._ip, self._info['backup_path'])
-        self._info['backup_status'] = dbd.compare_databases()
+        # gather info on the current backup if possible
+        try:
+            dbd = db_diff(self._info["db_name"], self._ip, self._info['backup_path'])
+            self._info['backup_status'] = dbd.compare_databases()
+            
+        except:
+            self._info['backup_status'] = "N/A"
 
 
     def _make_backup_path(self,  timeout=30):
@@ -563,14 +589,10 @@ class Ethoscope(Device):
     def stop(self):
         self._is_online = False
 
-ZCF = Zeroconf(ip_version = IPVersion.V4Only)
-
 class DeviceScanner():
     """
     Uses zeroconf (aka Bonjour, aka Avahi etc) to passively listen for ethoscope devices registering themselves on the network.
     From: https://github.com/jstasiak/python-zeroconf
-    
-    This does not need to be a thread because browser already is one
     """
     #avahi requires .local but some routers may have .lan
     #TODO: check if this is going to be a problem
@@ -581,15 +603,14 @@ class DeviceScanner():
 
     
     def __init__(self, device_refresh_period = 5, deviceClass=Device):
-        #self._zeroconf = Zeroconf(ip_version = IPVersion.V4Only)
+        self._zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
         self.devices = []
         self.device_refresh_period = device_refresh_period
         self._Device = deviceClass
         
     def start(self):
         # Use self as the listener class because I have add_service and remove_service methods
-        #self.browser = ServiceBrowser(self._zeroconf, self._service_type, self)
-        self.browser = ServiceBrowser(ZCF, self._service_type, self)
+        self.browser = ServiceBrowser(self._zeroconf, self._service_type, self)
         
     def stop(self):
         self._zeroconf.close()
@@ -645,6 +666,7 @@ class DeviceScanner():
         type = '_device._tcp.local.'
         name = 'DEVICE000._device._tcp.local.'
         """
+        #logging.info("Got info about device %s" % name)
 
         
         try:
@@ -656,7 +678,7 @@ class DeviceScanner():
                 ip = socket.inet_ntoa(info.addresses[0])
                 port = info.port
                 self.add( ip, port, name, zcinfo = info )
-    
+                
         except Exception as error:
             logging.error("Exception trying to add zeroconf service '"+name+"' of type '"+type+"': "+str(error))
             
@@ -690,14 +712,14 @@ class EthoscopeScanner(DeviceScanner):
 
     
     def __init__(self, device_refresh_period = 5, results_dir="/ethoscope_data/results", deviceClass=Ethoscope):
-        self._zeroconf = Zeroconf(ip_version = IPVersion.V4Only)
-        
+        self._zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
         self.devices = []
         self.device_refresh_period = device_refresh_period
         self.results_dir = results_dir
         self._Device = deviceClass
-        
         self._edb = ExperimentalDB()
+        
+        self.timestarted = datetime.datetime.now()
 
     def _get_last_backup_time(self, device):
         try:
@@ -751,17 +773,12 @@ class EthoscopeScanner(DeviceScanner):
         device.zeroconf_name = name
         device.start()
 
+        #device_id = zcinfo.properties[b'id']
+        #device_id = name.split("-")[1].split(".")[0]
+
         self.devices.append(device)
-        logging.info("New %s added with name = %s, id = %s at IP = %s:%s" % (self._device_type, name, device.id(), ip, port))
+        logging.info("New %s added with name = %s at IP = %s:%s" % (self._device_type, name, ip, port))
 
-        if 'kernel' in device.machine_info().keys():
-            machine_info = "%s on pi%s" % (device.machine_info()['kernel'], device.machine_info()['pi_version'])
-        else:
-            machine_info = ""
-
-        #We add the device to the database or update its record but only if it is not a 000 device
-        if device.info()['name'] != "ETHOSCOPE_OOO":
-            self._edb.updateEthoscopes(ethoscope_id = device.id(), ethoscope_name = device.info()['name'], last_ip = ip, machineinfo = machine_info)
     
     def retire_device (self, id, active=0):
         """
@@ -771,9 +788,6 @@ class EthoscopeScanner(DeviceScanner):
         new_data = self._edb.getEthoscope(id, asdict=True)[id]
         return {'id' : new_data['ethoscope_id'], 'active' : new_data['active']}
         
-        
-
-
 class SensorScanner(DeviceScanner):
     """
     Sensor specific scanner
@@ -782,7 +796,17 @@ class SensorScanner(DeviceScanner):
     _service_type = "_sensor._tcp.local." 
     _device_type = "sensor"
     
-    def __init__(self, device_refresh_period = 60):
+    def __init__(self, device_refresh_period = 60, deviceClass=Sensor):
+        self._zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
+        self.devices = []
+        self.device_refresh_period = device_refresh_period
+        self._Device = deviceClass
         self.results_dir = ""
-        super(SensorScanner, self).__init__(device_refresh_period=device_refresh_period, deviceClass=Sensor)
-    
+        super(SensorScanner, self).__init__(device_refresh_period=self.device_refresh_period, deviceClass=self._Device)
+        
+    def start(self):
+        # Use self as the listener class because I have add_service and remove_service methods
+        self.browser = ServiceBrowser(self._zeroconf, self._service_type, self)
+        
+    def stop(self):
+        self._zeroconf.close()

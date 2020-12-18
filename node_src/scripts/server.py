@@ -605,7 +605,7 @@ if __name__ == '__main__':
 
     logging.getLogger().setLevel(logging.INFO)
     parser = optparse.OptionParser()
-    parser.add_option("-D", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
+    parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-p", "--port", dest="port", default=80, help="port")
     parser.add_option("-e", "--temporary-results-dir", dest="temp_results_dir", help="Where temporary result files are stored")
 
@@ -622,7 +622,6 @@ if __name__ == '__main__':
         logging.info("Logging using DEBUG SETTINGS")
 
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
-    device_scanner = None
     
     try:
         device_scanner = EthoscopeScanner(results_dir=RESULTS_DIR)
@@ -638,17 +637,23 @@ if __name__ == '__main__':
 #            if CFG.content['sensors'][sensor]['active']:
 #                sensor_scanner.add(CFG.content['sensors'][sensor]['name'], CFG.content['sensors'][sensor]['URL'])
         
-        #######TO be remove when bottle changes to version 0.13
-        server = "cherrypy"
+        
         try:
-            from bottle.cherrypy import wsgiserver
+            bottle.run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='paste')
+
         except:
-            #Trick bottle into thinking that cheroot is cherrypy
-            bottle.server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
-            logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
-            pass
-        #########
-        bottle.run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='cherrypy')
+        
+            #######TO be remove when bottle changes to version 0.13
+            server = "cherrypy"
+            try:
+                from bottle.cherrypy import wsgiserver
+            except:
+                #Trick bottle into thinking that cheroot is cherrypy
+                bottle.server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
+                logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
+                pass
+            #########
+            bottle.run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='cherrypy')
 
     except KeyboardInterrupt:
         logging.info("Stopping server cleanly")
