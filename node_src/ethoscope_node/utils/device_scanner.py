@@ -8,7 +8,7 @@ import logging
 import traceback
 from functools import wraps
 import socket
-from zeroconf import ServiceBrowser, Zeroconf
+from zeroconf import ServiceBrowser, Zeroconf, IPVersion
 
 from ethoscope_node.utils.etho_db import ExperimentalDB
 from ethoscope_node.utils.mysql_backup import db_diff
