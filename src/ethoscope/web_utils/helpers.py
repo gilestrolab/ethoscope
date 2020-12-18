@@ -398,7 +398,7 @@ def SQL_dump( database_name = None, credentials = {'username' : 'ethoscope', 'pa
     
     fullpath = os.path.join(output_dir, outputfile)
    
-    cmd = "mysqldump -alv --user=%s --password=%s %s > %s" % (credentials['username'], credentials['password'], database_name, fullpath)
+    cmd = "mysqldump -alv --compatible=ansi --skip-extended-insert --compact --user=%s --password=%s %s > %s" % (credentials['username'], credentials['password'], database_name, fullpath)
 
     try:
         # Exporting the database can take some time 
