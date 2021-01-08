@@ -4,6 +4,8 @@ from .tracking_unit import TrackingUnit
 import logging
 import traceback
 
+import datetime
+
 
 class Monitor(object):
 
@@ -84,7 +86,7 @@ class Monitor(object):
         """
         self._force_stop = True
 
-    def run(self, result_writer = None, drawer = None):
+    def run(self, result_writer = None, drawer = None, verbose=False):
         """
         Runs the monitor indefinitely.
 
@@ -99,6 +101,9 @@ class Monitor(object):
             self._is_running = True
 
             for i,(t, frame) in enumerate(self._camera):
+                
+                # This is useful feedback when we do offline tracking
+                if verbose and t % 5000 == 0: print ( str(datetime.timedelta(milliseconds=t)) )
 
                 if self._force_stop:
                     logging.info("Monitor object stopped from external request")
@@ -136,6 +141,7 @@ class Monitor(object):
         finally:
             self._is_running = False
             logging.info("Monitor closing - processed %s frames" % i)
+            if verbose: print ("Monitor closing - processed %s frames" % i)
 
 
 

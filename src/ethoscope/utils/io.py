@@ -768,13 +768,13 @@ class SQLiteResultWriter(ResultWriter):
 
 
 class npyAppendableFile():
-    def __init__(self, fname, newfile=True):
+    def __init__(self, fname, newfile = True):
         '''
         Creates a new instance of the appendable filetype
         If newfile is True, recreate the file even if already exists
         '''
         filepath, extension = os.path.splitext(fname)
-        self.fname=filepath + ".anpy"
+        self.fname = filepath + ".anpy"
         
         self._newfile = newfile
         self._first_write = True
@@ -892,8 +892,8 @@ class rawdatawriter():
         '''
 
         #Convert data_rows to an array with shape (nf, 5) where nf is the number of flies in the ROI
-        arr = np.asarray([[fly['x'], fly['y'], fly['w'], fly['h'], fly['phi']] for fly in data_rows])
+        arr = np.asarray([[t, fly['x'], fly['y'], fly['w'], fly['h'], fly['phi']] for fly in data_rows])
         #The size of data_rows depends on how many contours were found. The array needs to have a fixed shape so we round it to self.entities as the max number of flies allowed
-        arr.resize((self.entities, 5, 1), refcheck=False)
+        arr.resize((self.entities, 6, 1), refcheck=False)
         self.data[roi.idx] = arr
 
