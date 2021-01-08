@@ -18,7 +18,7 @@ from threading import Thread
 import bottle
 
 import socket
-from zeroconf import ServiceInfo, Zeroconf
+from zeroconf import ServiceInfo, Zeroconf, IPVersion
 
 try:
     from cheroot.wsgi import Server as WSGIServer
@@ -121,7 +121,6 @@ def make_index():
 @error_decorator
 def rm_static_file(id):
     global control
-    global record
 
     data = bottle.request.body.read()
     data = json.loads(data)
@@ -221,7 +220,6 @@ def update_machine_info(id):
 @error_decorator
 def controls(id, action):
     global control
-    global record
     if id != machine_id:
         raise WrongMachineID
 
@@ -229,7 +227,6 @@ def controls(id, action):
         data = bottle.request.json
         tracking_json_data.update(data)
         
-        #control = None
         control = ControlThread(machine_id=machine_id,
                                 name=machine_name,
                                 version=version,
@@ -468,6 +465,13 @@ if __name__ == '__main__':
 
     PORT = option_dict["port"]
     DEBUG = option_dict["debug"]
+    ETHOSCOPE_DIR = option_dict["results_dir"]
+
+    if DEBUG:
+        logging.basicConfig()
+        logging.getLogger().setLevel(logging.DEBUG)
+        logging.info("Logging using DEBUG SETTINGS")
+
 
     machine_id = get_machine_id()
     machine_name = get_machine_name()
@@ -482,36 +486,19 @@ if __name__ == '__main__':
 
 
     if option_dict["record_video"]:
-        recording_json_data = json_data
-        control = ControlThreadVideoRecording(machine_id=machine_id,
-                                              name=machine_name,
-                                              version=version,
-                                              ethoscope_dir=ETHOSCOPE_DIR,
-                                              data=recording_json_data)
-
+        controlClass = ControlThreadVideoRecording
     else:
-        tracking_json_data = json_data
-        control = ControlThread(machine_id=machine_id,
-                                name=machine_name,
-                                version=version,
-                                ethoscope_dir=ETHOSCOPE_DIR,
-                                data=tracking_json_data)
+        controlClass = ControlThread
 
-    ETHOSCOPE_DIR = option_dict["results_dir"]
-
-    if DEBUG:
-        logging.basicConfig()
-        logging.getLogger().setLevel(logging.DEBUG)
-        logging.info("Logging using DEBUG SETTINGS")
-
-    #if option_dict["stop_after_run"]:
-    #     control.set_evanescent(True) # kill program after first run
+    control = ControlClass (machine_id = get_machine_id(),
+                            name = get_machine_name(),
+                            version = get_git_version(), 
+                            ethoscope_dir = ETHOSCOPE_DIR,
+                            data=json_data
+                            )
 
     if option_dict["run"] or control.was_interrupted:
         control.start()
-
-#    try:
-#        run(api, host='0.0.0.0', port=port, server='cherrypy',debug=option_dict["debug"])
 
     try:
         # Register the ethoscope using zeroconf so that the node knows about it.
@@ -526,7 +513,7 @@ if __name__ == '__main__':
         # to make sure each burned image will get a unique machine-id at the first boot
         
         hostname = socket.gethostname()
-        uid = "%s-%s" % ( hostname, get_machine_id() )
+        uid = "%s-%s" % ( hostname, machine_id )
         
         
         ip_attempts = 0
@@ -557,40 +544,41 @@ if __name__ == '__main__':
                         addresses = [socket.inet_aton(ip_address)],
                         port = PORT,
                         properties = {
-                            'version': '0.0.1',
+                            'version': '0.1',
                             'id_page': '/id',
-                            'user_options_page': '/user_options',
-                            'static_page': '/static',
-                            'controls_page': '/controls',
-                            'user_options_page': '/user_options'
+                            'id' : machine_id
                         } )
                         
-        zeroconf = Zeroconf()
+        zeroconf = Zeroconf(IPVersion.V4Only)
         zeroconf.register_service(serviceInfo)
 
-        ####### THIS IS A BIG MESS AND NEEDS TO BE FIXED. To be remove when bottle changes to version 0.13
-
-        SERVER = "cheroot"
         try:
-            #This checks if the patch has to be applied or not. We check if bottle has declared cherootserver
-            #we assume that we are using cherrypy > 9
-            from bottle import CherootServer
+            bottle.run(api, host='0.0.0.0', port=PORT, debug=DEBUG, server='paste')
+            
         except:
-            #Trick bottle to think that cheroot is actulay cherrypy server, modifies the server_names allowed in bottle
-            #so we use cheroot in background.
-            SERVER="cherrypy"
-            bottle.server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
-            logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
-            pass
-        #########
 
-        bottle.run(api, host='0.0.0.0', port=PORT, debug=DEBUG, server=SERVER)
+            ####### THIS IS A BIG MESS AND NEEDS TO BE FIXED. To be remove when bottle changes to version 0.13
+
+            SERVER = "cheroot"
+            try:
+                #This checks if the patch has to be applied or not. We check if bottle has declared cherootserver
+                #we assume that we are using cherrypy > 9
+                from bottle import CherootServer
+            except:
+                #Trick bottle to think that cheroot is actulay cherrypy server, modifies the server_names allowed in bottle
+                #so we use cheroot in background.
+                SERVER="cherrypy"
+                bottle.server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
+                logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
+                pass
+            #########
+
+            bottle.run(api, host='0.0.0.0', port=PORT, debug=DEBUG, server=SERVER)
 
     except Exception as e:
         logging.error(traceback.format_exc())
         try:
             zeroconf.unregister_service(serviceInfo)
-            zeroconf.close()
         except:
             pass
         close(1)
