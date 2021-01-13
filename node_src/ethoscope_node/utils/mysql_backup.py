@@ -464,10 +464,12 @@ class db_diff():
             db_name = entry[0]
             table_name = entry[1]
             
-            if table_name not in ["ROI_MAP", "VAR_MAP", "METADATA"]:
-                command = 'SELECT max(id) FROM %s.%s' % (db_name, table_name)
-            else:
+            if table_name in ["ROI_MAP", "VAR_MAP"] or table_name.startswith("METADATA"):
+                #tables that do not have a unique id - slower command
                 command = 'SELECT count(*) from %s.%s' % (db_name, table_name)
+            else:
+                #tables that do
+                command = 'SELECT max(id) FROM %s.%s' % (db_name, table_name)
             
             src_cur.execute(command)
             remote_local_tables_dictionary [db_name] . update ( { table_name :  src_cur.fetchone()[0] } )
