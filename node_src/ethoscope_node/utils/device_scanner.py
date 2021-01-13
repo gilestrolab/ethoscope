@@ -242,6 +242,7 @@ class Ethoscope(Device):
         self._info['ping'] = 0
         
         self._edb = ExperimentalDB()
+        self._last_db_info = time.time()
 
         super(Ethoscope,self).__init__()
         
@@ -540,12 +541,12 @@ class Ethoscope(Device):
 
 
         # gather info on the current backup if possible
-        self._last_db_info = time.time()
         try:
             if time.time() - self._last_db_info > 60:
                 dbd = db_diff(self._info["db_name"], self._ip, self._info['backup_path'])
                 self._info['backup_status'] = dbd.compare_databases()
-            
+                self._last_db_info = time.time()
+
         except:
             self._info['backup_status'] = "N/A"
 
