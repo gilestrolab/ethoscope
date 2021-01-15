@@ -18,7 +18,7 @@ from threading import Thread
 import bottle
 
 import socket
-from zeroconf import ServiceInfo, Zeroconf, IPVersion
+from zeroconf import ServiceInfo, Zeroconf
 
 try:
     from cheroot.wsgi import Server as WSGIServer
@@ -548,8 +548,12 @@ if __name__ == '__main__':
                             'id_page': '/id',
                             'id' : machine_id
                         } )
-                        
-        zeroconf = Zeroconf(IPVersion.V4Only)
+
+        try:
+            zeroconf = Zeroconf(zeroconf.IPVersion.V4Only)
+        except:
+            zeroconf = Zeroconf()
+            
         zeroconf.register_service(serviceInfo)
 
         try:
