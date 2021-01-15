@@ -490,7 +490,7 @@ if __name__ == '__main__':
     else:
         controlClass = ControlThread
 
-    control = ControlClass (machine_id = get_machine_id(),
+    control = controlClass (machine_id = get_machine_id(),
                             name = get_machine_name(),
                             version = get_git_version(), 
                             ethoscope_dir = ETHOSCOPE_DIR,
