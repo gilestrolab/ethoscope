@@ -71,7 +71,7 @@ class ControlThread(Thread):
     Note: Options are passed and shown only if the remote class contains a "_description" field!
     """
 
-    _auto_SQL_backup_at_stop = True
+    _auto_SQL_backup_at_stop = False
     
     _option_dict = {
         "roi_builder":{
