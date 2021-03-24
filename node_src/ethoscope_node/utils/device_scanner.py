@@ -70,7 +70,8 @@ class Device(Thread):
         
         except urllib.error.URLError as e:
            raise ScanException("Error" + str(e.reason))
-            #return e
+           # Needs to return something to avoid problems with _update_id()
+           return False
         
         except Exception as e:
            raise ScanException("Unexpected error" + str(e))
@@ -441,6 +442,10 @@ class Ethoscope(Device):
 
         old_id = self._id
         resp = self._get_json(self._id_url)
+        if not resp:
+            # Ethoscope most likely is off. 
+            #_get_json returns False if URLError is reached. 
+            return 0
         self._id = resp['id']
         
         if self._id != old_id and old_id != "":
