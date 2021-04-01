@@ -68,6 +68,7 @@ class IsMovingStimulator(BaseStimulator):
         if  has_moved:# or xor_diff > self._xor_speed_threshold :
             self._last_active = t[-1]
             return HasInteractedVariable(False), {}
+            
         return HasInteractedVariable(True), {}
 
 class SleepDepStimulator(IsMovingStimulator):
@@ -75,6 +76,7 @@ class SleepDepStimulator(IsMovingStimulator):
                     "arguments": [
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_correction_coef", "description": "Velocity correction coef","default":3.0e-3},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken","default":120},
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step": 0.1, "name": "stimulus_probability",  "description": "Probability the stimulus will happen", "default": 1.0},
                                     {"type": "date_range", "name": "date_range",
                                      "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
                                      "default": ""},
@@ -89,6 +91,7 @@ class SleepDepStimulator(IsMovingStimulator):
                  hardware_connection,
                  velocity_correction_coef=3.0e-3,
                  min_inactive_time=120,  #s
+                 stimulus_probability=1.0,
                  date_range=""
                  ):
         """
@@ -100,11 +103,13 @@ class SleepDepStimulator(IsMovingStimulator):
         :type velocity_correction_coef: float
         :param min_inactive_time: the minimal time without motion after which an animal should be disturbed (in seconds)
         :type min_inactive_time: float
+        :type stimulus_probability: float defines the accuracy of the _define function. ( 1 - p ) will be the rate of false positives
         :return:
         """
 
         self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
         self._t0 = None
+        self._p = stimulus_probability
         
         super(SleepDepStimulator, self).__init__(hardware_connection, velocity_correction_coef, date_range=date_range)
 
@@ -126,11 +131,12 @@ class SleepDepStimulator(IsMovingStimulator):
             self._t0 = now
 
         if not has_moved:
-            if float(now - self._t0) > self._inactivity_time_threshold_ms:
+            if ( float(now - self._t0) > self._inactivity_time_threshold_ms ) and ( random.uniform(0,1) <= self._p ):
                 self._t0 = None
                 return HasInteractedVariable(True), {"channel":channel}
         else:
             self._t0 = now
+
         return HasInteractedVariable(False), {}
 
 
@@ -278,7 +284,7 @@ class ExperimentalSleepDepStimulator(SleepDepStimulator):
 class MiddleCrossingStimulator(BaseStimulator):
     _description = {"overview": "A stimulator to disturb animal as they cross the midline",
                     "arguments": [
-                                    {"type": "number", "min": 0.0, "max": 1.0, "step":0.01, "name": "p", "description": "the probability to move the tube when a beam cross was detected","default":1.0},
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step":0.1, "name": "stimulus_probability", "description": "the probability to move the tube when a beam cross was detected", "default":1.0},
                                     {"type": "date_range", "name": "date_range",
                                      "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
                                      "default": ""}
@@ -292,7 +298,7 @@ class MiddleCrossingStimulator(BaseStimulator):
         }
     def __init__(self,
                  hardware_connection,
-                 p=1.0,
+                 stimulus_probability=1.0,
                  date_range=""
                  ):
         """
@@ -304,7 +310,7 @@ class MiddleCrossingStimulator(BaseStimulator):
         """
 
         self._last_stimulus_time = 0
-        self._p = p
+        self._p = stimulus_probability
         
         super(MiddleCrossingStimulator, self).__init__(hardware_connection,  date_range=date_range)
 
@@ -411,6 +417,7 @@ class mAGO(SleepDepStimulator):
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken(s)","default":120},
                                     {"type": "number", "min": 500, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
                                     {"type": "number", "min": 0, "max": 3, "step": 1, "name": "stimulus_type",  "description": "1 = motor, 2= valves", "default": 1},
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step": 0.1, "name": "stimulus_probability",  "description": "Probability the stimulus will happen", "default": 1.0},
                                     {"type": "date_range", "name": "date_range",
                                      "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
                                      "default": ""}
@@ -431,14 +438,16 @@ class mAGO(SleepDepStimulator):
                  min_inactive_time=120,  # s
                  pulse_duration = 1000,  #ms
                  stimulus_type = 2,  # 1 = opto, 2= moto, 3 = both
+                 stimulus_probability = 1.0,
                  date_range=""
                  ):
 
 
         self._t0 = None
+        self._p = stimulus_probability
 
         # the inactive time depends on the chanel here
-        super(mAGO, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, date_range)
+        super(mAGO, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range)
 
 
 
@@ -452,4 +461,4 @@ class mAGO(SleepDepStimulator):
     def _decide(self):
         out, dic = super(mAGO, self)._decide()
         dic["duration"] = self._pulse_duration
-        return out,dic
+        return out, dic
