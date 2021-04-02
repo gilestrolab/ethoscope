@@ -1,21 +1,22 @@
 /*
   ESP32/8266 mDNS based environmental sensor
-
+  https://www.notion.so/giorgiogilestro/ESP8266-Sensor-mesh-fbf3c45a68034634a02316458a0336b5
+  
   This is an example of an HTTP server that is accessible
   via mDNS responder.
 
   Soldier together the two sensors boards (BME280 and BH1750), using the same header
-  then connect to the ESP32 
+  then connect to the ESP32 via I2C cable
   VCC -> 3.3V
   Gnd -> Gnd
   SDA -> D21
   SCL -> D22
 
-  or ESP8266 D1 mini Pro
+  or (reccomended) ESP8266 D1 mini Pro
   VCC -> 3.3V
   Gnd -> Gnd
-  SDA -> D1
-  SCL -> D2
+  SDA -> D2
+  SCL -> D1
 
   Instructions:
   - Update WiFi SSID and password as necessary.
