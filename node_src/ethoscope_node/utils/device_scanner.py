@@ -441,6 +441,9 @@ class Ethoscope(Device):
 
         old_id = self._id
         resp = self._get_json(self._id_url)
+        if not resp:
+            # Ethoscope is not reachable
+            return 0
         self._id = resp['id']
         
         if self._id != old_id and old_id != "":
@@ -466,11 +469,9 @@ class Ethoscope(Device):
 
         self._info['ping'] += 1
 
-        if not self._id:
-            self._update_id()
-
-
         try:
+            if not self._id:
+                self._update_id()
             
             data_url = "http://%s:%i/data/%s" % (self._ip, self._port, self._id)
             new_info = self._get_json(data_url)
@@ -481,17 +482,22 @@ class Ethoscope(Device):
             backup_path = self._make_backup_path()
             self._info.update(backup_path)
 
-        except ScanException:
+        except ScanException as e:
+            logging.warning(f"error while scanning: {e}")
+            logging.warning(f"ethoscope not reachable, previous state {previous_status}")
 
             # first check if the problem is that we don't know what the ID is.
-            self._update_id()
-
+            # self._update_id()
             new_status = 'unreached'
 
             if 'run_id' in self._info['experimental_info']:
                 run_id = self._info['experimental_info']['run_id']
                 self._edb.flagProblem( run_id = run_id, message = "unreached" ) #ethoscope went offline while running
+                if previous_status == 'running'      and new_status == 'unreached': self._edb.updateEthoscopes(ethoscope_id = self._id, status="unreached")
+            else:
+                if previous_status == 'stopped'      and new_status == 'unreached': self._edb.updateEthoscopes(ethoscope_id = self._id, status="offline")
 
+            self._reset_info()
             return
 
 
