@@ -131,9 +131,13 @@ class SleepDepStimulator(IsMovingStimulator):
             self._t0 = now
 
         if not has_moved:
-            if ( float(now - self._t0) > self._inactivity_time_threshold_ms ) and ( random.uniform(0,1) <= self._p ):
-                self._t0 = None
-                return HasInteractedVariable(True), {"channel":channel}
+            if float(now - self._t0) > self._inactivity_time_threshold_ms:
+                if random.uniform(0,1) <= self._p:
+                    self._t0 = None
+                    return HasInteractedVariable(True), {"channel":channel}
+                else:
+                    self.t_0 = None
+                    return HasInteractedVariable(False), {}
         else:
             self._t0 = now
 
@@ -344,6 +348,9 @@ class MiddleCrossingStimulator(BaseStimulator):
             if random.uniform(0,1) < self._p:
                 self._last_stimulus_time = now
                 return HasInteractedVariable(True), {"channel": channel}
+            else:
+                self._last_stimulus_time = now
+                return HasInteractedVariable(False), {}
 
         return HasInteractedVariable(False), {"channel": channel}
 
