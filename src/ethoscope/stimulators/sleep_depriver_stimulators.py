@@ -109,7 +109,7 @@ class SleepDepStimulator(IsMovingStimulator):
 
         self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
         self._t0 = None
-        self._p = stimulus_probability
+        self._p = float(stimulus_probability)
         
         super(SleepDepStimulator, self).__init__(hardware_connection, velocity_correction_coef, date_range=date_range)
 
