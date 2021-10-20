@@ -140,7 +140,7 @@ class SleepDepStimulator(IsMovingStimulator):
                     self._t0 = None
                     return HasInteractedVariable(True), {"channel":channel}
                 else:
-                    self.t_0 = None
+                    self._t0 = None
                     return HasInteractedVariable(False), {}
         else:
             self._t0 = now
