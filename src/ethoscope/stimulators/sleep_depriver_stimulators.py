@@ -138,14 +138,14 @@ class SleepDepStimulator(IsMovingStimulator):
             if float(now - self._t0) > self._inactivity_time_threshold_ms:
                 if random.uniform(0,1) <= self._p:
                     self._t0 = None
-                    return HasInteractedVariable(True), {"channel":channel}
+                    return HasInteractedVariable(1), {"channel":channel}
                 else:
                     self._t0 = None
-                    return HasInteractedVariable(False), {}
+                    return HasInteractedVariable(2), {}
         else:
             self._t0 = now
 
-        return HasInteractedVariable(False), {}
+        return HasInteractedVariable(0), {}
 
 
 class SleepDepStimulatorCR(SleepDepStimulator):
