@@ -11,7 +11,7 @@
   SDA -> D21
   SCL -> D22
 
-  or ESP8266 D1 mini Pro
+  or ESP8266 D1 mini Pro (use WEMOS D1 R1)
   VCC -> 3.3V
   Gnd -> Gnd
   SDA -> D2
@@ -32,193 +32,184 @@
 
 */
 
+#define USELIGHT
+
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <WiFiClient.h>
 
 //https://github.com/me-no-dev/ESPAsyncWebServer
 #include <ESPAsyncWebServer.h>
-
 #include <StringArray.h>
-#include <SPIFFS.h>
-#include <FS.h>
 
+// For ESP8266, EEPROM rotate seems the only library that actually works
+// https://github.com/xoseperez/eeprom_rotate
+#include <EEPROM_Rotate.h>
+EEPROM_Rotate EEPROMr;
 
-
+#define EEPROM_SIZE 4096 //total size of the eeprom we want to use
+#define EEPROM_START 128 //from which byte on we start writing data
 
 //For I2C communication
 #include <Wire.h>
 
 //For sensor-specific routines
 #include <Adafruit_Sensor.h>
+
+//BMP cannot measure humidity
 #include <Adafruit_BME280.h>
+//#include <Adafruit_BMP280.h>
+
 #include <BH1750FVI.h>
 
-// Create a web server object on port 80
-AsyncWebServer server(80);
-
 //Initialise the I2C environmental sensors
-Adafruit_BME280 bme;
-BH1750FVI LightSensor(BH1750FVI::k_DevModeContLowRes);
+Adafruit_BME280 bme; // I2C
+
+#if defined(USELIGHT)
+    BH1750FVI LightSensor(BH1750FVI::k_DevModeContLowRes);
+#endif
 
 typedef struct {
   float temperature;
   float humidity;
   float pressure;
-  uint16_t lux;  
+  #if defined(USELIGHT)
+      uint16_t lux;  
+  #endif
 } environment;
 
 typedef struct {
   char location[20];
-  char phenoscope_name[20];
+  char name[20];
   char wifi_ssid[20];
   char wifi_pwd[20];
 } configuration;
 
 environment env;
-configuration cfg = {"", "phenoscope_000", "pecorita.net", "p3c0r1t4"};
+configuration cfg = {"", "etho_sensor", "ETHOSCOPE_WIFI", "ETHOSCOPE_1234"};
 
 #define CFG_FILE "/CFG_FILE.bin"
+
+// Create a web server object on port 80
+AsyncWebServer server(80);
+
 
 void setup(void)
 {  
     Serial.begin(115200);
 
-    // Mount SPIFFS
-    if (!SPIFFS.begin(true)) {
-      Serial.println("An Error has occurred while mounting SPIFFS");
-      ESP.restart();
+    // Connect to WiFi network
+    WiFi.begin(cfg.wifi_ssid, cfg.wifi_pwd);
+
+    // Wait for connection
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
     }
-    else {
-      delay(500);
-      Serial.println("SPIFFS mounted successfully");
+    Serial.println("");
+    Serial.print("Connected to ");
+    Serial.println(cfg.wifi_ssid);
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
+
+    // Set up mDNS responder:
+    if (!MDNS.begin(cfg.name)) {
+        Serial.println("Error setting up MDNS responder!");
+        while(1) {
+            delay(1000);
+        }
     }
+    Serial.println("mDNS responder started");
 
-      loadConfigurationSPIFFS();
+    // Start TCP (HTTP) server
+    server.onNotFound(notFound);
 
-      // Connect to WiFi network
-      WiFi.begin(cfg.wifi_ssid, cfg.wifi_pwd);
-
-      // Wait for connection
-      while (WiFi.status() != WL_CONNECTED) {
-          delay(500);
-          Serial.print(".");
-      }
-      Serial.println("");
-      Serial.print("Connected to ");
-      Serial.println(cfg.wifi_ssid);
-      Serial.print("IP address: ");
-      Serial.println(WiFi.localIP());
-
-      // Set up mDNS responder:
-      if (!MDNS.begin(cfg.phenoscope_name)) {
-          Serial.println("Error setting up MDNS responder!");
-          while(1) {
-              delay(1000);
-          }
-      }
-      Serial.println("mDNS responder started");
-
-      // Start TCP (HTTP) server
-      server.onNotFound(notFound);
+    server.on("/id", HTTP_GET, [](AsyncWebServerRequest *request){
+      request->send(200, "text/plain", getID() );
+    });
       
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
       readEnv();
       request->send(200, "text/plain", SendJSON() );
     });    
 
-	//to rename from commandline use the following command
-  //curl -d location=Incubator_1A -d phenoscope_name=phenoscope_1A -G http://DEVICE_IP/set (for GET)
-	//echo '{"phenoscope_name": "phenoscope-001", "location": "Room-A"}' | curl -d @- http://DEVICE_IP/set  (for POST)
-	//DEVICE_IP can be found opening the serial port
+	//to rename from commandline use curl as below:
+  //curl -d location=Incubator_1A -d name=etho_sensor_1A -G http://DEVICE_IP/set (for GET)
+	//echo '{"name": "etho_sensor-001", "location": "Incubator-18C"}' | curl -d @- http://DEVICE_IP/set  (for POST)
+  //DEVICE_IP can be found opening the serial port
+  
     server.on("/set", HTTP_GET, [](AsyncWebServerRequest *request){
 
-        if (request->hasParam("phenoscope_name")) {
-            request->getParam("phenoscope_name")->value().toCharArray(cfg.phenoscope_name, 20);
-            Serial.println(cfg.phenoscope_name);
+        if (request->hasParam("name")) {
+            request->getParam("name")->value().toCharArray(cfg.name, 20);
+            Serial.println(cfg.name);
         }
         
         if (request->hasParam("location")) {
             request->getParam("location")->value().toCharArray(cfg.location, 20);
             Serial.println(cfg.location);
-		}
-        
-        saveConfigurationSPIFFS();
-        request->send(200, "text/plain", "Configuration changed." );
+        }
+            
+        saveConfiguration();
+            request->send(200, "text/plain", "OK! Configuration changed." );
     });
 
     server.begin();
     Serial.println("HTTP server started");
 
     // Advertise WEBSERVER service to MDNS-SD
-    MDNS.addService("phenoscope", "tcp", 80);
+    MDNS.addService("sensor", "tcp", 80);
+
+    // Initialise Wire. This is where we can specify different SDA/SCL pins if needed
+    Wire.begin();
 
     // Initialise BME280 and BH1750 I2C sensors
-    I2CBME.begin(I2C_SDA, I2C_SCL, 100000);
-   
-	bool status;
-	status = bme.begin(0x76, &I2CBME);  
-	if (!status) {
-		Serial.println("Could not find a valid BME280 sensor, check wiring!");
-		//while (1);
-	}
+    bool status;
+    status = bme.begin(0x77);  
+    if (!status) {
+    	Serial.println("Could not find a valid BME280 sensor, check wiring!");
+    	//while (1);
+    }
 
-    //LightSensor.begin();
+    #if defined(USELIGHT)
+      LightSensor.begin();
+    #endif
+    
     readEnv();
     Serial.println(SendJSON());
-
-    //Starting a watchdog timer
-    timer = timerBegin(0, 80, true);                  //timer 0, div 80
-    timerAttachInterrupt(timer, &resetModule, true);  //attach callback
-    timerAlarmWrite(timer, wdtTimeout * 1000, false); //set time in us
-    timerAlarmEnable(timer);                          //enable interrupt
-
-    // We remove power save functions on WiFi to try and solve the mDNS disappearance issue
-    WiFi.setSleep(false);
-
 
 }
 
 void loop(void)
 {
   
-    timerWrite(timer, 0); //reset timer (feed watchdog)
-    delay(1);
+    delay(10);
+    MDNS.update();
 
 }
 
-void saveConfigurationSPIFFS() {
-    // Photo file name
-    Serial.printf("Configuration file name: %s\n", CFG_FILE);
-    File configFile = SPIFFS.open(CFG_FILE, FILE_WRITE);
+void loadConfiguration()
+{
 
-    // Insert the data in the photo file
-    if (!configFile) {
-      Serial.println("Failed to open file in writing mode");
-    }
-    else {
-	  //unsigned char * data = reinterpret_cast<unsigned char*>(cfg); // use unsigned char, as uint8_t is not guarunteed to be same width as char...
-	  //size_t bytes = configFile.write(data, sizeof(cfg)); 
-	  configFile.write((byte *)&cfg, sizeof(cfg));
-	  Serial.println("Configuration written to file");
-    }
-    // Close the file
-    configFile.close();
+    if (EEPROMr.read(EEPROM_START) != 1) { saveConfiguration(); }
+    EEPROMr.get(EEPROM_START+2, cfg);
+    delay(500);
+
+    Serial.println("Configuration loaded.");
+
 }
 
-void loadConfigurationSPIFFS() {
+void saveConfiguration()
+{
+    EEPROMr.write(EEPROM_START, 1);
+    delay(250);
+    EEPROMr.put(EEPROM_START+2, cfg);
+    delay(250);
+    EEPROMr.commit();
 
-  if (!SPIFFS.exists(CFG_FILE)) {
-	   saveConfigurationSPIFFS ();
-	   }
-
-  File configFile = SPIFFS.open (CFG_FILE, "r");
-
-  if (configFile && configFile.size()) {
-	  configFile.read((byte *)&cfg, sizeof(cfg));
-	  configFile.close();
-	}
+    Serial.println("Configuration saved.");
 }
+
 
 void notFound(AsyncWebServerRequest *request) {
     request->send(404, "text/plain", "Not found");
@@ -226,9 +217,15 @@ void notFound(AsyncWebServerRequest *request) {
 
 void readEnv(void){
     env.temperature = bme.readTemperature();
-    env.humidity = bme.readHumidity();
     env.pressure = bme.readPressure() / 100.0F;
-    //env.lux = LightSensor.GetLightIntensity();
+
+    #if defined(__BME280_H__)
+      env.humidity = bme.readHumidity();
+    #endif
+
+    #if defined(USELIGHT)
+      env.lux = LightSensor.GetLightIntensity();
+    #endif
   }
 
 String SendJSON(){
@@ -237,17 +234,25 @@ String SendJSON(){
     ptr += "\", \"ip\" : \"";
     ptr += WiFi.localIP().toString();
     ptr += "\", \"name\" : \"";
-    ptr += cfg.phenoscope_name;
+    ptr += cfg.name;
     ptr += "\", \"location\" : \"";
     ptr += cfg.location;
     ptr += "\", \"temperature\" : \"";
     ptr += env.temperature;
-    ptr += "\", \"humidity\" : \"";
-    ptr += env.humidity;
+
+    #if defined(__BME280_H__)
+      ptr += "\", \"humidity\" : \"";
+      ptr += env.humidity;
+    #endif
+
     ptr += "\", \"pressure\" : \"";
     ptr += env.pressure;
-    ptr += "\", \"light\" : \"";
-    ptr += env.lux;
+
+    #if defined(USELIGHT)
+        ptr += "\", \"light\" : \"";
+        ptr += env.lux;
+    #endif
+
     ptr += "\"}";
     return ptr; 
 }
@@ -273,15 +278,23 @@ String SendHTML(){
     ptr +="<p>Temperature: ";
     ptr +=env.temperature;
     ptr +="&deg;C</p>";
-    ptr +="<p>Humidity: ";
-    ptr +=env.humidity;
-    ptr +="%</p>";
+
+    #if defined(__BME280_H__)
+      ptr +="<p>Humidity: ";
+      ptr +=env.humidity;
+      ptr +="%</p>";
+    #endif
+
     ptr +="<p>Pressure: ";
     ptr +=env.pressure;
     ptr +="hPa</p>";
-    ptr +="<p>Lux: ";
-    ptr +=env.lux;
-    ptr +="hPa</p>";
+
+    #if defined(USELIGHT)
+        ptr +="<p>Lux: ";
+        ptr +=env.lux;
+    #endif
+
+    ptr +="</p>";
     ptr +="</div>\n";
     ptr +="</body>\n";
     ptr +="</html>\n";
@@ -297,4 +310,11 @@ String getMacAddress(void) {
     char baseMacChr[18] = {0};
     sprintf(baseMacChr, "%02X:%02X:%02X:%02X:%02X:%02X", baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
     return String(baseMacChr);
+}
+
+String getID(void) {
+    String id_json = "{\"id\": \"";
+    id_json += getMacAddress();
+    id_json += "\"}\n";
+    return id_json;
 }
