@@ -29,7 +29,8 @@ SYSTEM_DAEMONS = {"ethoscope_node": {'description' : 'The main Ethoscope node se
                   "ethoscope_update_node" : {'description' : 'The service used to update the nodes and the ethoscopes.'},
                   "git-daemon.socket" : {'description' : 'The GIT server that handles git updates for the node and ethoscopes.'},
                   "ntpd" : {'description': 'The NTPd service is syncing time with the ethoscopes.'},
-                  "sshd" : {'description': 'The SSH daemon allows power users to access the node terminal from remote.'}
+                  "sshd" : {'description': 'The SSH daemon allows power users to access the node terminal from remote.'},
+                  "vsftpd" : {'description' : 'The FTP server on the node, used to access the local ethoscope data'}
                   }
 
 
@@ -404,47 +405,49 @@ def download(what):
 def node_info(req):#, device):
     if req == 'info':
        
-        with os.popen('df %s -h' % RESULTS_DIR) as df:
-            disk_free = df.read()
-        
-        disk_usage = RESULTS_DIR+" Not Found on disk"
+        try:
+            with os.popen('df %s -h' % RESULTS_DIR) as df:
+                disk_free = df.read()
+            disk_usage = disk_free.split("\n")[1].split()
+            #this returns something like ['/dev/sda2', '916G', '330G', '540G', '38%', '/']
+
+        except:
+            disk_usage = []
+
+        if os.path.exists(RESULTS_DIR):
+            RDIR = RESULTS_DIR
+        else:
+            RDIR = "%s is not available" % RESULTS_DIR
 
         CARDS = {}
         IPs = []
-
         CFG.load()
 
+
+        #the following returns something like this: [['eno1', 'ec:b1:d7:66:2e:3a', '192.168.1.1'], ['enp0s20u12', '74:da:38:49:f8:2a', '155.198.232.206']]
+        adapters_list = [ [i, netifaces.ifaddresses(i)[17][0]['addr'], netifaces.ifaddresses(i)[2][0]['addr']] for i in netifaces.interfaces() if 17 in netifaces.ifaddresses(i) and 2 in netifaces.ifaddresses(i) and netifaces.ifaddresses(i)[17][0]['addr'] != '00:00:00:00:00:00' ]
+        for ad in adapters_list:
+            CARDS [ ad[0] ] = {'MAC' : ad[1], 'IP' : ad[2]}
+            IPs.append (ad[2])
+        
+       
+        with os.popen('git rev-parse --abbrev-ref HEAD') as df:
+            GIT_BRANCH = df.read() or "Not detected"
+        
+        with os.popen('git status -s -uno') as df:
+            NEEDS_UPDATE = df.read() != ""
+        
         try:
-            disk_usage = disk_free.split("\n")[1].split()
-
-            #the following returns something like this: [['eno1', 'ec:b1:d7:66:2e:3a', '192.168.1.1'], ['enp0s20u12', '74:da:38:49:f8:2a', '155.198.232.206']]
-            adapters_list = [ [i, netifaces.ifaddresses(i)[17][0]['addr'], netifaces.ifaddresses(i)[2][0]['addr']] for i in netifaces.interfaces() if 17 in netifaces.ifaddresses(i) and 2 in netifaces.ifaddresses(i) and netifaces.ifaddresses(i)[17][0]['addr'] != '00:00:00:00:00:00' ]
-            for ad in adapters_list:
-                CARDS [ ad[0] ] = {'MAC' : ad[1], 'IP' : ad[2]}
-                IPs.append (ad[2])
+            with os.popen('systemctl status ethoscope_node.service') as df:
+                ACTIVE_SINCE = df.read().split("\n")[2] 
+        except: 
+            ACTIVE_SINCE = "N/A. Probably not running through systemd"
             
-           
-            with os.popen('git rev-parse --abbrev-ref HEAD') as df:
-                GIT_BRANCH = df.read() or "Not detected"
-            #df = subprocess.Popen(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], stdout=subprocess.PIPE)
-            #GIT_BRANCH = df.communicate()[0].decode('utf-8')
             
-            with os.popen('git status -s -uno') as df:
-                NEEDS_UPDATE = df.read() != ""
 
-            #df = subprocess.Popen(['git', 'status', '-s', '-uno'], stdout=subprocess.PIPE)
-            #NEEDS_UPDATE = df.communicate()[0].decode('utf-8') != ""
-            
-            try:
-                with os.popen('systemctl status ethoscope_node.service') as df:
-                    ACTIVE_SINCE = df.read().split("\n")[2] 
-            except:
-                ACTIVE_SINCE = "Not running through systemd"
+        #except Exception as e:
 
-        except Exception as e:
-            logging.error(e)
-
-        return {'active_since': ACTIVE_SINCE, 'disk_usage': disk_usage, 'IPs' : IPs , 'CARDS': CARDS, 'GIT_BRANCH': GIT_BRANCH, 'NEEDS_UPDATE': NEEDS_UPDATE}
+        return {'active_since': ACTIVE_SINCE, 'disk_usage': disk_usage, 'RDIR' : RDIR , 'IPs' : IPs , 'CARDS': CARDS, 'GIT_BRANCH': GIT_BRANCH, 'NEEDS_UPDATE': NEEDS_UPDATE}
                 
     elif req == 'time':
         return {'time':datetime.datetime.now().isoformat()}
