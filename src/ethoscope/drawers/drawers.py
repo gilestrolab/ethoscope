@@ -56,7 +56,7 @@ class BaseDrawer(object):
     def last_drawn_frame(self):
         return self._last_drawn_frame
 
-    def draw(self,img, positions, tracking_units):
+    def draw(self,img, positions, tracking_units, reference_points=None):
         """
         Draw results on a frame.
 
@@ -71,7 +71,7 @@ class BaseDrawer(object):
 
         self._last_drawn_frame = img.copy()
 
-        self._annotate_frame(self._last_drawn_frame, positions,tracking_units)
+        self._annotate_frame(self._last_drawn_frame, positions, tracking_units, reference_points)
 
         if self._draw_frames:
             cv2.imshow(self._window_name, self._last_drawn_frame )
@@ -121,9 +121,20 @@ class DefaultDrawer(BaseDrawer):
         """
         super(DefaultDrawer,self).__init__(video_out=video_out, draw_frames=draw_frames, **kwargs)
 
-    def _annotate_frame(self,img, positions, tracking_units):
+    def _annotate_frame(self, img, positions, tracking_units, reference_points=None):
+        '''
+        Annotate frames with information about ROIs and moving objects
+        '''
         if img is None:
             return
+        
+        try:
+            for p in reference_points:
+                cv2.drawMarker(img, (int(p[0]), int(p[1])), color=(0,255,0), markerType=cv2.MARKER_CROSS, thickness=2)
+        except:
+            #noreferencepoints
+            pass
+        
         for track_u in tracking_units:
 
             x,y = track_u.roi.offset
