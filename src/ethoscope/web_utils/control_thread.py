@@ -441,7 +441,7 @@ class ControlThread(Thread):
             "experimental_info": str(self._info["experimental_info"]),
             "selected_options": str(self._option_dict),
             "hardware_info" : str(self.hw_info),
-            "reference_points" : [(p[0],p[1]) for p in reference_points]
+            "reference_points" : str([(p[0],p[1]) for p in reference_points])
         }
         
         
