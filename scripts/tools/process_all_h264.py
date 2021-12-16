@@ -62,13 +62,15 @@ def process_video (folder, verbose=True):
      #   return False
 
 
-def list_mp4s (root_path):
+def list_ext (root_path, ext="mp4"):
     '''
-    returns a list of folders that contains a mp4 file
+    returns a list of folders that contains file with the given extension
     '''
 
+    extension = "*.%s" % ext
+
     all_folders = [ x[0] for x in os.walk(root_path) ]
-    have_mp4s = [p for p in all_folders if glob(os.path.join(p, "*.mp4"))]
+    have_mp4s = [p for p in all_folders if glob(os.path.join(p, extension))]
     
     return have_mp4s
     
@@ -99,7 +101,7 @@ if __name__ == '__main__':
     option_dict = vars(options)
     
     if option_dict['list']:
-        l = list_mp4s (option_dict['path'])
+        l = list_ext (option_dict['path'])
         
         print ("\n".join(l))
         print ("Found %s folders with mp4 files" % len(l))

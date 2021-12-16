@@ -105,6 +105,7 @@
               <ul class="dd-menu">
                 <li ng-class="{'disabled':!isActive}" data-toggle="{{isActive ? 'modal' : ''}}" data-target="#recordModal">Record Video</li>
                 <li ng-class="{'disabled':!can_stream || !isActive}" ng-click="!can_stream || !isActive || ethoscope.stream()">Start Streaming</li>
+                <li ng-class="{'disabled':!machine_info.isExperimental}" ng-click="ethoscope.convertvideos()" style="{{machine_info.isExperimental ? '' :'display:none'}}">Convert Videos</li>
               </ul>
             </label>
 

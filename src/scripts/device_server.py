@@ -279,6 +279,11 @@ def controls(id, action):
         control.start()
         return info(id)
         
+    elif action == 'convertvideos':
+        logging.info("Converting h264 chunks to mp4")
+        subprocess.call(['/opt/ethoscope-device/scripts/tools/process_all_h264.py','-p','/ethoscope_data'])
+        return info(id)
+        
     else:
         raise Exception("No such action: %s" % action)
 
@@ -290,15 +295,23 @@ def list_data_files(category, id):
     category is the name of the folder
     this is not meant to report db files or h264 files but it's supposed to be working for things like masks and other user generated files
     '''
+    
+    filelist = {}
+    
     if id != machine_id:
         raise WrongMachineID
 
     path = os.path.join (ETHOSCOPE_UPLOAD, category)
 
     if os.path.exists(path):
-        return {'filelist' : [{'filename': i, 'fullpath' : os.path.abspath(os.path.join(path,i))} for i in os.listdir(path)]}
+        filelist = {'filelist' : [{'filename': i, 'fullpath' : os.path.abspath(os.path.join(path,i))} for i in os.listdir(path)]}
 
-    return {}
+    if category == 'video':
+        converted_mp4s = [f for f in [ x[0] for x in os.walk(ETHOSCOPE_DIR) ] if glob.glob(os.path.join(f, "*.mp4"))]
+        filelist['filelist'] = filelist['filelist'] + [{'filename': os.path.basename(i), 'fullpath' : i} for i in glob.glob(ETHOSCOPE_DIR+'/**/*.mp4', recursive=True)]
+
+
+    return filelist
 
 
 @api.get('/machine/<id>')
@@ -321,6 +334,7 @@ def get_machine_info(id):
 
     machine_info['knows_node_ip'] = ( machine_info['node_ip'] == machine_info['etc_node_ip'] )
     machine_info['hostname'] = os.uname()[1]
+    machine_info['isExperimental'] = isExperimental()
     
     machine_info['machine-name'] = get_machine_name()
     

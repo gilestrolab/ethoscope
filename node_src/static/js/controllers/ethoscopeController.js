@@ -50,9 +50,14 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
         $scope.showLog = false;
         $scope.can_stream = false;
         $scope.isActive = false;
+        //$scope.isExperimental = false;
         var refresh_data = false;
         var spStart= new Spinner(opts).spin();
         var starting_tracking= document.getElementById('starting');
+
+        $http.get('/device/'+device_id+'/machineinfo').success(function(data){
+            $scope.machine_info = data;
+        });
 
         $http.get('/device/'+device_id+'/data').success(function(data){
             $scope.device = data;
@@ -193,9 +198,18 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                 .success(function(response){
                     $scope.device.status = response.status;
                     window.location.reload();
-                    
                 });
             }
+        };
+
+        $scope.ethoscope.convertvideos = function() {
+            console.log("Asking ethoscope to convert any h264 chunks to local mp4");
+            $http.post('/device/'+device_id+'/controls/convertvideos')
+            .success(function(response){
+                $scope.device.status = response.status;
+                window.location.reload();
+            });
+            
         };
 
         $scope.get_ip_of_sensor = function(location){

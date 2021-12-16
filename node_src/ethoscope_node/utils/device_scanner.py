@@ -220,7 +220,9 @@ class Ethoscope(Device):
                                      "reboot" : ["stopped"],
                                      "restart" : ["stopped"],
                                      "dumpdb" : ["stopped"],
-                                     "offline": []}
+                                     "offline": [],
+                                     "convertvideos" : ["stopped"]
+                                     }
 
     def __init__(self, ip, port = ETHOSCOPE_PORT, refresh_period = 5, results_dir = "/ethoscope_data/results"):
         '''
