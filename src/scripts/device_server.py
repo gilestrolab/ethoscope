@@ -296,7 +296,7 @@ def list_data_files(category, id):
     this is not meant to report db files or h264 files but it's supposed to be working for things like masks and other user generated files
     '''
     
-    filelist = {}
+    filelist = {'filelist' : []}
     
     if id != machine_id:
         raise WrongMachineID

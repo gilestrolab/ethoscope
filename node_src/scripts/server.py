@@ -30,7 +30,8 @@ SYSTEM_DAEMONS = {"ethoscope_node": {'description' : 'The main Ethoscope node se
                   "git-daemon.socket" : {'description' : 'The GIT server that handles git updates for the node and ethoscopes.'},
                   "ntpd" : {'description': 'The NTPd service is syncing time with the ethoscopes.'},
                   "sshd" : {'description': 'The SSH daemon allows power users to access the node terminal from remote.'},
-                  "vsftpd" : {'description' : 'The FTP server on the node, used to access the local ethoscope data'}
+                  "vsftpd" : {'description' : 'The FTP server on the node, used to access the local ethoscope data'},
+                  "virtuascope" : {'description' : 'A virtual ethoscope running on the node. Useful for offline tracking'}
                   }
 
 

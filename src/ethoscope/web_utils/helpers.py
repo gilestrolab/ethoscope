@@ -261,6 +261,11 @@ def isExperimental(new_value=None):
     this mymics a non-PI or a PI without plugged in camera
     to activate, create an empty file called /etc/isexperimental
     """
+    
+    # If the ethoscope is running on something that is not a pi, it will be always flagged as experimental
+    if new_value == None and not isMachinePI():
+        return True
+    
     filename = '/etc/isexperimental'
     current_value = os.path.exists(filename)
     
