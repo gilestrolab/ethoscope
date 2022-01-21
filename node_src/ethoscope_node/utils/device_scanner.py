@@ -478,7 +478,9 @@ class Ethoscope(Device):
             data_url = "http://%s:%i/data/%s" % (self._ip, self._port, self._id)
             new_info = self._get_json(data_url)
 
-            new_status = new_info['status']
+            if 'status' in new_info:
+                new_status = new_info['status']
+                
             self._info.update(new_info)
 
             backup_path = self._make_backup_path()
@@ -492,7 +494,7 @@ class Ethoscope(Device):
             # self._update_id()
             new_status = 'unreached'
 
-            if 'run_id' in self._info['experimental_info']:
+            if 'experimental_info' in self._info and 'run_id' in self._info['experimental_info']:
                 run_id = self._info['experimental_info']['run_id']
                 self._edb.flagProblem( run_id = run_id, message = "unreached" ) #ethoscope went offline while running
                 if previous_status == 'running'      and new_status == 'unreached': self._edb.updateEthoscopes(ethoscope_id = self._id, status="unreached")
@@ -519,16 +521,14 @@ class Ethoscope(Device):
 
 
         #if ethoscope is online and returning data
-
-        if 'name' in self._info['experimental_info']:
+        try:
             user_name = self._info['experimental_info']['name']
             location = self._info['experimental_info']['location']
-            
-        else:
+        except:
             user_name = ""
             location = ""
 
-        if 'run_id' in self._info['experimental_info']:
+        try:
             run_id = self._info['experimental_info']['run_id']
             
             #TODO
@@ -546,7 +546,8 @@ class Ethoscope(Device):
             if previous_status == 'stopped'      and new_status == 'unreached': self._edb.updateEthoscopes(ethoscope_id = self._id, status="offline")
    
             #if previous_status == 'running'      and new_status == 'unreached': self._edb.flagProblem( run_id = run_id, message = "unreached" ) #ethoscope went offline during tracking!
-
+        except:
+            pass
 
         # gather info on the current backup if possible
         try:

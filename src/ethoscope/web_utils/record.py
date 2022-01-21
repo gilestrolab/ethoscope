@@ -56,7 +56,11 @@ class cameraCaptureThread(threading.Thread):
         '''
         logging.info("Starting initialisation of the Camera for the activity")
 
-        import picamera
+        try:
+            import picamera
+        except ImportError as e:
+            raise e
+            return
 
         #camera=picamera.PiCamera(resolution=self._resolution, framerate=self._fps)
         with picamera.PiCamera() as camera:

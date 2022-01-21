@@ -6,6 +6,9 @@ import os
 import re
 from uuid import uuid4
 
+
+PERSISTENT_STATE = "/var/cache/ethoscope/persistent_state.pkl"
+
 def pi_version():
     """
     Detect the version of the Raspberry Pi.
@@ -281,9 +284,9 @@ def isExperimental(new_value=None):
         #delete file
         os.remove(filename)
         logging.warning("Removed file %s. The machine is not experimental." % filename)
-        
-    
-    
+
+def was_interrupted():
+    return os.path.exists(PERSISTENT_STATE)
 
 def get_machine_id(path="/etc/machine-id"):
     """

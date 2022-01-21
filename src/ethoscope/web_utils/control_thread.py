@@ -29,7 +29,7 @@ from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulat
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
 from ethoscope.utils.description import DescribedObject
-from ethoscope.web_utils.helpers import isMachinePI, hasPiCamera, isExperimental, get_machine_name, pi_version, getPiCameraVersion, get_SD_CARD_AGE, get_partition_infos, get_SD_CARD_NAME, SQL_dump
+from ethoscope.web_utils.helpers import *
 
 class ExperimentalInformation(DescribedObject):
     
@@ -139,7 +139,7 @@ class ControlThread(Thread):
                             "fps":0
                             }
 
-    _persistent_state_file = "/var/cache/ethoscope/persistent_state.pkl"
+    _persistent_state_file = PERSISTENT_STATE
 
     def __init__(self, machine_id, name, version, ethoscope_dir, data=None, *args, **kwargs):
 
@@ -182,13 +182,14 @@ class ControlThread(Thread):
                         "log_file": os.path.join(ethoscope_dir, self._log_file),
                         "dbg_img": os.path.join(ethoscope_dir, self._dbg_img_file),
                         "last_drawn_img": os.path.join(self._tmp_dir, self._tmp_last_img_file),
-                        "id": machine_id,
-                        "name": name,
-                        "version": version,
                         "db_name": self._db_credentials["name"],
                         "monitor_info": self._default_monitor_info,
                         #"user_options": self._get_user_options(),
-                        "experimental_info": {}
+                        "experimental_info": {},
+
+                        "id": machine_id,
+                        "name": name,
+                        "version": version
                         }
         self._monit = None
 
@@ -289,6 +290,11 @@ class ControlThread(Thread):
 
 
     def _update_info(self):
+        '''
+        Updates a dictionary with information that relates to the current status of the machine, ie data linked for instance to data acquisition
+        Information that is not related to control and it is not experiment-dependent will come from elsewhere
+        '''
+        
         if self._monit is None:
             return
         t = self._monit.last_time_stamp

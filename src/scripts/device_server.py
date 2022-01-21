@@ -71,7 +71,7 @@ def error_decorator(func):
 @api.route('/upload/<id>', method='POST')
 def do_upload(id):
     
-    if id != machine_id:
+    if id != _MACHINE_ID:
         raise WrongMachineID
     
     upload = bottle.request.files.get('upload')
@@ -105,7 +105,7 @@ def server_static(filepath):
 @api.get('/id')
 @error_decorator
 def name():
-    return {"id": control.info["id"]}
+    return {"id": _MACHINE_ID}
 
 @api.get('/make_index')
 @error_decorator
@@ -125,7 +125,7 @@ def rm_static_file(id):
     data = bottle.request.body.read()
     data = json.loads(data)
     file_to_del = data["file"]
-    if id != machine_id:
+    if id != _MACHINE_ID:
         raise WrongMachineID
 
     if file_in_dir_r(file_to_del, ETHOSCOPE_DIR ):
@@ -150,7 +150,7 @@ def db_dump(id):
     
     global dumping_thread
     
-    if id != machine_id:
+    if id != _MACHINE_ID:
         raise WrongMachineID
     
     now = int ( time.time() / 60 ) 
@@ -182,7 +182,7 @@ def update_machine_info(id):
     '''
     haschanged = False
     
-    if id != machine_id:
+    if id != _MACHINE_ID:
         raise WrongMachineID
         
     data = bottle.request.json
@@ -212,24 +212,21 @@ def update_machine_info(id):
         
 
     return {"haschanged": haschanged}
-    #return get_machine_info(id)
-
-    
 
 @api.post('/controls/<id>/<action>')
 @error_decorator
 def controls(id, action):
     global control
-    if id != machine_id:
+    if id != _MACHINE_ID:
         raise WrongMachineID
 
     if action == 'start':
         data = bottle.request.json
         tracking_json_data.update(data)
         
-        control = ControlThread(machine_id=machine_id,
-                                name=machine_name,
-                                version=version,
+        control = ControlThread(machine_id=_MACHINE_ID,
+                                name=_MACHINE_NAME,
+                                version=_GIT_VERSION,
                                 ethoscope_dir=ETHOSCOPE_DIR,
                                 data=tracking_json_data)
         control.start()
@@ -270,9 +267,9 @@ def controls(id, action):
         recording_json_data.update(data)
         logging.warning("Recording or Streaming video, data is %s" % str(data))
         control = None
-        control = ControlThreadVideoRecording(machine_id=machine_id,
-                                              name=machine_name,
-                                              version=version,
+        control = ControlThreadVideoRecording(machine_id=_MACHINE_ID,
+                                              name=_MACHINE_NAME,
+                                              version=_GIT_VERSION,
                                               ethoscope_dir=ETHOSCOPE_DIR,
                                               data=recording_json_data)
 
@@ -298,7 +295,7 @@ def list_data_files(category, id):
     
     filelist = {'filelist' : []}
     
-    if id != machine_id:
+    if id != _MACHINE_ID:
         raise WrongMachineID
 
     path = os.path.join (ETHOSCOPE_UPLOAD, category)
@@ -319,9 +316,10 @@ def list_data_files(category, id):
 def get_machine_info(id):
     """
     This is information about the ethoscope that is not changing in time such as hardware specs and configuration parameters
+    {"node_ip": "192.168.1.2", "etc_node_ip": "192.168.1.2", "knows_node_ip": true, "hostname": "ETHOSCOPE107", "machine-name": "ETHOSCOPE_107", "machine-number": 107, "machine-id": "10799c8f41b04562a60eab6dfd1745e1", "kernel": "5.4.79-1-ARCH", "pi_version": "Raspberry Pi 3 Model B Rev 1.2", "camera": "This is a new ethoscope. Run tracking once to detect the camera module", "WIFI_SSID": "ETHOSCOPE_WIFI", "WIFI_PASSWORD": "ETHOSCOPE_1234", "SD_CARD_AGE": 14851.871500253677, "partitions": [{"Filesystem": "/dev/root", "Type": "ext4", "Size": "9.2G", "Used": "3.4G", "Avail": "5.3G", "Use%": "40%", "Mounted": "/"}, {"Filesystem": "devtmpfs", "Type": "devtmpfs", "Size": "339M", "Used": "0", "Avail": "339M", "Use%": "0%", "Mounted": "/dev"}, {"Filesystem": "tmpfs", "Type": "tmpfs", "Size": "372M", "Used": "0", "Avail": "372M", "Use%": "0%", "Mounted": "/dev/shm"}, {"Filesystem": "tmpfs", "Type": "tmpfs", "Size": "149M", "Used": "440K", "Avail": "149M", "Use%": "1%", "Mounted": "/run"}, {"Filesystem": "tmpfs", "Type": "tmpfs", "Size": "4.0M", "Used": "0", "Avail": "4.0M", "Use%": "0%", "Mounted": "/sys/fs/cgroup"}, {"Filesystem": "tmpfs", "Type": "tmpfs", "Size": "372M", "Used": "0", "Avail": "372M", "Use%": "0%", "Mounted": "/tmp"}, {"Filesystem": "/dev/mmcblk0p1", "Type": "vfat", "Size": "120M", "Used": "38M", "Avail": "83M", "Use%": "32%", "Mounted": "/boot"}, {"Filesystem": "/dev/mmcblk0p3", "Type": "f2fs", "Size": "20G", "Used": "1.1G", "Avail": "19G", "Use%": "6%", "Mounted": "/var"}], "SD_CARD_NAME": "20201126_ethoscope_000.img"}
     """
 
-    if id is not None and id != machine_id:
+    if id is not None and id != _MACHINE_ID:
         raise WrongMachineID
 
     machine_info = {}
@@ -336,7 +334,7 @@ def get_machine_info(id):
     machine_info['hostname'] = os.uname()[1]
     machine_info['isExperimental'] = isExperimental()
     
-    machine_info['machine-name'] = get_machine_name()
+    machine_info['machine-name'] = _MACHINE_NAME
     
     try:
         machine_info['machine-number'] = int ( machine_info['machine-name'].split("_")[1] )
@@ -344,7 +342,7 @@ def get_machine_info(id):
         machine_info['machine-number'] = 0
         
         
-    machine_info['machine-id'] = get_machine_id()
+    machine_info['machine-id'] = _MACHINE_ID
     machine_info['kernel'] = os.uname()[2]
     machine_info['pi_version'] = pi_version()
     machine_info['camera'] = getPiCameraVersion()
@@ -370,17 +368,43 @@ def get_machine_info(id):
 def info(id):
     """
     This is information that is changing in time as the machine operates, such as FPS during tracking, CPU temperature etc
+    
+    {
+     "status": "stopped", 
+     "time": 1601748840.9973018, 
+     "error": null, 
+     "log_file": "/ethoscope_data/results/ethoscope.log", 
+     "dbg_img": "/ethoscope_data/results/dbg_img.png", 
+     "last_drawn_img": "/tmp/ethoscope_l99ys8nw/last_img.jpg", 
+     "db_name": "ETHOSCOPE_107_db", 
+     "monitor_info": {"last_positions": null, "last_time_stamp": 0, "fps": 0}, 
+     "experimental_info": {}, 
+     "CPU_temp": 46.2
+     }
+
+     "version": {"id": "4bdcc9c4a1ef06f7226856aaef5e078b1b164b1e", "date": "2020-11-23 18:50:31"}, 
+     "id": "10799c8f41b04562a60eab6dfd1745e1", 
+     "name": "ETHOSCOPE_107", 
+
+    
     """
     
-    info = {}
-    if machine_id != id:
+    if id != _MACHINE_ID:
         raise WrongMachineID
     
     if control is not None: 
         info = control.info
-        
-    info["current_timestamp"] = bottle.time.time()
+    else:
+        info = {}
+        info["status"] = 'stopped'
+        info["id"] = _MACHINE_ID
+        info["name"] = _MACHINE_NAME
+        info["version"] = _GIT_VERSION
+        info["time"] = bottle.time.time()
+
     info["CPU_temp"] = get_core_temperature()
+    info["current_timestamp"] = info["time"]
+    
     return info
 
 @api.get('/user_options/<id>')
@@ -389,7 +413,7 @@ def user_options(id):
     '''
     Passing back options regarding what information can be changed on the the device. This populates the form on the node GUI
     '''
-    if machine_id != id:
+    if id != _MACHINE_ID:
         raise WrongMachineID
     
     
@@ -487,9 +511,11 @@ if __name__ == '__main__':
         logging.info("Logging using DEBUG SETTINGS")
 
 
-    machine_id = get_machine_id()
-    machine_name = get_machine_name()
-    version = get_git_version()
+    _MACHINE_ID = get_machine_id()
+    _MACHINE_NAME = get_machine_name()
+    _GIT_VERSION = get_git_version()
+    
+    control = None
 
     if option_dict["json"]:
         with open(option_dict["json"]) as f:
@@ -504,14 +530,15 @@ if __name__ == '__main__':
     else:
         controlClass = ControlThread
 
-    control = controlClass (machine_id = get_machine_id(),
-                            name = get_machine_name(),
-                            version = get_git_version(), 
-                            ethoscope_dir = ETHOSCOPE_DIR,
-                            data=json_data
-                            )
+    if option_dict["run"] or was_interrupted():
 
-    if option_dict["run"] or control.was_interrupted:
+        control = controlClass (machine_id = _MACHINE_ID,
+                                name = _MACHINE_NAME,
+                                version = _GIT_VERSION, 
+                                ethoscope_dir = ETHOSCOPE_DIR,
+                                data=json_data
+                                )
+
         control.start()
 
     try:
@@ -527,7 +554,7 @@ if __name__ == '__main__':
         # to make sure each burned image will get a unique machine-id at the first boot
         
         hostname = socket.gethostname()
-        uid = "%s-%s" % ( hostname, machine_id )
+        uid = "%s-%s" % ( hostname, _MACHINE_ID )
         
         
         ip_attempts = 0
@@ -560,7 +587,7 @@ if __name__ == '__main__':
                         properties = {
                             'version': '0.1',
                             'id_page': '/id',
-                            'id' : machine_id
+                            'id' : _MACHINE_ID
                         } )
 
         try:
