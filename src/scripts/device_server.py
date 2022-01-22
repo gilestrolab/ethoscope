@@ -3,9 +3,11 @@ __author__ = 'luis'
 import logging
 import traceback
 from optparse import OptionParser
+
 from ethoscope.web_utils.control_thread import ControlThread
-from ethoscope.web_utils.helpers import *
 from ethoscope.web_utils.record import ControlThreadVideoRecording
+from ethoscope.web_utils.helpers import *
+
 import subprocess
 import json
 import os
@@ -31,7 +33,6 @@ api = bottle.Bottle()
 tracking_json_data = {}
 recording_json_data = {}
 update_machine_json_data = {}
-ETHOSCOPE_DIR = None
 
 """
 
@@ -86,7 +87,7 @@ def do_upload(id):
     else:
         return {'result' : 'fail', 'comment' : "File extension not allowed. You can upload only movies, images, or masks"}
 
-    save_path = os.path.join(ETHOSCOPE_UPLOAD, "{category}".format(category=category))
+    save_path = os.path.join(_ETHOSCOPE_UPLOAD, "{category}".format(category=category))
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
@@ -110,8 +111,8 @@ def name():
 @api.get('/make_index')
 @error_decorator
 def make_index():
-    index_file = os.path.join(ETHOSCOPE_DIR, "index.html")
-    all_video_files = [y for x in os.walk(ETHOSCOPE_DIR) for y in glob.glob(os.path.join(x[0], '*.h264'))]
+    index_file = os.path.join(_ETHOSCOPE_DIR, "index.html")
+    all_video_files = [y for x in os.walk(_ETHOSCOPE_DIR) for y in glob.glob(os.path.join(x[0], '*.h264'))]
     with open(index_file, "w") as index:
         for f in all_video_files:
             index.write(f + "\n")
@@ -120,18 +121,16 @@ def make_index():
 @api.post('/rm_static_file/<id>')
 @error_decorator
 def rm_static_file(id):
-    global control
-
     data = bottle.request.body.read()
     data = json.loads(data)
     file_to_del = data["file"]
     if id != _MACHINE_ID:
         raise WrongMachineID
 
-    if file_in_dir_r(file_to_del, ETHOSCOPE_DIR ):
+    if file_in_dir_r( file_to_del, _ETHOSCOPE_DIR ):
         os.remove(file_to_del)
     else:
-        msg = "Could not delete file %s. It is not allowed to remove files outside of %s" % (file_to_del, ETHOSCOPE_DIR)
+        msg = "Could not delete file %s. It is not allowed to remove files outside of %s" % ( file_to_del, _ETHOSCOPE_DIR )
         logging.error(msg)
         raise Exception(msg)
     return data
@@ -216,31 +215,18 @@ def update_machine_info(id):
 @api.post('/controls/<id>/<action>')
 @error_decorator
 def controls(id, action):
-    global control
     if id != _MACHINE_ID:
         raise WrongMachineID
 
     if action == 'start':
         data = bottle.request.json
         tracking_json_data.update(data)
-        
-        control = ControlThread(machine_id=_MACHINE_ID,
-                                name=_MACHINE_NAME,
-                                version=_GIT_VERSION,
-                                ethoscope_dir=ETHOSCOPE_DIR,
-                                data=tracking_json_data)
-        control.start()
+        send_command(action, tracking_json_data)
         return info(id)
 
     elif action in ['stop', 'close', 'poweroff', 'reboot', 'restart']:
-        
-        if control.info['status'] in ['running', 'recording', 'streaming'] :
-            logging.info("Stopping monitor")
-            control.stop()
-            logging.info("Joining monitor")
-            control.join()
-            logging.info("Monitor joined")
-            logging.info("Monitor stopped")
+
+        send_command('stop')
 
         if action == 'close':
             close()
@@ -259,21 +245,12 @@ def controls(id, action):
             logging.info("Restarting service")
             subprocess.call(['systemctl', 'restart', 'ethoscope_device'])
 
-
         return info(id)
 
     elif action in ['start_record', 'stream']:
         data = bottle.request.json
         recording_json_data.update(data)
-        logging.warning("Recording or Streaming video, data is %s" % str(data))
-        control = None
-        control = ControlThreadVideoRecording(machine_id=_MACHINE_ID,
-                                              name=_MACHINE_NAME,
-                                              version=_GIT_VERSION,
-                                              ethoscope_dir=ETHOSCOPE_DIR,
-                                              data=recording_json_data)
-
-        control.start()
+        send_command(action, recording_json_data)
         return info(id)
         
     elif action == 'convertvideos':
@@ -298,14 +275,14 @@ def list_data_files(category, id):
     if id != _MACHINE_ID:
         raise WrongMachineID
 
-    path = os.path.join (ETHOSCOPE_UPLOAD, category)
+    path = os.path.join (_ETHOSCOPE_UPLOAD, category)
 
     if os.path.exists(path):
         filelist = {'filelist' : [{'filename': i, 'fullpath' : os.path.abspath(os.path.join(path,i))} for i in os.listdir(path)]}
 
     if category == 'video':
-        converted_mp4s = [f for f in [ x[0] for x in os.walk(ETHOSCOPE_DIR) ] if glob.glob(os.path.join(f, "*.mp4"))]
-        filelist['filelist'] = filelist['filelist'] + [{'filename': os.path.basename(i), 'fullpath' : i} for i in glob.glob(ETHOSCOPE_DIR+'/**/*.mp4', recursive=True)]
+        converted_mp4s = [f for f in [ x[0] for x in os.walk(_ETHOSCOPE_DIR) ] if glob.glob(os.path.join(f, "*.mp4"))]
+        filelist['filelist'] = filelist['filelist'] + [{'filename': os.path.basename(i), 'fullpath' : i} for i in glob.glob(_ETHOSCOPE_DIR+'/**/*.mp4', recursive=True)]
 
 
     return filelist
@@ -391,21 +368,23 @@ def info(id):
     
     if id != _MACHINE_ID:
         raise WrongMachineID
-    
-    if control is not None: 
-        info = control.info
-    else:
-        info = {}
-        info["status"] = 'stopped'
-        info["id"] = _MACHINE_ID
-        info["name"] = _MACHINE_NAME
-        info["version"] = _GIT_VERSION
-        info["time"] = bottle.time.time()
 
-    info["CPU_temp"] = get_core_temperature()
-    info["current_timestamp"] = info["time"]
+    runninginfo = send_command('info')
+    try:
+        runninginfo.update ( { "CPU_temp" : get_core_temperature(), "current_timestamp" : bottle.time.time() } )
+        
+    except:
+        runninginfo = {
+                        "status": 'not available',
+                        "id" : _MACHINE_ID,
+                        "name" : _MACHINE_NAME,
+                        "version" : _GIT_VERSION,
+                        "time" : bottle.time.time()
+                       }
+                       
     
-    return info
+    
+    return runninginfo
 
 @api.get('/user_options/<id>')
 @error_decorator
@@ -451,111 +430,75 @@ def get_log(id):
 
 
 def close(exit_status=0):
-    global control
-    if control is not None and control.is_alive():
-        control.stop()
-        control.join()
-        control=None
-    else:
-        control = None
     os._exit(exit_status)
 
 
-#======================================================================================================================#
-#############
-### CLASSS TO BE REMOVED IF BOTTLE CHANGES TO 0.13
-############
-class CherootServer(bottle.ServerAdapter):
-    def run(self, handler): # pragma: no cover
-        from cheroot import wsgi
-        from cheroot.ssl import builtin
-        self.options['bind_addr'] = (self.host, self.port)
-        self.options['wsgi_app'] = handler
-        certfile = self.options.pop('certfile', None)
-        keyfile = self.options.pop('keyfile', None)
-        chainfile = self.options.pop('chainfile', None)
-        server = wsgi.Server(**self.options)
-        if certfile and keyfile:
-            server.ssl_adapter = builtin.BuiltinSSLAdapter(
-                    certfile, keyfile, chainfile)
-        try:
-            server.start()
-        finally:
-            server.stop()
-#############
+def send_command(action, data=None, host='127.0.0.1', port=5000, size=1024):
+    '''
+    interfaces with the listening server
+    '''
+
+    message = {'command' : action,
+               'data' : data }
+
+    try:
+               
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((host, port))
+            s.sendall( json.dumps(message).encode('utf-8') )
+            r = json.loads( s.recv(size) )
+        
+        return r['response']
+
+    except:
+        return False
+
 
 if __name__ == '__main__':
 
-    ETHOSCOPE_DIR = "/ethoscope_data/results"
-    ETHOSCOPE_UPLOAD = "/ethoscope_data/upload"
-
     parser = OptionParser()
-    parser.add_option("-r", "--run", dest="run", default=False, help="Runs tracking directly", action="store_true")
-    parser.add_option("-v", "--record-video", dest="record_video", default=False, help="Records video instead of tracking", action="store_true")
-    parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
     parser.add_option("-p", "--port", dest="port", default=9000, help="port")
-    parser.add_option("-e", "--results-dir", dest="results_dir", default=ETHOSCOPE_DIR, help="Where temporary result files are stored")
     parser.add_option("-D", "--debug", dest="debug", default=False, help="Shows all logging messages", action="store_true")
-
 
     (options, args) = parser.parse_args()
     option_dict = vars(options)
 
     PORT = option_dict["port"]
     DEBUG = option_dict["debug"]
-    ETHOSCOPE_DIR = option_dict["results_dir"]
 
     if DEBUG:
         logging.basicConfig()
         logging.getLogger().setLevel(logging.DEBUG)
         logging.info("Logging using DEBUG SETTINGS")
 
-
     _MACHINE_ID = get_machine_id()
     _MACHINE_NAME = get_machine_name()
     _GIT_VERSION = get_git_version()
     
-    control = None
+    _ETHOSCOPE_UPLOAD = '/ethoscope_data/upload'
+    _ETHOSCOPE_DIR = '/ethoscope_data/results'
 
-    if option_dict["json"]:
-        with open(option_dict["json"]) as f:
-            json_data= json.loads(f.read())
-    else:
-        data = None
-        json_data = {}
+    alive = send_command('status')
+    if not alive:
+        logging.error('An Ethoscope controlling service is not running on this machine! I will be starting one for you but this is not the way this should work. Update your SD card.')
 
+        from device_listener import commandingThread
+        
+        ethoscope_info = { 'MACHINE_ID' : _MACHINE_ID,
+                      'MACHINE_NAME' : _MACHINE_NAME,
+                      'GIT_VERSION' : _GIT_VERSION,
+                      'ETHOSCOPE_UPLOAD' : _ETHOSCOPE_UPLOAD,
+                      'ETHOSCOPE_DIR' : _ETHOSCOPE_DIR,
+                      'DATA' : ''
+                    }
 
-    if option_dict["record_video"]:
-        controlClass = ControlThreadVideoRecording
-    else:
-        controlClass = ControlThread
-
-    if option_dict["run"] or was_interrupted():
-
-        control = controlClass (machine_id = _MACHINE_ID,
-                                name = _MACHINE_NAME,
-                                version = _GIT_VERSION, 
-                                ethoscope_dir = ETHOSCOPE_DIR,
-                                data=json_data
-                                )
-
-        control.start()
+        ethoscope = commandingThread(ethoscope_info)
+        ethoscope.start()
 
     try:
         # Register the ethoscope using zeroconf so that the node knows about it.
-        # I need an address to register the service, but I don't understand which one (different
-        # interfaces will have different addresses). The python module zeroconf fails if I don't
-        # provide one, and the way it gets supplied doesn't appear to be IPv6 compatible. I'll put
-        # in whatever I get from "gethostbyname" but not trust that in the code on the node side.
-
-        
-        # we include the machine-id together with the hostname to make sure each device is really unique
-        # moreover, we will burn the ETHOSCOPE_000 img with a non existing /etc/machine-id file
-        # to make sure each burned image will get a unique machine-id at the first boot
-        
         hostname = socket.gethostname()
         uid = "%s-%s" % ( hostname, _MACHINE_ID )
-        
         
         ip_attempts = 0
         ip_address = None
@@ -566,12 +509,7 @@ if __name__ == '__main__':
         while ip_address is None and ip_attempts < 60:
 
             try:
-                #this returns something like '192.168.1.4' - when both connected, ethernet IP has priority over wifi IP
-                #ip_address = socket.gethostbyname(hostname+".local")
-                
-                # this should be the same but does not require avahi-daemon running in the background - see https://github.com/gilestrolab/ethoscope/pull/129/commits/4086fdeabf3953f8b035dd7559259db6985f25f9
                 ip_address = socket.gethostbyname(hostname)
-                
             except:
                 pass
 
@@ -585,7 +523,7 @@ if __name__ == '__main__':
                         addresses = [socket.inet_aton(ip_address)],
                         port = PORT,
                         properties = {
-                            'version': '0.1',
+                            'version': '0.2',
                             'id_page': '/id',
                             'id' : _MACHINE_ID
                         } )
@@ -597,29 +535,11 @@ if __name__ == '__main__':
             
         zeroconf.register_service(serviceInfo)
 
-        try:
-            bottle.run(api, host='0.0.0.0', port=PORT, debug=DEBUG, server='paste')
-            
-        except:
+        #the webserver on the ethoscope side is quite basic so we can safely run the original bottle version based on WSGIRefServer()
+        bottle.run(api, host='0.0.0.0', port=PORT, debug=DEBUG)
 
-            ####### THIS IS A BIG MESS AND NEEDS TO BE FIXED. To be remove when bottle changes to version 0.13
-
-            SERVER = "cheroot"
-            try:
-                #This checks if the patch has to be applied or not. We check if bottle has declared cherootserver
-                #we assume that we are using cherrypy > 9
-                from bottle import CherootServer
-            except:
-                #Trick bottle to think that cheroot is actulay cherrypy server, modifies the server_names allowed in bottle
-                #so we use cheroot in background.
-                SERVER="cherrypy"
-                bottle.server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
-                logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
-                pass
-            #########
-
-            bottle.run(api, host='0.0.0.0', port=PORT, debug=DEBUG, server=SERVER)
-
+    
+    #this applies to any network error the will prevent zeroconf or the webserver from working
     except Exception as e:
         logging.error(traceback.format_exc())
         try:

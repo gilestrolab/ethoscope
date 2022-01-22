@@ -140,6 +140,11 @@ class cameraCaptureThread(threading.Thread):
                             except:
                                 break
 
+                    try:
+                        client_address.close()
+                    except:
+                        pass
+                    
                         #self.connection.write(struct.pack('<L', 0))
 
                     

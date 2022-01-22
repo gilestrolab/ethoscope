@@ -198,6 +198,8 @@ class ControlThread(Thread):
         DrawerClass = self._option_dict["drawer"]["class"]
         drawer_kwargs = self._option_dict["drawer"]["kwargs"]
         self._drawer = DrawerClass(**drawer_kwargs)
+        
+        logging.info('Starting a new monitor control thread')
 
         super(ControlThread, self).__init__()
 

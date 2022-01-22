@@ -237,7 +237,10 @@ def get_device_options(id):
 @error_decorator
 def get_device_videofiles(id):
     device = device_scanner.get_device(id)
-    return device.videofiles()
+    try:
+        return device.videofiles()
+    except:
+        return []
 
 
 #Get the information of one Sleep Monitor
