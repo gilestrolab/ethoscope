@@ -106,22 +106,49 @@ def get_WIFI(path="/etc/netctl/wlan"):
 
     else:
         return {'error' : 'No WIFI Settings were found in path %s' % path}
+
+def get_gateway():
+    """
+    """
+    with os.popen("ip route | grep default | head -n 1 | cut -d ' ' -f 3") as cmd:
+        out_cmd = cmd.read().strip()
+    
+    return out_cmd
     
 
-def set_WIFI(ssid="ETHOSCOPE_WIFI", wpakey="ETHOSCOPE_1234", path="/etc/netctl/wlan"):
+def set_WIFI(ssid="ETHOSCOPE_WIFI", wpakey="ETHOSCOPE_1234", useSTATIC=False, path="/etc/netctl/wlan"):
     """
+    Receives the setting for wifi connection
+    Uses dhcp by default but if USE_DHCP is set to False, it will adopt a static ip address instead
     """
 
     wlan_settings = '''Description=ethoscope_wifi network
 Interface=wlan0
 Connection=wireless
 Security=wpa
-IP=dhcp
-TimeoutDHCP=60
 ESSID=%s
 Key=%s
 ''' % (ssid, wpakey)
+
+    if not useSTATIC:
+        IPV4_settings = "IP=dhcp\nTimeoutDHCP=60"
+        
+    else:
+        try:
+            gateway = get_gateway()
+            a,b,c,_ = gateway.split('.')
+            d = int(get_machine_name().split('_')[-1])
             
+            if int(d) > 1 and int(d) < 255:
+                ip_address = '.'.join([a,b,c,str(d)])
+            
+            IPV4_settings = "IP=static\nAddress=('%s/24')\nGateway='%s'" % (ip_address, gateway)
+            
+        except:
+            IPV4_settings = "IP=dhcp\nTimeoutDHCP=60"
+        
+    wlan_settings += IPV4_settings
+
     try:
         with open(path, 'w') as f:
             f.write(wlan_settings)

@@ -194,10 +194,17 @@ def update_machine_info(id):
     if 'etho_number' in update_machine_json_data and int(update_machine_json_data['etho_number']) != int(get_machine_info(id)['machine-number']):
         set_machine_name(update_machine_json_data['etho_number'])
         set_machine_id(update_machine_json_data['etho_number'])
+
+        if 'useSTATIC' in update_machine_json_data:
+            set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'], useSTATIC=update_machine_json_data['useSTATIC'])
         haschanged = True
     
     if 'ESSID' in update_machine_json_data and 'Key' in update_machine_json_data and (update_machine_json_data['ESSID'] != get_machine_info(id)['WIFI_SSID'] or update_machine_json_data['Key'] != get_machine_info(id)['WIFI_PASSWORD']):
         set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'])
+        haschanged = True
+
+    if 'useSTATIC' in update_machine_json_data and update_machine_json_data['useSTATIC'] != get_machine_info(id)['useSTATIC']:
+        set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'], useSTATIC=update_machine_json_data['useSTATIC'])
         haschanged = True
 
     if 'isexperimental' in update_machine_json_data and update_machine_json_data['isexperimental'] != isExperimental():
@@ -332,6 +339,8 @@ def get_machine_info(id):
         machine_info['WIFI_PASSWORD'] = get_WIFI()['Key']
     except:
         machine_info['WIFI_PASSWORD'] = "not set"
+        
+    machine_info['useSTATIC'] = (get_WIFI()['IP'].strip().upper() == 'STATIC')
     
     machine_info['SD_CARD_AGE'] = get_SD_CARD_AGE()
     machine_info['partitions'] = get_partition_infos()
@@ -403,8 +412,9 @@ def user_options(id):
         "streaming": {},
         "update_machine": { "machine_options": [{"overview": "Machine information that can be set by the user",
                             "arguments": [
-                                {"type": "number", "name":"etho_number", "description": "An ID number (1-999) unique to this ethoscope","default": get_machine_info(id)['machine-number'] },
+                                {"type": "number", "name":"etho_number", "description": "An ID number (5-250) unique to this ethoscope","default": get_machine_info(id)['machine-number'] },
                                 {"type": "boolean", "name":"isexperimental", "description": "Specify if the ethoscope is to be treated as experimental", "default": isExperimental()}, 
+                                {"type": "boolean", "name":"useSTATIC", "description": "Use a static IP address instead of obtaining one with DHCP. The last number in the IP address will be the current ethoscope number", "default" : get_machine_info(id)['useSTATIC']},
                                 {"type": "str", "name":"node_ip", "description": "The IP address that you want to record as the node (do not change this value unless you know what you are doing!)","default": get_machine_info(id)['node_ip']},
                                 {"type": "str", "name":"ESSID", "description": "The name of the WIFI SSID","default": get_machine_info(id)['WIFI_SSID'] },
                                 {"type": "str", "name":"Key", "description": "The WPA password for the WIFI SSID","default": get_machine_info(id)['WIFI_PASSWORD'] }],

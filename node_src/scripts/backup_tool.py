@@ -78,8 +78,11 @@ if __name__ == '__main__':
                 
                 bj = None
                 for devID in all_devices:
-                    if all_devices[devID]['name'] == ("ETHOSCOPE_%03d" % ethoscope) and all_devices[devID]['status'] != "offline":
-                        bj = backup_job((all_devices[devID], RESULTS_DIR))
+                    try:
+                        if all_devices[devID]['name'] == ("ETHOSCOPE_%03d" % ethoscope) and all_devices[devID]['status'] != "offline":
+                            bj = backup_job((all_devices[devID], RESULTS_DIR))
+                    except:
+                        pass
                 if bj == None: exit("ETHOSCOPE_%03d is not online or not detected" % ethoscope)
 
         else:
