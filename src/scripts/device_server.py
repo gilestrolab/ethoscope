@@ -197,6 +197,7 @@ def update_machine_info(id):
 
         if 'useSTATIC' in update_machine_json_data:
             set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'], useSTATIC=update_machine_json_data['useSTATIC'])
+        
         haschanged = True
     
     if 'ESSID' in update_machine_json_data and 'Key' in update_machine_json_data and (update_machine_json_data['ESSID'] != get_machine_info(id)['WIFI_SSID'] or update_machine_json_data['Key'] != get_machine_info(id)['WIFI_PASSWORD']):
@@ -339,9 +340,11 @@ def get_machine_info(id):
         machine_info['WIFI_PASSWORD'] = get_WIFI()['Key']
     except:
         machine_info['WIFI_PASSWORD'] = "not set"
+    try:
+        machine_info['useSTATIC'] = (get_WIFI()['IP'].strip().upper() == 'STATIC')
+    except:
+        machine_info['useSTATIC'] = False
         
-    machine_info['useSTATIC'] = (get_WIFI()['IP'].strip().upper() == 'STATIC')
-    
     machine_info['SD_CARD_AGE'] = get_SD_CARD_AGE()
     machine_info['partitions'] = get_partition_infos()
     machine_info['SD_CARD_NAME'] = get_SD_CARD_NAME()

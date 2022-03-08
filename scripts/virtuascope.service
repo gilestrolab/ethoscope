@@ -7,7 +7,7 @@ After=ntpd.service network.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/ethoscope-node/src/scripts/
-ExecStart=/usr/bin/python3 /opt/ethoscope-node/src/scripts/device_server.py -D -e /ethoscope_data
+ExecStart=/usr/bin/python3 /opt/ethoscope-node/src/scripts/device_server.py -D
 RestartSec=5
 Restart=always
 

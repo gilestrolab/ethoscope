@@ -5,7 +5,7 @@ import datetime, time
 import os
 import re
 from uuid import uuid4
-
+import netifaces
 
 PERSISTENT_STATE = "/var/cache/ethoscope/persistent_state.pkl"
 
@@ -93,6 +93,18 @@ def set_machine_id(id, path="/etc/machine-id"):
 
 def get_WIFI(path="/etc/netctl/wlan"):
     """
+    Will return a dictionary like the following:
+    
+    {'Description': 'ethoscope_wifi network', 
+     'Interface': 'wlan0', 
+     'Connection': 'wireless', 
+     'Security': 'wpa', 
+     'ESSID': 'ETHOSCOPE_WIFI', 
+     'Key': 'ETHOSCOPE_1234', 
+     'IP': 'static', 
+     'Address': "('192.168.1.203/24')", 
+     'Gateway': "'192.168.1.1'"}
+
     """
     if os.path.exists(path):
         with open(path,'r') as f:
@@ -103,7 +115,6 @@ def get_WIFI(path="/etc/netctl/wlan"):
             if "=" in line:
                 d[ line.strip().split("=")[0] ] =  line.strip().split("=")[1]
         return d
-
     else:
         return {'error' : 'No WIFI Settings were found in path %s' % path}
 
@@ -156,7 +167,15 @@ Key=%s
     except:
         raise
             
-    
+def get_connection_status():
+    ifs = {}
+    for interface in netifaces.interfaces():
+        addr = netifaces.ifaddresses(interface)
+        ifs.update({interface : netifaces.AF_INET in addr})
+
+    return ifs
+
+    #return netifaces.AF_INET in addr    
 
 def set_etc_hostname(ip_address, nodename = "node", path="/etc/hosts"):
     '''
