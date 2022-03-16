@@ -247,14 +247,16 @@ def cpu_serial():
 def hasPiCamera():
     """
     return True if a piCamera is supported and detected
+
+    'supported=1 detected=1'
+    'supported=1 detected=0, libcamera interfaces=0'
+
     """
     if isMachinePI():
        with os.popen('/opt/vc/bin/vcgencmd get_camera') as cmd:
            out_cmd = cmd.read().strip()
-       out = dict(x.split('=') for x in out_cmd.split(' '))
-       
+       out = dict(x.split('=') for x in out_cmd.split(',')[0].split(' '))
        return out["detected"] == out["supported"] == "1"
-
     else:
         return False
         
