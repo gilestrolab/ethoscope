@@ -131,7 +131,10 @@ class commandingThread(threading.Thread):
         if not data and action in ['start', 'start_record']:
             return 'This action requires JSON data'
         
-        if action == 'info':
+        if action == 'help':
+            return "Commands that do not require JSON info: help, info, status, stop, stream.\nCommands that do require JSON info: start, start_record."
+        
+        elif action == 'info':
             return self.control.info
         
         elif action == 'status':
@@ -183,8 +186,6 @@ class commandingThread(threading.Thread):
             return 'This ethoscope action is not available.'
 
 
-
-
 if __name__ == '__main__':
 
     parser = OptionParser()
@@ -219,7 +220,7 @@ if __name__ == '__main__':
 
     ethoscope = commandingThread(ethoscope_info)
     ethoscope.start()
-    print ('Ethoscope controlling server started and listening')
+    logging.info ('Ethoscope controlling server started and listening')
 
     if option_dict["run"] or was_interrupted():
         

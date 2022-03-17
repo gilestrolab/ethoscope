@@ -54,7 +54,7 @@ if __name__ == '__main__':
 
     parser = OptionParser()
     parser.add_option("-s", "--server", dest="host", default='127.0.0.1', help="The IP of the ethoscope to be interrogated")
-    parser.add_option("-c", "--command", dest="command", default='status', help="The command to be sent")
+    parser.add_option("-c", "--command", dest="command", default='status', help="The command to be sent. Send help to receive a list of available commands.")
     parser.add_option("-d", "--data", dest="data", default='', help="dictionary with data to be sent")
 
 
