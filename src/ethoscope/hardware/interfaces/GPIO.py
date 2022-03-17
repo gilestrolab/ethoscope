@@ -1,5 +1,4 @@
 #!/bin/env python
-
 from optparse import OptionParser
 import threading
 import time, os
@@ -8,6 +7,33 @@ import logging
 import json, ast
 
 GPIO.setmode(GPIO.BOARD)
+
+class Output():
+    '''
+    Handles GPIO as output
+    This is meant to be used in a remote thread
+    The sleep component is only for testing purposes
+    '''
+    
+    def __init__(self, channel):
+        self.channel = channel
+        self.status = False
+        GPIO.setup(channel, GPIO.OUT)
+
+    def set(self, state, sleep=0):
+        GPIO.output(self.channel, state)
+        self.status = state
+        if sleep > 0: time.sleep(sleep)
+        
+    def on(self, sleep=0):
+        self.set(True, sleep)
+    
+    def off(self, sleep=0):
+        self.set(False, sleep)
+        
+    def close(self):
+        GPIO.cleanup()
+
 
 class GPIOButtons():
     
@@ -23,8 +49,6 @@ class GPIOButtons():
         GPIO.cleanup() # cleanup all GPIO
         for B in self.BTN: 
             B.stop()
-
-
 
 class Button(threading.Thread):
     def __init__(self, channel, commands={ '0' : '', '5' : ''} ):
@@ -107,7 +131,7 @@ if __name__ == '__main__':
     parser.add_option("-D", "--debug", dest="debug", default=True, help="Shows all logging messages", action="store_true")
     parser.add_option("-C", "--jsonfile", dest="commands", help="A JSON file describing which command to associate to each button", default=DEFAULT_JSON_FILE)
     parser.add_option("-S", "--jsonstring", dest="jsonstring", help="A JSON string describing which command to associate to each button")
-    
+    parser.add_option("-B", "--blink", dest="blink", help="Blink specified GPIO. Meant to be used as an example only")
 
     (options, args) = parser.parse_args()
     option_dict = vars(options)
@@ -117,6 +141,15 @@ if __name__ == '__main__':
         logging.basicConfig()
         logging.getLogger().setLevel(logging.DEBUG)
         logging.info("Logging using DEBUG SETTINGS")
+
+    #meant for testing purposes only. Use a LED but blink it fast.
+    if option_dict["blink"]:
+        led = Output(int(option_dict["blink"]))
+        for i in range(10):
+            led.on(sleep=0.2)
+            led.off(sleep=0.5)
+        GPIO.cleanup()
+        os.sys.exit()
 
     if option_dict["jsonstring"]:
         commands = ast.literal_eval(ast.literal_eval(json.dumps(option_dict["jsonstring"])))
