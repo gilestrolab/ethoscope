@@ -3,7 +3,7 @@ Description=Ethoscope GPIO button listener
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/ethoscope-device/src/ethoscope/hardware/interfaces/GPIO.py
+WorkingDirectory=/opt/ethoscope-device/src/ethoscope/hardware/interfaces/
 ExecStart=/usr/bin/python3 /opt/ethoscope-device/src/ethoscope/hardware/interfaces/GPIO.py -D
 RestartSec=5
 Restart=always
