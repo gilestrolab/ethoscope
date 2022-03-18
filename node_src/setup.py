@@ -1,8 +1,11 @@
-from setuptools import setup, find_packages
+try:
+    from setuptools import setup, find_packages
+except ImportError:
+    from distutils.core import setup, find_packages
 
 setup(
     name='ethoscope_node',
-    version='trunk',
+    version='1.1',
     author=['Quentin Geissmann', 'Giorgio Gilestro', 'Luis Garcia'],
     author_email=['quentin.geissmann@gmail.com', 'giorgio@gilest.ro', 'luis.garcia@uni-muenster.de'],
     packages=find_packages(),

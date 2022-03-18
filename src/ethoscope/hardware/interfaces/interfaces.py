@@ -55,6 +55,7 @@ class HardwareConnection(Thread):
 
     def stop(self, error=None):
         self._connection_open = False
+        
     def __del__(self):
         self.stop()
 
@@ -88,6 +89,7 @@ class BaseInterface(object):
 
     def _warm_up(self):
         raise NotImplementedError
+        
     def send(self, **kwargs):
         """
         Method to request hardware interface to interact with the physical world.

@@ -287,8 +287,16 @@ class AdaptiveBGModel(BaseTracker):
 
         #
         mean = cv2.mean(self._buff_grey, mask)
+<<<<<<< HEAD
         
         scale = 128. / mean[0]
+=======
+
+        try:
+            scale = 128. / mean[0]
+        except ZeroDivisionError:
+            raise NoPositionError
+>>>>>>> dev
 
         cv2.multiply(self._buff_grey, scale, dst = self._buff_grey)
 
@@ -298,6 +306,11 @@ class AdaptiveBGModel(BaseTracker):
             return self._buff_grey
 
     def _pre_process_input(self, img, mask, t):
+        '''
+        Receives the whole img, a mask describing the ROI and time t
+        Returns a grey converted image in which the tracking routine should then look for objects
+        The image returned is processed to decrease noise
+        '''
 
         blur_rad = int(self._object_expected_size * np.max(img.shape) * 2.0)
         if blur_rad % 2 == 0:
@@ -353,6 +366,11 @@ class AdaptiveBGModel(BaseTracker):
 
 
     def _find_position(self, img, mask,t):
+        '''
+        Middleman between the tracker and the actual tracking routine
+        It cuts the portion defined by mask (i.e. the ROI), converts it to grey and passes it on to the actual tracking routine
+        to look for the flies to track. The result of the tracking routine is a list of points describing the objects found in that ROI
+        '''
 
         grey = self._pre_process_input_minimal(img, mask, t)
         # grey = self._pre_process_input(img, mask, t)
@@ -489,6 +507,10 @@ class AdaptiveBGModel(BaseTracker):
 
         self.fg_model.update(img, hull,t)
 
+        # NOTE: x and y already match the centroid of the contour.
+        # rounding these values at this stage may not be necessarily a good idea because we lose information
+        # TODO: it would be better to feed the object with the raw value and return the rounding from the object itself.
+        
         x_var = XPosVariable(int(round(x)))
         y_var = YPosVariable(int(round(y)))
         distance = XYDistance(int(xy_dist))

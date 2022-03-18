@@ -1,0 +1,16 @@
+[Unit]
+Description=Ethoscope listener server
+Wants=ntpd.service mysqld.service
+After=ntpd.service network.target
+
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ethoscope-device/src/scripts/
+ExecStart=/usr/bin/python3 /opt/ethoscope-device/src/scripts/device_listener.py -D
+RestartSec=5
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+

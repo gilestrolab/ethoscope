@@ -1,10 +1,5 @@
 <!-- home.html -->
     <div class="jumbotron text-center" ng-cloak>
-        <h1>Platform Overview</h1>
-
-        <!--<div class="intro">Scan the network to detect connected ethoscopes</div>-->
-        <!--<button class=" btn btn-default" ng-click="get_devices()">Scan Network for Devices</button>-->
-
         <div id="node-info" class="intro">
              <div class="row">
                  <div class="col-sm-6">
@@ -13,7 +8,7 @@
                 </div>
 
                 <div class="col-sm-6">
-                <h2><span class="fa fa-clock-o"></span> Time:</h2>
+                <h2><span class="fa fa-clock"></span>Time</h2>
                     <li> On the platform, {{time}}</li>
                     <li> On your machine, {{localtime}}</li>
                 </div>
@@ -80,7 +75,7 @@
             <tr ng-repeat="sensor in sensors |  orderObjectBy:sortType:sortReverse:orderSensors">
                 <td>
                     <div ng-if="sensor.status != 'offline'">
-                        <a ng-href="/#sensor/{{sensor.id}}" target="_blank">
+                        <a data-target="#editSensorModal" data-toggle="modal" data-sensor={{sensor}} href="" >
                         <span class="fa fa-circle-o"></span><span> {{sensor.name}}</span>
                         </a>
                     </div>
@@ -98,26 +93,74 @@
 </table>
 </div>
 
-  <form>
-    <div class="form-group">
+<!-- Modal EDIT Sensor -->
+<div class="modal fade" id="editSensorModal" tabindex="-1" role="dialog" aria-labelledby="editSensorLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Sensor settings</h4>
+      </div>
+      <div class="modal-body">
+        <form name="editSensorForm">
+            <div class="alert alert-warning" ng-if="!editSensorForm.$valid">The fields labeled by a red bar are required.</div>
+            <label class="input" id="sensor_details">{{sensoredit.id}} at {{sensoredit.ip}}</label>
+            <label class="input"><span ng-hide="sensoredit.name != null">Name</span><input type="text" ng-model="sensoredit.name" name="sensor-name" required ng-required="true" style="width: 240px;"></label>
+            <label class="input"><span ng-hide="sensoredit.location != null">Location</span><input type="text" ng-model="sensoredit.location" name="sensor-location" required ng-required="true" style="width: 240px;"></label>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button class="btn btn-danger" ng-click="editSensor()"  data-dismiss="modal" ng-disabled="editSensorForm.$invalid">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<form>
+<!-- Interface to quickly filter machines in the table -->
+    <div class="form-group" id="userInputs">
       <div class="input-group">
         <div class="input-group-addon"><i class="fa fa-search"></i></div>
-
-        <input type="text" class="form-control" placeholder="Filter devices " ng-model="filterEthoscopes">
-
+        <input type="text" class="form-control" placeholder="Filter devices " ng-model="filterEthoscopes" title="Filter ethoscopes in the table below">
       </div>      
     </div>
-  </form>
 
-<!-- **** ETHOSCOPE LIST TABLE **** -->
+<!-- Interface to manually add machines from IPs -->
+    <div class="input-group">
+       <div class="input-group-addon"><i class="fa fa-plus" ng-click="manuallyAdd()"></i></div>
+       <input type="text" class="form-control" placeholder="IP address of the device or comma separated IP addresses" ng-model="ip_to_add" ng-enter="manuallyAdd()" title="Manually add a device">
+    </div>
+</form>
 
-<div class="alert alert-neutral" style="background-color:#f2f2f2;">
+<div class="modal fade" id="IPAlertModal" role="dialog" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="alertLabel">Problems adding some IPs</h4>
+      </div>
+      <div class="modal-body">
+          {{alertMessage}}
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">OK</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Toggle to quickly filter between all machines in the db or only active ones -->
+<div class="alert alert-neutral" style="background-color:#f2f2f2; margin-top: 15px;">
 <label class="toggle-check">Show all machines, even if no longer connected
   <input name="showAll" type="checkbox" class="toggle-check-input" ng-model="showAll" ng-checked="false" >
   <span class="toggle-check-text"></span>
 </label>
 </div>
 
+<!-- **** ETHOSCOPE LIST TABLE **** -->
 <table class="table table-striped" ng-cloak>
             <thead>
             <th>
@@ -188,7 +231,7 @@
                 <span ng-if="device.status == 'streaming'" class="fa fa-play-circle color-red" title={{device.status}}></span>
                 <span ng-if="device.status == 'stopped'" class="fa fa-stop-circle" title={{device.status}}></span></td>
                 <td>{{secToDate(device.time)}}</td>
-                <td>{{elapsedtime(device.time_since_backup)}}</td>
+                <td>{{elapsedtime(device.time_since_backup)}} ({{device.backup_status | number : 0}}%) </td>
                 <td>{{device.experimental_info.name}}</td>
                 <td>{{device.experimental_info.location}}</td>
                 <td>

@@ -4,11 +4,13 @@ from .tracking_unit import TrackingUnit
 import logging
 import traceback
 
+import datetime
+
 
 class Monitor(object):
 
     def __init__(self, camera, tracker_class,
-                 rois = None, stimulators=None,
+                 rois = None, reference_points = None, stimulators=None,
                  *args, **kwargs  # extra arguments for the tracker objects
                  ):
         r"""
@@ -28,8 +30,10 @@ class Monitor(object):
         :type tracker_class: class
         :param rois: A list of region of interest.
         :type rois: list(:class:`~ethoscope.core.roi.ROI`)
+        :param reference_points: A list containing the coordinates of the points used to build the ROIs
+        :type reference_points: list
         :param stimulators: The class that will be used to analyse the position of the object and interact with the system/hardware.
-        :type stimulators: list(:class:`~ethoscope.stimulators.stimulators.BaseInteractor`
+        :type stimulators: list(:class:`~ethoscope.stimulators.stimulators.BaseInteractor`)
         :param args: additional arguments passed to the tracking algorithm
         :param kwargs: additional keyword arguments passed to the tracking algorithm
         """
@@ -40,6 +44,7 @@ class Monitor(object):
         self._last_positions = {}
         self._last_time_stamp = 0
         self._is_running = False
+        self._reference_points = reference_points
 
 
         if rois is None:
@@ -84,7 +89,7 @@ class Monitor(object):
         """
         self._force_stop = True
 
-    def run(self, result_writer = None, drawer = None):
+    def run(self, result_writer = None, drawer = None, verbose=False):
         """
         Runs the monitor indefinitely.
 
@@ -99,6 +104,9 @@ class Monitor(object):
             self._is_running = True
 
             for i,(t, frame) in enumerate(self._camera):
+                
+                # This is useful feedback when we do offline tracking
+                if verbose and t % 5000 == 0: print ( str(datetime.timedelta(milliseconds=t)) )
 
                 if self._force_stop:
                     logging.info("Monitor object stopped from external request")
@@ -126,7 +134,7 @@ class Monitor(object):
                     result_writer.flush(t, frame)
 
                 if drawer is not None:
-                    drawer.draw(frame, self._last_positions, self._unit_trackers)
+                    drawer.draw(frame, self._last_positions, self._unit_trackers, self._reference_points)
                 self._last_t = t
 
         except Exception as e:
@@ -135,8 +143,8 @@ class Monitor(object):
 
         finally:
             self._is_running = False
-            logging.info("Monitor closing")
-
+            logging.info("Monitor closing - processed %s frames" % i)
+            if verbose: print ("Monitor closing - processed %s frames" % i)
 
 
 

@@ -1,8 +1,13 @@
 Ethoscope
 ============
 
+<<<<<<< HEAD
 This is the github repository of the software part of the [ethoscope platform](http://gilestrolab.github.io/ethoscope/).
 All technical information regarding ethoscope is compiled in [our documentation](https://www.notion.so/Ethoscope-User-Manual-a9739373ae9f4840aa45b277f2f0e3a7).
+=======
+This is the github repository of the software part of the [ethoscope platform](https://lab.gilest.ro/ethoscope).
+All technical information regarding ethoscope is compiled in [our documentation](https://lab.gilest.ro/ethoscope-manual).
+>>>>>>> dev
 
 Organisation of the code
 --------------------------

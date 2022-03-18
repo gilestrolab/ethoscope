@@ -39,7 +39,8 @@ class BaseROIBuilder(DescribedObject):
 
             accum = np.median(np.array(accum),0).astype(np.uint8)
         try:
-            rois = self._rois_from_img(accum)
+            reference_points, rois = self._rois_from_img(accum)
+            
         except Exception as e:
             if not isinstance(input, np.ndarray):
                 del input
@@ -53,7 +54,7 @@ class BaseROIBuilder(DescribedObject):
         else:
             rois = self._value_sorting(rois)
 
-        return rois
+        return reference_points, rois
 
 
 
@@ -78,12 +79,13 @@ class DefaultROIBuilder(BaseROIBuilder):
 
     """
     The default ROI builder. It simply defines the entire image as a unique ROI.
+    There are no reference points
     """
 
 
     def _rois_from_img(self,img):
         h, w = img.shape[0],img.shape[1]
-        return[
+        return _, [
             ROI(np.array([
                 (   0,        0       ),
                 (   0,        h -1    ),

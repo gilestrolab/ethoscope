@@ -31,6 +31,7 @@ def receive_devices(server = "localhost"):
         
 
 class BackupClass(object):
+    
     _db_credentials = {
             "name":"ethoscope_db",
             "user":"ethoscope",
@@ -41,7 +42,7 @@ class BackupClass(object):
     # #the user remotely accessing it is node/node
     
     # _db_credentials = {
-            # "name":"ETHOSCOPE_000_db",
+            # "name":"ETHOSCOPE_001_db",
             # "user":"node",
             # "password":"node"
         # }
@@ -64,12 +65,14 @@ class BackupClass(object):
 
             self._db_credentials["name"] = "%s_db" % self._device_info["name"]
 
-            mirror= MySQLdbToSQlite(backup_path, self._db_credentials["name"],
+            mirror = MySQLdbToSQlite(backup_path, self._db_credentials["name"],
                             remote_host=self._database_ip,
                             remote_pass=self._db_credentials["password"],
                             remote_user=self._db_credentials["user"])
 
             mirror.update_roi_tables()
+            
+            logging.info("Backup status for %s is %0.2f%%" %(self._device_info["id"], mirror.compare_databases() ))
 
         except DBNotReadyError as e:
             logging.warning(e)
@@ -92,17 +95,20 @@ class GenericBackupWrapper(object):
         # for safety, starts device scanner too in case the node will go down at later stage
         self._device_scanner = EthoscopeScanner(results_dir = results_dir)
             
-            
 
+    def get_devices(self):
+        logging.info("Updating list of devices")
+        devices = receive_devices(self._server)
+        
+        if not devices:
+            logging.info("Using Ethoscope Scanner to look for devices")
+            self._device_scanner.start()
+            time.sleep(20)
+            
+        return devices
 
     def run(self):
         try:
-            devices = receive_devices(self._server)
-            
-            if not devices:
-                logging.info("Using Ethoscope Scanner to look for devices")
-                self._device_scanner.start()
-                time.sleep(20)
 
             t0 = time.time()
             t1 = t0 + self._BACKUP_DT
@@ -114,6 +120,7 @@ class GenericBackupWrapper(object):
                     continue
 
                 logging.info("Starting backup")
+                devices = self.get_devices()
 
                 if not devices:
                     devices = self._device_scanner.get_all_devices_info()
@@ -121,21 +128,21 @@ class GenericBackupWrapper(object):
                 dev_list = str([d for d in sorted(devices.keys())])
                 logging.info("device map is: %s" %dev_list)
 
-                args = []
+                devices_to_backup = []
                 for d in list(devices.values()):
-                    if d["status"] not in ["not_in_use", "offline"]:
-                        args.append((d, self._results_dir))
+                    if d["status"] not in ["not_in_use", "offline"] and d["name"] != "ETHOSCOPE_000":
+                        devices_to_backup.append((d, self._results_dir))
 
-                logging.info("Found %s devices online" % len(args))
+                logging.info("Found %s devices online" % len(devices_to_backup))
 
                 if self._safe:
-                    for arg in args:
-                        self._backup_job(arg)
+                    for dtb in devices_to_backup:
+                        self._backup_job(dtb)
 
-                    #map(self._backup_job, args)
+                    #map(self._backup_job, devices_to_backup)
                 else:
                     pool = multiprocessing.Pool(4)
-                    _ = pool.map(self._backup_job, args)
+                    _ = pool.map(self._backup_job, devices_to_backup)
                     logging.info("Pool mapped")
                     pool.close()
                     logging.info("Joining now")

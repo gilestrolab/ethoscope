@@ -22,14 +22,14 @@ from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection, EthoscopeSensor
 from ethoscope.stimulators.stimulators import DefaultStimulator
-from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator, OptomotorSleepDepriver, ExperimentalSleepDepStimulator, MiddleCrossingStimulator, OptomotorSleepDepriverSystematic
+from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator, OptomotorSleepDepriver, ExperimentalSleepDepStimulator, MiddleCrossingStimulator, OptomotorSleepDepriverSystematic, mAGO
 from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver, MiddleCrossingOdourStimulator, MiddleCrossingOdourStimulatorFlushed
 from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulator
 
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
 from ethoscope.utils.description import DescribedObject
-from ethoscope.web_utils.helpers import isMachinePI, hasPiCamera, isExperimental, get_machine_name
+from ethoscope.web_utils.helpers import *
 
 class ExperimentalInformation(DescribedObject):
     
@@ -37,22 +37,24 @@ class ExperimentalInformation(DescribedObject):
                             "arguments": [
                                     {"type": "str", "name": "name", "description": "Who are you?", "default" : "", "asknode" : "users", "required" : "required"},
                                     {"type": "str", "name": "location", "description": "Where is your device","default" : "", "asknode" : "incubators"},
-                                    {"type": "str", "name": "code", "description": "Would you like to add any code to the resulting filename?", "default" : ""},
+                                    {"type": "str", "name": "code", "description": "Would you like to add any code to the resulting filename or metadata?", "default" : ""},
+                                    {"type": "boolean", "name": "append", "description": "Append tracking data to the existing database", "default": False},
                                     {"type": "str", "name": "sensor", "description": "url to access the relevant ethoscope sensor", "default": "", "asknode" : "sensors", "hidden" : "true"}
-
                                    ]}
-        def __init__(self, name="", location="", code="", sensor=""):
+                                   
+        def __init__(self, name="", location="", code="", append=False, sensor=""):
             self._check_code(code)
             self._info_dic = {"name":name,
                               "location":location,
                               "code":code,
-                              "sensor":sensor}
+                              "sensor":sensor,
+                              "append":append}
 
         def _check_code(self, code):
             r = re.compile(r"[^a-zA-Z0-9-]")
             clean_code = r.sub("",code)
             if len(code) != len(clean_code):
-                logging.error("the code in the video name contains unallowed characters")
+                logging.error("The provided string contains unallowed characters: %s" % code)
                 raise Exception("Code contains special characters. Please use only letters, digits or -")
 
 
@@ -68,7 +70,9 @@ class ControlThread(Thread):
     From this thread, the PI passes option to the node.
     Note: Options are passed and shown only if the remote class contains a "_description" field!
     """
-    _evanescent = False
+
+    _auto_SQL_backup_at_stop = False
+    
     _option_dict = {
         "roi_builder":{
                 "possible_classes":[DefaultROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder, OlfactionAssayROIBuilder, ElectricShockAssayROIBuilder],
@@ -89,7 +93,8 @@ class ControlThread(Thread):
                                             OptoMidlineCrossStimulator,
                                             OptomotorSleepDepriverSystematic,
                                             MiddleCrossingOdourStimulator,
-                                            MiddleCrossingOdourStimulatorFlushed
+                                            MiddleCrossingOdourStimulatorFlushed,
+                                            mAGO
                                             ],
                     },
         "drawer":{
@@ -109,7 +114,7 @@ class ControlThread(Thread):
     #some classes do not need to be offered as choices to the user in normal conditions
     #these are shown only if the machine is not a PI
     _is_a_rPi = isMachinePI() and hasPiCamera() and not isExperimental()
-    _hidden_options = {'camera', 'result_writer'}
+    _hidden_options = {'camera', 'result_writer', 'tracker'}
     
     for k in _option_dict:
         _option_dict[k]["class"] =_option_dict[k]["possible_classes"][0]
@@ -119,6 +124,7 @@ class ControlThread(Thread):
     _tmp_last_img_file = "last_img.jpg"
     _dbg_img_file = "dbg_img.png"
     _log_file = "ethoscope.log"
+
     #give the database an ethoscope specific name
     #future proof in case we want to use a remote server
     _db_credentials = {"name": "%s_db" % get_machine_name(),
@@ -132,7 +138,8 @@ class ControlThread(Thread):
                             "last_time_stamp":0,
                             "fps":0
                             }
-    _persistent_state_file = "/var/cache/ethoscope/persistent_state.pkl"
+
+    _persistent_state_file = PERSISTENT_STATE
 
     def __init__(self, machine_id, name, version, ethoscope_dir, data=None, *args, **kwargs):
 
@@ -167,6 +174,7 @@ class ControlThread(Thread):
             pass
 
         self._tmp_dir = tempfile.mkdtemp(prefix="ethoscope_")
+        
         #todo add 'data' -> how monitor was started to metadata
         self._info = {  "status": "stopped",
                         "time": time.time(),
@@ -174,25 +182,44 @@ class ControlThread(Thread):
                         "log_file": os.path.join(ethoscope_dir, self._log_file),
                         "dbg_img": os.path.join(ethoscope_dir, self._dbg_img_file),
                         "last_drawn_img": os.path.join(self._tmp_dir, self._tmp_last_img_file),
-                        "id": machine_id,
-                        "name": name,
-                        "version": version,
-                        "db_name":self._db_credentials["name"],
+                        "db_name": self._db_credentials["name"],
                         "monitor_info": self._default_monitor_info,
                         #"user_options": self._get_user_options(),
-                        "experimental_info": {}
+                        "experimental_info": {},
+
+                        "id": machine_id,
+                        "name": name,
+                        "version": version
                         }
         self._monit = None
 
         self._parse_user_options(data)
-
-
+        
         DrawerClass = self._option_dict["drawer"]["class"]
         drawer_kwargs = self._option_dict["drawer"]["kwargs"]
         self._drawer = DrawerClass(**drawer_kwargs)
-
+        
+        logging.info('Starting a new monitor control thread')
 
         super(ControlThread, self).__init__()
+
+    
+    @property
+    def hw_info(self):
+        """
+        This is information about the ethoscope that is not changing in time such as hardware specs and configuration parameters
+        """
+
+        _hw_info = {}
+        
+        _hw_info['kernel'] = os.uname()[2]
+        _hw_info['pi_version'] = pi_version()
+        _hw_info['camera'] = getPiCameraVersion()
+        _hw_info['SD_CARD_AGE'] = get_SD_CARD_AGE()
+        _hw_info['partitions'] = get_partition_infos()
+        _hw_info['SD_CARD_NAME'] = get_SD_CARD_NAME()
+        
+        return _hw_info
 
 
     @property
@@ -203,7 +230,6 @@ class ControlThread(Thread):
     @property
     def was_interrupted(self):
         return os.path.exists(self._persistent_state_file)
-
 
     @classmethod
     def user_options(self):
@@ -266,6 +292,11 @@ class ControlThread(Thread):
 
 
     def _update_info(self):
+        '''
+        Updates a dictionary with information that relates to the current status of the machine, ie data linked for instance to data acquisition
+        Information that is not related to control and it is not experiment-dependent will come from elsewhere
+        '''
+        
         if self._monit is None:
             return
         t = self._monit.last_time_stamp
@@ -298,7 +329,7 @@ class ControlThread(Thread):
         self._last_info_frame_idx = frame_idx
 
 
-    def _start_tracking(self, camera, result_writer, rois, TrackerClass, tracker_kwargs,
+    def _start_tracking(self, camera, result_writer, rois, reference_points, TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs):
 
         #Here the stimulator passes args. Hardware connection was previously open as thread.
@@ -310,8 +341,10 @@ class ControlThread(Thread):
         # todo: pickle hardware connection, camera, rois, tracker class, stimulator class,.
         # then rerun stimulators and Monitor(......)
         self._monit = Monitor(camera, TrackerClass, rois,
+                              reference_points = reference_points,
                               stimulators=stimulators,
                               *self._monit_args)
+        
         self._info["status"] = "running"
         logging.info("Setting monitor status as running: '%s'" % self._info["status"])
 
@@ -329,12 +362,12 @@ class ControlThread(Thread):
                 time.sleep(15)
                 return pickle.load(f)
 
-    def _save_pickled_state(self, camera, result_writer, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, running_info):
+    def _save_pickled_state(self, camera, result_writer, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, running_info):
         """
         note that cv2.videocapture is not a serializable object and cannot be pickled
         """
 
-        tpl = (camera, result_writer, rois, TrackerClass, tracker_kwargs,
+        tpl = (camera, result_writer, rois, reference_points, TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs, running_info)
 
 
@@ -369,7 +402,7 @@ class ControlThread(Thread):
         roi_builder = ROIBuilderClass(**roi_builder_kwargs)
         
         try:
-            rois = roi_builder.build(cam)
+            reference_points, rois = roi_builder.build(cam)
         except EthoscopeException as e:
             cam._close()
             raise e
@@ -398,7 +431,14 @@ class ControlThread(Thread):
             logging.info("Using sensor with URL %s" % self._info["experimental_info"]["sensor"])
         else:
             sensor = None
+
+        if "append" in self._info["experimental_info"]:
+            append_to_db = self._info["experimental_info"]["append"]
+            logging.info(["Recreating a new database", "Appending tracking data to the existing database"][append_to_db])
+        else:
+            append_to_db = False
         
+        #this will be saved in the metadata table
         self._metadata = {
             "machine_id": self._info["id"],
             "machine_name": self._info["name"],
@@ -408,11 +448,15 @@ class ControlThread(Thread):
             "version": self._info["version"]["id"],
             "experimental_info": str(self._info["experimental_info"]),
             "selected_options": str(self._option_dict),
+            "hardware_info" : str(self.hw_info),
+            "reference_points" : str([(p[0],p[1]) for p in reference_points])
         }
+        
+        
         # hardware_interface is a running thread
-        rw = ResultWriter(self._db_credentials, rois, self._metadata, take_frame_shots=True, sensor=sensor)
+        rw = ResultWriter(self._db_credentials, rois, self._metadata, take_frame_shots=True, erase_old_db = (not append_to_db), sensor=sensor,)
 
-        return  (cam, rw, rois, TrackerClass, tracker_kwargs,
+        return  (cam, rw, rois, reference_points, TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs)
 
     def run(self):
@@ -431,7 +475,7 @@ class ControlThread(Thread):
                 logging.warning("Attempting to resume a previously interrupted state")
                 
                 try:
-                    cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, self._info = self._set_tracking_from_pickled()
+                    cam, rw, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, self._info = self._set_tracking_from_pickled()
 
                 except Exception as e:
                     logging.error("Could not load previous state for unexpected reason:")
@@ -439,19 +483,19 @@ class ControlThread(Thread):
             
             #a previous instance does not exist, hence we create a new one
             else:
-                cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
+                cam, rw, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
                 
             
             with rw as result_writer:
                 
                 # and we save it if we can
                 if cam.canbepickled:
-                    self._save_pickled_state(cam, rw, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, self._info)
+                    self._save_pickled_state(cam, rw, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, self._info)
                 
                 # then we start tracking
-                self._start_tracking(cam, result_writer, rois, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
+                self._start_tracking(cam, result_writer, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
             
-            self.stop()
+            #self.stop()
 
         except EthoscopeException as e:
             if e.img is not  None:
@@ -482,14 +526,10 @@ class ControlThread(Thread):
                 logging.warning("Could not close hardware connection properly")
                 pass
 
-            #for testing purposes
-            if self._evanescent:
-                del self._drawer
-                self.stop()
-                os._exit(0)
-
-
-    def stop(self, error=None):
+    def stop (self, error=None):
+        """
+        """
+        
         self._info["status"] = "stopping"
         self._info["time"] = time.time()
         
@@ -504,6 +544,12 @@ class ControlThread(Thread):
             self._monit.stop()
             self._monit = None
 
+            if self._auto_SQL_backup_at_stop:
+                logging.info("Performing a SQL dump of the database.")
+                t = Thread( target = SQL_dump )
+                t.start()
+
+
         self._info["status"] = "stopped"
         self._info["time"] = time.time()
         self._info["error"] = error
@@ -516,10 +562,9 @@ class ControlThread(Thread):
             logging.info("Monitor closed all right")
 
     def __del__(self):
+        """
+        """
+
         self.stop()
         shutil.rmtree(self._tmp_dir, ignore_errors=True)
         shutil.rmtree(self._persistent_state_file, ignore_errors=True)
-
-    def set_evanescent(self, value=True):
-        self._evanescent = value
-

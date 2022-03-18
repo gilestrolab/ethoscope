@@ -29,7 +29,9 @@ SYSTEM_DAEMONS = {"ethoscope_node": {'description' : 'The main Ethoscope node se
                   "ethoscope_update_node" : {'description' : 'The service used to update the nodes and the ethoscopes.'},
                   "git-daemon.socket" : {'description' : 'The GIT server that handles git updates for the node and ethoscopes.'},
                   "ntpd" : {'description': 'The NTPd service is syncing time with the ethoscopes.'},
-                  "sshd" : {'description': 'The SSH daemon allows power users to access the node terminal from remote.'}
+                  "sshd" : {'description': 'The SSH daemon allows power users to access the node terminal from remote.'},
+                  "vsftpd" : {'description' : 'The FTP server on the node, used to access the local ethoscope data'},
+                  "virtuascope" : {'description' : 'A virtual ethoscope running on the node. Useful for offline tracking'}
                   }
 
 
@@ -102,6 +104,7 @@ def enable_cors():
 /device/<id>/stream                     GET
 /device/<id>/controls/<instruction>     POST
 /device/<id>/log                        GET
+/device/<id>/databases                  GET
 
 
 # RESOURCES ON NODE
@@ -149,6 +152,40 @@ def get_devices_list():
 @error_decorator
 def sensors():
     return sensor_scanner.get_all_devices_info()
+    
+@app.post('/sensor/set')
+def edit_sensor():
+    input_string = bottle.request.body.read().decode("utf-8")
+    d = eval(input_string)
+    try:
+        sensor = sensor_scanner.get_device(d["id"])
+        return sensor.set({"location" : d["location"] , "sensor_name" : d["name"] })
+    except:
+        pass
+        # a sensor with this ID was not found
+
+
+@app.post('/device/add')
+def manual_add():
+    """
+    Try to manually add one or more ethoscopes using the provided IPs
+    Accept a single IP or a list of comma separated IPs
+    """
+    input_string = bottle.request.body.read().decode("utf-8") 
+    added = [];
+    problems = [];
+    
+    for ip_address in input_string.split(","):
+        ip_address = ip_address.replace(" ", "")
+        
+        try:
+            device_scanner.add ( ip_address )
+            added.append(ip_address)
+        except:
+            problems.append(ip_address)
+        
+        
+    return {"added": added, "problems": problems }
 
 
 #Get the information of one device
@@ -200,7 +237,10 @@ def get_device_options(id):
 @error_decorator
 def get_device_videofiles(id):
     device = device_scanner.get_device(id)
-    return device.videofiles()
+    try:
+        return device.videofiles()
+    except:
+        return []
 
 
 #Get the information of one Sleep Monitor
@@ -253,6 +293,16 @@ def force_device_backup(id):
         logging.error("Unexpected error in backup. args are: %s" % str(args))
         logging.error(traceback.format_exc())
 
+@app.get('/device/<id>/dumpSQLdb')
+@error_decorator
+def device_local_dump(id):
+    '''
+    Aks the device to perform a local SQL dump
+    '''
+    device = device_scanner.get_device(id)
+    return device.dumpSQLdb()
+    
+    
 
 @app.get('/device/<id>/retire')
 @error_decorator
@@ -359,47 +409,49 @@ def download(what):
 def node_info(req):#, device):
     if req == 'info':
        
-        with os.popen('df %s -h' % RESULTS_DIR) as df:
-            disk_free = df.read()
-        
-        disk_usage = RESULTS_DIR+" Not Found on disk"
+        try:
+            with os.popen('df %s -h' % RESULTS_DIR) as df:
+                disk_free = df.read()
+            disk_usage = disk_free.split("\n")[1].split()
+            #this returns something like ['/dev/sda2', '916G', '330G', '540G', '38%', '/']
+
+        except:
+            disk_usage = []
+
+        if os.path.exists(RESULTS_DIR):
+            RDIR = RESULTS_DIR
+        else:
+            RDIR = "%s is not available" % RESULTS_DIR
 
         CARDS = {}
         IPs = []
-
         CFG.load()
 
+
+        #the following returns something like this: [['eno1', 'ec:b1:d7:66:2e:3a', '192.168.1.1'], ['enp0s20u12', '74:da:38:49:f8:2a', '155.198.232.206']]
+        adapters_list = [ [i, netifaces.ifaddresses(i)[17][0]['addr'], netifaces.ifaddresses(i)[2][0]['addr']] for i in netifaces.interfaces() if 17 in netifaces.ifaddresses(i) and 2 in netifaces.ifaddresses(i) and netifaces.ifaddresses(i)[17][0]['addr'] != '00:00:00:00:00:00' ]
+        for ad in adapters_list:
+            CARDS [ ad[0] ] = {'MAC' : ad[1], 'IP' : ad[2]}
+            IPs.append (ad[2])
+        
+       
+        with os.popen('git rev-parse --abbrev-ref HEAD') as df:
+            GIT_BRANCH = df.read() or "Not detected"
+        
+        with os.popen('git status -s -uno') as df:
+            NEEDS_UPDATE = df.read() != ""
+        
         try:
-            disk_usage = disk_free.split("\n")[1].split()
-
-            #the following returns something like this: [['eno1', 'ec:b1:d7:66:2e:3a', '192.168.1.1'], ['enp0s20u12', '74:da:38:49:f8:2a', '155.198.232.206']]
-            adapters_list = [ [i, netifaces.ifaddresses(i)[17][0]['addr'], netifaces.ifaddresses(i)[2][0]['addr']] for i in netifaces.interfaces() if 17 in netifaces.ifaddresses(i) and 2 in netifaces.ifaddresses(i) and netifaces.ifaddresses(i)[17][0]['addr'] != '00:00:00:00:00:00' ]
-            for ad in adapters_list:
-                CARDS [ ad[0] ] = {'MAC' : ad[1], 'IP' : ad[2]}
-                IPs.append (ad[2])
-            
-           
-            with os.popen('git rev-parse --abbrev-ref HEAD') as df:
-                GIT_BRANCH = df.read() or "Not detected"
-            #df = subprocess.Popen(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], stdout=subprocess.PIPE)
-            #GIT_BRANCH = df.communicate()[0].decode('utf-8')
-            
-            with os.popen('git status -s -uno') as df:
-                NEEDS_UPDATE = df.read() != ""
-
-            #df = subprocess.Popen(['git', 'status', '-s', '-uno'], stdout=subprocess.PIPE)
-            #NEEDS_UPDATE = df.communicate()[0].decode('utf-8') != ""
-            
             with os.popen('systemctl status ethoscope_node.service') as df:
-                try:
-                    ACTIVE_SINCE = df.read().split("\n")[2] 
-                except:
-                    ACTIVE_SINCE = "Not running through systemd"
+                ACTIVE_SINCE = df.read().split("\n")[2] 
+        except: 
+            ACTIVE_SINCE = "N/A. Probably not running through systemd"
+            
+            
 
-        except Exception as e:
-            logging.error(e)
+        #except Exception as e:
 
-        return {'active_since': ACTIVE_SINCE, 'disk_usage': disk_usage, 'IPs' : IPs , 'CARDS': CARDS, 'GIT_BRANCH': GIT_BRANCH, 'NEEDS_UPDATE': NEEDS_UPDATE}
+        return {'active_since': ACTIVE_SINCE, 'disk_usage': disk_usage, 'RDIR' : RDIR , 'IPs' : IPs , 'CARDS': CARDS, 'GIT_BRANCH': GIT_BRANCH, 'NEEDS_UPDATE': NEEDS_UPDATE}
                 
     elif req == 'time':
         return {'time':datetime.datetime.now().isoformat()}
@@ -560,7 +612,7 @@ if __name__ == '__main__':
 
     logging.getLogger().setLevel(logging.INFO)
     parser = optparse.OptionParser()
-    parser.add_option("-D", "--debug", dest="debug", default=False,help="Set DEBUG mode ON", action="store_true")
+    parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-p", "--port", dest="port", default=80, help="port")
     parser.add_option("-e", "--temporary-results-dir", dest="temp_results_dir", help="Where temporary result files are stored")
 
@@ -577,7 +629,7 @@ if __name__ == '__main__':
         logging.info("Logging using DEBUG SETTINGS")
 
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
-    device_scanner = None
+    
     try:
         device_scanner = EthoscopeScanner(results_dir=RESULTS_DIR)
         device_scanner.start()
@@ -592,17 +644,23 @@ if __name__ == '__main__':
 #            if CFG.content['sensors'][sensor]['active']:
 #                sensor_scanner.add(CFG.content['sensors'][sensor]['name'], CFG.content['sensors'][sensor]['URL'])
         
-        #######TO be remove when bottle changes to version 0.13
-        server = "cherrypy"
+        
         try:
-            from bottle.cherrypy import wsgiserver
+            bottle.run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='paste')
+
         except:
-            #Trick bottle into thinking that cheroot is cherrypy
-            bottle.server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
-            logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
-            pass
-        #########
-        bottle.run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='cherrypy')
+        
+            #######TO be remove when bottle changes to version 0.13
+            server = "cherrypy"
+            try:
+                from bottle.cherrypy import wsgiserver
+            except:
+                #Trick bottle into thinking that cheroot is cherrypy
+                bottle.server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
+                logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
+                pass
+            #########
+            bottle.run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='cherrypy')
 
     except KeyboardInterrupt:
         logging.info("Stopping server cleanly")

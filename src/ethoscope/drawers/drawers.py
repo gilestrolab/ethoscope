@@ -56,7 +56,7 @@ class BaseDrawer(object):
     def last_drawn_frame(self):
         return self._last_drawn_frame
 
-    def draw(self,img, positions, tracking_units):
+    def draw(self,img, positions, tracking_units, reference_points=None):
         """
         Draw results on a frame.
 
@@ -71,7 +71,7 @@ class BaseDrawer(object):
 
         self._last_drawn_frame = img.copy()
 
-        self._annotate_frame(self._last_drawn_frame, positions,tracking_units)
+        self._annotate_frame(self._last_drawn_frame, positions, tracking_units, reference_points)
 
         if self._draw_frames:
             cv2.imshow(self._window_name, self._last_drawn_frame )
@@ -108,7 +108,7 @@ class NullDrawer(BaseDrawer):
 
 
 class DefaultDrawer(BaseDrawer):
-    def __init__(self, video_out= None, draw_frames=False):
+    def __init__(self, video_out= None, draw_frames=False, **kwargs):
         """
         The default drawer. It draws ellipses on the detected objects and polygons around ROIs. When an "interaction"
         see :class:`~ethoscope.stimulators.stimulators.BaseInteractor` happens within a ROI,
@@ -119,19 +119,33 @@ class DefaultDrawer(BaseDrawer):
         :param draw_frames: Whether frames should be displayed on the screen (a new window will be created).
         :type draw_frames: bool
         """
-        super(DefaultDrawer,self).__init__(video_out=video_out, draw_frames=draw_frames)
+        super(DefaultDrawer,self).__init__(video_out=video_out, draw_frames=draw_frames, **kwargs)
 
-    def _annotate_frame(self,img, positions, tracking_units):
+    def _annotate_frame(self, img, positions, tracking_units, reference_points=None):
+        '''
+        Annotate frames with information about ROIs and moving objects
+        '''
         if img is None:
             return
+        
+        try:
+            for p in reference_points:
+                cv2.drawMarker(img, (int(p[0]), int(p[1])), color=(0,255,0), markerType=cv2.MARKER_CROSS, thickness=2)
+        except:
+            #noreferencepoints
+            pass
+        
         for track_u in tracking_units:
 
             x,y = track_u.roi.offset
             y += track_u.roi.rectangle[3]/2
 
+            # label ROI with its number
             cv2.putText(img, str(track_u.roi.idx), (int(x),int(y)), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,0))
-            black_colour = (0, 0,0)
-            roi_colour = (0, 255,0)
+            
+            # draw the shape of the ROI
+            black_colour = (0, 0, 0)
+            roi_colour = (0, 255, 0)
             cv2.drawContours(img,[track_u.roi.polygon],-1, black_colour, 3, LINE_AA)
             cv2.drawContours(img,[track_u.roi.polygon],-1, roi_colour, 1, LINE_AA)
 
@@ -147,6 +161,7 @@ class DefaultDrawer(BaseDrawer):
                         colour = (255, 0,0)
                 except KeyError:
                     pass
-
-                cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),black_colour,3, LINE_AA)
-                cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]),colour,1, LINE_AA)
+                
+                # Draw the ellipse around the fly
+                #cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]), black_colour, 3, LINE_AA)
+                cv2.ellipse(img,((pos["x"],pos["y"]), (pos["w"],pos["h"]), pos["phi"]), colour, 1, LINE_AA)

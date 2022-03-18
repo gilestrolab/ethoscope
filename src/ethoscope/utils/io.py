@@ -8,7 +8,11 @@ import cv2
 import tempfile
 import os
 
+import numpy as np
 
+import sqlite3
+import mysql.connector
+                
 #this code is reused from device_scanner
 import urllib.request, urllib.error, urllib.parse
 import json
@@ -19,6 +23,8 @@ class AsyncMySQLWriter(multiprocessing.Process):
     #_db_host = "node" #uncomment this to save data on the node
 
     def __init__(self, db_credentials, queue, erase_old_db=True):
+        """
+        """
         self._db_name = db_credentials["name"]
         self._db_user_name = db_credentials["user"]
         self._db_user_pass = db_credentials["password"]
@@ -26,14 +32,11 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
         self._queue = queue
 
-        # if erase_old_db:
-        #     self._delete_my_sql_db()
-        #     self._create_mysql_db()
         super(AsyncMySQLWriter,self).__init__()
 
 
     def _delete_my_sql_db(self):
-        import mysql.connector
+
         try:
             db = mysql.connector.connect(host=self._db_host,
                                          user=self._db_user_name,
@@ -81,7 +84,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
 
     def _create_mysql_db(self):
-        import mysql.connector
+
         db = mysql.connector.connect(host=self._db_host,
                                      user=self._db_user_name,
                                      passwd=self._db_user_pass,
@@ -111,7 +114,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
         db.close()
 
     def _get_connection(self):
-        import mysql.connector
+
         db = mysql.connector.connect(host=self._db_host,
                                      user=self._db_user_name,
                                      passwd=self._db_user_pass,
@@ -126,12 +129,14 @@ class AsyncMySQLWriter(multiprocessing.Process):
         
         db = None
         do_run = True
+        
         try:
             if self._erase_old_db:
                 self._delete_my_sql_db()
                 self._create_mysql_db()
 
             db = self._get_connection()
+        
             while do_run:
                 try:
                     msg = self._queue.get()
@@ -439,9 +444,11 @@ class ResultWriter(object):
             self._sensor_saver = None
         
         self._var_map_initialised = False
+        
         if erase_old_db:
             logging.warning("Erasing the old database and recreating the tables")
             self._create_all_tables()
+            
         else:
             event = "crash_recovery"
             command = "INSERT INTO START_EVENTS VALUES %s" % str((self._null, int(time.time()), event))
@@ -636,6 +643,7 @@ class ResultWriter(object):
     def __setstate__(self, state):
         self.__init__(**state["args"])
 
+
 class AsyncSQLiteWriter(multiprocessing.Process):
     _pragmas = {"temp_store": "MEMORY",
                 "journal_mode": "OFF",
@@ -647,6 +655,7 @@ class AsyncSQLiteWriter(multiprocessing.Process):
         self._erase_old_db =  erase_old_db
 
         super(AsyncSQLiteWriter,self).__init__()
+        
         if erase_old_db:
             try:
                 os.remove(self._db_name)
@@ -663,7 +672,7 @@ class AsyncSQLiteWriter(multiprocessing.Process):
 
         
     def _get_connection(self):
-        import sqlite3
+
         db =   sqlite3.connect(self._db_name)
         return db
 
@@ -755,3 +764,136 @@ class SQLiteResultWriter(ResultWriter):
                 self._insert_dict[roi_id] = command
             else:
                 self._insert_dict[roi_id] += ("," + str(tp))
+                
+
+
+class npyAppendableFile():
+    def __init__(self, fname, newfile = True):
+        '''
+        Creates a new instance of the appendable filetype
+        If newfile is True, recreate the file even if already exists
+        '''
+        filepath, extension = os.path.splitext(fname)
+        self.fname = filepath + ".anpy"
+        
+        self._newfile = newfile
+        self._first_write = True
+        
+    def write(self, data):
+        '''
+        append a new array to the file
+        note that this will not change the header
+        '''
+        if self._newfile and self._first_write:
+
+            with open(self.fname, "wb") as fh:
+                np.save(fh, data)
+            self._first_write = False
+            return True
+        
+        else:
+        
+            with open(self.fname, "ab") as fh:
+                np.save(fh, data)
+            
+            return True
+        
+        return False
+            
+    def load(self, axis=2):
+        '''
+        Load the whole file, returning all the arrays that were consecutively
+        saved on top of each other
+        axis defines how the arrays should be concatenated
+        '''
+        
+        with open(self.fname, "rb") as fh:
+            fsz = os.fstat(fh.fileno()).st_size
+            out = np.load(fh)
+            while fh.tell() < fsz:
+                out = np.concatenate((out, np.load(fh)), axis=axis)
+            
+        return out
+    
+    
+    def convert(self, filename=None):
+        '''
+        We created the new file by appending new arrays to an existing npy
+        The header, however, has remained constant and describes the very first array
+        Here we reload the all content and we save it with the appropriate array, hence transforming a .anpy file to a regular .npy one
+        '''
+        
+        content = self.load()
+        
+        if filename == None:
+            filepath, _ = os.path.splitext(self.fname)
+            filename = filepath + ".npy"
+        
+        with open(filename, "wb") as fh:
+            np.save(fh, content)
+            
+        print ("New .npy compatible file saved with name %s. Use numpy.load to load data from it. The array has a shape of %s" % (filename, content.shape))
+
+    @property
+    def _dtype(self):
+        return self.load().dtype
+
+    @property
+    def _actual_shape(self):
+        return self.load().shape
+    
+    @property
+    def header(self):
+        '''
+        Reads the header of the npy file
+        '''
+        with open(self.fname, "rb") as fh:
+            version = np.lib.format.read_magic(fh)
+            shape, fortran, dtype = np.lib.format._read_array_header(fh, version)
+        
+        return version, {'descr': dtype,
+                         'fortran_order' : fortran,
+                         'shape' : shape}
+
+class rawdatawriter():
+    '''
+    A writer used for offline data analysis
+    Writes the raw data to a np array with extension .anpy
+    Note that by default this is not a regular npy file because the header of the file
+    describe a small array. The .anpy can be converted to .npy using the update_content property
+    '''
+    
+    def __init__(self, basename, n_rois, entities=40):
+
+        self._basename, _ = os.path.splitext (basename)
+        
+        
+        self.entities = entities
+
+        self.files = [ npyAppendableFile (os.path.join("%s_%03d" % (self._basename, n_rois) + ".anpy"), newfile = True ) for r in range(n_rois) ]
+        
+        self.data = dict()
+        
+    def flush(self, t, frame):
+        '''
+        Called at the end of each frame
+        Used to commit the changes to the file and close it
+        '''
+        for row, fh in zip(self.data, self.files):
+            fh.write(self.data[row])
+        
+    def write(self, t, roi, data_rows):
+        '''
+        Get data data for each roi at time t
+        
+        data_rows is something like the below:
+        DataPoint([('x', 236), ('y', 94), ('w', 23), ('h', 9), ('phi', 39), ('is_inferred', 0), ('has_interacted', 0)])]
+
+        '''
+
+        #Convert data_rows to an array with shape (nf, 5) where nf is the number of flies in the ROI
+        arr = np.asarray([[t, fly['x'], fly['y'], fly['w'], fly['h'], fly['phi']] for fly in data_rows])
+        #The size of data_rows depends on how many contours were found. The array needs to have a fixed shape so we round it to self.entities as the max number of flies allowed
+        arr.resize((self.entities, 6, 1), refcheck=False)
+        self.data[roi.idx] = arr
+

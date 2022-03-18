@@ -71,6 +71,12 @@ class OptoMotor(BaseInterface):
     def _test_serial_connection(self):
         return
 
+    def interrogate(self):
+        """
+        Try to interrogate the device to check what its capabilities are.
+        Will work with all firmware for the new PCB and firmware newer than September 2020
+        """
+        return self._serial.write("T\r\n")
 
     def activate(self, channel, duration, intensity):
         """
@@ -98,6 +104,9 @@ class OptoMotor(BaseInterface):
         self.activate(channel, duration, intensity)
 
     def _warm_up(self):
+        """
+        Send a warm-up command that will test all channels
+        """
         for i in range(self._n_channels):
             self.send(i, duration=1000)
             time.sleep(1.000) #s

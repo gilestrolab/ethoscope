@@ -105,6 +105,7 @@
               <ul class="dd-menu">
                 <li ng-class="{'disabled':!isActive}" data-toggle="{{isActive ? 'modal' : ''}}" data-target="#recordModal">Record Video</li>
                 <li ng-class="{'disabled':!can_stream || !isActive}" ng-click="!can_stream || !isActive || ethoscope.stream()">Start Streaming</li>
+                <li ng-class="{'disabled':!machine_info.isExperimental}" ng-click="ethoscope.convertvideos()" style="{{machine_info.isExperimental ? '' :'display:none'}}">Convert Videos</li>
               </ul>
             </label>
 
@@ -117,7 +118,9 @@
               <ul class="dd-menu">
                 <li ng-click="ethoscope.log()">Info and Logs</li>
                 <li data-toggle="modal" data-target="#changeInfo">Settings</li>
-                <li ng-click="ethoscope.backup()">Backup</li>
+                <li data-toggle="modal" data-target="#backupProgress" ng-click="ethoscope.backup()" >Backup</li>
+                <li data-toggle="modal" data-target="#SQLdumpProgress" ng-click="ethoscope.SQLdump()" >SQL dump</li>
+
               </ul>
             </label>
 
@@ -172,6 +175,7 @@
         <h4>Hardware info</h4>
         <ul>
             <li>SD card age: {{ethoscope.elapsedtime(machine_info.SD_CARD_AGE)}}</li>
+            <li>SD card version: {{machine_info.SD_CARD_NAME}}</li>
             <li>PI version : {{machine_info.pi_version}}</li>
             <li>PI camera  : {{machine_info.camera}}</li>
         </ul>
@@ -195,6 +199,52 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-default" data-dismiss="modal">No</button>
         <button type="button" class="btn btn-primary" ng-click="ethoscope.poweroff()" data-dismiss="modal">Yes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Modal SQLdump -->
+<div class="modal fade" id="SQLdumpProgress" tabindex="-1" role="dialog" aria-labelledby="SQLdumpProgressLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Backup progress</h4>
+      </div>
+      <div class="modal-body">
+
+        <br>
+        <p >Asking {{device.name}} to perform a SQLdump: {{ SQLdumpStatus }}</p>
+        <p ng-if="SQLdumpStatus == 'Finished'" >The latest SQL dump was made {{ SQLdumpStarted }} minutes ago.</p>
+        <p ng-if="SQLdumpStatus == 'Dumping'" >Wait till the process is finished and do not close this window</p>
+      </div>
+      <div class="modal-footer">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Backup -->
+<div class="modal fade" id="backupProgress" tabindex="-1" role="dialog" aria-labelledby="backupProgressLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Backup progress</h4>
+      </div>
+      <div class="modal-body">
+
+        <div class="ProgressBarContainer" style="width: 100%; background-color: grey;">
+          <div class="ProgressBar" style="width: {{device.backup_status | number : 2}}%; height: 30px; background-color: #4CAF50; text-align: center; line-height: 30px; color: white;;">{{device.backup_status | number : 0}}%</div>
+        </div>
+        <br>
+        <p ng-if="device.backup_status < 100">Attempting full backup for {{device.name}}.</p>
+        <p ng-if="device.backup_status == 100">Backup terminated with success.</p>
+
+      </div>
+      <div class="modal-footer">
       </div>
     </div>
   </div>
@@ -281,13 +331,14 @@
                     </div>
                   <ul ng-if="selected_options.tracking[name]['name']==opt.name">
                         <li  ng-repeat="arg in opt.arguments">
-                            <label for="input-{{arg.name}}" ng-hide="arg.hidden" >{{arg.description}}</label>
+                            <label ng-if="arg.type != 'boolean'" for="input-{{arg.name}}" ng-hide="arg.hidden" >{{arg.description}}</label>
 
                             
                             <select ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" > <option value="">Available Movies</option><option ng-repeat="entry in videofiles" value="{{entry.fullpath}}">{{entry.filename | limitTo: 40}}{{entry.filename.length < 40 ? '' : '...'}}</option> </select>
                             <input  ng-if="arg.type == 'number'"   id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]" >
                             <input  ng-if="(arg.type == 'str' && arg.asknode == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.tracking[name]['arguments'][arg.name]">
                             <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" ng-required="true" ><option value="">-- choose {{arg.name}} --</option><option ng-repeat="entry in node[arg.asknode]  | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option> </select>
+                            <div ng-if="arg.type == 'boolean'" ><label for="input-{{arg.name}}"><input style="transform: scale(1.5); margin: 3px; margin-right: 10px;" id="input-{{arg.name}}" type="checkbox" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" >{{arg.description}}</label></div>
 
                             <div ng-if="arg.type == 'date_range'" class="input-group">
                                 <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-drp" type=hidden readonly ng-model="selected_options.tracking[name]['arguments'][arg.name]" options="{timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss', separator : ' > ' }}" > 

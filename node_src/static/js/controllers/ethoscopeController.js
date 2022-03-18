@@ -50,9 +50,14 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
         $scope.showLog = false;
         $scope.can_stream = false;
         $scope.isActive = false;
+        //$scope.isExperimental = false;
         var refresh_data = false;
         var spStart= new Spinner(opts).spin();
         var starting_tracking= document.getElementById('starting');
+
+        $http.get('/device/'+device_id+'/machineinfo').success(function(data){
+            $scope.machine_info = data;
+        });
 
         $http.get('/device/'+device_id+'/data').success(function(data){
             $scope.device = data;
@@ -179,14 +184,32 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
 
         }
 
+        $scope.ethoscope.SQLdump = function(){
+                
+                function recvinfo(){ $http.get('/device/'+device_id+'/dumpSQLdb').success(function(data) { $scope.SQLdumpStatus = data['Status']; $scope.SQLdumpStarted = data['Started']}) }
+                var timer1 = setInterval ( function() { if ($scope.SQLdumpStatus != 'Finished') { recvinfo() } else {clearInterval(timer1)} } , 2000);
+        }        
+        
+
         $scope.ethoscope.stream = function(option){
             if ($scope.can_stream) {
-                console.log("getting real time stream")
+                console.log("getting real time stream");
                 $http.post('/device/'+device_id+'/controls/stream', data= {"recorder":{"name":"Streamer","arguments":{}}} )
                 .success(function(response){
                     $scope.device.status = response.status;
+                    window.location.reload();
                 });
             }
+        };
+
+        $scope.ethoscope.convertvideos = function() {
+            console.log("Asking ethoscope to convert any h264 chunks to local mp4");
+            $http.post('/device/'+device_id+'/controls/convertvideos')
+            .success(function(response){
+                $scope.device.status = response.status;
+                window.location.reload();
+            });
+            
         };
 
         $scope.get_ip_of_sensor = function(location){
@@ -373,6 +396,7 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
             return date.toUTCString();
         };
 
+        var $attempt = 0;
         var refresh = function(){
         if (document.visibilityState=="visible"){
             $http.get('/device/'+device_id+'/data')
@@ -389,12 +413,14 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                         $scope.node_datetime = node_time.toUTCString();
                         $scope.delta_t_min = Math.abs((node_t - data.current_timestamp) / 60);
                         
-                        if ($scope.delta_t_min > 3) { 
+                        // Tries twice to adjust time remotely - if it does not manage we assume an old ethoscope version and we give up
+                        if (($scope.delta_t_min > 3) && ($attempt < 3)) { 
                             $scope.ethoscope.update_machine({'machine_options': {
                                                                 arguments: {'datetime' : new Date().getTime() / 1000 },
                                                                 name : 'datetime'
-                                                                }}) ;
-                            console.log("Trying to force time update on the ethoscope");
+                                                                }});
+                            $attempt = $attempt + 1 ;
+                            console.log("Trying to force time update on the ethoscope. Attempt: " + $attempt);
                             };
                      });
                 }

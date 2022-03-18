@@ -158,6 +158,9 @@ class TargetGridROIBuilder(BaseROIBuilder):
         return 1
 
     def _find_target_coordinates(self, img):
+        '''
+        Finds the coordinates of the three blobs on the given img
+        '''
         map = self._find_blobs(img, self._score_targets)
         bin = np.zeros_like(map)
 
@@ -215,21 +218,34 @@ class TargetGridROIBuilder(BaseROIBuilder):
         # the remaining point is a
         sorted_a = [sp for sp in src_points if not sp is sorted_b and not sp is sorted_c][0]
         sorted_src_pts = np.array([sorted_a, sorted_b, sorted_c], dtype=np.float32)
+        
+        #sorted_src_pts will return something like this
+        #[[1193.1302, 125.34195 ], [1209.0566, 857.9937  ], [  46.788918, 859.4524  ]]
+
         return sorted_src_pts
 
     def _rois_from_img(self,img):
-        sorted_src_pts = self._find_target_coordinates(img)
+        '''
+        Fit a ROI to the provided img
+        '''
+        
+        reference_points = self._find_target_coordinates(img)
+        
+        #point 1 is the reference point at coords A,B; point 0 will be A,y and point 2 x,B
+        #we then transform the ROIS on the assumption that those points are aligned perpendicularly in this way
         dst_points = np.array([(0,-1),
                                (0,0),
                                (-1,0)], dtype=np.float32)
-        wrap_mat = cv2.getAffineTransform(dst_points, sorted_src_pts)
+                               
+        wrap_mat = cv2.getAffineTransform(dst_points, reference_points)
 
         rectangles = self._make_grid(self._n_cols, self._n_rows,
                                      self._top_margin, self._bottom_margin,
                                      self._left_margin,self._right_margin,
                                      self._horizontal_fill, self._vertical_fill)
 
-        shift = np.dot(wrap_mat, [1,1,0]) - sorted_src_pts[1] # point 1 is the ref, at 0,0
+        shift = np.dot(wrap_mat, [1,1,0]) - reference_points[1] # point 1 is the ref which we have set at 0,0
+        
         rois = []
         for i,r in enumerate(rectangles):
             r = np.append(r, np.zeros((4,1)), axis=1)
@@ -238,10 +254,11 @@ class TargetGridROIBuilder(BaseROIBuilder):
             ct = mapped_rectangle.reshape((1,4,2)).astype(np.int32)
             cv2.drawContours(img,[ct], -1, (255,0,0),1,LINE_AA)
             rois.append(ROI(ct, idx=i+1))
-
-            # cv2.imshow("dbg",img)
-            # cv2.waitKey(0)
-        return rois
+            
+        #rois is an array of ROI objects
+        #reference points is an array containing the abslolute coordinates of the three refs
+        
+        return reference_points, rois
 
 
 class ThirtyFliesMonitorWithTargetROIBuilder(TargetGridROIBuilder):

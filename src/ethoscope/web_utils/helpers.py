@@ -5,6 +5,9 @@ import datetime, time
 import os
 import re
 from uuid import uuid4
+import netifaces
+
+PERSISTENT_STATE = "/var/cache/ethoscope/persistent_state.pkl"
 
 def pi_version():
     """
@@ -90,6 +93,18 @@ def set_machine_id(id, path="/etc/machine-id"):
 
 def get_WIFI(path="/etc/netctl/wlan"):
     """
+    Will return a dictionary like the following:
+    
+    {'Description': 'ethoscope_wifi network', 
+     'Interface': 'wlan0', 
+     'Connection': 'wireless', 
+     'Security': 'wpa', 
+     'ESSID': 'ETHOSCOPE_WIFI', 
+     'Key': 'ETHOSCOPE_1234', 
+     'IP': 'static', 
+     'Address': "('192.168.1.203/24')", 
+     'Gateway': "'192.168.1.1'"}
+
     """
     if os.path.exists(path):
         with open(path,'r') as f:
@@ -100,25 +115,51 @@ def get_WIFI(path="/etc/netctl/wlan"):
             if "=" in line:
                 d[ line.strip().split("=")[0] ] =  line.strip().split("=")[1]
         return d
-
     else:
         return {'error' : 'No WIFI Settings were found in path %s' % path}
+
+def get_gateway():
+    """
+    """
+    with os.popen("ip route | grep default | head -n 1 | cut -d ' ' -f 3") as cmd:
+        out_cmd = cmd.read().strip()
+    
+    return out_cmd
     
 
-def set_WIFI(ssid="ETHOSCOPE_WIFI", wpakey="ETHOSCOPE_1234", path="/etc/netctl/wlan"):
+def set_WIFI(ssid="ETHOSCOPE_WIFI", wpakey="ETHOSCOPE_1234", useSTATIC=False, path="/etc/netctl/wlan"):
     """
+    Receives the setting for wifi connection
+    Uses dhcp by default but if USE_DHCP is set to False, it will adopt a static ip address instead
     """
 
     wlan_settings = '''Description=ethoscope_wifi network
 Interface=wlan0
 Connection=wireless
 Security=wpa
-IP=dhcp
-TimeoutDHCP=60
 ESSID=%s
 Key=%s
 ''' % (ssid, wpakey)
+
+    if not useSTATIC:
+        IPV4_settings = "IP=dhcp\nTimeoutDHCP=60"
+        
+    else:
+        try:
+            gateway = get_gateway()
+            a,b,c,_ = gateway.split('.')
+            d = int(get_machine_name().split('_')[-1])
             
+            if int(d) > 1 and int(d) < 255:
+                ip_address = '.'.join([a,b,c,str(d)])
+            
+            IPV4_settings = "IP=static\nAddress=('%s/24')\nGateway='%s'" % (ip_address, gateway)
+            
+        except:
+            IPV4_settings = "IP=dhcp\nTimeoutDHCP=60"
+        
+    wlan_settings += IPV4_settings
+
     try:
         with open(path, 'w') as f:
             f.write(wlan_settings)
@@ -126,7 +167,15 @@ Key=%s
     except:
         raise
             
-    
+def get_connection_status():
+    ifs = {}
+    for interface in netifaces.interfaces():
+        addr = netifaces.ifaddresses(interface)
+        ifs.update({interface : netifaces.AF_INET in addr})
+
+    return ifs
+
+    #return netifaces.AF_INET in addr    
 
 def set_etc_hostname(ip_address, nodename = "node", path="/etc/hosts"):
     '''
@@ -198,14 +247,16 @@ def cpu_serial():
 def hasPiCamera():
     """
     return True if a piCamera is supported and detected
+
+    'supported=1 detected=1'
+    'supported=1 detected=0, libcamera interfaces=0'
+
     """
     if isMachinePI():
        with os.popen('/opt/vc/bin/vcgencmd get_camera') as cmd:
            out_cmd = cmd.read().strip()
-       out = dict(x.split('=') for x in out_cmd.split(' '))
-       
+       out = dict(x.split('=') for x in out_cmd.split(',')[0].split(' '))
        return out["detected"] == out["supported"] == "1"
-
     else:
         return False
         
@@ -261,6 +312,11 @@ def isExperimental(new_value=None):
     this mymics a non-PI or a PI without plugged in camera
     to activate, create an empty file called /etc/isexperimental
     """
+    
+    # If the ethoscope is running on something that is not a pi, it will be always flagged as experimental
+    if new_value == None and not isMachinePI():
+        return True
+    
     filename = '/etc/isexperimental'
     current_value = os.path.exists(filename)
     
@@ -276,9 +332,9 @@ def isExperimental(new_value=None):
         #delete file
         os.remove(filename)
         logging.warning("Removed file %s. The machine is not experimental." % filename)
-        
-    
-    
+
+def was_interrupted():
+    return os.path.exists(PERSISTENT_STATE)
 
 def get_machine_id(path="/etc/machine-id"):
     """
@@ -331,6 +387,21 @@ def get_SD_CARD_AGE():
         
     except:
         return
+
+def get_SD_CARD_NAME():
+    """
+    On recent (07/2020 on) versions of the SD images we save a file called
+    /etc/sdimagename
+    that contains the name of the img file we burnt to create the ethoscope
+    """
+    fn = "/etc/sdimagename"
+    try:
+        with open(fn) as f:
+            name = f.read()
+        return name.rstrip()
+
+    except:
+        return "N/A"
         
         
 def get_partition_infos():
@@ -362,5 +433,36 @@ def set_datetime(time_on_node):
         
         return True
         
+    except:
+        return False
+        
+        
+def SQL_dump( database_name = None, credentials = {'username' : 'ethoscope', 'password' : 'ethoscope'}, output_dir = "/ethoscope_data/backup", outputfile=None ):
+    """
+    Creates a SQL dump of the specified database
+    """
+    
+    if database_name == None:
+        database_name = get_machine_name() + "_db"
+    
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    if outputfile is None:
+        formatted_time = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        outputfile = "%s_%s.sql" % (database_name, formatted_time)
+    
+    fullpath = os.path.join(output_dir, outputfile)
+   
+    cmd = "mysqldump -alv --compatible=ansi --skip-extended-insert --compact --user=%s --password=%s %s > %s" % (credentials['username'], credentials['password'], database_name, fullpath)
+
+    try:
+        # Exporting the database can take some time 
+        # I am not really sure if there is a way to get a real time feedback of the process
+        with os.popen(cmd, 'r') as c:
+            verbose = c.read()
+
+        return True
+
     except:
         return False

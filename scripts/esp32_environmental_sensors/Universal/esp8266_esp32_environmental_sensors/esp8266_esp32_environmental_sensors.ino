@@ -1,21 +1,22 @@
 /*
   ESP32/8266 mDNS based environmental sensor
-
+  https://www.notion.so/giorgiogilestro/ESP8266-Sensor-mesh-fbf3c45a68034634a02316458a0336b5
+  
   This is an example of an HTTP server that is accessible
   via mDNS responder.
 
   Soldier together the two sensors boards (BME280 and BH1750), using the same header
-  then connect to the ESP32 
+  then connect to the ESP32 via I2C cable
   VCC -> 3.3V
   Gnd -> Gnd
   SDA -> D21
   SCL -> D22
 
-  or ESP8266 D1 mini Pro
+  or (reccomended) ESP8266 D1 mini Pro
   VCC -> 3.3V
   Gnd -> Gnd
-  SDA -> D1
-  SCL -> D2
+  SDA -> D2
+  SCL -> D1
 
   Instructions:
   - Update WiFi SSID and password as necessary.
@@ -256,7 +257,7 @@ void handlePost() {
       Serial.println(cfg.sensor_name);
   }
     saveConfiguration();
-    server.send(200, "application/json", "OK\n");
+    server.send(200, "application/json", "{'data':'OK'}");
 }
 
 
@@ -307,41 +308,41 @@ String SendJSON(){
     return ptr; 
 }
 
-String SendHTML(){
-    String ptr = "<!DOCTYPE html> <html>\n";
-    ptr +="<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
-    ptr +="<title>ESP based Environmental Station</title>\n";
-    ptr +="<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}\n";
-    ptr +="body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;}\n";
-    ptr +="p {font-size: 24px;color: #444444;margin-bottom: 10px;}\n";
-    ptr +="</style>\n";
-    ptr +="</head>\n";
-    ptr +="<body>\n";
-    ptr +="<div id=\"webpage\">\n";
-    ptr +="<h1>ESP32 Based WIFI sensor</h1>\n";
-    ptr +="<p>ID: ";
-    ptr +=getMacAddress();
-    ptr +="</p>";
-    ptr +="<p>IP: ";
-    ptr +=WiFi.localIP().toString();
-    ptr +="</p>";
-    ptr +="<p>Temperature: ";
-    ptr +=env.temperature;
-    ptr +="&deg;C</p>";
-    ptr +="<p>Humidity: ";
-    ptr +=env.humidity;
-    ptr +="%</p>";
-    ptr +="<p>Pressure: ";
-    ptr +=env.pressure;
-    ptr +="hPa</p>";
-    ptr +="<p>Lux: ";
-    ptr +=env.lux;
-    ptr +="hPa</p>";
-    ptr +="</div>\n";
-    ptr +="</body>\n";
-    ptr +="</html>\n";
-    return ptr;
-}
+//String SendHTML(){
+    //String ptr = "<!DOCTYPE html> <html>\n";
+    //ptr +="<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n";
+    //ptr +="<title>ESP based Environmental Station</title>\n";
+    //ptr +="<style>html { font-family: Helvetica; display: inline-block; margin: 0px auto; text-align: center;}\n";
+    //ptr +="body{margin-top: 50px;} h1 {color: #444444;margin: 50px auto 30px;}\n";
+    //ptr +="p {font-size: 24px;color: #444444;margin-bottom: 10px;}\n";
+    //ptr +="</style>\n";
+    //ptr +="</head>\n";
+    //ptr +="<body>\n";
+    //ptr +="<div id=\"webpage\">\n";
+    //ptr +="<h1>ESP32 Based WIFI sensor</h1>\n";
+    //ptr +="<p>ID: ";
+    //ptr +=getMacAddress();
+    //ptr +="</p>";
+    //ptr +="<p>IP: ";
+    //ptr +=WiFi.localIP().toString();
+    //ptr +="</p>";
+    //ptr +="<p>Temperature: ";
+    //ptr +=env.temperature;
+    //ptr +="&deg;C</p>";
+    //ptr +="<p>Humidity: ";
+    //ptr +=env.humidity;
+    //ptr +="%</p>";
+    //ptr +="<p>Pressure: ";
+    //ptr +=env.pressure;
+    //ptr +="hPa</p>";
+    //ptr +="<p>Lux: ";
+    //ptr +=env.lux;
+    //ptr +="hPa</p>";
+    //ptr +="</div>\n";
+    //ptr +="</body>\n";
+    //ptr +="</html>\n";
+    //return ptr;
+//}
 
 String getMacAddress(void) {
     uint8_t baseMac[6];

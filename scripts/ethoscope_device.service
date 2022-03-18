@@ -1,8 +1,7 @@
 [Unit]
-Description=Ethoscope device server
-Wants=ntpd.service mysqld.service
-After=ntpd.service network.target
-
+Description=Ethoscope device WEB server
+Wants=ntpd.service
+After=ntpd.service network.target ethoscope_listener.service
 
 [Service]
 Type=simple

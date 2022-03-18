@@ -8,6 +8,8 @@ import traceback
 import os
 
 server = "localhost"
+
+#file currently undergoing backup
 info_file = "/var/run/ethoscope_backup"
 
 
@@ -16,6 +18,7 @@ def backup_job(args):
         device_info, results_dir = args
         logging.info("Initiating backup for device  %s" % device_info["id"])
         
+        #this is to be reviewed. it definetely does not look good and it's not used at the moment anyway
         with open(info_file, "w") as f:
             f.write(device_info["id"])
 
@@ -39,7 +42,6 @@ if __name__ == '__main__':
     logging.getLogger().setLevel(logging.INFO)
     try:
         parser = optparse.OptionParser()
-        parser = optparse.OptionParser()
         parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
         parser.add_option("-r", "--results-dir", dest="results_dir", help="Where result files are stored")
         parser.add_option("-i", "--server", dest="server", default="localhost", help="The server on which the node is running will be interrogated first for the device list")
@@ -48,21 +50,40 @@ if __name__ == '__main__':
         
         (options, args) = parser.parse_args()
         option_dict = vars(options)
+
         RESULTS_DIR = option_dict["results_dir"] or CFG.content['folders']['results']['path']
         SAFE_MODE = option_dict["safe"]
+        DEBUG = option_dict["debug"]
+
         ethoscope = option_dict["ethoscope"]
         server = option_dict["server"]
 
+        if DEBUG:
+            logging.basicConfig()
+            logging.getLogger().setLevel(logging.DEBUG)
+            logging.info("Logging using DEBUG SETTINGS")
+
+
         if ethoscope:
-            ethoscope = int(ethoscope)
-            print ("Forcing backup for ethoscope %03d" % ethoscope)
-            all_devices = receive_devices(server)
             
-            bj = None
-            for devID in all_devices:
-                if all_devices[devID]['name'] == ("ETHOSCOPE_%03d" % ethoscope) and all_devices[devID]['status'] != "offline":
-                    bj = backup_job((all_devices[devID], RESULTS_DIR))
-            if bj == None: exit("ETHOSCOPE_%03d is not online or not detected" % ethoscope)
+            all_devices = receive_devices(server)
+
+            try:
+                ethoscopes = [int(ethoscope)]
+            except:
+                ethoscopes = [int(e) for e in ethoscope.split("-")]
+                
+            for ethoscope in ethoscopes:
+                print ("Forcing backup for ethoscope %03d" % ethoscope)
+                
+                bj = None
+                for devID in all_devices:
+                    try:
+                        if 'name' in all_devices[devID] and all_devices[devID]['name'] == ("ETHOSCOPE_%03d" % ethoscope) and all_devices[devID]['status'] != "offline":
+                            bj = backup_job((all_devices[devID], RESULTS_DIR))
+                    except:
+                        pass
+                if bj == None: exit("ETHOSCOPE_%03d is not online or not detected" % ethoscope)
 
         else:
         

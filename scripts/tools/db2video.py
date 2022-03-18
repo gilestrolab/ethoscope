@@ -47,7 +47,7 @@ def make_video_file(file, output, fps=1, annotate=True):
                 id, t, blob = c
                 file_name = os.path.join(dir,"%05d_%i.jpg" % (id, t))
 
-                file_like = io.StringIO(blob)
+                file_like = io.BytesIO(blob)
                 out_file = open(file_name, "wb")
                 file_like.seek(0)
                 shutil.copyfileobj(file_like, out_file)
