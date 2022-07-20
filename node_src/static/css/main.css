@@ -478,3 +478,23 @@ input.ng-valid{
     -webkit-border-radius:2px;
     z-index:1;
 }
+
+pre.bash {
+    background-color: black; 
+    color: white; 
+    font-family: Consolas,Monaco,Lucida Console,Liberation Mono,DejaVu Sans Mono,Bitstream Vera Sans Mono,Courier New, monospace;
+    height:20em;
+    overflow: auto;
+    word-break: normal !important;
+    word-wrap: normal !important;
+    white-space: pre !important;
+}
+
+pre.command {
+    display: inline;
+    background-color: black; 
+    color: white; 
+    font-family: Consolas,Monaco,Lucida Console,Liberation Mono,DejaVu Sans Mono,Bitstream Vera Sans Mono,Courier New, monospace;
+    overflow: auto;
+    width: min-content;
+}

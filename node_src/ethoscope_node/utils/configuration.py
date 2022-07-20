@@ -25,9 +25,10 @@ class EthoscopeConfiguration(object):
                                     'incubator 1' : {'id' : 1, 'name' : 'Incubator 1', 'location' : '', 'owner' : '', 'description' : ''}
                         },
                         
-                  'sensors' : {} 
-                                    
-                        }
+                  'sensors' : {},
+                  
+                  'commands' : {}
+                }
 
     def __init__(self, config_file = "/etc/ethoscope.conf"):
         self._config_file = config_file
@@ -47,7 +48,7 @@ class EthoscopeConfiguration(object):
 
     
     def addKey(self, section, obj):
-        self._settings[section] = obj
+        self._settings[section].update(obj)
     
     def addUser(self, userdata):
         name = userdata['name']
@@ -98,7 +99,7 @@ class EthoscopeConfiguration(object):
         '''
         try:
             with open(self._config_file, 'w') as json_data_file:
-                json.dump(self._settings, json_data_file)
+                json.dump(self._settings, json_data_file, indent=4, sort_keys=True)
             
             logging.info('Saved ethoscope configuration file to %s' % self._config_file)
         
@@ -125,11 +126,16 @@ class EthoscopeConfiguration(object):
 
 if __name__ == '__main__':
 
-    c = configuration()
+    c = EthoscopeConfiguration()
+    c.load()
+    
+    c.addKey('commands', {'command_1' : {'name': 'Sync all data to Turing', 'description': 'Sync all the ethoscope data to turing', 'command': '/etc/cron.hourly/sync'}})
+    c.addKey('commands', {'command_2' : {'name': 'Delete old files', 'description': 'Delete ethoscope data older than 180 days', 'command': 'find /ethoscope_data/results -type f -mtime +90 -exec rm {}\;'}})
+    c.addKey('commands', {'command_3' : {'name': 'List ethoscope files', 'description': 'Just used for debugging purposes', 'command': 'ls -h /ethoscope_data/results'}})
+
     print (c.listSections())
-    #c.addSection('Users')
-    c.addKey('Users', 'Name', )
+    print (c.content['commands'])
+
     c.save()
-    print (c.key['folders']['results_dir'])
     
     

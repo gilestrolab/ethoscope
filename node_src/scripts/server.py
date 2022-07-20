@@ -482,6 +482,9 @@ def node_info(req):#, device):
         
     elif req == 'sensors':
         return sensor_scanner.get_all_devices_info()
+        
+    elif req == 'commands':
+        return CFG.content['commands']
 
     else:
         raise NotImplementedError()
@@ -517,8 +520,28 @@ def node_actions():
                 CFG.save()
                 
         return CFG.content['folders']
-        
     
+    elif action['action'] == 'exec_cmd':
+        cmd = CFG.content['commands'][action['cmd_name']]['command']
+        logging.info("Executing command: %s" % cmd)
+
+        #try:
+        with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, shell=True) as po:
+            for line in po.stderr:
+                yield (line)
+
+            for line in po.stdout:
+                yield line
+                
+        yield "Done"
+            
+        #except subprocess.CalledProcessError:
+        #    print (po.stderr)
+        #    return "Error executing the command.\n%s" % po.stderr
+            
+        
+        return po.stdout
+        
     elif action['action'] == 'toggledaemon':
 
         if action['status'] == True:
