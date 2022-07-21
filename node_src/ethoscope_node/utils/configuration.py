@@ -27,7 +27,9 @@ class EthoscopeConfiguration(object):
                         
                   'sensors' : {},
                   
-                  'commands' : {}
+                  'commands' : {
+                                 'command_1' : {'name' : 'List ethoscope files.', 'description' : 'Show ethoscope data folders on the node. Just an example of how to write a command', 'command' : 'ls -lh /ethoscope_data/results'}
+                        }
                 }
 
     def __init__(self, config_file = "/etc/ethoscope.conf"):
