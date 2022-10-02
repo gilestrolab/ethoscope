@@ -246,7 +246,8 @@ class Ethoscope(Device):
         
         self._edb = ExperimentalDB()
         self._last_db_info = time.time()
-
+        self._device_controller_created = time.time()
+        
         super(Ethoscope,self).__init__()
         
 
@@ -452,7 +453,6 @@ class Ethoscope(Device):
         self._info["ip"] = self._ip
         self._id = resp['id']
 
-
     def _reset_info(self):
         '''
         This is called whenever the device goes offline or when it is first added
@@ -546,7 +546,7 @@ class Ethoscope(Device):
         except:
             pass
 
-        # gather info on the current backup if possible
+        # Every 60 seconds gather info on the current backup if possible
         try:
             if time.time() - self._last_db_info > 60:
                 dbd = db_diff(self._info["db_name"], self._ip, self._info['backup_path'])
@@ -555,7 +555,6 @@ class Ethoscope(Device):
 
         except:
             self._info['backup_status'] = "N/A"
-
 
     def _make_backup_path(self,  timeout=30):
         '''
@@ -743,6 +742,10 @@ class EthoscopeScanner(DeviceScanner):
             logging.error(traceback.format_exc())
             return
 
+    @property
+    def current_devices_id(self):
+        return [device.id() for device in self.devices]
+
     def get_all_devices_info(self):
         '''
         Returns a dictionary in which each entry has key of device_id
@@ -775,18 +778,44 @@ class EthoscopeScanner(DeviceScanner):
         """
         Add an ethoscope to the list
         TODO: Can be called manually or by zeroconf - it would be good to recognise which case we are in
-        """
         
-        #initialised the device and start it
-        device = self._Device(ip, port=port, refresh_period = self.device_refresh_period, results_dir = self.results_dir )
-        device.zeroconf_name = name
-        device.start()
+        name will be something like ETHOSCOPE170-170211ce7a844c23abc5ffe6ede1e154._ethoscope._tcp.local
+        """
 
-        #device_id = zcinfo.properties[b'id']
-        #device_id = name.split("-")[1].split(".")[0]
+        #tries to extract ID from name
+        if zcinfo:
+            try:
+                name = zcinfo['MACHINE_NAME']
+                eid = zcinfo['MACHINE_ID']
+            except:
+                try:
+                    name, eid = name.split(".")[0].split("-")
+                except:
+                    name, eid = None, None
+        
+        #check if device already exists
+        if eid not in self.current_devices_id or eid is None:
+        
+            #initialised the device and start it
+            device = self._Device(ip, port=port, refresh_period = self.device_refresh_period, results_dir = self.results_dir )
+            device.zeroconf_name = name
+            device.start()
 
-        self.devices.append(device)
-        logging.info("New %s added with name = %s at IP = %s:%s" % (self._device_type, name, ip, port))
+            logging.info("New %s ethoscope found with name = %s  at IP = %s:%s" % (self._device_type, name, ip, port))
+
+            #The system above is rather fragile because depends on zeroconf names The solution below adds a second layer
+            if device.id() in self.current_devices_id:
+                logging.info("The ethoscope was actually already known. Deleting it.")
+                del device
+            else:
+                logging.info("Adding ethoscope to the list.")
+                self.devices.append(device)
+                
+        
+        else:
+            logging.info("%s %s back online with IP %s" % (self._device_type, name, ip) )
+
+
 
     
     def retire_device (self, id, active=0):
