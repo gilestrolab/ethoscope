@@ -316,8 +316,14 @@ class Ethoscope(Device):
 
     def ip(self):
         return self._ip
-        
+
     def id(self):
+        '''
+        '''
+        # this may be the first time the id is asked.
+        if not self._id:
+            self._update_id()
+            
         return self._id
         
     def info(self):
