@@ -203,7 +203,7 @@ class StandardVideoRecorder(GeneralVideoRecorder):
 
 class Streamer(GeneralVideoRecorder):
     #hiding the description field will not pass this class information to the node UI
-    _hidden_description  = { "overview": "A preset 640 x 480, 25fps, bitrate = 2e5 streamer. Active on port 8008.", "arguments": []}
+    _description  = { "overview": "A preset 640 x 480, 25fps, bitrate = 2e5 streamer. Active on port 8008.", "arguments": [], 'hidden': True}
     status = "streaming"
     
     def __init__(self, cameraClass, camera_kwargs, video_prefix, video_dir, img_path):
