@@ -234,16 +234,22 @@ class ControlThread(Thread):
     @classmethod
     def user_options(self):
         out = {}
+        d = {}
         for key, value in list(self._option_dict.items()):
             # check if the options for the remote class will be visible
             # they will be visible only if they have a description, and if we are on a PC or they are not hidden
             if (self._is_a_rPi and key not in self._hidden_options) or not self._is_a_rPi:
                 out[key] = []
                 for p in value["possible_classes"]:
-                    try:
+                    #try:
+                    
+                    if "_description" in p.__dict__:
                         d = p.__dict__["_description"]
-                    except KeyError:
-                        continue
+                    if not self._is_a_rPi and "_hidden_description" in p.__dict__:
+                        d = p.__dict__["_hidden_description"]
+                    
+                    #except KeyError:
+                    #    continue
 
                     d["name"] = p.__name__
                     out[key].append(d)

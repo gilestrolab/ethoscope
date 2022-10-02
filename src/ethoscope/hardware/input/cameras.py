@@ -21,7 +21,7 @@ import traceback
 
 class BaseCamera(object):
     capture = None
-    _resolution = None
+    resolution = None
     _frame_idx = 0
 
     def __init__(self,drop_each=1, max_duration=None, *args, **kwargs):
@@ -228,6 +228,10 @@ class V4L2Camera(BaseCamera):
         
         self.canbepickled = False
         self.capture = cv2.VideoCapture(device)
+        
+        #gst_str = ("v4l2src device=/dev/video{} ! video/x-raw,width=(int){},height=(int){},framerate=(fraction){}/1 ! videoconvert ! video/x-raw,format=BGR ! queue ! appsink drop=1").format(device, target_resolution[0], target_resolution[1], target_fps)
+        #self.capture = cv2.VideoCapture(gst_str, cv2.CAP_GSTREAMER)
+        
         self._warm_up()
 
         w, h = target_resolution
@@ -244,25 +248,27 @@ class V4L2Camera(BaseCamera):
         if target_fps < 2:
             raise EthoscopeException("FPS must be at least 2")
         self.capture.set(CAP_PROP_FPS, target_fps)
-
+    
         self._target_fps = float(target_fps)
-        _, im = self.capture.read()
+        self.fps = float(target_fps)
+        
+        time.sleep(1)
+        _, first_frame = self.capture.read()
 
         # preallocate image buffer => faster
-        if im is None:
+        if first_frame is None:
             raise EthoscopeException("Error whist retrieving video frame. Got None instead. Camera not plugged?")
 
-        self._frame = im
+        assert(len(first_frame.shape) >1)
 
-        assert(len(im.shape) >1)
-
-        self._resolution = (im.shape[1], im.shape[0])
+        self._resolution = (first_frame.shape[1], first_frame.shape[0])
         if self._resolution != target_resolution:
             if w > 0 and h > 0:
                 logging.warning('Target resolution "%s" could NOT be achieved. Effective resolution is "%s"' % (target_resolution, self._resolution ))
             else:
                 logging.info('Maximal effective resolution is "%s"' % str(self._resolution))
 
+        self._frame = first_frame
 
         super(V4L2Camera, self).__init__(*args, **kwargs)
         self._start_time = time.time()
@@ -285,17 +291,25 @@ class V4L2Camera(BaseCamera):
         now = time.time()
         # relative time stamp
         return now - self._start_time
+    
     @property
     def start_time(self):
         return self._start_time
 
     def _close(self):
         self.capture.release()
+        
     def _next_image(self):
-        if self._frame_idx >0 :
+        '''
+        Image iterator. Tries to calculate the actual FPS and approach the desired FPS target
+        '''
+        if self._frame_idx > 0 :
             expected_time =  self._start_time + self._frame_idx / self._target_fps
             now = time.time()
+            self.fps = self._frame_idx/(now - self._start_time)
+
             to_sleep = expected_time - now
+
             # Warnings if the fps is so high that we cannot grab fast enough
             if to_sleep < 0:
                 if self._frame_idx % 5000 == 0:
@@ -306,12 +320,13 @@ class V4L2Camera(BaseCamera):
             while now < expected_time:
                 self.capture.grab()
                 now = time.time()
+
         else:
             self.capture.grab()
+        
         self.capture.retrieve(self._frame)
         return self._frame
 
-#class PiFrameGrabber(multiprocessing.Process):
 class PiFrameGrabber(threading.Thread):
 
     def __init__(self, target_fps, target_resolution, queue, stop_queue, *args, **kwargs):
@@ -451,7 +466,7 @@ class OurPiCameraAsync(BaseCamera):
         self._p.start()
         
         try:
-            im = self._queue.get(timeout=10)
+            first_frame = self._queue.get(timeout=10)
             
         except Exception as e:
             logging.error("Could not get any frame from the camera after the initialisation!")
@@ -461,10 +476,11 @@ class OurPiCameraAsync(BaseCamera):
 
             raise e
             
-        self._frame = cv2.cvtColor(im,cv2.COLOR_GRAY2BGR)
-        if len(im.shape) < 2:
+        self._frame = cv2.cvtColor(first_frame, cv2.COLOR_GRAY2BGR)
+        if len(first_frame.shape) < 2:
             raise EthoscopeException("The camera image is corrupted (less that 2 dimensions)")
-        self._resolution = (im.shape[1], im.shape[0])
+        
+        self._resolution = (first_frame.shape[1], first_frame.shape[0])
         if self._resolution != target_resolution:
             if w > 0 and h > 0:
                 logging.warning('Target resolution "%s" could NOT be achieved. Effective resolution is "%s"' % (target_resolution, self._resolution ))
@@ -521,9 +537,13 @@ class OurPiCameraAsync(BaseCamera):
         logging.info("Frame grabbing thread is joined")
 
     def _next_image(self):
+        self.fps = self._frame_idx/(time.time() - self._start_time)
+
         try:
             g = self._queue.get(timeout=30)
-            cv2.cvtColor(g,cv2.COLOR_GRAY2BGR,self._frame)
+            # do we always want to conver to GRAY? Probably no for videos?
+            cv2.cvtColor(g, cv2.COLOR_GRAY2BGR, self._frame)
+            
             return self._frame
         except Exception as e:
             raise EthoscopeException("Could not get frame from camera\n%s", traceback.format_exc())

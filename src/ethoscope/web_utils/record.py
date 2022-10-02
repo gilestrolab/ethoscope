@@ -3,6 +3,7 @@ import logging
 import time
 from ethoscope.web_utils.control_thread import ControlThread, ExperimentalInformation
 from ethoscope.utils.description import DescribedObject
+from ethoscope.hardware.input.cameras import V4L2Camera, OurPiCameraAsync
 import tempfile
 import shutil
 import threading, queue
@@ -10,8 +11,12 @@ import glob
 import datetime
 import os
 
+#from cv2 import VideoWriter, VideoWriter_fourcc, imwrite
+import cv2
+
 #streaming socket
 import socket, struct, io
+import pickle
 
 STREAMING_PORT = 8887
 
@@ -25,152 +30,119 @@ class cameraCaptureThread(threading.Thread):
     '''
         
     _VIDEO_CHUNCK_DURATION = 30 * 10
-    def __init__(self, video_prefix, video_root_dir, img_path, width, height, fps, bitrate, stream=False):
+    def __init__(self, cameraClass, camera_kwargs, video_prefix, video_root_dir, img_path, width, height, fps, bitrate, stream=False):
         self._img_path = img_path
+        
         self._resolution = (width, height)
         self._fps = fps
         self._bitrate = bitrate
         self._video_prefix = video_prefix
         self._video_root_dir = video_root_dir
         self._stream = stream
+        self.camera = cameraClass ( target_fps = fps , target_resolution = (width, height), **camera_kwargs )
         
         self.video_file_index = 0
         self.stop_camera_activity = False
 
         super(cameraCaptureThread, self).__init__()
 
-    @property
-    def _get_video_chunk_filename(self):
+    def _get_video_chunk_filename(self, ext='h264'):
         '''
         we save the files in chunks that will have to be merged togheter at a later point
         this names the next chunck
         '''
+
         self.video_file_index += 1
         w,h = self._resolution
-        video_info= "%ix%i@%i" %(w, h, self._fps)
-        
-        return '%s_%s_%05d.h264' % (self._video_prefix, video_info, self.video_file_index)
+        video_info= "%ix%i@%i" %(w, h, self.camera.fps)
+        video_filename = '%s_%s_%05d.%s' % (self._video_prefix, video_info, self.video_file_index, ext)
+        return video_filename
 
-    def run(self):
+    def _save_preview_frame(self, frame, writing_status):
         '''
         '''
-        logging.info("Starting initialisation of the Camera for the activity")
 
+        writing_status = ['', 'Writing'][writing_status]
+        timestamp = datetime.datetime.now().strftime("%m/%d/%Y, %H:%M:%S") + " FPS: " + str(round(self.camera.fps,2)) + " " + writing_status
+        cv2.putText(frame, timestamp , (20,20) , 1 , 1 , (255,255,255) )
+        cv2.imwrite(self._img_path, frame)
+        self.preview_time = time.time()
+
+    def run (self):
+        '''
+        Iterates the camera object for images and writes them the to a video file, dividing the video in multiple AVI
+        Every 5 seconds, updates the preview frame served over the network by the webserver adding some info text on it
+        '''
+
+        if self._stream:
+            server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server_socket.bind(('', STREAMING_PORT))
+            server_socket.listen(5)
+            logging.info("Socket stream initiliased.")
+
+        # creates a destination folder for the video, if it does not exist
         try:
-            import picamera
-        except ImportError as e:
+            video_dirname = os.path.dirname(self._video_prefix)
+            if not os.path.exists ( video_dirname ): os.makedirs( video_dirname )
+                
+        except OSError as e:
             raise e
-            return
 
-        #camera=picamera.PiCamera(resolution=self._resolution, framerate=self._fps)
-        with picamera.PiCamera() as camera:
-            camera.resolution = self._resolution
-            camera.framerate = self._fps
+        self.start_time = time.time()
+        self.preview_time = time.time()
+        
+        writer = None
 
-            #disable auto white balance to address the following issue: https://github.com/raspberrypi/firmware/issues/1167
-            #however setting this to off would have to be coupled with custom gains
-            #some suggestion on how to set the gains can be found here: https://picamera.readthedocs.io/en/release-1.12/recipes1.html
-            #and here: https://github.com/waveform80/picamera/issues/182
-            #camera.awb_mode = 'off'
-            #camera.awb_gains = (1.8, 1.5)
-            camera.awb_mode = 'auto'
+        while not self.stop_camera_activity:
 
-            logging.info("PiCamera initialised with resolution %s and fps %s." % (self._resolution, self._fps))
-            
-            self.start_time = time.time()
-            
             if self._stream:
+                logging.info("Waiting for a connection to start streaming")
+                client_socket, client_address = server_socket.accept() # blocking call
+                logging.info("Connection established!")
+          
+            for ix, (_, frame) in enumerate (self.camera):
 
-                self.stream = io.BytesIO()
-
-                self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                self.server_socket.bind(('', STREAMING_PORT))
-                self.server_socket.listen(1)
+                if self.stop_camera_activity: break
                 
-                logging.info("Socket stream initiliased")
-
-            else:
+                if writer and writer.isOpened() and not self._stream:
+                    writer.write(frame)
                 
-                try:
-                    video_dirname = os.path.dirname(self._video_prefix)
-                    if not os.path.exists ( video_dirname ): os.makedirs( video_dirname )
-                        
-                except OSError as e:
-                    raise e
-
-                camera.start_recording(self._get_video_chunk_filename, bitrate=self._bitrate)
-
-                logging.info("Video recording started.")
-
-                
-
-    
-            while not self.stop_camera_activity:
-            
-                if not self._stream:
-                    camera.wait_recording(2)
-                    camera.capture(self._img_path, use_video_port=True, quality=50)
+                # Wait for the first 150 frames before opening the video writer object
+                # This is done to calcualate a decent approximation of actual FPS
+                if time.time() - self.start_time >= self._VIDEO_CHUNCK_DURATION or ix == 150 and not self._stream:
+                    if writer:
+                        writer.release()
                     
-                    if time.time() - self.start_time >= self._VIDEO_CHUNCK_DURATION:
-                        camera.split_recording( self._get_video_chunk_filename )
-                        self.start_time = time.time()
-                            
+                    writer = cv2.VideoWriter(self._get_video_chunk_filename(ext='avi'), cv2.VideoWriter_fourcc(*'mp4v'), self.camera.fps, (self.camera.width, self.camera.height))
+                    if not writer.isOpened():
+                        logging.error('Error: failed to open Video writer destination. The Video file cannot be saved.')
 
+                    self.start_time = time.time()
+
+                # annotates a preview frame every 5 seconds
+                if (( time.time() - self.preview_time ) > 5) and not self._stream:
+                    self._save_preview_frame(frame, writing_status = writer is not None)
+                    
                 if self._stream:
-                    
-                    #try:
-                    while not self.stop_camera_activity:
-                        client_conn, client_address = self.server_socket.accept() # blocking call
-                        logging.info("Waiting for a connection to start streaming")
-                        self.connection = client_conn.makefile('wb')
-                        
-                        
-                        # send jpeg format video stream
-                        for _ in camera.capture_continuous(self.stream, 'jpeg', use_video_port = True):
-                            try:
-                                self.connection.write(struct.pack('<L', self.stream.tell()))
-                                self.connection.flush()
-                                self.stream.seek(0)
-                                self.connection.write(self.stream.read())
-                                self.stream.seek(0)
-                                self.stream.truncate()
-                               
-                            
-                            except:
-                                break
 
-                    try:
-                        client_address.close()
-                    except:
-                        pass
-                    
-                        #self.connection.write(struct.pack('<L', 0))
+                    frame = cv2.resize(frame, (640,480))
+                    frame = cv2.putText(frame, 'FPS: ' + str(round(self.camera.fps,2)) , (20,20) , 1 , 1 , (255,255,255) )
+                    _, frame = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
 
-                    
-                    #except:
-                    #    logging.error("Connection reset during streaming")
-                    #    pass
-                        
-                   
-                        
-                        
-            #out of the while loop
-            logging.info("Closing camera activity")
-
-            if not self._stream:
-                camera.wait_recording(1)
-                camera.stop_recording()
+                    data = pickle.dumps(frame)
+                    message = struct.pack("Q", len(data)) + data
+                    client_socket.sendall(message)
             
-            if self._stream:
+        # out of the loop - exit signal received
+        self.camera._close()
 
-                self.connection.close()
-                self.server_socket.close()
+        if self._stream:
+            client_socket.close()
+            server_socket.close()
 
-                logging.info("Streaming server stopped")
-
-            #camera.close()
-            logging.info("Camera closed.")
+        if writer:
+            writer.release()
 
 class GeneralVideoRecorder(DescribedObject):
 
@@ -181,16 +153,16 @@ class GeneralVideoRecorder(DescribedObject):
                                 {"type": "number", "name":"fps", "description": "The target number of frames per seconds","default":25, "min":1, "max":25,"step":1},
                                 {"type": "number", "name":"bitrate", "description": "The target bitrate","default":200000, "min":0, "max":10000000,"step":1000}
                                ]}
+    status = "recording" #this is the default status. The alternative is streaming
 
-    def __init__(self, video_prefix, video_dir, img_path,width=1280, height=960, fps=25, bitrate=200000, stream = False):
+    def __init__(self, cameraClass, camera_kwargs, video_prefix, video_dir, img_path, width=1280, height=960, fps=25, bitrate=200000, stream = False):
 
         self._stream = stream
 
         #This used to be a process but it's best handled as a thread. See also commit https://github.com/gilestrolab/ethoscope/commit/c2e8a7f656611cc10379c8e93ff4205220c8807a
-        self._p = cameraCaptureThread(video_prefix, video_dir, img_path, width, height,fps, bitrate, stream)
+        self._p = cameraCaptureThread(cameraClass, camera_kwargs, video_prefix, video_dir, img_path, width, height, fps, bitrate, stream)
 
-
-    def run(self):
+    def start_recording(self):
         '''
         '''
         self._p.start()
@@ -201,12 +173,15 @@ class GeneralVideoRecorder(DescribedObject):
     def stop(self):
         '''
         '''
+        logging.info("The control thread asked me to stop the camera")
         self._p.stop_camera_activity = True
+
         if self._stream: 
             try:
                 self._p.connection.close()
             except:
                 pass
+
         self._p.join(10)
 
 class HDVideoRecorder(GeneralVideoRecorder):
@@ -215,38 +190,41 @@ class HDVideoRecorder(GeneralVideoRecorder):
                                   "so we effectively zoom in the middle of arenas","arguments": []}
     status = "recording"
 
-    def __init__(self, video_prefix, video_dir, img_path):
-        super(HDVideoRecorder, self).__init__(video_prefix, video_dir, img_path, width=1920, height=1080,fps=25,bitrate=1000000)
+    def __init__(self, cameraClass, camera_kwargs, video_prefix, video_dir, img_path):
+        super(HDVideoRecorder, self).__init__(cameraClass, camera_kwargs, video_prefix, video_dir, img_path, width=1920, height=1080,fps=25,bitrate=1000000)
 
 
 class StandardVideoRecorder(GeneralVideoRecorder):
     _description  = { "overview": "A preset 1280 x 960, 25fps, bitrate = 2e5 video recorder.", "arguments": []}
     status = "recording"
     
-    def __init__(self, video_prefix, video_dir, img_path):
-        super(StandardVideoRecorder, self).__init__(video_prefix, video_dir, img_path, width=1280, height=960,fps=25,bitrate=500000)
+    def __init__(self, cameraClass, camera_kwargs, video_prefix, video_dir, img_path):
+        super(StandardVideoRecorder, self).__init__(cameraClass, camera_kwargs, video_prefix, video_dir, img_path, width=1280, height=960,fps=25,bitrate=500000)
 
 class Streamer(GeneralVideoRecorder):
     #hiding the description field will not pass this class information to the node UI
     _hidden_description  = { "overview": "A preset 640 x 480, 25fps, bitrate = 2e5 streamer. Active on port 8008.", "arguments": []}
     status = "streaming"
     
-    def __init__(self, video_prefix, video_dir, img_path):
-        super(Streamer, self).__init__(video_prefix, video_dir, img_path, width=640, height=480, fps=20, bitrate=500000, stream=True)
+    def __init__(self, cameraClass, camera_kwargs, video_prefix, video_dir, img_path):
+        super(Streamer, self).__init__(cameraClass, camera_kwargs, video_prefix, video_dir, img_path, width=640, height=480, fps=20, bitrate=500000, stream=True)
         
 
 class ControlThreadVideoRecording(ControlThread):
 
     _evanescent = False
     _option_dict = {
-
-        "recorder":{
-                "possible_classes":[StandardVideoRecorder, HDVideoRecorder, GeneralVideoRecorder, Streamer],
-            },
-        "experimental_info":{
-                        "possible_classes":[ExperimentalInformation],
+            "camera": {
+                    "possible_classes":[OurPiCameraAsync, V4L2Camera],
+                    },
+            "recorder": {
+                    "possible_classes":[StandardVideoRecorder, HDVideoRecorder, GeneralVideoRecorder, Streamer],
+                },
+            "experimental_info":{
+                    "possible_classes":[ExperimentalInformation],
+                    }
                 }
-     }
+                
     for k in _option_dict:
         _option_dict[k]["class"] =_option_dict[k]["possible_classes"][0]
         _option_dict[k]["kwargs"] ={}
@@ -255,6 +233,8 @@ class ControlThreadVideoRecording(ControlThread):
     _tmp_last_img_file = "last_img.jpg"
     _dbg_img_file = "dbg_img.png"
     _log_file = "ethoscope.log"
+    
+    _hidden_options = {'camera'}
 
     def __init__(self, machine_id, name, version, ethoscope_dir, data=None, *args, **kwargs):
 
@@ -336,17 +316,21 @@ class ControlThreadVideoRecording(ControlThread):
             self._output_video_full_prefix = os.path.join ( self._video_root_dir, self._machine_id, self._device_name, formatted_time, file_prefix )
 
             RecorderClass = self._option_dict["recorder"]["class"]
-            recorder_kwargs = self._option_dict["recorder"]["kwargs"]
+            recorder_kwargs = self._option_dict["recorder"]["kwargs"] # {'width': 1280, 'height': 960, 'fps': 25, 'bitrate': 200000}
 
-            self._recorder = RecorderClass(video_prefix = self._output_video_full_prefix,
-                                       video_dir = self._video_root_dir,
-                                       img_path=self._info["last_drawn_img"],**recorder_kwargs)
-
+            cameraClass = self._option_dict["camera"]["class"]
+            camera_kwargs = self._option_dict["camera"]["kwargs"]
+            
+            self._recorder = RecorderClass( cameraClass, camera_kwargs, 
+                                            video_prefix = self._output_video_full_prefix,
+                                            video_dir = self._video_root_dir,
+                                            img_path = self._info["last_drawn_img"],
+                                            **recorder_kwargs)
 
             self._info["status"] = self._recorder.status # "recording" or "streaming"
             logging.info( "Started %s" % self._recorder.status )
             
-            self._recorder.run()
+            self._recorder.start_recording()
 
         except Exception as e:
             self.stop(traceback.format_exc())
@@ -358,7 +342,8 @@ class ControlThreadVideoRecording(ControlThread):
 
 
     def stop(self, error=None):
-
+        '''
+        '''
         self._info["status"] = "stopping"
         self._info["time"] = time.time()
         self._info["experimental_info"] = {}

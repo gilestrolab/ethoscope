@@ -6,8 +6,9 @@ import json
 import time
 import logging
 import traceback
+import pickle
 from functools import wraps
-import socket
+import socket, struct
 from zeroconf import ServiceBrowser, Zeroconf, IPVersion
 
 from ethoscope_node.utils.etho_db import ExperimentalDB
@@ -275,6 +276,9 @@ class Ethoscope(Device):
         
 
     def send_instruction(self, instruction, post_data):
+        '''
+        Handles JSON instructions received by the server
+        '''
         
         post_url = "http://%s:%i/%s/%s/%s" % (self._ip, self._port, self._remote_pages['controls'], self._id, instruction)
         self._check_instructions_status(instruction)
@@ -343,47 +347,40 @@ class Ethoscope(Device):
         out = self._get_json(videofiles_url)
         return out
 
-
     def relay_stream(self):
         '''
         The node uses this function to relay the stream of images from the device to the node client
         '''
-        
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.connect((self._ip, STREAMING_PORT))
 
-        client_socket.settimeout(5)
+        #client_socket.settimeout(5)
         client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
         client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
         
-        rfile = client_socket.makefile('rb')
-
-        stream_bytes = b' '
-
+        data = b""
+        payload_size = struct.calcsize("Q")
+        
         while True:
+            while len(data) < payload_size:
+                packet = client_socket.recv(4*1024)
+                if not packet: break
+                data+=packet
             
-            stream_bytes += rfile.read(1024)
+            packed_msg_size = data[:payload_size]
+            data = data[payload_size:]
+            msg_size = struct.unpack("Q",packed_msg_size)[0]
             
-            if len(stream_bytes) == 0:
-                break
-
-            first = stream_bytes.find(b'\xff\xd8')
-            last = stream_bytes.find(b'\xff\xd9')
+            while len(data) < msg_size:
+                data += client_socket.recv(4*1024)
             
-            if first != -1 and last != -1:
+            frame_data = data[:msg_size]
+            data  = data[msg_size:]
+            frame = pickle.loads(frame_data)
+            
+            yield (b'--frame\r\nContent-Type:image/jpeg\r\n\r\n' + frame.tobytes() + b'\r\n')
 
-                jpg = stream_bytes[first:last+2]
-                stream_bytes = stream_bytes[last+2:]
-
-                yield b'--frame\r\n'
-                yield b'X-Timestamp: %s\r\n' % str(time.time()).encode()
-                yield b'Content-Length: %s\r\n' % str(len(jpg)).encode()
-                yield b'Content-Type: image/jpeg\r\n\r\n' 
-                yield jpg
-                yield b'\r\n'
-
-        rfile.close()
-        client_socket.close()
+        client_socket.close()        
 
     def user_options(self):
         """
