@@ -22,6 +22,8 @@ import bottle
 import socket
 from zeroconf import ServiceInfo, Zeroconf
 
+from ethoclient import send_command, listenerIsAlive
+
 try:
     from cheroot.wsgi import Server as WSGIServer
 except ImportError:
@@ -382,19 +384,16 @@ def info(id):
         raise WrongMachineID
 
     runninginfo = send_command('info')
-    try:
-        runninginfo.update ( { "CPU_temp" : get_core_temperature(), "current_timestamp" : bottle.time.time() } )
+    runninginfo.update ( { "CPU_temp" : get_core_temperature(), "current_timestamp" : bottle.time.time() } )
         
-    except:
-        runninginfo = {
-                        "status": 'not available',
-                        "id" : _MACHINE_ID,
-                        "name" : _MACHINE_NAME,
-                        "version" : _GIT_VERSION,
-                        "time" : bottle.time.time()
-                       }
-                       
-    
+    # except:
+        # runninginfo = {
+                        # "status": 'not available',
+                        # "id" : _MACHINE_ID,
+                        # "name" : _MACHINE_NAME,
+                        # "version" : _GIT_VERSION,
+                        # "time" : bottle.time.time()
+                       # }
     
     return runninginfo
 
@@ -406,9 +405,7 @@ def user_options(id):
     '''
     if id != _MACHINE_ID:
         raise WrongMachineID
-    
-    
-        
+
     return {
         "tracking":ControlThread.user_options(),
         "recording":ControlThreadVideoRecording.user_options(),
@@ -445,28 +442,6 @@ def get_log(id):
 def close(exit_status=0):
     os._exit(exit_status)
 
-
-def send_command(action, data=None, host='127.0.0.1', port=5000, size=1024):
-    '''
-    interfaces with the listening server
-    '''
-
-    message = {'command' : action,
-               'data' : data }
-
-    try:
-               
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((host, port))
-            s.sendall( json.dumps(message).encode('utf-8') )
-            r = json.loads( s.recv(size) )
-        
-        return r['response']
-
-    except:
-        return False
-
-
 if __name__ == '__main__':
 
     parser = OptionParser()
@@ -491,8 +466,7 @@ if __name__ == '__main__':
     _ETHOSCOPE_UPLOAD = '/ethoscope_data/upload'
     _ETHOSCOPE_DIR = '/ethoscope_data/results'
 
-    alive = send_command('status')
-    if not alive:
+    if not listenerIsAlive():
         logging.error('An Ethoscope controlling service is not running on this machine! I will be starting one for you but this is not the way this should work. Update your SD card.')
 
         from device_listener import commandingThread

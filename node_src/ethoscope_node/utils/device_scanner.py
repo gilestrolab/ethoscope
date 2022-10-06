@@ -471,6 +471,7 @@ class Ethoscope(Device):
         '''
 
         previous_status = self._info['status']
+        new_status = ''
 
         self._info['ping'] += 1
 
