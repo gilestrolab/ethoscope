@@ -384,7 +384,9 @@ def info(id):
         raise WrongMachineID
 
     runninginfo = send_command('info')
-    runninginfo.update ( { "CPU_temp" : get_core_temperature(), "current_timestamp" : bottle.time.time() } )
+    runninginfo.update ( { "CPU_temp" : get_core_temperature(), 
+                           "underpowered" : underPowered(),
+                           "current_timestamp" : bottle.time.time() } )
         
     # except:
         # runninginfo = {

@@ -7,6 +7,8 @@ import re
 from uuid import uuid4
 import netifaces
 
+from ethoscope.utils.rpi_bad_power import new_under_voltage
+
 PERSISTENT_STATE = "/var/cache/ethoscope/persistent_state.pkl"
 
 def pi_version():
@@ -376,6 +378,19 @@ def get_core_temperature():
             return 0
     else: 
         return 0
+
+def underPowered():
+    '''
+    Return true if the PI is underpowered, false otherwise
+    Code from rpi-bad-power https://github.com/shenxn/rpi-bad-power
+    '''
+    under_voltage = new_under_voltage()
+    if under_voltage is None:
+        return None
+    else:
+        return under_voltage.get()
+
+    
 
 def get_SD_CARD_AGE():
     """

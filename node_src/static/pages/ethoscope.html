@@ -1,7 +1,9 @@
 <!-- home.html -->
     <div class="jumbotron text-center" ng-cloak>
 
-        <div class="header">
+        <div class="header" style="position: relative;">
+          <span ng-if="device.underpowered == true" class="fa fa-bolt fa-3x" title="The PI is underpowered!" style="position: absolute; top: 0px; right: 0px;"></span>
+          
           <h1>{{device.name}}</h1>
           <ul>
             <li title="Device IP address"><a href="ssh://alarm@{{device.ip}}">{{device.ip}}</a></li>
