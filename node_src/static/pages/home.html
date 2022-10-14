@@ -232,7 +232,8 @@
                 <span ng-if="device.status == 'stopped'" class="fa fa-stop-circle" title={{device.status}}></span>
                 <span ng-if="device.underpowered == true" class="fa fa-bolt" title="The device is underpowered!"></span></td>
                 <td>{{secToDate(device.time)}}</td>
-                <td><span>{{elapsedtime(device.time_since_backup)}} ({{humanFileSize(device.backup_size)}} | {{device.backup_status | number : 0}}%)</span></td>
+                <td><span ng-if="device.backup_status > 0">{{elapsedtime(device.time_since_backup)}} ({{humanFileSize(device.backup_size)}} | {{device.backup_status | number : 0}}%)</span>
+                <span ng-if="device.backup_status <= 0">N/A</span></td>
                 <td>{{device.experimental_info.name}}</td>
                 <td>{{device.experimental_info.location}}</td>
                 <td>
