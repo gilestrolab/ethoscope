@@ -232,12 +232,12 @@
                 <span ng-if="device.status == 'stopped'" class="fa fa-stop-circle" title={{device.status}}></span>
                 <span ng-if="device.underpowered == true" class="fa fa-bolt" title="The device is underpowered!"></span></td>
                 <td>{{secToDate(device.time)}}</td>
-                <td><span title="{{humanFileSize(device.backup_size)}}">{{elapsedtime(device.time_since_backup)}} ({{device.backup_status | number : 0}}%)</span></td>
+                <td><span>{{elapsedtime(device.time_since_backup)}} ({{humanFileSize(device.backup_size)}} | {{device.backup_status | number : 0}}%)</span></td>
                 <td>{{device.experimental_info.name}}</td>
                 <td>{{device.experimental_info.location}}</td>
                 <td>
                     <span ng-if="device.status == 'offline'" title="Last known IP: {{device.ip}}">offline</span>
-                    <span ng-if="device.status != 'offline'" title="ping: {{device.ping}}ms">{{device.ip}}</span>
+                    <span ng-if="device.status != 'offline'" title="pinged: {{device.ping}} times">{{device.ip}}</span>
                 </td>
                 <td title="{{device.id}}">{{device.id.substring(0,6)}}</td>
             </tr>

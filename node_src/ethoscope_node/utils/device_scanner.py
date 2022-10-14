@@ -728,8 +728,7 @@ class EthoscopeScanner(DeviceScanner):
         try:
             backup_path = device.info()["backup_path"]
             if backup_path and os.path.exists(backup_path):
-                backup_size = os.path.getsize(backup_path)
-                return backup_size
+                return os.path.getsize(backup_path)
         except:
             return
 
@@ -739,9 +738,7 @@ class EthoscopeScanner(DeviceScanner):
         try:
             backup_path = device.info()["backup_path"]
             if backup_path and os.path.exists(backup_path):
-                backup_size = os.path.getsize(backup_path)
-                time_since_backup = time.time() - os.path.getmtime(backup_path)
-                return time_since_backup#, backup_size
+                return time.time() - os.path.getmtime(backup_path)
         except:
             return
             
