@@ -475,8 +475,10 @@ class AdaptiveBGModel(BaseTracker):
         #todo center mass just on the ellipse area
         cv2.bitwise_and(self._buff_fg_backup, self._buff_fg,self._buff_fg_backup)
 
-        y,x = ndimage.measurements.center_of_mass(self._buff_fg_backup)
-
+        #DeprecationWarning: Please use `center_of_mass` from the `scipy.ndimage` namespace, the `scipy.ndimage.measurements` namespace is deprecated.
+        #y,x = ndimage.measurements.center_of_mass(self._buff_fg_backup)
+        y,x = ndimage.center_of_mass(self._buff_fg_backup)
+        
         pos = x +1.0j*y
         pos /= w_im
 
