@@ -8,7 +8,6 @@ import traceback
 
 from ethoscope.utils.io import SQL_CHARSET
 
-
 class DBNotReadyError(Exception):
     pass
 

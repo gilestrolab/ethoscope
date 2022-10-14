@@ -722,14 +722,27 @@ class EthoscopeScanner(DeviceScanner):
         
         self.timestarted = datetime.datetime.now()
 
+    def _get_backup_size(self, device):
+        '''
+        '''
+        try:
+            backup_path = device.info()["backup_path"]
+            if backup_path and os.path.exists(backup_path):
+                backup_size = os.path.getsize(backup_path)
+                return backup_size
+        except:
+            return
+
     def _get_last_backup_time(self, device):
         '''
         '''
-        backup_path = device.info()["backup_path"]
-        if backup_path and os.path.exists(backup_path):
-            time_since_backup = time.time() - os.path.getmtime(backup_path)
-            return time_since_backup
-        else:
+        try:
+            backup_path = device.info()["backup_path"]
+            if backup_path and os.path.exists(backup_path):
+                backup_size = os.path.getsize(backup_path)
+                time_since_backup = time.time() - os.path.getmtime(backup_path)
+                return time_since_backup#, backup_size
+        except:
             return
             
     @property
@@ -759,6 +772,7 @@ class EthoscopeScanner(DeviceScanner):
             if device.name != "ETHOSCOPE_000":
                 out[device.id()] = device.info()
                 out[device.id()]["time_since_backup"] = self._get_last_backup_time(device)
+                out[device.id()]["backup_size"] = self._get_backup_size(device)
             else:
                 out[device.name] = device.info()
                 
@@ -791,7 +805,7 @@ class EthoscopeScanner(DeviceScanner):
             device.zeroconf_name = name
             device.start()
 
-            logging.info("New %s ethoscope found with name = %s  at IP = %s:%s" % (self._device_type, name, ip, port))
+            logging.info("New %s found with name = %s  at IP = %s:%s" % (self._device_type, name, ip, port))
 
             #The system above is rather fragile because depends on zeroconf names The solution below adds a second layer
             if device.id() in self.current_devices_id:
