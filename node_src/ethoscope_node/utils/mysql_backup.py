@@ -6,6 +6,9 @@ import os
 import logging
 import traceback
 
+from ethoscope.utils.io import SQL_CHARSET
+
+
 class DBNotReadyError(Exception):
     pass
 
@@ -44,7 +47,10 @@ class MySQLdbToSQlite(object):
                                       user=self._remote_user,
                                       passwd=self._remote_pass,
                                       db=self._remote_db_name,
-                                      connect_timeout=45)
+                                      connect_timeout=45,
+                                      buffered=True,
+                                      charset=SQL_CHARSET,
+                                      use_unicode=True)
 
 
         self._dst_path=dst_path
@@ -140,7 +146,11 @@ class MySQLdbToSQlite(object):
         #fetches data about the size of the remote db ( remote_local_tables_dictionary )
         src = mysql.connector.connect(host=self._remote_host,
                                       user=self._remote_user,
-                                      passwd=self._remote_pass)
+                                      passwd=self._remote_pass,
+                                      buffered=True,
+                                      charset=SQL_CHARSET,
+                                      use_unicode=True)
+
             
         src_cur = src.cursor(buffered=True)
         
@@ -238,7 +248,10 @@ class MySQLdbToSQlite(object):
         src = mysql.connector.connect(host=self._remote_host,
                                       user=self._remote_user,
                                       passwd=self._remote_pass,
-                                      db=self._remote_db_name)
+                                      db=self._remote_db_name,
+                                      buffered=True,
+                                      charset=SQL_CHARSET,
+                                      use_unicode=True)
 
         with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
 
@@ -450,7 +463,10 @@ class db_diff():
         #fetches data about the size of the remote db ( remote_local_tables_dictionary )
         src = mysql.connector.connect(host=self._remote_host,
                                       user=self._remote_user,
-                                      passwd=self._remote_pass)
+                                      passwd=self._remote_pass,
+                                      buffered=True,
+                                      charset=SQL_CHARSET,
+                                      use_unicode=True)
             
         src_cur = src.cursor(buffered=True)
         

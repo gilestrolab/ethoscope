@@ -17,6 +17,10 @@ import mysql.connector
 import urllib.request, urllib.error, urllib.parse
 import json
 
+#for mariadb
+SQL_CHARSET = 'latin1'
+
+
 class AsyncMySQLWriter(multiprocessing.Process):
     
     _db_host = "localhost"
@@ -42,7 +46,10 @@ class AsyncMySQLWriter(multiprocessing.Process):
                                          user=self._db_user_name,
                                          passwd=self._db_user_pass,
                                          db=self._db_name,
-                                         buffered=True)
+                                         buffered=True,
+                                         charset=SQL_CHARSET,
+                                         use_unicode=True)
+
                                          
         except mysql.connector.errors.OperationalError:
             logging.warning("Database %s does not exist. Cannot delete it" % self._db_name)
@@ -88,7 +95,9 @@ class AsyncMySQLWriter(multiprocessing.Process):
         db = mysql.connector.connect(host=self._db_host,
                                      user=self._db_user_name,
                                      passwd=self._db_user_pass,
-                                     buffered=True)
+                                     buffered=True,
+                                     charset=SQL_CHARSET,
+                                     use_unicode=True)
 
         c = db.cursor()
 
@@ -119,7 +128,10 @@ class AsyncMySQLWriter(multiprocessing.Process):
                                      user=self._db_user_name,
                                      passwd=self._db_user_pass,
                                      db=self._db_name,
-                                     buffered=True)
+                                     buffered=True,
+                                     charset=SQL_CHARSET,
+                                     use_unicode=True)
+
         return db
 
     def run(self):
