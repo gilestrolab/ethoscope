@@ -730,7 +730,7 @@ class EthoscopeScanner(DeviceScanner):
             if backup_path and os.path.exists(backup_path):
                 return os.path.getsize(backup_path)
         except:
-            return
+            return 0
 
     def _get_last_backup_time(self, device):
         '''

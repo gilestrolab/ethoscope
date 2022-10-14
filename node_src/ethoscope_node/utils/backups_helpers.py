@@ -119,7 +119,7 @@ class GenericBackupWrapper(object):
                     time.sleep(self._TICK)
                     continue
 
-                logging.info("Starting backup")
+                logging.info("Starting backup round")
                 devices = self.get_devices()
 
                 if not devices:

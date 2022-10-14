@@ -18,7 +18,7 @@ class baseSQLconnector():
     This is used to check if the db backup is in good shape
     """
 
-    def _get_remote_db_info_fast(self):
+    def _get_remote_db_info(self):
         """
         """
         src = mysql.connector.connect(host=self._remote_host,
@@ -38,44 +38,44 @@ class baseSQLconnector():
         
         return {a[0] : a[1] for a in tables}
 
-    def _get_remote_db_info(self):
-        """
-        """
+    # def _get_remote_db_info_slow(self):
+        # """
+        # """
 
-        #fetches data about the size of the remote db ( remote_local_tables_dictionary )
-        src = mysql.connector.connect(host=self._remote_host,
-                                      user=self._remote_user,
-                                      passwd=self._remote_pass,
-                                      buffered=True,
-                                      charset=SQL_CHARSET,
-                                      use_unicode=True)
+        # #fetches data about the size of the remote db ( remote_local_tables_dictionary )
+        # src = mysql.connector.connect(host=self._remote_host,
+                                      # user=self._remote_user,
+                                      # passwd=self._remote_pass,
+                                      # buffered=True,
+                                      # charset=SQL_CHARSET,
+                                      # use_unicode=True)
             
-        src_cur = src.cursor(buffered=True)
+        # src_cur = src.cursor(buffered=True)
         
-        command = 'SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.tables WHERE TABLE_SCHEMA LIKE "ETHOSCOPE%";'
-        src_cur.execute(command)
-        tables = src_cur.fetchall()
+        # command = 'SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.tables WHERE TABLE_SCHEMA LIKE "ETHOSCOPE%";'
+        # src_cur.execute(command)
+        # tables = src_cur.fetchall()
         
-        remote_local_tables_dictionary = {dbn : {} for dbn in set([entry[0] for entry in tables])}
+        # remote_local_tables_dictionary = {dbn : {} for dbn in set([entry[0] for entry in tables])}
         
-        for entry in tables: 
-            db_name = entry[0]
-            table_name = entry[1]
+        # for entry in tables: 
+            # db_name = entry[0]
+            # table_name = entry[1]
             
-            if table_name in ["ROI_MAP", "VAR_MAP"] or table_name.startswith("METADATA"):
-                #tables that do not have a unique id - slower command
-                command = 'SELECT count(*) from %s.%s' % (db_name, table_name)
-            else:
-                #tables that do
-                command = 'SELECT max(id) FROM %s.%s' % (db_name, table_name)
+            # if table_name in ["ROI_MAP", "VAR_MAP"] or table_name.startswith("METADATA"):
+                # #tables that do not have a unique id - slower command
+                # command = 'SELECT count(*) from %s.%s' % (db_name, table_name)
+            # else:
+                # #tables that do
+                # command = 'SELECT max(id) FROM %s.%s' % (db_name, table_name)
             
-            src_cur.execute(command)
-            remote_local_tables_dictionary [db_name] . update ( { table_name :  src_cur.fetchone()[0] } )
+            # src_cur.execute(command)
+            # remote_local_tables_dictionary [db_name] . update ( { table_name :  src_cur.fetchone()[0] } )
 
-        src.commit()
-        src.close()
+        # src.commit()
+        # src.close()
         
-        return remote_local_tables_dictionary
+        # return remote_local_tables_dictionary
 
     def _get_local_db_info(self):
         """
@@ -115,7 +115,7 @@ class baseSQLconnector():
         total_local = 0
         
         try:
-            remote_tables_info = self._get_remote_db_info_fast()
+            remote_tables_info = self._get_remote_db_info()
         except:
             logging.error("Problem getting info from the remote database: %s " % self._remote_db_name)
         
