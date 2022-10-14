@@ -417,13 +417,11 @@ class ControlThread(Thread):
 
         logging.info("Initialising monitor")
         cam.restart()
-        # the camera start time is the reference 0
-
 
         ExpInfoClass = self._option_dict["experimental_info"]["class"]
         exp_info_kwargs = self._option_dict["experimental_info"]["kwargs"]
         self._info["experimental_info"] = ExpInfoClass(**exp_info_kwargs).info_dic
-        self._info["time"] = cam.start_time
+        self._info["time"] = cam.start_time # the camera start time is the reference 0
         
         #here the hardwareconnection call the interface class without passing any argument!
         hardware_connection = HardwareConnection(HardWareInterfaceClass)
@@ -444,19 +442,22 @@ class ControlThread(Thread):
             logging.info(["Recreating a new database", "Appending tracking data to the existing database"][append_to_db])
         else:
             append_to_db = False
+
+        self._info["backup_filename"] = "%s_%s.db" % ( datetime.datetime.fromtimestamp(self._info["time"]).strftime('%Y-%m-%d_%H-%M-%S'), self._info["id"] )
         
         #this will be saved in the metadata table
         self._metadata = {
             "machine_id": self._info["id"],
             "machine_name": self._info["name"],
-            "date_time": cam.start_time,  # the camera start time is the reference 0
+            "date_time": self._info["time"],
             "frame_width": cam.width,
             "frame_height": cam.height,
             "version": self._info["version"]["id"],
             "experimental_info": str(self._info["experimental_info"]),
             "selected_options": str(self._option_dict),
             "hardware_info" : str(self.hw_info),
-            "reference_points" : str([(p[0],p[1]) for p in reference_points])
+            "reference_points" : str([(p[0],p[1]) for p in reference_points]),
+            "backup_filename" : self._info["backup_filename"]
         }
         
         

@@ -565,41 +565,27 @@ class Ethoscope(Device):
 
     def _make_backup_path(self,  timeout=30):
         '''
+        Creates the full path for the backup file, gathering info from the ethoscope
         '''
-        
         try:
-            import mysql.connector
-            device_id = self._info["id"]
-            device_name = self._info["name"]
-            self._ethoscope_db_credentials["db"] = self._info["db_name"]
-            
-            com = "SELECT value from METADATA WHERE field = 'date_time'"
+            # Only commits after 2022/10/14 will give us the backup_filename. We derive it from older versions.
+            if "backup_filename" not in self._info or not self._info["backup_filename"]:
+                self._info["backup_filename"] = "%s_%s.db" % ( datetime.datetime.fromtimestamp(self._info["time"]).strftime('%Y-%m-%d_%H-%M-%S'), self._info["id"] )
 
-            mysql_db = mysql.connector.connect(host=self._ip,
-                                               connect_timeout=timeout,
-                                               **self._ethoscope_db_credentials,
-                                               buffered=True)
-            cur = mysql_db.cursor()
-            cur.execute(com)
-            query = [c for c in cur]
-            timestamp = float(query[0][0])
-            mysql_db.close()
-            date_time = datetime.datetime.fromtimestamp(timestamp)
+            date_time = datetime.datetime.fromtimestamp(self._info["time"])
             formatted_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
-            file_name = "%s_%s.db" % (formatted_time, device_id)
+            
             output_db_file = os.path.join(self._results_dir,
-                                          device_id,
-                                          device_name,
+                                          self._info["id"],
+                                          self._info["name"],
                                           formatted_time,
-                                          file_name
-                                          )
+                                          self._info["backup_filename"])
 
-        except Exception as e:
-            #logging.error("Could not generate backup path for device. Probably a MySQL issue")
-            #logging.error(traceback.format_exc())
-            return {"backup_path": "None"}
-
-        return {"backup_path": output_db_file}
+            return {"backup_path": output_db_file}
+        
+        except:
+            
+            return {"backup_path": None}
 
     def stop(self):
         self._is_online = False
@@ -737,18 +723,15 @@ class EthoscopeScanner(DeviceScanner):
         self.timestarted = datetime.datetime.now()
 
     def _get_last_backup_time(self, device):
-        try:
-            backup_path = device.info()["backup_path"]
+        '''
+        '''
+        backup_path = device.info()["backup_path"]
+        if backup_path and os.path.exists(backup_path):
             time_since_backup = time.time() - os.path.getmtime(backup_path)
             return time_since_backup
-        except OSError:
+        else:
             return
-        except KeyError:
-            return
-        except Exception as e:
-            logging.error(traceback.format_exc())
-            return
-
+            
     @property
     def current_devices_id(self):
         return [device.id() for device in self.devices]
