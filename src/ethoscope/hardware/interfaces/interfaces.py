@@ -73,7 +73,7 @@ class HardwareConnection(Thread):
 
 
 class BaseInterface(object):
-    def __init__(self, do_warm_up = True):
+    def __init__(self, do_warm_up = False):
         """
         Template class which is an abstract representation of an hardware interface.
         It must define, in :func:`~ethoscope.hardware.interfaces.interfaces.BaseInterface.__init__`,

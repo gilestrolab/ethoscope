@@ -15,7 +15,7 @@ class SimpleLynxMotionInterface(BaseInterface):
     _max_angle_pulse = (90.,2500.)
     _n_channels = 10
 
-    def __init__(self, port=None, *args, **kwargs):
+    def __init__(self, port=None, warmup=False, *args, **kwargs):
         """
         Class to connect and abstract the SSC-32U Lynx Motion servo controller.
         It assumes a BAUD of 115200, which can be configured on the board as described in the

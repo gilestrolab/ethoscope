@@ -42,3 +42,9 @@ class SleepDepriverInterfaceCR(SimpleLynxMotionInterface):
         self.move_with_speed(channel, speed, half_dt)
         self.move_with_speed(channel, -speed, half_dt)
         self.move_with_speed(channel, 0, 100) #stop signal
+
+
+
+if __name__ == '__main__':
+    l = SleepDepriverInterface(do_warm_up=True)
+    #l.send(1)
