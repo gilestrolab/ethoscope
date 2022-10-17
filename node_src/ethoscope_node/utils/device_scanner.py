@@ -566,13 +566,16 @@ class Ethoscope(Device):
     def _make_backup_path(self,  timeout=30):
         '''
         Creates the full path for the backup file, gathering info from the ethoscope
+        Something like:
+        /ethoscope_data/results/280fd605ceec45fdacdd365f10865f9b/ETHOSCOPE_280/2022-10-17_18-21-27/2022-10-17_17-21-27_280fd605ceec45fdacdd365f10865f9b.db
         '''
         try:
             # Only commits after 2022/10/14 will give us the backup_filename. We derive it from older versions.
+            
             if "backup_filename" not in self._info or not self._info["backup_filename"]:
                 self._info["backup_filename"] = "%s_%s.db" % ( datetime.datetime.fromtimestamp(self._info["time"]).strftime('%Y-%m-%d_%H-%M-%S'), self._info["id"] )
-
-            date_time = datetime.datetime.fromtimestamp(self._info["time"])
+            
+            date_time = datetime.datetime.utcfromtimestamp(self._info["time"])
             formatted_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
             
             output_db_file = os.path.join(self._results_dir,

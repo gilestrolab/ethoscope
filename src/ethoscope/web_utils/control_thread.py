@@ -443,7 +443,7 @@ class ControlThread(Thread):
         else:
             append_to_db = False
 
-        self._info["backup_filename"] = "%s_%s.db" % ( datetime.datetime.fromtimestamp(self._info["time"]).strftime('%Y-%m-%d_%H-%M-%S'), self._info["id"] )
+        self._info["backup_filename"] = "%s_%s.db" % ( datetime.datetime.utcfromtimestamp(self._info["time"]).strftime('%Y-%m-%d_%H-%M-%S'), self._info["id"] )
         
         #this will be saved in the metadata table
         self._metadata = {
