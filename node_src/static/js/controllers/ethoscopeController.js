@@ -391,7 +391,8 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                 readable = ".../"+readable[len - 1];
                 return readable;
         };
-         $scope.ethoscope.start_date_time = function(unix_timestamp){
+        
+        $scope.ethoscope.start_date_time = function(unix_timestamp){
             var date = new Date(unix_timestamp*1000);
             return date.toUTCString();
         };
