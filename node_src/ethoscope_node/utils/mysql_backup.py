@@ -6,7 +6,7 @@ import os
 import logging
 import traceback
 
-from ethoscope.utils.io import SQL_CHARSET
+SQL_CHARSET = 'latin1'
 
 class DBNotReadyError(Exception):
     pass
