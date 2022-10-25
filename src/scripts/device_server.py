@@ -253,6 +253,7 @@ def controls(id, action):
 
         if action == 'restart':
             logging.info("Restarting service")
+            send_command('remove')
             subprocess.call(['systemctl', 'restart', 'ethoscope_device'])
 
         return info(id)
