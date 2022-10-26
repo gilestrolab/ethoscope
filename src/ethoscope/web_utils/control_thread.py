@@ -140,6 +140,7 @@ class ControlThread(Thread):
                             }
 
     _persistent_state_file = PERSISTENT_STATE
+    _last_run_info = '/var/run/last_run.ethoscope'
 
     def __init__(self, machine_id, name, version, ethoscope_dir, data=None, *args, **kwargs):
 
@@ -177,7 +178,7 @@ class ControlThread(Thread):
         
         #todo add 'data' -> how monitor was started to metadata
         self._info = {  "status": "stopped",
-                        "time": time.time(),
+                        "time": time.time(), #this is time of last interaction, e.g. last reboot, last start, last stop.
                         "error": None,
                         "log_file": os.path.join(ethoscope_dir, self._log_file),
                         "dbg_img": os.path.join(ethoscope_dir, self._dbg_img_file),
@@ -192,6 +193,10 @@ class ControlThread(Thread):
                         "version": version
                         }
         self._monit = None
+
+        if os.path.exists(self._last_run_info):
+            with open(self._last_run_info, 'rb') as fn:
+                self._info.update( pickle.load(fn) )
 
         self._parse_user_options(data)
         
@@ -445,7 +450,8 @@ class ControlThread(Thread):
 
         self._info["backup_filename"] = "%s_%s.db" % ( datetime.datetime.utcfromtimestamp(self._info["time"]).strftime('%Y-%m-%d_%H-%M-%S'), self._info["id"] )
         
-        #this will be saved in the metadata table
+        # this will be saved in the metadata table
+        # and in the pickle file below
         self._metadata = {
             "machine_id": self._info["id"],
             "machine_name": self._info["name"],
@@ -460,6 +466,14 @@ class ControlThread(Thread):
             "backup_filename" : self._info["backup_filename"]
         }
         
+        # This is useful to retrieve the latest run's information after a reboot
+        with open(self._last_run_info, "wb") as f:
+            pickle.dump( {
+                        "previous_date_time" : self._info["time"],
+                        "previous_backup_filename" : self._info["backup_filename"],
+                        "previous_user" : self._info["experimental_info"]["name"],
+                        "previous_location" : self._info["experimental_info"]["location"]
+                        }, f)
         
         # hardware_interface is a running thread
         rw = ResultWriter(self._db_credentials, rois, self._metadata, take_frame_shots=True, erase_old_db = (not append_to_db), sensor=sensor,)
@@ -467,6 +481,13 @@ class ControlThread(Thread):
         return  (cam, rw, rois, reference_points, TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs)
 
+    def _get_latest_backup_filename(self):
+        '''
+        Tries to recover the latest backup_filename
+        '''
+        pass
+        
+    
     def run(self):
         cam = None
         hardware_connection = None
@@ -562,6 +583,14 @@ class ControlThread(Thread):
         self._info["time"] = time.time()
         self._info["error"] = error
         self._info["monitor_info"] = self._default_monitor_info
+        
+        
+        if "backup_filename" in self._info:
+            self._info["previous_date_time"] : self._info["time"]
+            self._info["previous_backup_filename"] : self._info["backup_filename"]
+            self._info["previous_user"] : self._info["experimental_info"]["name"]
+            self._info["previous_location"] : self._info["experimental_info"]["location"]
+
 
         if error is not None:
             logging.error("Monitor closed with an error:")

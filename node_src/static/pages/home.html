@@ -234,8 +234,13 @@
                 <td>{{secToDate(device.time)}}</td>
                 <td><span ng-if="device.backup_status > 0">({{device.backup_status | number : 0}}% or {{humanFileSize(device.backup_size)}}) {{elapsedtime(device.time_since_backup)}}</span>
                 <span ng-if="device.backup_status <= 0">N/A</span></td>
-                <td>{{device.experimental_info.name}}</td>
-                <td>{{device.experimental_info.location}}</td>
+                <td>
+                    <span ng-if="device.experimental_info.name != ''">{{device.experimental_info.name}}</span>
+                    <span ng-if="device.previous_user != ''" style="color:grey">{{device.previous_user}}</span>
+                </td>
+                <td>
+                    <span ng-if="device.experimental_info.location != ''">{{device.experimental_info.location}}</span>
+                    <span ng-if="device.previous_location != ''" style="color:grey">{{device.previous_location}}</span>
                 <td>
                     <span ng-if="device.status == 'offline'" title="Last known IP: {{device.ip}}">offline</span>
                     <span ng-if="device.status != 'offline'" title="pinged: {{device.ping}} times">{{device.ip}}</span>

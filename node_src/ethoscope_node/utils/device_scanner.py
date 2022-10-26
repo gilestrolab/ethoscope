@@ -17,7 +17,7 @@ from ethoscope_node.utils.mysql_backup import db_diff
 STREAMING_PORT = 8887
 ETHOSCOPE_PORT = 9000
 
-DB_UPDATE_INTERVAL = 120
+DB_UPDATE_INTERVAL = 30
 
 class ScanException(Exception):
     pass
@@ -575,7 +575,17 @@ class Ethoscope(Device):
         /ethoscope_data/results/280fd605ceec45fdacdd365f10865f9b/ETHOSCOPE_280/2022-10-17_18-21-27/2022-10-17_17-21-27_280fd605ceec45fdacdd365f10865f9b.db
         '''
         
-        if "backup_filename" in self._info and self._info["backup_filename"]:
+        if self._info["status"] == 'stopped' and "previous_backup_filename" in self._info and self._info["previous_backup_filename"]:
+            fname, _ = os.path.splitext(self._info["previous_backup_filename"])
+            backup_date, backup_time, etho_id = fname.split("_")
+            
+            output_db_file = os.path.join(self._results_dir,
+                                          etho_id,
+                                          self._info["name"],
+                                          "%s_%s" % (backup_date, backup_time),
+                                          self._info["previous_backup_filename"])
+        
+        elif self._info["status"] != 'stopped' and "backup_filename" in self._info and self._info["backup_filename"]:
 
             #backup_filename is something like 2022-03-13_01-25-20_2719721d8b3e409da53c77be58c7ca62.db
             fname, _ = os.path.splitext(self._info["backup_filename"])

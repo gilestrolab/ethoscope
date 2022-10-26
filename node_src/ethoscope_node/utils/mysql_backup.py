@@ -16,6 +16,10 @@ class baseSQLconnector():
     """
     Basic class providing functions to compare the status of a local SQLlite3 db to the remote counterpart
     This is used to check if the db backup is in good shape
+    
+    The SQL command can be run from commandline for debugging purposes:
+    
+    mysql -u ethoscope -p -h 192.168.1.45 -e 'SELECT table_name,table_rows FROM INFORMATION_SCHEMA.tables WHERE table_schema LIKE "ETHOSCOPE%";'
     """
 
     def _get_remote_db_info(self):
