@@ -83,6 +83,7 @@ class baseSQLconnector():
         src.close()
         
         return remote_local_tables_dictionary
+        #return remote_local_tables_dictionary[db_name]
 
     def _get_local_db_info(self):
         """
@@ -90,7 +91,9 @@ class baseSQLconnector():
 
         local_tables_dictionary = {}
         
+        # now, this is very funny: this returns false if the folder is mounted via ssh - wtf?
         if os.path.exists(self._dst_path):
+            
             #connection to the local node file requires no credentials
             with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
                 dst_cur = dst.cursor()
@@ -115,15 +118,18 @@ class baseSQLconnector():
             
             return {} # sqlite3 file does not exist yet
             
-    def compare_databases(self):
+    def compare_databases(self, use_fast_mode=False):
         """
         """
         total_remote = 0
         total_local = 0
         
         try:
-            #remote_tables_info = self._get_remote_db_info()
-            remote_tables_info = self._get_remote_db_info_slow()
+            if use_fast_mode:
+                remote_tables_info = self._get_remote_db_info()
+            else:
+                remote_tables_info = self._get_remote_db_info_slow()
+               
         except:
             logging.error("Problem getting info from the remote database: %s " % self._remote_db_name)
         
@@ -134,10 +140,13 @@ class baseSQLconnector():
         
         #try:
         for table in sorted(local_tables_info):
-            l = local_tables_info[table]
-            r = remote_tables_info[table]
 
-            #r = remote_tables_info[self._remote_db_name][table]
+            l = local_tables_info[table]
+
+            if use_fast_mode:
+                r = remote_tables_info[table] # the fast system
+            else:
+                r = remote_tables_info[self._remote_db_name][table] # the slow system
             
             if r == None : r = 0
             if l == None : l = 0
