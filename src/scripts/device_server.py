@@ -427,13 +427,13 @@ def user_options(id):
 
 @api.get('/data/log/<id>')
 @error_decorator
-def get_log(id):
+def get_log(id, n_lines=200):
     '''
     returns the journalctl log
     '''
     output = "No log available"
     try:
-        with os.popen('journalctl -u ethoscope_device.service -rb') as p:
+        with os.popen('journalctl -u ethoscope_device.service -rb -n %s' % n_lines) as p:
             output = p.read()
 
     except Exception as e:
