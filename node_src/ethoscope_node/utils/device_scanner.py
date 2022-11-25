@@ -849,6 +849,9 @@ class EthoscopeScanner(DeviceScanner):
                     name, eid = name.split(".")[0].split("-")
                 except:
                     name, eid = None, None
+        else:
+            name, eid = None, None
+            
         
         #check if device already exists
         if eid not in self.current_devices_id or eid is None:
