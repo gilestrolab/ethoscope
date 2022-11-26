@@ -49,7 +49,7 @@ class BackupClass(object):
         self._results_dir = results_dir
 
 
-    def run(self):
+    def backup (self):
         try:
             if "backup_path" not in self._device_info:
                 raise KeyError("Could not obtain device backup path for %s" % self._device_info["id"])
@@ -68,14 +68,16 @@ class BackupClass(object):
             mirror.update_roi_tables()
             
             logging.info("Backup status for %s is %0.2f%%" %(self._device_info["id"], mirror.compare_databases() ))
+            return True
 
         except DBNotReadyError as e:
             logging.warning(e)
             logging.warning("Database %s on IP %s not ready, will try later" % (self._db_credentials["name"], self._database_ip) )
-            pass
+            return False
 
         except Exception as e:
             logging.error(traceback.format_exc())
+            return False
 
 
 class GenericBackupWrapper(threading.Thread):
@@ -103,10 +105,14 @@ class GenericBackupWrapper(threading.Thread):
             logging.info("Running backup for device  %s" % dev_id)
             self.devices_to_backup[dev_id] = {'started': int(time.time()), 'ended' : 0 }
 
-            backup_job.run()
+            if backup_job.backup():
 
-            logging.info("Backup done for for device  %s" % dev_id)
-            self.devices_to_backup[dev_id]['ended'] = int(time.time())
+                logging.info("Backup done for for device %s" % dev_id)
+                self.devices_to_backup[dev_id]['ended'] = int(time.time())
+            else:
+                logging.error("Problem backing up device %s" % dev_id)
+                self.devices_to_backup[dev_id]['ended'] = -1
+
 
             return True
             
