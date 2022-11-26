@@ -85,7 +85,7 @@ class GenericBackupWrapper(threading.Thread):
         self._results_dir = results_dir
         self._safe = safe
         self._node_address = node_address
-        self.devices_to_backup = []
+        self.devices_to_backup = {}
 
         super(GenericBackupWrapper, self).__init__()
             
@@ -95,24 +95,26 @@ class GenericBackupWrapper(threading.Thread):
         '''
         try:
             device_info, results_dir = args
-            logging.info("Initiating backup for device  %s" % device_info["id"])
+            dev_id = device_info["id"]
+            logging.info("Initiating backup for device  %s" % dev_id)
             
             backup_job = BackupClass(device_info, results_dir=results_dir)
 
-            logging.info("Running backup for device  %s" % device_info["id"])
-            self.devices_to_backup['id'] = {'started': int(time.time()), 'ended' : 0 }
+            logging.info("Running backup for device  %s" % dev_id)
+            self.devices_to_backup[dev_id] = {'started': int(time.time()), 'ended' : 0 }
 
             backup_job.run()
 
-            logging.info("Backup done for for device  %s" % device_info["id"])
-            self.devices_to_backup['id']['ended'] = datetime.datetime.now()
+            logging.info("Backup done for for device  %s" % dev_id)
+            self.devices_to_backup[dev_id]['ended'] = int(time.time())
 
-            return 1
+            return True
             
         except Exception as e:
+
             logging.error("Unexpected error in backup. args are: %s" % str(args))
             logging.error(traceback.format_exc())
-            return
+            return False
 
     def get_devices(self):
         '''
@@ -157,13 +159,16 @@ class GenericBackupWrapper(threading.Thread):
             
             ids_to_backup = [d[0]['id'] for d in self._devices_information]
             
+            for did in ids_to_backup:
+                if did not in self.devices_to_backup:
+                    self.devices_to_backup.update ({did : { 'started' : 0, 'ended' : 0 }})
+            
             logging.info("Found %s devices online: %s" % (
                               len(self._devices_information),
                               ', '.join( ids_to_backup )
                               )
                          )
-                         
-            self.devices_to_backup = {}.fromkeys(ids_to_backup, {'started': 0, 'ended' : 0 })
+            
 
             if self._safe:
                 logging.info("Safe mode set to True: processing backups one by one.")
