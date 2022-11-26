@@ -10,10 +10,11 @@ import traceback
 import urllib.request
 import json
 
+import threading
+
 def receive_devices(server = "localhost"):
     '''
-    Interrogates the NODE on its current knowledge of devices, then extracts from the JSON record
-    only the IPs
+    Interrogates the NODE on its current knowledge of devices
     '''
     url = "http://%s/devices" % server
     devices = []
@@ -31,6 +32,9 @@ def receive_devices(server = "localhost"):
         
 
 class BackupClass(object):
+    '''
+    The default backup class. Will connect to the ethoscope mysql and mirror its content into the local sqlite3
+    '''
     
     _db_credentials = {
             "name":"ethoscope_db",
@@ -38,15 +42,6 @@ class BackupClass(object):
             "password":"ethoscope"
         }
     
-    # #the db name is specific to the ethoscope being interrogated
-    # #the user remotely accessing it is node/node
-    
-    # _db_credentials = {
-            # "name":"ETHOSCOPE_001_db",
-            # "user":"node",
-            # "password":"node"
-        # }
-        
     def __init__(self, device_info, results_dir):
 
         self._device_info = device_info
@@ -83,74 +78,106 @@ class BackupClass(object):
             logging.error(traceback.format_exc())
 
 
-class GenericBackupWrapper(object):
-    def __init__(self, backup_job, results_dir, safe, server):
+class GenericBackupWrapper(threading.Thread):
+    def __init__(self, results_dir, safe, node_address):
         self._TICK = 1.0  # s
         self._BACKUP_DT = 5 * 60  # 5min
         self._results_dir = results_dir
         self._safe = safe
-        self._backup_job = backup_job
-        self._server = server
+        self._node_address = node_address
+        self.devices_to_backup = []
 
-        # for safety, starts device scanner too in case the node will go down at later stage
-        self._device_scanner = EthoscopeScanner(results_dir = results_dir)
+        super(GenericBackupWrapper, self).__init__()
             
 
+    def _backup_job(self, args):
+        '''
+        '''
+        try:
+            device_info, results_dir = args
+            logging.info("Initiating backup for device  %s" % device_info["id"])
+            
+            backup_job = BackupClass(device_info, results_dir=results_dir)
+
+            logging.info("Running backup for device  %s" % device_info["id"])
+            self.devices_to_backup['id'] = {'started': datetime.datetime.now(), 'ended' : 0 }
+
+            backup_job.run()
+
+            logging.info("Backup done for for device  %s" % device_info["id"])
+            self.devices_to_backup['id']['ended'] = datetime.datetime.now()
+
+            return 1
+            
+        except Exception as e:
+            logging.error("Unexpected error in backup. args are: %s" % str(args))
+            logging.error(traceback.format_exc())
+            return
+
     def get_devices(self):
+        '''
+        '''
+        
         logging.info("Updating list of devices")
-        devices = receive_devices(self._server)
+        devices = receive_devices(self._node_address)
         
         if not devices:
             logging.info("Using Ethoscope Scanner to look for devices")
+
+            self._device_scanner = EthoscopeScanner()
             self._device_scanner.start()
             time.sleep(20)
+            self._device_scanner.stop()
+            del self._device_scanner
             
         return devices
 
-    def run(self):
-        try:
+    def run (self):
+        '''
+        '''
+        
+        t0 = time.time()
+        t1 = t0 + self._BACKUP_DT
 
-            t0 = time.time()
-            t1 = t0 + self._BACKUP_DT
-
-            while True:
-                if t1 - t0 < self._BACKUP_DT:
-                    t1 = time.time()
-                    time.sleep(self._TICK)
-                    continue
-
-                logging.info("Starting backup round")
-                devices = self.get_devices()
-
-                if not devices:
-                    devices = self._device_scanner.get_all_devices_info()
-
-                dev_list = str([d for d in sorted(devices.keys())])
-                logging.info("device map is: %s" %dev_list)
-
-                devices_to_backup = []
-                for d in list(devices.values()):
-                    if d["status"] not in ["not_in_use", "offline"] and d["name"] != "ETHOSCOPE_000":
-                        devices_to_backup.append((d, self._results_dir))
-
-                logging.info("Found %s devices online" % len(devices_to_backup))
-
-                if self._safe:
-                    for dtb in devices_to_backup:
-                        self._backup_job(dtb)
-
-                    #map(self._backup_job, devices_to_backup)
-                else:
-                    pool = multiprocessing.Pool(4)
-                    _ = pool.map(self._backup_job, devices_to_backup)
-                    logging.info("Pool mapped")
-                    pool.close()
-                    logging.info("Joining now")
-                    pool.join()
+        while True:
+            if t1 - t0 < self._BACKUP_DT:
                 t1 = time.time()
-                logging.info("Backup finished at t=%i" % t1)
-                t0 = t1
+                time.sleep(self._TICK)
+                continue
 
-        finally:
+            logging.info("Starting backup round")
+            devices = self.get_devices()
+
             if not devices:
-                self._device_scanner.stop()
+                devices = self._device_scanner.get_all_devices_info()
+
+            self._devices_information = [ (d, self._results_dir) for d in list(devices.values()) 
+                                        if (d["status"] not in ["not_in_use", "offline"] and d["name"] != "ETHOSCOPE_000")
+                                     ]
+            
+            ids_to_backup = [d[0]['id'] for d in self._devices_information]
+            
+            logging.info("Found %s devices online: %s" % (
+                              len(self._devices_information),
+                              ', '.join( ids_to_backup )
+                              )
+                         )
+                         
+            self.devices_to_backup = {}.fromkeys(ids_to_backup, {'started': 0, 'ended' : 0 })
+
+            if self._safe:
+                logging.info("Safe mode set to True: processing backups one by one.")
+                for dtb in self._devices_information:
+                    self._backup_job(dtb)
+
+            else:
+                logging.info("Safe mode set to False: processing all backups at once.")
+                pool = multiprocessing.Pool(4)
+                _ = pool.map(self._backup_job, self._devices_information)
+                pool.close()
+                pool.join()
+                
+            t1 = time.time()
+            logging.info("Backup finished at t=%i" % t1)
+            t0 = t1
+
