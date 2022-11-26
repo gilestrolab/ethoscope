@@ -100,7 +100,7 @@ class GenericBackupWrapper(threading.Thread):
             backup_job = BackupClass(device_info, results_dir=results_dir)
 
             logging.info("Running backup for device  %s" % device_info["id"])
-            self.devices_to_backup['id'] = {'started': datetime.datetime.now(), 'ended' : 0 }
+            self.devices_to_backup['id'] = {'started': int(time.time()), 'ended' : 0 }
 
             backup_job.run()
 

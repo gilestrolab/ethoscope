@@ -29,7 +29,7 @@ if __name__ == '__main__':
     parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-r", "--results-dir", dest="results_dir", help="Where result files are stored")
     parser.add_option("-i", "--server", dest="NODE_ADDRESS", default="localhost", help="The server on which the node is running will be interrogated first for the device list")
-    parser.add_option("-s", "--safe", dest="safe", default=False, help="Set Safe mode ON", action="store_true")
+    parser.add_option("-s", "--safe", dest="safe", default=True, help="Set Safe mode ON", action="store_true")
     parser.add_option("-e", "--ethoscope", dest="ethoscope", help="Force backup of given ethoscope number (eg: 007)")
     
     (options, args) = parser.parse_args()
