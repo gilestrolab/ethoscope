@@ -154,7 +154,7 @@ class GenericBackupWrapper(threading.Thread):
             
             for dev in active_devices:
                 if dev['id'] not in self.backup_status:
-                    self.backup_status['id'] = { 'started' : 0, 'ended' : 0 }
+                    self.backup_status[dev['id']] = { 'started' : 0, 'ended' : 0 }
                 self._backup_job (dev)
                 
             t0 = t1 = time.time()
