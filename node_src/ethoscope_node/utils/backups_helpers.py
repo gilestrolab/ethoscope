@@ -4,32 +4,12 @@ from ethoscope_node.utils.mysql_backup import MySQLdbToSQlite, DBNotReadyError
 import os
 import logging
 import time
-import multiprocessing
 import traceback
 
 import urllib.request
 import json
 
 import threading
-
-def receive_devices(server = "localhost"):
-    '''
-    Interrogates the NODE on its current knowledge of devices
-    '''
-    url = "http://%s/devices" % server
-    devices = []
-    
-    try:
-        req = urllib.request.Request(url, headers={'Content-Type': 'application/json'})            
-        f = urllib.request.urlopen(req, timeout=10)
-        devices = json.load(f)
-        return devices
-
-    except:
-        logging.error("The node ethoscope server %s is not running or cannot be reached. A list of available ethoscopes could not be found." % server)
-        return
-        #logging.error(traceback.format_exc())
-        
 
 class BackupClass(object):
     '''
@@ -81,39 +61,68 @@ class BackupClass(object):
 
 
 class GenericBackupWrapper(threading.Thread):
-    def __init__(self, results_dir, safe, node_address):
+    def __init__(self, results_dir, node_address):
+        '''
+        '''
         self._TICK = 1.0  # s
         self._BACKUP_DT = 5 * 60  # 5min
         self._results_dir = results_dir
-        self._safe = safe
         self._node_address = node_address
-        self.devices_to_backup = {}
+        self.backup_status = {}
 
         super(GenericBackupWrapper, self).__init__()
+
+    def find_devices(self, only_active=True):
+        '''
+        Interrogates the NODE on its current knowledge of devices
+        '''
+        url = "http://%s/devices" % self._node_address
+        timeout = 10
+        devices = {}
+        
+        try:
+            req = urllib.request.Request(url, headers={'Content-Type': 'application/json'})            
+            f = urllib.request.urlopen(req, timeout=timeout)
+            devices = json.load(f)
+
+        except urllib.error.URLError as e:
+            logging.error("The node ethoscope server %s is not running or cannot be reached. A list of available ethoscopes could not be found." % server)
+            logging.info("Using Ethoscope Scanner to look for devices")
+
+            _device_scanner = EthoscopeScanner()
+            _device_scanner.start()
+            time.sleep(timeout) #let's just wait a bit
+            devices = _device_scanner.get_all_devices_info()
+            del _device_scanner
+                
+        
+        if only_active:
+            return [ d for d in list( devices.values() ) if (d["status"] not in ["not_in_use", "offline"] and d["name"] != "ETHOSCOPE_000") ]
+        
+        return devices
             
 
-    def _backup_job(self, args):
+    def _backup_job(self,  device_info):
         '''
         '''
         try:
-            device_info, results_dir = args
             dev_id = device_info["id"]
             logging.info("Initiating backup for device  %s" % dev_id)
             
-            backup_job = BackupClass(device_info, results_dir=results_dir)
+            backup_job = BackupClass(device_info, results_dir=self._results_dir)
 
             logging.info("Running backup for device  %s" % dev_id)
-            self.devices_to_backup[dev_id] = {'started': int(time.time()), 'ended' : 0 }
+            self.backup_status[dev_id] = {'started': int(time.time()), 'ended' : 0 }
 
             if backup_job.backup():
 
                 logging.info("Backup done for for device %s" % dev_id)
-                self.devices_to_backup[dev_id]['ended'] = int(time.time())
+                self.backup_status[dev_id]['ended'] = int(time.time())
             else:
                 logging.error("Problem backing up device %s" % dev_id)
-                self.devices_to_backup[dev_id]['ended'] = -1
-
-
+                self.backup_status[dev_id]['ended'] = -1
+            
+            del backup_job
             return True
             
         except Exception as e:
@@ -121,24 +130,6 @@ class GenericBackupWrapper(threading.Thread):
             logging.error("Unexpected error in backup. args are: %s" % str(args))
             logging.error(traceback.format_exc())
             return False
-
-    def get_devices(self):
-        '''
-        '''
-        
-        logging.info("Updating list of devices")
-        devices = receive_devices(self._node_address)
-        
-        if not devices:
-            logging.info("Using Ethoscope Scanner to look for devices")
-
-            self._device_scanner = EthoscopeScanner()
-            self._device_scanner.start()
-            time.sleep(20)
-            self._device_scanner.stop()
-            del self._device_scanner
-            
-        return devices
 
     def run (self):
         '''
@@ -154,41 +145,17 @@ class GenericBackupWrapper(threading.Thread):
                 continue
 
             logging.info("Starting backup round")
-            devices = self.get_devices()
+            active_devices = self.find_devices()
 
-            if not devices:
-                devices = self._device_scanner.get_all_devices_info()
-
-            self._devices_information = [ (d, self._results_dir) for d in list(devices.values()) 
-                                        if (d["status"] not in ["not_in_use", "offline"] and d["name"] != "ETHOSCOPE_000")
-                                     ]
-            
-            ids_to_backup = [d[0]['id'] for d in self._devices_information]
-            
-            for did in ids_to_backup:
-                if did not in self.devices_to_backup:
-                    self.devices_to_backup.update ({did : { 'started' : 0, 'ended' : 0 }})
-            
             logging.info("Found %s devices online: %s" % (
-                              len(self._devices_information),
-                              ', '.join( ids_to_backup )
-                              )
-                         )
+                              len(active_devices),
+                              ', '.join( [dev['id'] for dev in active_devices] )
+                              ) )
             
-
-            if self._safe:
-                logging.info("Safe mode set to True: processing backups one by one.")
-                for dtb in self._devices_information:
-                    self._backup_job(dtb)
-
-            else:
-                logging.info("Safe mode set to False: processing all backups at once.")
-                pool = multiprocessing.Pool(4)
-                _ = pool.map(self._backup_job, self._devices_information)
-                pool.close()
-                pool.join()
+            for dev in active_devices:
+                if dev['id'] not in self.backup_status:
+                    self.backup_status['id'] = { 'started' : 0, 'ended' : 0 }
+                self._backup_job (dev)
                 
-            t1 = time.time()
+            t0 = t1 = time.time()
             logging.info("Backup finished at t=%i" % t1)
-            t0 = t1
-

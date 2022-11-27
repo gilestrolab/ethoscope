@@ -1,22 +1,17 @@
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
-from ethoscope_node.utils.backups_helpers import GenericBackupWrapper, receive_devices
-from ethoscope_node.utils.device_scanner import EthoscopeScanner
+from ethoscope_node.utils.backups_helpers import GenericBackupWrapper
 
 import logging
 import optparse
 import traceback
-import os
 
-import json
 import bottle
 app = bottle.Bottle()
 
 
 @app.route('/')
 def index():
-    '''
-    '''
-    return gbw.devices_to_backup
+    return gbw.backup_status
 
 
 if __name__ == '__main__':
@@ -29,17 +24,15 @@ if __name__ == '__main__':
     parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
     parser.add_option("-r", "--results-dir", dest="results_dir", help="Where result files are stored")
     parser.add_option("-i", "--server", dest="NODE_ADDRESS", default="localhost", help="The server on which the node is running will be interrogated first for the device list")
-    parser.add_option("-s", "--safe", dest="safe", default=True, help="Set Safe mode ON", action="store_true")
-    parser.add_option("-e", "--ethoscope", dest="ethoscope", help="Force backup of given ethoscope number (eg: 007)")
+    parser.add_option("-e", "--ethoscope", dest="ethoscope", help="Force backup of given ethoscope numbers (eg: 007,010,102)")
     
     (options, args) = parser.parse_args()
     option_dict = vars(options)
 
     RESULTS_DIR = option_dict["results_dir"] or CFG.content['folders']['results']['path']
-    SAFE_MODE = option_dict["safe"]
     DEBUG = option_dict["debug"]
 
-    ethoscope = option_dict["ethoscope"]
+    ETHO_TO_BACKUP = option_dict["ethoscope"]
     NODE_ADDRESS = option_dict["NODE_ADDRESS"]
 
     if DEBUG:
@@ -47,38 +40,32 @@ if __name__ == '__main__':
         logging.getLogger().setLevel(logging.DEBUG)
         logging.info("Logging using DEBUG SETTINGS")
 
-
     
-    if ethoscope:
-        # We have provided a dash separated list of ethoscopes to backup
-        
-        all_devices = receive_devices(NODE_ADDRESS)
-
+    # Start the backup wrapper
+    gbw = GenericBackupWrapper( RESULTS_DIR, NODE_ADDRESS )
+    
+    if ETHO_TO_BACKUP:
+        # We have provided an ethoscope or a comma separated list of ethoscopes to backup
         try:
-            ethoscopes = [int(ethoscope)]
+            ETHO_TO_BACKUP_LIST = [int(ETHO_TO_BACKUP)]
         except:
-            ethoscopes = [int(e) for e in ethoscope.split("-")]
+            ETHO_TO_BACKUP_LIST = [int(e) for e in ETHO_TO_BACKUP.split(",")]
             
-        for ethoscope in ethoscopes:
+        for ethoscope in ETHO_TO_BACKUP_LIST:
             print ("Forcing backup for ethoscope %03d" % ethoscope)
             
             bj = None
-            for devID in all_devices:
-                try:
-                    if 'name' in all_devices[devID] and all_devices[devID]['name'] == ("ETHOSCOPE_%03d" % ethoscope) and all_devices[devID]['status'] != "offline":
-                        bj = backup_job((all_devices[devID], RESULTS_DIR))
-                except:
-                    pass
+            for device in gbw.find_devices():
+                if device['name'] == ("ETHOSCOPE_%03d" % ethoscope):
+                    bj = gbw._backup_job( device )
+
             if bj == None: exit("ETHOSCOPE_%03d is not online or not detected" % ethoscope)
 
     else:
-
         try:
-        # We start in server mode
+            # We start in server mode
 
-            gbw = GenericBackupWrapper( RESULTS_DIR, SAFE_MODE, NODE_ADDRESS)
             gbw.start()
-
             bottle.run(app, host='0.0.0.0', port=82)
 
         except KeyboardInterrupt:

@@ -286,8 +286,11 @@ def force_device_backup(id):
         logging.info("Initiating backup for device  %s" % device_info["id"])
         backup_job = BackupClass(device_info, results_dir=results_dir)
         logging.info("Running backup for device  %s" % device_info["id"])
-        backup_job.run()
-        logging.info("Backup done for for device  %s" % device_info["id"])
+        if backup_job.backup():
+            logging.info("Backup done for device  %s" % device_info["id"])
+        else:
+            logging.error("Backup for device  %s could not be completed" % device_info["id"])
+    
     except Exception as e:
         logging.error("Unexpected error in backup. args are: %s" % str(args))
         logging.error(traceback.format_exc())
