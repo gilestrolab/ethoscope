@@ -47,7 +47,7 @@ class UnderVoltage:
 class UnderVoltageNew(UnderVoltage):
     """Read under voltage status from new entry."""
 
-    def __init__(self, hwmon: Text, debug = False):
+    def __init__(self, hwmon: Text):
         """Initialize the under voltage class."""
         self._hwmon = hwmon
 
@@ -56,8 +56,8 @@ class UnderVoltageNew(UnderVoltage):
         # Use new hwmon entry
         with open(os.path.join(self._hwmon, SYSFILE_HWMON_FILE)) as file:
             bit = file.read()[:-1]
-        if debug:
-            _LOGGER.debug("Get under voltage status: %s", bit)
+        #if debug:
+        #    _LOGGER.debug("Get under voltage status: %s", bit)
         return bit == "1"
 
 
