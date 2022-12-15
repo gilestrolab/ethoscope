@@ -47,7 +47,7 @@ class UnderVoltage:
 class UnderVoltageNew(UnderVoltage):
     """Read under voltage status from new entry."""
 
-    def __init__(self, hwmon: Text, debug: bool = False):
+    def __init__(self, hwmon: Text, debug = False):
         """Initialize the under voltage class."""
         self._hwmon = hwmon
 
