@@ -14,6 +14,7 @@ from ethoscope.hardware.interfaces.optomotor import OptoMotor
 
 import random
 import time
+import logging
 
 class IsMovingStimulator(BaseStimulator):
     _HardwareInterfaceClass = DefaultInterface
@@ -107,21 +108,21 @@ class SleepDepStimulator(IsMovingStimulator):
         :return:
         """
 
-        self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
+        self._inactivity_time_threshold_ms = min_inactive_time * 1000 #so we use ms internally
         self._t0 = None
         
-        try:
+        if 0 <= float(stimulus_probability) <= 1.0:
             self._p = float(stimulus_probability)
-        except:
-            self._p = 1.0
+        else:
+            raise ValueError("Probability must be between 0.0 and 1.0")
         
         super(SleepDepStimulator, self).__init__(hardware_connection, velocity_correction_coef, date_range=date_range)
 
 
 
     def _decide(self):
-        roi_id= self._tracker._roi.idx
-        now =  self._tracker.last_time_point
+        roi_id = self._tracker._roi.idx
+        now = self._tracker.last_time_point
 
         try:
             channel = self._roi_to_channel[roi_id]
@@ -136,11 +137,14 @@ class SleepDepStimulator(IsMovingStimulator):
 
         if not has_moved:
             if float(now - self._t0) > self._inactivity_time_threshold_ms:
+                
                 if random.uniform(0,1) <= self._p:
                     self._t0 = None
+                    logging.info("real stimulation on channel %s" % channel)
                     return HasInteractedVariable(1), {"channel":channel}
                 else:
                     self._t0 = None
+                    logging.info("ghost stimulation on channel %s" % channel)
                     return HasInteractedVariable(2), {}
         else:
             self._t0 = now
@@ -318,9 +322,13 @@ class MiddleCrossingStimulator(BaseStimulator):
         """
 
         self._last_stimulus_time = 0
-        self._p = stimulus_probability
-        
-        super(MiddleCrossingStimulator, self).__init__(hardware_connection,  date_range=date_range)
+
+        if 0 <= float(stimulus_probability) <= 1.0:
+            self._p = float(stimulus_probability)
+        else:
+            raise ValueError("Probability must be between 0.0 and 1.0")
+
+        super(MiddleCrossingStimulator, self).__init__(hardware_connection, date_range=date_range)
 
     def _decide(self):
         roi_id = self._tracker._roi.idx
@@ -351,10 +359,10 @@ class MiddleCrossingStimulator(BaseStimulator):
 
             if random.uniform(0,1) < self._p:
                 self._last_stimulus_time = now
-                return HasInteractedVariable(True), {"channel": channel}
+                return HasInteractedVariable(1), {"channel": channel}
             else:
                 self._last_stimulus_time = now
-                return HasInteractedVariable(False), {}
+                return HasInteractedVariable(2), {}
 
         return HasInteractedVariable(False), {"channel": channel}
 
@@ -455,12 +463,9 @@ class mAGO(SleepDepStimulator):
 
 
         self._t0 = None
-        self._p = stimulus_probability
 
         # the inactive time depends on the chanel here
         super(mAGO, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range)
-
-
 
         if stimulus_type == 2:
             self._roi_to_channel = self._roi_to_channel_valves
