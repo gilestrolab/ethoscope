@@ -3,6 +3,7 @@ __author__ = 'quentin'
 from threading import Thread
 import time
 import collections
+import logging
 
 import urllib.request, urllib.error, urllib.parse
 import json
@@ -38,7 +39,10 @@ class HardwareConnection(Thread):
             time.sleep(.1)
             while len(self._instructions) > 0 and self._connection_open:
                 instruc = self._instructions.popleft()
-                ret = self._interface.send(**instruc)
+                try:
+                    ret = self._interface.send(**instruc)
+                except:
+                    logging.error("Could not send the following instruction to the module. Instruction: %s" % instruc)
 
     def send_instruction(self, instruction=None):
         """
