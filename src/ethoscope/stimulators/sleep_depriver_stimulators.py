@@ -21,7 +21,7 @@ class IsMovingStimulator(BaseStimulator):
 
     def __init__(self, hardware_connection=None, velocity_correction_coef=3.0e-3, date_range = "", **kwargs):
         """
-        class implementing an stimulator that decides whether an animal has moved though does nothing   accordingly.
+        class implementing an stimulator that decides whether an animal has moved though does nothing accordingly.
         :param hardware_connection: a default hardware interface object
         :param velocity_correction_coef: the correction coeeficient for computing velocity at various fps. Emirically defined. When greater than one, the animal is moving
         :type velocity_correction_coef: float
@@ -73,13 +73,13 @@ class IsMovingStimulator(BaseStimulator):
         return HasInteractedVariable(True), {}
 
 class SleepDepStimulator(IsMovingStimulator):
-    _description = {"overview": "A stimulator to sleep deprive an animal using servo motor. See http://todo/fixme.html",
+    _description = {"overview": "A stimulator to sleep deprive an animal using servo motor.",
                     "arguments": [
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_correction_coef", "description": "Velocity correction coef","default":3.0e-3},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken","default":120},
                                     {"type": "number", "min": 0.0, "max": 1.0, "step": 0.01, "name": "stimulus_probability",  "description": "Probability the stimulus will happen", "default": 1.0},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "description": "A date and time range in which the device will perform.",
                                      "default": ""},
                                    ]}
 
@@ -197,8 +197,9 @@ class OptomotorSleepDepriver(SleepDepStimulator):
                     "arguments": [
                         {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_correction_coef", "description": "Velocity correction coef", "default": 3.0e-3},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken(s)","default":120},
-                                    {"type": "number", "min": 500, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
+                                    {"type": "number", "min": 50, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
                                     {"type": "number", "min": 0, "max": 3, "step": 1, "name": "stimulus_type",  "description": "1 = opto, 2= moto", "default": 2},
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step": 0.1, "name": "stimulus_probability",  "description": "Probability the stimulus will happen", "default": 1.0},
                                     {"type": "date_range", "name": "date_range",
                                      "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
                                      "default": ""}
@@ -244,11 +245,11 @@ class OptomotorSleepDepriver(SleepDepStimulator):
 
 
 class ExperimentalSleepDepStimulator(SleepDepStimulator):
-    _description = {"overview": "A stimulator to sleep deprive an animal using servo motor. See http://todo/fixme.html",
+    _description = {"overview": "A stimulator to sleep deprive an animal using servo motor.",
                     "arguments": [
                         {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_correction_coef", "description": "Velocity correction coef", "default": 3.0e-3},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "description": "A date and time range in which the device will perform. Format YYYY-MM-DD HH:mm:ss ",
                                      "default": ""}
                                    ]}
 
@@ -375,7 +376,7 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
                     "arguments": [
 
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "interval", "description": "The recurence of the stimulus","default":120},
-                                    {"type": "number", "min": 500, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
+                                    {"type": "number", "min": 50, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
                                     {"type": "number", "min": 0, "max": 3, "step": 1, "name": "stimulus_type",  "description": "1 = opto, 2= moto", "default": 2},
                                     {"type": "date_range", "name": "date_range",
                                      "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
@@ -434,7 +435,7 @@ class mAGO(SleepDepStimulator):
                     "arguments": [
                         {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_correction_coef", "description": "Velocity correction coef", "default": 3.0e-3},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken(s)","default":120},
-                                    {"type": "number", "min": 500, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
+                                    {"type": "number", "min": 50, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
                                     {"type": "number", "min": 0, "max": 3, "step": 1, "name": "stimulus_type",  "description": "1 = motor, 2= valves", "default": 1},
                                     {"type": "number", "min": 0.0, "max": 1.0, "step": 0.1, "name": "stimulus_probability",  "description": "Probability the stimulus will happen", "default": 1.0},
                                     {"type": "date_range", "name": "date_range",
