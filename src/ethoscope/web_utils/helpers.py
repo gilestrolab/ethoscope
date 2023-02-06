@@ -481,3 +481,39 @@ def SQL_dump( database_name = None, credentials = {'username' : 'ethoscope', 'pa
 
     except:
         return False
+
+def loggingStatus( status = None ):
+    """
+    Set or read the current logging status
+    """
+    if status == None:
+        try:
+            with os.popen('systemctl status systemd-journal-upload.service') as df:
+                status = df.read().split("\n")[2] 
+            if "active (running)" in status: return True
+            else: return False
+        except: 
+            return -1
+
+    elif status == True and not loggingStatus():
+        try:
+            logging.info('User requested to start remote Logging.')
+            
+            with open('/etc/systemd/journal-upload.conf', mode='w') as cf:
+                cf.write ("[Upload]\nURL=http://node:19532\n")
+            logging.info('Modified journal-upload.conf to point to the node')
+
+            with os.popen("sleep 1 && systemctl enable --now systemd-journal-upload.service && sleep 2") as po:
+                r = po.read()
+            
+            return loggingStatus()
+        except:
+            return -1
+
+    elif status == False and loggingStatus():
+        try:
+            with os.popen("sleep 1 && systemctl disable --now systemd-journal-upload.service && sleep 2") as po:
+                r = po.read()
+            return loggingStatus()
+        except:
+            return -1

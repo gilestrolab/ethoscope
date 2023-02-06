@@ -213,6 +213,10 @@ def update_machine_info(id):
     if 'isexperimental' in update_machine_json_data and update_machine_json_data['isexperimental'] != isExperimental():
         isExperimental(update_machine_json_data['isexperimental'])
         haschanged = True
+
+    if 'remoteLogging' in update_machine_json_data and update_machine_json_data['remoteLogging'] != loggingStatus():
+        loggingStatus(update_machine_json_data['remoteLogging'])
+        haschanged = True
     
     #Time comes as number of milliseconds from timestamp
     if 'datetime' in update_machine_json_data and update_machine_json_data['datetime']:
@@ -339,15 +343,22 @@ def get_machine_info(id):
         machine_info['WIFI_SSID'] = get_WIFI()['ESSID']
     except: 
         machine_info['WIFI_SSID'] = "not set"
+
     try:    
         machine_info['WIFI_PASSWORD'] = get_WIFI()['Key']
     except:
         machine_info['WIFI_PASSWORD'] = "not set"
+
     try:
         machine_info['useSTATIC'] = (get_WIFI()['IP'].strip().upper() == 'STATIC')
     except:
         machine_info['useSTATIC'] = False
-        
+
+    try:
+        machine_info['remoteLogging'] = loggingStatus()
+    except:
+        machine_info['remoteLogging'] = False
+
     machine_info['SD_CARD_AGE'] = get_SD_CARD_AGE()
     machine_info['partitions'] = get_partition_infos()
     machine_info['SD_CARD_NAME'] = get_SD_CARD_NAME()
@@ -418,6 +429,7 @@ def user_options(id):
                                 {"type": "number", "name":"etho_number", "description": "An ID number (5-250) unique to this ethoscope","default": get_machine_info(id)['machine-number'] },
                                 {"type": "boolean", "name":"isexperimental", "description": "Specify if the ethoscope is to be treated as experimental", "default": isExperimental()}, 
                                 {"type": "boolean", "name":"useSTATIC", "description": "Use a static IP address instead of obtaining one with DHCP. The last number in the IP address will be the current ethoscope number", "default" : get_machine_info(id)['useSTATIC']},
+                                {"type": "boolean", "name":"remoteLogging", "description": "The ethoscope logs events directly on the node.", "default" : get_machine_info(id)['remoteLogging']},
                                 {"type": "str", "name":"node_ip", "description": "The IP address that you want to record as the node (do not change this value unless you know what you are doing!)","default": get_machine_info(id)['node_ip']},
                                 {"type": "str", "name":"ESSID", "description": "The name of the WIFI SSID","default": get_machine_info(id)['WIFI_SSID'] },
                                 {"type": "str", "name":"Key", "description": "The WPA password for the WIFI SSID","default": get_machine_info(id)['WIFI_PASSWORD'] }],
