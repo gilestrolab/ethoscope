@@ -182,6 +182,7 @@ def update_machine_info(id):
     Updates the private machine informations
     '''
     haschanged = False
+    machine_info = get_machine_info(id)
     
     if id != _MACHINE_ID:
         raise WrongMachineID
@@ -189,11 +190,11 @@ def update_machine_info(id):
     data = bottle.request.json
     update_machine_json_data.update(data['machine_options']['arguments'])
     
-    if 'node_ip' in update_machine_json_data and update_machine_json_data['node_ip'] != get_machine_info(id)['etc_node_ip']:
+    if 'node_ip' in update_machine_json_data and update_machine_json_data['node_ip'] != machine_info['etc_node_ip']:
         set_etc_hostname(update_machine_json_data['node_ip'])
         haschanged = True
     
-    if 'etho_number' in update_machine_json_data and int(update_machine_json_data['etho_number']) != int(get_machine_info(id)['machine-number']):
+    if 'etho_number' in update_machine_json_data and int(update_machine_json_data['etho_number']) != int(machine_info['machine-number']):
         set_machine_name(update_machine_json_data['etho_number'])
         set_machine_id(update_machine_json_data['etho_number'])
 
@@ -202,11 +203,11 @@ def update_machine_info(id):
         
         haschanged = True
     
-    if 'ESSID' in update_machine_json_data and 'Key' in update_machine_json_data and (update_machine_json_data['ESSID'] != get_machine_info(id)['WIFI_SSID'] or update_machine_json_data['Key'] != get_machine_info(id)['WIFI_PASSWORD']):
+    if 'ESSID' in update_machine_json_data and 'Key' in update_machine_json_data and (update_machine_json_data['ESSID'] != machine_info['WIFI_SSID'] or update_machine_json_data['Key'] != machine_info['WIFI_PASSWORD']):
         set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'])
         haschanged = True
 
-    if 'useSTATIC' in update_machine_json_data and update_machine_json_data['useSTATIC'] != get_machine_info(id)['useSTATIC']:
+    if 'useSTATIC' in update_machine_json_data and update_machine_json_data['useSTATIC'] != machine_info['useSTATIC']:
         set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'], useSTATIC=update_machine_json_data['useSTATIC'])
         haschanged = True
 
@@ -338,7 +339,7 @@ def get_machine_info(id):
     machine_info['kernel'] = os.uname()[2]
     machine_info['pi_version'] = pi_version()
     machine_info['camera'] = getPiCameraVersion()
-    
+
     try:
         machine_info['WIFI_SSID'] = get_WIFI()['ESSID']
     except: 
@@ -362,7 +363,7 @@ def get_machine_info(id):
     machine_info['SD_CARD_AGE'] = get_SD_CARD_AGE()
     machine_info['partitions'] = get_partition_infos()
     machine_info['SD_CARD_NAME'] = get_SD_CARD_NAME()
-    
+
     return machine_info
 
 
@@ -420,19 +421,21 @@ def user_options(id):
     if id != _MACHINE_ID:
         raise WrongMachineID
 
+    machine_info = get_machine_info(id)
+
     return {
         "tracking":ControlThread.user_options(),
         "recording":ControlThreadVideoRecording.user_options(),
         "streaming": {},
         "update_machine": { "machine_options": [{"overview": "Machine information that can be set by the user",
                             "arguments": [
-                                {"type": "number", "name":"etho_number", "description": "An ID number (5-250) unique to this ethoscope","default": get_machine_info(id)['machine-number'] },
-                                {"type": "boolean", "name":"isexperimental", "description": "Specify if the ethoscope is to be treated as experimental", "default": isExperimental()}, 
-                                {"type": "boolean", "name":"useSTATIC", "description": "Use a static IP address instead of obtaining one with DHCP. The last number in the IP address will be the current ethoscope number", "default" : get_machine_info(id)['useSTATIC']},
-                                {"type": "boolean", "name":"remoteLogging", "description": "The ethoscope logs events directly on the node.", "default" : get_machine_info(id)['remoteLogging']},
-                                {"type": "str", "name":"node_ip", "description": "The IP address that you want to record as the node (do not change this value unless you know what you are doing!)","default": get_machine_info(id)['node_ip']},
-                                {"type": "str", "name":"ESSID", "description": "The name of the WIFI SSID","default": get_machine_info(id)['WIFI_SSID'] },
-                                {"type": "str", "name":"Key", "description": "The WPA password for the WIFI SSID","default": get_machine_info(id)['WIFI_PASSWORD'] }],
+                                {"type": "number", "name":"etho_number", "description": "An ID number (5-250) unique to this ethoscope","default": machine_info['machine-number'] },
+                                {"type": "boolean", "name":"isexperimental", "description": "Specify if the ethoscope is to be treated as experimental", "default": machine_info['isExperimental']}, 
+                                {"type": "boolean", "name":"useSTATIC", "description": "Use a static IP address instead of obtaining one with DHCP. The last number in the IP address will be the current ethoscope number", "default" : machine_info['useSTATIC']},
+                                {"type": "boolean", "name":"remoteLogging", "description": "The ethoscope logs events directly on the node.", "default" : machine_info['remoteLogging']},
+                                {"type": "str", "name":"node_ip", "description": "The IP address that you want to record as the node (do not change this value unless you know what you are doing!)","default": machine_info['node_ip']},
+                                {"type": "str", "name":"ESSID", "description": "The name of the WIFI SSID","default": machine_info['WIFI_SSID'] },
+                                {"type": "str", "name":"Key", "description": "The WPA password for the WIFI SSID","default": machine_info['WIFI_PASSWORD'] }],
                             "name" : "Ethoscope Options"}],
 
                                } }
