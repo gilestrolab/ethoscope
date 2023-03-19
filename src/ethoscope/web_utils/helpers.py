@@ -93,7 +93,24 @@ def set_machine_id(id, path="/etc/machine-id"):
     except:
         raise
 
-def get_WIFI(path="/etc/netctl/wlan"):
+def get_Network_Service():
+    """
+    Detects wether we are using systemd-networkd or netctl
+    """
+    daemon = {'netctl' : False, 'systemd' : False}
+
+    with os.popen('systemctl is-active netctl@wlan.service') as df:
+        status = df.read()
+    if status.startswith('active'): daemon['netctl'] = True 
+    
+    with os.popen('systemctl is-active systemd-networkd.service') as df:
+        status = df.read()
+    if status.startswith('active'): daemon['systemd'] = True 
+
+    return daemon
+
+
+def get_WIFI():
     """
     Will return a dictionary like the following:
     
@@ -108,67 +125,115 @@ def get_WIFI(path="/etc/netctl/wlan"):
      'Gateway': "'192.168.1.1'"}
 
     """
-    if os.path.exists(path):
-        with open(path,'r') as f:
+    network_service = get_Network_Service()
+    data = {}
+    
+    if network_service['netctl']:
+        netctl_file = "/etc/netctl/wlan"
+        with open(netctl_file,'r') as f:
             wlan_settings = f.readlines()
         
-        d = {}
         for line in wlan_settings:
             if "=" in line:
-                d[ line.strip().split("=")[0] ] =  line.strip().split("=")[1]
-        return d
-    else:
-        return {'error' : 'No WIFI Settings were found in path %s' % path}
+                data[ line.strip().split("=")[0] ] =  line.strip().split("=")[1]
+        
+        data['netctl'] = True
 
-def get_gateway():
+    if network_service['systemd']:
+        wpasupplicant_file = "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
+        systemd_file = "/etc/systemd/network/25-wireless.network"       
+
+        with open(wpasupplicant_file,'r') as f:
+            wlan_settings = f.readlines()
+        
+        for line in wlan_settings:
+            if "=" in line:
+                data[ line.strip().split("=")[0] ] =  line.strip().split("=")[1].replace('"', '')
+
+        data['systemd'] = True
+        data['ESSID'] = data['ssid']
+        data['Key'] = data['#psk']
+
+        with os.popen("/sbin/ip -o -4 addr list eth0 | awk '{print $4}' | cut -d/ -f1") as cmd:
+            data['IP'] = cmd.read().strip()
+
+        with os.popen("ip route | grep default | head -n 1 | cut -d ' ' -f 3") as cmd:
+            data['Gateway'] = cmd.read().strip()
+
+        with open(systemd_file,'r') as f:
+            net_settings = f.readlines()
+        
+        for line in net_settings:
+            if "=" in line:
+                data[ line.strip().split("=")[0] ] =  line.strip().split("=")[1]
+
+    return data
+
+
+def get_static_IPV4():
     """
     """
+
     with os.popen("ip route | grep default | head -n 1 | cut -d ' ' -f 3") as cmd:
-        out_cmd = cmd.read().strip()
+        gateway = cmd.read().strip()
+
+    a,b,c,_ = gateway.split('.')
+    d = int(get_machine_name().split('_')[-1])
     
-    return out_cmd
+    if int(d) > 1 and int(d) < 255:
+        ip_address = '.'.join([a,b,c,str(d)])
+    else: #out of range
+        ip_address = None
+
+    return ip_address, gateway
     
 
-def set_WIFI(ssid="ETHOSCOPE_WIFI", wpakey="ETHOSCOPE_1234", useSTATIC=False, path="/etc/netctl/wlan"):
+def set_WIFI(ssid="ETHOSCOPE_WIFI", wpakey="ETHOSCOPE_1234", useSTATIC=False):
     """
     Receives the setting for wifi connection
     Uses dhcp by default but if USE_DHCP is set to False, it will adopt a static ip address instead
     """
 
-    wlan_settings = '''Description=ethoscope_wifi network
-Interface=wlan0
-Connection=wireless
-Security=wpa
-ESSID=%s
-Key=%s
-''' % (ssid, wpakey)
+    ip_address, gateway = get_static_IPV4()
+    network_service = get_Network_Service()
 
-    if not useSTATIC:
-        IPV4_settings = "IP=dhcp\nTimeoutDHCP=60"
-        
-    else:
-        try:
-            gateway = get_gateway()
-            a,b,c,_ = gateway.split('.')
-            d = int(get_machine_name().split('_')[-1])
-            
-            if int(d) > 1 and int(d) < 255:
-                ip_address = '.'.join([a,b,c,str(d)])
-            
-            IPV4_settings = "IP=static\nAddress=('%s/24')\nGateway='%s'" % (ip_address, gateway)
-            
-        except:
-            IPV4_settings = "IP=dhcp\nTimeoutDHCP=60"
-        
-    wlan_settings += IPV4_settings
+    if network_service['netctl']:
+        #### Write the settings for netctl (for images made before 2023/03/07)
+        netctl_file = "/etc/netctl/wlan"
 
-    try:
-        with open(path, 'w') as f:
+        wlan_settings = "Description=ethoscope_wifi network\nInterface=wlan0\nConnection=wireless\nSecurity=wpa\nESSID=%s\nKey=%s" % (ssid, wpakey)
+
+        if useSTATIC:
+            wlan_settings += "IP=static\nAddress=('%s/24')\nGateway='%s'" % (ip_address, gateway)
+        else:
+            wlan_settings += "IP=dhcp\nTimeoutDHCP=60"
+            
+        with open(netctl_file, 'w') as f:
             f.write(wlan_settings)
-        logging.warning("Wrote new information in file: %s" % path)
-    except:
-        raise
-            
+        logging.warning("Wrote new information to %s" % netctl_file)
+
+    if network_service['systemd']:
+        #### Write the settings for systemd-networkd (from images > 2023/03/07)
+        wpasupplicant_file = "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
+        systemd_file = "/etc/systemd/network/25-wireless.network"
+
+        wpa_cmd = "wpa_passphrase %s %s > %s" % (ssid, wpakey, wpasupplicant_file)
+        with os.popen(wpa_cmd) as cmd:
+            logging.info ( cmd.read() )
+
+        wlan_settings_systemd = "[Match]\nName=wlan0\n\n[DHCPv4]\nRouteMetric=20\n"
+
+        if useSTATIC:
+            wlan_settings_systemd += "[Network]\nAddress=%s/24\nGateway=%s\nDHCP=no" % (ip_address, gateway)
+        else:
+            wlan_settings_systemd += "[Network]\nDHCP=yes"
+
+
+        with open(systemd_file, 'w') as f:
+            f.write(wlan_settings_systemd)
+        logging.warning("Wrote new information to %s" % systemd_file)
+
+
 def get_connection_status():
     ifs = {}
     for interface in netifaces.interfaces():
@@ -488,9 +553,9 @@ def loggingStatus( status = None ):
     """
     if status == None:
         try:
-            with os.popen('systemctl status systemd-journal-upload.service') as df:
+            with os.popen('systemctl is-active systemd-journal-upload.service') as df:
                 status = df.read().split("\n")[2] 
-            if "active (running)" in status: return True
+            if status.startswith('active'): return True
             else: return False
         except: 
             return -1
