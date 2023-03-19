@@ -27,7 +27,7 @@
 
 .last_drawn_img img{
     height: 480px;
-    background-image: url("https://thumbs.gfycat.com/FaintSpicyAnnashummingbird-small.gif")
+    background-image: url("/img/rotating_spin.gif")
 }
 
 
@@ -49,9 +49,16 @@
     margin: 1em;
 }
 
-.option-list li{
-list-style: none;
+.option-items li{
+  list-style: none;
+  min-height: 60px;
+  margin-bottom: 10px;
+  margin-top: 10px;
+  background: #f5f5f5;
 }
+
+
+
 
 p {
     text-align: left;

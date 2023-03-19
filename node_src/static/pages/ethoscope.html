@@ -391,14 +391,25 @@
                     <div ng-if="description[opt.name] == true">
                         {{opt.overview}}
                     </div>
-                  <ul ng-if="selected_options.update_machine[name]['name']==opt.name">
-                        <li  ng-repeat="arg in opt.arguments">
-                            <label for="input-{{arg.name}}">{{arg.description}}</label>
-                            
+                  <ul ng-if="selected_options.update_machine[name]['name']==opt.name" class="option-items">
+                        <li ng-repeat="arg in opt.arguments">
+
+
                             <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=file name={{arg.name}}  ng-model="selected_options.update_machine[name]['arguments'][arg.name]"  >
+                            
+                            <label ng-if="arg.type == 'number'" for="input-{{arg.name}}">{{arg.description}}</label>
                             <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}}  ng-model="selected_options.update_machine[name]['arguments'][arg.name]" >
+                            
+                            <label ng-if="arg.type == 'str'" for="input-{{arg.name}}">{{arg.description}}</label>
                             <input ng-if="arg.type == 'str'" id="input-{{arg.name}}" type=text name={{arg.name}}  ng-model="selected_options.update_machine[name]['arguments'][arg.name]"  >
-                            <input ng-if="arg.type == 'boolean'" id="input-{{arg.name}}" type=checkbox name={{arg.name}}  ng-model="selected_options.update_machine[name]['arguments'][arg.name]"  >
+                            
+
+                            <div ng-if="arg.type == 'boolean'">
+                              <label for="input-{{arg.name}}" class="switchlabel">{{arg.description}}</label>
+                              <label class="switch">
+                                <input id="input-{{arg.name}}" type="checkbox" name={{arg.name}}  ng-model="selected_options.update_machine[name]['arguments'][arg.name]" ><span class="slider"></span>
+                              </label>
+                            </div>
 
                             <div ng-if="arg.type == 'date_range'" class="input-group">
                                 <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.update_machine[name]['arguments'][arg.name]" options="{timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss', separator : ' > ' }}" > 
@@ -409,7 +420,6 @@
                                 <input ng-if="arg.type == 'datetime'" date-range-picker class="form-control date-picker" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.update_machine[name]['arguments'][arg.name]" options="{singleDatePicker: true, timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss' }}" > 
                                 <span class="input-group-addon"><i class="glyphicon glyphicon-calendar"></i></span>
                             </div>
-
                         </li>
                     </ul>
                 </li>
