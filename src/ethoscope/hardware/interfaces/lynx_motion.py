@@ -1,6 +1,6 @@
 import logging
 import time
-from ethoscope.hardware.interfaces.interfaces import BaseInterface
+from ethoscope.hardware.interfaces.interfaces import SimpleSerialInterface
 
 class WrongSerialPortError(Exception):
     pass
@@ -8,14 +8,13 @@ class WrongSerialPortError(Exception):
 class NoValidPortError(Exception):
     pass
 
-class SimpleLynxMotionInterface(BaseInterface):
+class LynxMotionInterface(SimpleSerialInterface):
 
-    _baud = 115200
     _min_angle_pulse = (-90.,535.)
     _max_angle_pulse = (90.,2500.)
     _n_channels = 10
 
-    def __init__(self, port=None, warmup=False, *args, **kwargs):
+    def __init__(self, port=115200, warmup=False, *args, **kwargs):
         """
         Class to connect and abstract the SSC-32U Lynx Motion servo controller.
         It assumes a BAUD of 115200, which can be configured on the board as described in the
@@ -37,77 +36,9 @@ class SimpleLynxMotionInterface(BaseInterface):
             cat < /dev/pts/n+1
         """
         
-        #lazy import
-        import serial
         logging.info("Connecting to Lynx motion serial port...")
+        super(LynxMotionInterface, self).__init__(*args, **kwargs)
 
-        self._serial = None
-        if port is None:
-            self._port =  self._find_port()
-        else:
-            self._port = port
-
-        self._serial = serial.Serial(self._port, self._baud, timeout=2)
-        time.sleep(2)
-        self._test_serial_connection()
-        super(SimpleLynxMotionInterface, self).__init__(*args, **kwargs)
-
-
-    def _find_port(self):
-        from serial.tools import list_ports
-        import serial
-        import os
-        all_port_tuples = list_ports.comports()
-        logging.info("listing serial ports")
-        all_ports = set()
-        for ap, _, _  in all_port_tuples:
-            p = os.path.basename(ap)
-            print(p)
-            if p.startswith("ttyUSB") or p.startswith("ttyACM"):
-                all_ports |= {ap}
-                logging.info("\t%s", str(ap))
-
-        if len(all_ports) == 0:
-            logging.error("No valid port detected!. Possibly, device not plugged/detected.")
-            raise NoValidPortError()
-
-        elif len(all_ports) > 2:
-            logging.info("Several port detected, using first one: %s", str(all_ports))
-        return  all_ports.pop()
-            # for ap in list(all_ports):
-        #     logging.info("trying port %s", str(ap))
-        #
-        #     try:
-        #         #here we use a recursive strategy to find the good port (ap).
-        #         SimpleLynxMotionInterface(ap)
-        #         return ap
-        #     except (WrongSerialPortError, serial.SerialException):
-        #         warn_str = "Tried to use port %s. Failed." % ap
-        #         logging.warning(warn_str)
-        #         pass
-
-
-    def __del__(self):
-        if self._serial is not None:
-            self._serial.close()
-#
-    def _test_serial_connection(self):
-        return
-
-        # try:
-            # If we fail to ping the port, this is a wrong port
-
-            #self._serial.write("L\n")
-#             r = self._serial.readline()
-#             if not r:
-#                 raise WrongSleepDepPortError
-#             self.deprive(0)
-#
-#         except (OSError, serial.SerialException):
-#             raise WrongSleepDepPortError
-# #
-#
-#
 
     def _angle_to_pulse(self,angle):
         """

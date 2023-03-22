@@ -1,8 +1,8 @@
 __author__ = 'quentin'
-from ethoscope.hardware.interfaces.lynx_motion import SimpleLynxMotionInterface
+from ethoscope.hardware.interfaces.lynx_motion import LynxMotionInterface
 
 
-class SleepDepriverInterface(SimpleLynxMotionInterface):
+class SleepDepriverInterface(LynxMotionInterface):
     def send(self, channel, dt=350, margin=10):
         """
         Sleep deprive an animal by rotating its tube.
@@ -22,7 +22,7 @@ class SleepDepriverInterface(SimpleLynxMotionInterface):
         self.move_to_angle(channel, 0,half_dt)
 
 
-class SleepDepriverInterfaceCR(SimpleLynxMotionInterface):
+class SleepDepriverInterfaceCR(LynxMotionInterface):
     def send(self, channel, dt=800):
         """
         Sleep deprive an animal by rotating its tube.
@@ -46,5 +46,5 @@ class SleepDepriverInterfaceCR(SimpleLynxMotionInterface):
 
 
 if __name__ == '__main__':
-    l = SleepDepriverInterface(do_warm_up=True)
+    l = SleepDepriverInterface(warmup==True)
     #l.send(1)

@@ -122,10 +122,11 @@
                 <li data-toggle="modal" data-target="#changeInfo">Settings</li>
                 <li data-toggle="modal" data-target="#backupProgress" ng-click="ethoscope.backup()" >Backup</li>
                 <li data-toggle="modal" data-target="#SQLdumpProgress" ng-click="ethoscope.SQLdump()" >SQL dump</li>
-
+                <li ng-class="{'disabled':!machine_info.Module.Connected}" data-toggle="modal" data-target="#ModuleTest" ng-click="ethoscope.testModule()" >Test Module</li>
               </ul>
             </label>
-
+            
+           
             <!-- Dropdown Button for Power actions -->
             <label class="dropdown" ng-if="device.status == 'stopped'">
               <div class="dd-button" id="power-btn">
@@ -207,6 +208,26 @@
 </div>
 
 
+<!-- Modal Test Module -->
+<div class="modal fade" id="ModuleTest" tabindex="-1" role="dialog" aria-labelledby="ModuleTestLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Module connected to {{device.name}}</h4>
+      </div>
+      <div class="modal-body">
+
+        <br>
+        <p>Attempting to send test command.</p>
+
+      </div>
+      <div class="modal-footer">
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal SQLdump -->
 <div class="modal fade" id="SQLdumpProgress" tabindex="-1" role="dialog" aria-labelledby="SQLdumpProgressLabel" aria-hidden="true">
   <div class="modal-dialog">
@@ -239,7 +260,7 @@
       <div class="modal-body">
 
         <div class="ProgressBarContainer" style="width: 100%; background-color: grey;">
-          <div class="ProgressBar" style="width: {{device.backup_status | number : 2}}%; height: 30px; background-color: #4CAF50; text-align: center; line-height: 30px; color: white;;">{{device.backup_status | number : 0}}%</div>
+          <div class="ProgressBar" style="width: {{device.backup_status | number : 2}}%; height: 30px; background-color: #4CAF50; text-align: center; line-height: 30px; color: white;">{{device.backup_status | number : 0}}%</div>
         </div>
         <br>
         <p ng-if="device.backup_status < 100">Attempting full backup for {{device.name}}.</p>

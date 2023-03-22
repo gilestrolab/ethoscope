@@ -69,11 +69,8 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
         });
 
         $http.get('/device/'+device_id+'/user_options').success(function(data){
-            $scope.can_stream = (typeof data.streaming !== 'undefined');
-        });
-        
-        $http.get('/device/'+device_id+'/user_options').success(function(data){
             $scope.user_options = {};
+            $scope.can_stream = (typeof data.streaming !== 'undefined');
             $scope.user_options.tracking = data.tracking;
             $scope.user_options.recording = data.recording;
             $scope.user_options.update_machine = data.update_machine;
@@ -190,6 +187,16 @@ app.controller('ethoscopeController', function($scope, $http, $routeParams, $int
                 var timer1 = setInterval ( function() { if ($scope.SQLdumpStatus != 'Finished') { recvinfo() } else {clearInterval(timer1)} } , 2000);
         }        
         
+        $scope.ethoscope.testModule = function(){
+            console.log("Asking ethoscope to test the attached module.");
+            $http.post('/device/'+device_id+'/controls/test_module')
+            .success(function(response){
+                $scope.device.status = response.status;
+                window.location.reload();
+            });
+            
+        }
+
 
         $scope.ethoscope.stream = function(option){
             if ($scope.can_stream) {

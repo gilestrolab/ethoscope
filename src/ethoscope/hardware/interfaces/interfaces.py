@@ -1,12 +1,59 @@
 __author__ = 'quentin'
 
 from threading import Thread
+import os
 import time
 import collections
 import logging
 
 import urllib.request, urllib.error, urllib.parse
 import json
+import usb
+import serial
+
+def connectedUSB(optional_file='/etc/modules.json'):
+    """
+    Returns a dictionary of connected USB devices from a known selection
+
+    Known devices:
+    #Arduino Micro
+    Bus 001 Device 005: ID 2341:8037 Arduino SA Arduino Micro
+
+    #Arduino Nano Every
+    Bus 001 Device 006: ID 2341:0058 Arduino SA Arduino Nano Every
+
+    #Lynxmotion SSC-32U
+    Bus 001 Device 008: ID 0403:6001 Future Technology Devices International, Ltd FT232 Serial (UART) IC
+    """
+    
+    # Hardwired interactors
+    known = {
+                'arduino_nano' : {'name' : 'Arduino Nano', 'family' : 'arduino', 'model' : 'nano', 'used_for' : ['optomotor', 'mAGO'], 'id' : ['2341:0058'] },
+                'arduino_micro' : {'name' : 'Arduino Micro', 'family' : 'arduino', 'model' : 'micro', 'used_for' : ['optomotor', 'mAGO'], 'id' : ['2341:8037'] },
+                'arduino_uno' : {'name' : 'Arduino UNO', 'family' : 'arduino', 'model' : 'uno', 'used_for' : [], 'id' : ['2341:0043'] },
+                'arduino_leonardo' : {'name' : 'Arduino Leonardo', 'family' : 'arduino', 'model' : 'leonardo', 'used_for' : [], 'id' : ['2341:8036'] },
+                'wemos_D1' : {'name' : 'Wemos D1', 'family' : 'ESP8266', 'model' : 'D1', 'used_for' : [], 'id' : ['1a86:7523'], 'aka' : 'CH340' },
+                'lynxmotion_ssc32u' : {'name' : 'LynxMotion SSC-32U', 'family' : 'LynxMotion', 'model' : 'SSC-32U', 'used_for' : ['servo', 'AGO'], 'id' : ['0403:6001'], 'aka' : 'FT232'}
+            }
+
+    # potential user-specified interactors
+    if os.path.exists(optional_file):
+        with open (optional_file, 'r') as optional_modules_file:
+            known.update ( json.load (optional_modules_file) )
+
+    # connected devices
+    devices = ['%s:%s' % ('{:x}'.format(dev.idVendor).zfill(4), '{:x}'.format(dev.idProduct).zfill(4) ) for dev in usb.core.find(find_all=True)]
+
+    # matchmaking
+    found = {}
+    for dev in known:
+        for detected in devices: 
+            if detected in known[dev]['id']:
+                found[dev] = known[dev]
+
+    return known, found       
+
+
 
 
 class HardwareConnection(Thread):
@@ -76,10 +123,10 @@ class HardwareConnection(Thread):
                       *state["interface_args"], **kwargs)
 
 
-class BaseInterface(object):
-    def __init__(self, do_warm_up = False):
+class SimpleSerialInterface(object):
+    def __init__(self, port = None, baud = 115200, warmup = False):
         """
-        Template class which is an abstract representation of an hardware interface.
+        Template class which is an abstract representation of a Serial hardware interface.
         It must define, in :func:`~ethoscope.hardware.interfaces.interfaces.BaseInterface.__init__`,
         how the interface is connected, and in :func:`~ethoscope.hardware.interfaces.interfaces.BaseInterface.send`,
         how information are communicated to the hardware. In addition, derived classes must implement a
@@ -88,8 +135,76 @@ class BaseInterface(object):
 
         :param do_warm_up:
         """
-        if do_warm_up:
+        logging.info("Connecting to Serial port...")
+
+        self._serial = None
+        if port is None:
+            self._port = self._find_port()
+        else:
+            self._port = port
+
+        self._serial = serial.Serial(self._port, baud, timeout=2)
+        time.sleep(2)
+        #self._test_serial_connection()
+
+        if warmup:
             self._warm_up()
+
+
+    def _find_port(self):
+        from serial.tools import list_ports
+        import serial
+        import os
+        all_port_tuples = list_ports.comports()
+        logging.info("listing serial ports")
+        all_ports = set()
+        for ap, _, _ in all_port_tuples:
+            p = os.path.basename(ap)
+            print(p)
+            if p.startswith("ttyUSB") or p.startswith("ttyACM"):
+                all_ports |= {ap}
+                logging.info("\t%s", str(ap))
+
+        if len(all_ports) == 0:
+            logging.error("No valid port detected!. Possibly, device not plugged/detected.")
+            raise NoValidPortError()
+
+        elif len(all_ports) > 2:
+            logging.info("Several port detected, using first one: %s", str(all_ports))
+        return all_ports.pop()
+
+    def __del__(self):
+        if self._serial is not None:
+            self._serial.close()
+            #
+
+    def _test_serial_connection(self):
+        return
+
+    def interrogate(self, test=False):
+        """
+        Try to interrogate the device to check what its capabilities are.
+        Will work with all firmware for the new PCB and firmware newer than September 2020
+        
+        Ff test is True it will also attempt a test run using the information it just received.
+        """
+        self._serial.write(b"T\r\n")
+        time.sleep(0.1)
+        info = eval(self._serial.read_all())
+        info['test'] = 'Not attempted'
+        
+        if test:
+            try:
+                logging.info("Sending Test command.")
+                cmd = "%s\r\n" % info["test_button"]["command"]
+                self._serial.write(cmd.encode())
+                info['test'] = 'Success'
+            except:
+                    info['test'] = 'Failed'
+
+        return info
+
+
 
     def _warm_up(self):
         raise NotImplementedError
@@ -102,7 +217,7 @@ class BaseInterface(object):
         raise NotImplementedError
 
 
-class DefaultInterface(BaseInterface):
+class DefaultInterface(SimpleSerialInterface):
     """
     Class that implements a dummy interface that does nothing. This can be used to keep software consistency when
     no hardware is to be used.

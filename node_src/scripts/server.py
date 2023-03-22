@@ -213,6 +213,18 @@ def get_device_machine_info(id):
 
     return device.machine_info()
 
+#Get info about a device connected module
+@app.get('/device/<id>/module')
+@error_decorator
+def get_device_module(id):
+
+    device = device_scanner.get_device(id)
+    
+    if device:
+        return device.connected_module()
+    
+    return {}
+
 @app.post('/device/<id>/machineinfo')
 @error_decorator
 def set_device_machine_info(id):
@@ -488,7 +500,7 @@ def node_info(req):#, device):
         
     elif req == 'commands':
         return CFG.content['commands']
-
+   
     else:
         raise NotImplementedError()
 

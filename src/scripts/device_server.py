@@ -211,11 +211,11 @@ def update_machine_info(id):
         set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'], useSTATIC=update_machine_json_data['useSTATIC'])
         haschanged = True
 
-    if 'isexperimental' in update_machine_json_data and update_machine_json_data['isexperimental'] != isExperimental():
+    if 'isexperimental' in update_machine_json_data and update_machine_json_data['isexperimental'] != machine_info['isExperimental']:
         isExperimental(update_machine_json_data['isexperimental'])
         haschanged = True
 
-    if 'remoteLogging' in update_machine_json_data and update_machine_json_data['remoteLogging'] != loggingStatus():
+    if 'remoteLogging' in update_machine_json_data and update_machine_json_data['remoteLogging'] != machine_info['remoteLogging']:
         loggingStatus(update_machine_json_data['remoteLogging'])
         haschanged = True
     
@@ -273,7 +273,12 @@ def controls(id, action):
         logging.info("Converting h264 chunks to mp4")
         subprocess.call(['/opt/ethoscope-device/scripts/tools/process_all_h264.py','-p','/ethoscope_data'])
         return info(id)
-        
+
+    elif action == 'test_module':
+        logging.info("Sending a test command to the connected module.")
+        module_info = getModuleCapabilities(test=True)
+        return info(id)
+                
     else:
         raise Exception("No such action: %s" % action)
 
@@ -364,7 +369,23 @@ def get_machine_info(id):
     machine_info['partitions'] = get_partition_infos()
     machine_info['SD_CARD_NAME'] = get_SD_CARD_NAME()
 
+    machine_info['Module'] = getModuleCapabilities(shallow=True)
+
     return machine_info
+
+@api.get('/module/<id>')
+def connectedModule(id):
+    """
+    Interrogates the serial port to see if a) a known module is connected and b) the module can tell us something about itself.
+    https://www.notion.so/giorgiogilestro/The-new-Modular-SD-Device-05bbe90b6ee04b8aa439165f69d62de8#77aa2029495448f38ad433901cf9c88b
+    """
+
+    if id != _MACHINE_ID:
+        raise WrongMachineID
+    
+    else:
+        return getModuleCapabilities(test=False)
+
 
 
 @api.get('/data/<id>')

@@ -210,6 +210,7 @@ class Ethoscope(Device):
             'static' : "static",
             'controls' : "controls",
             'machine_info' : "machine",
+            'connected_module' : "module",
             'update' : "update",
             'dumpdb' : "dumpSQLdb"
             }
@@ -224,7 +225,8 @@ class Ethoscope(Device):
                                      "restart" : ["stopped"],
                                      "dumpdb" : ["stopped"],
                                      "offline": [],
-                                     "convertvideos" : ["stopped"]
+                                     "convertvideos" : ["stopped"],
+                                     "test_module" : ["stopped"]
                                      }
 
     def __init__(self, ip, port = ETHOSCOPE_PORT, refresh_period = 5, results_dir = "/ethoscope_data/results"):
@@ -342,7 +344,17 @@ class Ethoscope(Device):
             return out
         else:
             return {}
-        
+
+    def connected_module(self):
+        '''
+        Asks the ethoscope to give us information about connected modules. We do not do this through machine info because the step requires
+        opening a serial connection with a module and we do not want to risk doing this when the module is actually running in an experiment.
+        '''
+        if self._id:
+            url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_pages['connected_module'], self._id)
+            return self._get_json(url, timeout=12)
+        else:
+            return {}
 
     def skip_scanning(self, value):
         self._skip_scanning = value

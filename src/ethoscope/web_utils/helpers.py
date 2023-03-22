@@ -8,6 +8,8 @@ from uuid import uuid4
 import netifaces
 
 from ethoscope.utils.rpi_bad_power import new_under_voltage
+from ethoscope.hardware.interfaces.interfaces import connectedUSB, SimpleSerialInterface
+
 
 PERSISTENT_STATE = "/var/cache/ethoscope/persistent_state.pkl"
 
@@ -582,3 +584,29 @@ def loggingStatus( status = None ):
             return loggingStatus()
         except:
             return -1
+
+def getModuleCapabilities(test=False, shallow=False):
+    '''
+    Tries to get information regarding a possible attached Module
+    '''
+
+    _, found = connectedUSB()
+
+    if shallow and found:
+        found.update({'Smart' : False, 'Connected' : True})
+        return found
+    
+    if found:
+
+        try:
+            device = SimpleSerialInterface()
+            dev_info = device.interrogate(test)
+            dev_info.update({'Smart' : True, 'Connected' : True})
+            return dev_info
+            #Should return something like this: {"version": "FW-1.00;HW-10", "module_name": "N20 Sleep Deprivation Module", "module_description": "Rotates up to twenty N20 geared motors independently", "test_button": {"title": "Test output", "description": "Test all outputs in a sequence", "command": "D"}, "command": "P", "arguments": {"channel": ["The channel to act on", "MAPSTOROI"], "duration": ["The length of the stimulus in ms"]}}
+
+        except:
+            return {'Error': 'A known device is connected but could not open a connection with it.', 'found' : found, 'Smart' : False, 'Connected' : True}
+
+    else:
+            return {'Error': 'No known device is connected.', 'Smart' : False, 'Connected' : False}
