@@ -606,6 +606,7 @@ def getModuleCapabilities(test=False, shallow=False):
             #Should return something like this: {"version": "FW-1.00;HW-10", "module_name": "N20 Sleep Deprivation Module", "module_description": "Rotates up to twenty N20 geared motors independently", "test_button": {"title": "Test output", "description": "Test all outputs in a sequence", "command": "D"}, "command": "P", "arguments": {"channel": ["The channel to act on", "MAPSTOROI"], "duration": ["The length of the stimulus in ms"]}}
 
         except:
+            found = False if 'noUSB' in found else found
             return {'Error': 'A known device is connected but could not open a connection with it.', 'found' : found, 'Smart' : False, 'Connected' : True}
 
     else:
