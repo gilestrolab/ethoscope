@@ -8,7 +8,6 @@ import logging
 
 import urllib.request, urllib.error, urllib.parse
 import json
-import usb
 import serial
 
 def connectedUSB(optional_file='/etc/modules.json'):
