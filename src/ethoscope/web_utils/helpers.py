@@ -596,7 +596,7 @@ def getModuleCapabilities(test=False, shallow=False):
         found.update({'Smart' : False, 'Connected' : True})
         return found
     
-    if found:
+    if found or 'noUSB' in found:
 
         try:
             device = SimpleSerialInterface()

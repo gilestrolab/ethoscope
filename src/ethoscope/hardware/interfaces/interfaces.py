@@ -25,6 +25,7 @@ def connectedUSB(optional_file='/etc/modules.json'):
     #Lynxmotion SSC-32U
     Bus 001 Device 008: ID 0403:6001 Future Technology Devices International, Ltd FT232 Serial (UART) IC
     """
+
     
     # Hardwired interactors
     known = {
@@ -33,7 +34,8 @@ def connectedUSB(optional_file='/etc/modules.json'):
                 'arduino_uno' : {'name' : 'Arduino UNO', 'family' : 'arduino', 'model' : 'uno', 'used_for' : [], 'id' : ['2341:0043'] },
                 'arduino_leonardo' : {'name' : 'Arduino Leonardo', 'family' : 'arduino', 'model' : 'leonardo', 'used_for' : [], 'id' : ['2341:8036'] },
                 'wemos_D1' : {'name' : 'Wemos D1', 'family' : 'ESP8266', 'model' : 'D1', 'used_for' : [], 'id' : ['1a86:7523'], 'aka' : 'CH340' },
-                'lynxmotion_ssc32u' : {'name' : 'LynxMotion SSC-32U', 'family' : 'LynxMotion', 'model' : 'SSC-32U', 'used_for' : ['servo', 'AGO'], 'id' : ['0403:6001'], 'aka' : 'FT232'}
+                'lynxmotion_ssc32u' : {'name' : 'LynxMotion SSC-32U', 'family' : 'LynxMotion', 'model' : 'SSC-32U', 'used_for' : ['servo', 'AGO'], 'id' : ['0403:6001'], 'aka' : 'FT232'},
+                'noUSB' : {'name' : 'python-usb not loaded', 'id' : ['0000:0000']} #in case pyUSB cannot be loaded
             }
 
     # potential user-specified interactors
@@ -41,8 +43,11 @@ def connectedUSB(optional_file='/etc/modules.json'):
         with open (optional_file, 'r') as optional_modules_file:
             known.update ( json.load (optional_modules_file) )
 
-    # connected devices
-    devices = ['%s:%s' % ('{:x}'.format(dev.idVendor).zfill(4), '{:x}'.format(dev.idProduct).zfill(4) ) for dev in usb.core.find(find_all=True)]
+    try: #needed for compatibility with older images
+        import usb 
+        devices = ['%s:%s' % ('{:x}'.format(dev.idVendor).zfill(4), '{:x}'.format(dev.idProduct).zfill(4) ) for dev in usb.core.find(find_all=True)]
+    except:
+        devices = ['0000:0000']
 
     # matchmaking
     found = {}
