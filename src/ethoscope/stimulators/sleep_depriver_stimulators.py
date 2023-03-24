@@ -219,6 +219,7 @@ class OptomotorSleepDepriver(SleepDepStimulator):
                  min_inactive_time=120,  # s
                  pulse_duration = 1000,  #ms
                  stimulus_type = 2,  # 1 = opto, 2= moto, 3 = both
+                 stimulus_probability = 1.0,
                  date_range=""
                  ):
 
@@ -226,7 +227,7 @@ class OptomotorSleepDepriver(SleepDepStimulator):
         self._t0 = None
 
         # the inactive time depends on the chanel here
-        super(OptomotorSleepDepriver, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, date_range)
+        super(OptomotorSleepDepriver, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range)
 
 
 
@@ -402,7 +403,7 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
 
         self._interval = interval  *1000 # ms used internally
 
-        super(OptomotorSleepDepriverSystematic, self).__init__(hardware_connection, 0,0,
+        super(OptomotorSleepDepriverSystematic, self).__init__(hardware_connection, 0, 0,
                                                                pulse_duration, stimulus_type,
                                                                date_range)
 

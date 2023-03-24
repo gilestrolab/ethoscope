@@ -122,7 +122,7 @@ class HardwareConnection(Thread):
 
     def __setstate__(self, state):
         kwargs = state["interface_kwargs"]
-        kwargs["do_warm_up"] = False
+        kwargs["warmup"] = False
         self.__init__(state["interface_class"],
                       *state["interface_args"], **kwargs)
 
@@ -137,7 +137,7 @@ class SimpleSerialInterface(object):
         :func:`~ethoscope.hardware.interfaces.interfaces.BaseInterface._warm_up`, method, which defines optionnal instructions
         passed to the hardware upon first connection (that is useful to experimenters that want to manually check their settings).
 
-        :param do_warm_up:
+        :param warmup:
         """
         logging.info("Connecting to Serial port...")
 

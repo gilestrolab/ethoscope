@@ -450,6 +450,10 @@ class ControlThread(Thread):
 
         self._info["backup_filename"] = "%s_%s.db" % ( datetime.datetime.utcfromtimestamp(self._info["time"]).strftime('%Y-%m-%d_%H-%M-%S'), self._info["id"] )
         
+        self._info["interactor"] = {}
+        self._info["interactor"]["name"] = str(self._option_dict['interactor']['class'])
+        self._info["interactor"].update ( self._option_dict['interactor']['kwargs'])
+
         # this will be saved in the metadata table
         # and in the pickle file below
         self._metadata = {

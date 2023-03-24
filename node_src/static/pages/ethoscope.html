@@ -69,7 +69,14 @@
         <div id="starting" class="spinner" >
         </div>
     </div>
-   
+
+    <div class="jumbotron-fluid" ng-if="device.status == 'running' && device.interactor.name != '<class \'ethoscope.stimulators.stimulators.DefaultStimulator\'>' ">
+      <button data-toggle="collapse" data-target="#interactor" style="float:right;" class="fa fa-robot fa-2x"></button>
+      <div class="collapse" id="interactor">
+        <li ng-repeat="(name, value) in device.interactor">{{name}}: {{value}}</li>
+      </div>
+    </div>
+
     <div class= "last_drawn_img">
         <img ng-if="device.status == 'running' || device.status == 'recording'"  ng-src="{{device.url_img}}" alt="" width="640"></img>
         <img ng-if="device.status == 'streaming'"  ng-src="{{device.url_stream}}" alt="" width=""></img>
