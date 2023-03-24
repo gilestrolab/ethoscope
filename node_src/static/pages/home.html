@@ -236,11 +236,11 @@
                 <span ng-if="device.backup_status <= 0">N/A</span></td>
                 <td>
                     <span ng-if="device.experimental_info.name != ''">{{device.experimental_info.name}}</span>
-                    <span ng-if="device.previous_user != '' and device.status == 'stopped'" style="color:grey">{{device.previous_user}}</span>
+                    <span ng-if="device.previous_user != '' && device.status == 'stopped'" style="color:grey;">{{device.previous_user}}</span>
                 </td>
                 <td>
                     <span ng-if="device.experimental_info.location != ''">{{device.experimental_info.location}}</span>
-                    <span ng-if="device.previous_location != '' and device.status == 'stopped'" style="color:grey">{{device.previous_location}}</span>
+                    <span ng-if="device.previous_location != '' && device.status == 'stopped'" style="color:grey;">{{device.previous_location}}</span>
                 <td>
                     <span ng-if="device.status == 'offline'" title="Last known IP: {{device.ip}}">offline</span>
                     <span ng-if="device.status != 'offline'" title="pinged: {{device.ping}} times">{{device.ip}}</span>
