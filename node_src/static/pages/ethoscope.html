@@ -70,7 +70,7 @@
         </div>
     </div>
 
-    <div class="jumbotron-fluid" ng-if="device.status == 'running' && device.interactor.name != '<class \'ethoscope.stimulators.stimulators.DefaultStimulator\'>' ">
+    <div class="jumbotron-fluid" ng-if="device.status == 'running' && 'interactor' in device && device.interactor.name != '<class \'ethoscope.stimulators.stimulators.DefaultStimulator\'>' ">
       <button data-toggle="collapse" data-target="#interactor" style="float:right;" class="fa fa-robot fa-2x"></button>
       <div class="collapse" id="interactor">
         <li ng-repeat="(name, value) in device.interactor">{{name}}: {{value}}</li>
