@@ -10,6 +10,12 @@ import urllib.request, urllib.error, urllib.parse
 import json
 import serial
 
+class WrongSerialPortError(Exception):
+    pass
+
+class NoValidPortError(Exception):
+    pass
+
 def connectedUSB(optional_file='/etc/modules.json'):
     """
     Returns a dictionary of connected USB devices from a known selection

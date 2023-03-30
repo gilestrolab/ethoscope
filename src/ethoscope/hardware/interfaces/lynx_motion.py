@@ -2,12 +2,6 @@ import logging
 import time
 from ethoscope.hardware.interfaces.interfaces import SimpleSerialInterface
 
-class WrongSerialPortError(Exception):
-    pass
-
-class NoValidPortError(Exception):
-    pass
-
 class LynxMotionInterface(SimpleSerialInterface):
 
     _min_angle_pulse = (-90.,535.)
