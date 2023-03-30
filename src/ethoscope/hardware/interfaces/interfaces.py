@@ -153,12 +153,15 @@ class SimpleSerialInterface(object):
         else:
             self._port = port
 
-        self._serial = serial.Serial(self._port, baud, timeout=2)
-        time.sleep(2)
-        #self._test_serial_connection()
+        try:
+            self._serial = serial.Serial(self._port, baud, timeout=2)
+            time.sleep(2)
+            #self._test_serial_connection()
 
-        if warmup:
-            self._warm_up()
+            if warmup:
+                self._warm_up()
+        except:
+            pass
 
 
     def _find_port(self):
@@ -179,15 +182,13 @@ class SimpleSerialInterface(object):
         if len(all_ports) == 0:
             logging.error("No valid port detected!. Possibly, device not plugged/detected.")
             #raise NoValidPortError()
-            return []
+            return ""
 
         elif len(all_ports) > 2:
             logging.info("Several port detected, using first one: %s", str(all_ports))
-            return all_ports[0]
 
-        else:
-            logging.info("Found one port: %s" % all_ports[0])
-            return all_ports[0]
+        
+        return all_ports.pop()
 
     def __del__(self):
         if self._serial is not None:
