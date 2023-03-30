@@ -177,10 +177,11 @@ class SimpleSerialInterface(object):
 
         if len(all_ports) == 0:
             logging.error("No valid port detected!. Possibly, device not plugged/detected.")
-            raise NoValidPortError()
+            #raise NoValidPortError()
 
         elif len(all_ports) > 2:
             logging.info("Several port detected, using first one: %s", str(all_ports))
+            
         return all_ports.pop()
 
     def __del__(self):
