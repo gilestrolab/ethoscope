@@ -165,12 +165,13 @@ class SimpleSerialInterface(object):
         from serial.tools import list_ports
         import serial
         import os
+
         all_port_tuples = list_ports.comports()
         logging.info("listing serial ports")
         all_ports = set()
         for ap, _, _ in all_port_tuples:
             p = os.path.basename(ap)
-            print(p)
+
             if p.startswith("ttyUSB") or p.startswith("ttyACM"):
                 all_ports |= {ap}
                 logging.info("\t%s", str(ap))
@@ -178,11 +179,15 @@ class SimpleSerialInterface(object):
         if len(all_ports) == 0:
             logging.error("No valid port detected!. Possibly, device not plugged/detected.")
             #raise NoValidPortError()
+            return []
 
         elif len(all_ports) > 2:
             logging.info("Several port detected, using first one: %s", str(all_ports))
-            
-        return all_ports.pop()
+            return all_ports[0]
+
+        else:
+            logging.info("Found one port: %s" % all_ports[0])
+            return all_ports[0]
 
     def __del__(self):
         if self._serial is not None:
