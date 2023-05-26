@@ -86,7 +86,7 @@ class GenericBackupWrapper(threading.Thread):
             devices = json.load(f)
 
         except urllib.error.URLError as e:
-            logging.error("The node ethoscope server %s is not running or cannot be reached. A list of available ethoscopes could not be found." % server)
+            logging.error("The node ethoscope server %s is not running or cannot be reached. A list of available ethoscopes could not be found." % self._node_address)
             logging.info("Using Ethoscope Scanner to look for devices")
 
             _device_scanner = EthoscopeScanner()
