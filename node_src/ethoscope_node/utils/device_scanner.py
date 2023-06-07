@@ -1,4 +1,3 @@
-from threading import Thread
 import urllib.request, urllib.error, urllib.parse
 import os
 import datetime
@@ -7,10 +6,12 @@ import time
 import logging
 import traceback
 import pickle
-from functools import wraps
+import mysql.connector
 import socket, struct
-from zeroconf import ServiceBrowser, Zeroconf, IPVersion
 
+from threading import Thread
+from functools import wraps
+from zeroconf import ServiceBrowser, Zeroconf, IPVersion
 from ethoscope_node.utils.etho_db import ExperimentalDB
 from ethoscope_node.utils.mysql_backup import db_diff
 
@@ -617,8 +618,6 @@ class Ethoscope(Device):
 
             try:
                 logging.warning("No information regarding backup file from the ethoscope") 
-                import mysql.connector
-                from ethoscope.utils.io import SQL_CHARSET
                 
                 device_id = self._info["id"]
                 device_name = self._info["name"]
@@ -630,7 +629,7 @@ class Ethoscope(Device):
                                                    connect_timeout=timeout,
                                                    **self._ethoscope_db_credentials,
                                                    buffered=True,
-                                                   charset=SQL_CHARSET,
+                                                   charset='latin1', #this should match what set in ethoscope.utils.io
                                                    use_unicode=True)
                 cur = mysql_db.cursor()
                 cur.execute(com)
@@ -649,9 +648,9 @@ class Ethoscope(Device):
                                               )
 
             except Exception as e:
-                #logging.error("Could not generate backup path for device. Probably a MySQL issue")
+                logging.error("Could not generate backup path for device. Probably a MySQL issue")
                 #logging.error(traceback.format_exc())
-                 output_db_file = "None"
+                output_db_file = "None"
 
 
         self._info.update( {"backup_path": output_db_file} )
