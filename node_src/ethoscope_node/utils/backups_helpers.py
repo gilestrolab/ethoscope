@@ -5,8 +5,9 @@ import os
 import logging
 import time
 import traceback
-
-import urllib.request
+import optparse
+import subprocess
+import urllib.request, urllib.error, urllib.parse
 import json
 
 import threading
@@ -59,9 +60,112 @@ class BackupClass(object):
             logging.error(traceback.format_exc())
             return False
 
+class VideoBackupClass(object):
+    '''
+    The video backup class. Will connect to the ethoscope and mirror its video chunks in the node
+    '''
+
+    def __init__(self, device_info, results_dir):
+
+        self._device_info = device_info
+        self._database_ip = os.path.basename(self._device_info["ip"])
+        self._results_dir = results_dir
+
+    def backup (self):
+        try:
+            if "backup_path" not in self._device_info:
+                raise KeyError("Could not obtain device backup path for %s" % self._device_info["id"])
+
+            if self._device_info["backup_path"] is None:
+                raise ValueError("backup path is None for device %s" % self._device_info["id"])
+            
+            backup_path = os.path.join(self._results_dir, self._device_info["backup_path"])
+
+  
+            logging.info("Initiating backup for device  %s" % self._device_info["id"])
+        
+            self.get_all_videos()
+            logging.info("Backup done for for device  %s" % self._device_info["id"])
+            return True
+        
+        except Exception as e:
+            #logging.error("Unexpected error in backup. args are: %s" % str(args))
+            logging.error(traceback.format_exc())
+            return False
+    
+    def wget_mirror_wrapper(target, target_prefix, output_dir, cut_dirs=3):
+        target = target_prefix + target
+        command_arg_list=  ["wget",
+                            target,
+                            "-nv",
+                            "--mirror",
+                            "--cut-dirs=%i" % cut_dirs,
+                            "-nH",
+                            "--directory-prefix=%s" % output_dir
+                            ]
+        p = subprocess.Popen(command_arg_list,  stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+        stdout, stderr = p.communicate()
+        if p.returncode != 0:
+            raise Exception("Error %i: %s" % ( p.returncode,stdout))
+
+        if stdout == "":
+            return False
+        return True
+
+
+    def get_video_list(ip, port=9000,static_dir = "static", index_file="ethoscope_data/results/index.html"):
+
+        url = "/".join(["%s:%i"%(ip,port), static_dir, index_file])
+
+        try:
+            response = urllib.request.urlopen(url)
+            out = [r.decode('utf-8').rstrip() for r in response]
+        except urllib.error.HTTPError as e:
+            logging.warning("No index file could be found for device %s" % ip)
+            out = None
+        finally:
+            self.make_index(ip, port)
+            return out
+
+    def remove_video_from_host(ip, id, target, port=9000):
+        request_url = "{ip}:{port}/rm_static_file/{id}".format(ip=ip, id=id, port=port)
+        data = {"file": target}
+        data =json.dumps(data)
+        req = urllib.request.Request(url=request_url, data= data, headers={'Content-Type': 'application/json'})
+        _ = urllib.request.urlopen(req, timeout=5)
+
+
+    def make_index(ip, port=9000, page="make_index"):
+        url = "/".join(["%s:%i"%(ip,port), page])
+        try:
+            response = urllib.request.urlopen(url)
+            return True
+        except urllib.error.HTTPError as e:
+            logging.warning("No index file could be found for device %s" % ip)
+            return False
+        
+    def get_all_videos(port=9000, static_dir="static"):
+        url = "http://" + self._device_info["ip"]
+        id = self._device_info["id"]
+        video_list = self.get_video_list(url, port=port, static_dir=static_dir)
+        #backward compatible. if no index, we do not stop
+        if video_list is None:
+            return
+        target_prefix = "/".join(["%s:%i"%(url,port), static_dir])
+        for v in video_list:
+            try:
+                current = self.wget_mirror_wrapper(v, target_prefix=target_prefix, output_dir=self._results_dir)
+            except Exception as e:
+                logging.warning(e)
+                continue
+
+            if not current:
+                # we only attempt to remove if the files is mirrored
+                self.remove_video_from_host(url, id, v)
 
 class GenericBackupWrapper(threading.Thread):
-    def __init__(self, results_dir, node_address):
+    def __init__(self, results_dir, node_address, video=False):
         '''
         '''
         self._TICK = 1.0  # s
@@ -69,6 +173,7 @@ class GenericBackupWrapper(threading.Thread):
         self._results_dir = results_dir
         self._node_address = node_address
         self.backup_status = {}
+        self._is_instance_video = video
 
         super(GenericBackupWrapper, self).__init__()
 
@@ -108,8 +213,10 @@ class GenericBackupWrapper(threading.Thread):
         try:
             dev_id = device_info["id"]
             logging.info("Initiating backup for device  %s" % dev_id)
-            
-            backup_job = BackupClass(device_info, results_dir=self._results_dir)
+            if self._is_instance_video:
+                backup_job = VideoBackupClass(device_info, results_dir=self._results_dir)
+            else:
+                backup_job = BackupClass(device_info, results_dir=self._results_dir)
 
             logging.info("Running backup for device  %s" % dev_id)
             self.backup_status[dev_id] = {'started': int(time.time()), 'ended' : 0 }
@@ -126,8 +233,7 @@ class GenericBackupWrapper(threading.Thread):
             return True
             
         except Exception as e:
-
-            logging.error("Unexpected error in backup. args are: %s" % str(args))
+            #logging.error("Unexpected error in backup. args are: %s" % str(args))
             logging.error(traceback.format_exc())
             return False
 

@@ -113,8 +113,12 @@ def name():
 @api.get('/make_index')
 @error_decorator
 def make_index():
+    """ 
+    Creates an index of all the video files in the provided formats
+    """
+    video_formats = ['h264', 'avi', 'mp4']
     index_file = os.path.join(_ETHOSCOPE_DIR, "index.html")
-    all_video_files = [y for x in os.walk(_ETHOSCOPE_DIR) for y in glob.glob(os.path.join(x[0], '*.h264'))]
+    all_video_files = [y for x in os.walk(_ETHOSCOPE_DIR) for y in glob.glob(os.path.join(x[0], '*.*')) if y.endswith(tuple(video_formats))]
     with open(index_file, "w") as index:
         for f in all_video_files:
             index.write(f + "\n")

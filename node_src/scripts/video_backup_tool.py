@@ -6,7 +6,7 @@ import optparse
 import  traceback
 import subprocess
 import json
-from ethoscope_node.utils.backups_helpers import GenericBackupWrapper, receive_devices
+from ethoscope_node.utils.backups_helpers import GenericBackupWrapper
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
 
 class WGetERROR(Exception):
@@ -140,10 +140,9 @@ if __name__ == '__main__':
             if bj == None: exit("ETHOSCOPE_%03d is not online or not detected" % ethoscope)
 
         else:
-            gbw = GenericBackupWrapper( backup_job,
-                                        VIDEO_DIR,
-                                        SAFE_MODE,
-                                        server )
+            gbw = GenericBackupWrapper(     VIDEO_DIR,
+                                            server, 
+                                            video=True)
             gbw.run()
         
     except Exception as e:
