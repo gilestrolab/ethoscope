@@ -30,13 +30,16 @@ class cameraCaptureThread(threading.Thread):
     '''
         
     _VIDEO_CHUNCK_DURATION = 30 * 10
-    def __init__(self, cameraClass, camera_kwargs, video_prefix, video_root_dir, img_path, width, height, fps, bitrate, stream=False):
+    def __init__(self, cameraClass, camera_kwargs, video_root_dir, img_path, width, height, fps, bitrate, video_prefix='h264', stream=False):
         self._img_path = img_path
         
         self._resolution = (width, height)
         self._fps = fps
         self._bitrate = bitrate
         self._video_prefix = video_prefix
+
+        self._use_h264_recording = self._resolution[2] > 480 or self._video_prefix == 'h264'
+
         self._video_root_dir = video_root_dir
         self._stream = stream
         self.camera = cameraClass ( target_fps = fps , target_resolution = (width, height), **camera_kwargs )
@@ -74,7 +77,8 @@ class cameraCaptureThread(threading.Thread):
         Every 5 seconds, updates the preview frame served over the network by the webserver adding some info text on it
         '''
 
-        if self._stream:
+        if self._stream and not self._use_h264_recording:
+            #open the streaming socket
             server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             server_socket.bind(('', STREAMING_PORT))
@@ -90,49 +94,68 @@ class cameraCaptureThread(threading.Thread):
             raise e
 
         self.start_time = time.time()
-        self.preview_time = time.time()
         
-        writer = None
+        # legacy system. Not compatible with streaming but records at faster FPSs
+        if self._use_h264_recording:
 
-        while not self.stop_camera_activity:
+            self.camera.start_recording(self._get_video_chunk_filename(ext='h264'), bitrate=self._bitrate)
+            logging.info("h264 video recording started.")
 
-            if self._stream:
-                logging.info("Waiting for a connection to start streaming")
-                client_socket, client_address = server_socket.accept() # blocking call
-                logging.info("Connection established!")
-          
-            for ix, (_, frame) in enumerate (self.camera):
+            while not self.stop_camera_activity:
 
-                if self.stop_camera_activity: break
+                self.camera.wait_recording(2)
+                self.camera.capture(self._img_path, use_video_port=True, quality=50)
                 
-                if writer and writer.isOpened() and not self._stream:
-                    writer.write(frame)
-                
-                # Wait for the first 150 frames before opening the video writer object
-                # This is done to calcualate a decent approximation of actual FPS
-                if time.time() - self.start_time >= self._VIDEO_CHUNCK_DURATION or ix == 150 and not self._stream:
-                    if writer:
-                        writer.release()
-                    
-                    writer = cv2.VideoWriter(self._get_video_chunk_filename(ext='avi'), cv2.VideoWriter_fourcc(*'mp4v'), self.camera.fps, (self.camera.width, self.camera.height))
-                    if not writer.isOpened():
-                        logging.error('Error: failed to open Video writer destination. The Video file cannot be saved.')
-
+                if time.time() - self.start_time >= self._VIDEO_CHUNCK_DURATION:
+                    self.camera.split_recording( self._get_video_chunk_filename )
                     self.start_time = time.time()
+        
+        # this is too slow when recording files in HD
+        else:
+            writer = None
+            self.preview_time = time.time()
 
-                # annotates a preview frame every 5 seconds
-                if (( time.time() - self.preview_time ) > 5) and not self._stream:
-                    self._save_preview_frame(frame, writing_status = writer is not None)
-                    
+            while not self.stop_camera_activity:
+
+                #waiting for the streaming connection to be established
                 if self._stream:
+                    logging.info("Waiting for a connection to start streaming")
+                    client_socket, client_address = server_socket.accept() # blocking call
+                    logging.info("Connection established!")
+            
+                #processing images one by one
+                for ix, (_, frame) in enumerate (self.camera):
 
-                    frame = cv2.resize(frame, (640,480))
-                    frame = cv2.putText(frame, 'FPS: ' + str(round(self.camera.fps,2)) , (20,20) , 1 , 1 , (255,255,255) )
-                    _, frame = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
+                    if self.stop_camera_activity: break
+                    
+                    if writer and writer.isOpened() and not self._stream:
+                        writer.write(frame)
+                    
+                    # Wait for the first 150 frames before opening the video writer object
+                    # This is done to calcualate a decent approximation of actual FPS
+                    if time.time() - self.start_time >= self._VIDEO_CHUNCK_DURATION or ix == 150 and not self._stream:
+                        if writer:
+                            writer.release()
+                        
+                        writer = cv2.VideoWriter(self._get_video_chunk_filename(ext=self._video_prefix), cv2.VideoWriter_fourcc(*'mp4v'), self.camera.fps, (self.camera.width, self.camera.height))
+                        if not writer.isOpened():
+                            logging.error('Error: failed to open Video writer destination. The Video file cannot be saved.')
 
-                    data = pickle.dumps(frame)
-                    message = struct.pack("Q", len(data)) + data
-                    client_socket.sendall(message)
+                        self.start_time = time.time()
+
+                    # annotates a preview frame every 5 seconds
+                    if (( time.time() - self.preview_time ) > 5) and not self._stream:
+                        self._save_preview_frame(frame, writing_status = writer is not None)
+                        
+                    if self._stream:
+
+                        frame = cv2.resize(frame, (640,480))
+                        frame = cv2.putText(frame, 'FPS: ' + str(round(self.camera.fps,2)) , (20,20) , 1 , 1 , (255,255,255) )
+                        _, frame = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
+
+                        data = pickle.dumps(frame)
+                        message = struct.pack("Q", len(data)) + data
+                        client_socket.sendall(message)
             
         # out of the loop - exit signal received
         self.camera._close()
