@@ -30,18 +30,18 @@ class cameraCaptureThread(threading.Thread):
     '''
         
     _VIDEO_CHUNCK_DURATION = 30 * 10
-    def __init__(self, cameraClass, camera_kwargs, video_root_dir, img_path, width, height, fps, bitrate, video_prefix='h264', stream=False):
+    def __init__(self, cameraClass, camera_kwargs, video_prefix,  video_root_dir, img_path, width, height, fps, bitrate, stream=False):
         self._img_path = img_path
         
         self._resolution = (width, height)
         self._fps = fps
         self._bitrate = bitrate
         self._video_prefix = video_prefix
+        self._stream = stream
 
-        self._use_h264_recording = self._resolution[2] > 480 or self._video_prefix == 'h264'
+        self._use_h264_recording = int(self._resolution[1]) > 480 or self._stream == False
 
         self._video_root_dir = video_root_dir
-        self._stream = stream
         self.camera = cameraClass ( target_fps = fps , target_resolution = (width, height), **camera_kwargs )
         
         self.video_file_index = 0
@@ -137,7 +137,7 @@ class cameraCaptureThread(threading.Thread):
                         if writer:
                             writer.release()
                         
-                        writer = cv2.VideoWriter(self._get_video_chunk_filename(ext=self._video_prefix), cv2.VideoWriter_fourcc(*'mp4v'), self.camera.fps, (self.camera.width, self.camera.height))
+                        writer = cv2.VideoWriter(self._get_video_chunk_filename(ext='avi'), cv2.VideoWriter_fourcc(*'mp4v'), self.camera.fps, (self.camera.width, self.camera.height))
                         if not writer.isOpened():
                             logging.error('Error: failed to open Video writer destination. The Video file cannot be saved.')
 
@@ -214,7 +214,7 @@ class HDVideoRecorder(GeneralVideoRecorder):
     status = "recording"
 
     def __init__(self, cameraClass, camera_kwargs, video_prefix, video_dir, img_path):
-        super(HDVideoRecorder, self).__init__(cameraClass, camera_kwargs, video_prefix, video_dir, img_path, width=1920, height=1080,fps=25,bitrate=1000000)
+        super(HDVideoRecorder, self).__init__(cameraClass, camera_kwargs, video_prefix, video_dir, img_path, width=1920, height=1080, fps=25, bitrate=1000000)
 
 
 class StandardVideoRecorder(GeneralVideoRecorder):
@@ -222,7 +222,7 @@ class StandardVideoRecorder(GeneralVideoRecorder):
     status = "recording"
     
     def __init__(self, cameraClass, camera_kwargs, video_prefix, video_dir, img_path):
-        super(StandardVideoRecorder, self).__init__(cameraClass, camera_kwargs, video_prefix, video_dir, img_path, width=1280, height=960,fps=25,bitrate=500000)
+        super(StandardVideoRecorder, self).__init__(cameraClass, camera_kwargs, video_prefix, video_dir, img_path, width=1280, height=960, fps=25,bitrate=500000)
 
 class Streamer(GeneralVideoRecorder):
     #hiding the description field will not pass this class information to the node UI
