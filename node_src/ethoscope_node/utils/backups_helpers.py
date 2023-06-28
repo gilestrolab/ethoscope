@@ -93,7 +93,7 @@ class VideoBackupClass(object):
             logging.error(traceback.format_exc())
             return False
     
-    def wget_mirror_wrapper(target, target_prefix, output_dir, cut_dirs=3):
+    def wget_mirror_wrapper(self, target, target_prefix, output_dir, cut_dirs=3):
         target = target_prefix + target
         command_arg_list=  ["wget",
                             target,
@@ -114,7 +114,7 @@ class VideoBackupClass(object):
         return True
 
 
-    def get_video_list(ip, port=9000,static_dir = "static", index_file="ethoscope_data/results/index.html"):
+    def get_video_list(self, ip, port=9000,static_dir = "static", index_file="ethoscope_data/results/index.html"):
 
         url = "/".join(["%s:%i"%(ip,port), static_dir, index_file])
 
@@ -128,7 +128,7 @@ class VideoBackupClass(object):
             self.make_index(ip, port)
             return out
 
-    def remove_video_from_host(ip, id, target, port=9000):
+    def remove_video_from_host(self, ip, id, target, port=9000):
         request_url = "{ip}:{port}/rm_static_file/{id}".format(ip=ip, id=id, port=port)
         data = {"file": target}
         data =json.dumps(data)
@@ -136,7 +136,7 @@ class VideoBackupClass(object):
         _ = urllib.request.urlopen(req, timeout=5)
 
 
-    def make_index(ip, port=9000, page="make_index"):
+    def make_index(self, ip, port=9000, page="make_index"):
         url = "/".join(["%s:%i"%(ip,port), page])
         try:
             response = urllib.request.urlopen(url)
@@ -145,7 +145,7 @@ class VideoBackupClass(object):
             logging.warning("No index file could be found for device %s" % ip)
             return False
         
-    def get_all_videos(port=9000, static_dir="static"):
+    def get_all_videos(self, port=9000, static_dir="static"):
         url = "http://" + self._device_info["ip"]
         id = self._device_info["id"]
         video_list = self.get_video_list(url, port=port, static_dir=static_dir)
