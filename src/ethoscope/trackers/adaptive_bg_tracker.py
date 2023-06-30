@@ -114,9 +114,7 @@ class ObjectModel(object):
 
         sub_mask = self._mask_img_buff[0 : h, 0 : w]
 
-        sub_grey = self._roi_img_buff[ 0 : h, 0: w]
-
-        cv2.cvtColor(img[y : y + h, x : x + w, :],cv2.COLOR_BGR2GRAY,sub_grey)
+        sub_grey = img[y : y + h, x : x + w]
         sub_mask.fill(0)
 
         cv2.drawContours(sub_mask,[contour],-1, 255,-1,offset=(-x,-y))
@@ -275,11 +273,12 @@ class AdaptiveBGModel(BaseTracker):
             blur_rad += 1
 
         if self._buff_grey is None:
-            self._buff_grey = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+            self._buff_grey = img.copy()
             if mask is None:
                 mask = np.ones_like(self._buff_grey) * 255
 
-        cv2.cvtColor(img,cv2.COLOR_BGR2GRAY, self._buff_grey)
+        self._buff_grey = img.copy()
+
         # cv2.imshow("dbg",self._buff_grey)
         cv2.GaussianBlur(self._buff_grey,(blur_rad,blur_rad),1.2, self._buff_grey)
         if darker_fg:
@@ -313,7 +312,7 @@ class AdaptiveBGModel(BaseTracker):
 
 
         if self._buff_grey is None:
-            self._buff_grey = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+            self._buff_grey = img.copy()
             self._buff_grey_blurred = np.empty_like(self._buff_grey)
             # self._buff_grey_blurred = np.empty_like(self._buff_grey)
             if mask is None:
@@ -324,7 +323,7 @@ class AdaptiveBGModel(BaseTracker):
             self._buff_convolved_mask  = (1/255.0 *  mask_conv.astype(np.float32))
 
 
-        cv2.cvtColor(img,cv2.COLOR_BGR2GRAY, self._buff_grey)
+        self._buff_grey = img.copy()
 
         hist = cv2.calcHist([self._buff_grey], [0], None, [256], [0,255]).ravel()
         hist = np.convolve(hist, [1] * 3)

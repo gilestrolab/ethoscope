@@ -91,7 +91,13 @@ class TargetGridROIBuilder(BaseROIBuilder):
         super(TargetGridROIBuilder,self).__init__()
 
     def _find_blobs(self, im, scoring_fun):
-        grey= cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
+        
+        if len(im.shape) == 2:
+            grey = im
+        
+        elif len(im.shape) == 3:
+            grey = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+        
         rad = int(self._adaptive_med_rad * im.shape[1])
         if rad % 2 == 0:
             rad += 1

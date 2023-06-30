@@ -69,7 +69,8 @@ class BaseDrawer(object):
         :return:
         """
 
-        self._last_drawn_frame = img.copy()
+        #self._last_drawn_frame = img.copy()
+        self._last_drawn_frame = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
         self._annotate_frame(self._last_drawn_frame, positions, tracking_units, reference_points)
 
