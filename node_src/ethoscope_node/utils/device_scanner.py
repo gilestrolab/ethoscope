@@ -421,7 +421,6 @@ class Ethoscope(Device):
     def last_image(self):
         """
         Collects the last drawn image fromt the device
-        TODO: on the device side, this should not rely on an actuale image file but be fished from memory
         """
         # we return none if the device is not in a stoppable status (e.g. running, recording)
         if self._info["status"] not in self._allowed_instructions_status["stop"]:

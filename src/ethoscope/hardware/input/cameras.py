@@ -339,7 +339,7 @@ class V4L2Camera(BaseCamera):
 
 class PiFrameGrabber(threading.Thread):
 
-    def __init__(self, target_fps, target_resolution, queue, stop_queue, video_prefix=None, video_quality=20, *args, **kwargs):
+    def __init__(self, target_fps, target_resolution, queue, stop_queue, video_prefix=None, quality=20, *args, **kwargs):
         """
         Class to grab frames from pi camera. Designed to be used within :class:`~ethoscope.hardware.camreras.camreras.OurPiCameraAsync`
         This allows to get frames asynchronously as acquisition is a bottleneck.
@@ -373,7 +373,7 @@ class PiFrameGrabber(threading.Thread):
         # Specifies the quality that the encoder should attempt to maintain. 
         # For the 'h264' format, use values between 10 and 40 where 10 is extremely high quality, and 40 is extremely low 
         # (20-25 is usually a reasonable range for H.264 encoding)
-        self.video_quality = video_quality
+        self.video_quality = quality
 
         super(PiFrameGrabber, self).__init__()
 
@@ -397,7 +397,7 @@ class PiFrameGrabber(threading.Thread):
         
         self._file_index += 1
         w,h = self._target_resolution
-        video_info= "%ix%i@%i" %(w, h, fps)
+        video_info= "%ix%i@%ifps-%iq" %(w, h, fps, self.video_quality)
         chunk_file_name = '%s_%s_%05d.%s' % (self._video_prefix, video_info, self._file_index, ext)
         return chunk_file_name
 

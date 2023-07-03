@@ -35,7 +35,7 @@ class cameraCaptureThread(threading.Thread):
     '''
         
     _VIDEO_CHUNCK_DURATION = 30 * 10
-    def __init__(self, cameraClass, camera_kwargs, img_path, video_prefix, width, height, fps, bitrate, stream=False):
+    def __init__(self, cameraClass, camera_kwargs, img_path, video_prefix, width, height, fps, bitrate, quality, stream=False):
 
         self._img_path = img_path
         self._stream = stream
@@ -49,7 +49,7 @@ class cameraCaptureThread(threading.Thread):
         self._record_video = video_prefix is not None
         if self._record_video: self._create_recording_folder()
 
-        self.camera = cameraClass ( target_fps = fps , target_resolution = (width, height), video_prefix = video_prefix,  **camera_kwargs )
+        self.camera = cameraClass ( target_fps = fps , target_resolution = (width, height), video_prefix = video_prefix, quality = quality, **camera_kwargs )
         self._local_recording = self._record_video is True and self.camera.isPiCamera is False
 
         self.video_file_index = 0
@@ -179,12 +179,12 @@ class GeneralVideoRecorder(DescribedObject):
                                ]}
     status = "recording" #this is the default status. The alternative is streaming
 
-    def __init__(self, cameraClass, camera_kwargs, img_path, video_prefix, width=1280, height=960, fps=25, bitrate=200000, stream = False):
+    def __init__(self, cameraClass, camera_kwargs, img_path, video_prefix, width=1280, height=960, fps=25, bitrate=200000, quality=20, stream = False):
 
         self._stream = stream
 
         #This used to be a process but it's best handled as a thread. See also commit https://github.com/gilestrolab/ethoscope/commit/c2e8a7f656611cc10379c8e93ff4205220c8807a
-        self._p = cameraCaptureThread(cameraClass, camera_kwargs, img_path, video_prefix, width, height, fps, bitrate, stream)
+        self._p = cameraCaptureThread(cameraClass, camera_kwargs, img_path, video_prefix, width, height, fps, bitrate, quality, stream)
 
     def start_recording(self):
         '''
@@ -342,7 +342,7 @@ class ControlThreadVideoRecording(ControlThread):
             self._output_video_full_prefix = os.path.join ( self._video_root_dir, self._machine_id, self._device_name, formatted_time, file_prefix )
 
             RecorderClass = self._option_dict["recorder"]["class"]
-            recorder_kwargs = self._option_dict["recorder"]["kwargs"] # {'width': 1280, 'height': 960, 'fps': 25, 'bitrate': 200000}
+            recorder_kwargs = self._option_dict["recorder"]["kwargs"] # {'width': 1280, 'height': 960, 'fps': 25, 'bitrate': 200000, 'quality' : 20}
 
             cameraClass = self._option_dict["camera"]["class"]
             camera_kwargs = self._option_dict["camera"]["kwargs"]
