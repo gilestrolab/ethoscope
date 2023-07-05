@@ -119,31 +119,36 @@ if __name__ == '__main__':
         SAFE_MODE = option_dict["safe"]
         DEBUG = option_dict["debug"]
 
-        ethoscope = option_dict["ethoscope"]
-        server = option_dict["server"]
+        ETHO_TO_BACKUP = option_dict["ethoscope"]
+        NODE_ADDRESS = option_dict["server"]
 
         if DEBUG:
             logging.basicConfig()
             logging.getLogger().setLevel(logging.DEBUG)
             logging.info("Logging using DEBUG SETTINGS")
 
+        # Start the backup wrapper
+        gbw = GenericBackupWrapper( VIDEO_DIR, NODE_ADDRESS, video=True )
 
-        if ethoscope:
-            ethoscope = int(ethoscope)
-            print ("Forcing backup for ethoscope %03d" % ethoscope)
-            all_devices = receive_devices(server)
-            
-            bj = None
-            for devID in all_devices:
-                if all_devices[devID]['name'] == ("ETHOSCOPE_%03d" % ethoscope) and all_devices[devID]['status'] != "offline":
-                    bj = backup_job((all_devices[devID], VIDEO_DIR))
-            if bj == None: exit("ETHOSCOPE_%03d is not online or not detected" % ethoscope)
+        if ETHO_TO_BACKUP:
+            # We have provided an ethoscope or a comma separated list of ethoscopes to backup
+            try:
+                ETHO_TO_BACKUP_LIST = [int(ETHO_TO_BACKUP)]
+            except:
+                ETHO_TO_BACKUP_LIST = [int(e) for e in ETHO_TO_BACKUP.split(",")]
+                
+            for ethoscope in ETHO_TO_BACKUP_LIST:
+                print ("Forcing video backup for ethoscope %03d" % ethoscope)
+                
+                bj = None
+                for device in gbw.find_devices():
+                    if device['name'] == ("ETHOSCOPE_%03d" % ethoscope):
+                        bj = gbw._backup_job( device )
+
+                if bj == None: exit("ETHOSCOPE_%03d is not online or not detected" % ethoscope)
 
         else:
-            gbw = GenericBackupWrapper(     VIDEO_DIR,
-                                            server, 
-                                            video=True)
-            gbw.run()
+            gbw.start()
         
     except Exception as e:
         logging.error(traceback.format_exc())

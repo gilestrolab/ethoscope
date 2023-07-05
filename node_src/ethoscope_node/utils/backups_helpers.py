@@ -207,7 +207,7 @@ class GenericBackupWrapper(threading.Thread):
         return devices
             
 
-    def _backup_job(self,  device_info):
+    def _backup_job(self, device_info):
         '''
         '''
         try:
