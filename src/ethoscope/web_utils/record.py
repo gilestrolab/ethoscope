@@ -172,7 +172,7 @@ class GeneralVideoRecorder(DescribedObject):
     _description  = {  "overview": "A video simple recorder. When using the default camera PI, frames should be multiple of 16 in X and 32 in Y.",
                             "arguments": [
                                 {"type": "number", "name":"width", "description": "The width of the frame","default":1280, "min":480, "max":1980,"step":1},
-                                {"type": "number", "name":"height", "description": "The height of the frame","default":960, "min":360, "max":1080,"step":1},
+                                {"type": "number", "name":"height", "description": "The height of the frame","default":960, "min":360, "max":1088,"step":1},
                                 {"type": "number", "name":"fps", "description": "The target number of frames per seconds","default":25, "min":1, "max":25,"step":1},
                                 {"type": "number", "name":"bitrate", "description": "The target bitrate","default":200000, "min":0, "max":10000000,"step":1000},
                                 {"type": "number", "name":"quality", "description": "10 is extremely high quality, 40 is extremely low", "default":20, "min":10, "max":40,"step":1},
@@ -217,7 +217,7 @@ class HDVideoRecorder(GeneralVideoRecorder):
     status = "recording"
 
     def __init__(self, cameraClass, camera_kwargs, video_prefix, img_path):
-        super(HDVideoRecorder, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix, width=1920, height=1088, fps=25, bitrate=1000000)
+        super(HDVideoRecorder, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix, width=1920, height=1088, quality=28, fps=25, bitrate=1000000)
 
 
 class StandardVideoRecorder(GeneralVideoRecorder):
