@@ -442,7 +442,7 @@ class PiFrameGrabber(threading.Thread):
                     capture.wait_recording(self._PREVIEW_REFRESH_TIME) 
 
                     if time.time() - self._video_time >= self._VIDEO_CHUNCK_DURATION:
-                        capture.split_recording( self._get_video_chunk_filename() )
+                        capture.split_recording( self._get_video_chunk_filename( fps=capture.framerate ) )
                         self._video_time = time.time()
                 
                 capture.stop_recording()

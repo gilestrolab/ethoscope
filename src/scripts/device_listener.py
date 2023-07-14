@@ -133,7 +133,7 @@ class commandingThread(threading.Thread):
             return 'This action requires JSON data'
         
         if action == 'help':
-            return "Commands that do not require JSON info: help, info, status, stop, stream, remove.\nCommands that do require JSON info: start, start_record."
+            return "Commands that do not require JSON info: help, info, status, stop, stream, remove, restart.\nCommands that do require JSON info: start, start_record."
         
         elif action == 'info':
             return self.control.info
@@ -192,7 +192,13 @@ class commandingThread(threading.Thread):
                     return "The persistent file does not exist"
             except:
                 return "The persistent file exists but could not be removed"
-                
+
+        elif action == 'restart' and self.control.info['status'] not in ['running', 'recording', 'streaming']:
+            logging.info("Restarting the ethoscope device service")
+            with os.popen('systemctl restart ethoscope_device.service') as df:
+                outcome = df.read()
+                logging.info(outcome)
+                return outcome
 
         else:
             #raise Exception("No such command: %s. Available commands are info, status, start, stop, start_record, stream " % action)
