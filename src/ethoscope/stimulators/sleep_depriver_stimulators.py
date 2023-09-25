@@ -488,7 +488,7 @@ class AGO(SleepDepStimulator):
     Command `T` will teach the ethoscope what the capabilities of the module are, returning a dictionary.
     """
     
-    _description = {"overview": "A stimulator to sleep deprive an animal using gear motors and probe arousal using air valves. See: https://www.notion.so/giorgiogilestro/The-new-Modular-SD-Device-05bbe90b6ee04b8aa439165f69d62de8",
+    _description = {"overview": "A stimulator to send an odour puff to an AGO setup with only 10 ROIs. The valve channels are the same as the mAGO",
                     "arguments": [
                         {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_correction_coef", "description": "Velocity correction coef", "default": 3.0e-3},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken(s)","default":120},
