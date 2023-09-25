@@ -480,3 +480,51 @@ class mAGO(SleepDepStimulator):
         out, dic = super(mAGO, self)._decide()
         dic["duration"] = self._pulse_duration
         return out, dic
+
+class AGO(SleepDepStimulator):
+    """
+    Valves are connected to even channels (0-18).
+    Command `D` will activate all the channels in a sequence and it's used for debugging.
+    Command `T` will teach the ethoscope what the capabilities of the module are, returning a dictionary.
+    """
+    
+    _description = {"overview": "A stimulator to sleep deprive an animal using gear motors and probe arousal using air valves. See: https://www.notion.so/giorgiogilestro/The-new-Modular-SD-Device-05bbe90b6ee04b8aa439165f69d62de8",
+                    "arguments": [
+                        {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_correction_coef", "description": "Velocity correction coef", "default": 3.0e-3},
+                                    {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken(s)","default":120},
+                                    {"type": "number", "min": 50, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step": 0.1, "name": "stimulus_probability",  "description": "Probability the stimulus will happen", "default": 1.0},
+                                    {"type": "date_range", "name": "date_range",
+                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "default": ""}
+                                   ]}
+
+    _HardwareInterfaceClass = OptoMotor
+                            
+    _roi_to_channel_valves= {1:0, 2:2, 3:4, 4:6, 5:8,
+                            6:10, 7:12, 8:14, 9:16, 10:18}
+
+
+    def __init__(self,
+                 hardware_connection,
+                 velocity_correction_coef=3.0e-3,
+                 min_inactive_time=120,  # s
+                 pulse_duration = 1000,  #ms
+                 stimulus_probability = 1.0,
+                 date_range=""
+                 ):
+
+
+        self._t0 = None
+
+        # the inactive time depends on the chanel here
+        super(mAGO, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range)
+
+        self._roi_to_channel = self._roi_to_channel_valves
+
+        self._pulse_duration= pulse_duration
+
+    def _decide(self):
+        out, dic = super(mAGO, self)._decide()
+        dic["duration"] = self._pulse_duration
+        return out, dic
