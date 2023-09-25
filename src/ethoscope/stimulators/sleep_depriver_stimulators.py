@@ -468,7 +468,7 @@ class mAGO(SleepDepStimulator):
 
         # the inactive time depends on the chanel here
         super(mAGO, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range)
-
+        
         if stimulus_type == 2:
             self._roi_to_channel = self._roi_to_channel_valves
         elif stimulus_type == 1:
@@ -518,7 +518,7 @@ class AGO(SleepDepStimulator):
         self._t0 = None
 
         # the inactive time depends on the chanel here
-        super(mAGO, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range)
+        super(AGO, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range)
 
         self._roi_to_channel = self._roi_to_channel_valves
 
