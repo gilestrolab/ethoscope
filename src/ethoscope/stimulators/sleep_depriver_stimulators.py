@@ -525,6 +525,6 @@ class AGO(SleepDepStimulator):
         self._pulse_duration= pulse_duration
 
     def _decide(self):
-        out, dic = super(AGO, self)._decide()
+        out, dic = super()._decide()
         dic["duration"] = self._pulse_duration
         return out, dic
