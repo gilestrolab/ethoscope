@@ -501,8 +501,8 @@ class AGO(SleepDepStimulator):
 
     _HardwareInterfaceClass = OptoMotor
                             
-    _roi_to_channel_valves= {1:0, 2:2, 3:4, 4:6, 5:8,
-                            6:10, 7:12, 8:14, 9:16, 10:18}
+    _roi_to_channel_valves= {1:0, 2:10, 3:2, 4:12, 5:4,
+                            6:14, 7:6, 8:16, 9:8, 10:18}
 
 
     def __init__(self,
