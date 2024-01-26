@@ -494,6 +494,7 @@ class AGO(SleepDepStimulator):
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken(s)","default":120},
                                     {"type": "number", "min": 50, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
                                     {"type": "number", "min": 0.0, "max": 1.0, "step": 0.1, "name": "stimulus_probability",  "description": "Probability the stimulus will happen", "default": 1.0},
+                                    {"type": "number", "min" : 1, "max": 10000, "name" : "number_of_stimuli", "description" : "The number of stimulus to be given before no more are given", "default" : 10},
                                     {"type": "date_range", "name": "date_range",
                                      "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
                                      "default": ""}
@@ -511,11 +512,19 @@ class AGO(SleepDepStimulator):
                  min_inactive_time=120,  # s
                  pulse_duration = 1000,  #ms
                  stimulus_probability = 1.0,
+                 number_of_stimuli = 10,
                  date_range=""
                  ):
 
 
         self._t0 = None
+
+        self._number_of_stimuli = number_of_stimuli
+
+        self._count_roi_stim = {i:0 for i in range(1,11)}
+        
+        self._prob_dict = {i:stimulus_probability for i in range(1,11)}
+
 
         # the inactive time depends on the chanel here
         super(AGO, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range)
@@ -525,6 +534,39 @@ class AGO(SleepDepStimulator):
         self._pulse_duration= pulse_duration
 
     def _decide(self):
-        out, dic = super()._decide()
-        dic["duration"] = self._pulse_duration
-        return out, dic
+
+        roi_id = self._tracker._roi.idx
+        now = self._tracker.last_time_point
+
+        try:
+            channel = self._roi_to_channel[roi_id]
+        except KeyError:
+            return HasInteractedVariable(False), {}
+
+        has_moved = self._has_moved()
+
+        if self._t0 is None:
+            self._t0 = now
+
+        if self._count_roi_stim[roi_id] >= self._number_of_stimuli:
+            self._prob_dict[roi_id] = 0
+
+        if not has_moved:
+            if float(now - self._t0) > self._inactivity_time_threshold_ms:
+
+                if random.uniform(0,1) <= self._prob_dict[roi_id]:
+                    self._t0 = None
+
+                    # increase the count by one
+                    self._count_roi_stim[roi_id] += 1
+
+                    logging.info("real stimulation on channel %s" % channel)
+                    return HasInteractedVariable(1), {"channel":channel, "duration" : self._pulse_duration}
+                else:
+                    self._t0 = None
+                    logging.info("ghost stimulation on channel %s" % channel)
+                    return HasInteractedVariable(2), {}
+        else:
+            self._t0 = now
+
+        return HasInteractedVariable(0), {}
