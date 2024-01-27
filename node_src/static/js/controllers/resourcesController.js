@@ -1,8 +1,8 @@
 (function(){
     var resourcesController = function($scope, $http, $timeout, $routeParams, $window){
         
-        var resourcesURL = "https://lab.gilest.ro:8088/resources";
-        var newsURL = "https://lab.gilest.ro:8088/news";
+        var resourcesURL = "https://ethoscope-resources.lab.gilest.ro/resources";
+        var newsURL = "https://ethoscope-resources.lab.gilest.ro/news";
         $scope.resources = {};
         $scope.notifications = {};
         $scope.hasAccess = false;

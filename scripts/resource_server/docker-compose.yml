@@ -1,0 +1,19 @@
+version: '3'
+
+services:
+  ethoscope-resources:
+    image: ethoscope-resources
+    name: ethoscope-resources
+    restart: always
+    expose:
+      8080
+    volumes:
+      - ./volume:/opt/ethoscope-resources
+    environment:
+      - VIRTUAL_HOST=ethoscope-resources.lab.gilest.ro
+      - LETSENCRYPT_HOST=ethoscope-resources.lab.gilest.ro
+
+networks:
+  default:
+  name: nginx-proxy
+  external: true
