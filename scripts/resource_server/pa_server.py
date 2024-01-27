@@ -44,6 +44,10 @@ def enable_cors():
     bottle.response.headers['Access-Control-Allow-Headers'] = 'Origin, Accept, Content-Type, X-Requested-With, X-CSRF-Token'
 
 
+@app.get('/')
+def index():
+    return bottle.template('index_template', sd_image=sd_image, gcodes=gcodes, onshape=onshape, gcodes_zip=gcodes_zip, news=news)
+
 @app.get('/latest_sd_image')
 def forward_to_sd_image():
     return bottle.redirect(sd_image['url'], code=302)
@@ -52,15 +56,22 @@ def forward_to_sd_image():
 @app.get('/resources')
 def resources():
     client = bottle.request.environ.get('HTTP_X_FORWARDED_FOR') or bottle.request.environ.get('REMOTE_ADDR')
-    # make sure the OS has the host command apt-get install host
-    with os.popen("host %s" % client) as p:
-        resolve = p.read().split("pointer ")[1].strip()
-    
+
+    try:
+        with os.popen("host %s" % client) as p:
+            output = p.read()
+            if "pointer" in output:
+                resolve = output.split("pointer ")[1].strip()
+            else:
+                resolve = "DNS resolution failed"
+    except Exception as e:
+        resolve = f"Error during DNS resolution: {str(e)}"
 
     logging.info("%s - Receiving request from %s - %s" % (datetime.datetime.now(), client, resolve))
     
     bottle.response.content_type = 'application/json'
-    return json.dumps( {"sd_image" : sd_image, "gcodes" : gcodes, "onshape" : onshape, 'gcodes_zip' : gcodes_zip, 'date' : FILESDATE, 'version' : FILESVERSION} )
+    return json.dumps({"sd_image": sd_image, "gcodes": gcodes, "onshape": onshape, 'gcodes_zip': gcodes_zip, 'date': FILESDATE, 'version': FILESVERSION})
+
 
 @app.get('/news')
 def announcements():

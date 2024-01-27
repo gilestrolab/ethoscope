@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir bottle
 EXPOSE 8080
 
 # Run pa_server.py when the container launches
-CMD ["python", "pa_server.py", "--debug", "--port", "8080", "--log", "/opt/ethoscope_resources/", "--static", "/opt/ethoscope_resources"]
+CMD ["python", "pa_server.py", "--debug", "--port", "8080", "--log", "/opt/ethoscope_resources/contents/", "--static", "/opt/ethoscope_resources"]
 
 
 # docker build -t ethoscope-resources .
