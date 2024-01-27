@@ -3,9 +3,10 @@ FROM python:3
 
 # Clone the repository from GitHub
 RUN apt-get update && \
-    apt-get install -y git && \
+    apt-get install -y git host nano && \
     git clone https://github.com/gilestrolab/ethoscope.git /opt/ethoscope && \
-    git checkout dev &&
+    cd /opt/ethoscope && \
+    git checkout dev && \
     ln -s /opt/ethoscope/scripts/resource_server /opt/ethoscope_resources
 
 # Change to the script's directory
@@ -15,6 +16,7 @@ WORKDIR /opt/ethoscope_resources
 # Install any needed packages specified in requirements.txt
 # Uncomment the following line if there is a requirements.txt in the repository
 # RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir bottle
 
 # Make port 8080 available to the world outside this container
 EXPOSE 8080

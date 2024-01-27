@@ -10,8 +10,14 @@ FILESDATE = "2020-02-15"
 
 app = bottle.Bottle()
 
+links_file = "./contents/links.json"
+assert os.path.exists(links_file), f"File not found: {links_file}"
+
+news_file = "./contents/news.txt"
+assert os.path.exists(news_file), f"File not found: {news_file}"
+
 # Open and read the JSON file containing all the links
-with open("links.json", 'r') as file:
+with open(links_file, 'r') as file:
     links = json.load(file)
 
 sd_image = links['sd_image']
@@ -21,7 +27,7 @@ gcodes_zip = links['gcodes_zip']
 
 # Open and read the txt file with news
 news = []
-with open("news.txt", "r") as nf:
+with open(news_file, "r") as nf:
     for line in nf.readlines():
         if ";" in line:
             news.append ( {"content" : line.split(";")[1], "date": line.split(";")[0]} )
@@ -46,8 +52,10 @@ def forward_to_sd_image():
 @app.get('/resources')
 def resources():
     client = bottle.request.environ.get('HTTP_X_FORWARDED_FOR') or bottle.request.environ.get('REMOTE_ADDR')
+    # make sure the OS has the host command apt-get install host
     with os.popen("host %s" % client) as p:
         resolve = p.read().split("pointer ")[1].strip()
+    
 
     logging.info("%s - Receiving request from %s - %s" % (datetime.datetime.now(), client, resolve))
     
