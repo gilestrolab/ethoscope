@@ -5,6 +5,7 @@ FROM python:3
 RUN apt-get update && \
     apt-get install -y git && \
     git clone https://github.com/gilestrolab/ethoscope.git /opt/ethoscope && \
+    git checkout dev &&
     ln -s /opt/ethoscope/scripts/resource_server /opt/ethoscope_resources
 
 # Change to the script's directory

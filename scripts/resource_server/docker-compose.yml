@@ -3,10 +3,10 @@ version: '3'
 services:
   ethoscope-resources:
     image: ethoscope-resources
-    name: ethoscope-resources
+    container_name: ethoscope-resources
     restart: always
     expose:
-      8080
+      - 8080
     volumes:
       - ./volume:/opt/ethoscope-resources
     environment:
@@ -15,5 +15,5 @@ services:
 
 networks:
   default:
-  name: nginx-proxy
-  external: true
+    name: nginx-proxy
+    external: true
