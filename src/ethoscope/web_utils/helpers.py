@@ -323,10 +323,13 @@ def hasPiCamera():
     """
     # older versions had vcgencmd coming from raspberrypi-firmware and located in /opt/vc/bin
     # in newer versions, the command comes from raspberrypi-utils and it's in /usr/bin
-    vcgencmd_possible_locations = ['/usr/bin/vcgencmd', '/opt/vc/bin/vcgencmd']
+    # we try this for future compatibility even though we still have to use raspberrypi-firmware for now
+    # we get it from https://alaa.ad24.cz/packages/r/raspberrypi-firmware/raspberrypi-firmware-20231019-1-armv7h.pkg.tar.xz
+    vcgencmd_possible_locations = ['/opt/vc/bin/vcgencmd', '/usr/bin/vcgencmd']
     for loc in vcgencmd_possible_locations:
         if os.path.isfile(loc):
             vcgencmd = "%s get_camera" % loc
+            break
 
     if isMachinePI():
        with os.popen(vcgencmd) as cmd:
@@ -443,9 +446,20 @@ def get_core_temperature():
     """
     Returns the internal core temperature in degrees celsius
     """
+    # older versions had vcgencmd coming from raspberrypi-firmware and located in /opt/vc/bin
+    # in newer versions, the command comes from raspberrypi-utils and it's in /usr/bin
+    # we try this for future compatibility even though we still have to use raspberrypi-firmware for now
+    # we get it from https://alaa.ad24.cz/packages/r/raspberrypi-firmware/raspberrypi-firmware-20231019-1-armv7h.pkg.tar.xz
+
+    vcgencmd_possible_locations = ['/opt/vc/bin/vcgencmd', '/usr/bin/vcgencmd']
+    for loc in vcgencmd_possible_locations:
+        if os.path.isfile(loc):
+            vcgencmd = "%s measure_temp" % loc
+            break
+
     if isMachinePI():
         try:
-            with os.popen("/opt/vc/bin/vcgencmd measure_temp") as df:
+            with os.popen(vcgencmd) as df:
                 temp = float("".join(filter(lambda d: str.isdigit(d) or d == '.', df.read())))
             return temp
         except:
