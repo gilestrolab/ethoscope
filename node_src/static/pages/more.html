@@ -198,7 +198,7 @@
 <div ng-if="showOption == 'nodeCommands'" class="col-xs-12">
     <div>
         <h2>Custom commands</h2>
-        <p>These BASH commands can be manually specified from within the json configuration file in <code>/etc/ethoscope.conf</code> - this is potentially very dangerous so BE AWARE OF WHAT YOU ARE DOING</p>
+        <p>These BASH commands can be manually specified from within the json configuration file in <code>/etc/ethoscope/ethoscope.conf</code> - the commands are run as root meaning this is potentially very dangerous, so BE VERY AWARE OF WHAT YOU ARE DOING</p>
             <ul class="list-group col-xs-12">
                 <li class="list-group-item input" ng-repeat="(name, cmd) in commands">
                         <button class="btn btn-info" data-toggle="modal" data-target="#commandOutput" ng-click="nodeManagement.exec_cmd(name)" title={{cmd.description}} style="width: 260px; bg-color: gray;">{{cmd.name}} <i class="fa fa-lg fa-terminal" style="display: inline; float:right; margin-top: 8px;"></i> </button>

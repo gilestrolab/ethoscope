@@ -5,6 +5,31 @@ users_keys = ['name', 'fullname', 'PIN', 'email', 'telephone',  'group', 'active
 incubators_keys = ['id', 'name', 'location', 'owner', 'description']
 
 
+def migrate_conf_file(file_path, destination = '/etc/ethoscope/'):
+    '''
+    On Jan 30, 2024 we moved the configuration files to their own folder in /etc/ethoscope/ so that they could be mounted
+    as volumes when using the node in a docker container. We need to migrate the files during the first update
+    '''
+    
+    # Check if the file exists and move it if it does
+    if os.path.isfile(file_path):
+        logging.info(f"File {file_path} exists.")
+        import shutil
+
+        # Check if the directory exists, and if not, create it
+        if not os.path.exists(destination):
+            os.makedirs(destination)
+            logging.info(f"Directory {destination} created.")
+
+        # Construct the new file path
+        new_file_path = os.path.join(destination, os.path.basename(file_path))
+
+        # Move the file
+        shutil.move(file_path, new_file_path)
+        logging.info(f"File moved to {new_file_path}.")
+
+
+
 class EthoscopeConfiguration(object):
     '''
     Handles the ethoscope configuration parameters
@@ -32,9 +57,37 @@ class EthoscopeConfiguration(object):
                         }
                 }
 
-    def __init__(self, config_file = "/etc/ethoscope.conf"):
+    def __init__(self, config_file = "/etc/ethoscope/ethoscope.conf"):
+        migrate_conf_file('/etc/ethoscope.conf')
         self._config_file = config_file
         self.load()
+
+    def _migrate_configuration_file(self):
+        '''
+        On Jan 30, 2024 we moved the configuration files to their own folder in /etc/ethoscope/ so that they could be mounted
+        as volumes when using the node in a docker container. We need to migrate the files during the first update
+        '''
+        # Define the file and directory paths
+        file_path = '/etc/ethoscope.conf'
+        directory_path = '/etc/ethoscope/'
+
+        # Check if the file exists
+        if os.path.isfile(file_path):
+            logging.info(f"File {file_path} exists.")
+            import shutil
+
+            # Check if the directory exists, and if not, create it
+            if not os.path.exists(directory_path):
+                os.makedirs(directory_path)
+                logging.info(f"Directory {directory_path} created.")
+
+            # Construct the new file path
+            new_file_path = os.path.join(directory_path, os.path.basename(file_path))
+
+            # Move the file
+            shutil.move(file_path, new_file_path)
+            logging.info(f"File moved to {new_file_path}.")
+
 
     def addSection(self, section):
         if section not in self._settings:
