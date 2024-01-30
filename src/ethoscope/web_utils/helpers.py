@@ -321,13 +321,20 @@ def hasPiCamera():
     'supported=1 detected=0, libcamera interfaces=0'
 
     """
+    # older versions had vcgencmd coming from raspberrypi-firmware and located in /opt/vc/bin
+    # in newer versions, the command comes from raspberrypi-utils and it's in /usr/bin
+    vcgencmd_possible_locations = ['/usr/bin/vcgencmd', '/opt/vc/bin/vcgencmd']
+    for loc in vcgencmd_possible_locations:
+        if os.path.isfile(loc):
+            vcgencmd = "%s get_camera" % loc
+
     if isMachinePI():
-       with os.popen('/opt/vc/bin/vcgencmd get_camera') as cmd:
+       with os.popen(vcgencmd) as cmd:
            out_cmd = cmd.read().strip()
        out = dict(x.split('=') for x in out_cmd.split(',')[0].split(' '))
        return out["detected"] == out["supported"] == "1"
     else:
-        return False
+       return False
         
 def getPiCameraVersion():
     """

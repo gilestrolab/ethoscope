@@ -25,4 +25,4 @@ EXPOSE 8080
 CMD ["python", "pa_server.py", "--debug", "--port", "8080", "--log", "/opt/ethoscope_resources/contents/", "--static", "/opt/ethoscope_resources"]
 
 
-# docker build -t ethoscope-resources .
+# docker build -t ethoscope-resources . --no-cache
