@@ -1,15 +1,37 @@
 version: '3.8'
 
+volumes:
+  ethoscope-git:  # Named volume for the Git repository
+
 services:
   ethoscope-node:
     build: .
     image: ethoscope-node
     container_name: ethoscope-node
+    restart: always
     volumes:
-# data and configurations
       - /mnt/ethoscope_data:/ethoscope_data
       - ./etc-ethoscope:/etc/ethoscope/
-# optional line to mount your local git instance. Useful for development
-#      - /home/gg/Data/ethoscope_project/ethoscope:/opt/ethoscope-node:ro
-# we need to get an IP from the host subnet if we want the container to be able to see the ethoscopes
+      - ethoscope-git:/srv/git/ethoscope.git
+      - /home/gg/Data/ethoscope_project/ethoscope:/opt/ethoscope-node:ro
     network_mode: host
+
+  vsftpd:
+    image: metabrainz/docker-anon-ftp
+    container_name: ethoscope-vsftpd
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      MAX_CLIENTS: "3"
+      MAX_PER_IP: "2"
+      FTPD_BANNER: "Welcome to the public ethoscope data FTP server of the Gilestro lab"
+    volumes:
+      - /mnt/ethoscope_data:/var/ftp:ro
+
+#  git-daemon:
+#    image: jkarlos/git-server-docker
+#    container_name: ethoscope-git-daemon
+#    restart: unless-stopped
+#    network_mode: host
+#    volumes:
+#      - ethoscope-git:/git-server/repos

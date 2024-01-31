@@ -296,12 +296,20 @@
             <!-- <p class="log" ng-repeat="(key,entry) in daemons | toArray |orderBy: 'key'">{{key}}: {{entry}}</p></pre> -->
 
             <li class="list-group-item" ng-repeat="(key, entry) in daemons">
-                <label class="toggle-check">{{key}}
-                  <input type="checkbox" class="toggle-check-input" ng-model="isActive" ng-checked="entry.active == 'active'" ng-click="nodeManagement.toggleDaemon(key, isActive != undefined ? isActive : entry.active == 'inactive')" >
-                  <span class="toggle-check-text"></span>
-                </label>
-                <p>{{entry.description}}</p>
-                <!-- <input type=text value={{entry.exec}}> -->
+
+              <span ng-if="entry.not_available">
+                  <label>{{key}}
+                      <i class="fas fa-ban not-available-icon fa-2x" title="Currently not available in a Dockerised instance."></i>
+                  </label>
+              </span>
+
+              <span ng-if="!entry.not_available">
+                  <label class="toggle-check">{{key}}
+                      <input type="checkbox" class="toggle-check-input" ng-model="isActive" ng-checked="entry.active == 'active'" ng-click="nodeManagement.toggleDaemon(key, isActive != undefined ? isActive : entry.active == 'inactive')">
+                      <span class="toggle-check-text"></span>
+                  </label>
+                  <p>{{entry.description}}</p>
+              </span>
             </li>
         </ul>
         <ul class="list-group col-xs-12">

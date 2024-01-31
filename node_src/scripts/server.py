@@ -23,14 +23,14 @@ app = bottle.Bottle()
 STATIC_DIR = "../static"
 
 #names of the backup services
-SYSTEM_DAEMONS = {"ethoscope_backup" : {'description' : 'The service that collects data from the ethoscopes and syncs them with the node.'}, 
-                  "ethoscope_video_backup" : {'description' : 'The service that collects VIDEOs from the ethoscopes and syncs them with the node'}, 
-                  "ethoscope_update_node" : {'description' : 'The service used to update the nodes and the ethoscopes.'},
-                  "git-daemon.socket" : {'description' : 'The GIT server that handles git updates for the node and ethoscopes.'},
-                  "ntpd" : {'description': 'The NTPd service is syncing time with the ethoscopes.'},
-                  "sshd" : {'description': 'The SSH daemon allows power users to access the node terminal from remote.'},
-                  "vsftpd" : {'description' : 'The FTP server on the node, used to access the local ethoscope data'},
-                  "virtuascope" : {'description' : 'A virtual ethoscope running on the node. Useful for offline tracking'}
+SYSTEM_DAEMONS = {"ethoscope_backup" : {'description' : 'The service that collects data from the ethoscopes and syncs them with the node.', 'available_on_docker' : True}, 
+                  "ethoscope_video_backup" : {'description' : 'The service that collects VIDEOs from the ethoscopes and syncs them with the node', 'available_on_docker' : True}, 
+                  "ethoscope_update_node" : {'description' : 'The service used to update the nodes and the ethoscopes.', 'available_on_docker' : True},
+                  "git-daemon.socket" : {'description' : 'The GIT server that handles git updates for the node and ethoscopes.', 'available_on_docker' : False},
+                  "ntpd" : {'description': 'The NTPd service is syncing time with the ethoscopes.', 'available_on_docker' : True},
+                  "sshd" : {'description': 'The SSH daemon allows power users to access the node terminal from remote.', 'available_on_docker' : False},
+                  "vsftpd" : {'description' : 'The FTP server on the node, used to access the local ethoscope data', 'available_on_docker' : False},
+                  "virtuascope" : {'description' : 'A virtual ethoscope running on the node. Useful for offline tracking', 'available_on_docker' : False}
                   }
 
 
@@ -484,7 +484,12 @@ def node_info(req):#, device):
         for daemon_name in SYSTEM_DAEMONS.keys():
         
             with os.popen(f"{SYSTEMCTL} is-active {daemon_name}") as df:
-                SYSTEM_DAEMONS[daemon_name]['active'] = df.read().strip()
+                is_active = df.read().strip()
+                is_not_available_on_docker = not SYSTEM_DAEMONS[daemon_name]["available_on_docker"]
+
+                SYSTEM_DAEMONS[daemon_name].update( { 'active'    : is_active, 
+                                                      'not_available' : (IS_DOCKERIZED and is_not_available_on_docker)
+                                                    } )
         
         return SYSTEM_DAEMONS
 
@@ -672,7 +677,8 @@ if __name__ == '__main__':
     # Check if we are inside a docker container. 
     # If we are, we are not using systemctl to handle processes
     # but docker-systemctl-replacement
-    if os.path.exists('/.dockerenv'):
+    IS_DOCKERIZED = os.path.exists('/.dockerenv')
+    if IS_DOCKERIZED:
         SYSTEMCTL = "/usr/bin/systemctl.py"
     else:
         SYSTEMCTL = "/usr/bin/systemctl"

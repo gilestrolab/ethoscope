@@ -162,3 +162,10 @@
   input:checked + .slider.blue {
 	background-color: #424bf5;
   }
+
+
+  .not-available-icon {
+    color: grey; /* Set the color to grey */
+    float: right; /* Align the icon to the right */
+    margin-left: 10px; /* Add some space between the text and the icon */
+  }
