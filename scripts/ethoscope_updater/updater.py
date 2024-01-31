@@ -99,6 +99,7 @@ class BareRepoUpdater(object):
     Hidden branches can be unlocked bu developers.
     """
     def __init__(self,git_working_dir):
+        logging.info(f"Using git repo at {git_working_dir}")
         self._git_working_dir = git_working_dir
         self._working_repo = Repo(git_working_dir)
         self._origin = self._working_repo.remotes.origin
@@ -148,23 +149,14 @@ class BareRepoUpdater(object):
 
         return self.update_all_visible_branches()
 
+if __name__ == '__main__':
 
 
-# #This works, but mind root permission
-# bare_updater = BareRepoUpdater("/srv/git/dummy_repo_bare.git")
-# print bare_updater._working_repo.branches
-# bare_updater.discover_branches()
-# bare_updater.update_all_visible_branches()
-#
-#
-#
-# #
-# updater = DeviceUpdater("/tmp/dummy_repo")
-# active_branch = updater.active_branch()
-# print updater._origin.refs[str(active_branch)].commit
+    #bare_updater = BareRepoUpdater("/srv/git/ethoscope.git")
+    #print (bare_updater._working_repo.branches)
+    #bare_updater.discover_branches()
+    #bare_updater.update_all_visible_branches()
 
-
-#print updater.available_branches()
-#updater.change_branch("another_branch")
-#updater.update_active_branch()
-# #
+    device_updater = DeviceUpdater("/opt/ethoscope-node")
+    active_branch = device_updater.active_branch()
+    print (device_updater._origin.refs[str(active_branch)].commit)

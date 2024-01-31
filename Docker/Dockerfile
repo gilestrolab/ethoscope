@@ -29,6 +29,7 @@ RUN yay -S --noconfirm docker-systemctl-replacement-git
 
 # Install ethoscope-node from AUR
 RUN yay -S --noconfirm ethoscope-node
+RUN git config --global --add safe.directory /srv/git/ethoscope.git
 
 # Clean up packages
 RUN sudo pacman -Scc --noconfirm

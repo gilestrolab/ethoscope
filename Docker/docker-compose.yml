@@ -1,8 +1,5 @@
 version: '3.8'
 
-volumes:
-  ethoscope-git:  # Named volume for the Git repository
-
 services:
   ethoscope-node:
     build: .
@@ -11,14 +8,15 @@ services:
     restart: always
     volumes:
       - /mnt/ethoscope_data:/ethoscope_data
-      - ./etc-ethoscope:/etc/ethoscope/
-      - ethoscope-git:/srv/git/ethoscope.git
-      - /home/gg/Data/ethoscope_project/ethoscope:/opt/ethoscope-node:ro
+      - ./etc-ethoscope:/etc/ethoscope
+      #- /home/gg/Data/ethoscope_project/ethoscope:/opt/ethoscope-node:ro
     network_mode: host
 
   vsftpd:
     image: metabrainz/docker-anon-ftp
     container_name: ethoscope-vsftpd
+    depends_on:
+      - ethoscope-node
     restart: unless-stopped
     network_mode: host
     environment:
@@ -27,11 +25,3 @@ services:
       FTPD_BANNER: "Welcome to the public ethoscope data FTP server of the Gilestro lab"
     volumes:
       - /mnt/ethoscope_data:/var/ftp:ro
-
-#  git-daemon:
-#    image: jkarlos/git-server-docker
-#    container_name: ethoscope-git-daemon
-#    restart: unless-stopped
-#    network_mode: host
-#    volumes:
-#      - ethoscope-git:/git-server/repos
