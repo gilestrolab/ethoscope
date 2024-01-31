@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  ethoscope-node:
+    build: .
+    image: ethoscope-node
+    container_name: ethoscope-node
+    volumes:
+# data and configurations
+      - /mnt/ethoscope_data:/ethoscope_data
+      - ./etc-ethoscope:/etc/ethoscope/
+# optional line to mount your local git instance. Useful for development
+#      - /home/gg/Data/ethoscope_project/ethoscope:/opt/ethoscope-node:ro
+# we need to get an IP from the host subnet if we want the container to be able to see the ethoscopes
+    network_mode: host

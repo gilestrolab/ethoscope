@@ -421,6 +421,7 @@ def download(what):
 @app.get('/node/<req>')
 @error_decorator
 def node_info(req):#, device):
+
     if req == 'info':
        
         try:
@@ -456,7 +457,7 @@ def node_info(req):#, device):
             NEEDS_UPDATE = df.read() != ""
         
         try:
-            with os.popen('systemctl status ethoscope_node.service') as df:
+            with os.popen(f'{systemctl} status ethoscope_node.service') as df:
                 ACTIVE_SINCE = df.read().split("\n")[2] 
         except: 
             ACTIVE_SINCE = "N/A. Probably not running through systemd"
@@ -479,11 +480,12 @@ def node_info(req):#, device):
         return {'log': l}
     
     elif req == 'daemons':
-        #returns active or inactive
+
         for daemon_name in SYSTEM_DAEMONS.keys():
         
-            with os.popen("systemctl is-active %s" % daemon_name) as df:
+            with os.popen(f"{SYSTEMCTL} is-active {daemon_name}") as df:
                 SYSTEM_DAEMONS[daemon_name]['active'] = df.read().strip()
+        
         return SYSTEM_DAEMONS
 
     elif req == 'folders':
@@ -511,7 +513,7 @@ def node_actions():
     
     if action['action'] == 'restart':
         logging.info('User requested a service restart.')
-        with os.popen("sleep 1; systemctl restart ethoscope_node.service") as po:
+        with os.popen(f"sleep 1; {SYSTEMCTL} restart ethoscope_node.service") as po:
             r = po.read()
         
         return r
@@ -560,11 +562,11 @@ def node_actions():
     elif action['action'] == 'toggledaemon':
 
         if action['status'] == True:
-            cmd = "systemctl start %s" % action['daemon_name']
+            cmd = f"{SYSTEMCTL} start %s" % action['daemon_name']
             logging.info ("Starting daemon %s" % action['daemon_name'])
             
         elif  action['status'] == False:
-            cmd = "systemctl stop %s" % action['daemon_name']
+            cmd = f"{SYSTEMCTL} stop %s" % action['daemon_name']
             logging.info ("Stopping daemon %s" % action['daemon_name'])
             
         with os.popen(cmd) as po:
@@ -666,7 +668,15 @@ if __name__ == '__main__':
         logging.info("Logging using DEBUG SETTINGS")
 
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
-    
+
+    # Check if we are inside a docker container. 
+    # If we are, we are not using systemctl to handle processes
+    # but docker-systemctl-replacement
+    if os.path.exists('/.dockerenv'):
+        SYSTEMCTL = "/usr/bin/systemctl.py"
+    else:
+        SYSTEMCTL = "/usr/bin/systemctl"
+
     try:
         device_scanner = EthoscopeScanner(results_dir=RESULTS_DIR)
         device_scanner.start()
