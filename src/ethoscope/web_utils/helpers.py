@@ -20,25 +20,44 @@ def pi_version():
     
     We used to use cat /proc/cpuinfo but as of the 4.9 kernel, all Pis report BCM2835, even those with BCM2836, BCM2837 and BCM2711 processors. 
     You should not use this string to detect the processor. Decode the revision code using the information in the URL above, or simply cat /sys/firmware/devicetree/base/model
+
+    PI 1 Raspberry Pi Model B Plus Rev 1.2
+    PI 2 Raspberry Pi 2 Model B Rev 1.1
+    PI 3 Raspberry Pi 3 Model B Rev 1.2
+    PI 4 Raspberry Pi 4 Model B Rev 1.5
+
     """
     
-    info_file = '/sys/firmware/devicetree/base/model'
-    
-    if os.path.exists(info_file):
-    
-        with open (info_file, 'r') as revision_input:
-            revision_info = revision_input.read().rstrip('\x00')
-    
-        return revision_info
-        
-    else:
-        return 0
+    try:
+        with open('/sys/firmware/devicetree/base/model', 'r') as file:
+            model_info = file.read().strip()
 
-def isMachinePI():
+        match = re.search(r'Raspberry Pi (\d+)([A-Za-z ]+)', model_info)
+        if match:
+            model_number = int(match.group(1))
+            model_type = match.group(2).strip()
+        else:
+            model_number = None
+            model_type = None
+
+        # Return the information as a dictionary
+        return {'model_number': model_number, 'model_type': model_type}
+    
+    except Exception as e:
+        return {'model_number': 0, 'model_type': None}
+        #return {'error': str(e)}
+
+def isMachinePI(version=None):
     """
     Return True if we are running on a Pi - proper ethoscope
     """
-    return pi_version() != 0
+    pi_ver = pi_version()['model_number']
+
+    if not version:
+        return pi_ver > 0
+    else:
+        return (pi_ver == int(version))
+
 
 def get_machine_name(path="/etc/machine-name"):
     """
@@ -317,27 +336,42 @@ def hasPiCamera():
     """
     return True if a piCamera is supported and detected
 
-    'supported=1 detected=1'
-    'supported=1 detected=0, libcamera interfaces=0'
+    In PI3 with libcamera support we can use vcgencmd which outputs something like this:
+    'supported=1 detected=1, libcamera interfaces=1'
+    'supported=1 detected=0, libcamera interfaces=1'
+
+    With PI4, however, we need to use libcamera-hello which has the following output
 
     """
-    # older versions had vcgencmd coming from raspberrypi-firmware and located in /opt/vc/bin
-    # in newer versions, the command comes from raspberrypi-utils and it's in /usr/bin
-    # we try this for future compatibility even though we still have to use raspberrypi-firmware for now
-    # we get it from https://alaa.ad24.cz/packages/r/raspberrypi-firmware/raspberrypi-firmware-20231019-1-armv7h.pkg.tar.xz
-    vcgencmd_possible_locations = ['/opt/vc/bin/vcgencmd', '/usr/bin/vcgencmd']
-    for loc in vcgencmd_possible_locations:
-        if os.path.isfile(loc):
-            vcgencmd = "%s get_camera" % loc
-            break
+    if not isMachinePI():
+        return False
 
-    if isMachinePI():
-       with os.popen(vcgencmd) as cmd:
-           out_cmd = cmd.read().strip()
-       out = dict(x.split('=') for x in out_cmd.split(',')[0].split(' '))
-       return out["detected"] == out["supported"] == "1"
-    else:
-       return False
+    if isMachinePI(2) or isMachinePI(3):
+
+        # older versions had vcgencmd coming from raspberrypi-firmware and located in /opt/vc/bin
+        # in newer versions, the command comes from raspberrypi-utils and it's in /usr/bin
+        # we try this for future compatibility even though we still have to use raspberrypi-firmware for now
+        # we get it from https://alaa.ad24.cz/packages/r/raspberrypi-firmware/raspberrypi-firmware-20231019-1-armv7h.pkg.tar.xz
+        vcgencmd_possible_locations = ['/opt/vc/bin/vcgencmd', '/usr/bin/vcgencmd']
+        for loc in vcgencmd_possible_locations:
+            if os.path.isfile(loc):
+                vcgencmd = "%s get_camera" % loc
+                break
+
+        with os.popen(vcgencmd) as cmd:
+            out_cmd = cmd.read().strip()
+        out = dict(x.split('=') for x in out_cmd.split(',')[0].split(' '))
+        return out["detected"] == out["supported"] == "1"
+
+    if isMachinePI(4):
+        with os.popen("libcamera-hello --list-cameras") as cmd:
+            out_cmd = cmd.read()
+        match = re.search(r'\d+ : (\w+)', out_cmd)
+        if match:
+            return match.group(1)
+        else:
+            return False
+
         
 def getPiCameraVersion():
     """

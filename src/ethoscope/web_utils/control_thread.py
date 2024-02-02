@@ -396,7 +396,6 @@ class ControlThread(Thread):
         """
         CameraClass = self._option_dict["camera"]["class"]
         camera_kwargs = self._option_dict["camera"]["kwargs"]
-
         ROIBuilderClass = self._option_dict["roi_builder"]["class"]
         roi_builder_kwargs = self._option_dict["roi_builder"]["kwargs"]
 

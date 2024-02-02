@@ -20,6 +20,7 @@ from threading import Thread
 import bottle
 
 import socket
+import netifaces as ni
 from zeroconf import ServiceInfo, Zeroconf
 
 from ethoclient import send_command, listenerIsAlive
@@ -485,6 +486,15 @@ def get_log(id, n_lines=200):
 def close(exit_status=0):
     os._exit(exit_status)
 
+def get_ip_address(interface_name='eth0'):
+    try:
+        interface_addresses = ni.ifaddresses(interface_name)
+        ip_address = interface_addresses[ni.AF_INET][0]['addr']
+        return ip_address
+    except (ValueError, KeyError):
+        return False
+
+
 if __name__ == '__main__':
 
     parser = OptionParser()
@@ -539,7 +549,7 @@ if __name__ == '__main__':
         while ip_address is None and ip_attempts < 60:
 
             try:
-                ip_address = socket.gethostbyname(hostname)
+                ip_address = get_ip_address("eth0")
             except:
                 pass
 
