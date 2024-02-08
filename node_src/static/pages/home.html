@@ -242,7 +242,7 @@
                     <span ng-if="device.experimental_info.location != ''">{{device.experimental_info.location}}</span>
                     <span ng-if="device.previous_location != '' && device.status == 'stopped'" style="color:grey;">{{device.previous_location}}</span>
                 <td>
-                    <span ng-if="device.status == 'offline'" title="Last known IP: {{device.ip}}">offline</span>
+                    <span ng-if="device.status == 'offline'" title="Last known IP: {{device.ip}}" style="color: grey;">{{device.ip}}</span>
                     <span ng-if="device.status != 'offline'" title="pinged: {{device.ping}} times">{{device.ip}}</span>
                 </td>
                 <td title="{{device.id}}">{{device.id.substring(0,6)}}</td>
