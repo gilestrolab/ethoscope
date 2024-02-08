@@ -486,13 +486,27 @@ def get_log(id, n_lines=200):
 def close(exit_status=0):
     os._exit(exit_status)
 
-def get_ip_address(interface_name='eth0'):
+def get_ip_address(interface_name='wlan0'):
     try:
         interface_addresses = ni.ifaddresses(interface_name)
         ip_address = interface_addresses[ni.AF_INET][0]['addr']
         return ip_address
     except (ValueError, KeyError):
         return False
+
+def get_main_ip_address():
+    for interface in ni.interfaces():
+        addresses = ni.ifaddresses(interface)
+        try:
+            # Attempt to get the IPv4 address of the current interface
+            ipv4_info = addresses[ni.AF_INET][0]
+            ip_address = ipv4_info['addr']
+            if not ip_address.startswith("127.0"):
+                return ip_address
+        except KeyError:
+            # No IPv4 address found for this interface
+            pass
+    return None
 
 
 if __name__ == '__main__':
@@ -549,7 +563,7 @@ if __name__ == '__main__':
         while ip_address is None and ip_attempts < 60:
 
             try:
-                ip_address = get_ip_address("eth0")
+                ip_address = get_main_ip_address()
             except:
                 pass
 
