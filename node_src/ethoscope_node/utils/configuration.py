@@ -152,6 +152,14 @@ class EthoscopeConfiguration(object):
         '''
         Save settings to default json file
         '''
+        # Extract the directory path
+        config_dir = os.path.dirname(self._config_file)
+
+        # Check if the directory exists, and create it if it does not
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir)
+            logging.info(f"Directory '{config_dir}' did not exist and was created.")
+
         try:
             with open(self._config_file, 'w') as json_data_file:
                 json.dump(self._settings, json_data_file, indent=4, sort_keys=True)
