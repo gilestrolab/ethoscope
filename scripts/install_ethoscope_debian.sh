@@ -100,11 +100,11 @@ if [ -f "/etc/os-release" ]; then
     fi
 fi
 
-echo '[server]' > ${MYCNF}
-echo 'log-bin=mysql-bin' >> ${MYCNF}
-echo 'binlog_format=mixed' >> ${MYCNF}
-echo 'expire_logs_days = 10' >> ${MYCNF}
-echo 'max_binlog_size  = 100M' >> ${MYCNF}
+echo '[server]' > "$MYCNF"
+echo 'log-bin=mysql-bin' >> "$MYCNF"
+echo 'binlog_format=mixed' >> "$MYCNF"
+echo 'expire_logs_days = 10' >> "$MYCNF"
+echo 'max_binlog_size  = 100M' >> "$MYCNF"
 
 echo "limiting journal log space"
 echo 'SystemMaxUse=250MB' >> /etc/systemd/journald.conf
@@ -124,13 +124,13 @@ if [[ "$revision" == "a01041" || "$revision" == "a21041" || "$revision" == "a220
       "$revision" == "a020d3" ]]; then
     echo "This script is running on a Raspberry Pi 2 or 3."
     echo "install picamera settings into the boot/config.txt"
-    echo 'start_file=start_x.elf' > ${BOOTCFG}
-    echo 'fixup_file=fixup_x.dat' >> ${BOOTCFG}
-    echo 'disable_camera_led=1' >> ${BOOTCFG}
-    echo 'gpu_mem=256' >> ${BOOTCFG}
-    echo 'cma_lwm=' >> ${BOOTCFG}
-    echo 'cma_hwm=' >> ${BOOTCFG}
-    echo 'cma_offline_start=' >> ${BOOTCFG}
+    echo 'start_file=start_x.elf' > "$BOOTCFG"
+    echo 'fixup_file=fixup_x.dat' >> "$BOOTCFG"
+    echo 'disable_camera_led=1' >> "$BOOTCFG"
+    echo 'gpu_mem=256' >> "$BOOTCFG"
+    echo 'cma_lwm=' >> "$BOOTCFG"
+    echo 'cma_hwm=' >> "$BOOTCFG"
+    echo 'cma_offline_start=' >> "$BOOTCFG"
 
     # https://github.com/raspberrypi/firmware/issues/1167
     echo 'awb_auto_is_greyworld=1' >> /boot/config.txt
@@ -145,13 +145,13 @@ echo "en_GB.UTF-8 UTF-8" >> /etc/locale.gen
 locale-gen
 
 echo "disable bluetooth"
-echo 'dtoverlay=pi3-disable-bt' >> ${BOOTCFG}
+echo 'dtoverlay=disable-bt' >> "$BOOTCFG"
 
-echo 'hdmi_force_hotplug=1' >> ${BOOTCFG}
+echo 'hdmi_force_hotplug=1' >> "$BOOTCFG"
 
 #https://madflex.de/use-i2c-on-raspberry-pi-with-archlinux-arm/
 echo "adding support to I2C"
-echo 'dtparam=i2c_arm=on' >> ${BOOTCFG}
+echo 'dtparam=i2c_arm=on' >> "$BOOTCFG"
 echo 'i2c-dev' >> /etc/modules-load.d/raspberrypi.conf
 
 echo "Please reboot this PI now."
