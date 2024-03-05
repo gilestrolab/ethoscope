@@ -90,7 +90,7 @@ if [ -f "/etc/os-release" ]; then
     . /etc/os-release
     
     # Check if running on Raspbian
-    if [[ "$ID" == "raspbian" || "$ID_LIKE" == "debian" ]]; then
+    if [[ "$ID" == "debian" ]]; then
         MYCNF="/etc/mysql/mariadb.conf.d/ethoscope.cnf"
         BOOTCFG="/boot/firmware/config.txt"
     # Check if running on Arch Linux
