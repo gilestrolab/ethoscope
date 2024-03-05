@@ -512,7 +512,7 @@ class AGO(SleepDepStimulator):
                  min_inactive_time=120,  # s
                  pulse_duration = 1000,  #ms
                  stimulus_probability = 1.0,
-                 number_of_stimuli = 10,
+                 number_of_stimuli = 0,
                  date_range=""
                  ):
 
