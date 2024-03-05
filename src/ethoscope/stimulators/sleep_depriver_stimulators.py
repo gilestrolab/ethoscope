@@ -494,7 +494,7 @@ class AGO(SleepDepStimulator):
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken(s)","default":120},
                                     {"type": "number", "min": 50, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
                                     {"type": "number", "min": 0.0, "max": 1.0, "step": 0.1, "name": "stimulus_probability",  "description": "Probability the stimulus will happen", "default": 1.0},
-                                    {"type": "number", "min" : 1, "max": 10000, "name" : "number_of_stimuli", "description" : "The number of stimulus to be given before no more are given", "default" : 10},
+                                    {"type": "number", "min" : 0, "max": 10000, "name" : "number_of_stimuli", "description" : "The number of stimulus to be given before no more are given. 0 means unlimited.", "default" : 0},
                                     {"type": "date_range", "name": "date_range",
                                      "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
                                      "default": ""}
@@ -548,7 +548,7 @@ class AGO(SleepDepStimulator):
         if self._t0 is None:
             self._t0 = now
 
-        if self._count_roi_stim[roi_id] >= self._number_of_stimuli:
+        if self._number_of_stimuli > 0 and self._count_roi_stim[roi_id] >= self._number_of_stimuli:
             self._prob_dict[roi_id] = 0
 
         if not has_moved:
