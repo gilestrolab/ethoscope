@@ -521,11 +521,11 @@ class AGO(SleepDepStimulator):
 
         self._number_of_stimuli = int(number_of_stimuli)
 
-        self._stim_prob = int(stimulus_probability)
+        self._stim_prob = stimulus_probability
 
         self._count_roi_stim = {i:0 for i in range(1,11)}
         
-        self._prob_dict = {i:int(stimulus_probability) for i in range(1,11)}
+        self._prob_dict = {i:stimulus_probability for i in range(1,11)}
 
 
         # the inactive time depends on the chanel here
@@ -550,7 +550,7 @@ class AGO(SleepDepStimulator):
         if self._t0 is None:
             self._t0 = now
 
-        if self._number_of_stimuli > 0 and self._count_roi_stim[roi_id] >= self._number_of_stimuli:            
+        if self._number_of_stimuli != 0 and self._count_roi_stim[roi_id] >= self._number_of_stimuli:            
             self._prob_dict[roi_id] = 0
 
         if not has_moved:
