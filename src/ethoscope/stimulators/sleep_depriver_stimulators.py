@@ -490,7 +490,7 @@ class AGO(SleepDepStimulator):
     
     _description = {"overview": "A stimulator to send an odour puff to an AGO setup with only 10 ROIs. The valve channels are the same as the mAGO",
                     "arguments": [
-                        {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_correction_coef", "description": "Velocity correction coef", "default": 3.0e-3},
+                        {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_correction_coef", "description": "Velocity correction coef", "default": 1.5e-3},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken(s)","default":120},
                                     {"type": "number", "min": 50, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
                                     {"type": "number", "min": 0.0, "max": 1.0, "step": 0.1, "name": "stimulus_probability",  "description": "Probability the stimulus will happen", "default": 1.0},
@@ -521,6 +521,8 @@ class AGO(SleepDepStimulator):
 
         self._number_of_stimuli = number_of_stimuli
 
+        self._stim_prob = stimulus_probability
+
         self._count_roi_stim = {i:0 for i in range(1,11)}
         
         self._prob_dict = {i:stimulus_probability for i in range(1,11)}
@@ -548,25 +550,46 @@ class AGO(SleepDepStimulator):
         if self._t0 is None:
             self._t0 = now
 
-        if self._number_of_stimuli > 0 and self._count_roi_stim[roi_id] >= self._number_of_stimuli:
-            self._prob_dict[roi_id] = 0
+        if self._number_of_stimuli == 0:
 
-        if not has_moved:
-            if float(now - self._t0) > self._inactivity_time_threshold_ms:
+            if not has_moved:
+                if float(now - self._t0) > self._inactivity_time_threshold_ms:
 
-                if random.uniform(0,1) <= self._prob_dict[roi_id]:
-                    self._t0 = None
+                    if random.uniform(0,1) <= self._stim_prob:
+                        self._t0 = None
 
-                    # increase the count by one
-                    self._count_roi_stim[roi_id] += 1
+                        logging.info("real stimulation on channel %s" % channel)
+                        return HasInteractedVariable(1), {"channel":channel, "duration" : self._pulse_duration}
+                    else:
+                        self._t0 = None
+                        logging.info("ghost stimulation on channel %s" % channel)
+                        return HasInteractedVariable(2), {}
+            else:
+                self._t0 = now
 
-                    logging.info("real stimulation on channel %s" % channel)
-                    return HasInteractedVariable(1), {"channel":channel, "duration" : self._pulse_duration}
-                else:
-                    self._t0 = None
-                    logging.info("ghost stimulation on channel %s" % channel)
-                    return HasInteractedVariable(2), {}
+            return HasInteractedVariable(0), {}
+
         else:
-            self._t0 = now
 
-        return HasInteractedVariable(0), {}
+            if self._count_roi_stim[roi_id] >= self._number_of_stimuli:
+                self._prob_dict[roi_id] = 0
+
+            if not has_moved:
+                if float(now - self._t0) > self._inactivity_time_threshold_ms:
+
+                    if random.uniform(0,1) <= self._prob_dict[roi_id]:
+                        self._t0 = None
+
+                        # increase the count by one
+                        self._count_roi_stim[roi_id] += 1
+
+                        logging.info("real stimulation on channel %s" % channel)
+                        return HasInteractedVariable(1), {"channel":channel, "duration" : self._pulse_duration}
+                    else:
+                        self._t0 = None
+                        logging.info("ghost stimulation on channel %s" % channel)
+                        return HasInteractedVariable(2), {}
+            else:
+                self._t0 = now
+
+            return HasInteractedVariable(0), {}
