@@ -519,13 +519,13 @@ class AGO(SleepDepStimulator):
 
         self._t0 = None
 
-        self._number_of_stimuli = number_of_stimuli
+        self._number_of_stimuli = int(number_of_stimuli)
 
-        self._stim_prob = stimulus_probability
+        self._stim_prob = int(stimulus_probability)
 
         self._count_roi_stim = {i:0 for i in range(1,11)}
         
-        self._prob_dict = {i:stimulus_probability for i in range(1,11)}
+        self._prob_dict = {i:int(stimulus_probability) for i in range(1,11)}
 
 
         # the inactive time depends on the chanel here
@@ -550,46 +550,25 @@ class AGO(SleepDepStimulator):
         if self._t0 is None:
             self._t0 = now
 
-        if self._number_of_stimuli == 0:
+        if self._number_of_stimuli > 0 and self._count_roi_stim[roi_id] >= self._number_of_stimuli:            
+            self._prob_dict[roi_id] = 0
 
-            if not has_moved:
-                if float(now - self._t0) > self._inactivity_time_threshold_ms:
+        if not has_moved:
+            if float(now - self._t0) > self._inactivity_time_threshold_ms:
 
-                    if random.uniform(0,1) <= self._stim_prob:
-                        self._t0 = None
+                if random.uniform(0,1) <= self._prob_dict[roi_id]:
+                    self._t0 = None
 
-                        logging.info("real stimulation on channel %s" % channel)
-                        return HasInteractedVariable(1), {"channel":channel, "duration" : self._pulse_duration}
-                    else:
-                        self._t0 = None
-                        logging.info("ghost stimulation on channel %s" % channel)
-                        return HasInteractedVariable(2), {}
-            else:
-                self._t0 = now
+                    # increase the count by one
+                    self._count_roi_stim[roi_id] += 1
 
-            return HasInteractedVariable(0), {}
-
+                    logging.info("real stimulation on channel %s" % channel)
+                    return HasInteractedVariable(1), {"channel":channel, "duration" : self._pulse_duration}
+                else:
+                    self._t0 = None
+                    logging.info("ghost stimulation on channel %s" % channel)
+                    return HasInteractedVariable(2), {}
         else:
+            self._t0 = now
 
-            if self._count_roi_stim[roi_id] >= self._number_of_stimuli:
-                self._prob_dict[roi_id] = 0
-
-            if not has_moved:
-                if float(now - self._t0) > self._inactivity_time_threshold_ms:
-
-                    if random.uniform(0,1) <= self._prob_dict[roi_id]:
-                        self._t0 = None
-
-                        # increase the count by one
-                        self._count_roi_stim[roi_id] += 1
-
-                        logging.info("real stimulation on channel %s" % channel)
-                        return HasInteractedVariable(1), {"channel":channel, "duration" : self._pulse_duration}
-                    else:
-                        self._t0 = None
-                        logging.info("ghost stimulation on channel %s" % channel)
-                        return HasInteractedVariable(2), {}
-            else:
-                self._t0 = now
-
-            return HasInteractedVariable(0), {}
+        return HasInteractedVariable(0), {}
