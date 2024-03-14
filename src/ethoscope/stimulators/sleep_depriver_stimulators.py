@@ -551,10 +551,7 @@ class AGO(SleepDepStimulator):
         if self._t0 is None:
             self._t0 = now
         
-        logging.info(f"num stim {self._number_of_stimuli}, called within {roi_id}" )
-
-        if self._number_of_stimuli != 0 and self._count_roi_stim[roi_id] >= self._number_of_stimuli:   
-            logging.info(f"calling True on if statement: {roi_id}" )
+        if self._number_of_stimuli > 0 and self._count_roi_stim[roi_id] >= self._number_of_stimuli:   
             self._prob_dict[roi_id] = 0
 
         if not has_moved:
@@ -562,7 +559,6 @@ class AGO(SleepDepStimulator):
 
                 if random.uniform(0,1) <= self._prob_dict[roi_id]:
                     self._t0 = None
-                    logging.info(f"Probability for {roi_id}: {self._prob_dict[roi_id]}")
 
                     # increase the count by one
                     self._count_roi_stim[roi_id] += 1
