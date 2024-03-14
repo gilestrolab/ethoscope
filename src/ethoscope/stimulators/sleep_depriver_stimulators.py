@@ -527,6 +527,7 @@ class AGO(SleepDepStimulator):
         
         self._prob_dict = {i:stimulus_probability for i in range(1,11)}
 
+        logging.info(f"num stim {self._number_of_stimuli} at start" )
 
         # the inactive time depends on the chanel here
         super(AGO, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range)
@@ -549,8 +550,11 @@ class AGO(SleepDepStimulator):
 
         if self._t0 is None:
             self._t0 = now
+        
+        logging.info(f"num stim {self._number_of_stimuli}, called within {roi_id}" )
 
-        if self._number_of_stimuli != 0 and self._count_roi_stim[roi_id] >= self._number_of_stimuli:            
+        if self._number_of_stimuli != 0 and self._count_roi_stim[roi_id] >= self._number_of_stimuli:   
+            logging.info(f"calling True on if statement: {roi_id}" )
             self._prob_dict[roi_id] = 0
 
         if not has_moved:
@@ -558,6 +562,7 @@ class AGO(SleepDepStimulator):
 
                 if random.uniform(0,1) <= self._prob_dict[roi_id]:
                     self._t0 = None
+                    logging.info(f"Probability for {roi_id}: {self._prob_dict[roi_id]}")
 
                     # increase the count by one
                     self._count_roi_stim[roi_id] += 1
