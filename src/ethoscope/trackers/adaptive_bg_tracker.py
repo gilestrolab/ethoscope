@@ -236,12 +236,21 @@ class AdaptiveBGModel(BaseTracker):
 
     def __init__(self, roi, data=None):
         """
-        An adaptive background subtraction model to find position of one animal in one roi.
+        Initializes an adaptive background model for tracking a single animal within a specified region of interest (ROI).
+        This model leverages background subtraction techniques enhanced with adaptive learning rates and preprocessing
+        strategies to accurately identify and track the subject within the ROI across frames.
 
-        TODO more description here
-        :param roi:
-        :param data:
-        :return:
+        Parameters:
+        - roi: tuple or any
+            Specifies the region of interest within the frame where tracking is to be focused. The exact type and format
+            can vary depending on the implementation details and how the ROI information is utilized within the tracking
+            system. It is generally expected to define the spatial boundaries for tracking.
+        - data: dict or None, optional
+            An optional dictionary of additional data or parameters that may be required for initializing the tracking model.
+            This could include calibration data, model parameters, or other configuration settings relevant to the tracking process.
+
+        The method sets up internal buffers and default settings necessary for the operation of the tracking model, including
+        object size expectations, smoothing mechanisms for mode detection, and initialization of both background and foreground models.
         """
         self._previous_shape=None
         self._object_expected_size = 0.05 # proportion of the roi main axis
@@ -266,12 +275,22 @@ class AdaptiveBGModel(BaseTracker):
         self._buff_fg_diff = None
         self._old_sum_fg = 0
 
+        self._roi = roi
+
         super(AdaptiveBGModel, self).__init__(roi, data)
 
     def _calculate_blur_radius(self, img_shape):
         """
-        Blur radius depends on the image size and expected object size only. 
-        We created once and then use it in all subsequent frames
+        Calculate the blur radius based on the object expected size and the maximum dimension of the image.
+
+        Args:
+            img_shape (tuple): The shape of the input image.
+
+        The function calculates the blur radius using the formula: blur_radius = int(object_expected_size * max(img_shape) / 2.0).
+        It then ensures that the blur radius is an odd number by incrementing it by 1 if it's even.
+
+        Example:
+        _calculate_blur_radius((640, 480))  # Calculates the blur radius for an image with dimensions 640x480.
         """
         
         self.blur_rad = int(self._object_expected_size * np.max(img_shape) / 2.0)
@@ -335,7 +354,7 @@ class AdaptiveBGModel(BaseTracker):
 
         return buff_img
 
-    def _find_position(self, img, mask,t):
+    def _find_position(self, img, mask, t):
         '''
         Middleman between the tracker and the actual tracking routine
         It cuts the portion defined by mask (i.e. the ROI), converts it to grey and passes it on to the actual tracking routine
@@ -352,8 +371,33 @@ class AdaptiveBGModel(BaseTracker):
             raise NoPositionError
 
 
-    def _track(self, img,  grey, mask,t):
-
+    def _track(self, img,  grey, mask, t):
+        """
+        Tracks objects in a given frame by detecting changes from a background model, identifying contours,
+        fitting ellipses to these contours, and updating tracking models based on the analysis.
+        Conditions such as the proportion of foreground pixels and contour analysis guide the tracking process,
+        including decisions to update learning rates and when to raise exceptions for tracking failures.
+        
+        Parameters:
+        - img: numpy.ndarray
+            The current frame in its original color space.
+        - grey: numpy.ndarray
+            The current frame converted to grayscale.
+        - mask: numpy.ndarray
+            An optional mask to focus tracking on a specific region of interest in the frame.
+        - t: int or float
+            The current timestamp or frame index.
+            
+        Returns:
+        - list of DataPoint
+            A list containing a single DataPoint object representing the tracked object's position,
+            dimensions, orientation, and the logarithmic distance moved since the last frame.
+            
+        Raises:
+        - NoPositionError
+            If the background model is not set, the proportion of foreground pixels is too high or zero,
+            no valid contours are found, or the detected change exceeds the maximum log-likelihood threshold.
+        """
         if self._bg_model.bg_img is None:
             self._buff_fg = np.empty_like(grey)
             self._old_pos = 0.0 +0.0j
@@ -363,14 +407,15 @@ class AdaptiveBGModel(BaseTracker):
 
             raise NoPositionError
 
-        bg = self._bg_model.bg_img.astype(np.uint8)
-        cv2.subtract(grey, bg, dst=self._buff_fg)
+        # Background subtraction to isolate foreground objects.
+        cv2.subtract(grey, self._bg_model.bg_img.astype(np.uint8), dst=self._buff_fg)
         cv2.threshold(self._buff_fg, 20, 255, cv2.THRESH_TOZERO, dst=self._buff_fg)
 
+        # Backup the foreground buffer for subsequent analysis.
         self._buff_fg_backup = np.copy(self._buff_fg)
 
-        n_fg_pix = np.count_nonzero(self._buff_fg)
-        prop_fg_pix  = n_fg_pix / (grey.size)
+        # Calculate the proportion of foreground pixels.
+        prop_fg_pix  = np.count_nonzero(self._buff_fg) / (grey.size)
 
         if  prop_fg_pix > self._max_area  or prop_fg_pix == 0:
             self._bg_model.increase_learning_rate()
@@ -378,10 +423,6 @@ class AdaptiveBGModel(BaseTracker):
 
         contours, _ = cv2.findContours(self._buff_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours = [cv2.approxPolyDP(c, 1.2, True) for c in contours  if cv2.contourArea(c) >= 3]
-
-        if not contours:
-            self._bg_model.increase_learning_rate()
-            raise NoPositionError
 
         # Process contours
         hull, distance, is_ambiguous = self._process_contours(img, contours, t)
@@ -409,6 +450,9 @@ class AdaptiveBGModel(BaseTracker):
 
         self._old_pos = pos
 
+        ## This can be use during offline tracking for debug purposes.
+        #cv2.imshow(f"ROI_{self._roi.idx}", grey ); cv2.waitKey(1)
+
         return [DataPoint([
                           XPosVariable(int(round(x))),
                           YPosVariable(int(round(y))),
@@ -421,7 +465,37 @@ class AdaptiveBGModel(BaseTracker):
 
     def _update_models(self, img, grey, mask, hull, t, distance, prop_fg_pix, is_ambiguous):
         """
-        ChatGPT to add properly formatted description here
+        Updates the background and foreground models based on the analysis of the current frame.
+        The background model's learning rate is adjusted according to the ambiguity of the detection,
+        and the foreground model is updated with the current detection details. Optionally,
+        a mask can be applied to the foreground before updating the models to focus on a specific
+        area of interest.
+        
+        Parameters:
+        - img: numpy.ndarray
+            The current frame in its original color space, used for updating the foreground model.
+        - grey: numpy.ndarray
+            The grayscale version of the current frame, used for updating the background model.
+        - mask: numpy.ndarray or None
+            An optional binary mask that defines the region of interest for the foreground update.
+            If provided, it is applied to the foreground before the model updates.
+        - hull: numpy.ndarray
+            The contour points of the detected object, used for updating the foreground model.
+        - t: int or float
+            The current timestamp or frame index, used for temporal reference in model updates.
+        - distance: float
+            The measured distance or change metric between the current and previous detections.
+            This parameter is currently not used directly in this function but included for potential
+            extensions or conditional logic.
+        - prop_fg_pix: float
+            The proportion of foreground pixels in the detection. This parameter is not directly
+            used in this function but included for potential extensions or conditional logic.
+        - is_ambiguous: bool
+            A flag indicating whether the current detection situation is ambiguous, affecting
+            how the background model's learning rate is adjusted.
+            
+        Returns:
+        None
         """
     
         if mask is not None:
@@ -438,8 +512,40 @@ class AdaptiveBGModel(BaseTracker):
 
     def _process_contours(self, img, contours, t):
         """
-        ChatGPT to add properly formatted description here
+        Processes detected contours to identify the primary object for tracking, assesses the
+        ambiguity of the detection, and calculates the distance moved by the tracked object based
+        on foreground model predictions. This method updates the learning rate of the background model
+        based on detection outcomes and raises exceptions if no valid contours are found or the foreground
+        model is not ready for ambiguous situations.
+
+        Parameters:
+        - img: numpy.ndarray
+            The current frame in its original color space, used for feature computation by the foreground model.
+        - contours: list of numpy.ndarray
+            A list of contour arrays, where each contour is represented by an array of points.
+        - t: int or float
+            The current timestamp or frame index, used for temporal reference in distance calculations.
+
+        Returns:
+        - tuple: (hull, distance, is_ambiguous)
+            hull: numpy.ndarray
+                The contour of the identified primary object for tracking.
+            distance: float
+                The computed distance metric indicating the movement of the object, based on the
+                foreground model's analysis of the current and previous frames.
+            is_ambiguous: bool
+                A flag indicating whether the current frame's detections are ambiguous, based on
+                the number of significant contours identified.
+
+        Raises:
+        - NoPositionError
+            If no valid contours are found, if the foreground model is not ready in ambiguous situations,
+            or if the identified primary contour does not meet minimum criteria for tracking.
         """
+
+        if not contours:
+            self._bg_model.increase_learning_rate()
+            raise NoPositionError
 
         if len(contours) > 1:
             if not self.fg_model.is_ready:
