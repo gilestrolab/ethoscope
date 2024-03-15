@@ -251,6 +251,8 @@ class AdaptiveBGModel(BaseTracker):
         self._smooth_mode_tstamp = deque()
         self._smooth_mode_window_dt = 30 * 1000 #miliseconds
 
+        # Pre-calculate and store the blur radius
+        self.blur_rad = None
 
         self._bg_model = BackgroundModel()
         self._max_m_log_lik = 5.5
@@ -266,98 +268,72 @@ class AdaptiveBGModel(BaseTracker):
 
         super(AdaptiveBGModel, self).__init__(roi, data)
 
+    def _calculate_blur_radius(self, img_shape):
+        """
+        Blur radius depends on the image size and expected object size only. 
+        We created once and then use it in all subsequent frames
+        """
+        
+        self.blur_rad = int(self._object_expected_size * np.max(img_shape) / 2.0)
+
+        if self.blur_rad % 2 == 0:
+            self.blur_rad += 1
+
     def _pre_process_input_minimal(self, img, mask, t, darker_fg=True):
-        blur_rad = int(self._object_expected_size * np.max(img.shape) / 2.0)
+        """
+        Preprocesses an input image for object tracking, with optional foreground darkening.
+        
+        This function first checks if the input image is in color and converts it to grayscale if necessary. 
+        It then applies a Gaussian blur to smooth the image, potentially inverts the image colors 
+        to highlight darker foreground elements, normalizes the image brightness, and finally applies 
+        a mask to isolate the region of interest. The result is a preprocessed image optimized for subsequent 
+        tracking operations.
+        
+        Parameters:
+        - img: numpy.ndarray
+            The input image, either in grayscale or BGR color.
+        - mask: numpy.ndarray or None
+            A binary mask defining the region of interest. If None, a mask covering the entire image is used.
+        - t: any
+            A timestamp or identifier for the input image. Currently not used in processing, 
+            but included for compatibility with future extensions.
+        - darker_fg: bool, optional (default=True)
+            If True, inverts the image colors to make the foreground elements darker than the background.
+            
+        Returns:
+        - buff_img: numpy.ndarray
+            The preprocessed image, ready for object tracking.
+        
+        Raises:
+        - NoPositionError: If an error occurs due to division by zero in scaling calculations.
+        """
 
-        if blur_rad % 2 == 0:
-            blur_rad += 1
+        # Check if the image has more than one channel (indicative of a color image)
+        # and convert it to grayscale if necessary
+        if len(img.shape) > 2 and img.shape[2] == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        if self._buff_grey is None:
-            self._buff_grey = img.copy()
-            if mask is None:
-                mask = np.ones_like(self._buff_grey) * 255
+        if not self.blur_rad: self._calculate_blur_radius(img.shape)
+        if mask is None: mask = np.ones(img.shape, dtype=np.uint8) * 255
 
-        self._buff_grey = img.copy()
+        buff_img = img.copy()
 
-        # cv2.imshow("dbg",self._buff_grey)
-        cv2.GaussianBlur(self._buff_grey,(blur_rad,blur_rad),1.2, self._buff_grey)
+        cv2.GaussianBlur(buff_img, (self.blur_rad, self.blur_rad), 1.2, buff_img)
+        
         if darker_fg:
-            cv2.subtract(255, self._buff_grey, self._buff_grey)
+            cv2.subtract(255, buff_img, buff_img)
 
-        #
-        mean = cv2.mean(self._buff_grey, mask)
+        mean = cv2.mean(buff_img, mask)
 
         try:
             scale = 128. / mean[0]
         except ZeroDivisionError:
             raise NoPositionError
 
-        cv2.multiply(self._buff_grey, scale, dst = self._buff_grey)
+        cv2.multiply(buff_img, scale, dst = buff_img)
+        cv2.bitwise_and(buff_img, mask, buff_img)
 
-
-        if mask is not None:
-            cv2.bitwise_and(self._buff_grey, mask, self._buff_grey)
-            return self._buff_grey
-
-    def _pre_process_input(self, img, mask, t):
-        '''
-        Receives the whole img, a mask describing the ROI and time t
-        Returns a grey converted image in which the tracking routine should then look for objects
-        The image returned is processed to decrease noise
-        '''
-
-        blur_rad = int(self._object_expected_size * np.max(img.shape) * 2.0)
-        if blur_rad % 2 == 0:
-            blur_rad += 1
-
-
-        if self._buff_grey is None:
-            self._buff_grey = img.copy()
-            self._buff_grey_blurred = np.empty_like(self._buff_grey)
-            # self._buff_grey_blurred = np.empty_like(self._buff_grey)
-            if mask is None:
-                mask = np.ones_like(self._buff_grey) * 255
-
-            mask_conv = cv2.blur(mask,(blur_rad, blur_rad))
-
-            self._buff_convolved_mask  = (1/255.0 *  mask_conv.astype(np.float32))
-
-
-        self._buff_grey = img.copy()
-
-        hist = cv2.calcHist([self._buff_grey], [0], None, [256], [0,255]).ravel()
-        hist = np.convolve(hist, [1] * 3)
-        mode =  np.argmax(hist)
-
-        self._smooth_mode.append(mode)
-        self._smooth_mode_tstamp.append(t)
-
-        if len(self._smooth_mode_tstamp) >2 and self._smooth_mode_tstamp[-1] - self._smooth_mode_tstamp[0] > self._smooth_mode_window_dt:
-            self._smooth_mode.popleft()
-            self._smooth_mode_tstamp.popleft()
-
-
-        mode = np.mean(list(self._smooth_mode))
-        scale = 128. / mode
-
-        # cv2.GaussianBlur(self._buff_grey,(5,5), 1.5,self._buff_grey)
-
-        cv2.multiply(self._buff_grey, scale, dst = self._buff_grey)
-
-
-        cv2.bitwise_and(self._buff_grey, mask, self._buff_grey)
-
-        cv2.blur(self._buff_grey,(blur_rad, blur_rad), self._buff_grey_blurred)
-        #fixme could be optimised
-        self._buff_grey_blurred = (self._buff_grey_blurred / self._buff_convolved_mask).astype(np.uint8)
-
-
-        cv2.absdiff(self._buff_grey, self._buff_grey_blurred, self._buff_grey)
-
-        if mask is not None:
-            cv2.bitwise_and(self._buff_grey, mask, self._buff_grey)
-            return self._buff_grey
-
+        return buff_img
 
     def _find_position(self, img, mask,t):
         '''
@@ -366,12 +342,13 @@ class AdaptiveBGModel(BaseTracker):
         to look for the flies to track. The result of the tracking routine is a list of points describing the objects found in that ROI
         '''
 
-        grey = self._pre_process_input_minimal(img, mask, t)
-        # grey = self._pre_process_input(img, mask, t)
+        pre_processed_image = self._pre_process_input_minimal(img, mask, t)
+
         try:
-            return self._track(img, grey, mask, t)
+            return self._track(img, pre_processed_image, mask, t)
+
         except NoPositionError:
-            self._bg_model.update(grey, t)
+            self._bg_model.update(pre_processed_image, t)
             raise NoPositionError
 
 
@@ -379,120 +356,76 @@ class AdaptiveBGModel(BaseTracker):
 
         if self._bg_model.bg_img is None:
             self._buff_fg = np.empty_like(grey)
+            self._old_pos = 0.0 +0.0j
+
             self._buff_object= np.empty_like(grey)
             self._buff_fg_backup = np.empty_like(grey)
-  #          self._buff_fg_diff = np.empty_like(grey)
-            self._old_pos = 0.0 +0.0j
-   #         self._old_sum_fg = 0
+
             raise NoPositionError
 
         bg = self._bg_model.bg_img.astype(np.uint8)
-        cv2.subtract(grey, bg, self._buff_fg)
-
-        cv2.threshold(self._buff_fg,20,255,cv2.THRESH_TOZERO, dst=self._buff_fg)
-
-        # cv2.bitwise_and(self._buff_fg_backup,self._buff_fg,dst=self._buff_fg_diff)
-        # sum_fg = cv2.countNonZero(self._buff_fg)
+        cv2.subtract(grey, bg, dst=self._buff_fg)
+        cv2.threshold(self._buff_fg, 20, 255, cv2.THRESH_TOZERO, dst=self._buff_fg)
 
         self._buff_fg_backup = np.copy(self._buff_fg)
 
         n_fg_pix = np.count_nonzero(self._buff_fg)
-        prop_fg_pix  = n_fg_pix / (1.0 * grey.shape[0] * grey.shape[1])
-        is_ambiguous = False
+        prop_fg_pix  = n_fg_pix / (grey.size)
 
-        if  prop_fg_pix > self._max_area:
+        if  prop_fg_pix > self._max_area  or prop_fg_pix == 0:
             self._bg_model.increase_learning_rate()
             raise NoPositionError
 
-        if  prop_fg_pix == 0:
+        contours, _ = cv2.findContours(self._buff_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours = [cv2.approxPolyDP(c, 1.2, True) for c in contours  if cv2.contourArea(c) >= 3]
+
+        if not contours:
             self._bg_model.increase_learning_rate()
             raise NoPositionError
 
-        if CV_VERSION == 3:
-            _, contours,hierarchy = cv2.findContours(self._buff_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        else:
-            contours,hierarchy = cv2.findContours(self._buff_fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-
-
-
-        contours = [cv2.approxPolyDP(c,1.2,True) for c in contours]
-
-        if len(contours) == 0:
-            self._bg_model.increase_learning_rate()
-            raise NoPositionError
-
-        elif len(contours) > 1:
-            if not self.fg_model.is_ready:
-                raise NoPositionError
-            # hulls = [cv2.convexHull( c) for c in contours]
-            hulls = contours
-            #hulls = merge_blobs(hulls)
-
-            hulls = [h for h in hulls if h.shape[0] >= 3]
-
-            if len(hulls) < 1:
-                raise NoPositionError
-
-            elif len(hulls) > 1:
-                is_ambiguous = True
-            cluster_features = [self.fg_model.compute_features(img, h) for h in hulls]
-            all_distances = [self.fg_model.distance(cf,t) for cf in cluster_features]
-            good_clust = np.argmin(all_distances)
-
-            hull = hulls[good_clust]
-            distance = all_distances[good_clust]
-        else:
-            hull = contours[0]
-            if hull.shape[0] < 3:
-                self._bg_model.increase_learning_rate()
-                raise NoPositionError
-
-            features = self.fg_model.compute_features(img, hull)
-            distance = self.fg_model.distance(features,t)
+        # Process contours
+        hull, distance, is_ambiguous = self._process_contours(img, contours, t)
 
         if distance > self._max_m_log_lik:
             self._bg_model.increase_learning_rate()
             raise NoPositionError
 
+        self._previous_shape=np.copy(hull)
 
-        (x,y) ,(w,h), angle  = cv2.minAreaRect(hull)
+        # Ellipse fitting and adjustments
+        (x, y), (w, h), angle = self._fit_and_adjust_ellipse(hull, grey)
 
-        if w < h:
-            angle -= 90
-            w,h = h,w
-        angle = angle % 180
+        # Update tracking models based on analysis
+        self._update_models(img, grey, mask, hull, t, distance, prop_fg_pix, is_ambiguous)
 
-        h_im = min(grey.shape)
-        w_im = max(grey.shape)
-        max_h = 2*h_im
-        if w>max_h or h>max_h:
-            raise NoPositionError
+        #normalised position
+        #this does not really need to be normalised because the image size does not change between frames
+        #pos = (x + 1.0j * y) / w_im
+        #xy_dist = round(log10(1./float(w_im) + abs(pos - self._old_pos))*1000)
 
-        cv2.ellipse(self._buff_fg ,((x,y), (int(w*1.5),int(h*1.5)),angle),255,-1)
+        #non normalised
+        pos = x + 1.0j * y  # Keep position without normalization
+        xy_dist = round(log10(abs(pos - self._old_pos) + 1) * 1000)  # Add 1 to avoid log(0)
 
-        #todo center mass just on the ellipse area
-        cv2.bitwise_and(self._buff_fg_backup, self._buff_fg,self._buff_fg_backup)
-
-        #DeprecationWarning: Please use `center_of_mass` from the `scipy.ndimage` namespace, the `scipy.ndimage.measurements` namespace is deprecated.
-        #y,x = ndimage.measurements.center_of_mass(self._buff_fg_backup)
-        y,x = ndimage.center_of_mass(self._buff_fg_backup)
-        
-        pos = x +1.0j*y
-        pos /= w_im
-
-        xy_dist = round(log10(1./float(w_im) + abs(pos - self._old_pos))*1000)
-
-        # cv2.bitwise_and(self._buff_fg_diff,self._buff_fg,dst=self._buff_fg_diff)
-        # sum_diff = cv2.countNonZero(self._buff_fg_diff)
-        # xor_dist = (sum_fg  + self._old_sum_fg - 2*sum_diff)  / float(sum_fg  + self._old_sum_fg)
-        # xor_dist *=1000.
-        # self._old_sum_fg = sum_fg
         self._old_pos = pos
 
+        return [DataPoint([
+                          XPosVariable(int(round(x))),
+                          YPosVariable(int(round(y))),
+                          WidthVariable(int(round(w))),
+                          HeightVariable(int(round(h))),
+                          PhiVariable(int(round(angle))),
+                          XYDistance(int(xy_dist))
+                         ])]
+       
 
+    def _update_models(self, img, grey, mask, hull, t, distance, prop_fg_pix, is_ambiguous):
+        """
+        ChatGPT to add properly formatted description here
+        """
+    
         if mask is not None:
-            cv2.bitwise_and(self._buff_fg, mask,  self._buff_fg)
+            cv2.bitwise_and(self._buff_fg, mask, self._buff_fg)
 
         if is_ambiguous:
             self._bg_model.increase_learning_rate()
@@ -503,27 +436,82 @@ class AdaptiveBGModel(BaseTracker):
 
         self.fg_model.update(img, hull,t)
 
-        # NOTE: x and y already match the centroid of the contour.
-        # rounding these values at this stage may not be necessarily a good idea because we lose information
-        # TODO: it would be better to feed the object with the raw value and return the rounding from the object itself.
+    def _process_contours(self, img, contours, t):
+        """
+        ChatGPT to add properly formatted description here
+        """
+
+        if len(contours) > 1:
+            if not self.fg_model.is_ready:
+                raise NoPositionError
+
+            hulls = [h for h in contours if h.shape[0] >= 3]
+
+            if len(hulls) < 1:
+                raise NoPositionError
+
+            is_ambiguous = len(hulls) > 1
+
+            cluster_features = [self.fg_model.compute_features(img, h) for h in hulls]
+            all_distances = [self.fg_model.distance(cf,t) for cf in cluster_features]
+            good_clust = np.argmin(all_distances)
+
+            hull = hulls[good_clust]
+            distance = all_distances[good_clust]
+
+        else:
+            is_ambiguous = False
+
+            hull = contours[0]
+            if hull.shape[0] < 3:
+                self._bg_model.increase_learning_rate()
+                raise NoPositionError
+
+            features = self.fg_model.compute_features(img, hull)
+            distance = self.fg_model.distance(features,t)
+
+        return hull, distance, is_ambiguous
+
+    def _fit_and_adjust_ellipse(self, hull, grey):
+        """
+        Fits an ellipse to the given contour (hull) and adjusts its dimensions and orientation. 
+        Validates that the ellipse does not exceed the image dimensions. Draws the adjusted 
+        ellipse on a foreground buffer and calculates its center of mass.
         
-        x_var = XPosVariable(int(round(x)))
-        y_var = YPosVariable(int(round(y)))
-        distance = XYDistance(int(xy_dist))
-        #xor_dist = XorDistance(int(xor_dist))
-        w_var = WidthVariable(int(round(w)))
-        h_var = HeightVariable(int(round(h)))
-        phi_var = PhiVariable(int(round(angle)))
-        # mlogl =   mLogLik(int(distance*1000))
+        Parameters:
+        - hull: numpy.ndarray
+            The contour points of the detected object.
+        - grey: numpy.ndarray
+            The grayscale image on which the object was detected.
+            
+        Returns:
+        - tuple: ((x, y), (w, h), angle)
+            The center, dimensions, and orientation angle of the fitted and adjusted ellipse.
+            - (x, y): The center of mass of the area within the drawn ellipse.
+            - (w, h): The width and height of the ellipse.
+            - angle: The orientation angle of the ellipse.
+        
+        Raises:
+        - NoPositionError:
+            If the fitted ellipse's dimensions exceed the dimensions of the input image.
+        """
+    
+        (x,y), (w,h), angle  = cv2.minAreaRect(hull)
 
-        out = DataPoint([x_var, y_var, w_var, h_var,
-                         phi_var,
-                         #mlogl,
-                         distance,
-                         #xor_dist
-                        #Label(0)
-                         ])
+        if w < h:
+            angle -= 90
+            w,h = h,w
+        angle = angle % 180
 
+        img_height, img_width = grey.shape[:2]
+        if w > img_width or h > img_height:
+            raise NoPositionError
 
-        self._previous_shape=np.copy(hull)
-        return [out]
+        cv2.ellipse(self._buff_fg ,((x,y), (int(w*1.5),int(h*1.5)),angle),255,-1)
+
+        #todo center mass just on the ellipse area
+        cv2.bitwise_and(self._buff_fg_backup, self._buff_fg, self._buff_fg_backup)
+
+        y, x = ndimage.center_of_mass(self._buff_fg_backup)
+        
+        return (x,y), (w,h), angle
