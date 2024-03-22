@@ -72,7 +72,7 @@ def get_machine_name(path="/etc/machine-name"):
         return info
 
     else:
-        return 'VIRTUASCOPE_' + str(random.randint(100,999))
+        return 'VIRTUA_' + get_machine_id()[:3]
         
 def set_machine_name(id, path="/etc/machine-name"):
     '''
@@ -280,8 +280,11 @@ def set_etc_hostname(ip_address, nodename = "node", path="/etc/hosts"):
 
 def get_commit_version(commit):
     '''
+    Returns a dictionary formatted like the following
+    {'id': 'a82d746e370e15182d780d0f06fca03efddb07c9', 'date': '2024-03-21 08:44:11'}
     '''
-    return {"id":str(commit),
+    return {
+            "id":str(commit),
             "date":datetime.datetime.utcfromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
                     }
                     
@@ -301,6 +304,7 @@ def get_git_version():
 
         except git.InvalidGitRepositoryError:
             wd = os.path.dirname(wd)
+            return {"id" : "NOT_A_GIT", "date": "None" }
             
     raise Exception("Not in a git Tree")
 
@@ -449,7 +453,7 @@ def isExperimental(new_value=None):
 def was_interrupted():
     return os.path.exists(PERSISTENT_STATE)
 
-def get_container_id():
+def get_container_id(short=True):
     """
     From https://stackoverflow.com/a/71823877
     """
@@ -458,7 +462,10 @@ def get_container_id():
             line = line.strip()
             if '/docker/containers/' in line:
                 container_id = line.split('/docker/containers/')[-1].split('/')[0]
-                return container_id
+                if not short:
+                    return container_id
+                else:
+                    return container_id[:12]
     return None
 
 def get_machine_id(path="/etc/machine-id"):
