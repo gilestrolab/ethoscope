@@ -42,9 +42,10 @@ class AsyncMySQLWriter(multiprocessing.Process):
     def _delete_my_sql_db(self):
 
         try:
+            logging.info(f"Attempting to connect to mysql db {self._db_name} on host {self._db_host} as {self._db_user_name}:{self._db_user_name}")
             db = mysql.connector.connect(host=self._db_host,
                                          user=self._db_user_name,
-                                         passwd=self._db_user_pass,
+                                         passwd=self._db_user_name,
                                          db=self._db_name,
                                          buffered=True,
                                          charset=SQL_CHARSET,
@@ -59,15 +60,19 @@ class AsyncMySQLWriter(multiprocessing.Process):
             logging.error(traceback.format_exc())
             return
 
-        logging.info("connecting to mysql db")
         c = db.cursor()
         #Truncate all tables before dropping db for performance
         command = "SHOW TABLES"
         c.execute(command)
 
-        # we remove bin logs to save space!
-        command = "RESET MASTER"
-        c.execute(command)
+        # In case we use binary logging, we remove bin logs to save space.
+        # However, this will throw an error if binary logging is set to off
+        # Which is what we should be doing because it reduces disk access and we do not need it anyway
+        c.execute("SHOW VARIABLES LIKE 'log_bin';")
+        log_bin_status = c.fetchone()
+        if log_bin_status and log_bin_status[1] == 'ON':
+            logging.info("The binary logs are set to true. Resetting them to save space.")
+            c.execute("RESET MASTER")
 
         to_execute  = []
         for t in c:
