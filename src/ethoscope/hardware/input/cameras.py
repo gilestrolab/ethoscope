@@ -124,7 +124,7 @@ class BaseCamera(object):
 class MovieVirtualCamera(BaseCamera):
     _description = {"overview":  "Class to acquire frames from a video file.",
                     "arguments": [
-                                    {"type": "filepath", "name": "path", "description": "The *LOCAL* path to the video file to use as virtual camera","default":""},
+                                    {"type": "filepath", "name": "path", "description": "Will be looking for videos in /ethoscope_data/upload/video/","default":""},
                                    ]}
                                    
 
