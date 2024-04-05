@@ -12,6 +12,13 @@ try:
 except ImportError:
     from cv2 import CAP_PROP_FRAME_WIDTH, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_COUNT, CAP_PROP_POS_MSEC, CAP_PROP_FPS
 
+try:
+    import picamera
+    USE_PICAMERA2 = False
+except:
+    import picamera2
+    USE_PICAMERA2 = True
+
 import time, datetime
 import logging
 import os
@@ -590,13 +597,7 @@ class OurPiCameraAsync(BaseCamera):
         """
         self.canbepickled = True #cv2.videocapture object cannot be serialized, hence cannot be picked
         self.isPiCamera = True
-
-        try:
-            import picamera
-            self._frame_grabber_class = PiFrameGrabber
-        except:
-            import picamera2
-            self._frame_grabber_class = PiFrameGrabber2
+        self._frame_grabber_class = PiFrameGrabber2 if USE_PICAMERA2 else PiFrameGrabber
 
         w,h = target_resolution
         if not isinstance(target_fps, int):
