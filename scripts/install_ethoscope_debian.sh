@@ -64,6 +64,7 @@ echo $'[Match]\nName=eth0\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\nRouteMetric=10\n' 
 echo $'[Match]\nName=wlan0\n\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\nRouteMetric=20\n' > /etc/systemd/network/25-wireless.network
 
 systemctl enable systemd-networkd systemd-resolved
+systemctl disable systemd-networkd-wait-online #this needs to be disabled because it hangs at boot. investigate.
 systemctl disable NetworkManager ModemManager
 
 wpa_passphrase ETHOSCOPE_WIFI ETHOSCOPE_1234 > /etc/wpa_supplicant/wpa_supplicant-wlan0.conf
