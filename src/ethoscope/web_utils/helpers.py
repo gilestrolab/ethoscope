@@ -482,7 +482,7 @@ def get_machine_id(path="/etc/machine-id"):
             return info
 
         else:
-            return get_container_id()
+            return "VIR%s" % get_container_id()
     except: 
         return "NO_ID_AVAILABLE"
 
