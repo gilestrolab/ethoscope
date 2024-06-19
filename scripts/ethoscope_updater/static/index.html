@@ -70,10 +70,10 @@
                         <th>Name</th>
                         <th>Status</th>
                         <th>Software Version</th>
-                        <th>IP</th>
-                        <th>ID</th>
+                        <th>ip</th>
+                        <th>id</th>
                         <th>
-                            <center><input type="checkbox" ng-model="selectAll" ng-click="toggleAll()"></center>
+                            <center><input type="checkbox" ng-model="selectAll" ng-change="toggleAll()"></center>
                         </th>
                     </tr>
                 </thead>
@@ -81,7 +81,7 @@
                     <tr>
                         <td>
 
-                            <span ng-if="node.check_update.up_to_date==false" class="fa fa-circle color-red"></span> <span ng-if="node.check_update.up_t>
+                            <span ng-if="node.check_update.up_to_date==false" class="fa fa-circle color-red"></span> <span ng-if="node.check_update.up_to_date==true" class="fa fa-circle color-green"></span><span> Node <span ng-if="node.check_update.up_to_date==false"> [Outdated]</span> <span ng-if="node.check_update.up_to_date==true">[Up to Date]</span></span>
 
                         </td>
                         <td>{{node.status}}</td>
@@ -93,15 +93,15 @@
                         </td>
                         <td>
                             <center>
-                                <input type=" checkbox" checklist-model="selected_devices" checklist-value="node"></center>
+                                <input type="checkbox" checklist-model="selected_devices" checklist-value="node"></center>
                         </td>
                     </tr>
                     <tr ng-repeat="(id,device) in devices" ng-if="(device.status == 'stopped' && device.up_to_date == false) || showAll">
 
                         <td>
 
-                            <span ng-if="device.up_to_date==false" class="fa fa-circle color-red"></span> <span ng-if="device.up_to_date==true" class="f>
-                            <span> {{device.name}}<span ng-if=" device.up_to_date==false"> [Outdated]</span> <span ng-if="device.up_to_date==true">[Up to>
+                            <span ng-if="device.up_to_date==false" class="fa fa-circle color-red"></span> <span ng-if="device.up_to_date==true" class="fa fa-circle color-green"></span>
+                            <span> {{device.name}}<span ng-if="device.up_to_date==false"> [Outdated]</span> <span ng-if="device.up_to_date==true">[Up to Date]</span></span>
 
                         </td>
                         <td> {{device.status}}</td>
@@ -109,63 +109,61 @@
                         <td>{{device.ip}}</td>
                         <td>{{device.id.substring(0,6)}}</td>
                         <td>
-                            <center><input type="checkbox" ng-disabled="device.status != 'stopped'" checklist-model="selected_devices" checklist-value=">
+                            <center><input type="checkbox" ng-disabled="device.status != 'stopped' " checklist-model="selected_devices" checklist-value="device" ng-checked="device.selected" ng-click="updateSelection(device)"></center>
                         </td>
                     </tr>
                 </tbody>
             </table>
-
-
         </div>
 
         <!--Modal-->
-        <div class=" modal fade" id="Modal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
-                                <div class="modal-dialog">
-                                    <div class="modal-content">
-                                        <div class="modal-header">
-                                            {{modal.title}}
-                                        </div>
-                                        <div class="model-body" ng-if="system.modal_error != ''">
-                                            <h3>{{system.modal_error}}</h3>
-                                        </div>
+        <div class="modal fade" id="Modal" tabindex="-1" role="dialog" aria-labelledby="startModal" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        {{modal.title}}
+                    </div>
+                    <div class="model-body" ng-if="system.modal_error != ''">
+                        <h3>{{system.modal_error}}</h3>
+                    </div>
 
-                                        <div class="modal-body " ng-if="system.modal_error == ''">
-                                            {{modal.info}}
-                                            <select ng-show="modal.action=='swBranch'" name="branch_to_switch" ng-model="modal.branch_to_switch">
-                                                <option ng-repeat="(key, name) in system.status" value="{{key}}">{{key}}</option>
-                                            </select>
-                                            <table class="table table-striped" ng-cloak>
-                                                <thead>
-                                                    <th>Name</th>
-                                                    <th>Status</th>
-                                                    <th>Software Version</th>
-                                                    <th>ip</th>
-                                                    <th>id</th>
-                                                </thead>
-                                                <tbody>
+                    <div class="modal-body " ng-if="system.modal_error == ''">
+                        {{modal.info}}
+                        <select ng-show="modal.action=='swBranch'" name="branch_to_switch" ng-model="modal.branch_to_switch">
+                            <option ng-repeat="(key, name) in system.status" value="{{key}}">{{key}}</option>
+                        </select>
+                        <table class="table table-striped" ng-cloak>
+                            <thead>
+                                <th>Name</th>
+                                <th>Status</th>
+                                <th>Software Version</th>
+                                <th>ip</th>
+                                <th>id</th>
+                            </thead>
+                            <tbody>
 
-                                                    <tr ng-repeat="(id,device) in selected_devices">
+                                <tr ng-repeat="(id,device) in selected_devices">
 
-                                                        <td>
-                                                            <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
-                                                                <span ng-if="device.up_to_date==false" class="fa fa-circle colour-red"></span> <span ng-if="device.up_to_date==true" class="fa fa-circle colour-green"></span>
-                                                                <span> {{device.name}}</span>
-                                                            </a>
-                                                        </td>
-                                                        <td> {{device.status}}</td>
-                                                        <td>[{{device.active_branch}}] {{device.version.id.substring(0,6)}}... ({{device.version.date}})</td>
-                                                        <td>{{device.ip}}</td>
-                                                        <td>{{device.id.substring(0,6)}}</td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        <div class="modal-footer">
-                                            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-                                            <button ng-click="modal_action(selected_devices, modal.action)" target="_blank" type="button" class="btn btn-primary" ng-if="system.modal_error == ''">{{modal.action_text}}</button>
-                                        </div>
-                                    </div>
-                                </div>
+                                    <td>
+                                        <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
+                                            <span ng-if="device.up_to_date==false" class="fa fa-circle colour-red"></span> <span ng-if="device.up_to_date==true" class="fa fa-circle colour-green"></span>
+                                            <span> {{device.name}}</span>
+                                        </a>
+                                    </td>
+                                    <td> {{device.status}}</td>
+                                    <td>[{{device.active_branch}}] {{device.version.id.substring(0,6)}}... ({{device.version.date}})</td>
+                                    <td>{{device.ip}}</td>
+                                    <td>{{device.id.substring(0,6)}}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                        <button ng-click="modal_action(selected_devices, modal.action)" target="_blank" type="button" class="btn btn-primary" ng-if="system.modal_error == ''">{{modal.action_text}}</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
 
