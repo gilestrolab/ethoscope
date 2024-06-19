@@ -6,7 +6,6 @@ import os
 import re
 from uuid import uuid4
 import netifaces
-
 import git
 
 from ethoscope.utils.rpi_bad_power import new_under_voltage
