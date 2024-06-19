@@ -9,7 +9,7 @@ services:
     volumes:
       - /mnt/ethoscope_data:/ethoscope_data
       - ./etc-ethoscope:/etc/ethoscope
-      #- /home/gg/Data/ethoscope_project/ethoscope:/opt/ethoscope-node:ro
+      - /home/gg/Data/ethoscope_project/ethoscope:/opt/ethoscope-node:ro
     network_mode: host
 
   vsftpd:

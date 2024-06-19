@@ -7,9 +7,10 @@ import re
 from uuid import uuid4
 import netifaces
 
+import git
+
 from ethoscope.utils.rpi_bad_power import new_under_voltage
 from ethoscope.hardware.interfaces.interfaces import connectedUSB, SimpleSerialInterface
-import git
 
 PERSISTENT_STATE = "/var/cache/ethoscope/persistent_state.pkl"
 

@@ -37,6 +37,7 @@ def get_commit_version(commit):
     return {"id":str(commit),
             "date":datetime.datetime.utcfromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
                     }
+                    
 def assert_node(is_node):
     if not is_node:
         raise NotNode("This device is not a node.")
