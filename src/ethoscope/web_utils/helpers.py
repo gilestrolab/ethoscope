@@ -9,7 +9,7 @@ import netifaces
 
 from ethoscope.utils.rpi_bad_power import new_under_voltage
 from ethoscope.hardware.interfaces.interfaces import connectedUSB, SimpleSerialInterface
-
+import git
 
 PERSISTENT_STATE = "/var/cache/ethoscope/persistent_state.pkl"
 
@@ -287,13 +287,12 @@ def get_commit_version(commit):
             "id":str(commit),
             "date":datetime.datetime.utcfromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
                     }
-                    
+
 def get_git_version():
     '''
     return the current git version
     '''
-    
-    import git
+
     wd = os.getcwd()
 
     while wd != "/":
@@ -304,9 +303,9 @@ def get_git_version():
 
         except git.InvalidGitRepositoryError:
             wd = os.path.dirname(wd)
-            return {"id" : "NOT_A_GIT", "date": "None" }
-            
-    raise Exception("Not in a git Tree")
+    
+    return {"id": "NOT_A_GIT", "date": "None", "dir": os.getcwd()}
+
 
 def file_in_dir_r(file, dir):
     file_dir_path = os.path.dirname(file).rstrip("//")
