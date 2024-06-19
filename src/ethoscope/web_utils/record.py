@@ -186,18 +186,17 @@ class GeneralVideoRecorder(DescribedObject):
         #This used to be a process but it's best handled as a thread. See also commit https://github.com/gilestrolab/ethoscope/commit/c2e8a7f656611cc10379c8e93ff4205220c8807a
         self._p = cameraCaptureThread(cameraClass, camera_kwargs, img_path, video_prefix, width, height, fps, bitrate, quality, stream)
 
+
     def start_recording(self):
         '''
         '''
         self._p.start()
 
-        #while self._p.is_alive():
-        #    time.sleep(.25)
-            
     def stop(self):
         '''
+        Stops the camera capture thread and closes any necessary resources.
         '''
-        logging.info("The control thread asked me to stop the camera")
+        logging.info("Stopping camera recording.")
         self._p.stop_camera_activity = True
 
         if self._stream: 
@@ -213,28 +212,79 @@ class GeneralVideoRecorder(DescribedObject):
 class HDVideoRecorder(GeneralVideoRecorder):
     _description  = { "overview": "A preset 1920 x 1088, 25fps, bitrate = 5e5 video recorder. "
                                   "At this resolution, the field of view is only partial, "
-                                  "so we effectively zoom in the middle of arenas","arguments": []}
+                                  "so we effectively zoom in the middle of arenas",
+                      "arguments": []}
     status = "recording"
 
     def __init__(self, cameraClass, camera_kwargs, video_prefix, img_path):
         super(HDVideoRecorder, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix, width=1920, height=1088, quality=28, fps=25, bitrate=1000000)
 
-
 class StandardVideoRecorder(GeneralVideoRecorder):
-    _description  = { "overview": "A preset 1280 x 960, 25fps, bitrate = 2e5 video recorder.", "arguments": []}
+    _description  = { "overview": "A preset 1280 x 960, 25fps, bitrate = 2e5 video recorder.",
+                      "arguments": []}
     status = "recording"
     
     def __init__(self, cameraClass, camera_kwargs, video_prefix, img_path):
-        super(StandardVideoRecorder, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix, width=1280, height=960, fps=25,bitrate=500000)
+        super(StandardVideoRecorder, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix, width=1280, height=960, fps=25, bitrate=500000)
 
 class Streamer(GeneralVideoRecorder):
-    #hiding the description field will not pass this class information to the node UI
-    _description  = { "overview": "A preset 640 x 480, 25fps, bitrate = 2e5 streamer. Active on port 8008.", "arguments": [], 'hidden': True}
+    _description  = { "overview": "A preset 640 x 480, 25fps, bitrate = 2e5 streamer. Active on port 8008.", 
+                      "arguments": [], 
+                      "hidden": True
+                    }
     status = "streaming"
     
     def __init__(self, cameraClass, camera_kwargs, video_prefix, img_path):
         super(Streamer, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix=None, width=640, height=480, fps=20, bitrate=500000, stream=True)
         
+
+class timedStop(DescribedObject):
+    _description = { "overview": "Automatically stops the experiment at the given time.", 
+                     "arguments": [
+                        {"type": "str", "name": "timer", "description": "Countdown timer to automatically stop the experiment. Days(DD):Hours(HH):Minutes(MM). ", "default" : "00:00:00"},
+                    ]}
+    def __init__(self, timer="00:00:00"):
+        self.timer = timer
+        self.countdown = self._convert_to_seconds(timer)        
+        self.autostop = self.countdown > 0
+
+
+    def _convert_to_seconds(self, time_str):
+        """
+        Converts a time string from "DD:HH:MM" format into total seconds.
+        
+        Args:
+        time_str (str): The time string in "DD:HH:MM" format.
+        
+        Returns:
+        int: Total number of seconds.
+        
+        Raises:
+        ValueError: If the format is incorrect or values are out of expected range.
+        """
+        # Split the string by ':' and check if it has exactly three parts
+        parts = time_str.split(':')
+        if len(parts) != 3:
+            raise ValueError("Time format must be DD:HH:MM")
+        
+        try:
+            # Parse days, hours, and minutes from the parts
+            days, hours, minutes = int(parts[0]), int(parts[1]), int(parts[2])
+            
+            # Sanity checks for hours and minutes range
+            if not (0 <= hours < 24):
+                raise ValueError("Hours must be between 0 and 23")
+            if not (0 <= minutes < 60):
+                raise ValueError("Minutes must be between 0 and 59")
+            
+            # Convert all to seconds
+            total_seconds = days * 86400 + hours * 3600 + minutes * 60
+            return total_seconds
+
+        except ValueError:
+            raise ValueError("Error in countdown format. Use DD:HH:MM (days, hours, minutes)")
+
+
 
 class ControlThreadVideoRecording(ControlThread):
 
@@ -245,9 +295,12 @@ class ControlThreadVideoRecording(ControlThread):
                     },
             "recorder": {
                     "possible_classes":[StandardVideoRecorder, HDVideoRecorder, GeneralVideoRecorder, Streamer],
-                },
+                    },
             "experimental_info":{
                     "possible_classes":[ExperimentalInformation],
+                    },
+            "time_control":{
+                    "possible_classes":[timedStop],
                     }
                 }
                 
@@ -286,7 +339,8 @@ class ControlThreadVideoRecording(ControlThread):
                         "id": machine_id,
                         "name": name,
                         "version": version,
-                        "experimental_info": {}
+                        "experimental_info": {},
+                        "autostop": False
                         }
 
         self._parse_user_options(data)
@@ -346,7 +400,7 @@ class ControlThreadVideoRecording(ControlThread):
 
             cameraClass = self._option_dict["camera"]["class"]
             camera_kwargs = self._option_dict["camera"]["kwargs"]
-            
+           
             self._recorder = RecorderClass( cameraClass, camera_kwargs, 
                                             video_prefix = self._output_video_full_prefix,
                                             img_path = self._info["last_drawn_img"],
@@ -356,6 +410,13 @@ class ControlThreadVideoRecording(ControlThread):
             logging.info( "Started %s" % self._recorder.status )
             
             self._recorder.start_recording()
+
+            # Setting up a timer to stop the recording
+            self._timer = self._option_dict["time_control"]["class"] (**self._option_dict["time_control"]["kwargs"])
+            if self._timer.autostop:
+                timer = threading.Timer(self._timer.countdown, self.stop)
+                timer.start()
+                self._info["autostop"] = self._timer.timer
 
         except Exception as e:
             self.stop(traceback.format_exc())

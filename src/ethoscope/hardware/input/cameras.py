@@ -1,5 +1,12 @@
 __author__ = 'quentin'
 
+import time, datetime
+import logging
+import os
+from ethoscope.utils.debug import EthoscopeException
+import threading, queue
+import traceback
+
 import cv2
 import numpy as np
 try:
@@ -15,17 +22,12 @@ except ImportError:
 try:
     import picamera
     USE_PICAMERA2 = False
-except:
-    import picamera2
-    USE_PICAMERA2 = True
-
-import time, datetime
-import logging
-import os
-from ethoscope.utils.debug import EthoscopeException
-
-import threading, queue
-import traceback
+except ImportError:
+    try:
+        import picamera2
+        USE_PICAMERA2 = True
+    except ImportError:
+        USE_PICAMERA2 = None  # None or some other value to indicate both imports failed
 
 class BaseCamera(object):
     capture = None
