@@ -457,7 +457,7 @@ def node_info(req):#, device):
             NEEDS_UPDATE = df.read() != ""
         
         try:
-            with os.popen(f'{systemctl} status ethoscope_node.service') as df:
+            with os.popen(f'{SYSTEMCTL} status ethoscope_node.service') as df:
                 ACTIVE_SINCE = df.read().split("\n")[2] 
         except: 
             ACTIVE_SINCE = "N/A. Probably not running through systemd"
