@@ -78,24 +78,37 @@
             $scope.node.id = data.id;
         });
 
-        $scope.toggleAll = function(selectAll, devices) {
-            angular.forEach(devices, function(device) {
-                device.selected = selectAll;
-            });
-        };
+        $scope.toggleAll = function() {
+            $scope.selected_devices = [];
 
-        $scope.checkAllSelected = function() {
-            var allSelected = true;
             angular.forEach($scope.devices, function(device) {
-                if (!device.selected) {
-                    allSelected = false;
+                if (device.status === 'stopped') {
+                    device.selected = $scope.selectAll;
+                    if ($scope.selectAll) {
+                        $scope.selected_devices.push(device);
+                    }
                 }
             });
-            $scope.selectAll = allSelected;
+
+            console.log('Selected devices length:', $scope.selected_devices.length);
         };
 
-        //modal controller
+        $scope.updateSelection = function(device) {
+            if (device.selected) {
+                const index = $scope.selected_devices.indexOf(device);
+                if (index > -1) {
+                    $scope.selected_devices.splice(index, 1);
+                }
+            } else {
+                $scope.selected_devices.push(device);
+            }
 
+            device.selected = !device.selected;
+            console.log('Selected devices length:', $scope.selected_devices.length);
+        };
+
+
+        //modal controller
         $scope.activate_modal = function(devices, action) {
             spin("start");
             // error == false => at least one device  is NOT {stopped, NA, Software broken}
