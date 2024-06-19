@@ -304,5 +304,4 @@ def reload_node_daemon():
 
 def reload_device_daemon():
     _reload_daemon("ethoscope_device")
-    _reload_daemon("ethoscope_listener")
-    _reload_daemon("ethoscope_GPIO_listener")
+
