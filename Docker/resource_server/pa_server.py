@@ -29,7 +29,7 @@ gcodes_zip = links['gcodes_zip']
 news = []
 with open(news_file, "r") as nf:
     for line in nf.readlines():
-        if ";" in line:
+        if not line.startswith("#") and ";" in line:
             news.append ( {"content" : line.split(";")[1], "date": line.split(";")[0]} )
 
 @app.hook('after_request')
