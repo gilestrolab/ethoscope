@@ -67,9 +67,12 @@ def process_video(folder, verbose=True, extension="h264"):
 
     print(f"Number of .{extension} files: {len(video_files)}")
 
-    # Get the first video file to process
+    # Get the first video file to process and create the output filename
     video_file = video_files[0]
     prefix = os.path.splitext(video_file)[0]
+    prefix = re.sub(r'_\d{5}$', '_merged', prefix)  # Replace last occurrence of _00001 with _merged
+    tmp_file = f"{prefix}.tmp"
+    filename = f"{prefix}.mp4"
 
     fps = get_video_fps(video_file)
     if fps is None:
