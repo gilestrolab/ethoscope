@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  ethoscope-node:
+    build: .
+    image: ethoscope-node
+    container_name: ethoscope-node
+    restart: always
+    volumes:
+      - /mnt/ethoscope_data:/ethoscope_data
+      - ./etc-ethoscope:/etc/ethoscope
+      - /home/gg/Data/ethoscope_project/ethoscope:/opt/ethoscope-node:ro
+    network_mode: host
+
+  vsftpd:
+    image: metabrainz/docker-anon-ftp
+    container_name: ethoscope-vsftpd
+    depends_on:
+      - ethoscope-node
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      MAX_CLIENTS: "3"
+      MAX_PER_IP: "2"
+      FTPD_BANNER: "Welcome to the public ethoscope data FTP server of the Gilestro lab"
+    volumes:
+      - /mnt/ethoscope_data:/var/ftp:ro

@@ -1,0 +1,75 @@
+{
+    "sd_image": {
+        "filename": "20230306_ethoscope_000.img.zip",
+        "url": "https://imperialcollegelondon.box.com/shared/static/qp3haay6i8w9vpyo575hm7uqihzb5xlk.zip",
+        "date": "06 Mar 2023",
+        "md5sum": "499d94be6ab904ac65fe5413b67e25a5"
+    },
+    "gcodes": [
+        {
+            "filename": "1_etho_1.6_LIGHT_BOX.2x",
+            "url": "https://www.dropbox.com/s/u4598hoxt2ueg5v/1_etho_1.6_LIGHT_BOX.2x.gcode?dl=0",
+            "prints": "Light box only",
+            "material": "PLA White"
+        },
+        {
+            "filename": "2.1_etho_v1.7_CASE_and_CAMERA.1x",
+            "url": "https://www.dropbox.com/s/vwubid0eazgxldj/2.1_etho_v1.7_CASE_and_CAMERA.1x.gcode?dl=0",
+            "prints": "Upper case and camera lid",
+            "material": "PLA Gray"
+        },
+        {
+            "filename": "2.2_etho_v1.7_CASE_ONLY.2x",
+            "url": "https://www.dropbox.com/s/sng0yhr9pyz66ei/2.2_etho_v1.7_CASE_ONLY.2x.gcode?dl=0",
+            "prints": "Upper case only",
+            "material": "PLA Gray"
+        },
+        {
+            "filename": "3_etho_v1.6_LID_AND_STRIP.2x",
+            "url": "https://www.dropbox.com/s/a5p543hqup6li22/3_etho_v1.6_LID_AND_STRIP.2x.gcode?dl=0",
+            "prints": "Case lid and camera strip",
+            "material": "PLA White"
+        },
+        {
+            "filename": "3.1_etho_v1.6_LID_ONLY.2x",
+            "url": "https://www.dropbox.com/s/97inb00c9vj2k0d/3.1_etho_v1.6_LID_ONLY.2x.gcode?dl=0",
+            "prints": "Lid only",
+            "material": "PLA White"
+        },
+        {
+            "filename": "3.2_etho_v1.6_light_strip.7x",
+            "url": "https://www.dropbox.com/s/b3tmhg097f23she/3.2_etho_v1.6_light_strip.7x.gcode?dl=0",
+            "prints": "Light strip only",
+            "material": "PLA Clear or White"
+        },
+        {
+            "filename": "3.3_etho_v1.6_CAMERA_LIDS.8x",
+            "url": "https://www.dropbox.com/s/8nxnbc091ce0roi/3.3_etho_v1.6_CAMERA_LIDS.8x.gcode?dl=0",
+            "prints": "Upper case and camera case",
+            "material": "PLA Gray"
+        }
+    ],
+    "onshape": [
+        {
+            "name": "Upper case",
+            "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/d228e2116a5933cf39312517"
+        },
+        {
+            "name": "Light box",
+            "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/d5e7d416ecf9f99624a6734c"
+        },
+        {
+            "name": "Walls",
+            "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/72167f0b1de0d32cd5d66968"
+        },
+        {
+            "name": "Stabiliser",
+            "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/51c11b1cb511015be15336e4"
+        }
+    ],
+    "gcodes_zip": {
+        "filename": "ethoscope_gcodes_v1.7.zip",
+        "url": "https://www.dropbox.com/s/9lskay367tpr81r/ethoscope_gcodes_v.1.7.zip?dl=0",
+        "date": "2020-05-07"
+    }
+}
