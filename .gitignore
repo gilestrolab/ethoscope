@@ -69,3 +69,6 @@ docs/_build/
 
 *.mp4
 *.avi
+
+#folders
+Docker/node/etc-ethoscope/
