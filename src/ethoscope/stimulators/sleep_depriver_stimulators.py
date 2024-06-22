@@ -14,13 +14,14 @@ from ethoscope.hardware.interfaces.optomotor import OptoMotor
 
 import random
 import time
+import logging
 
 class IsMovingStimulator(BaseStimulator):
     _HardwareInterfaceClass = DefaultInterface
 
     def __init__(self, hardware_connection=None, velocity_correction_coef=3.0e-3, date_range = "", **kwargs):
         """
-        class implementing an stimulator that decides whether an animal has moved though does nothing   accordingly.
+        class implementing an stimulator that decides whether an animal has moved though does nothing accordingly.
         :param hardware_connection: a default hardware interface object
         :param velocity_correction_coef: the correction coeeficient for computing velocity at various fps. Emirically defined. When greater than one, the animal is moving
         :type velocity_correction_coef: float
@@ -72,13 +73,13 @@ class IsMovingStimulator(BaseStimulator):
         return HasInteractedVariable(True), {}
 
 class SleepDepStimulator(IsMovingStimulator):
-    _description = {"overview": "A stimulator to sleep deprive an animal using servo motor. See http://todo/fixme.html",
+    _description = {"overview": "A stimulator to sleep deprive an animal using servo motor.",
                     "arguments": [
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":0.0001, "name": "velocity_correction_coef", "description": "Velocity correction coef","default":3.0e-3},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken","default":120},
                                     {"type": "number", "min": 0.0, "max": 1.0, "step": 0.01, "name": "stimulus_probability",  "description": "Probability the stimulus will happen", "default": 1.0},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "description": "A date and time range in which the device will perform.",
                                      "default": ""},
                                    ]}
 
@@ -107,21 +108,21 @@ class SleepDepStimulator(IsMovingStimulator):
         :return:
         """
 
-        self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
+        self._inactivity_time_threshold_ms = min_inactive_time * 1000 #so we use ms internally
         self._t0 = None
         
-        try:
+        if 0 <= float(stimulus_probability) <= 1.0:
             self._p = float(stimulus_probability)
-        except:
-            self._p = 1.0
+        else:
+            raise ValueError("Probability must be between 0.0 and 1.0")
         
         super(SleepDepStimulator, self).__init__(hardware_connection, velocity_correction_coef, date_range=date_range)
 
 
 
     def _decide(self):
-        roi_id= self._tracker._roi.idx
-        now =  self._tracker.last_time_point
+        roi_id = self._tracker._roi.idx
+        now = self._tracker.last_time_point
 
         try:
             channel = self._roi_to_channel[roi_id]
@@ -136,11 +137,14 @@ class SleepDepStimulator(IsMovingStimulator):
 
         if not has_moved:
             if float(now - self._t0) > self._inactivity_time_threshold_ms:
+                
                 if random.uniform(0,1) <= self._p:
                     self._t0 = None
+                    logging.info("real stimulation on channel %s" % channel)
                     return HasInteractedVariable(1), {"channel":channel}
                 else:
                     self._t0 = None
+                    logging.info("ghost stimulation on channel %s" % channel)
                     return HasInteractedVariable(2), {}
         else:
             self._t0 = now
@@ -193,8 +197,9 @@ class OptomotorSleepDepriver(SleepDepStimulator):
                     "arguments": [
                         {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_correction_coef", "description": "Velocity correction coef", "default": 3.0e-3},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken(s)","default":120},
-                                    {"type": "number", "min": 500, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
+                                    {"type": "number", "min": 50, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
                                     {"type": "number", "min": 0, "max": 3, "step": 1, "name": "stimulus_type",  "description": "1 = opto, 2= moto", "default": 2},
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step": 0.1, "name": "stimulus_probability",  "description": "Probability the stimulus will happen", "default": 1.0},
                                     {"type": "date_range", "name": "date_range",
                                      "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
                                      "default": ""}
@@ -214,6 +219,7 @@ class OptomotorSleepDepriver(SleepDepStimulator):
                  min_inactive_time=120,  # s
                  pulse_duration = 1000,  #ms
                  stimulus_type = 2,  # 1 = opto, 2= moto, 3 = both
+                 stimulus_probability = 1.0,
                  date_range=""
                  ):
 
@@ -221,7 +227,7 @@ class OptomotorSleepDepriver(SleepDepStimulator):
         self._t0 = None
 
         # the inactive time depends on the chanel here
-        super(OptomotorSleepDepriver, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, date_range)
+        super(OptomotorSleepDepriver, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range)
 
 
 
@@ -240,11 +246,11 @@ class OptomotorSleepDepriver(SleepDepStimulator):
 
 
 class ExperimentalSleepDepStimulator(SleepDepStimulator):
-    _description = {"overview": "A stimulator to sleep deprive an animal using servo motor. See http://todo/fixme.html",
+    _description = {"overview": "A stimulator to sleep deprive an animal using servo motor.",
                     "arguments": [
                         {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_correction_coef", "description": "Velocity correction coef", "default": 3.0e-3},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "description": "A date and time range in which the device will perform. Format YYYY-MM-DD HH:mm:ss ",
                                      "default": ""}
                                    ]}
 
@@ -318,9 +324,13 @@ class MiddleCrossingStimulator(BaseStimulator):
         """
 
         self._last_stimulus_time = 0
-        self._p = stimulus_probability
-        
-        super(MiddleCrossingStimulator, self).__init__(hardware_connection,  date_range=date_range)
+
+        if 0 <= float(stimulus_probability) <= 1.0:
+            self._p = float(stimulus_probability)
+        else:
+            raise ValueError("Probability must be between 0.0 and 1.0")
+
+        super(MiddleCrossingStimulator, self).__init__(hardware_connection, date_range=date_range)
 
     def _decide(self):
         roi_id = self._tracker._roi.idx
@@ -351,10 +361,10 @@ class MiddleCrossingStimulator(BaseStimulator):
 
             if random.uniform(0,1) < self._p:
                 self._last_stimulus_time = now
-                return HasInteractedVariable(True), {"channel": channel}
+                return HasInteractedVariable(1), {"channel": channel}
             else:
                 self._last_stimulus_time = now
-                return HasInteractedVariable(False), {}
+                return HasInteractedVariable(2), {}
 
         return HasInteractedVariable(False), {"channel": channel}
 
@@ -367,7 +377,7 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
                     "arguments": [
 
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "interval", "description": "The recurence of the stimulus","default":120},
-                                    {"type": "number", "min": 500, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
+                                    {"type": "number", "min": 50, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
                                     {"type": "number", "min": 0, "max": 3, "step": 1, "name": "stimulus_type",  "description": "1 = opto, 2= moto", "default": 2},
                                     {"type": "date_range", "name": "date_range",
                                      "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
@@ -393,7 +403,7 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
 
         self._interval = interval  *1000 # ms used internally
 
-        super(OptomotorSleepDepriverSystematic, self).__init__(hardware_connection, 0,0,
+        super(OptomotorSleepDepriverSystematic, self).__init__(hardware_connection, 0, 0,
                                                                pulse_duration, stimulus_type,
                                                                date_range)
 
@@ -426,7 +436,7 @@ class mAGO(SleepDepStimulator):
                     "arguments": [
                         {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_correction_coef", "description": "Velocity correction coef", "default": 3.0e-3},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken(s)","default":120},
-                                    {"type": "number", "min": 500, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
+                                    {"type": "number", "min": 50, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
                                     {"type": "number", "min": 0, "max": 3, "step": 1, "name": "stimulus_type",  "description": "1 = motor, 2= valves", "default": 1},
                                     {"type": "number", "min": 0.0, "max": 1.0, "step": 0.1, "name": "stimulus_probability",  "description": "Probability the stimulus will happen", "default": 1.0},
                                     {"type": "date_range", "name": "date_range",
@@ -455,13 +465,10 @@ class mAGO(SleepDepStimulator):
 
 
         self._t0 = None
-        self._p = stimulus_probability
 
         # the inactive time depends on the chanel here
         super(mAGO, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range)
-
-
-
+        
         if stimulus_type == 2:
             self._roi_to_channel = self._roi_to_channel_valves
         elif stimulus_type == 1:
@@ -473,3 +480,96 @@ class mAGO(SleepDepStimulator):
         out, dic = super(mAGO, self)._decide()
         dic["duration"] = self._pulse_duration
         return out, dic
+
+class AGO(SleepDepStimulator):
+    """
+    Valves are connected to even channels (0-18).
+    Command `D` will activate all the channels in a sequence and it's used for debugging.
+    Command `T` will teach the ethoscope what the capabilities of the module are, returning a dictionary.
+    """
+    
+    _description = {"overview": "A stimulator to send an odour puff to an AGO setup with only 10 ROIs. The valve channels are the same as the mAGO",
+                    "arguments": [
+                        {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_correction_coef", "description": "Velocity correction coef", "default": 1.5e-3},
+                                    {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken(s)","default":120},
+                                    {"type": "number", "min": 50, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
+                                    {"type": "number", "min": 0.0, "max": 1.0, "step": 0.1, "name": "stimulus_probability",  "description": "Probability the stimulus will happen", "default": 1.0},
+                                    {"type": "number", "min" : 0, "max": 10000, "name" : "number_of_stimuli", "description" : "The number of stimulus to be given before no more are given. 0 means unlimited.", "default" : 0},
+                                    {"type": "date_range", "name": "date_range",
+                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "default": ""}
+                                   ]}
+
+    _HardwareInterfaceClass = OptoMotor
+                            
+    _roi_to_channel_valves= {1:0, 2:10, 3:2, 4:12, 5:4,
+                            6:14, 7:6, 8:16, 9:8, 10:18}
+
+
+    def __init__(self,
+                 hardware_connection,
+                 velocity_correction_coef=3.0e-3,
+                 min_inactive_time=120,  # s
+                 pulse_duration = 1000,  #ms
+                 stimulus_probability = 1.0,
+                 number_of_stimuli = 0,
+                 date_range=""
+                 ):
+
+
+        self._t0 = None
+
+        self._number_of_stimuli = int(number_of_stimuli)
+
+        self._stim_prob = stimulus_probability
+
+        self._count_roi_stim = {i:0 for i in range(1,11)}
+        
+        self._prob_dict = {i:stimulus_probability for i in range(1,11)}
+
+        logging.info(f"num stim {self._number_of_stimuli} at start" )
+
+        # the inactive time depends on the chanel here
+        super(AGO, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range)
+
+        self._roi_to_channel = self._roi_to_channel_valves
+
+        self._pulse_duration= pulse_duration
+
+    def _decide(self):
+
+        roi_id = self._tracker._roi.idx
+        now = self._tracker.last_time_point
+
+        try:
+            channel = self._roi_to_channel[roi_id]
+        except KeyError:
+            return HasInteractedVariable(False), {}
+
+        has_moved = self._has_moved()
+
+        if self._t0 is None:
+            self._t0 = now
+        
+        if self._number_of_stimuli > 0 and self._count_roi_stim[roi_id] >= self._number_of_stimuli:   
+            self._prob_dict[roi_id] = 0
+
+        if not has_moved:
+            if float(now - self._t0) > self._inactivity_time_threshold_ms:
+
+                if random.uniform(0,1) <= self._prob_dict[roi_id]:
+                    self._t0 = None
+
+                    # increase the count by one
+                    self._count_roi_stim[roi_id] += 1
+
+                    logging.info("real stimulation on channel %s" % channel)
+                    return HasInteractedVariable(1), {"channel":channel, "duration" : self._pulse_duration}
+                else:
+                    self._t0 = None
+                    logging.info("ghost stimulation on channel %s" % channel)
+                    return HasInteractedVariable(2), {}
+        else:
+            self._t0 = now
+
+        return HasInteractedVariable(0), {}

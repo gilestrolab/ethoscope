@@ -1,9 +1,9 @@
 _author__ = 'quentin'
-from ethoscope.hardware.interfaces.lynx_motion import SimpleLynxMotionInterface
+from ethoscope.hardware.interfaces.lynx_motion import LynxMotionInterface
 from ethoscope.hardware.interfaces.sleep_depriver_interface import SleepDepriverInterface
 import time
 
-class OdourDelivererInterface(SimpleLynxMotionInterface):
+class OdourDelivererInterface(LynxMotionInterface):
     _positions_to_angles = {1: -25,
                             2: 20,
                             3: 0}

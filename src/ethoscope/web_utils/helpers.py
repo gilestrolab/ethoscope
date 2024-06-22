@@ -6,6 +6,10 @@ import os
 import re
 from uuid import uuid4
 import netifaces
+import git
+
+from ethoscope.utils.rpi_bad_power import new_under_voltage
+from ethoscope.hardware.interfaces.interfaces import connectedUSB, SimpleSerialInterface
 
 PERSISTENT_STATE = "/var/cache/ethoscope/persistent_state.pkl"
 
@@ -16,25 +20,44 @@ def pi_version():
     
     We used to use cat /proc/cpuinfo but as of the 4.9 kernel, all Pis report BCM2835, even those with BCM2836, BCM2837 and BCM2711 processors. 
     You should not use this string to detect the processor. Decode the revision code using the information in the URL above, or simply cat /sys/firmware/devicetree/base/model
+
+    PI 1 Raspberry Pi Model B Plus Rev 1.2
+    PI 2 Raspberry Pi 2 Model B Rev 1.1
+    PI 3 Raspberry Pi 3 Model B Rev 1.2
+    PI 4 Raspberry Pi 4 Model B Rev 1.5
+
     """
     
-    info_file = '/sys/firmware/devicetree/base/model'
-    
-    if os.path.exists(info_file):
-    
-        with open (info_file, 'r') as revision_input:
-            revision_info = revision_input.read().rstrip('\x00')
-    
-        return revision_info
-        
-    else:
-        return 0
+    try:
+        with open('/sys/firmware/devicetree/base/model', 'r') as file:
+            model_info = file.read().strip()
 
-def isMachinePI():
+        match = re.search(r'Raspberry Pi (\d+)([A-Za-z ]+)', model_info)
+        if match:
+            model_number = int(match.group(1))
+            model_type = match.group(2).strip()
+        else:
+            model_number = None
+            model_type = None
+
+        # Return the information as a dictionary
+        return {'model_number': model_number, 'model_type': model_type}
+    
+    except Exception as e:
+        return {'model_number': 0, 'model_type': None}
+        #return {'error': str(e)}
+
+def isMachinePI(version=None):
     """
     Return True if we are running on a Pi - proper ethoscope
     """
-    return pi_version() != 0
+    pi_ver = pi_version()['model_number']
+
+    if not version:
+        return pi_ver > 0
+    else:
+        return (pi_ver == int(version))
+
 
 def get_machine_name(path="/etc/machine-name"):
     """
@@ -49,7 +72,7 @@ def get_machine_name(path="/etc/machine-name"):
         return info
 
     else:
-        return 'VIRTUASCOPE_' + str(random.randint(100,999))
+        return 'VIRTUA_' + get_machine_id()[:3]
         
 def set_machine_name(id, path="/etc/machine-name"):
     '''
@@ -91,7 +114,24 @@ def set_machine_id(id, path="/etc/machine-id"):
     except:
         raise
 
-def get_WIFI(path="/etc/netctl/wlan"):
+def get_Network_Service():
+    """
+    Detects wether we are using systemd-networkd or netctl
+    """
+    daemon = {'netctl' : False, 'systemd' : False}
+
+    with os.popen('systemctl is-active netctl@wlan.service') as df:
+        status = df.read()
+    if status.startswith('active'): daemon['netctl'] = True 
+    
+    with os.popen('systemctl is-active systemd-networkd.service') as df:
+        status = df.read()
+    if status.startswith('active'): daemon['systemd'] = True 
+
+    return daemon
+
+
+def get_WIFI():
     """
     Will return a dictionary like the following:
     
@@ -106,67 +146,115 @@ def get_WIFI(path="/etc/netctl/wlan"):
      'Gateway': "'192.168.1.1'"}
 
     """
-    if os.path.exists(path):
-        with open(path,'r') as f:
+    network_service = get_Network_Service()
+    data = {}
+    
+    if network_service['netctl']:
+        netctl_file = "/etc/netctl/wlan"
+        with open(netctl_file,'r') as f:
             wlan_settings = f.readlines()
         
-        d = {}
         for line in wlan_settings:
             if "=" in line:
-                d[ line.strip().split("=")[0] ] =  line.strip().split("=")[1]
-        return d
-    else:
-        return {'error' : 'No WIFI Settings were found in path %s' % path}
+                data[ line.strip().split("=")[0] ] =  line.strip().split("=")[1]
+        
+        data['netctl'] = True
 
-def get_gateway():
+    if network_service['systemd']:
+        wpasupplicant_file = "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
+        systemd_file = "/etc/systemd/network/25-wireless.network"       
+
+        with open(wpasupplicant_file,'r') as f:
+            wlan_settings = f.readlines()
+        
+        for line in wlan_settings:
+            if "=" in line:
+                data[ line.strip().split("=")[0] ] =  line.strip().split("=")[1].replace('"', '')
+
+        data['systemd'] = True
+        data['ESSID'] = data['ssid']
+        data['Key'] = data['#psk']
+
+        with os.popen("/sbin/ip -o -4 addr list eth0 | awk '{print $4}' | cut -d/ -f1") as cmd:
+            data['IP'] = cmd.read().strip()
+
+        with os.popen("ip route | grep default | head -n 1 | cut -d ' ' -f 3") as cmd:
+            data['Gateway'] = cmd.read().strip()
+
+        with open(systemd_file,'r') as f:
+            net_settings = f.readlines()
+        
+        for line in net_settings:
+            if "=" in line:
+                data[ line.strip().split("=")[0] ] =  line.strip().split("=")[1]
+
+    return data
+
+
+def get_static_IPV4():
     """
     """
+
     with os.popen("ip route | grep default | head -n 1 | cut -d ' ' -f 3") as cmd:
-        out_cmd = cmd.read().strip()
+        gateway = cmd.read().strip()
+
+    a,b,c,_ = gateway.split('.')
+    d = int(get_machine_name().split('_')[-1])
     
-    return out_cmd
+    if int(d) > 1 and int(d) < 255:
+        ip_address = '.'.join([a,b,c,str(d)])
+    else: #out of range
+        ip_address = None
+
+    return ip_address, gateway
     
 
-def set_WIFI(ssid="ETHOSCOPE_WIFI", wpakey="ETHOSCOPE_1234", useSTATIC=False, path="/etc/netctl/wlan"):
+def set_WIFI(ssid="ETHOSCOPE_WIFI", wpakey="ETHOSCOPE_1234", useSTATIC=False):
     """
     Receives the setting for wifi connection
     Uses dhcp by default but if USE_DHCP is set to False, it will adopt a static ip address instead
     """
 
-    wlan_settings = '''Description=ethoscope_wifi network
-Interface=wlan0
-Connection=wireless
-Security=wpa
-ESSID=%s
-Key=%s
-''' % (ssid, wpakey)
+    ip_address, gateway = get_static_IPV4()
+    network_service = get_Network_Service()
 
-    if not useSTATIC:
-        IPV4_settings = "IP=dhcp\nTimeoutDHCP=60"
-        
-    else:
-        try:
-            gateway = get_gateway()
-            a,b,c,_ = gateway.split('.')
-            d = int(get_machine_name().split('_')[-1])
-            
-            if int(d) > 1 and int(d) < 255:
-                ip_address = '.'.join([a,b,c,str(d)])
-            
-            IPV4_settings = "IP=static\nAddress=('%s/24')\nGateway='%s'" % (ip_address, gateway)
-            
-        except:
-            IPV4_settings = "IP=dhcp\nTimeoutDHCP=60"
-        
-    wlan_settings += IPV4_settings
+    if network_service['netctl']:
+        #### Write the settings for netctl (for images made before 2023/03/07)
+        netctl_file = "/etc/netctl/wlan"
 
-    try:
-        with open(path, 'w') as f:
+        wlan_settings = "Description=ethoscope_wifi network\nInterface=wlan0\nConnection=wireless\nSecurity=wpa\nESSID=%s\nKey=%s" % (ssid, wpakey)
+
+        if useSTATIC:
+            wlan_settings += "IP=static\nAddress=('%s/24')\nGateway='%s'" % (ip_address, gateway)
+        else:
+            wlan_settings += "IP=dhcp\nTimeoutDHCP=60"
+            
+        with open(netctl_file, 'w') as f:
             f.write(wlan_settings)
-        logging.warning("Wrote new information in file: %s" % path)
-    except:
-        raise
-            
+        logging.warning("Wrote new information to %s" % netctl_file)
+
+    if network_service['systemd']:
+        #### Write the settings for systemd-networkd (from images > 2023/03/07)
+        wpasupplicant_file = "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
+        systemd_file = "/etc/systemd/network/25-wireless.network"
+
+        wpa_cmd = "wpa_passphrase %s %s > %s" % (ssid, wpakey, wpasupplicant_file)
+        with os.popen(wpa_cmd) as cmd:
+            logging.info ( cmd.read() )
+
+        wlan_settings_systemd = "[Match]\nName=wlan0\n\n[DHCPv4]\nRouteMetric=20\n"
+
+        if useSTATIC:
+            wlan_settings_systemd += "[Network]\nAddress=%s/24\nGateway=%s\nDHCP=no" % (ip_address, gateway)
+        else:
+            wlan_settings_systemd += "[Network]\nDHCP=yes"
+
+
+        with open(systemd_file, 'w') as f:
+            f.write(wlan_settings_systemd)
+        logging.warning("Wrote new information to %s" % systemd_file)
+
+
 def get_connection_status():
     ifs = {}
     for interface in netifaces.interfaces():
@@ -192,17 +280,19 @@ def set_etc_hostname(ip_address, nodename = "node", path="/etc/hosts"):
 
 def get_commit_version(commit):
     '''
+    Returns a dictionary formatted like the following
+    {'id': 'a82d746e370e15182d780d0f06fca03efddb07c9', 'date': '2024-03-21 08:44:11'}
     '''
-    return {"id":str(commit),
+    return {
+            "id":str(commit),
             "date":datetime.datetime.utcfromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
                     }
-                    
+
 def get_git_version():
     '''
     return the current git version
     '''
-    
-    import git
+
     wd = os.getcwd()
 
     while wd != "/":
@@ -213,8 +303,9 @@ def get_git_version():
 
         except git.InvalidGitRepositoryError:
             wd = os.path.dirname(wd)
-            
-    raise Exception("Not in a git Tree")
+    
+    return {"id": "NOT_A_GIT", "date": "None", "dir": os.getcwd()}
+
 
 def file_in_dir_r(file, dir):
     file_dir_path = os.path.dirname(file).rstrip("//")
@@ -248,17 +339,42 @@ def hasPiCamera():
     """
     return True if a piCamera is supported and detected
 
-    'supported=1 detected=1'
-    'supported=1 detected=0, libcamera interfaces=0'
+    In PI3 with libcamera support we can use vcgencmd which outputs something like this:
+    'supported=1 detected=1, libcamera interfaces=1'
+    'supported=1 detected=0, libcamera interfaces=1'
+
+    With PI4, however, we need to use libcamera-hello which has the following output
 
     """
-    if isMachinePI():
-       with os.popen('/opt/vc/bin/vcgencmd get_camera') as cmd:
-           out_cmd = cmd.read().strip()
-       out = dict(x.split('=') for x in out_cmd.split(',')[0].split(' '))
-       return out["detected"] == out["supported"] == "1"
-    else:
+    if not isMachinePI():
         return False
+
+    if isMachinePI(2) or isMachinePI(3):
+
+        # older versions had vcgencmd coming from raspberrypi-firmware and located in /opt/vc/bin
+        # in newer versions, the command comes from raspberrypi-utils and it's in /usr/bin
+        # we try this for future compatibility even though we still have to use raspberrypi-firmware for now
+        # we get it from https://alaa.ad24.cz/packages/r/raspberrypi-firmware/raspberrypi-firmware-20231019-1-armv7h.pkg.tar.xz
+        vcgencmd_possible_locations = ['/opt/vc/bin/vcgencmd', '/usr/bin/vcgencmd']
+        for loc in vcgencmd_possible_locations:
+            if os.path.isfile(loc):
+                vcgencmd = "%s get_camera" % loc
+                break
+
+        with os.popen(vcgencmd) as cmd:
+            out_cmd = cmd.read().strip()
+        out = dict(x.split('=') for x in out_cmd.split(',')[0].split(' '))
+        return out["detected"] == out["supported"] == "1"
+
+    if isMachinePI(4):
+        with os.popen("libcamera-hello --list-cameras") as cmd:
+            out_cmd = cmd.read()
+        match = re.search(r'\d+ : (\w+)', out_cmd)
+        if match:
+            return match.group(1)
+        else:
+            return False
+
         
 def getPiCameraVersion():
     """
@@ -336,16 +452,38 @@ def isExperimental(new_value=None):
 def was_interrupted():
     return os.path.exists(PERSISTENT_STATE)
 
+def get_container_id(short=True):
+    """
+    From https://stackoverflow.com/a/71823877
+    """
+    with open('/proc/self/mountinfo') as file:
+        for line in file:
+            line = line.strip()
+            if '/docker/containers/' in line:
+                container_id = line.split('/docker/containers/')[-1].split('/')[0]
+                if not short:
+                    return container_id
+                else:
+                    return container_id[:12]
+    return None
+
 def get_machine_id(path="/etc/machine-id"):
     """
     Reads the machine ID
-    This file should be present on any linux installation because, when missing, it is automatically generated by the OS
+    This file should be present on any linux installation because, when missing, it is automatically generated by the OS.
+    However, it won't be present in a docker container so if the file is missing we fall back to assuming it's because
+    we are running this as a virtuascope inside a container
     """
-    
-    with open(path,'r') as f:
-        info = f.readline().rstrip()
-    return info
+    try:
+        if os.path.exists(path):
+            with open(path,'r') as f:
+                info = f.readline().rstrip()
+            return info
 
+        else:
+            return "VIR%s" % get_container_id()
+    except: 
+        return "NO_ID_AVAILABLE"
 
 def get_etc_hostnames():
     """
@@ -367,15 +505,39 @@ def get_core_temperature():
     """
     Returns the internal core temperature in degrees celsius
     """
+    # older versions had vcgencmd coming from raspberrypi-firmware and located in /opt/vc/bin
+    # in newer versions, the command comes from raspberrypi-utils and it's in /usr/bin
+    # we try this for future compatibility even though we still have to use raspberrypi-firmware for now
+    # we get it from https://alaa.ad24.cz/packages/r/raspberrypi-firmware/raspberrypi-firmware-20231019-1-armv7h.pkg.tar.xz
+
+    vcgencmd_possible_locations = ['/opt/vc/bin/vcgencmd', '/usr/bin/vcgencmd']
+    for loc in vcgencmd_possible_locations:
+        if os.path.isfile(loc):
+            vcgencmd = "%s measure_temp" % loc
+            break
+
     if isMachinePI():
         try:
-            with os.popen("/opt/vc/bin/vcgencmd measure_temp") as df:
+            with os.popen(vcgencmd) as df:
                 temp = float("".join(filter(lambda d: str.isdigit(d) or d == '.', df.read())))
             return temp
         except:
             return 0
     else: 
         return 0
+
+def underPowered():
+    '''
+    Return true if the PI is underpowered, false otherwise
+    Code from rpi-bad-power https://github.com/shenxn/rpi-bad-power
+    '''
+    under_voltage = new_under_voltage()
+    if under_voltage is None:
+        return None
+    else:
+        return under_voltage.get()
+
+    
 
 def get_SD_CARD_AGE():
     """
@@ -466,3 +628,66 @@ def SQL_dump( database_name = None, credentials = {'username' : 'ethoscope', 'pa
 
     except:
         return False
+
+def loggingStatus( status = None ):
+    """
+    Set or read the current logging status
+    """
+    if status == None:
+        try:
+            with os.popen('systemctl is-active systemd-journal-upload.service') as df:
+                status = df.read().split("\n")[2] 
+            if status.startswith('active'): return True
+            else: return False
+        except: 
+            return -1
+
+    elif status == True and not loggingStatus():
+        try:
+            logging.info('User requested to start remote Logging.')
+            
+            with open('/etc/systemd/journal-upload.conf', mode='w') as cf:
+                cf.write ("[Upload]\nURL=http://node:19532\n")
+            logging.info('Modified journal-upload.conf to point to the node')
+
+            with os.popen("sleep 1 && systemctl enable --now systemd-journal-upload.service && sleep 2") as po:
+                r = po.read()
+            
+            return loggingStatus()
+        except:
+            return -1
+
+    elif status == False and loggingStatus():
+        try:
+            with os.popen("sleep 1 && systemctl disable --now systemd-journal-upload.service && sleep 2") as po:
+                r = po.read()
+            return loggingStatus()
+        except:
+            return -1
+
+def getModuleCapabilities(test=False, shallow=False):
+    '''
+    Tries to get information regarding a possible attached Module
+    '''
+
+    _, found = connectedUSB()
+
+    if shallow and found:
+        found.update({'Smart' : False, 'Connected' : True})
+        return found
+    
+    if found or 'noUSB' in found:
+
+        try:
+            device = SimpleSerialInterface()
+            dev_info = device.interrogate(test)
+            dev_info.update({'Smart' : True, 'Connected' : True})
+            return dev_info
+            #Should return something like this: {"version": "FW-1.00;HW-10", "module_name": "N20 Sleep Deprivation Module", "module_description": "Rotates up to twenty N20 geared motors independently", "test_button": {"title": "Test output", "description": "Test all outputs in a sequence", "command": "D"}, "command": "P", "arguments": {"channel": ["The channel to act on", "MAPSTOROI"], "duration": ["The length of the stimulus in ms"]}}
+
+        except:
+            found = False if 'noUSB' in found else found
+            return {'Error': 'A known device is connected but could not open a connection with it.', 'found' : found, 'Smart' : False, 'Connected' : True}
+
+    else:
+            return {'Error': 'No known device is connected.', 'Smart' : False, 'Connected' : False}

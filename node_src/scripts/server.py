@@ -23,15 +23,14 @@ app = bottle.Bottle()
 STATIC_DIR = "../static"
 
 #names of the backup services
-SYSTEM_DAEMONS = {"ethoscope_node": {'description' : 'The main Ethoscope node server interface. It is used to control the ethoscopes.'}, 
-                  "ethoscope_backup" : {'description' : 'The service that collects data from the ethoscopes and syncs them with the node.'}, 
-                  "ethoscope_video_backup" : {'description' : 'The service that collects VIDEOs from the ethoscopes and syncs them with the node'}, 
-                  "ethoscope_update_node" : {'description' : 'The service used to update the nodes and the ethoscopes.'},
-                  "git-daemon.socket" : {'description' : 'The GIT server that handles git updates for the node and ethoscopes.'},
-                  "ntpd" : {'description': 'The NTPd service is syncing time with the ethoscopes.'},
-                  "sshd" : {'description': 'The SSH daemon allows power users to access the node terminal from remote.'},
-                  "vsftpd" : {'description' : 'The FTP server on the node, used to access the local ethoscope data'},
-                  "virtuascope" : {'description' : 'A virtual ethoscope running on the node. Useful for offline tracking'}
+SYSTEM_DAEMONS = {"ethoscope_backup" : {'description' : 'The service that collects data from the ethoscopes and syncs them with the node.', 'available_on_docker' : True}, 
+                  "ethoscope_video_backup" : {'description' : 'The service that collects VIDEOs from the ethoscopes and syncs them with the node', 'available_on_docker' : True}, 
+                  "ethoscope_update_node" : {'description' : 'The service used to update the nodes and the ethoscopes.', 'available_on_docker' : True},
+                  "git-daemon.socket" : {'description' : 'The GIT server that handles git updates for the node and ethoscopes.', 'available_on_docker' : False},
+                  "ntpd" : {'description': 'The NTPd service is syncing time with the ethoscopes.', 'available_on_docker' : True},
+                  "sshd" : {'description': 'The SSH daemon allows power users to access the node terminal from remote.', 'available_on_docker' : False},
+                  "vsftpd" : {'description' : 'The FTP server on the node, used to access the local ethoscope data', 'available_on_docker' : False},
+                  "virtuascope" : {'description' : 'A virtual ethoscope running on the node. Useful for offline tracking', 'available_on_docker' : False}
                   }
 
 
@@ -214,6 +213,18 @@ def get_device_machine_info(id):
 
     return device.machine_info()
 
+#Get info about a device connected module
+@app.get('/device/<id>/module')
+@error_decorator
+def get_device_module(id):
+
+    device = device_scanner.get_device(id)
+    
+    if device:
+        return device.connected_module()
+    
+    return {}
+
 @app.post('/device/<id>/machineinfo')
 @error_decorator
 def set_device_machine_info(id):
@@ -287,8 +298,11 @@ def force_device_backup(id):
         logging.info("Initiating backup for device  %s" % device_info["id"])
         backup_job = BackupClass(device_info, results_dir=results_dir)
         logging.info("Running backup for device  %s" % device_info["id"])
-        backup_job.run()
-        logging.info("Backup done for for device  %s" % device_info["id"])
+        if backup_job.backup():
+            logging.info("Backup done for device  %s" % device_info["id"])
+        else:
+            logging.error("Backup for device  %s could not be completed" % device_info["id"])
+    
     except Exception as e:
         logging.error("Unexpected error in backup. args are: %s" % str(args))
         logging.error(traceback.format_exc())
@@ -407,6 +421,7 @@ def download(what):
 @app.get('/node/<req>')
 @error_decorator
 def node_info(req):#, device):
+
     if req == 'info':
        
         try:
@@ -442,7 +457,7 @@ def node_info(req):#, device):
             NEEDS_UPDATE = df.read() != ""
         
         try:
-            with os.popen('systemctl status ethoscope_node.service') as df:
+            with os.popen(f'{SYSTEMCTL} status ethoscope_node.service') as df:
                 ACTIVE_SINCE = df.read().split("\n")[2] 
         except: 
             ACTIVE_SINCE = "N/A. Probably not running through systemd"
@@ -465,11 +480,17 @@ def node_info(req):#, device):
         return {'log': l}
     
     elif req == 'daemons':
-        #returns active or inactive
+
         for daemon_name in SYSTEM_DAEMONS.keys():
         
-            with os.popen("systemctl is-active %s" % daemon_name) as df:
-                SYSTEM_DAEMONS[daemon_name]['active'] = df.read().strip()
+            with os.popen(f"{SYSTEMCTL} is-active {daemon_name}") as df:
+                is_active = df.read().strip()
+                is_not_available_on_docker = not SYSTEM_DAEMONS[daemon_name]["available_on_docker"]
+
+                SYSTEM_DAEMONS[daemon_name].update( { 'active'    : is_active, 
+                                                      'not_available' : (IS_DOCKERIZED and is_not_available_on_docker)
+                                                    } )
+        
         return SYSTEM_DAEMONS
 
     elif req == 'folders':
@@ -483,7 +504,10 @@ def node_info(req):#, device):
         
     elif req == 'sensors':
         return sensor_scanner.get_all_devices_info()
-
+        
+    elif req == 'commands':
+        return CFG.content['commands']
+   
     else:
         raise NotImplementedError()
 
@@ -494,7 +518,7 @@ def node_actions():
     
     if action['action'] == 'restart':
         logging.info('User requested a service restart.')
-        with os.popen("sleep 1; systemctl restart ethoscope_node.service") as po:
+        with os.popen(f"sleep 1; {SYSTEMCTL} restart ethoscope_node.service") as po:
             r = po.read()
         
         return r
@@ -518,16 +542,36 @@ def node_actions():
                 CFG.save()
                 
         return CFG.content['folders']
-        
     
+    elif action['action'] == 'exec_cmd':
+        cmd = CFG.content['commands'][action['cmd_name']]['command']
+        logging.info("Executing command: %s" % cmd)
+
+        #try:
+        with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, shell=True) as po:
+            for line in po.stderr:
+                yield (line)
+
+            for line in po.stdout:
+                yield line
+                
+        yield "Done"
+            
+        #except subprocess.CalledProcessError:
+        #    print (po.stderr)
+        #    return "Error executing the command.\n%s" % po.stderr
+            
+        
+        return po.stdout
+        
     elif action['action'] == 'toggledaemon':
 
         if action['status'] == True:
-            cmd = "systemctl start %s" % action['daemon_name']
+            cmd = f"{SYSTEMCTL} start %s" % action['daemon_name']
             logging.info ("Starting daemon %s" % action['daemon_name'])
             
         elif  action['status'] == False:
-            cmd = "systemctl stop %s" % action['daemon_name']
+            cmd = f"{SYSTEMCTL} stop %s" % action['daemon_name']
             logging.info ("Stopping daemon %s" % action['daemon_name'])
             
         with os.popen(cmd) as po:
@@ -629,7 +673,16 @@ if __name__ == '__main__':
         logging.info("Logging using DEBUG SETTINGS")
 
     tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
-    
+
+    # Check if we are inside a docker container. 
+    # If we are, we are not using systemctl to handle processes
+    # but docker-systemctl-replacement
+    IS_DOCKERIZED = os.path.exists('/.dockerenv')
+    if IS_DOCKERIZED:
+        SYSTEMCTL = "/usr/bin/systemctl.py"
+    else:
+        SYSTEMCTL = "/usr/bin/systemctl"
+
     try:
         device_scanner = EthoscopeScanner(results_dir=RESULTS_DIR)
         device_scanner.start()

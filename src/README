@@ -1,4 +1,5 @@
-To install, we run
+=======
+To install, run
 `sudo python setup.py develop`
 in the `src` directory.
 

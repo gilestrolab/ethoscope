@@ -30,11 +30,13 @@ class BaseDrawer(object):
         self._video_out = video_out
         self._draw_frames= draw_frames
         self._video_writer = None
-        self._window_name = "ethoscope_" + str(os.getpid())
+        self._live_window_name = "ethoscope_" + str(os.getpid())
         self._video_out_fourcc = video_out_fourcc
         self._video_out_fps = video_out_fps
+
         if draw_frames:
-            cv2.namedWindow(self._window_name, cv2.WINDOW_AUTOSIZE)
+            cv2.namedWindow(self._live_window_name, cv2.WINDOW_AUTOSIZE)
+            
         self._last_drawn_frame = None
 
     def _annotate_frame(self,img, positions, tracking_units):
@@ -69,12 +71,13 @@ class BaseDrawer(object):
         :return:
         """
 
-        self._last_drawn_frame = img.copy()
+        #self._last_drawn_frame = img.copy()
+        self._last_drawn_frame = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
 
         self._annotate_frame(self._last_drawn_frame, positions, tracking_units, reference_points)
 
         if self._draw_frames:
-            cv2.imshow(self._window_name, self._last_drawn_frame )
+            cv2.imshow(self._live_window_name, self._last_drawn_frame )
             cv2.waitKey(1)
 
         if self._video_out is None:

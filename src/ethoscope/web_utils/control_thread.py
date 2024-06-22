@@ -14,7 +14,7 @@ import subprocess
 import signal
 
 import trace
-from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera, DummyPiCameraAsync, V4L2Camera
+from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera, V4L2Camera
 from ethoscope.roi_builders.target_roi_builder import OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder, ElectricShockAssayROIBuilder
 from ethoscope.roi_builders.roi_builders import  DefaultROIBuilder
 from ethoscope.core.monitor import Monitor
@@ -22,7 +22,7 @@ from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection, EthoscopeSensor
 from ethoscope.stimulators.stimulators import DefaultStimulator
-from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator, OptomotorSleepDepriver, ExperimentalSleepDepStimulator, MiddleCrossingStimulator, OptomotorSleepDepriverSystematic, mAGO
+from ethoscope.stimulators.sleep_depriver_stimulators import * #importing all stimulators - remember to add the allowed ones to line 84
 from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver, MiddleCrossingOdourStimulator, MiddleCrossingOdourStimulatorFlushed
 from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulator
 
@@ -94,14 +94,15 @@ class ControlThread(Thread):
                                             OptomotorSleepDepriverSystematic,
                                             MiddleCrossingOdourStimulator,
                                             MiddleCrossingOdourStimulatorFlushed,
-                                            mAGO
+                                            mAGO,
+                                            AGO
                                             ],
                     },
         "drawer":{
                         "possible_classes":[DefaultDrawer, NullDrawer],
                     },
         "camera":{
-                        "possible_classes":[OurPiCameraAsync, MovieVirtualCamera, DummyPiCameraAsync, V4L2Camera],
+                        "possible_classes":[OurPiCameraAsync, MovieVirtualCamera, V4L2Camera],
                     },
         "result_writer":{
                         "possible_classes":[ResultWriter, SQLiteResultWriter],
@@ -140,6 +141,7 @@ class ControlThread(Thread):
                             }
 
     _persistent_state_file = PERSISTENT_STATE
+    _last_run_info = '/var/run/last_run.ethoscope'
 
     def __init__(self, machine_id, name, version, ethoscope_dir, data=None, *args, **kwargs):
 
@@ -177,7 +179,7 @@ class ControlThread(Thread):
         
         #todo add 'data' -> how monitor was started to metadata
         self._info = {  "status": "stopped",
-                        "time": time.time(),
+                        "time": time.time(), #this is time of last interaction, e.g. last reboot, last start, last stop.
                         "error": None,
                         "log_file": os.path.join(ethoscope_dir, self._log_file),
                         "dbg_img": os.path.join(ethoscope_dir, self._dbg_img_file),
@@ -192,6 +194,10 @@ class ControlThread(Thread):
                         "version": version
                         }
         self._monit = None
+
+        if os.path.exists(self._last_run_info):
+            with open(self._last_run_info, 'rb') as fn:
+                self._info.update( pickle.load(fn) )
 
         self._parse_user_options(data)
         
@@ -234,19 +240,26 @@ class ControlThread(Thread):
     @classmethod
     def user_options(self):
         out = {}
+        
         for key, value in list(self._option_dict.items()):
             # check if the options for the remote class will be visible
             # they will be visible only if they have a description, and if we are on a PC or they are not hidden
-            if (self._is_a_rPi and key not in self._hidden_options) or not self._is_a_rPi:
+            if key not in self._hidden_options or isExperimental() or not self._is_a_rPi:
                 out[key] = []
                 for p in value["possible_classes"]:
                     try:
-                        d = p.__dict__["_description"]
+                        if isExperimental():
+                            d = p.__dict__["_description"]
+                            d["name"] = p.__name__
+                            out[key].append(d)
+                            
+                        elif not isExperimental() and 'hidden' not in p.__dict__['_description'] or not p.__dict__['_description']['hidden']:
+                            d = p.__dict__["_description"]
+                            d["name"] = p.__name__
+                            out[key].append(d)
+
                     except KeyError:
                         continue
-
-                    d["name"] = p.__name__
-                    out[key].append(d)
 
         out_curated = {}
         for key, value in list(out.items()):
@@ -383,7 +396,6 @@ class ControlThread(Thread):
         """
         CameraClass = self._option_dict["camera"]["class"]
         camera_kwargs = self._option_dict["camera"]["kwargs"]
-
         ROIBuilderClass = self._option_dict["roi_builder"]["class"]
         roi_builder_kwargs = self._option_dict["roi_builder"]["kwargs"]
 
@@ -410,13 +422,11 @@ class ControlThread(Thread):
 
         logging.info("Initialising monitor")
         cam.restart()
-        # the camera start time is the reference 0
-
 
         ExpInfoClass = self._option_dict["experimental_info"]["class"]
         exp_info_kwargs = self._option_dict["experimental_info"]["kwargs"]
         self._info["experimental_info"] = ExpInfoClass(**exp_info_kwargs).info_dic
-        self._info["time"] = cam.start_time
+        self._info["time"] = cam.start_time # the camera start time is the reference 0
         
         #here the hardwareconnection call the interface class without passing any argument!
         hardware_connection = HardwareConnection(HardWareInterfaceClass)
@@ -437,21 +447,37 @@ class ControlThread(Thread):
             logging.info(["Recreating a new database", "Appending tracking data to the existing database"][append_to_db])
         else:
             append_to_db = False
+
+        self._info["backup_filename"] = "%s_%s.db" % ( datetime.datetime.utcfromtimestamp(self._info["time"]).strftime('%Y-%m-%d_%H-%M-%S'), self._info["id"] )
         
-        #this will be saved in the metadata table
+        self._info["interactor"] = {}
+        self._info["interactor"]["name"] = str(self._option_dict['interactor']['class'])
+        self._info["interactor"].update ( self._option_dict['interactor']['kwargs'])
+
+        # this will be saved in the metadata table
+        # and in the pickle file below
         self._metadata = {
             "machine_id": self._info["id"],
             "machine_name": self._info["name"],
-            "date_time": cam.start_time,  # the camera start time is the reference 0
+            "date_time": self._info["time"],
             "frame_width": cam.width,
             "frame_height": cam.height,
             "version": self._info["version"]["id"],
             "experimental_info": str(self._info["experimental_info"]),
             "selected_options": str(self._option_dict),
             "hardware_info" : str(self.hw_info),
-            "reference_points" : str([(p[0],p[1]) for p in reference_points])
+            "reference_points" : str([(p[0],p[1]) for p in reference_points]),
+            "backup_filename" : self._info["backup_filename"]
         }
         
+        # This is useful to retrieve the latest run's information after a reboot
+        with open(self._last_run_info, "wb") as f:
+            pickle.dump( {
+                        "previous_date_time" : self._info["time"],
+                        "previous_backup_filename" : self._info["backup_filename"],
+                        "previous_user" : self._info["experimental_info"]["name"],
+                        "previous_location" : self._info["experimental_info"]["location"]
+                        }, f)
         
         # hardware_interface is a running thread
         rw = ResultWriter(self._db_credentials, rois, self._metadata, take_frame_shots=True, erase_old_db = (not append_to_db), sensor=sensor,)
@@ -459,6 +485,13 @@ class ControlThread(Thread):
         return  (cam, rw, rois, reference_points, TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs)
 
+    def _get_latest_backup_filename(self):
+        '''
+        Tries to recover the latest backup_filename
+        '''
+        pass
+        
+    
     def run(self):
         cam = None
         hardware_connection = None
@@ -554,6 +587,14 @@ class ControlThread(Thread):
         self._info["time"] = time.time()
         self._info["error"] = error
         self._info["monitor_info"] = self._default_monitor_info
+        
+        
+        if "backup_filename" in self._info:
+            self._info["previous_date_time"] : self._info["time"]
+            self._info["previous_backup_filename"] : self._info["backup_filename"]
+            self._info["previous_user"] : self._info["experimental_info"]["name"]
+            self._info["previous_location"] : self._info["experimental_info"]["location"]
+
 
         if error is not None:
             logging.error("Monitor closed with an error:")

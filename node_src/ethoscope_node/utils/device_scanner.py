@@ -1,4 +1,3 @@
-from threading import Thread
 import urllib.request, urllib.error, urllib.parse
 import os
 import datetime
@@ -6,15 +5,20 @@ import json
 import time
 import logging
 import traceback
-from functools import wraps
-import socket
-from zeroconf import ServiceBrowser, Zeroconf, IPVersion
+import pickle
+import mysql.connector
+import socket, struct
 
+from threading import Thread
+from functools import wraps
+from zeroconf import ServiceBrowser, Zeroconf, IPVersion
 from ethoscope_node.utils.etho_db import ExperimentalDB
 from ethoscope_node.utils.mysql_backup import db_diff
 
 STREAMING_PORT = 8887
 ETHOSCOPE_PORT = 9000
+
+DB_UPDATE_INTERVAL = 30
 
 class ScanException(Exception):
     pass
@@ -207,6 +211,7 @@ class Ethoscope(Device):
             'static' : "static",
             'controls' : "controls",
             'machine_info' : "machine",
+            'connected_module' : "module",
             'update' : "update",
             'dumpdb' : "dumpSQLdb"
             }
@@ -221,7 +226,8 @@ class Ethoscope(Device):
                                      "restart" : ["stopped"],
                                      "dumpdb" : ["stopped"],
                                      "offline": [],
-                                     "convertvideos" : ["stopped"]
+                                     "convertvideos" : ["stopped"],
+                                     "test_module" : ["stopped"]
                                      }
 
     def __init__(self, ip, port = ETHOSCOPE_PORT, refresh_period = 5, results_dir = "/ethoscope_data/results"):
@@ -244,10 +250,10 @@ class Ethoscope(Device):
         self._info['ping'] = 0
         
         self._edb = ExperimentalDB()
-        self._last_db_info = time.time()
-
-        super(Ethoscope,self).__init__()
+        self._last_db_info = 0
+        self._device_controller_created = time.time()
         
+        super(Ethoscope,self).__init__()
 
 
     def run(self):
@@ -275,6 +281,9 @@ class Ethoscope(Device):
         
 
     def send_instruction(self, instruction, post_data):
+        '''
+        Handles JSON instructions received by the server
+        '''
         
         post_url = "http://%s:%i/%s/%s/%s" % (self._ip, self._port, self._remote_pages['controls'], self._id, instruction)
         self._check_instructions_status(instruction)
@@ -311,8 +320,14 @@ class Ethoscope(Device):
 
     def ip(self):
         return self._ip
-        
+
     def id(self):
+        '''
+        '''
+        # this may be the first time the id is asked.
+        if not self._id:
+            self._update_id()
+            
         return self._id
         
     def info(self):
@@ -330,7 +345,17 @@ class Ethoscope(Device):
             return out
         else:
             return {}
-        
+
+    def connected_module(self):
+        '''
+        Asks the ethoscope to give us information about connected modules. We do not do this through machine info because the step requires
+        opening a serial connection with a module and we do not want to risk doing this when the module is actually running in an experiment.
+        '''
+        if self._id:
+            url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_pages['connected_module'], self._id)
+            return self._get_json(url, timeout=12)
+        else:
+            return {}
 
     def skip_scanning(self, value):
         self._skip_scanning = value
@@ -343,47 +368,40 @@ class Ethoscope(Device):
         out = self._get_json(videofiles_url)
         return out
 
-
     def relay_stream(self):
         '''
         The node uses this function to relay the stream of images from the device to the node client
         '''
-        
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.connect((self._ip, STREAMING_PORT))
 
-        client_socket.settimeout(5)
+        #client_socket.settimeout(5)
         client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
         client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
         
-        rfile = client_socket.makefile('rb')
-
-        stream_bytes = b' '
-
+        data = b""
+        payload_size = struct.calcsize("Q")
+        
         while True:
+            while len(data) < payload_size:
+                packet = client_socket.recv(4*1024)
+                if not packet: break
+                data+=packet
             
-            stream_bytes += rfile.read(1024)
+            packed_msg_size = data[:payload_size]
+            data = data[payload_size:]
+            msg_size = struct.unpack("Q",packed_msg_size)[0]
             
-            if len(stream_bytes) == 0:
-                break
-
-            first = stream_bytes.find(b'\xff\xd8')
-            last = stream_bytes.find(b'\xff\xd9')
+            while len(data) < msg_size:
+                data += client_socket.recv(4*1024)
             
-            if first != -1 and last != -1:
+            frame_data = data[:msg_size]
+            data  = data[msg_size:]
+            frame = pickle.loads(frame_data)
+            
+            yield (b'--frame\r\nContent-Type:image/jpeg\r\n\r\n' + frame.tobytes() + b'\r\n')
 
-                jpg = stream_bytes[first:last+2]
-                stream_bytes = stream_bytes[last+2:]
-
-                yield b'--frame\r\n'
-                yield b'X-Timestamp: %s\r\n' % str(time.time()).encode()
-                yield b'Content-Length: %s\r\n' % str(len(jpg)).encode()
-                yield b'Content-Type: image/jpeg\r\n\r\n' 
-                yield jpg
-                yield b'\r\n'
-
-        rfile.close()
-        client_socket.close()
+        client_socket.close()        
 
     def user_options(self):
         """
@@ -403,7 +421,6 @@ class Ethoscope(Device):
     def last_image(self):
         """
         Collects the last drawn image fromt the device
-        TODO: on the device side, this should not rely on an actuale image file but be fished from memory
         """
         # we return none if the device is not in a stoppable status (e.g. running, recording)
         if self._info["status"] not in self._allowed_instructions_status["stop"]:
@@ -455,7 +472,6 @@ class Ethoscope(Device):
         self._info["ip"] = self._ip
         self._id = resp['id']
 
-
     def _reset_info(self):
         '''
         This is called whenever the device goes offline or when it is first added
@@ -468,6 +484,7 @@ class Ethoscope(Device):
         '''
 
         previous_status = self._info['status']
+        new_status = ''
 
         self._info['ping'] += 1
 
@@ -482,9 +499,6 @@ class Ethoscope(Device):
                 new_status = new_info['status']
                 
             self._info.update(new_info)
-
-            backup_path = self._make_backup_path()
-            self._info.update(backup_path)
 
         except ScanException as e:
             logging.warning(f"error while scanning: {e}")
@@ -519,6 +533,8 @@ class Ethoscope(Device):
             self._edb.updateEthoscopes(ethoscope_id = self._id, ethoscope_name = self._info['name'], last_ip = self._ip, machineinfo = machine_info)
         
 
+        # Stores full backup path to _info['backup_path']
+        self._make_backup_path()
 
         #if ethoscope is online and returning data
         try:
@@ -549,54 +565,94 @@ class Ethoscope(Device):
         except:
             pass
 
-        # gather info on the current backup if possible
-        try:
-            if time.time() - self._last_db_info > 60:
+
+        # Every 60 seconds gather info on the current backup if possible
+        if time.time() - self._last_db_info > DB_UPDATE_INTERVAL:
+            try:
                 dbd = db_diff(self._info["db_name"], self._ip, self._info['backup_path'])
                 self._info['backup_status'] = dbd.compare_databases()
-                self._last_db_info = time.time()
 
-        except:
-            self._info['backup_status'] = "N/A"
+            except:
+                # Something went wrong - trying again later
+                self._info['backup_status'] = "N/A"
+
+            self._last_db_info = time.time()
 
 
-    def _make_backup_path(self,  timeout=30):
+    def _make_backup_path(self, timeout=30):
         '''
+        Creates the full path for the backup file, gathering info from the ethoscope
+        
+        The full backup_path will look something like:
+        /ethoscope_data/results/280fd605ceec45fdacdd365f10865f9b/ETHOSCOPE_280/2022-10-17_18-21-27/2022-10-17_17-21-27_280fd605ceec45fdacdd365f10865f9b.db
         '''
         
-        try:
-            import mysql.connector
-            device_id = self._info["id"]
-            device_name = self._info["name"]
-            self._ethoscope_db_credentials["db"] = self._info["db_name"]
+        if self._info["status"] == 'stopped' and "previous_backup_filename" in self._info and self._info["previous_backup_filename"]:
+            fname, _ = os.path.splitext(self._info["previous_backup_filename"])
+            backup_date, backup_time, etho_id = fname.split("_")
             
-            com = "SELECT value from METADATA WHERE field = 'date_time'"
-
-            mysql_db = mysql.connector.connect(host=self._ip,
-                                               connect_timeout=timeout,
-                                               **self._ethoscope_db_credentials,
-                                               buffered=True)
-            cur = mysql_db.cursor()
-            cur.execute(com)
-            query = [c for c in cur]
-            timestamp = float(query[0][0])
-            mysql_db.close()
-            date_time = datetime.datetime.fromtimestamp(timestamp)
-            formatted_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
-            file_name = "%s_%s.db" % (formatted_time, device_id)
             output_db_file = os.path.join(self._results_dir,
-                                          device_id,
-                                          device_name,
-                                          formatted_time,
-                                          file_name
-                                          )
+                                          etho_id,
+                                          self._info["name"],
+                                          "%s_%s" % (backup_date, backup_time),
+                                          self._info["previous_backup_filename"])
+        
+        elif self._info["status"] != 'stopped' and "backup_filename" in self._info and self._info["backup_filename"]:
 
-        except Exception as e:
-            #logging.error("Could not generate backup path for device. Probably a MySQL issue")
-            #logging.error(traceback.format_exc())
-            return {"backup_path": "None"}
+            #backup_filename is something like 2022-03-13_01-25-20_2719721d8b3e409da53c77be58c7ca62.db
+            fname, _ = os.path.splitext(self._info["backup_filename"])
+            backup_date, backup_time, etho_id = fname.split("_")
+            
+            output_db_file = os.path.join(self._results_dir,
+                                          etho_id,
+                                          self._info["name"],
+                                          "%s_%s" % (backup_date, backup_time),
+                                          self._info["backup_filename"])
+            
+        else:
+        # The ethoscope did not communicate to us its backup_filename
+        # probably because it runs a software version older than October 2022
+        # we will interrogate the mysql database on the ethoscope and try to 
+        # sort out the name ourselves, like the (bad) old times.
 
-        return {"backup_path": output_db_file}
+            try:
+                logging.warning("No information regarding backup file from the ethoscope") 
+                
+                device_id = self._info["id"]
+                device_name = self._info["name"]
+                self._ethoscope_db_credentials["db"] = self._info["db_name"]
+                
+                com = "SELECT value from METADATA WHERE field = 'date_time'"
+
+                mysql_db = mysql.connector.connect(host=self._ip,
+                                                   connect_timeout=timeout,
+                                                   **self._ethoscope_db_credentials,
+                                                   buffered=True,
+                                                   charset='latin1', #this should match what set in ethoscope.utils.io
+                                                   use_unicode=True)
+                cur = mysql_db.cursor()
+                cur.execute(com)
+                query = [c for c in cur]
+                timestamp = float(query[0][0])
+                mysql_db.close()
+                date_time = datetime.datetime.utcfromtimestamp(timestamp)
+                formatted_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
+                self._info["backup_filename"] = "%s_%s.db" % (formatted_time, device_id)
+                
+                output_db_file = os.path.join(self._results_dir,
+                                              device_id,
+                                              device_name,
+                                              formatted_time,
+                                              self._info["backup_filename"]
+                                              )
+
+            except Exception as e:
+                logging.error("Could not generate backup path for device. Probably a MySQL issue")
+                #logging.error(traceback.format_exc())
+                output_db_file = "None"
+
+
+        self._info.update( {"backup_path": output_db_file} )
 
     def stop(self):
         self._is_online = False
@@ -643,7 +699,6 @@ class DeviceScanner():
         :param id: The ID of the device
         :return: the device instance
         """
-        
         for device in self.devices:
             if device.id()==id:
                 return device
@@ -733,18 +788,29 @@ class EthoscopeScanner(DeviceScanner):
         
         self.timestarted = datetime.datetime.now()
 
-    def _get_last_backup_time(self, device):
+    def _get_backup_size(self, device):
+        '''
+        '''
         try:
             backup_path = device.info()["backup_path"]
-            time_since_backup = time.time() - os.path.getmtime(backup_path)
-            return time_since_backup
-        except OSError:
+            if backup_path and os.path.exists(backup_path):
+                return os.path.getsize(backup_path)
+        except:
+            return 0
+
+    def _get_last_backup_time(self, device):
+        '''
+        '''
+        try:
+            backup_path = device.info()["backup_path"]
+            if backup_path and os.path.exists(backup_path):
+                return time.time() - os.path.getmtime(backup_path)
+        except:
             return
-        except KeyError:
-            return
-        except Exception as e:
-            logging.error(traceback.format_exc())
-            return
+            
+    @property
+    def current_devices_id(self):
+        return [device.id() for device in self.devices]
 
     def get_all_devices_info(self):
         '''
@@ -769,6 +835,7 @@ class EthoscopeScanner(DeviceScanner):
             if device.name != "ETHOSCOPE_000":
                 out[device.id()] = device.info()
                 out[device.id()]["time_since_backup"] = self._get_last_backup_time(device)
+                out[device.id()]["backup_size"] = self._get_backup_size(device)
             else:
                 out[device.name] = device.info()
                 
@@ -778,18 +845,47 @@ class EthoscopeScanner(DeviceScanner):
         """
         Add an ethoscope to the list
         TODO: Can be called manually or by zeroconf - it would be good to recognise which case we are in
-        """
         
-        #initialised the device and start it
-        device = self._Device(ip, port=port, refresh_period = self.device_refresh_period, results_dir = self.results_dir )
-        device.zeroconf_name = name
-        device.start()
+        name will be something like ETHOSCOPE170-170211ce7a844c23abc5ffe6ede1e154._ethoscope._tcp.local
+        """
 
-        #device_id = zcinfo.properties[b'id']
-        #device_id = name.split("-")[1].split(".")[0]
+        #tries to extract ID from name
+        if zcinfo:
+            try:
+                name = zcinfo['MACHINE_NAME']
+                eid = zcinfo['MACHINE_ID']
+            except:
+                try:
+                    name, eid = name.split(".")[0].split("-")
+                except:
+                    name, eid = None, None
+        else:
+            name, eid = None, None
+            
+        
+        #check if device already exists
+        if eid not in self.current_devices_id or eid is None:
+        
+            #initialised the device and start it
+            device = self._Device(ip, port=port, refresh_period = self.device_refresh_period, results_dir = self.results_dir )
+            device.zeroconf_name = name
+            device.start()
 
-        self.devices.append(device)
-        logging.info("New %s added with name = %s at IP = %s:%s" % (self._device_type, name, ip, port))
+            logging.info("New %s found with name = %s  at IP = %s:%s" % (self._device_type, name, ip, port))
+
+            #The system above is rather fragile because depends on zeroconf names The solution below adds a second layer
+            if device.id() in self.current_devices_id:
+                logging.info("The ethoscope was actually already known. Deleting it.")
+                del device
+            else:
+                logging.info("Adding ethoscope to the list.")
+                self.devices.append(device)
+                
+        
+        else:
+            logging.info("%s %s back online with IP %s" % (self._device_type, name, ip) )
+
+
 
     
     def retire_device (self, id, active=0):

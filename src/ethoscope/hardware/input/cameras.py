@@ -1,6 +1,14 @@
 __author__ = 'quentin'
 
+import time, datetime
+import logging
+import os
+from ethoscope.utils.debug import EthoscopeException
+import threading, queue
+import traceback
+
 import cv2
+import numpy as np
 try:
     from cv2.cv import CV_CAP_PROP_FRAME_WIDTH as CAP_PROP_FRAME_WIDTH
     from cv2.cv import CV_CAP_PROP_FRAME_HEIGHT as CAP_PROP_FRAME_HEIGHT
@@ -11,20 +19,22 @@ try:
 except ImportError:
     from cv2 import CAP_PROP_FRAME_WIDTH, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_COUNT, CAP_PROP_POS_MSEC, CAP_PROP_FPS
 
-import time
-import logging
-import os
-from ethoscope.utils.debug import EthoscopeException
-
-import threading, queue
-import traceback
+try:
+    import picamera
+    USE_PICAMERA2 = False
+except ImportError:
+    try:
+        import picamera2
+        USE_PICAMERA2 = True
+    except ImportError:
+        USE_PICAMERA2 = None  # None or some other value to indicate both imports failed
 
 class BaseCamera(object):
     capture = None
-    _resolution = None
+    resolution = None
     _frame_idx = 0
 
-    def __init__(self,drop_each=1, max_duration=None, *args, **kwargs):
+    def __init__(self, drop_each=1, max_duration=None, *args, **kwargs):
         """
         The template class to generate and use video streams.
 
@@ -123,7 +133,7 @@ class BaseCamera(object):
 class MovieVirtualCamera(BaseCamera):
     _description = {"overview":  "Class to acquire frames from a video file.",
                     "arguments": [
-                                    {"type": "filepath", "name": "path", "description": "The *LOCAL* path to the video file to use as virtual camera","default":""},
+                                    {"type": "filepath", "name": "path", "description": "Will be looking for videos in /ethoscope_data/upload/video/","default":""},
                                    ]}
                                    
 
@@ -140,6 +150,10 @@ class MovieVirtualCamera(BaseCamera):
         :param kwargs: additional keyword arguments.
         """
 
+        self.canbepickled = False #cv2.videocapture object cannot be serialized, hence cannot be picked
+        self.isPiCamera = True
+
+
         #print "path", path
         self._frame_idx = 0
         self._path = path
@@ -151,7 +165,6 @@ class MovieVirtualCamera(BaseCamera):
         if not os.path.exists(path):
             raise EthoscopeException("'%s' does not exist. No such file" % path)
 
-        self.canbepickled = False #cv2.videocapture object cannot be serialized, hence cannot be picked
         self.capture = cv2.VideoCapture(path) 
         w = self.capture.get(CAP_PROP_FRAME_WIDTH)
         h = self.capture.get(CAP_PROP_FRAME_HEIGHT)
@@ -188,7 +201,7 @@ class MovieVirtualCamera(BaseCamera):
 
     def _next_image(self):
         _, frame = self.capture.read()
-        return frame
+        return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     def _time_stamp(self):
         if self._use_wall_clock:
@@ -227,7 +240,13 @@ class V4L2Camera(BaseCamera):
         """
         
         self.canbepickled = False
+        self.isPiCamera = False
+
         self.capture = cv2.VideoCapture(device)
+        
+        #gst_str = ("v4l2src device=/dev/video{} ! video/x-raw,width=(int){},height=(int){},framerate=(fraction){}/1 ! videoconvert ! video/x-raw,format=BGR ! queue ! appsink drop=1").format(device, target_resolution[0], target_resolution[1], target_fps)
+        #self.capture = cv2.VideoCapture(gst_str, cv2.CAP_GSTREAMER)
+        
         self._warm_up()
 
         w, h = target_resolution
@@ -244,25 +263,27 @@ class V4L2Camera(BaseCamera):
         if target_fps < 2:
             raise EthoscopeException("FPS must be at least 2")
         self.capture.set(CAP_PROP_FPS, target_fps)
-
+    
         self._target_fps = float(target_fps)
-        _, im = self.capture.read()
+        self.fps = float(target_fps)
+        
+        time.sleep(1)
+        _, first_frame = self.capture.read()
 
         # preallocate image buffer => faster
-        if im is None:
+        if first_frame is None:
             raise EthoscopeException("Error whist retrieving video frame. Got None instead. Camera not plugged?")
 
-        self._frame = im
+        assert(len(first_frame.shape) >1)
 
-        assert(len(im.shape) >1)
-
-        self._resolution = (im.shape[1], im.shape[0])
+        self._resolution = (first_frame.shape[1], first_frame.shape[0])
         if self._resolution != target_resolution:
             if w > 0 and h > 0:
                 logging.warning('Target resolution "%s" could NOT be achieved. Effective resolution is "%s"' % (target_resolution, self._resolution ))
             else:
                 logging.info('Maximal effective resolution is "%s"' % str(self._resolution))
 
+        self._frame = first_frame
 
         super(V4L2Camera, self).__init__(*args, **kwargs)
         self._start_time = time.time()
@@ -285,17 +306,25 @@ class V4L2Camera(BaseCamera):
         now = time.time()
         # relative time stamp
         return now - self._start_time
+    
     @property
     def start_time(self):
         return self._start_time
 
     def _close(self):
         self.capture.release()
+        
     def _next_image(self):
-        if self._frame_idx >0 :
+        '''
+        Image iterator. Tries to calculate the actual FPS and approach the desired FPS target
+        '''
+        if self._frame_idx > 0 :
             expected_time =  self._start_time + self._frame_idx / self._target_fps
             now = time.time()
+            self.fps = self._frame_idx/(now - self._start_time)
+
             to_sleep = expected_time - now
+
             # Warnings if the fps is so high that we cannot grab fast enough
             if to_sleep < 0:
                 if self._frame_idx % 5000 == 0:
@@ -306,15 +335,20 @@ class V4L2Camera(BaseCamera):
             while now < expected_time:
                 self.capture.grab()
                 now = time.time()
+
         else:
             self.capture.grab()
+        
         self.capture.retrieve(self._frame)
+        
+        if len(self._frame.shape) == 3:
+            return cv2.cvtColor(self._frame, cv2.COLOR_BGR2GRAY)
+        
         return self._frame
 
-#class PiFrameGrabber(multiprocessing.Process):
 class PiFrameGrabber(threading.Thread):
 
-    def __init__(self, target_fps, target_resolution, queue, stop_queue, *args, **kwargs):
+    def __init__(self, target_fps, target_resolution, queue, stop_queue, video_prefix=None, quality=20, *args, **kwargs):
         """
         Class to grab frames from pi camera. Designed to be used within :class:`~ethoscope.hardware.camreras.camreras.OurPiCameraAsync`
         This allows to get frames asynchronously as acquisition is a bottleneck.
@@ -331,13 +365,58 @@ class PiFrameGrabber(threading.Thread):
         :param kwargs: additional keyword arguments
         """
 
+        self._acquisition_speed = 0
         self._queue = queue
         self._stop_queue = stop_queue
         self._target_fps = target_fps
         self._target_resolution = target_resolution
         
+        # This stuff should not be here in principle but the video recording
+        # must be done from the camera class or else it will be to slow
+        self._record_video = video_prefix is not None
+        self._video_prefix = video_prefix
+        self._VIDEO_CHUNCK_DURATION = 300
+        self._PREVIEW_REFRESH_TIME = 5
+        self._file_index = 0
+
+        # Specifies the quality that the encoder should attempt to maintain. 
+        # For the 'h264' format, use values between 10 and 40 where 10 is extremely high quality, and 40 is extremely low 
+        # (20-25 is usually a reasonable range for H.264 encoding)
+        self.video_quality = quality
+
         super(PiFrameGrabber, self).__init__()
 
+    def _save_camera_info(self, camera_info, save_path='/etc/picamera-version'):
+        """
+        PINoIR v1 with picamera
+        {'IFD0.Model': 'RP_ov5647', 'IFD0.Make': 'RaspberryPi'}
+        
+        PINoIR v2 with picamera
+        {'IFD0.Model': 'RP_imx219', 'IFD0.Make': 'RaspberryPi'}
+
+        v2 with picamera2
+        {'Model': 'imx219', 'Location': 2, 'Rotation': 180, 'Id': '/base/soc/i2c0mux/i2c@1/imx219@10', 'Num': 0}
+        
+        We save this information on the filesystem so that it can be retrieved by the system if the system needs to know
+        which camera we are using - this is not ideal but accessing IFD0 from another instance creates weird issues
+        """
+
+        #double the dictionary key for compatibility between picamera and picamera2
+        if "Model" in camera_info:
+            camera_info["IFD0.Model"] = camera_info["Model"]
+
+        logging.info(f"Detected camera {camera_info}")
+        with open(save_path, 'w') as outfile:
+            print(camera_info, file=outfile)
+
+    def _get_video_chunk_filename(self, fps=None, ext='h264'):
+        
+        fps = fps or 0
+        self._file_index += 1
+        w,h = self._target_resolution
+        video_info= "%ix%i@%ifps-%iq" %(w, h, fps, self.video_quality)
+        chunk_file_name = '%s_%s_%05d.%s' % (self._video_prefix, video_info, self._file_index, ext)
+        return chunk_file_name
 
     def run (self):
         """
@@ -345,61 +424,60 @@ class PiFrameGrabber(threading.Thread):
         Run stops if the _stop_queue is not empty.
         """
 
-        try:
-            # lazy import should only use those on devices
-            
-            # Warning: the following causes a major issue with Python 3.8.1
-            # https://www.bountysource.com/issues/86094172-python-3-8-1-typeerror-vc_dispmanx_element_add-argtypes-item-9-in-_argtypes_-passes-a-union-by-value-which-is-unsupported
-            # this should now be fixed in Python 3.8.2 (6/5/2020)
-            
-            import picamera
-            import picamera.array
+        #try:
+        # lazy import should only use those on devices
+        
+        # Warning: the following causes a major issue with Python 3.8.1
+        # https://www.bountysource.com/issues/86094172-python-3-8-1-typeerror-vc_dispmanx_element_add-argtypes-item-9-in-_argtypes_-passes-a-union-by-value-which-is-unsupported
+        # this should now be fixed in Python 3.8.2 (6/5/2020)
+        
+        import picamera
+        import picamera.array
 
-            with picamera.PiCamera() as capture:
+        # try:
+        with picamera.PiCamera(
+                        #sensor_mode = 1, #https://picamera.readthedocs.io/en/release-1.13/fov.html#sensor-modes
+                        resolution = self._target_resolution,
+                        framerate = self._target_fps
+        ) as capture:
 
-                capture.resolution = self._target_resolution
-                camera_info = capture.exif_tags
-                logging.info("Detected camera %s: " % camera_info)
-                
-                #PINoIR v1
-                #{'IFD0.Model': 'RP_ov5647', 'IFD0.Make': 'RaspberryPi'}
-                #PINoIR v2
-                #{'IFD0.Model': 'RP_imx219', 'IFD0.Make': 'RaspberryPi'}
-                
-                #disable auto white balance to address the following issue: https://github.com/raspberrypi/firmware/issues/1167
-                #however setting this to off would have to be coupled with custom gains
-                #some suggestion on how to set the gains can be found here: https://picamera.readthedocs.io/en/release-1.12/recipes1.html
-                #and here: https://github.com/waveform80/picamera/issues/182
-                
-                # Let's disable this and use awb_auto_is_greyworld in /boot/config.txt instead (see #97  )
-                # if camera_info['IFD0.Model'] == 'RP_imx219':
-                    # capture.awb_mode = 'off'
-                    # capture.awb_gains = (1.8, 1.5) #TODO: allow user-specified gains
-                    # logging.info("piNoIR v2 detected - using custom awb parameters")
-                # else:
-                    # # we are disabling auto white balance for IMX219
-                    # capture.awb_mode = 'auto'
-                    # logging.info("piNoIR v1 detected - using automatic white balance")
-                    
-                #we save this information on the filesystem so that it can be retrieved by the system - this is not ideal but accessing IFD0 from another instance creates weird issues
-                with open('/etc/picamera-version', 'w') as outfile:
-                    print(camera_info, file=outfile)
-                
+            self._save_camera_info (capture.exif_tags)
+            w, h = capture.resolution[0], capture.resolution[1]
 
-                capture.framerate = self._target_fps
-                stream = picamera.array.PiRGBArray(capture, size=self._target_resolution)
+            if self._record_video:
+
+                self._video_time = time.time()
+
+                frame = np.empty((h, w, 3), dtype=np.uint8)
+                capture.start_recording( self._get_video_chunk_filename(fps=capture.framerate) , format = 'h264', quality = self.video_quality)
+
+                while self._stop_queue.empty():        
+                    capture.capture(frame, format = 'bgr', use_video_port=True)
+
+                    self._queue.put(frame)
+
+                    capture.wait_recording(self._PREVIEW_REFRESH_TIME) 
+
+                    if time.time() - self._video_time >= self._VIDEO_CHUNCK_DURATION:
+                        capture.split_recording( self._get_video_chunk_filename( fps=capture.framerate ) )
+                        self._video_time = time.time()
+                
+                capture.stop_recording()
+
+
+
+            else: #regular acquisition: all frames go in the queue
+
+                #stream = picamera.array.PiRGBArray(capture, size=self._target_resolution)
+                # Capturing in YUV then taking the first dimension is the fastest way to directly get grayscale images
+                # https://github.com/raspberrypi/picamera2/issues/698
+                
+                video_stream = picamera.array.PiYUVArray(capture, size=self._target_resolution)
+
                 time.sleep(0.2) # sleep 200ms to allow the camera to warm up
 
-                for frame in capture.capture_continuous(stream, format="bgr", use_video_port=True):
-                    
-                    #This syntax changed from picamera > 1.7    - see https://picamera.readthedocs.io/en/release-1.10/deprecated.html
-                    stream.seek(0)
-                    stream.truncate()
-                    # out = np.copy(frame.array)
-                    out = cv2.cvtColor(frame.array,cv2.COLOR_BGR2GRAY)
-                    #fixme here we could actually pass a JPG compressed file object (http://docs.scipy.org/doc/scipy-0.16.0/reference/generated/scipy.misc.imsave.html)
-                    # This way, we would manage to get faster FPS
-                    self._queue.put(out)
+                # video port True gives 19 FPS; False gives 4
+                for frame in capture.capture_continuous(video_stream, format='yuv', use_video_port=True):
 
                     if not self._stop_queue.empty():
                         logging.info("The stop queue is not empty. This signals it is time to stop acquiring frames")
@@ -407,12 +485,99 @@ class PiFrameGrabber(threading.Thread):
                         self._stop_queue.task_done()
                         break
 
-        except:
-            logging.warning("Some problem acquiring frames from the camera")
+                    video_stream.seek(0)
+                    self._queue.put(frame.array[:, :, 0]) #gets the first channel (Y) to extract greyscale
+
+
+        # except:
+        #     logging.warning("Some problem acquiring frames from the camera")
                     
-        finally:
-            self._queue.task_done() # this tell the parent the thread can be closed
-            logging.warning("Camera Frame grabber stopped acquisition cleanly")
+        # finally:
+
+        #     self._queue.task_done() # this tell the parent the thread can be closed
+        #     logging.warning("Camera Frame grabber stopped acquisition cleanly")
+
+
+class PiFrameGrabber2(PiFrameGrabber):
+    """
+    Same as PiFrameGrabber but uses picamera2
+    """
+
+    def run (self):
+        """
+        Initialise pi camera, get frames, convert them fo greyscale, and make them available in a queue.
+        Run stops if the _stop_queue is not empty.
+        """
+
+        w, h = self._target_resolution
+        
+        from picamera2 import Picamera2, MappedArray
+
+        Picamera2.set_logging(Picamera2.ERROR)
+
+        with Picamera2() as capture:
+           
+            config = capture.create_video_configuration(
+                            main = { 'size' : self._target_resolution, 'format': 'YUV420' },
+                            lores = {'size' : (640, 480), 'format': 'YUV420' },
+                            buffer_count = 2, #Still image capture normally configures only a single buffer, as this is all you need. But if you're doing some form of burst capture, increasing the buffer count may enable the application to receive images more quickly.
+                            controls = { 'FrameRate': self._target_fps },
+                            )
+            capture.configure(config)
+
+            self._save_camera_info (capture.global_camera_info()[0])
+
+            if self._record_video:
+
+                from picamera2.encoders import H264Encoder
+                encoder = H264Encoder(bitrate=10000000)
+
+                self._video_time = time.time()
+                self._refresh_interval = time.time()
+
+                capture.start()
+                capture.start_encoder(encoder, self._get_video_chunk_filename(self._target_fps))
+
+                while self._stop_queue.empty():
+
+                    if time.time() - self._refresh_interval >= self._PREVIEW_REFRESH_TIME:
+                        request = capture.capture_request()
+                        with MappedArray(request, "main") as frame:
+                            self._queue.put(frame.array[:h, :])
+                        request.release()
+                        self._refresh_interval = time.time()
+
+                    if time.time() - self._video_time >= self._VIDEO_CHUNCK_DURATION:
+                        logging.info("Splitting video recording into a new H264 chunk.")
+                        capture.stop_encoder()
+                        capture.start_encoder(encoder, self._get_video_chunk_filename(self._target_fps))
+                        self._video_time = time.time()
+
+                self._stop_queue.get()
+                self._stop_queue.task_done()
+                capture.stop_encoder()
+                capture.stop()
+
+
+            else:
+
+                capture.start()
+                while self._stop_queue.empty():
+
+                    frame = capture.capture_array("main")
+
+                    # As for picamera, we take arrays in YUV420 format and then get only the Y channel. The slicing, however, is different.
+                    # from the picamera2 manual, pg 37 https://datasheets.raspberrypi.com/camera/picamera2-manual.pdf
+                    # YUv420 is a slightly special case because the first height rows give the Y channel, the next height/4 rows contain the U
+                    # channel and the final height/4 rows contain the V channel. For the other formats, where there is an "alpha" value it will
+                    # take the fixed value 255
+
+                    self._queue.put(frame[:h, :])
+
+                logging.info("The stop queue is not empty. This signals it is time to stop acquiring frames")
+                self._stop_queue.get()
+                self._stop_queue.task_done()
+                capture.stop()
 
 
 class OurPiCameraAsync(BaseCamera):
@@ -420,8 +585,7 @@ class OurPiCameraAsync(BaseCamera):
                     "arguments": []}
                                    
 
-    _frame_grabber_class = PiFrameGrabber
-    def __init__(self, target_fps=20, target_resolution=(1280, 960), *args, **kwargs):
+    def __init__(self, target_fps=20, target_resolution=(1280, 960), video_prefix=None, *args, **kwargs):
         """
         Class to acquire frames from the raspberry pi camera asynchronously.
         At the moment, frames are only greyscale images.
@@ -434,6 +598,8 @@ class OurPiCameraAsync(BaseCamera):
         :param kwargs: additional keyword arguments
         """
         self.canbepickled = True #cv2.videocapture object cannot be serialized, hence cannot be picked
+        self.isPiCamera = True
+        self._frame_grabber_class = PiFrameGrabber2 if USE_PICAMERA2 else PiFrameGrabber
 
         w,h = target_resolution
         if not isinstance(target_fps, int):
@@ -445,13 +611,13 @@ class OurPiCameraAsync(BaseCamera):
         self._queue = queue.Queue(maxsize=1)
         self._stop_queue = queue.Queue(maxsize=1)
 
-        self._p = self._frame_grabber_class(target_fps, target_resolution, self._queue, self._stop_queue, *args, **kwargs)
+        self._p = self._frame_grabber_class(target_fps, target_resolution, self._queue, self._stop_queue, video_prefix=video_prefix, *args, **kwargs)
 
         self._p.daemon = True
         self._p.start()
         
         try:
-            im = self._queue.get(timeout=10)
+            self._frame = first_frame = self._queue.get(timeout=10)
             
         except Exception as e:
             logging.error("Could not get any frame from the camera after the initialisation!")
@@ -461,10 +627,10 @@ class OurPiCameraAsync(BaseCamera):
 
             raise e
             
-        self._frame = cv2.cvtColor(im,cv2.COLOR_GRAY2BGR)
-        if len(im.shape) < 2:
+        if len(first_frame.shape) < 2:
             raise EthoscopeException("The camera image is corrupted (less that 2 dimensions)")
-        self._resolution = (im.shape[1], im.shape[0])
+        
+        self._resolution = (first_frame.shape[1], first_frame.shape[0])
         if self._resolution != target_resolution:
             if w > 0 and h > 0:
                 logging.warning('Target resolution "%s" could NOT be achieved. Effective resolution is "%s"' % (target_resolution, self._resolution ))
@@ -521,63 +687,18 @@ class OurPiCameraAsync(BaseCamera):
         logging.info("Frame grabbing thread is joined")
 
     def _next_image(self):
+        self.fps = self._frame_idx/(time.time() - self._start_time)
+
         try:
-            g = self._queue.get(timeout=30)
-            cv2.cvtColor(g,cv2.COLOR_GRAY2BGR,self._frame)
-            return self._frame
+            return self._queue.get(timeout=30)
+
         except Exception as e:
             raise EthoscopeException("Could not get frame from camera\n%s", traceback.format_exc())
 
 
-class DummyFrameGrabber(threading.Thread):
-    def __init__(self, target_fps, target_resolution, queue, stop_queue, path, *args, **kwargs):
-        """
-        Class to mimic the behaviour of :class:`~ethoscope.hardware.input.cameras.PiFrameGrabber`.
-        This is intended for testing purposes.
-        This way, we can emulate the async functionality of the hardware camera by a video file.
 
-        :param target_fps: the desired number of frames par second (FPS)
-        :type target_fps: int
-        :param target_fps: the desired resolution (W x H)
-        :param target_resolution: (int,int)
-        :param args: additional arguments
-        :param kwargs: additional keyword arguments
-        """
-        self._queue = queue
-        self._stop_queue = stop_queue
-        self._target_fps = target_fps
-        self._target_resolution = target_resolution
-        self._video_file = path
-        super(DummyFrameGrabber, self).__init__()
-        
-    def run(self):
-        try:
 
-            cap = cv2.VideoCapture(self._video_file)
-            
-            while True:
-                if not self._stop_queue.empty():
+if __name__ == '__main__':
 
-                    logging.warning("The stop queue is not empty. Stop acquiring frames")
-                    self._stop_queue.get()
-                    self._stop_queue.task_done()
-                    logging.warning("Stop Task Done")
-                    break
-                    
-                _, out = cap.read()
-                #todo sleep here
-                out = cv2.cvtColor(out, cv2.COLOR_BGR2GRAY)
-                self._queue.put(out)
-                
-        except:
-            logging.error("Problems accessing or iterating through the video file")
-
-        finally:
-            logging.info("Dummy Frame grabber stopped acquisition cleanly")
-
-class DummyPiCameraAsync(OurPiCameraAsync):
-    """
-    Class to mimic the behaviour of :class:`~ethoscope.hardware.input.cameras.OurPiCameraAsync`.
-    This is intended for testing purposes. This way, we can emulate the async functionality of the hardware camera by a video file.
-    """
-    _frame_grabber_class = DummyFrameGrabber
+    #I should add some code to test the camera here
+    pass

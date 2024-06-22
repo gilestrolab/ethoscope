@@ -53,9 +53,15 @@ function maxLengthCheck(object) {
                           },
                           {name:"Node Management",
                            icon:"fa fa-cog",
-                           color:"alert alert-success",
+                           color:"alert alert-info",
                            style:"font-size:36px; padding:10px",
                            opt: "nodeManage",
+                          },
+                          {name:"Node Actions",
+                           icon:"fa fa-terminal",
+                           color:"alert alert-info",
+                           style:"font-size:36px; padding:10px",
+                           opt: "nodeCommands",
                           },
 
                          ];
@@ -76,6 +82,9 @@ function maxLengthCheck(object) {
                     viewLog();
                     break;
                 case "nodeManage":
+                    getNodeConfiguration();
+                    break;
+                case "nodeCommands":
                     getNodeConfiguration();
                     break;
                 case "all":
@@ -118,7 +127,7 @@ function maxLengthCheck(object) {
                 //console.log($scope.filesObj);
                      })
         };
-        $scope.browse.dowload = function(){
+        $scope.browse.download = function(){
 
             if($scope.selected.files.length == 1){
                 $('#downloadModal').modal('show');
@@ -179,6 +188,13 @@ function maxLengthCheck(object) {
         
         $scope.nodeManagement.time = new Date();
         $scope.nodeManagement.time = $scope.nodeManagement.time.toString();
+        
+        $scope.nodeManagement.exec_cmd = function(cmd_name){
+            $http.post('/node-actions', data = {'action': 'exec_cmd', 'cmd_name' : cmd_name})
+            .success(function(data){
+                $scope.nodeManagement.std_output = data;
+            });
+        };
         
         $scope.nodeManagement.action = function(action){
                $http.post('/node-actions', data = {'action': action})
@@ -304,6 +320,12 @@ function maxLengthCheck(object) {
                  .success(function(data, status, headers, config){
                     $scope.sensors = data;
             });
+        
+            $http.get('/node/commands')
+                 .success(function(data, status, headers, config){
+                    $scope.commands = data;
+            });
+
         
         };
         

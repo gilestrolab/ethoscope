@@ -1,6 +1,7 @@
 import logging
 import time
-from ethoscope.hardware.interfaces.interfaces import BaseInterface
+import serial
+from ethoscope.hardware.interfaces.interfaces import SimpleSerialInterface
 
 
 class WrongSerialPortError(Exception):
@@ -11,7 +12,7 @@ class NoValidPortError(Exception):
     pass
 
 
-class OptoMotor(BaseInterface):
+class OptoMotor(SimpleSerialInterface):
     _baud = 115200
     _n_channels = 24
 
@@ -25,9 +26,6 @@ class OptoMotor(BaseInterface):
         :param kwargs: additional keyword arguments
         """
 
-
-        # lazy import
-        import serial
         logging.info("Connecting to GMSD serial port...")
 
         self._serial = None
@@ -40,43 +38,6 @@ class OptoMotor(BaseInterface):
         time.sleep(2)
         self._test_serial_connection()
         super(OptoMotor, self).__init__(*args, **kwargs)
-
-    def _find_port(self):
-        from serial.tools import list_ports
-        import serial
-        import os
-        all_port_tuples = list_ports.comports()
-        logging.info("listing serial ports")
-        all_ports = set()
-        for ap, _, _ in all_port_tuples:
-            p = os.path.basename(ap)
-            print(p)
-            if p.startswith("ttyUSB") or p.startswith("ttyACM"):
-                all_ports |= {ap}
-                logging.info("\t%s", str(ap))
-
-        if len(all_ports) == 0:
-            logging.error("No valid port detected!. Possibly, device not plugged/detected.")
-            raise NoValidPortError()
-
-        elif len(all_ports) > 2:
-            logging.info("Several port detected, using first one: %s", str(all_ports))
-        return all_ports.pop()
-
-    def __del__(self):
-        if self._serial is not None:
-            self._serial.close()
-            #
-
-    def _test_serial_connection(self):
-        return
-
-    def interrogate(self):
-        """
-        Try to interrogate the device to check what its capabilities are.
-        Will work with all firmware for the new PCB and firmware newer than September 2020
-        """
-        return self._serial.write("T\r\n")
 
     def activate(self, channel, duration, intensity):
         """

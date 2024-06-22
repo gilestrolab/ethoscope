@@ -195,6 +195,41 @@
 
 </div>
 
+<div ng-if="showOption == 'nodeCommands'" class="col-xs-12">
+    <div>
+        <h2>Custom commands</h2>
+        <p>These BASH commands can be manually specified from within the json configuration file in <code>/etc/ethoscope/ethoscope.conf</code> - the commands are run as root meaning this is potentially very dangerous, so BE VERY AWARE OF WHAT YOU ARE DOING</p>
+            <ul class="list-group col-xs-12">
+                <li class="list-group-item input" ng-repeat="(name, cmd) in commands">
+                        <button class="btn btn-info" data-toggle="modal" data-target="#commandOutput" ng-click="nodeManagement.exec_cmd(name)" title={{cmd.description}} style="width: 260px; bg-color: gray;">{{cmd.name}} <i class="fa fa-lg fa-terminal" style="display: inline; float:right; margin-top: 8px;"></i> </button>
+<!--
+                        <input type="text" value={{cmd.command}} style="width:40em;" readonly >
+-->
+                        <pre class="command" width="40">{{cmd.command}}</pre>
+                </li>
+            </ul>        
+    </div>
+</div>
+
+<!-- Modal power off -->
+<div class="modal fade" id="commandOutput" tabindex="-1" role="dialog" aria-labelledby="commandOutputLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="myModalLabel">Command output</h4>
+      </div>
+      <div class="modal-body">
+        <pre class="bash">{{nodeManagement.std_output}}</pre>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 
 <div ng-if="showOption == 'nodeInfo'" class="col-xs-12">
     <div>
@@ -261,12 +296,20 @@
             <!-- <p class="log" ng-repeat="(key,entry) in daemons | toArray |orderBy: 'key'">{{key}}: {{entry}}</p></pre> -->
 
             <li class="list-group-item" ng-repeat="(key, entry) in daemons">
-                <label class="toggle-check">{{key}}
-                  <input type="checkbox" class="toggle-check-input" ng-model="isActive" ng-checked="entry.active == 'active'" ng-click="nodeManagement.toggleDaemon(key, isActive != undefined ? isActive : entry.active == 'inactive')" >
-                  <span class="toggle-check-text"></span>
-                </label>
-                <p>{{entry.description}}</p>
-                <!-- <input type=text value={{entry.exec}}> -->
+
+              <span ng-if="entry.not_available">
+                  <label>{{key}}
+                      <i class="fas fa-ban not-available-icon fa-2x" title="Currently not available in a Dockerised instance."></i>
+                  </label>
+              </span>
+
+              <span ng-if="!entry.not_available">
+                  <label class="toggle-check">{{key}}
+                      <input type="checkbox" class="toggle-check-input" ng-model="isActive" ng-checked="entry.active == 'active'" ng-click="nodeManagement.toggleDaemon(key, isActive != undefined ? isActive : entry.active == 'inactive')">
+                      <span class="toggle-check-text"></span>
+                  </label>
+                  <p>{{entry.description}}</p>
+              </span>
             </li>
         </ul>
         <ul class="list-group col-xs-12">

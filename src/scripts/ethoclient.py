@@ -28,8 +28,19 @@ from optparse import OptionParser
 import socket
 import json
 
+COMM_PACKET_SIZE = 1024*16 # in bytes. This should be large because it has to account for possible raise error messages coming backs
 
-def send_command(action, data=None, host='127.0.0.1', port=5000, size=1024):
+def listenerIsAlive():
+    '''
+    Only to use to check if the listener service is alive
+    '''
+    try:
+        r = send_command('status')
+        return True
+    except:
+        return False
+
+def send_command(action, data=None, host='127.0.0.1', port=5000, size=COMM_PACKET_SIZE):
     '''
     interfaces with the listening server
     '''
@@ -37,18 +48,15 @@ def send_command(action, data=None, host='127.0.0.1', port=5000, size=1024):
     message = {'command' : action,
                'data' : data }
 
-    try:
-               
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((host, port))
-            s.sendall( json.dumps(message).encode('utf-8') )
-            response = s.recv(size)
-            r = json.loads( response )
+              
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((host, port))
+        s.sendall( json.dumps(message).encode('utf-8') )
+        response = s.recv(size)
         
-        return r['response']
-
-    except:
-        return {}
+        r = json.loads( response )
+    
+    return r['response']
 
 if __name__ == '__main__':
 

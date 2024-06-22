@@ -20,7 +20,10 @@ from threading import Thread
 import bottle
 
 import socket
+import netifaces as ni
 from zeroconf import ServiceInfo, Zeroconf
+
+from ethoclient import send_command, listenerIsAlive
 
 try:
     from cheroot.wsgi import Server as WSGIServer
@@ -111,8 +114,12 @@ def name():
 @api.get('/make_index')
 @error_decorator
 def make_index():
+    """ 
+    Creates an index of all the video files in the provided formats
+    """
+    video_formats = ['h264', 'avi', 'mp4']
     index_file = os.path.join(_ETHOSCOPE_DIR, "index.html")
-    all_video_files = [y for x in os.walk(_ETHOSCOPE_DIR) for y in glob.glob(os.path.join(x[0], '*.h264'))]
+    all_video_files = [y for x in os.walk(_ETHOSCOPE_DIR) for y in glob.glob(os.path.join(x[0], '*.*')) if y.endswith(tuple(video_formats))]
     with open(index_file, "w") as index:
         for f in all_video_files:
             index.write(f + "\n")
@@ -180,6 +187,7 @@ def update_machine_info(id):
     Updates the private machine informations
     '''
     haschanged = False
+    machine_info = get_machine_info(id)
     
     if id != _MACHINE_ID:
         raise WrongMachineID
@@ -187,11 +195,11 @@ def update_machine_info(id):
     data = bottle.request.json
     update_machine_json_data.update(data['machine_options']['arguments'])
     
-    if 'node_ip' in update_machine_json_data and update_machine_json_data['node_ip'] != get_machine_info(id)['etc_node_ip']:
+    if 'node_ip' in update_machine_json_data and update_machine_json_data['node_ip'] != machine_info['etc_node_ip']:
         set_etc_hostname(update_machine_json_data['node_ip'])
         haschanged = True
     
-    if 'etho_number' in update_machine_json_data and int(update_machine_json_data['etho_number']) != int(get_machine_info(id)['machine-number']):
+    if 'etho_number' in update_machine_json_data and int(update_machine_json_data['etho_number']) != int(machine_info['machine-number']):
         set_machine_name(update_machine_json_data['etho_number'])
         set_machine_id(update_machine_json_data['etho_number'])
 
@@ -200,16 +208,20 @@ def update_machine_info(id):
         
         haschanged = True
     
-    if 'ESSID' in update_machine_json_data and 'Key' in update_machine_json_data and (update_machine_json_data['ESSID'] != get_machine_info(id)['WIFI_SSID'] or update_machine_json_data['Key'] != get_machine_info(id)['WIFI_PASSWORD']):
+    if 'ESSID' in update_machine_json_data and 'Key' in update_machine_json_data and (update_machine_json_data['ESSID'] != machine_info['WIFI_SSID'] or update_machine_json_data['Key'] != machine_info['WIFI_PASSWORD']):
         set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'])
         haschanged = True
 
-    if 'useSTATIC' in update_machine_json_data and update_machine_json_data['useSTATIC'] != get_machine_info(id)['useSTATIC']:
+    if 'useSTATIC' in update_machine_json_data and update_machine_json_data['useSTATIC'] != machine_info['useSTATIC']:
         set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'], useSTATIC=update_machine_json_data['useSTATIC'])
         haschanged = True
 
-    if 'isexperimental' in update_machine_json_data and update_machine_json_data['isexperimental'] != isExperimental():
+    if 'isexperimental' in update_machine_json_data and update_machine_json_data['isexperimental'] != machine_info['isExperimental']:
         isExperimental(update_machine_json_data['isexperimental'])
+        haschanged = True
+
+    if 'remoteLogging' in update_machine_json_data and update_machine_json_data['remoteLogging'] != machine_info['remoteLogging']:
+        loggingStatus(update_machine_json_data['remoteLogging'])
         haschanged = True
     
     #Time comes as number of milliseconds from timestamp
@@ -251,6 +263,7 @@ def controls(id, action):
 
         if action == 'restart':
             logging.info("Restarting service")
+            send_command('remove')
             subprocess.call(['systemctl', 'restart', 'ethoscope_device'])
 
         return info(id)
@@ -265,7 +278,12 @@ def controls(id, action):
         logging.info("Converting h264 chunks to mp4")
         subprocess.call(['/opt/ethoscope-device/scripts/tools/process_all_h264.py','-p','/ethoscope_data'])
         return info(id)
-        
+
+    elif action == 'test_module':
+        logging.info("Sending a test command to the connected module.")
+        module_info = getModuleCapabilities(test=True)
+        return info(id)
+                
     else:
         raise Exception("No such action: %s" % action)
 
@@ -331,25 +349,48 @@ def get_machine_info(id):
     machine_info['kernel'] = os.uname()[2]
     machine_info['pi_version'] = pi_version()
     machine_info['camera'] = getPiCameraVersion()
-    
+
     try:
         machine_info['WIFI_SSID'] = get_WIFI()['ESSID']
     except: 
         machine_info['WIFI_SSID'] = "not set"
+
     try:    
         machine_info['WIFI_PASSWORD'] = get_WIFI()['Key']
     except:
         machine_info['WIFI_PASSWORD'] = "not set"
+
     try:
         machine_info['useSTATIC'] = (get_WIFI()['IP'].strip().upper() == 'STATIC')
     except:
         machine_info['useSTATIC'] = False
-        
+
+    try:
+        machine_info['remoteLogging'] = loggingStatus()
+    except:
+        machine_info['remoteLogging'] = False
+
     machine_info['SD_CARD_AGE'] = get_SD_CARD_AGE()
     machine_info['partitions'] = get_partition_infos()
     machine_info['SD_CARD_NAME'] = get_SD_CARD_NAME()
-    
+
+    machine_info['Module'] = getModuleCapabilities(shallow=True)
+
     return machine_info
+
+@api.get('/module/<id>')
+def connectedModule(id):
+    """
+    Interrogates the serial port to see if a) a known module is connected and b) the module can tell us something about itself.
+    https://www.notion.so/giorgiogilestro/The-new-Modular-SD-Device-05bbe90b6ee04b8aa439165f69d62de8#77aa2029495448f38ad433901cf9c88b
+    """
+
+    if id != _MACHINE_ID:
+        raise WrongMachineID
+    
+    else:
+        return getModuleCapabilities(test=False)
+
 
 
 @api.get('/data/<id>')
@@ -382,19 +423,18 @@ def info(id):
         raise WrongMachineID
 
     runninginfo = send_command('info')
-    try:
-        runninginfo.update ( { "CPU_temp" : get_core_temperature(), "current_timestamp" : bottle.time.time() } )
+    runninginfo.update ( { "CPU_temp" : get_core_temperature(), 
+                           "underpowered" : underPowered(),
+                           "current_timestamp" : bottle.time.time() } )
         
-    except:
-        runninginfo = {
-                        "status": 'not available',
-                        "id" : _MACHINE_ID,
-                        "name" : _MACHINE_NAME,
-                        "version" : _GIT_VERSION,
-                        "time" : bottle.time.time()
-                       }
-                       
-    
+    # except:
+        # runninginfo = {
+                        # "status": 'not available',
+                        # "id" : _MACHINE_ID,
+                        # "name" : _MACHINE_NAME,
+                        # "version" : _GIT_VERSION,
+                        # "time" : bottle.time.time()
+                       # }
     
     return runninginfo
 
@@ -406,34 +446,35 @@ def user_options(id):
     '''
     if id != _MACHINE_ID:
         raise WrongMachineID
-    
-    
-        
+
+    machine_info = get_machine_info(id)
+
     return {
         "tracking":ControlThread.user_options(),
         "recording":ControlThreadVideoRecording.user_options(),
         "streaming": {},
         "update_machine": { "machine_options": [{"overview": "Machine information that can be set by the user",
                             "arguments": [
-                                {"type": "number", "name":"etho_number", "description": "An ID number (5-250) unique to this ethoscope","default": get_machine_info(id)['machine-number'] },
-                                {"type": "boolean", "name":"isexperimental", "description": "Specify if the ethoscope is to be treated as experimental", "default": isExperimental()}, 
-                                {"type": "boolean", "name":"useSTATIC", "description": "Use a static IP address instead of obtaining one with DHCP. The last number in the IP address will be the current ethoscope number", "default" : get_machine_info(id)['useSTATIC']},
-                                {"type": "str", "name":"node_ip", "description": "The IP address that you want to record as the node (do not change this value unless you know what you are doing!)","default": get_machine_info(id)['node_ip']},
-                                {"type": "str", "name":"ESSID", "description": "The name of the WIFI SSID","default": get_machine_info(id)['WIFI_SSID'] },
-                                {"type": "str", "name":"Key", "description": "The WPA password for the WIFI SSID","default": get_machine_info(id)['WIFI_PASSWORD'] }],
+                                {"type": "number", "name":"etho_number", "description": "An ID number (5-250) unique to this ethoscope","default": machine_info['machine-number'] },
+                                {"type": "boolean", "name":"isexperimental", "description": "Specify if the ethoscope is to be treated as experimental", "default": machine_info['isExperimental']}, 
+                                {"type": "boolean", "name":"useSTATIC", "description": "Use a static IP address instead of obtaining one with DHCP. The last number in the IP address will be the current ethoscope number", "default" : machine_info['useSTATIC']},
+                                {"type": "boolean", "name":"remoteLogging", "description": "The ethoscope logs events directly on the node.", "default" : machine_info['remoteLogging']},
+                                {"type": "str", "name":"node_ip", "description": "The IP address that you want to record as the node (do not change this value unless you know what you are doing!)","default": machine_info['node_ip']},
+                                {"type": "str", "name":"ESSID", "description": "The name of the WIFI SSID","default": machine_info['WIFI_SSID'] },
+                                {"type": "str", "name":"Key", "description": "The WPA password for the WIFI SSID","default": machine_info['WIFI_PASSWORD'] }],
                             "name" : "Ethoscope Options"}],
 
                                } }
 
 @api.get('/data/log/<id>')
 @error_decorator
-def get_log(id):
+def get_log(id, n_lines=200):
     '''
     returns the journalctl log
     '''
     output = "No log available"
     try:
-        with os.popen('journalctl -u ethoscope_device.service -rb') as p:
+        with os.popen('journalctl -u ethoscope_device.service -rb -n %s' % n_lines) as p:
             output = p.read()
 
     except Exception as e:
@@ -445,26 +486,27 @@ def get_log(id):
 def close(exit_status=0):
     os._exit(exit_status)
 
-
-def send_command(action, data=None, host='127.0.0.1', port=5000, size=1024):
-    '''
-    interfaces with the listening server
-    '''
-
-    message = {'command' : action,
-               'data' : data }
-
+def get_ip_address(interface_name='wlan0'):
     try:
-               
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((host, port))
-            s.sendall( json.dumps(message).encode('utf-8') )
-            r = json.loads( s.recv(size) )
-        
-        return r['response']
-
-    except:
+        interface_addresses = ni.ifaddresses(interface_name)
+        ip_address = interface_addresses[ni.AF_INET][0]['addr']
+        return ip_address
+    except (ValueError, KeyError):
         return False
+
+def get_main_ip_address():
+    for interface in ni.interfaces():
+        addresses = ni.ifaddresses(interface)
+        try:
+            # Attempt to get the IPv4 address of the current interface
+            ipv4_info = addresses[ni.AF_INET][0]
+            ip_address = ipv4_info['addr']
+            if not ip_address.startswith("127.0"):
+                return ip_address
+        except KeyError:
+            # No IPv4 address found for this interface
+            pass
+    return None
 
 
 if __name__ == '__main__':
@@ -491,8 +533,7 @@ if __name__ == '__main__':
     _ETHOSCOPE_UPLOAD = '/ethoscope_data/upload'
     _ETHOSCOPE_DIR = '/ethoscope_data/results'
 
-    alive = send_command('status')
-    if not alive:
+    if not listenerIsAlive():
         logging.error('An Ethoscope controlling service is not running on this machine! I will be starting one for you but this is not the way this should work. Update your SD card.')
 
         from device_listener import commandingThread
@@ -522,7 +563,7 @@ if __name__ == '__main__':
         while ip_address is None and ip_attempts < 60:
 
             try:
-                ip_address = socket.gethostbyname(hostname)
+                ip_address = get_main_ip_address()
             except:
                 pass
 

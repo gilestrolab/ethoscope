@@ -6,7 +6,7 @@ import os
 import socket
 
 from optparse import OptionParser
-from helpers import get_machine_id, assert_node, WrongMachineID
+from helpers import assert_node, WrongMachineID
 from helpers import get_commit_version, generate_new_device_map, updates_api_wrapper, reload_node_daemon, reload_device_daemon
 
 
@@ -270,13 +270,15 @@ if __name__ == '__main__':
 
     #Here we decide if we are running on an ethoscope or a node
     if bare_repo is not None:
-        bare_repo_updater = updater.BareRepoUpdater(bare_repo)
         is_node = True
+        bare_repo_updater = updater.BareRepoUpdater(bare_repo)
         device_id = "node"
 
     else:
-        bare_repo_updater = None
+
         is_node = False
+        from ethoscope.web_utils.helpers import get_machine_id
+        bare_repo_updater = None
         device_id = get_machine_id()
 
     try:

@@ -35,10 +35,12 @@ import sqlite3
 import datetime
 import logging, traceback
 
+from ethoscope_node.utils.configuration import migrate_conf_file
+
 class ExperimentalDB(multiprocessing.Process):
     
     
-    _db_name = "/etc/ethoscope-node.db"
+    _db_name = "/etc/ethoscope/ethoscope-node.db"
     #_db_name = "/tmp/ethoscope-node.db"
     #_db_name = ":memory:"
 
@@ -48,8 +50,8 @@ class ExperimentalDB(multiprocessing.Process):
     _ethoscopes_table_name = "ethoscopes"
     
     def __init__(self):
+        migrate_conf_file('/etc/ethoscope-node.db')
         self.create_tables()
-
 
     def executeSQL(self, command):
         """
