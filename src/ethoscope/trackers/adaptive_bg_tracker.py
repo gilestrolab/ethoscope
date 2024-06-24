@@ -436,6 +436,12 @@ class AdaptiveBGModel(BaseTracker):
         # Ellipse fitting and adjustments
         (x, y), (w, h), angle = self._fit_and_adjust_ellipse(hull, grey)
 
+        h_im = min(grey.shape)
+        w_im = max(grey.shape)
+        max_h = 2*h_im
+        if w>max_h or h>max_h:
+            raise NoPositionError
+
         # Update tracking models based on analysis
         self._update_models(img, grey, mask, hull, t, distance, prop_fg_pix, is_ambiguous)
 
