@@ -441,12 +441,12 @@ class AdaptiveBGModel(BaseTracker):
 
         #normalised position
         #this does not really need to be normalised because the image size does not change between frames
-        #pos = (x + 1.0j * y) / w_im
-        #xy_dist = round(log10(1./float(w_im) + abs(pos - self._old_pos))*1000)
+        pos = (x + 1.0j * y) / w_im
+        xy_dist = round(log10(1./float(w_im) + abs(pos - self._old_pos))*1000)
 
         #non normalised
-        pos = x + 1.0j * y  # Keep position without normalization
-        xy_dist = round(log10(abs(pos - self._old_pos) + 1) * 1000)  # Add 1 to avoid log(0)
+        #pos = x + 1.0j * y  # Keep position without normalization
+        #xy_dist = round(log10(abs(pos - self._old_pos) + 1) * 1000)  # Add 1 to avoid log(0)
 
         self._old_pos = pos
 
