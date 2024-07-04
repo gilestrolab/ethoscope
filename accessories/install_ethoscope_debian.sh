@@ -41,6 +41,7 @@ echo "setting dev branch and changing remote git source to the node"
 cd /opt/ethoscope-device/
 git checkout dev
 git remote set-url origin git://node/ethoscope.git
+git config --global --add safe.directory /opt/ethoscope-device
 
 echo "make and install python wheel"
 cd /opt/ethoscope-device/src
