@@ -1,11 +1,14 @@
-version: '3.8'
-
 services:
   ethoscope-node:
-    build: .
+    build:
+      context: .
+      dockerfile: node.dockerfile
     image: ethoscope-node
     container_name: ethoscope-node
-    restart: always
+    restart: unless-stopped
+    ports:
+      - "80:80/tcp"          #node webUI
+      - "8088:8088/tcp"      #node update webUI
     volumes:
       - /mnt/ethoscope_data:/ethoscope_data
       - ./etc-ethoscope:/etc/ethoscope
@@ -25,3 +28,15 @@ services:
       FTPD_BANNER: "Welcome to the public ethoscope data FTP server of the Gilestro lab"
     volumes:
       - /mnt/ethoscope_data:/var/ftp:ro
+
+  git-server:
+    image: git-daemon
+    build:
+      context: ./git-server
+      dockerfile: git-daemon.dockerfile
+    container_name: my-git-daemon
+    restart: unless-stopped
+    environment:
+      - REPO_URL=https://github.com/gilestrolab/ethoscope.git
+    ports:
+      - "9418:9418"

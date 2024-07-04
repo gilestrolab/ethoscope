@@ -70,6 +70,7 @@ docs/_build/
 *.mp4
 *.avi
 *.db
+.vscode
 
 #folders
 Docker/node/etc-ethoscope
