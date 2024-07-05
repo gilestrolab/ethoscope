@@ -157,7 +157,7 @@ class commandingThread(threading.Thread):
                                name = self.ethoscope_info['MACHINE_NAME'],
                                version = self.ethoscope_info['GIT_VERSION'], 
                                ethoscope_dir = self.ethoscope_info['ETHOSCOPE_DIR'],
-                               data = data )
+                               data = {'recorder': {'name': 'Streamer', 'arguments': {}}} )
 
             self.control.start()
             return "Starting streaming activity"
