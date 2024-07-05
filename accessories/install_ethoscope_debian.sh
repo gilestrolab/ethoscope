@@ -125,10 +125,11 @@ if [ -f "/etc/os-release" ]; then
 fi
 
 echo '[server]' > "$MYCNF"
-echo 'log-bin=mysql-bin' >> "$MYCNF"
-echo 'binlog_format=mixed' >> "$MYCNF"
+echo 'log-bin          = mysql-bin' >> "$MYCNF"
+echo 'binlog_format    = mixed' >> "$MYCNF"
 echo 'expire_logs_days = 10' >> "$MYCNF"
 echo 'max_binlog_size  = 100M' >> "$MYCNF"
+echo 'bind-address     = 127.0.0.1' >> "$MYCNF"
 
 echo "limiting journal log space"
 echo 'SystemMaxUse=250MB' >> /etc/systemd/journald.conf
