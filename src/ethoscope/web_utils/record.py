@@ -228,14 +228,14 @@ class StandardVideoRecorder(GeneralVideoRecorder):
         super(StandardVideoRecorder, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix, width=1280, height=960, fps=25, bitrate=500000)
 
 class Streamer(GeneralVideoRecorder):
-    _description  = { "overview": "A preset 640 x 480, 25fps, bitrate = 2e5 streamer. Active on port 8008.", 
+    _description  = { "overview": "A preset 960 x 720, 25fps, bitrate = 2e5 streamer. Active on port 8887.", 
                       "arguments": [], 
                       "hidden": True
                     }
     status = "streaming"
     
     def __init__(self, cameraClass, camera_kwargs, video_prefix, img_path):
-        super(Streamer, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix=None, width=640, height=480, fps=20, bitrate=500000, stream=True)
+        super(Streamer, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix=None, width=960, height=720, fps=25, bitrate=500000, stream=True)
         
 
 class timedStop(DescribedObject):

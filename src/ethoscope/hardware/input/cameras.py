@@ -509,17 +509,21 @@ class PiFrameGrabber2(PiFrameGrabber):
         Run stops if the _stop_queue is not empty.
         """
 
-        w, h = self._target_resolution
-        
         from picamera2 import Picamera2, MappedArray
 
         Picamera2.set_logging(Picamera2.ERROR)
 
         with Picamera2() as capture:
            
+            # The appropriate size of the image acquisition is tricky and depends on the actual hardware. 
+            # With IMX219 640x480 will not return the full FoV. 960x720 does.
+            # See https://picamera.readthedocs.io/en/release-1.13/fov.html for a full description
+
+
+            w, h = self._target_resolution
+
             config = capture.create_video_configuration(
-                            main = { 'size' : self._target_resolution, 'format': 'YUV420' },
-                            lores = {'size' : (640, 480), 'format': 'YUV420' },
+                            main = { 'size' : (w, h), 'format': 'YUV420' },
                             buffer_count = 2, #Still image capture normally configures only a single buffer, as this is all you need. But if you're doing some form of burst capture, increasing the buffer count may enable the application to receive images more quickly.
                             controls = { 'FrameRate': self._target_fps },
                             )
@@ -562,6 +566,7 @@ class PiFrameGrabber2(PiFrameGrabber):
             else:
 
                 capture.start()
+
                 while self._stop_queue.empty():
 
                     frame = capture.capture_array("main")
