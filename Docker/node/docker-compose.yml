@@ -34,7 +34,7 @@ services:
     build:
       context: ./git-server
       dockerfile: git-daemon.dockerfile
-    container_name: my-git-daemon
+    container_name: ethoscope-git-daemon
     restart: unless-stopped
     environment:
       - REPO_URL=https://github.com/gilestrolab/ethoscope.git
