@@ -1,4 +1,16 @@
 #!/bin/env python3
+
+# This script simulates a virtual hardware sensor with its corresponding network service advertisements
+# and a RESTful API server. 
+# It uses the Zeroconf/mDNS protocol for service discovery on a local network and the Bottle framework
+# for setting up HTTP endpoints. The virtual sensor can provide dummy data such as temperature, humidity,
+# pressure, and light, and allows updating its configuration details such as sensor name and location
+# through POST requests. 
+#
+# The script can operate in two modes: as a sensor or as a zeroconf service listener that lists the 
+# sensors discovered on the network.
+
+
 from zeroconf import ServiceInfo, Zeroconf, ServiceBrowser
 import bottle
 import socket

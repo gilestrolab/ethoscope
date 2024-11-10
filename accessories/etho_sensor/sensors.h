@@ -6,11 +6,13 @@
 #include "config.h"
 
 extern Adafruit_BME280 bme;
+extern environment env;
+
 #if defined(USELIGHT)
     extern BH1750FVI LightSensor;
 #endif
 
-bool initializeSensors();
-bool readSensorData();
+bool ICACHE_FLASH_ATTR initializeSensors();
+bool ICACHE_FLASH_ATTR readSensorData();
 
 #endif
