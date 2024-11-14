@@ -970,7 +970,7 @@ class SensorScanner(DeviceScanner):
     _service_type = "_sensor._tcp.local." 
     _device_type = "sensor"
     
-    def __init__(self, device_refresh_period = 60, deviceClass=Sensor):
+    def __init__(self, device_refresh_period = 300, deviceClass=Sensor):
         self._zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
         self.devices = []
         self.device_refresh_period = device_refresh_period
