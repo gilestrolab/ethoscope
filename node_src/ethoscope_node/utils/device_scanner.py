@@ -608,7 +608,13 @@ class Ethoscope(Device):
                                           self._info["name"],
                                           "%s_%s" % (backup_date, backup_time),
                                           self._info["backup_filename"])
+        
+        elif self._info["status"] == 'stopped' and "db_name" not in self._info and "previous_backup_filename" not in self._info:
+            #This may happen if the ethoscope was never used before I think. The ethoscope will return something like:
+            #{"status": "stopped", "time": 1729688963.3384466, "error": null, "log_file": "/ethoscope_data/results/ethoscope.log", "dbg_img": "/ethoscope_data/results/dbg_img.png", "last_drawn_img": "/tmp/ethoscope_2k9u1y0o/last_img.jpg", "id": "25053d5270b640deb718cbd7ed02ae49", "name": "ETHOSCOPE_250", "version": {"id": "f1599f0181d76a0c15ac841d936368c7a762fc48", "date": "2024-10-17 13:51:02"}, "experimental_info": {}, "autostop": false, "CPU_temp": 45.1, "underpowered": true, "current_timestamp": 1731581931.727096}
             
+            output_db_file = None
+
         else:
         # The ethoscope did not communicate to us its backup_filename
         # probably because it runs a software version older than October 2022
@@ -647,9 +653,9 @@ class Ethoscope(Device):
                                               )
 
             except Exception as e:
-                logging.error("Could not generate backup path for device. Probably a MySQL issue")
+                logging.error(f"Could not generate backup path for {device_id}. Probably a MySQL issue.")
                 #logging.error(traceback.format_exc())
-                output_db_file = "None"
+                output_db_file = None
 
 
         self._info.update( {"backup_path": output_db_file} )
