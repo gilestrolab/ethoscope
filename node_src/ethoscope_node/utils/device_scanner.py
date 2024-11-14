@@ -1,5 +1,6 @@
 import urllib.request, urllib.error, urllib.parse
 import os
+import csv
 import datetime
 import json
 import time
@@ -83,9 +84,12 @@ class Device(Thread):
 class Sensor(Device):
     """
     """
-    def __init__(self, ip, port = 80, refresh_period = 5, results_dir = ""):
+    _CSV_PATH = "/ethoscope_data/sensors/"
+
+    def __init__(self, ip, port = 80, refresh_period = 5, results_dir = "", save_to_CSV=True):
         self._ip = ip
         self._port = port
+        self.save_to_csv = save_to_CSV
         
         self._data_url = "http://%s:%i/" % (ip, port)
         self._id_url = "http://%s:%i/id" % (ip, port)
@@ -190,8 +194,57 @@ class Sensor(Device):
             resp = self._get_json(self._data_url)
             self._info.update(resp)
             self._info['status'] = 'online'
+
+            if self.save_to_CSV:
+                self._save_to_CSV()
         except ScanException:
             pass
+
+    def _save_to_CSV(self):
+        # Extract required data from the _info dictionary
+        sensor_id = self._info.get('id', 'unknown_id')
+        sensor_ip = self._info.get('ip', 'unknown_ip')
+        sensor_name = self._info.get('name', 'unknown_sensor')
+        sensor_location = self._info.get('location', 'unknown_location')
+        temperature = self._info.get('temperature', 'N/A')
+        humidity = self._info.get('humidity', 'N/A')
+        pressure = self._info.get('pressure', 'N/A')
+        light = self._info.get('light', 'N/A')
+        
+        # Ensure the CSV directory exists
+        if not os.path.exists(self._CSV_PATH):
+            os.makedirs(self._CSV_PATH)
+        
+        # Define the filename based on the sensor name within the designated path
+        filename = os.path.join(self._CSV_PATH, f"{sensor_name}.csv")
+        
+        # Prepare the header with metadata as a comment
+        metadata_header = (
+            f"# Sensor ID: {sensor_id}\n"
+            f"# IP: {sensor_ip}\n"
+            f"# Name: {sensor_name}\n"
+            f"# Location: {sensor_location}\n"
+        )
+        
+        # Prepare data to append
+        current_utc_time = datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        data_row = [current_utc_time, temperature, humidity, pressure, light]
+        
+        # Check if the file exists
+        file_exists = os.path.isfile(filename)
+        
+        # Open the file in append mode (creates it if it does not exist)
+        with open(filename, mode='a', newline='') as csvfile:
+            # Initialize writer
+            writer = csv.writer(csvfile)
+            
+            # Write the metadata header if the file is new
+            if not file_exists:
+                csvfile.write(metadata_header)
+                writer.writerow(["Temperature", "Humidity", "Pressure", "Light"])  # Actual CSV header
+            
+            # Append the current sensor data
+            writer.writerow(data_row)
 
     def ip(self):
         return self._ip
