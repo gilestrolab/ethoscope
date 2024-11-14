@@ -163,6 +163,33 @@ def edit_sensor():
         pass
         # a sensor with this ID was not found
 
+@app.get('/list_sensor_csv_files')
+@error_decorator
+def list_csv_files():
+    """
+    Lists CSV files in /ethoscope_data/sensors/
+    """
+    directory = '/ethoscope_data/sensors/'
+    try:
+        csv_files = [f for f in os.listdir(directory) if f.endswith('.csv')]
+        return {'files': csv_files}
+    except:
+        return {'files' : []}
+
+@app.get('/get_sensor_csv_data/<filename>')
+@error_decorator
+def get_csv_data(filename):
+    """
+    Reads the CSV file and returns the data for plotting.
+    """
+    directory = '/ethoscope_data/sensors/'
+    filepath = os.path.join(directory, filename)
+    data = []
+    with open(filepath, 'r') as csvfile:
+        headers = csvfile.readline().strip().split(',')
+        for line in csvfile:
+            data.append(line.strip().split(','))
+    return {'headers': headers, 'data': data}
 
 @app.post('/device/add')
 def manual_add():
@@ -616,6 +643,10 @@ def redirection_to_more(action):
 @app.get('/experiments')
 def redirection_to_experiments():
     return bottle.redirect('/#/experiments')
+
+@app.get('/sensors_data')
+def redirection_to_sensors():
+    return bottle.redirect('/#/sensors_data')
 
 @app.get('/resources')
 def redirection_to_resources():
