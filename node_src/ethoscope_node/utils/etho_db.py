@@ -27,6 +27,7 @@ import random
 import pickle
 import os
 import secrets
+import json
 
 
 __author__ = 'giorgio'
@@ -307,7 +308,7 @@ class ExperimentalDB(multiprocessing.Process):
             return row
         
     
-    def updateEthoscopes (self, ethoscope_id, ethoscope_name=None, active=None, last_ip=None, problems=None, machineinfo=None, comments=None, status=None, blacklist=['ETHOSCOPE_000']):
+    def updateEthoscopes(self, ethoscope_id, ethoscope_name=None, active=None, last_ip=None, problems=None, machineinfo=None, comments=None, status=None, blacklist=['ETHOSCOPE_000']):
         """
         Updates the parameters of a given ethoscope
         if an ethoscope with the same ID is not found in the current database
@@ -315,25 +316,24 @@ class ExperimentalDB(multiprocessing.Process):
         """
         e = self.getEthoscope(ethoscope_id, True)
         now = datetime.datetime.now()
-        
+
         if ethoscope_name in blacklist:
-            return 
-        
+            return
+
+        if machineinfo:
+            machineinfo = machineinfo.replace("'", "''")
+
         if type(e) is dict and e != {}:
-            
-            updates = {name: value for (name, value) in zip(['ethoscope_name', 'active', 'last_ip', 'machineinfo', 'problems', 'comments', 'status'], [ethoscope_name, active, last_ip, machineinfo, problems, comments, status]) if value != None}
+            updates = {name: value for (name, value) in zip(['ethoscope_name', 'active', 'last_ip', 'machineinfo', 'problems', 'comments', 'status'], [ethoscope_name, active, last_ip, machineinfo, problems, comments, status]) if value is not None}
             values = " , ".join(["%s = '%s'" % (name, updates[name]) for name in updates.keys()])
-            sql_update_ethoscope = "UPDATE "+ self._ethoscopes_table_name +" SET last_seen = '"+ str(now) +"', "+ values + " WHERE ethoscope_id = '"+str(ethoscope_id)+"'"
-            
+            sql_update_ethoscope = "UPDATE " + self._ethoscopes_table_name + " SET last_seen = '" + str(now) + "', " + values + " WHERE ethoscope_id = '" + str(ethoscope_id) + "'"
+
         else:
             active = 1
-            sql_update_ethoscope = "INSERT INTO %s VALUES( NULL, '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % ( self._ethoscopes_table_name, ethoscope_id, ethoscope_name, now, now, active, last_ip, machineinfo, problems, comments, status)
+            sql_update_ethoscope = "INSERT INTO %s VALUES( NULL, '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % (self._ethoscopes_table_name, ethoscope_id, ethoscope_name, now, now, active, last_ip, machineinfo, problems, comments, status)
             logging.warning("Adding a new ethoscope to the db. Welcome %s with id %s" % (ethoscope_name, ethoscope_id))
-            
-            
+
         return self.executeSQL(sql_update_ethoscope)
-
-
         
 class simpleDB(object):
     '''
