@@ -89,7 +89,7 @@ class Sensor(Device):
     def __init__(self, ip, port = 80, refresh_period = 5, results_dir = "", save_to_CSV=True):
         self._ip = ip
         self._port = port
-        self.save_to_csv = save_to_CSV
+        self.save_to_CSV = save_to_CSV
         
         self._data_url = "http://%s:%i/" % (ip, port)
         self._id_url = "http://%s:%i/id" % (ip, port)
