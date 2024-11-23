@@ -11,6 +11,14 @@
                 $scope.csvFiles = response.files.map(function(file) {
                     return file.replace('.csv', '');
                 });
+
+                // Find and select the default file with "room" in its name
+                var defaultFileIndex = $scope.csvFiles.findIndex(file => file.toLowerCase().includes('room'));
+                if (defaultFileIndex !== -1) {
+                    $scope.selectedFile = $scope.csvFiles[defaultFileIndex];
+                    // Automatically fetch data for the default selected file
+                    $scope.fetchAndPlotData();
+                }
             })
             .error(function(error) {
                 console.error("Error fetching CSV file list:", error);
@@ -61,7 +69,10 @@
                     },
                     margin: {
                         t: 50
-                    }
+                    },
+                    autosize: true,
+                    //width: 700,
+                    //height: 400
                 };
             };
 
