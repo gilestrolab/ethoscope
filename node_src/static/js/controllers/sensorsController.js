@@ -40,7 +40,6 @@
             }
         };
 
-
         // Function to plot the sensor data using Plotly
         function plotSensorData(headers, data) {
             var dates = [],
