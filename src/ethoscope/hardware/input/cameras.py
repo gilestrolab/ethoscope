@@ -6,6 +6,7 @@ import os
 from ethoscope.utils.debug import EthoscopeException
 import threading, queue
 import traceback
+import hashlib
 
 import cv2
 import numpy as np
@@ -378,6 +379,7 @@ class PiFrameGrabber(threading.Thread):
         self._VIDEO_CHUNCK_DURATION = 300
         self._PREVIEW_REFRESH_TIME = 5
         self._file_index = 0
+        self._last_computed_filename = ""
 
         # Specifies the quality that the encoder should attempt to maintain. 
         # For the 'h264' format, use values between 10 and 40 where 10 is extremely high quality, and 40 is extremely low 
@@ -409,13 +411,17 @@ class PiFrameGrabber(threading.Thread):
         with open(save_path, 'w') as outfile:
             print(camera_info, file=outfile)
 
-    def _get_video_chunk_filename(self, fps=None, ext='h264'):
+    def _get_video_chunk_filename(self, fps=None, ext='h264', current=False):
         
-        fps = fps or 0
+        if current:
+            return self._last_computed_filename
+
         self._file_index += 1
+        fps = fps or 0
         w,h = self._target_resolution
         video_info= "%ix%i@%ifps-%iq" %(w, h, fps, self.video_quality)
         chunk_file_name = '%s_%s_%05d.%s' % (self._video_prefix, video_info, self._file_index, ext)
+        self._last_computed_filename = chunk_file_name
         return chunk_file_name
 
     def run (self):
@@ -449,7 +455,7 @@ class PiFrameGrabber(threading.Thread):
                 self._video_time = time.time()
 
                 frame = np.empty((h, w, 3), dtype=np.uint8)
-                capture.start_recording( self._get_video_chunk_filename(fps=capture.framerate) , format = 'h264', quality = self.video_quality)
+                capture.start_recording(self._get_video_chunk_filename(fps=capture.framerate), format = 'h264', quality = self.video_quality)
 
                 while self._stop_queue.empty():        
                     capture.capture(frame, format = 'bgr', use_video_port=True)
@@ -459,7 +465,9 @@ class PiFrameGrabber(threading.Thread):
                     capture.wait_recording(self._PREVIEW_REFRESH_TIME) 
 
                     if time.time() - self._video_time >= self._VIDEO_CHUNCK_DURATION:
+                        filename_to_hash = self._get_video_chunk_filename (current=True)
                         capture.split_recording( self._get_video_chunk_filename( fps=capture.framerate ) )
+                        self.save_hash_info_file(filename_to_hash) # we need to compute the hash *after* the split
                         self._video_time = time.time()
                 
                 capture.stop_recording()
@@ -497,6 +505,28 @@ class PiFrameGrabber(threading.Thread):
         #     self._queue.task_done() # this tell the parent the thread can be closed
         #     logging.warning("Camera Frame grabber stopped acquisition cleanly")
 
+
+    def save_hash_info_file(self, filename_to_hash):
+        """
+        Create a file containing the MD5 hash of the given video.
+        """
+
+        def compute_md5(file_path):
+            """
+            Compute the MD5 hash of the provided file.
+            """
+            md5_hash = hashlib.md5()
+            with open(file_path, "rb") as file:
+                # Read the file in chunks to avoid loading the whole file into memory
+                for chunk in iter(lambda: file.read(4096), b""):
+                    md5_hash.update(chunk)
+            return md5_hash.hexdigest()
+
+        video_hash = compute_md5(filename_to_hash)
+        hash_file = filename_to_hash + ".md5"
+
+        with open(hash_file, "w") as file:
+            file.write(video_hash)
 
 class PiFrameGrabber2(PiFrameGrabber):
     """
@@ -554,6 +584,7 @@ class PiFrameGrabber2(PiFrameGrabber):
                     if time.time() - self._video_time >= self._VIDEO_CHUNCK_DURATION:
                         logging.info("Splitting video recording into a new H264 chunk.")
                         capture.stop_encoder()
+                        self.save_hash_info_file( self._get_video_chunk_filename (current=True) )
                         capture.start_encoder(encoder, self._get_video_chunk_filename(self._target_fps))
                         self._video_time = time.time()
 
