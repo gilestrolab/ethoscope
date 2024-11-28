@@ -1,102 +1,31 @@
-__author__ = 'quentin'
-
 import urllib.request, urllib.error, urllib.parse
 import logging
 import optparse
-import  traceback
+import traceback
 import subprocess
 import json
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from ethoscope_node.utils.backups_helpers import GenericBackupWrapper
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
 
 class WGetERROR(Exception):
     pass
 
-def wget_mirror_wrapper(target, target_prefix, output_dir, cut_dirs=3):
-    target = target_prefix + target
-    command_arg_list=  ["wget",
-                        target,
-                        "-nv",
-                         "--mirror",
-                         "--cut-dirs=%i" % cut_dirs,
-                         "-nH",
-                         "--directory-prefix=%s" % output_dir
-                        ]
-    p = subprocess.Popen(command_arg_list,  stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-
-    stdout, stderr = p.communicate()
-    if p.returncode != 0:
-        raise WGetERROR("Error %i: %s" % ( p.returncode,stdout))
-
-    if stdout == "":
-        return False
-    return True
-
-
-def get_video_list(ip, port=9000,static_dir = "static", index_file="ethoscope_data/results/index.html"):
-
-    url = "/".join(["%s:%i"%(ip,port), static_dir, index_file])
-
-    try:
-        response = urllib.request.urlopen(url)
-        out = [r.decode('utf-8').rstrip() for r in response]
-    except urllib.error.HTTPError as e:
-        logging.warning("No index file could be found for device %s" % ip)
-        out = None
-    finally:
-        make_index(ip, port)
-        return out
-
-def remove_video_from_host(ip, id, target, port=9000):
-    request_url = "{ip}:{port}/rm_static_file/{id}".format(ip=ip, id=id, port=port)
-    data = {"file": target}
-    data =json.dumps(data)
-    req = urllib.request.Request(url=request_url, data= data, headers={'Content-Type': 'application/json'})
-    _ = urllib.request.urlopen(req, timeout=5)
-
-
-def make_index(ip, port=9000, page="make_index"):
-    url = "/".join(["%s:%i"%(ip,port), page])
-    try:
-        response = urllib.request.urlopen(url)
-        return True
-    except urllib.error.HTTPError as e:
-        logging.warning("No index file could be found for device %s" % ip)
-        return False
-
-
-def get_all_videos(device_info, out_dir, port=9000, static_dir="static"):
-    url = "http://" + device_info["ip"]
-    id = device_info["id"]
-    video_list = get_video_list(url, port=port, static_dir=static_dir)
-    #backward compatible. if no index, we do not stop
-    if video_list is None:
-        return
-    target_prefix = "/".join(["%s:%i"%(url,port), static_dir])
-    for v in video_list:
-        try:
-            current = wget_mirror_wrapper(v, target_prefix=target_prefix, output_dir=out_dir)
-        except WGetERROR as e:
-            logging.warning(e)
-            continue
-
-        if not current:
-            # we only attempt to remove if the files is mirrored
-            remove_video_from_host(url, id, v)
-
-def backup_job(args):
-    try:
-        device_info, video_result_dir = args
-        logging.info("Initiating backup for device  %s" % device_info["id"])
-        
-        get_all_videos(device_info, video_result_dir)
-        logging.info("Backup done for for device  %s" % device_info["id"])
-        return 1
-        
-    except Exception as e:
-        logging.error("Unexpected error in backup. args are: %s" % str(args))
-        logging.error(traceback.format_exc())
-        return
+class SimpleWebServer(BaseHTTPRequestHandler):
+    def do_GET(self):
+        # Handle the /status endpoint
+        if self.path == "/status":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            # Output the content of gbw.backup_status
+            response_data = json.dumps(gbw.backup_status, indent=2)
+            self.wfile.write(response_data.encode("utf-8"))
+        else:
+            # Handle unknown endpoints
+            self.send_response(404)
+            self.end_headers()
+            self.wfile.write(b"404 Not Found")
 
 
 if __name__ == '__main__':
@@ -149,6 +78,19 @@ if __name__ == '__main__':
 
         else:
             gbw.start()
-        
+            # Start a simple HTTP server on port 8090
+            server_address = ('', 8090)
+            httpd = HTTPServer(server_address, SimpleWebServer)
+            logging.info("Starting web server on port 8090...")
+
+            try:
+                # Replace serve_forever() with an explicit request handling loop
+                while True:
+                    httpd.handle_request()
+            except KeyboardInterrupt:
+                logging.info("Shutting down the web server.")
+            finally:
+                httpd.server_close()
+
     except Exception as e:
         logging.error(traceback.format_exc())
