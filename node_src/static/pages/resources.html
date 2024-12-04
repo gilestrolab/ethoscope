@@ -4,57 +4,63 @@
 </div>
 <div ng-if="hasAccess">
     <h2>Notifications</h2>
-    <div class="alert alert-neutral" style="background-color:#f2f2f2;" ng-repeat = "news in notifications | orderBy:date:reverse">{{news.date}} - {{news.content}}</div>
-        
-    
+    <div class="alert alert-neutral" style="background-color:#f2f2f2;" ng-repeat="news in notifications | orderBy:date:reverse">{{news.date}} - {{news.content}}</div>
+
+
     <h2>Making Ethoscopes</h2>
 
     <div>
-    <h3>Burning SD cards for Ethoscopes</h3>
-    SD images should be burned using <a href="https://www.balena.io/etcher/">Balena Etcher</a> on a <a href="https://www.amazon.co.uk/gp/product/B06XFSZGCC/ref=ppx_yo_dt_b_search_asin_title?ie=UTF8&psc=1">Samsung EVO Plus 32GB card</a>.
-    The most recent version of the SD image ({{resources.sd_image.filename}}) can be downlodaded from <a href="{{resources.sd_image.url}}">here</a> and dates {{resources.sd_image.date}}. The md5sum of the zip file is {{resources.sd_image.md5sum}}. There is no need to deflate the zip file; it can be burned onto the SDHC image as it is.
+        <h3>Burning SD cards for Ethoscopes</h3>
+        SD images should be burned using <a href="https://www.balena.io/etcher/">Balena Etcher</a> on a <a href="https://www.amazon.co.uk/gp/product/B06XFSZGCC/ref=ppx_yo_dt_b_search_asin_title?ie=UTF8&psc=1">Samsung EVO Plus 32GB card</a>.
+        The most recent version of the SD image ({{resources.sd_image.filename}}) can be downlodaded from <a href="{{resources.sd_image.url}}">here</a> and dates {{resources.sd_image.date}}. The md5sum of the zip file is {{resources.sd_image.md5sum}}. There is no need to deflate the zip file; it can be burned onto the SDHC image as it is.
     </div>
 
     <div>
         <h3>Case files</h3>
         <div>
-        <h4>Onshape links</h4>
-        Link to the most recent models on onshape - Last updated on {{resources.date}} - version {{resources.version}}
-        <ul>
-        <li ng-repeat = "onshape in resources.onshape"><a href="{{onshape.url}}">{{onshape.name}}</a></li>
-        </ul>
+            <h4>Onshape links</h4>
+            Link to the most recent models on onshape - Last updated on {{resources.date}} - version {{resources.version}}
+            <ul>
+                <li ng-repeat="onshape in resources.onshape"><a href="{{onshape.url}}">{{onshape.name}}</a></li>
+            </ul>
         </div>
         <div>
-        <h4>GCODE files</h4>
-        Created on CURA for printing on UltiMaker 2+ using PLA as filament
-        <table  class="table table-striped" ng-cloak>
-            <thead>
-                <th>File</th>
-                <th>Content</th>
-                <th>Material</th>
-            </thead>
-            <tbody>
-                <tr ng-repeat = "gcode in resources.gcodes">
-                <td><a href="{{gcode.url}}">{{gcode.filename}}</a></td><td>{{gcode.prints}}</td></td><td>{{gcode.material}}</td></tr>
-                </tr>
-            </tbody>
-            <tfoot>
-                <tr><td><a href="{{resources.gcodes_zip.url}}">All the files above as one zip folder - includes GCODES and STLs from Onshape</a></td></tr>
-            </tfoot>
-        </table>
+            <h4>GCODE files</h4>
+            Created on CURA for printing on UltiMaker 2+ using PLA as filament
+            <table class="table table-striped" ng-cloak>
+                <thead>
+                    <th>File</th>
+                    <th>Content</th>
+                    <th>Material</th>
+                </thead>
+                <tbody>
+                    <tr ng-repeat="gcode in resources.gcodes">
+                        <td><a href="{{gcode.url}}">{{gcode.filename}}</a></td>
+                        <td>{{gcode.prints}}</td>
+                        </td>
+                        <td>{{gcode.material}}</td>
+                    </tr>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td><a href="{{resources.gcodes_zip.url}}">All the files above as one zip folder - includes GCODES and STLs from Onshape</a></td>
+                    </tr>
+                </tfoot>
+            </table>
         </div>
-        
+
     </div>
     <div>
         <img src="https://imgur.com/T1rqiQ8.png">
     </div>
     <h4></h4>
     <div>
-    The easiest way to print is to download the gcode zip file and uncompressit on a SD card. Use the SD card directly on the printer.
-    One can print 2 whole ethoscopes selecting files numbered 1,2,3 (excluding walls).
-    Versions greater than 1.6 rely exclusively on printed parts (no screws and nuts needed) and print two small extra components compared to the published version: a camera holder that holds the camera in place and a light strip holder that holds the IR light.
+        The easiest way to print is to download the gcode zip file and uncompressit on a SD card. Use the SD card directly on the printer.
+        One can print 2 whole ethoscopes selecting files numbered 1,2,3 (excluding walls).
+        Versions greater than 1.6 rely exclusively on printed parts (no screws and nuts needed) and print two small extra components compared to the published version: a camera holder that holds the camera in place and a light strip holder that holds the IR light.
 
-    We also recommend using A4 mirror paper <a href="https://www.amazon.co.uk/gp/product/B0785GSQW4/ref=ppx_yo_dt_b_asin_title_o01_s00?ie=UTF8&psc=1">like this one</a> to cover the lightbox. It will create more homogenous and stronger IR illumination. 
-    A PDF template to print on the BACK of those can be downloaded <a href="https://www.dropbox.com/s/71xjp5jpwa6ps79/ethoscope_mirror.pdf?dl=0">here</a>.
+        We also recommend using A4 mirror paper <a href="https://www.amazon.co.uk/gp/product/B0785GSQW4/ref=ppx_yo_dt_b_asin_title_o01_s00?ie=UTF8&psc=1">like this one</a> to cover the lightbox. It will create more homogenous and stronger IR illumination.
+        A PDF template to print on the BACK of those can be downloaded <a href="https://www.dropbox.com/s/71xjp5jpwa6ps79/ethoscope_mirror.pdf?dl=0">here</a>.
     </div>
 </div>

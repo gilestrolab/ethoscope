@@ -34,23 +34,28 @@ with open(news_file, "r") as nf:
 
 @app.hook('after_request')
 def enable_cors():
-    """
-    You need to add some headers to each request.
-    Don't use the wildcard '*' for Access-Control-Allow-Origin in production.
-    """
-    #bottle.response.headers['Access-Control-Allow-Origin'] = 'http://localhost:8888'
-    bottle.response.headers['Access-Control-Allow-Origin'] = '*' # Allowing CORS in development
+    origin = bottle.request.headers.get('Origin')  # Dynamically get the Origin header
+    if origin:
+        bottle.response.headers['Access-Control-Allow-Origin'] = origin
+    else:
+        bottle.response.headers['Access-Control-Allow-Origin'] = '*'
+    
+    # Other CORS headers
     bottle.response.headers['Access-Control-Allow-Methods'] = 'PUT, GET, POST, DELETE, OPTIONS'
     bottle.response.headers['Access-Control-Allow-Headers'] = 'Origin, Accept, Content-Type, X-Requested-With, X-CSRF-Token'
+    bottle.response.headers['Access-Control-Allow-Credentials'] = 'true'  # Required for credentials
 
 
 @app.get('/')
 def index():
     return bottle.template('index_template', images=images, gcodes=gcodes, onshape=onshape, gcodes_zip=gcodes_zip, news=news)
 
-@app.get('/latest_sd_image')
-def forward_to_sd_image():
-    return bottle.redirect(sd_image['url'], code=302)
+@app.get('/latest_sd_image/<pi>')
+def forward_to_sd_image(pi):
+    if pi == "pi3":
+        return bottle.redirect(images[0]['url'], code=302)
+    elif pi == "pi4":
+        return bottle.redirect(images[1]['url'], code=302)
 
 
 @app.get('/resources')
@@ -70,7 +75,7 @@ def resources():
     logging.info("%s - Receiving request from %s - %s" % (datetime.datetime.now(), client, resolve))
     
     bottle.response.content_type = 'application/json'
-    return json.dumps({"sd_image": sd_image, "gcodes": gcodes, "onshape": onshape, 'gcodes_zip': gcodes_zip, 'date': FILESDATE, 'version': FILESVERSION})
+    return json.dumps({"images": images, "gcodes": gcodes, "onshape": onshape, 'gcodes_zip': gcodes_zip, 'date': FILESDATE, 'version': FILESVERSION})
 
 
 @app.get('/news')
