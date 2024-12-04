@@ -20,7 +20,7 @@ assert os.path.exists(news_file), f"File not found: {news_file}"
 with open(links_file, 'r') as file:
     links = json.load(file)
 
-sd_image = links['sd_image']
+images = links['images']
 gcodes = links['gcodes']
 onshape = links['onshape']
 gcodes_zip = links['gcodes_zip']           
@@ -46,7 +46,7 @@ def enable_cors():
 
 @app.get('/')
 def index():
-    return bottle.template('index_template', sd_image=sd_image, gcodes=gcodes, onshape=onshape, gcodes_zip=gcodes_zip, news=news)
+    return bottle.template('index_template', images=images, gcodes=gcodes, onshape=onshape, gcodes_zip=gcodes_zip, news=news)
 
 @app.get('/latest_sd_image')
 def forward_to_sd_image():

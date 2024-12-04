@@ -1,12 +1,23 @@
 {
-    "sd_image": {
-        "filename": "20230306_ethoscope_000.img.zip",
-        "url": "https://imperialcollegelondon.box.com/shared/static/qp3haay6i8w9vpyo575hm7uqihzb5xlk.zip",
-        "date": "06 Mar 2023",
-        "md5sum": "499d94be6ab904ac65fe5413b67e25a5"
-    },
-    "gcodes": [
+    "images": [{
+            "title": "Ethoscope000, rPI2/3",
+            "filename": "20240130_ethoscope_000.img",
+            "url": "https://imperialcollegelondon.box.com/shared/static/1pqzhhe3podxw4i20s8jjxbfrnk7m3f8.zip",
+            "date": "30 Jan 2024",
+            "md5sum": "ae22646c979b98e6b5024857470270d6"
+        },
+
         {
+            "title": "Ethoscope000, rPI4",
+            "filename": "20241017_ethoscope_pi4_000.img",
+            "url": "https://imperialcollegelondon.box.com/shared/static/r9q3ldd6a384o29h8c8iwjrppsr7mujd.zip",
+            "date": "17 Oct 2024",
+            "md5sum": "e7fe190f038eb1d1358ed829feaf9fd2"
+        }
+    ],
+
+
+    "gcodes": [{
             "filename": "1_etho_1.6_LIGHT_BOX.2x",
             "url": "https://www.dropbox.com/s/u4598hoxt2ueg5v/1_etho_1.6_LIGHT_BOX.2x.gcode?dl=0",
             "prints": "Light box only",
@@ -49,8 +60,7 @@
             "material": "PLA Gray"
         }
     ],
-    "onshape": [
-        {
+    "onshape": [{
             "name": "Upper case",
             "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/d228e2116a5933cf39312517"
         },
