@@ -1,16 +1,16 @@
 [Unit]
-Description=Ethoscope node server
-Wants=ntpd.service clock.service
-After=ntpd.service clock.service
-
+Description=Ethoscope Updater Service
+After=network.target
 
 [Service]
 Type=simple
+#User=git
+#Group=git
 WorkingDirectory=/opt/ethoscope_updater/
-ExecStart=/usr/bin/python  /opt/ethoscope_updater/update_server.py -g /opt/ethoscope-node -b /srv/git/ethoscope.git
-RestartSec=5
+ExecStart=/usr/bin/python3 /opt/ethoscope_updater/update_server.py -g /opt/ethoscope-node -b /srv/git/ethoscope.git
 Restart=always
+RestartSec=5s
+Environment=PYTHONUNBUFFERED=1
 
 [Install]
 WantedBy=multi-user.target
-

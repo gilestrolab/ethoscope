@@ -1,5 +1,4 @@
 import bottle
-import updater
 import logging
 import traceback
 import os
@@ -8,6 +7,8 @@ import socket
 from optparse import OptionParser
 from helpers import assert_node, WrongMachineID
 from helpers import get_commit_version, generate_new_device_map, updates_api_wrapper, reload_node_daemon, reload_device_daemon
+
+import updater
 
 
 app = bottle.Bottle()
@@ -61,7 +62,7 @@ def device(action, id):
                     "origin_commit":get_commit_version(origin_commit)
                     }
         if action == 'active_branch':
-            return {"active_branch": str(ethoscope_updater.active_branch())}
+            return {"active_branch": str(ethoscope_updater.active_branch)}
             
         if action == 'available_branches':
             return {"available_branches": str(ethoscope_updater.available_branches())}
@@ -128,6 +129,7 @@ def bare(action):
         if action == 'update':
             #out format looks like  {branch:up_to_date}. e.g. out["dev"]=True
             out = bare_repo_updater.update_all_visible_branches()
+            #out = bare_repo_updater.update_all_branches()
             return out
         elif action == 'discover_branches':
             out = bare_repo_updater.discover_branches()
