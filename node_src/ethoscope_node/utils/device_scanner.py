@@ -490,7 +490,7 @@ class Ethoscope(Device):
 
         img_url = "http://%s:%i/%s/%s" % (self._ip, self._port, self._remote_pages['static'], img_path)
         try:
-            return urllib.request.urlopen(img_url,timeout=5)
+            return urllib.request.urlopen(img_url, timeout=10)
         except  urllib.error.HTTPError:
             logging.error("Could not get image for ip = %s (id = %s)" % (self._ip, self._id))
             raise Exception("Could not get image for ip = %s (id = %s)" % (self._ip, self._id))
@@ -690,11 +690,11 @@ class Ethoscope(Device):
                 com = "SELECT value from METADATA WHERE field = 'date_time'"
 
                 mysql_db = mysql.connector.connect(host=self._ip,
-                                                   connect_timeout=timeout,
-                                                   **self._ethoscope_db_credentials,
-                                                   buffered=True,
-                                                   charset='latin1', #this should match what set in ethoscope.utils.io
-                                                   use_unicode=True)
+                                                    connect_timeout=timeout,
+                                                    **self._ethoscope_db_credentials,
+                                                    buffered=True,
+                                                    charset='latin1', #this should match what set in ethoscope.utils.io
+                                                    use_unicode=True)
                 cur = mysql_db.cursor()
                 cur.execute(com)
                 query = [c for c in cur]
@@ -705,14 +705,15 @@ class Ethoscope(Device):
                 self._info["backup_filename"] = "%s_%s.db" % (formatted_time, device_id)
                 
                 output_db_file = os.path.join(self._results_dir,
-                                              device_id,
-                                              device_name,
-                                              formatted_time,
-                                              self._info["backup_filename"]
-                                              )
+                                                device_id,
+                                                device_name,
+                                                formatted_time,
+                                                self._info["backup_filename"]
+                                                )
 
             except Exception as e:
-                logging.error(f"Could not generate backup path for {device_id}. Probably a MySQL issue")
+                # This normally either fails because no MYSQL connection can be established or because there is no SQL database.
+                logging.error(f"Could not generate backup path for {device_id}. Probably a MySQL issue: {e}")
                 #logging.error(traceback.format_exc())
                 output_db_file = None
 

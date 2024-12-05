@@ -3,11 +3,6 @@ __author__ = 'luis'
 import logging
 import traceback
 from optparse import OptionParser
-
-from ethoscope.web_utils.control_thread import ControlThread
-from ethoscope.web_utils.record import ControlThreadVideoRecording
-from ethoscope.web_utils.helpers import *
-
 import subprocess
 import json
 import os
@@ -16,14 +11,16 @@ import time
 
 from threading import Thread 
 
-#from bottle import Bottle, ServerAdapter, request, server_names
 import bottle
-
 import socket
 import netifaces as ni
 from zeroconf import ServiceInfo, Zeroconf
 
 from ethoclient import send_command, listenerIsAlive
+from ethoscope.web_utils.control_thread import ControlThread
+from ethoscope.web_utils.record import ControlThreadVideoRecording
+from ethoscope.web_utils.helpers import *
+from ethoscope.utils.io import list_local_video_files
 
 try:
     from cheroot.wsgi import Server as WSGIServer
@@ -44,6 +41,7 @@ update_machine_json_data = {}
 
 /<id>                                   GET     returns ID of the machine
 /make_index                             GET     create an index.html file with all the h264 files in the machine
+/list_video_files                       GET     returns a json with the full path and the md5sum information for each video chunk
 /rm_static_file/                        POST    remove file
 /dumpSQLdb/<id>                         POST    performs a SQL dump of the default database
 
@@ -110,6 +108,11 @@ def server_static(filepath):
 @error_decorator
 def name():
     return {"id": _MACHINE_ID}
+
+@api.get('/list_video_files')
+@error_decorator
+def list_video_files():
+    return list_local_video_files(_ETHOSCOPE_DIR)
 
 @api.get('/make_index')
 @error_decorator

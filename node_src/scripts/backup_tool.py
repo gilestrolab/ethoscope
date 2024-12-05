@@ -4,18 +4,38 @@ from ethoscope_node.utils.backups_helpers import GenericBackupWrapper
 import logging
 import optparse
 import traceback
+import signal
+import sys
 
+import json
 import bottle
 app = bottle.Bottle()
 
-
 @app.route('/')
-def index():
-    return gbw.backup_status
+def status():
+    bottle.response.content_type = 'application/json'
+    return json.dumps({'status': 'running'}, indent=2)
+
+@app.route('/status')
+def status():
+    bottle.response.content_type = 'application/json'
+    with gbw._lock:
+        status_copy = gbw.backup_status.copy()
+    return json.dumps(status_copy, indent=2)
 
 
 if __name__ == '__main__':
-    
+
+    def signal_handler(sig, frame):
+        logging.info("Received shutdown signal. Stopping backup thread...")
+        gbw.stop()  # Signal the thread to stop
+        gbw.join(timeout=10)  # Wait for the thread to finish
+        logging.info("Shutdown complete.")
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
     CFG = EthoscopeConfiguration()
     
     logging.getLogger().setLevel(logging.INFO)
@@ -57,16 +77,18 @@ if __name__ == '__main__':
             bj = None
             for device in gbw.find_devices():
                 if device['name'] == ("ETHOSCOPE_%03d" % ethoscope):
-                    bj = gbw._backup_job( device )
+                    bj = gbw.initiate_backup_job( device )
 
             if bj == None: exit("ETHOSCOPE_%03d is not online or not detected" % ethoscope)
 
     else:
-        try:
-            # We start in server mode
 
+        try:# We start in server mode
             gbw.start()
-            bottle.run(app, host='0.0.0.0', port=82)
+            bottle.run(app, host='0.0.0.0', port=8090)
 
         except KeyboardInterrupt:
             logging.info("Stopping server cleanly")
+            gbw.stop()
+            gbw.join()
+            sys.exit(1)

@@ -4,32 +4,38 @@ import optparse
 import traceback
 import subprocess
 import json
-from http.server import HTTPServer, BaseHTTPRequestHandler
+import sys
 from ethoscope_node.utils.backups_helpers import GenericBackupWrapper
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
 
-class WGetERROR(Exception):
-    pass
+import bottle
+import signal
+app = bottle.Bottle()
 
-class SimpleWebServer(BaseHTTPRequestHandler):
-    def do_GET(self):
-        # Handle the /status endpoint
-        if self.path == "/status":
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            # Output the content of gbw.backup_status
-            response_data = json.dumps(gbw.backup_status, indent=2)
-            self.wfile.write(response_data.encode("utf-8"))
-        else:
-            # Handle unknown endpoints
-            self.send_response(404)
-            self.end_headers()
-            self.wfile.write(b"404 Not Found")
+@app.route('/')
+def status():
+    bottle.response.content_type = 'application/json'
+    return json.dumps({'status': 'running', 'last_backup' : gbw.last_backup}, indent=2)
 
+@app.route('/status')
+def status():
+    bottle.response.content_type = 'application/json'
+    with gbw._lock:
+        status_copy = gbw.backup_status.copy()
+    return json.dumps(status_copy, indent=2)
 
 if __name__ == '__main__':
-    
+
+    def signal_handler(sig, frame):
+        logging.info("Received shutdown signal. Stopping backup thread...")
+        gbw.stop()  # Signal the thread to stop
+        gbw.join(timeout=10)  # Wait for the thread to finish
+        logging.info("Shutdown complete.")
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
     CFG = EthoscopeConfiguration()
 
     logging.getLogger().setLevel(logging.INFO)
@@ -72,25 +78,20 @@ if __name__ == '__main__':
                 bj = None
                 for device in gbw.find_devices():
                     if device['name'] == ("ETHOSCOPE_%03d" % ethoscope):
-                        bj = gbw._backup_job( device )
+                        bj = gbw.initiate_backup_job( device )
 
                 if bj == None: exit("ETHOSCOPE_%03d is not online or not detected" % ethoscope)
 
         else:
-            gbw.start()
-            # Start a simple HTTP server on port 8090
-            server_address = ('', 8090)
-            httpd = HTTPServer(server_address, SimpleWebServer)
-            logging.info("Starting web server on port 8090...")
 
-            try:
-                # Replace serve_forever() with an explicit request handling loop
-                while True:
-                    httpd.handle_request()
+            try:# We start in server mode
+                gbw.start()
+                bottle.run(app, host='0.0.0.0', port=8092)
+
             except KeyboardInterrupt:
-                logging.info("Shutting down the web server.")
-            finally:
-                httpd.server_close()
+                logging.info("Stopping server cleanly")
+                gbw.stop()
+                gbw.join(timeout=10)
 
     except Exception as e:
         logging.error(traceback.format_exc())
