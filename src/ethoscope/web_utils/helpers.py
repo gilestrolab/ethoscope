@@ -565,22 +565,34 @@ def get_SD_CARD_NAME():
     except:
         return "N/A"
         
-        
-def get_partition_infos():
+
+def get_partition_info(folder=''):
     """
-    Returns information about mounted partition and their free availble space
+    Returns information about the mounted partitions. If a folder is specified,
+    returns information about the mounted partition containing that folder
+    and its free available space.
     """
     try:
-        with os.popen('df -Th') as df:
+        command = f'df -Th {folder}'.strip()
+        with os.popen(command) as df:
             df_info = df.read().strip().split('\n')
-        keys = df_info[0]
+        
+        if len(df_info) < 2:
+            raise ValueError(f"No partition information found for folder: {folder}")
+
+        keys = df_info[0].split()
         values = df_info[1:]
         
-        return [dict([(key, value) for key, value in zip(keys.split(), line.split())]) for line in values]
+        # For a specified folder, return a dictionary; otherwise, return a list of dictionaries
+        if folder:
+            return dict(zip(keys, values[0].split()))
+        else:
+            return [dict(zip(keys, line.split())) for line in values]
         
-    except:
+    except Exception as e:
+        print(f"Error: {e}")
         return
-    
+
 def set_datetime(time_on_node):
     """
     Set date and time on the PI

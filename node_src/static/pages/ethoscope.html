@@ -2,7 +2,21 @@
 <div class="jumbotron text-center" ng-cloak>
 
     <div class="header" style="position: relative;">
-        <span ng-if="device.underpowered == true" class="fa fa-bolt fa-3x" title="The PI is underpowered!" style="position: absolute; top: 0px; right: 0px;"></span>
+        <!-- Underpowered Icon -->
+        <span ng-if="device.underpowered == true" class="fa fa-bolt fa-3x" title="The PI is underpowered!" style="position: absolute; top: 0px; right: 60px; color: #ff9966;">
+        </span>
+
+        <!-- Dynamic Hard Drive Icon -->
+        <span ng-if="device.used_space !== undefined && device.used_space !== null" class="fa-solid fa-hard-drive fa-3x" title="The device is using {{device.used_space || 0}}% of its space" ng-class="{
+        'low-usage': device.used_space < 50,
+        'medium-usage': device.used_space >= 60 && device.used_space < 80,
+        'high-usage': device.used_space >= 80
+            }" style="position: absolute; top: 0px; right: 0px;">
+        </span>
+
+        <!-- Display When Used Space Is Not Available -->
+        <span ng-if="device.used_space === undefined || device.used_space === null" class="fa-solid fa-question-circle fa-3x" title="Disk usage information not available" style="position: absolute; top: 0px; right: 0px; color: gray;">
+        </span>
 
         <h1>{{device.name}}</h1>
         <ul>
@@ -78,7 +92,7 @@
     </div>
 </div>
 
-<div class="jumbotron-fluid" ng-if="device.status == 'running' && 'interactor' in device && device.interactor.name != '<class \'ethoscope.stimulators.stimulators.DefaultStimulator\'>' ">
+<div class="jumbotron-fluid" ng-if="hasValidInteractor(device)">
     <button data-toggle="collapse" data-target="#interactor" style="float:right;" class="fa fa-robot fa-2x"></button>
     <div class="collapse" id="interactor">
         <li ng-repeat="(name, value) in device.interactor">{{name}}: {{value}}</li>

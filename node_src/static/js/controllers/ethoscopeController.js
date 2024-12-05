@@ -1,16 +1,46 @@
 (function() {
     var app = angular.module('flyApp');
 
-    app.directive('tooltip', function() {
+    app.directive('tooltip', function($compile, $timeout) {
         return {
             restrict: 'A',
             link: function(scope, element, attrs) {
-                $(element).hover(function() {
-                    // on mouseenter
-                    $(element).tooltip('show');
-                }, function() {
-                    // on mouseleave
-                    $(element).tooltip('hide');
+                // Create tooltip element
+                const tooltipElement = angular.element('<div class="custom-tooltip">{{tooltipText}}</div>');
+                tooltipElement.addClass('tooltip-hidden'); // Initially hidden
+                element.after(tooltipElement);
+
+                // Set tooltip text from the `tooltip` attribute
+                let tooltipText = attrs.tooltip || ''; // Default to empty string
+                scope.tooltipText = tooltipText;
+
+                // Compile the tooltip element to enable Angular binding
+                $compile(tooltipElement)(scope);
+
+                // Tooltip visibility logic
+                const showTooltip = () => {
+                    tooltipElement.removeClass('tooltip-hidden');
+                    tooltipElement.addClass('tooltip-visible');
+                };
+
+                const hideTooltip = () => {
+                    tooltipElement.removeClass('tooltip-visible');
+                    tooltipElement.addClass('tooltip-hidden');
+                };
+
+                // Attach mouseover and mouseleave events for tooltip visibility
+                element.bind('mouseenter', () => {
+                    scope.$apply(showTooltip);
+                });
+
+                element.bind('mouseleave', () => {
+                    scope.$apply(hideTooltip);
+                });
+
+                // Clean up event listeners on destroy
+                scope.$on('$destroy', () => {
+                    element.unbind('mouseenter');
+                    element.unbind('mouseleave');
                 });
             }
         };
@@ -111,69 +141,48 @@
         });
 
 
-        $scope.ethoscope.update_user_options = {};
+        $scope.ethoscope.update_user_options = function(optionType, name) {
+            const data = $scope.user_options[optionType];
 
+            // Iterate through the available options for the given type
+            for (let i = 0; i < data[name].length; i++) {
+                if (data[name][i]['name'] === $scope.selected_options[optionType][name]['name']) {
+                    // Reset arguments for the selected option
+                    $scope.selected_options[optionType][name]['arguments'] = {};
+
+                    // Populate arguments for the selected option
+                    for (let j = 0; j < data[name][i]['arguments'].length; j++) {
+                        const argument = data[name][i]['arguments'][j];
+
+                        if (argument['type'] === 'datetime') {
+                            // Handle datetime arguments
+                            $scope.selected_options[optionType][name]['arguments'][argument['name']] = [
+                                moment(argument['default']).format('LLLL'),
+                                argument['default']
+                            ];
+                        } else {
+                            // Set default arguments for other types
+                            $scope.selected_options[optionType][name]['arguments'][argument['name']] = argument['default'];
+                        }
+                    }
+                }
+            }
+        };
+
+        // Handling tracking options
         $scope.ethoscope.update_user_options.tracking = function(name) {
-            data = $scope.user_options;
-            for (var i = 0; i < data.tracking[name].length; i++) {
-                if (data.tracking[name][i]['name'] == $scope.selected_options.tracking[name]['name']) {
-                    $scope.selected_options.tracking[name]['arguments'] = {};
-                    for (var j = 0; j < data.tracking[name][i]['arguments'].length; j++) {
-                        if (data.tracking[name][i]['arguments'][j]['type'] == 'datetime') {
-                            $scope.selected_options.tracking[name]['arguments'][data.tracking[name][i]['arguments'][j]['name']] = [];
-                            $scope.selected_options.tracking[name]['arguments'][data.tracking[name][i]['arguments'][j]['name']][0] = moment(data.tracking[name][i]['arguments'][j]['default']).format('LLLL');
-                            $scope.selected_options.tracking[name]['arguments'][data.tracking[name][i]['arguments'][j]['name']][1] = data.tracking[name][i]['arguments'][j]['default'];
-                            console.log($scope.selected_options.tracking[name]['arguments'][data.tracking[name][i]['arguments'][j]['name']]);
-                        } else {
-                            $scope.selected_options.tracking[name]['arguments'][data.tracking[name][i]['arguments'][j]['name']] = data.tracking[name][i]['arguments'][j]['default'];
-                        }
+            $scope.ethoscope.update_user_options('tracking', name);
+        };
 
-                    }
-                }
-            }
-        }
-
-
+        // Handling recording options
         $scope.ethoscope.update_user_options.recording = function(name) {
-            data = $scope.user_options;
-            for (var i = 0; i < data.recording[name].length; i++) {
-                if (data.recording[name][i]['name'] == $scope.selected_options.recording[name]['name']) {
-                    $scope.selected_options.recording[name]['arguments'] = {};
-                    for (var j = 0; j < data.recording[name][i]['arguments'].length; j++) {
-                        if (data.recording[name][i]['arguments'][j]['type'] == 'datetime') {
-                            $scope.selected_options.recording[name]['arguments'][data.recording[name][i]['arguments'][j]['name']] = [];
-                            $scope.selected_options.recording[name]['arguments'][data.recording[name][i]['arguments'][j]['name']][0] = moment(data.recording[name][i]['arguments'][j]['default']).format('LLLL');
-                            $scope.selected_options.recording[name]['arguments'][data.recording[name][i]['arguments'][j]['name']][1] = data.recording[name][i]['arguments'][j]['default'];
-                            console.log($scope.selected_options.recording[name]['arguments'][data.recording[name][i]['arguments'][j]['name']]);
-                        } else {
-                            $scope.selected_options.recording[name]['arguments'][data.recording[name][i]['arguments'][j]['name']] = data.recording[name][i]['arguments'][j]['default'];
-                        }
+            $scope.ethoscope.update_user_options('recording', name);
+        };
 
-                    }
-                }
-            }
-        }
-
-
+        // Handling update_machine options
         $scope.ethoscope.update_user_options.update_machine = function(name) {
-            data = $scope.user_options;
-            for (var i = 0; i < data.update_machine[name].length; i++) {
-                if (data.update_machine[name][i]['name'] == $scope.selected_options.update_machine[name]['name']) {
-                    $scope.selected_options.update_machine[name]['arguments'] = {};
-                    for (var j = 0; j < data.update_machine[name][i]['arguments'].length; j++) {
-                        if (data.update_machine[name][i]['arguments'][j]['type'] == 'datetime') {
-                            $scope.selected_options.update_machine[name]['arguments'][data.update_machine[name][i]['arguments'][j]['name']] = [];
-                            $scope.selected_options.update_machine[name]['arguments'][data.update_machine[name][i]['arguments'][j]['name']][0] = moment(data.update_machine[name][i]['arguments'][j]['default']).format('LLLL');
-                            $scope.selected_options.update_machine[name]['arguments'][data.update_machine[name][i]['arguments'][j]['name']][1] = data.update_machine[name][i]['arguments'][j]['default'];
-                            console.log($scope.selected_options.update_machine[name]['arguments'][data.update_machine[name][i]['arguments'][j]['name']]);
-                        } else {
-                            $scope.selected_options.update_machine[name]['arguments'][data.update_machine[name][i]['arguments'][j]['name']] = data.update_machine[name][i]['arguments'][j]['default'];
-                        }
-
-                    }
-                }
-            }
-        }
+            $scope.ethoscope.update_user_options('update_machine', name);
+        };
 
         $scope.ethoscope.backup = function() {
             $http.post('/device/' + device_id + '/backup', data = {}).success(function(data) {
@@ -389,6 +398,13 @@
 
         };
 
+        $scope.hasValidInteractor = function(device) {
+            return (
+                device.status === 'running' &&
+                device.hasOwnProperty('interactor') &&
+                device.interactor.name !== "<class 'ethoscope.stimulators.stimulators.DefaultStimulator'>"
+            );
+        };
 
         $scope.ethoscope.alert = function(message) {
             alert(message);
@@ -489,7 +505,7 @@
             }
         }
 
-        refresh_data = $interval(refresh, 3000);
+        refresh_data = $interval(refresh, 6000);
         //clear interval when scope is destroyed
         $scope.$on("$destroy", function() {
             $interval.cancel(refresh_data);

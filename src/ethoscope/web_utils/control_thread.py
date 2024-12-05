@@ -191,7 +191,8 @@ class ControlThread(Thread):
 
                         "id": machine_id,
                         "name": name,
-                        "version": version
+                        "version": version,
+                        "used_space" : get_partition_info("/ethoscope_data")['Use%'].replace("%","")
                         }
         self._monit = None
 
@@ -215,17 +216,13 @@ class ControlThread(Thread):
         """
         This is information about the ethoscope that is not changing in time such as hardware specs and configuration parameters
         """
+        return { 'kernel'      : os.uname()[2],
+                 'pi_version'  : pi_version(),
+                 'camera'      : getPiCameraVersion(),
+                 'SD_CARD_AGE' : get_SD_CARD_AGE(),
+                 'partitions'  : get_partition_info(),
+                 'SD_CARD_NAME':  get_SD_CARD_NAME()  }
 
-        _hw_info = {}
-        
-        _hw_info['kernel'] = os.uname()[2]
-        _hw_info['pi_version'] = pi_version()
-        _hw_info['camera'] = getPiCameraVersion()
-        _hw_info['SD_CARD_AGE'] = get_SD_CARD_AGE()
-        _hw_info['partitions'] = get_partition_infos()
-        _hw_info['SD_CARD_NAME'] = get_SD_CARD_NAME()
-        
-        return _hw_info
 
 
     @property
