@@ -1,5 +1,5 @@
 [Unit]
-Description=Ethoscope Updater Service
+Description=Updater Service for the Node
 After=network.target
 
 [Service]

@@ -34,7 +34,7 @@ class BackupClass(object):
         """
         not yet implemented
         """
-        return -1, -1
+        return { 'tracking_db' : {} }
 
     def backup(self):
         """
@@ -179,8 +179,11 @@ class VideoBackupClass(object):
         try:
             yield json.dumps({"status": "info", "message": f"Backup initiated for device {self._id}"})
 
-            video_list = self.get_video_list_html()
-            #video_list = self.get_video_list_json()
+            #Needed for temporary compatibility given that json output with MD5 is a new thing (Dec 2024)
+            try:
+                video_list = [ file['path'] for file in self.get_video_list_json().values() ]
+            except:
+                video_list = self.get_video_list_html()
 
             if video_list is None:
                 yield json.dumps({"status": "warning", "message": f"No videos to download for device{self._id}"})
@@ -211,9 +214,7 @@ class VideoBackupClass(object):
         """
         video_list_url = f"{self._device_url}/list_video_files"
         try:
-            # Request the URL and read the response
             response = urllib.request.urlopen(video_list_url)
-            # Parse the JSON response directly into a dictionary
             video_list = json.load(response)
         except urllib.error.HTTPError as e:
             logging.warning("No JSON list of video files could be found for device %s: %s" % (self._id, str(e)))
@@ -263,7 +264,7 @@ class VideoBackupClass(object):
             number_of_matching_files = 0
             number_of_total_files = len(hashed_remote_video_list)
         except:
-            return -1,-1
+            return None
 
         # Compare each remote file with the local counterpart
         for filename, remote_info in hashed_remote_video_list.items():
@@ -285,8 +286,7 @@ class VideoBackupClass(object):
             else:
                 print(f"File missing locally: {filename}")
         
-        #return {'matching' : number_of_matching_files, 'total' : number_of_total_files }
-        return number_of_matching_files, number_of_total_files
+        return {'video_files' : { 'matching' : number_of_matching_files , 'total' : number_of_total_files } }
 
     def get_video_list_html(self, index_file="ethoscope_data/results/index.html", generate_first=True):
         """
@@ -391,7 +391,7 @@ class GenericBackupWrapper(threading.Thread):
     def initiate_backup_job(self, device_info):
         ''' Start the backup process for the specified device '''
         try:
-            dev_id = device_info["id"]
+            dev_id = device_info['id']
             logging.info("Initiating backup for device %s" % dev_id)
 
             if self._is_instance_video:
@@ -402,21 +402,27 @@ class GenericBackupWrapper(threading.Thread):
             # Prepare backup status
             with self._lock:
                 if dev_id not in self.backup_status:
-                    self.backup_status[dev_id] = {'name': device_info["name"], 'started': 0, 'ended': 0, 'count': 0, 'progress': {}}
+                    self.backup_status[dev_id] = { 'name' : device_info['name'],
+                                                   'status' : device_info['status'],
+                                                   'started': 0,
+                                                   'ended': 0,
+                                                   'processing' : False,
+                                                   'count': 0,
+                                                   'synced' : {},
+                                                   'progress': {}
+                                                 }
+                
                 self.backup_status[dev_id].update({'started': int(time.time()), 'ended': 0, 'processing': True, 'progress': {}})
                 self.backup_status[dev_id]['count'] += 1
 
-            # Perform the backup
+            # Perform the backup and Update progress info in real time
             for message in backup_job.backup():
-                # Update progress info
                 with self._lock:
                     self.backup_status[dev_id]['progress'] = json.loads(message)
 
-            # Check sync status and mark as completed
+            # When backup ends, check sync status and mark as completed
             with self._lock:
-                matching, total = backup_job.check_sync_status()
-                self.backup_status[dev_id]['synced'] = f"{matching}/{total}"    
-
+                self.backup_status[dev_id].update( {'synced' : backup_job.check_sync_status() } )
                 self.backup_status[dev_id]['processing'] = False
                 self.backup_status[dev_id]['ended'] = int(time.time())
 
@@ -436,11 +442,8 @@ class GenericBackupWrapper(threading.Thread):
             active_devices = self.find_devices()
             logging.info(f"Found {len(active_devices)} devices online: "
                         f"{', '.join([dev['id'] for dev in active_devices])}")
-            for dev in active_devices:
-                if dev['id'] not in self.backup_status:
-                    with self._lock:
-                        self.backup_status[dev['id']] = {'started': 0, 'ended': 0, 'count': 0, 'progress': {}}
 
+            for dev in active_devices:
                 # Launch a separate thread for each backup job
                 t = threading.Thread(target=self.initiate_backup_job, args=(dev,))
                 t.daemon = True  # Ensure threads close with the main process
