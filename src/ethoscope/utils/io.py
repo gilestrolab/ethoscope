@@ -188,7 +188,7 @@ def get_and_hash(target, target_prefix, output_dir, cut_dirs=2):
     relative_path_parts = target_path_parts[cut_dirs:]
     relative_path = os.path.join(*relative_path_parts)
     local_file_path = os.path.join(output_dir, relative_path)
-    
+
     # Construct the wget command with '-O' to specify the exact output file path
     command = [
         "wget",
@@ -200,6 +200,10 @@ def get_and_hash(target, target_prefix, output_dir, cut_dirs=2):
     ]
 
     try:
+
+        #we need to make sure the full path is created first or the file won't be downloaded
+        os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
+
         #logging.info(f"Executing command: {' '.join(command)}")
         result = subprocess.run(
             command,
@@ -222,6 +226,7 @@ def get_and_hash(target, target_prefix, output_dir, cut_dirs=2):
                 logging.warning(f"Downloaded file '{local_file_path}' is empty.")
                 return False
         
+            logging.info("File downloaded. Now creating a md5 hash for it")
             save_hash_info_file (local_file_path)
         
             return True
