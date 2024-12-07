@@ -1,6 +1,6 @@
 [Unit]
 Description=Ethoscope device WEB server
-Wants=ntpd.service
+Wants=ntpd.service ethoscope_listener.service
 After=ntpd.service network.target ethoscope_listener.service
 
 [Service]

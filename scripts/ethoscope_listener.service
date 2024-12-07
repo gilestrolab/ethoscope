@@ -1,6 +1,6 @@
 [Unit]
 Description=Ethoscope listener server
-Wants=ntpd.service mysqld.service
+Wants=ntpd.service mariadb.service
 After=ntpd.service network.target
 
 
