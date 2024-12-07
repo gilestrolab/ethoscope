@@ -98,7 +98,10 @@ def do_upload(id):
 
 @api.route('/static/<filepath:path>')
 def server_static(filepath):
-    return bottle.static_file(filepath, root="/")
+    download = filepath.lower().endswith(".h264")
+    result = bottle.static_file(filepath, root="/", download=download)
+    bottle.response.headers['Cache-Control'] = 'public, max-age=86400'
+    return result
 
 @api.route('/download/<filepath:path>')
 def server_static(filepath):
