@@ -4,6 +4,7 @@ import time, datetime
 import logging
 import os
 from ethoscope.utils.debug import EthoscopeException
+from ethoscope.utils.io import save_hash_info_file
 import threading, queue
 import traceback
 import hashlib
@@ -440,93 +441,82 @@ class PiFrameGrabber(threading.Thread):
         import picamera
         import picamera.array
 
-        # try:
-        with picamera.PiCamera(
-                        #sensor_mode = 1, #https://picamera.readthedocs.io/en/release-1.13/fov.html#sensor-modes
-                        resolution = self._target_resolution,
-                        framerate = self._target_fps
-        ) as capture:
+        try:
+            with picamera.PiCamera(
+                            #sensor_mode = 1, #https://picamera.readthedocs.io/en/release-1.13/fov.html#sensor-modes
+                            resolution = self._target_resolution,
+                            framerate = self._target_fps
+            ) as capture:
 
-            self._save_camera_info (capture.exif_tags)
-            w, h = capture.resolution[0], capture.resolution[1]
+                self._save_camera_info (capture.exif_tags)
+                w, h = capture.resolution
 
-            if self._record_video:
+                if self._record_video:
 
-                self._video_time = time.time()
+                    self._video_time = time.time()
 
-                frame = np.empty((h, w, 3), dtype=np.uint8)
-                capture.start_recording(self._get_video_chunk_filename(fps=capture.framerate), format = 'h264', quality = self.video_quality)
+                    frame = np.empty((h, w, 3), dtype=np.uint8)
+                    capture.start_recording(self._get_video_chunk_filename(fps=capture.framerate), 
+                                            format = 'h264', 
+                                            quality = self.video_quality)
 
-                while self._stop_queue.empty():        
-                    capture.capture(frame, format = 'bgr', use_video_port=True)
+                    while self._stop_queue.empty():        
+                        capture.capture(frame, format = 'bgr', use_video_port=True)
 
-                    self._queue.put(frame)
+                        self._queue.put(frame)
 
-                    capture.wait_recording(self._PREVIEW_REFRESH_TIME) 
+                        capture.wait_recording(self._PREVIEW_REFRESH_TIME) 
 
-                    if time.time() - self._video_time >= self._VIDEO_CHUNCK_DURATION:
-                        filename_to_hash = self._get_video_chunk_filename (current=True)
-                        capture.split_recording( self._get_video_chunk_filename( fps=capture.framerate ) )
-                        self.save_hash_info_file(filename_to_hash) # we need to compute the hash *after* the split
-                        self._video_time = time.time()
-                
-                capture.stop_recording()
+                        if time.time() - self._video_time >= self._VIDEO_CHUNCK_DURATION:
+                            filename_to_hash = self._get_video_chunk_filename (current=True)
+                            capture.split_recording( self._get_video_chunk_filename( fps=capture.framerate ) )
+                            
+                            # Wait until the file is fully written
+                            stable = False
+                            previous_size = os.path.getsize(filename_to_hash)
+                            time.sleep(0.5)
+                            while not stable:
+                                time.sleep(0.5)
+                                current_size = os.path.getsize(filename_to_hash)
+                                if current_size == previous_size:
+                                    stable = True  # The file size has stabilized, we can proceed with the hash
+                                else:
+                                    previous_size = current_size  # Update size for the next check
 
+                            save_hash_info_file(filename_to_hash)
+                            self._video_time = time.time()
 
-
-            else: #regular acquisition: all frames go in the queue
-
-                #stream = picamera.array.PiRGBArray(capture, size=self._target_resolution)
-                # Capturing in YUV then taking the first dimension is the fastest way to directly get grayscale images
-                # https://github.com/raspberrypi/picamera2/issues/698
-                
-                video_stream = picamera.array.PiYUVArray(capture, size=self._target_resolution)
-
-                time.sleep(0.2) # sleep 200ms to allow the camera to warm up
-
-                # video port True gives 19 FPS; False gives 4
-                for frame in capture.capture_continuous(video_stream, format='yuv', use_video_port=True):
-
-                    if not self._stop_queue.empty():
-                        logging.info("The stop queue is not empty. This signals it is time to stop acquiring frames")
-                        self._stop_queue.get()
-                        self._stop_queue.task_done()
-                        break
-
-                    video_stream.seek(0)
-                    self._queue.put(frame.array[:, :, 0]) #gets the first channel (Y) to extract greyscale
-
-
-        # except:
-        #     logging.warning("Some problem acquiring frames from the camera")
                     
-        # finally:
-
-        #     self._queue.task_done() # this tell the parent the thread can be closed
-        #     logging.warning("Camera Frame grabber stopped acquisition cleanly")
+                    capture.stop_recording()
 
 
-    def save_hash_info_file(self, filename_to_hash):
-        """
-        Create a file containing the MD5 hash of the given video.
-        """
 
-        def compute_md5(file_path):
-            """
-            Compute the MD5 hash of the provided file.
-            """
-            md5_hash = hashlib.md5()
-            with open(file_path, "rb") as file:
-                # Read the file in chunks to avoid loading the whole file into memory
-                for chunk in iter(lambda: file.read(4096), b""):
-                    md5_hash.update(chunk)
-            return md5_hash.hexdigest()
+                else:  # Regular acquisition: all frames go in the queue
+                    video_stream = picamera.array.PiYUVArray(capture, size=self._target_resolution)
+                    time.sleep(0.2)  # Allow camera to warm up
+                    for frame in capture.capture_continuous(video_stream, format='yuv', use_video_port=True):
+                        if not self._stop_queue.empty():
+                            logging.info("The stop queue is not empty. This signals it is time to stop acquiring frames")
+                            self._stop_queue.get()
+                            self._stop_queue.task_done()
+                            break
+                        video_stream.seek(0)
 
-        video_hash = compute_md5(filename_to_hash)
-        hash_file = filename_to_hash + ".md5"
+                        #stream = picamera.array.PiRGBArray(capture, size=self._target_resolution)
+                        # Capturing in YUV then taking the first dimension is the fastest way to directly get grayscale images
+                        # https://github.com/raspberrypi/picamera2/issues/698
+                        self._queue.put(frame.array[:, :, 0])  # Get first channel (Y) for grayscale
 
-        with open(hash_file, "w") as file:
-            file.write(video_hash)
+        except Exception as e:
+            logging.warning(f"Some problem acquiring frames from the camera: {e}")
+
+        finally:
+            if self._record_video:
+                capture.stop_recording()  # Ensure we stop recording on exit or exception
+                logging.info("Stopped recording cleanly.")
+                
+            self._queue.task_done()  # Indicates to the parent that the thread can be closed
+            logging.warning("Camera Frame grabber stopped acquisition cleanly.")
 
 class PiFrameGrabber2(PiFrameGrabber):
     """

@@ -139,8 +139,20 @@ def save_hash_info_file(filename_to_hash, writefile=True):
                 md5_hash.update(chunk)
         return md5_hash.hexdigest()
 
+
+    # Wait until the file is fully written
+    stable = False
+    previous_size = os.path.getsize(filename_to_hash)
+    time.sleep(0.5)
+    while not stable:
+        time.sleep(0.5)
+        current_size = os.path.getsize(filename_to_hash)
+        if current_size == previous_size:
+            stable = True  # The file size has stabilized, we can proceed with the hash
+        else:
+            previous_size = current_size  # Update size for the next check
+
     file_hash = compute_md5(filename_to_hash)
-    
     if writefile:
         hash_file = filename_to_hash + ".md5"
         with open(hash_file, "w") as file:
@@ -188,7 +200,7 @@ def get_and_hash(target, target_prefix, output_dir, cut_dirs=2):
     relative_path_parts = target_path_parts[cut_dirs:]
     relative_path = os.path.join(*relative_path_parts)
     local_file_path = os.path.join(output_dir, relative_path)
-
+    
     # Construct the wget command with '-O' to specify the exact output file path
     command = [
         "wget",
@@ -200,10 +212,7 @@ def get_and_hash(target, target_prefix, output_dir, cut_dirs=2):
     ]
 
     try:
-
-        #we need to make sure the full path is created first or the file won't be downloaded
         os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
-
         #logging.info(f"Executing command: {' '.join(command)}")
         result = subprocess.run(
             command,
@@ -225,8 +234,7 @@ def get_and_hash(target, target_prefix, output_dir, cut_dirs=2):
             if os.path.getsize(local_file_path) == 0:
                 logging.warning(f"Downloaded file '{local_file_path}' is empty.")
                 return False
-        
-            logging.info("File downloaded. Now creating a md5 hash for it")
+            logging.info("File downloaded. Now creating a md5 hash for it")	        
             save_hash_info_file (local_file_path)
         
             return True
