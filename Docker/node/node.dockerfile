@@ -5,7 +5,10 @@ FROM archlinux:latest
 
 # Update system and install base-devel and git for building AUR packages
 RUN pacman -Syu --noconfirm \
-    && pacman -S --needed --noconfirm base-devel git nano
+    && pacman -S --needed --noconfirm base-devel git nano \
+    # Import the default Arch GPG keys
+    && pacman-key --init \
+    && pacman-key --populate archlinux
 
 # Create a non-root user for building the AUR package
 RUN useradd -m node \
