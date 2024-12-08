@@ -327,7 +327,7 @@ def cpu_serial():
         with open('/proc/cpuinfo', 'r') as infile:
             cpuinfo = infile.read()
         # Match a line like 'Serial   : xxxxx'
-        serial = re.search('^Serial\s+:\s+(\w+)$', cpuinfo,
+        serial = re.search(r'^Serial\s+:\s+(\w+)$', cpuinfo,
                           flags=re.MULTILINE | re.IGNORECASE)
         
         serial = serial.group(1)

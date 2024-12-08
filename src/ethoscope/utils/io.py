@@ -4,7 +4,6 @@ import time, datetime
 import traceback
 import logging
 from collections import OrderedDict
-import cv2
 import tempfile
 import os, glob
 import hashlib
@@ -17,6 +16,8 @@ import mysql.connector
                 
 import urllib.request, urllib.error, urllib.parse
 import json
+
+from cv2 import imwrite, IMWRITE_JPEG_QUALITY
 
 #for mariadb
 SQL_CHARSET = 'latin1'
@@ -533,7 +534,7 @@ class ImgToMySQLHelper(object):
         if tick == self._last_tick:
             return
 
-        cv2.imwrite(self._tmp_file, img, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
+        imwrite(self._tmp_file, img, [int(IMWRITE_JPEG_QUALITY), 50])
 
         with open(self._tmp_file, "rb") as f:
                 bstring = f.read()

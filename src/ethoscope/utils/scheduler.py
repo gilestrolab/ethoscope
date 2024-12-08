@@ -57,7 +57,7 @@ class Scheduler(object):
     def _parse_date_range(self, str):
         self._start_date = 0
         self._stop_date = float('inf')
-        dates = re.split("\s*>\s*", str)
+        dates = re.split(r"\s*>\s*", str)
 
         if len(dates) > 2:
             raise DateRangeError(" found several '>' symbol. Only one is allowed")
@@ -89,8 +89,8 @@ class Scheduler(object):
         return out
         
     def _parse_date(self, str):
-        pattern = re.compile("^\s*(?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2})\s*$")
-        if re.match("^\s*$", str):
+        pattern = re.compile(r"^\s*(?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2})\s*$")
+        if re.match(r"^\s*$", str):
             return None
         if not re.match(pattern, str):
             raise DateRangeError("%s not match the expected pattern" % str)

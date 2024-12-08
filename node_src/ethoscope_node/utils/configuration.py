@@ -193,7 +193,7 @@ if __name__ == '__main__':
     c.load()
     
     c.addKey('commands', {'command_1' : {'name': 'Sync all data to Turing', 'description': 'Sync all the ethoscope data to turing', 'command': '/etc/cron.hourly/sync'}})
-    c.addKey('commands', {'command_2' : {'name': 'Delete old files', 'description': 'Delete ethoscope data older than 180 days', 'command': 'find /ethoscope_data/results -type f -mtime +90 -exec rm {}\;'}})
+    c.addKey('commands', {'command_2' : {'name': 'Delete old files', 'description': 'Delete ethoscope data older than 180 days', 'command': 'find /ethoscope_data/results -type f -mtime +90 -exec rm {}\\;'}})
     c.addKey('commands', {'command_3' : {'name': 'List ethoscope files', 'description': 'Just used for debugging purposes', 'command': 'ls -h /ethoscope_data/results'}})
 
     print (c.listSections())
