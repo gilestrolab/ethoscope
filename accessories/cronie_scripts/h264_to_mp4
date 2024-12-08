@@ -1,0 +1,4 @@
+#!/bin/bash
+# This should run on a daily frequency
+# If it's not there already, link it or copy it to /etc/cron.daily
+/usr/bin/python /opt/ethoscope-node/accessories/h264_to_mp4.py "$@"

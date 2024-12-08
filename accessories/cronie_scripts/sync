@@ -1,0 +1,27 @@
+#!/bin/bash
+# This should run on a hourly frequency
+# If it's not there already, link it or copy it to /etc/cron.hourly
+
+# Define default variables
+REMOTE_HOST="gg@turing.lab.gilest.ro"
+MOUNT_PATH="/mnt/data"
+
+# Parse command line arguments
+while getopts "h:m:" opt; do
+  case ${opt} in
+    h )
+      REMOTE_HOST="$OPTARG"
+      ;;
+    m )
+      MOUNT_PATH="$OPTARG"
+      ;;
+    \? )
+      echo "Usage: $0 [-h remote_host] [-m mount_path]"
+      exit 1
+      ;;
+  esac
+done
+
+# Use rsync to sync videos and tracking results
+rsync -rav --update /ethoscope_data/videos/* "${REMOTE_HOST}:${MOUNT_PATH}/videos/"
+rsync -rav --update /ethoscope_data/results/* "${REMOTE_HOST}:${MOUNT_PATH}/results/"
