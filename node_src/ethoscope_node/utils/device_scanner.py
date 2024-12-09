@@ -19,7 +19,7 @@ from ethoscope_node.utils.mysql_backup import db_diff
 STREAMING_PORT = 8887
 ETHOSCOPE_PORT = 9000
 
-DB_UPDATE_INTERVAL = 30
+DB_UPDATE_INTERVAL = 300 #interval in seconds to interrogate and compare the databases
 
 class ScanException(Exception):
     pass

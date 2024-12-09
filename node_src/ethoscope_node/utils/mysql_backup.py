@@ -93,30 +93,33 @@ class baseSQLconnector():
         
         # now, this is very funny: this returns false if the folder is mounted via ssh - wtf?
         if os.path.exists(self._dst_path):
-            
-            #connection to the local node file requires no credentials
-            with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
-                dst_cur = dst.cursor()
-                command = 'SELECT name FROM sqlite_master WHERE type ="table" AND name NOT LIKE "sqlite_%";'
-                dst_cur.execute(command)
-                tables = dst_cur.fetchall()
-                
-                for entry in tables: 
-                    table_name = entry[0]
-                    
-                    if table_name not in ["ROI_MAP", "VAR_MAP", "METADATA"]:
-                        command = 'SELECT max(id) FROM %s;' % table_name
-                    else:
-                        command = 'SELECT count(*) from %s' % table_name
-                    
+            try:
+                with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
+                    dst_cur = dst.cursor()
+                    command = 'SELECT name FROM sqlite_master WHERE type ="table" AND name NOT LIKE "sqlite_%";'
                     dst_cur.execute(command)
-                    local_tables_dictionary . update ( { table_name :  dst_cur.fetchone()[0] } )            
-                
-            return local_tables_dictionary
-        
-        else:
+                    tables = dst_cur.fetchall()
+
+                    for entry in tables:
+                        table_name = entry[0]
+                        
+                        if table_name not in ["ROI_MAP", "VAR_MAP", "METADATA"]:
+                            command = 'SELECT max(id) FROM "%s";' % table_name
+                        else:
+                            command = 'SELECT count(*) FROM "%s";' % table_name
+                        
+                        dst_cur.execute(command)
+                        result = dst_cur.fetchone()
+                        local_tables_dictionary[table_name] = result[0] if result else None
+
+                return local_tables_dictionary
             
-            return {} # sqlite3 file does not exist yet
+            except sqlite3.Error as e:
+                logging.error(f"SQLite error: {e}")
+                return {}
+        else:
+            logging.error(f"No db file at {self._dst_path}")
+            return {}
             
     def compare_databases(self, use_fast_mode=False):
         """
@@ -304,7 +307,7 @@ class MySQLdbToSQlite(baseSQLconnector):
                                       charset=SQL_CHARSET,
                                       use_unicode=True)
 
-        with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
+        with sqlite3.connect(self._dst_path, check_same_thread=False, timeout=10.0) as dst:
 
             dst_cur = src.cursor()
             command = "SELECT roi_idx FROM ROI_MAP"

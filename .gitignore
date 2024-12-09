@@ -74,3 +74,4 @@ docs/_build/
 
 #folders
 Docker/node/etc-ethoscope
+sync_from_node.sh
