@@ -1,8 +1,8 @@
 
 [Unit]
 Description=autorepair mysql
-Wants=mysqld.service
-After= mysqld.service
+Wants=mariadb.service
+After=mariadb.service
 
 
 [Service]
