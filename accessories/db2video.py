@@ -9,7 +9,7 @@ Typical .db File Path:
     /ethoscope_data/results/0256424ac3f545b6b3c687723085ffcb/ETHOSCOPE_025/2024-10-06_17-36-47/2024-10-06_17-36-47_0256424ac3f545b6b3c687723085ffcb.db
 
 Usage Example:
-    python extract_frames.py \
+    python db_to_video.py \
         -i /ethoscope_data/results/0256424ac3f545b6b3c687723085ffcb/ETHOSCOPE_025/2024-10-06_17-36-47/2024-10-06_17-36-47_0256424ac3f545b6b3c687723085ffcb.db \
         -o output_video.mp4 \
         -f 5 \
