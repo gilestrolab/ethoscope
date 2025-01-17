@@ -21,8 +21,8 @@ from ethoscope_node.utils.etho_db import ExperimentalDB
 
 app = bottle.Bottle()
 STATIC_DIR = "../static"
+DEFAULT_PORT=80
 
-#names of the backup services
 SYSTEM_DAEMONS = {"ethoscope_backup" : {'description' : 'The service that collects data from the ethoscopes and syncs them with the node.', 'available_on_docker' : True}, 
                   "ethoscope_video_backup" : {'description' : 'The service that collects VIDEOs from the ethoscopes and syncs them with the node', 'available_on_docker' : True}, 
                   "ethoscope_update_node" : {'description' : 'The service used to update the nodes and the ethoscopes.', 'available_on_docker' : True},
@@ -74,6 +74,11 @@ def server_download(filepath):
 @app.route('/')
 def index():
     return bottle.static_file('index.html', root=STATIC_DIR)
+
+
+@app.route('/update')
+def index():
+    return bottle.redirect(CFG.custom('UPDATE_SERVICE_URL'))
 
 
 @app.hook('after_request')
@@ -694,7 +699,7 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
 
     option_dict = vars(options)
-    PORT = option_dict["port"]
+    PORT = option_dict["port"] or DEFAULT_PORT
     DEBUG = option_dict["debug"]
     RESULTS_DIR = option_dict["temp_results_dir"] or CFG.content['folders']['temporary']['path']
 

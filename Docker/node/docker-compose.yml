@@ -7,12 +7,14 @@ services:
     container_name: ethoscope-node
     restart: unless-stopped
     ports:
-      - "80:80/tcp"          #node webUI
-      - "8088:8088/tcp"      #node update webUI
+      - "80:8080/tcp"          #node webUI
+      - "8088:8088/tcp"        #node update webUI
     volumes:
       - /mnt/ethoscope_data:/ethoscope_data
-      - ./etc-ethoscope:/etc/ethoscope
+      - ./.volumes/etc-ethoscope:/etc/ethoscope
       - /home/gg/Data/ethoscope_project/ethoscope:/opt/ethoscope-node:ro
+    environment:
+      - NODE_PORT: 8080
     network_mode: host
 
   vsftpd:

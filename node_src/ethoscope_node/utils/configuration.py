@@ -54,6 +54,10 @@ class EthoscopeConfiguration(object):
                   
                   'commands' : {
                                  'command_1' : {'name' : 'List ethoscope files.', 'description' : 'Show ethoscope data folders on the node. Just an example of how to write a command', 'command' : 'ls -lh /ethoscope_data/results'}
+                        },
+
+                  'custom' :   {
+                                 'UPDATE_SERVICE_URL' : 'http://localhost:8888'
                         }
                 }
 
@@ -181,10 +185,20 @@ class EthoscopeConfiguration(object):
             try:
                 with open(self._config_file, 'r') as json_data_file:
                     self._settings.update ( json.load(json_data_file) )
+                    self.save()
             except:
                 raise ValueError("File %s is not a valid configuration file" % self._config_file)
                 
         return self._settings
+
+    def custom(self, name=None):
+        '''
+        Returns the custom section, either in its entirety or the specified variable
+        '''
+        if not name:
+            return self._settings['custom']
+        else:
+            return self._settings['custom'][name]
 
 
 if __name__ == '__main__':
