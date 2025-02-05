@@ -213,7 +213,12 @@ class SimpleSerialInterface(object):
         if test:
             try:
                 logging.info("Sending Test command.")
-                cmd = "%s\r\n" % info["test_button"]["command"]
+                try:
+                    # old dictionary structure with firmware 1.0
+                    cmd = "%s\r\n" % info["test_button"]["command"]
+                except:
+                    # new structure with firmware > 1.0
+                    cmd = "%s\r\n" % info["interface"]["test_button"]["command"]
                 self._serial.write(cmd.encode())
                 info['test'] = 'Success'
             except:
