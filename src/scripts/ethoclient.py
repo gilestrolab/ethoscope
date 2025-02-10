@@ -92,5 +92,18 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
     option_dict = vars(options)
    
-    r = send_command( action = option_dict['command'], data = option_dict['data'], host = option_dict['host'] )
-    print (r)
+    # Parse the data argument from JSON string to dict
+    if option_dict['data']:
+        try:
+            data_dict = json.loads(option_dict['data'])
+        except json.JSONDecodeError as e:
+            print(f"Error parsing JSON data: {e}")
+            data_dict = None
+    else:
+        data_dict = None
+
+    try:
+        r = send_command(action=option_dict['command'], data=data_dict, host=option_dict['host'])
+        print(r)
+    except Exception as e:
+        print(f"An error occurred: {e}")
