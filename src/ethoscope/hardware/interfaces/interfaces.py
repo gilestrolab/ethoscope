@@ -16,7 +16,7 @@ class WrongSerialPortError(Exception):
 class NoValidPortError(Exception):
     pass
 
-def connectedUSB(optional_file='/etc/modules.json'):
+def connectedUSB(optional_file='/etc/ethoscope/modules.json'):
     """
     Returns a dictionary of connected USB devices from a known selection
 
@@ -198,35 +198,67 @@ class SimpleSerialInterface(object):
     def _test_serial_connection(self):
         return
 
-    def interrogate(self, test=False):
+    def interrogate(self, test=False, command=""):
         """
-        Try to interrogate the device to check what its capabilities are.
-        Will work with all firmware for the new PCB and firmware newer than September 2020
-        
-        Ff test is True it will also attempt a test run using the information it just received.
+        Interrogate the device to retrieve capability information and optionally execute tests.
+
+        This method performs a comprehensive device interrogation through serial communication,
+        compatible with all new PCB firmware versions and firmware releases post-September 2020.
+        Supports both capability discovery and functional validation through test execution.
+
+        Args:
+            test (bool, optional): Enable diagnostic test execution using device-reported parameters.
+                Defaults to False.
+            command (str, optional): Custom AT command for immediate execution post-interrogation.
+                Empty string disables this functionality.
+
+        Returns:
+            dict: Structured device information containing:
+                - Device capabilities from interrogation response
+                - Test execution status ('Success'/'Failed'/'Not attempted')
+                - Custom command execution status ('Success'/'Failed'/'Not attempted')
+
+        Note:
+            Automatically adapts to firmware version differences in response structures,
+            maintaining backward compatibility with legacy firmware (v1.0) while supporting
+            modern implementations (v>1.0).
         """
+        # Send initial capability interrogation command
         self._serial.write(b"T\r\n")
-        time.sleep(0.1)
-        info = eval(self._serial.read_all())
-        info['test'] = 'Not attempted'
+        time.sleep(0.1)  # Buffer period for device response
         
+        # Parse and store device capability information
+        info = eval(self._serial.read_all())
+        # Initialize result tracking fields
+        info.update({'test': 'Not attempted', 'command': 'Not attempted'})
+
+        if command:
+            try:
+                logging.info("Initiating custom command execution")
+                cmd = f"{command}\r\n".encode()
+                self._serial.write(cmd)
+                info['command'] = 'Success'
+            except Exception:
+                logging.error("Custom command transmission failed")
+                info['command'] = 'Failed'
+
         if test:
             try:
-                logging.info("Sending Test command.")
+                logging.info("Executing diagnostic test sequence")
+                # Attempt modern firmware command structure (v>1.0)
                 try:
-                    # old dictionary structure with firmware 1.0
-                    cmd = "%s\r\n" % info["test_button"]["command"]
-                except:
-                    # new structure with firmware > 1.0
-                    cmd = "%s\r\n" % info["interface"]["test_button"]["command"]
-                self._serial.write(cmd.encode())
+                    cmd = info["interface"]["test_button"]["command"]
+                except KeyError:
+                    # Fallback to legacy command structure (v1.0)
+                    cmd = info["test_button"]["command"]
+                
+                self._serial.write(f"{cmd}\r\n".encode())
                 info['test'] = 'Success'
-            except:
-                    info['test'] = 'Failed'
+            except Exception:
+                logging.error("Diagnostic test execution failed")
+                info['test'] = 'Failed'
 
         return info
-
-
 
     def _warm_up(self):
         raise NotImplementedError

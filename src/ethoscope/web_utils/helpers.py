@@ -677,7 +677,7 @@ def loggingStatus( status = None ):
         except:
             return -1
 
-def getModuleCapabilities(test=False, shallow=False):
+def getModuleCapabilities(test=False, shallow=False, command=""):
     '''
     Tries to get information regarding a possible attached Module
     '''
@@ -692,10 +692,9 @@ def getModuleCapabilities(test=False, shallow=False):
 
         try:
             device = SimpleSerialInterface()
-            dev_info = device.interrogate(test)
+            dev_info = device.interrogate(test=test, command=command)
             dev_info.update({'Smart' : True, 'Connected' : True})
             return dev_info
-            #Should return something like this: {"version": "FW-1.00;HW-10", "module_name": "N20 Sleep Deprivation Module", "module_description": "Rotates up to twenty N20 geared motors independently", "test_button": {"title": "Test output", "description": "Test all outputs in a sequence", "command": "D"}, "command": "P", "arguments": {"channel": ["The channel to act on", "MAPSTOROI"], "duration": ["The length of the stimulus in ms"]}}
 
         except:
             found = False if 'noUSB' in found else found

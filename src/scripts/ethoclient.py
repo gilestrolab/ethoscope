@@ -32,7 +32,13 @@ COMM_PACKET_SIZE = 1024*16 # in bytes. This should be large because it has to ac
 
 def listenerIsAlive():
     '''
-    Only to use to check if the listener service is alive
+    Verifies the operational status of the listener service through a status command probe.
+    
+    Utilizes the send_command() function to execute a 'status' request. Captures operational
+    exceptions to determine service availability.
+
+    Returns:
+        bool: True if the service responds successfully, False if any communication errors occur.
     '''
     try:
         r = send_command('status')
@@ -42,7 +48,24 @@ def listenerIsAlive():
 
 def send_command(action, data=None, host='127.0.0.1', port=5000, size=COMM_PACKET_SIZE):
     '''
-    interfaces with the listening server
+    Executes remote command execution via TCP socket communication with a JSON protocol.
+    
+    Establishes a connection to the listener service, transmits structured commands, and retrieves
+    responses. Manages socket lifecycle automatically and handles data serialization/deserialization.
+
+    Args:
+        action (str): Command identifier recognized by the remote service
+        data (dict, optional): a dict to accompany the command in dictionary format
+        host (str): IPv4 address of the target listener service
+        port (int): TCP port number for service communication
+        size (int): Maximum receive buffer size in bytes (must accommodate largest expected response)
+
+    Returns:
+        any: Deserialized response content from the service's JSON reply
+        
+    Raises:
+        socket.error: On network communication failures
+        json.JSONDecodeError: If malformed response data received
     '''
 
     message = {'command' : action,

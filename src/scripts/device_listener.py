@@ -38,7 +38,7 @@ import traceback
 from optparse import OptionParser
 from ethoscope.web_utils.control_thread import ControlThread
 from ethoscope.web_utils.record import ControlThreadVideoRecording
-from ethoscope.web_utils.helpers import get_machine_id, get_machine_name, get_git_version, was_interrupted, PERSISTENT_STATE
+from ethoscope.web_utils.helpers import get_machine_id, get_machine_name, get_git_version, was_interrupted, PERSISTENT_STATE, getModuleCapabilities
 
 import json
 import socket
@@ -199,6 +199,14 @@ class commandingThread(threading.Thread):
                 outcome = df.read()
                 logging.info(outcome)
                 return outcome
+
+        elif action == 'test_module' and not data:
+            logging.info("Sending the test command to the connected module")
+            return getModuleCapabilities(test=True)
+
+        elif action == 'test_module' and data:
+            logging.info("Restarting the ethoscope device service")
+            return getModuleCapabilities(command=data['command'])
 
         else:
             #raise Exception("No such command: %s. Available commands are info, status, start, stop, start_record, stream " % action)
