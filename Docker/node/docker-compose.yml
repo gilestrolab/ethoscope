@@ -1,35 +1,40 @@
 services:
-  ethoscope-node:
+  node-base: &node-base
     build:
       context: .
       dockerfile: node.dockerfile
-    image: ethoscope-node
-    container_name: ethoscope-node
-    restart: unless-stopped
-    ports:
-      - "80:8080/tcp"          #node webUI
-      - "8088:8088/tcp"        #node update webUI
-    volumes:
-      - /mnt/ethoscope_data:/ethoscope_data
-      - ./.volumes/etc-ethoscope:/etc/ethoscope
-      - /home/gg/Data/ethoscope_project/ethoscope:/opt/ethoscope-node:ro
-    environment:
-      - NODE_PORT: 8080
+      args:
+        - ETHOSCOPE_BRANCH=dev
+    image: ethoscope-node:latest
     network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ethoscope_data:/ethoscope_data
+      - etc_ethoscope:/etc/ethoscope
+      # - ../../:/opt/ethoscope-node:ro  # Uncomment if needed - will mount the host ethoscope folder, useful only for development
 
-  vsftpd:
-    image: metabrainz/docker-anon-ftp
-    container_name: ethoscope-vsftpd
-    depends_on:
-      - ethoscope-node
-    restart: unless-stopped
-    network_mode: host
-    environment:
-      MAX_CLIENTS: "3"
-      MAX_PER_IP: "2"
-      FTPD_BANNER: "Welcome to the public ethoscope data FTP server of the Gilestro lab"
-    volumes:
-      - /mnt/ethoscope_data:/var/ftp:ro
+  ethoscope-node:
+    <<: *node-base
+    container_name: ethoscope-node
+    command: "/usr/bin/python /opt/ethoscope-node/node_src/scripts/server.py"
+
+  ethoscope-node-backup:
+    <<: *node-base
+    container_name: ethoscope-node-backup
+    command: "/usr/bin/python /opt/ethoscope-node/node_src/scripts/backup_tool.py"
+
+  ethoscope-node-video-backup:
+    <<: *node-base
+    container_name: ethoscope-node-video-backup
+    command: "/usr/bin/python /opt/ethoscope-node/node_src/scripts/video_backup_tool.py"
+
+  ethoscope-node-update:
+    <<: *node-base
+    container_name: ethoscope-node-update
+    working_dir: "/opt/ethoscope-node/scripts/ethoscope_updater"
+    command: "/usr/bin/python /opt/ethoscope-node/scripts/ethoscope_updater/update_server.py -g /opt/ethoscope-node -b /srv/git/ethoscope.git"
+    volumes_from:
+      - git-server
 
   git-server:
     image: git-daemon
@@ -42,3 +47,35 @@ services:
       - REPO_URL=https://github.com/gilestrolab/ethoscope.git
     ports:
       - "9418:9418"
+    volumes:
+      - /srv/git
+
+  vsftpd:
+    image: metabrainz/docker-anon-ftp
+    container_name: ethoscope-vsftpd
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - MAX_CLIENTS=3
+      - MAX_PER_IP=2
+      - FTPD_BANNER=Welcome to the public ethoscope data FTP server of the Gilestro lab
+    volumes:
+      - ethoscope_data:/var/ftp:ro
+
+
+volumes:
+  ethoscope_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/ethoscope_data #example for linux/MacOS
+      #device: C:\ethoscope_data #example for windows
+
+  etc_ethoscope:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${PWD}/.volumes/conf #for linux/MacOS
+      #device: .\.volumes\conf #for windows

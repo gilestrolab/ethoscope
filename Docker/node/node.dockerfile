@@ -1,46 +1,25 @@
 # These build instructions will create a docker container running the node and most of its services
-
+ARG ETHOSCOPE_BRANCH=dev
 # Use the latest Arch Linux base image
 FROM archlinux:latest
 
 # Update system and install base-devel and git for building AUR packages
-RUN pacman -Syu --noconfirm \
-    && pacman -S --needed --noconfirm base-devel git nano \
-    # Import the default Arch GPG keys
+RUN pacman -Sy \
     && pacman-key --init \
-    && pacman-key --populate archlinux
+    && pacman-key --populate archlinux \
+    && pacman -S --noconfirm archlinux-keyring \
+    && pacman -Syu --needed --noconfirm base-devel git micro python-pip
 
-# Create a non-root user for building the AUR package
-RUN useradd -m node \
-    && passwd -d node \
-    && printf 'node ALL=(ALL) ALL\n' | tee -a /etc/sudoers
 
-# Switch to the non-root user
-USER node
-WORKDIR /home/node
+RUN pacman -Sy --needed --noconfirm python-setuptools python-pip python-ifaddr python-numpy \
+                                    python-bottle python-pyserial python-mysql-connector python-netifaces python-cherrypy \
+                                    python-eventlet python-dnspython python-greenlet python-monotonic \
+                                    python-zeroconf python-cheroot python-opencv python-gitpython 
 
-# Clone yay and install it
-RUN git clone https://aur.archlinux.org/yay.git \
-    && cd yay \
-    && makepkg -si --noconfirm \
-    && cd .. \
-    && rm -rf yay
 
-# This replaces systemctl which cannot work in containers
-# https://github.com/gdraheim/docker-systemctl-replacement
-RUN yay -S --noconfirm docker-systemctl-replacement-git
+RUN git clone https://github.com/gilestrolab/ethoscope.git /opt/ethoscope-node
+RUN cd /opt/ethoscope-node/ && git checkout ${ETHOSCOPE_BRANCH}
+RUN cd /opt/ethoscope-node/node_src && python setup.py develop
+RUN cd /opt/ethoscope-node/src && python setup.py develop
 
-# Install ethoscope-node from AUR
-RUN yay -S --noconfirm ethoscope-node
-RUN git config --global --add safe.directory /srv/git/ethoscope.git
-
-# Clean up packages
-RUN sudo pacman -Scc --noconfirm
-
-# Set the working directory
 WORKDIR /opt/ethoscope-node/node_src/scripts
-USER root
-
-# Command to run when the container starts
-CMD ["/usr/bin/systemctl.py", "-1"]
-
