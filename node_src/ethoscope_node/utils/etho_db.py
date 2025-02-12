@@ -21,74 +21,77 @@
 #  MA 02110-1301, USA.
 #  
 #  
+__author__ = 'giorgio'
+
 import datetime
 import string
 import random
 import pickle
 import os
 import secrets
-import json
-
-
-__author__ = 'giorgio'
 import multiprocessing
 import sqlite3
-import datetime
-import logging, traceback
+import logging
+import traceback
 
 from ethoscope_node.utils.configuration import migrate_conf_file
 
 class ExperimentalDB(multiprocessing.Process):
     
-    
     _db_name = "/etc/ethoscope/ethoscope-node.db"
-    #_db_name = "/tmp/ethoscope-node.db"
-    #_db_name = ":memory:"
-
     _runs_table_name = "runs"
     _users_table_name = "users"
     _experiments_table_name = "experiments"
     _ethoscopes_table_name = "ethoscopes"
     
     def __init__(self):
+        super().__init__()
         migrate_conf_file('/etc/ethoscope-node.db')
         self.create_tables()
 
-    def executeSQL(self, command):
+    def executeSQL(self, command: str):
         """
+        Execute an SQL command and return the results.
+        
+        Args:
+            command (str): The SQL command to execute
+            
+        Returns:
+            Union[int, list, int]: 
+                - For INSERT: returns the last inserted row id
+                - For SELECT: returns list of rows
+                - For other commands: returns 0
+                - Returns -1 if there's an error
         """
-        lid = 0
+        db = None
+        cursor = None
         try:
             db = sqlite3.connect(self._db_name)
             
-            if command.startswith("SELECT"):
+            if command.upper().startswith("SELECT"):
                 db.row_factory = sqlite3.Row
-
-            try:
-                c = db.cursor()
-                c.execute(command)
                 
-                lid = c.lastrowid # the last id inserted / 0 if not an INSERT command
-                rows = c.fetchall() # return the result of a SELECT query / [] if not a SELECT query
-               
-                db.commit()
-                db.close()
-
-                #print ('executing command: \n %s' % command) 
-                #print ('last inserted row was %s' % lid)
-                #print ('select entries are %s' % rows)
-
-
-            except Exception as e:
-                logging.error(traceback.format_exc())
-                return -1
-
-        except:
-            logging.error("Cannot connect to the experimental database %s." % self._db_name)
-            return -1
+            cursor = db.cursor()
+            cursor.execute(command)
+            lid = cursor.lastrowid  # the last id inserted / 0 if not an INSERT command
+            rows = cursor.fetchall()  # return the result of a SELECT query / [] if not a SELECT query
             
-        return lid or rows or 0
-    
+            db.commit()
+            return lid or rows or 0
+                
+        except sqlite3.Error as e:
+            logging.error(f"SQLite error while executing '{command}': {str(e)}")
+            logging.error(traceback.format_exc())
+            return -1
+        except Exception as e:
+            logging.error(f"Unexpected error while executing '{command}': {str(e)}")
+            logging.error(traceback.format_exc())
+            return -1
+        finally:
+            if cursor:
+                cursor.close()
+            if db:
+                db.close()    
     
     def create_tables(self):
         """
