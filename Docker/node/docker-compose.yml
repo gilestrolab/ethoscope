@@ -5,7 +5,7 @@ services:
       dockerfile: node.dockerfile
       args:
         - ETHOSCOPE_BRANCH=dev
-    image: ethoscope-node:latest
+    image: ggilestro/ethoscope-node:latest
     network_mode: host
     restart: unless-stopped
     volumes:
@@ -34,14 +34,14 @@ services:
     working_dir: "/opt/ethoscope-node/scripts/ethoscope_updater"
     command: "/usr/bin/python /opt/ethoscope-node/scripts/ethoscope_updater/update_server.py -g /opt/ethoscope-node -b /srv/git/ethoscope.git"
     volumes_from:
-      - git-server
+      - ethoscope-git-server
 
-  git-server:
-    image: git-daemon
+  ethoscope-git-server:
+    image: ggilestro/ethoscope-git-server:latest
     build:
       context: ./git-server
       dockerfile: git-daemon.dockerfile
-    container_name: ethoscope-git-daemon
+    container_name: ethoscope-git-server
     restart: unless-stopped
     environment:
       - REPO_URL=https://github.com/gilestrolab/ethoscope.git
@@ -58,7 +58,7 @@ services:
     environment:
       - MAX_CLIENTS=3
       - MAX_PER_IP=2
-      - FTPD_BANNER=Welcome to the public ethoscope data FTP server of the Gilestro lab
+      - FTPD_BANNER=Welcome to our laboratory's ethoscope data FTP server
     volumes:
       - ethoscope_data:/var/ftp:ro
 
