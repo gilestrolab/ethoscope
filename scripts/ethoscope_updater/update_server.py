@@ -252,32 +252,23 @@ if __name__ == '__main__':
 
     parser.add_option("-g", "--git-local-repo", dest="local_repo", help="Route to local repository to update")
     parser.add_option("-b", "--bare-repo", dest="bare_repo", default=None, help="Route to bare repository")
-    parser.add_option("-r", "--router-ip", dest="router_ip", default="192.169.123.254", help="the ip of the router in your setup")
     parser.add_option("-p", "--port", default=8888, dest="port", help="The port to run the server on. Default 8888")
-    parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
+    parser.add_option("-D", "--debug", dest="DEBUG", default=False, help="Set DEBUG mode ON", action="store_true")
 
     (options, args) = parser.parse_args()
 
-    option_dict = vars(options)
-    local_repo = option_dict["local_repo"]
-    bare_repo = option_dict["bare_repo"]
-    PORT = option_dict["port"]
-    DEBUG = option_dict["debug"]
-
-    if not local_repo:
+    if not options.local_repo:
         raise Exception("You must specify the location of the GIT repo to update using the -g or --git-local-repo flags.")
 
 
-    ethoscope_updater = updater.DeviceUpdater(local_repo)
+    ethoscope_updater = updater.DeviceUpdater(options.local_repo)
 
-    #Here we decide if we are running on an ethoscope or a node
-    if bare_repo is not None:
+    if options.bare_repo is not None:
         is_node = True
-        bare_repo_updater = updater.BareRepoUpdater(bare_repo)
+        bare_repo_updater = updater.BareRepoUpdater(options.bare_repo)
         device_id = "node"
 
     else:
-
         is_node = False
         from ethoscope.web_utils.helpers import get_machine_id
         bare_repo_updater = None
@@ -290,11 +281,11 @@ if __name__ == '__main__':
             from cherrypy import wsgiserver
         except:
             # Trick bottle to think that cheroot is actulay cherrypy server adds the pacth to BOTTLE
-            bottle.server_names["cherrypy"] = CherootServer(host='0.0.0.0', port=PORT)
+            bottle.server_names["cherrypy"] = CherootServer(host='0.0.0.0', port=options.port)
             logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
             pass
         #########
-        bottle.run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='cherrypy')
+        bottle.run(app, host='0.0.0.0', port=options.port, debug=options.DEBUG, server='cherrypy')
 
     except KeyboardInterrupt:
         logging.info("Stopping update server cleanly")
@@ -302,7 +293,7 @@ if __name__ == '__main__':
 
     except socket.error as e:
         logging.error(traceback.format_exc())
-        logging.error("Port %i is probably not accessible for you. Maybe use another one e.g.`-p 8000`" % port)
+        logging.error(f"Port {options.port} is probably not accessible for you. Maybe use another one e.g.`-p 8000`")
 
     except Exception as e:
         logging.error(traceback.format_exc())
