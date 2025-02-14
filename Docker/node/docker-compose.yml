@@ -1,3 +1,9 @@
+# Unfortunately Windows does not support `network_mode:host` mode, meaning that you will have to open single ports for each container
+# However, doing that will prevent mDNS/Avahi protocol to work and you will not be able to discover ethoscopes automatically
+# You can add them manually by knowing in advance their IP address, although that is not idea.
+# Linux still remains the best way to run this software
+
+
 services:
   node-base: &node-base
     build:
@@ -6,27 +12,35 @@ services:
       args:
         - ETHOSCOPE_BRANCH=dev
     image: ggilestro/ethoscope-node:latest
-    network_mode: host
     restart: unless-stopped
     volumes:
+      # - ../../:/opt/ethoscope-node:ro  # Uncomment if needed - will mount the host ethoscope folder, useful only for development
       - ethoscope_data:/ethoscope_data
       - etc_ethoscope:/etc/ethoscope
-      # - ../../:/opt/ethoscope-node:ro  # Uncomment if needed - will mount the host ethoscope folder, useful only for development
+
 
   ethoscope-node:
     <<: *node-base
     container_name: ethoscope-node
     command: "/usr/bin/python /opt/ethoscope-node/node_src/scripts/server.py"
+    network_mode: host                   # Comment out when running in Windows
+    ports:
+      - "80:80/tcp"
+      - "5353:5353/udp"
 
   ethoscope-node-backup:
     <<: *node-base
     container_name: ethoscope-node-backup
     command: "/usr/bin/python /opt/ethoscope-node/node_src/scripts/backup_tool.py"
+    ports:
+      - "8090:8090"
 
   ethoscope-node-video-backup:
     <<: *node-base
     container_name: ethoscope-node-video-backup
     command: "/usr/bin/python /opt/ethoscope-node/node_src/scripts/video_backup_tool.py"
+    ports:
+      - "8092:8092"
 
   ethoscope-node-update:
     <<: *node-base
@@ -35,6 +49,8 @@ services:
     command: "/usr/bin/python /opt/ethoscope-node/scripts/ethoscope_updater/update_server.py -g /opt/ethoscope-node -b /srv/git/ethoscope.git"
     volumes_from:
       - ethoscope-git-server
+    ports:
+      - "8888:8888"
 
   ethoscope-git-server:
     image: ggilestro/ethoscope-git-server:latest
@@ -50,18 +66,21 @@ services:
     volumes:
       - /srv/git
 
-  vsftpd:
+  ethoscope-vsftpd:
     image: metabrainz/docker-anon-ftp
     container_name: ethoscope-vsftpd
     restart: unless-stopped
-    network_mode: host
     environment:
       - MAX_CLIENTS=3
       - MAX_PER_IP=2
       - FTPD_BANNER=Welcome to our laboratory's ethoscope data FTP server
+      - PASV_MIN_PORT=21100
+      - PASV_MAX_PORT=21110
     volumes:
       - ethoscope_data:/var/ftp:ro
-
+    ports:
+      - "21:21"
+      - "21100-21110:21100-21110/tcp"
 
 volumes:
   ethoscope_data:
@@ -79,3 +98,9 @@ volumes:
       o: bind
       device: ${PWD}/.volumes/conf #for linux/MacOS
       #device: .\.volumes\conf #for windows
+
+
+networks:
+  default:
+    name: ethoscope_network
+    driver: bridge
