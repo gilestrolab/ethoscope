@@ -273,20 +273,20 @@ void activateAllMotors() {
         char *arg = SCmd.next(); // Duration in seconds
         
         if (!arg) {
-            Serial.println("ERROR: A command requires one argument: A [duration_ms]");
+            Serial.println("ERROR: A command requires one argument: A [duration_s]");
             return;
         }
         
-        int durationMs = atoi(arg);
+        int duration_s = atoi(arg);
         
         // Input validation
-        if (durationMs <= 0) {
+        if (duration_s <= 0) {
             Serial.println("ERROR: Duration must be a positive integer greater than 0.");
             return;
         }
 
         // Set the end time for deactivation
-        allMotorsEndTime = millis() + durationMs;
+        allMotorsEndTime = ((unsigned long)duration_s * 1000) + millis();
 
         // Activate all motors (odd channels for MODULE 1)
         for(uint8_t i=0; i<MOTOR_COUNT; i++) {
@@ -297,8 +297,9 @@ void activateAllMotors() {
         motorsActive = true;
         
         Serial.print("All motors activated for ");
-        Serial.print(durationMs);
-        Serial.println(" milliseconds.");
+        Serial.print(duration_s);
+        Serial.println(" seconds.");
+
     #else
         Serial.println("ERROR: No motors configured in this module.");
     #endif
@@ -385,7 +386,7 @@ void teach() {
     Serial.print(TOTAL_CHANNELS-1);
     Serial.print("\"},{\"name\":\"duration\",\"unit\":\"ms\"}]}");
     #if MOTOR_COUNT > 0
-        Serial.print(",{\"name\":\"Activate All\",\"format\":\"A [ms]\",\"description\":\"Activate all motors\",\"args\":[{\"name\":\"duration\",\"unit\":\"ms\"}]}");
+        Serial.print(",{\"name\":\"Activate All\",\"format\":\"A [s]\",\"description\":\"Activate all motors\",\"args\":[{\"name\":\"duration\",\"unit\":\"s\"}]}");
     #endif
     Serial.print(",{\"name\":\"Demo\",\"format\":\"D\",\"description\":\"Run test sequence\"}");
     Serial.print(",{\"name\":\"Help\",\"format\":\"H\",\"description\":\"Show commands\"}");
