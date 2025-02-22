@@ -13,59 +13,60 @@
             "url": "https://imperialcollegelondon.box.com/shared/static/r9q3ldd6a384o29h8c8iwjrppsr7mujd.zip",
             "date": "17 Oct 2024",
             "md5sum": "e7fe190f038eb1d1358ed829feaf9fd2"
+        },
+
+        {
+            "title": "Ethoscope Node, LiveCD",
+            "filename": "manjaro-ethoscope-25.0.0-minimal-250214-linux54.iso",
+            "url": "https://imperialcollegelondon.box.com/shared/static/ha14uo1c634u5qpxvfvksh8d3y0vpnjt.iso",
+            "date": "14 Feb 2025",
+            "md5sum": "921c26353d5988a9771b11b2e293a921"
         }
     ],
 
 
     "gcodes": [{
-            "filename": "1_etho_1.6_LIGHT_BOX.2x",
-            "url": "https://www.dropbox.com/s/u4598hoxt2ueg5v/1_etho_1.6_LIGHT_BOX.2x.gcode?dl=0",
-            "prints": "Light box only",
-            "material": "PLA White"
+            "filename": "CE3PRO_1_etho_v1.8_LIGHT_BOX_WITH_STRIP_2x.gcode",
+            "url": "https://github.com/gilestrolab/ethoscope/tree/dev/accessories/3D_printed_files",
+            "prints": "Light box with strip",
+            "material": "PLA - CE3PRO"
         },
         {
-            "filename": "2.1_etho_v1.7_CASE_and_CAMERA.1x",
-            "url": "https://www.dropbox.com/s/vwubid0eazgxldj/2.1_etho_v1.7_CASE_and_CAMERA.1x.gcode?dl=0",
-            "prints": "Upper case and camera lid",
-            "material": "PLA Gray"
+            "filename": "CE3PRO_2_etho_v1.7_PI3_CASE_FULL_1x.gcode",
+            "url": "https://github.com/gilestrolab/ethoscope/tree/dev/accessories/3D_printed_files",
+            "prints": "Upper case with camera case and lid - PI3 version",
+            "material": "PLA - CE3PRO"
         },
         {
-            "filename": "2.2_etho_v1.7_CASE_ONLY.2x",
-            "url": "https://www.dropbox.com/s/sng0yhr9pyz66ei/2.2_etho_v1.7_CASE_ONLY.2x.gcode?dl=0",
-            "prints": "Upper case only",
-            "material": "PLA Gray"
+            "filename": "CE3PRO_2_etho_v1.7_PI4_CASE_FULL_1x.gcode",
+            "url": "https://github.com/gilestrolab/ethoscope/tree/dev/accessories/3D_printed_files",
+            "prints": "Upper case with camera case and lid - PI4 version",
+            "material": "PLA - CE3PRO"
         },
         {
-            "filename": "3_etho_v1.6_LID_AND_STRIP.2x",
-            "url": "https://www.dropbox.com/s/a5p543hqup6li22/3_etho_v1.6_LID_AND_STRIP.2x.gcode?dl=0",
-            "prints": "Case lid and camera strip",
-            "material": "PLA White"
+            "filename": "CE3PRO_3.1_etho_v1.8_Wall_Stabiliser_2x.gcode",
+            "url": "https://github.com/gilestrolab/ethoscope/tree/dev/accessories/3D_printed_files",
+            "prints": "Wall stabilizers",
+            "material": "PLA - CE3PRO"
         },
         {
-            "filename": "3.1_etho_v1.6_LID_ONLY.2x",
-            "url": "https://www.dropbox.com/s/97inb00c9vj2k0d/3.1_etho_v1.6_LID_ONLY.2x.gcode?dl=0",
-            "prints": "Lid only",
-            "material": "PLA White"
-        },
-        {
-            "filename": "3.2_etho_v1.6_light_strip.7x",
-            "url": "https://www.dropbox.com/s/b3tmhg097f23she/3.2_etho_v1.6_light_strip.7x.gcode?dl=0",
-            "prints": "Light strip only",
-            "material": "PLA Clear or White"
-        },
-        {
-            "filename": "3.3_etho_v1.6_CAMERA_LIDS.8x",
-            "url": "https://www.dropbox.com/s/8nxnbc091ce0roi/3.3_etho_v1.6_CAMERA_LIDS.8x.gcode?dl=0",
-            "prints": "Upper case and camera case",
-            "material": "PLA Gray"
+            "filename": "CE3PRO_3.2_etho_v1.8_SSD_ADAPTER_2x.gcode",
+            "url": "https://github.com/gilestrolab/ethoscope/tree/dev/accessories/3D_printed_files",
+            "prints": "SSD adapter - mounts on wall stabilizers",
+            "material": "PLA - CE3PRO"
         }
+
     ],
     "onshape": [{
-            "name": "Upper case",
+            "name": "Upper case and lid - RPI3",
             "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/d228e2116a5933cf39312517"
         },
         {
-            "name": "Light box",
+            "name": "Upper case and lid - RPI4",
+            "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/e2cd330298b182900c4a8bf9"
+        },
+        {
+            "name": "Light box and light strip",
             "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/d5e7d416ecf9f99624a6734c"
         },
         {
@@ -73,13 +74,18 @@
             "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/72167f0b1de0d32cd5d66968"
         },
         {
-            "name": "Stabiliser",
-            "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/51c11b1cb511015be15336e4"
+            "name": "Wall stabiliser with pins for SSD mounting",
+            "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/87a97f390fc8099029a703fa"
+        },
+        {
+            "name": "SSD mounting plate",
+            "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/7a6406ee502010e636557252"
         }
+
     ],
     "gcodes_zip": {
-        "filename": "ethoscope_gcodes_v1.7.zip",
-        "url": "https://www.dropbox.com/s/9lskay367tpr81r/ethoscope_gcodes_v.1.7.zip?dl=0",
-        "date": "2020-05-07"
+        "filename": "ethoscope_gcodes_v1.8.zip",
+        "url": "https://github.com/gilestrolab/ethoscope/blob/dev/accessories/3D_printed_files/",
+        "date": "2025-02-22"
     }
 }
