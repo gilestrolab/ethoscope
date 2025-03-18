@@ -436,28 +436,26 @@ class GenericBackupWrapper(threading.Thread):
             return False
 
     def run(self):
-        threads = []
-        while not self._stop_event.is_set():
-            logging.info("Starting backup round")
-            active_devices = self.find_devices()
-            logging.info(f"Found {len(active_devices)} devices online: "
-                        f"{', '.join([dev['id'] for dev in active_devices])}")
-
-            for dev in active_devices:
-                # Launch a separate thread for each backup job
-                t = threading.Thread(target=self.initiate_backup_job, args=(dev,))
-                t.daemon = True  # Ensure threads close with the main process
-                threads.append(t)
-                t.start()
-
-            # Wait for threads to join with a timeout
-            for t in threads:
-                t.join(timeout=5)  # Set an optional timeout for each thread to avoid blocking indefinitely
-            threads = []  # Clear threads list for the next run
-
-            self.last_backup = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            logging.info(f"Backup cycle finished at {self.last_backup}")
-            self._stop_event.wait(self._BACKUP_DT)
+        with ThreadPoolExecutor(max_workers=self._max_threads) as executor:
+            while not self._stop_event.is_set():
+                logging.info("Starting backup round")
+                active_devices = self.find_devices()
+                futures = []
+                
+                for dev in active_devices:
+                    future = executor.submit(self.initiate_backup_job, dev)
+                    futures.append(future)
+                
+                # Wait for all backup jobs to complete with proper error handling
+                for future in as_completed(futures):
+                    try:
+                        future.result()
+                    except Exception as e:
+                        logging.error(f"Backup job failed: {e}")
+                
+                self.last_backup = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                logging.info(f"Backup cycle finished at {self.last_backup}")
+                self._stop_event.wait(self._BACKUP_DT)
 
     def update_backup_status(self, device_id, key, value):
         with self._lock:

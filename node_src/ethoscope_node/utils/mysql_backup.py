@@ -1,10 +1,8 @@
-__author__ = 'quentin'
-
 import mysql.connector
 import sqlite3
 import os
 import logging
-import traceback
+import re
 
 SQL_CHARSET = 'latin1'
 
@@ -12,7 +10,6 @@ class DBNotReadyError(Exception):
     pass
 
 class baseSQLconnector():
-
     """
     Basic class providing functions to compare the status of a local SQLlite3 db to the remote counterpart
     This is used to check if the db backup is in good shape
@@ -21,7 +18,13 @@ class baseSQLconnector():
     
     mysql -u ethoscope -p -h 192.168.1.45 -e 'SELECT table_name,table_rows FROM INFORMATION_SCHEMA.tables WHERE table_schema LIKE "ETHOSCOPE%";'
     """
-
+    def __init__(self, remote_host="localhost", remote_user="ethoscope", remote_pass="ethoscope", dst_path=None, remote_db_name=None):
+        self._remote_host = remote_host
+        self._remote_user = remote_user
+        self._remote_pass = remote_pass
+        self._dst_path = dst_path
+        self._remote_db_name = remote_db_name
+        
     def _get_remote_db_info(self):
         """
         This is fast but not reliable when the databases uses InnoDB because the information schema does not necessarily gets updated.
@@ -44,11 +47,10 @@ class baseSQLconnector():
         src.close()
         
         return {a[0] : a[1] for a in tables}
-
+        
     def _get_remote_db_info_slow(self):
         """
         """
-
         #fetches data about the size of the remote db ( remote_local_tables_dictionary )
         src = mysql.connector.connect(host=self._remote_host,
                                       user=self._remote_user,
@@ -71,24 +73,22 @@ class baseSQLconnector():
             
             if table_name in ["ROI_MAP", "VAR_MAP"] or table_name.startswith("METADATA"):
                 #tables that do not have a unique id - slower command
-                command = 'SELECT count(*) from %s.%s' % (db_name, table_name)
+                command = 'SELECT count(*) from `%s`.`%s`' % (db_name, table_name)
             else:
                 #tables that do
-                command = 'SELECT max(id) FROM %s.%s' % (db_name, table_name)
+                command = 'SELECT max(id) FROM `%s`.`%s`' % (db_name, table_name)
             
             src_cur.execute(command)
-            remote_local_tables_dictionary [db_name] . update ( { table_name :  src_cur.fetchone()[0] } )
-
+            remote_local_tables_dictionary[db_name].update({table_name: src_cur.fetchone()[0]})
+        
         src.commit()
         src.close()
         
         return remote_local_tables_dictionary
-        #return remote_local_tables_dictionary[db_name]
-
+        
     def _get_local_db_info(self):
         """
         """
-
         local_tables_dictionary = {}
         
         # now, this is very funny: this returns false if the folder is mounted via ssh - wtf?
@@ -99,7 +99,6 @@ class baseSQLconnector():
                     command = 'SELECT name FROM sqlite_master WHERE type ="table" AND name NOT LIKE "sqlite_%";'
                     dst_cur.execute(command)
                     tables = dst_cur.fetchall()
-
                     for entry in tables:
                         table_name = entry[0]
                         
@@ -111,7 +110,6 @@ class baseSQLconnector():
                         dst_cur.execute(command)
                         result = dst_cur.fetchone()
                         local_tables_dictionary[table_name] = result[0] if result else None
-
                 return local_tables_dictionary
             
             except sqlite3.Error as e:
@@ -133,41 +131,45 @@ class baseSQLconnector():
             else:
                 remote_tables_info = self._get_remote_db_info_slow()
                
-        except:
-            logging.error("Problem getting info from the remote database: %s " % self._remote_db_name)
+        except Exception as e:
+            logging.error(f"Problem getting info from the remote database: {self._remote_db_name} - {str(e)}")
+            return -1
         
         try:
             local_tables_info = self._get_local_db_info()
-        except:
-            logging.error("Problem getting info from the local database %s - perhaps it is locked?" % self._dst_path)
+        except Exception as e:
+            logging.error(f"Problem getting info from the local database {self._dst_path} - perhaps it is locked? {str(e)}")
+            return -1
         
-        #try:
-        for table in sorted(local_tables_info):
-
-            l = local_tables_info[table]
-
-            if use_fast_mode:
-                r = remote_tables_info[table] # the fast system
-            else:
-                r = remote_tables_info[self._remote_db_name][table] # the slow system
-            
-            if r == None : r = 0
-            if l == None : l = 0
-            
-            total_remote += int(r)
-            total_local += int(l)
-            
-            #print ("Transferred %s / %s for table %s (%0.2f)" % (l, r, table, l/r*100))
-        if total_remote == 0: return -1
-        else: return total_local/total_remote*100
-
-        #except:
-        #    return -1
-
+        try:
+            for table in sorted(local_tables_info):
+                l = local_tables_info[table]
+                
+                if use_fast_mode:
+                    if table not in remote_tables_info:
+                        logging.warning(f"Table {table} exists in local database but not in remote database")
+                        continue
+                    r = remote_tables_info[table] # the fast system
+                else:
+                    if self._remote_db_name not in remote_tables_info or table not in remote_tables_info[self._remote_db_name]:
+                        logging.warning(f"Table {table} exists in local database but not in remote database")
+                        continue
+                    r = remote_tables_info[self._remote_db_name][table] # the slow system
+                
+                if r is None: r = 0
+                if l is None: l = 0
+                
+                total_remote += int(r)
+                total_local += int(l)
+                
+            if total_remote == 0: return -1
+            else: return total_local/total_remote*100
+        except Exception as e:
+            logging.error(f"Error comparing databases: {str(e)}")
+            return -1
 
 class MySQLdbToSQlite(baseSQLconnector):
     _max_n_rows_to_insert = 10000
-
     def __init__(self,
                  dst_path,
                  remote_db_name="ethoscope_db",
@@ -176,11 +178,9 @@ class MySQLdbToSQlite(baseSQLconnector):
                  remote_pass="ethoscope",
                  overwrite=False):
         """
-
         A class to backup remote psv MySQL data base into a local sqlite3 one.
         The name of the static (not updated during run) and the dynamic tables is hardcoded.
         The `update_roi_tables` method will fetch only the new datapoint at each run.
-
         :param dst_path: where to save the data (expect a `.db` file)
         :param remote_db_name: the name of the remote database
         :param remote_host: the ip of the database
@@ -188,32 +188,15 @@ class MySQLdbToSQlite(baseSQLconnector):
         :param remote_pass: teh password for the remote database
         :param overwrite: whether the destination file should be overwritten. If False, data are appended to it
 
-
         """
-
-        self._remote_host = remote_host
-        self._remote_user = remote_user
-        self._remote_pass = remote_pass
-        self._remote_db_name = remote_db_name
-
-        src = mysql.connector.connect(host=self._remote_host,
-                                      user=self._remote_user,
-                                      passwd=self._remote_pass,
-                                      db=self._remote_db_name,
-                                      connect_timeout=45,
-                                      buffered=True,
-                                      charset=SQL_CHARSET,
-                                      use_unicode=True)
-
+        super().__init__(remote_host=remote_host, remote_user=remote_user, remote_pass=remote_pass,
+                         dst_path=dst_path, remote_db_name=remote_db_name)
 
         self._dst_path=dst_path
         logging.info("Initializing local database static tables at %s" % self._dst_path)
-
         self._dam_file_name = os.path.splitext(self._dst_path)[0] + ".txt"
 
-
         # we remove file and create dir, if needed
-
         if overwrite:
             logging.info("Trying to remove old database")
             try:
@@ -222,16 +205,13 @@ class MySQLdbToSQlite(baseSQLconnector):
             except OSError as e:
                 logging.warning(e)
                 pass
-
             logging.info("Trying to remove old DAM file")
-
             try:
                 os.remove(self._dam_file_name)
                 logging.info("Success")
             except OSError as e:
                 logging.warning(e)
                 pass
-
         try:
             logging.info("Making parent directories")
             os.makedirs(os.path.dirname(self._dst_path))
@@ -239,51 +219,49 @@ class MySQLdbToSQlite(baseSQLconnector):
         except OSError as e:
             logging.warning(e)
             pass
-
         with open(self._dam_file_name,"a"):
             logging.info("Ensuring DAM file exists at %s" % self._dam_file_name)
             pass
-
-        with sqlite3.connect(self._dst_path, check_same_thread=False) as conn:
-            src_cur = src.cursor(buffered=True)
-
-            command = "SELECT * FROM VAR_MAP"
-            src_cur.execute(command)
-            #empty var map means no reads are present yet
-            if len([i for i in src_cur]) == 0:
-                raise DBNotReadyError("No read are available for this database yet")
-
-            command = "SHOW TABLES"
-            src_cur.execute(command)
-            tables = [c[0] for c in src_cur]
-            for t in tables:
-                if t == "CSV_DAM_ACTIVITY":
-                    self._copy_table(t, src, conn, dump_in_csv=True)
-                else:
-                    self._copy_table(t, src, conn, dump_in_csv=False)
-
-            #TODO checksum of ordered metadata ?
-
+            
+        with mysql.connector.connect(host=self._remote_host,
+                                     user=self._remote_user,
+                                     passwd=self._remote_pass,
+                                     db=self._remote_db_name,
+                                     connect_timeout=45,
+                                     buffered=True,
+                                     charset=SQL_CHARSET,
+                                     use_unicode=True) as src:
+            with sqlite3.connect(self._dst_path, check_same_thread=False) as conn:
+                src_cur = src.cursor(buffered=True)
+                command = "SELECT * FROM VAR_MAP"
+                src_cur.execute(command)
+                #empty var map means no reads are present yet
+                if len([i for i in src_cur]) == 0:
+                    raise DBNotReadyError("No read are available for this database yet")
+                command = "SHOW TABLES"
+                src_cur.execute(command)
+                tables = [c[0] for c in src_cur]
+                for t in tables:
+                    if t == "CSV_DAM_ACTIVITY":
+                        self._copy_table(t, src, conn, dump_in_csv=True)
+                    else:
+                        self._copy_table(t, src, conn, dump_in_csv=False)
+                #TODO checksum of ordered metadata ?
         logging.info("Database mirroring initialised")
-
+        
     def _copy_table(self,table_name, src, dst, dump_in_csv=False):
         src_cur = src.cursor(buffered=True)
         dst_cur = dst.cursor()
-
         src_command = "SHOW COLUMNS FROM %s " % table_name
-
         src_cur.execute(src_command)
         col_list = []
         for c in src_cur:
              col_list.append(" ".join(c[0:2]))
-
         formated_cols_names = ", ".join(col_list)
-
 
         try:
             dst_command = "CREATE TABLE %s (%s)" % (table_name ,formated_cols_names)
             dst_cur.execute(dst_command)
-
         except sqlite3.OperationalError:
             logging.debug("Table %s exists, not copying it" % table_name)
             return
@@ -292,69 +270,57 @@ class MySQLdbToSQlite(baseSQLconnector):
             self._replace_img_snapshot_table(table_name, src, dst)
         else:
             self._replace_table(table_name, src, dst, dump_in_csv)
-
+            
     def update_roi_tables(self):
         """
         Fetch new ROI tables and new data points in the remote and use them to update local db
-
         :return:
         """
-        src = mysql.connector.connect(host=self._remote_host,
-                                      user=self._remote_user,
-                                      passwd=self._remote_pass,
-                                      db=self._remote_db_name,
-                                      buffered=True,
-                                      charset=SQL_CHARSET,
-                                      use_unicode=True)
+        with mysql.connector.connect(host=self._remote_host,
+                                     user=self._remote_user,
+                                     passwd=self._remote_pass,
+                                     db=self._remote_db_name,
+                                     buffered=True,
+                                     charset=SQL_CHARSET,
+                                     use_unicode=True) as src:
+            with sqlite3.connect(self._dst_path, check_same_thread=False, timeout=10.0) as dst:
+                dst_cur = dst.cursor()  # Fixed: was src.cursor()
+                command = "SELECT roi_idx FROM ROI_MAP"
+                dst_cur.execute(command)
+                rois_in_src = set([c[0] for c in dst_cur])
+                for i in rois_in_src:
+                    self._update_one_roi_table("ROI_%i" % i, src, dst)
 
-        with sqlite3.connect(self._dst_path, check_same_thread=False, timeout=10.0) as dst:
-
-            dst_cur = src.cursor()
-            command = "SELECT roi_idx FROM ROI_MAP"
-            dst_cur.execute(command)
-            rois_in_src = set([c[0] for c in dst_cur])
-            for i in rois_in_src :
-                self._update_one_roi_table("ROI_%i" % i, src, dst)
-
-
-            self._update_one_roi_table("CSV_DAM_ACTIVITY", src, dst, dump_in_csv=True)
-            try:
-                self._update_one_roi_table("START_EVENTS", src, dst)
-            except mysql.connector.errors.ProgrammingError:
-                logging.error("Programming Error")
-                pass
-
-
-            for table in ["IMG_SNAPSHOTS", "SENSORS"]:
+                self._update_one_roi_table("CSV_DAM_ACTIVITY", src, dst, dump_in_csv=True)
                 try:
-                    self._update_table(table, src, dst)
+                    self._update_one_roi_table("START_EVENTS", src, dst)
+                except mysql.connector.errors.ProgrammingError:
+                    logging.error("Programming Error")
+                    pass
 
-                except Exception as e:
-                    logging.error("Cannot mirror the '%s' table" % table)
-                    logging.error(e)
-
+                for table in ["IMG_SNAPSHOTS", "SENSORS"]:
+                    try:
+                        self._update_table(table, src, dst)
+                    except Exception as e:
+                        logging.error("Cannot mirror the '%s' table" % table)
+                        logging.error(str(e))
 
     def _replace_img_snapshot_table(self, table_name, src, dst):
         src_cur = src.cursor(buffered=True)
         dst_cur = dst.cursor()
-
         src_command = "SELECT id,t,img FROM %s" % table_name
         src_cur.execute(src_command)
-
         for sc in src_cur:
             id,t,img = sc
             command = "INSERT INTO %s (id,t,img) VALUES(?,?,?);" % table_name
             dst_cur.execute(command, [id,t,sqlite3.Binary(img)])
             dst.commit()
-
+            
     def _replace_table(self,table_name, src, dst, dump_in_csv=False):
         src_cur = src.cursor(buffered=True)
         dst_cur = dst.cursor()
-
         src_command = "SELECT * FROM %s " % table_name
-
         src_cur.execute(src_command)
-
         to_insert = []
         i = 0
         for sc in src_cur:
@@ -363,7 +329,7 @@ class MySQLdbToSQlite(baseSQLconnector):
             to_insert.append(str(tp))
             if len(to_insert) > self._max_n_rows_to_insert:
                 value_string = ",".join(to_insert)
-                dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string )
+                dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string)
                 dst_cur.execute(dst_command)
                 dst.commit()
                 to_insert = []
@@ -372,18 +338,15 @@ class MySQLdbToSQlite(baseSQLconnector):
                     row = "\t".join(["{0}".format(val) for val in sc])
                     f.write(row)
                     f.write("\n")
-
-        if len(to_insert) > 0:
+        if len(to_insert) > 0:  # Check if there's anything to insert
             value_string = ",".join(to_insert)
-            dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string )
+            dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string)
             dst_cur.execute(dst_command)
         dst.commit()
-
 
     def _update_one_roi_table(self, table_name, src, dst, dump_in_csv=False):
         src_cur = src.cursor(buffered=True)
         dst_cur = dst.cursor()
-
         try:
             dst_command= "SELECT MAX(id) FROM %s" % table_name
             dst_cur.execute(dst_command)
@@ -391,7 +354,6 @@ class MySQLdbToSQlite(baseSQLconnector):
             logging.warning("Local table %s appears empty. Rebuilding it from source" % table_name)
             self._replace_table(table_name, src, dst)
             return
-
         last_id_in_dst = 0
         for c in dst_cur:
             if c[0] is None:
@@ -401,7 +363,6 @@ class MySQLdbToSQlite(baseSQLconnector):
                 last_id_in_dst = c[0]
         src_command = "SELECT * FROM %s WHERE id > %d" % (table_name, last_id_in_dst)
         src_cur.execute(src_command)
-
         to_insert = []
         i = 0
         for sc in src_cur:
@@ -410,39 +371,33 @@ class MySQLdbToSQlite(baseSQLconnector):
             to_insert.append(str(tp))
             if len(to_insert) > self._max_n_rows_to_insert:
                 value_string = ",".join(to_insert)
-                dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string )
+                dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string)
                 dst_cur.execute(dst_command)
                 dst.commit()
                 to_insert = []
-
             if dump_in_csv:
                 with open(self._dam_file_name,"a") as f:
                     row = "\t".join(["{0}".format(val) for val in sc])
                     f.write(row)
                     f.write("\n")
-
-        if len(to_insert) > 0:
+        if len(to_insert) > 0:  # Check if there's anything to insert
             value_string = ",".join(to_insert)
-            dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string )
+            dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string)
             dst_cur.execute(dst_command)
         dst.commit()
-
 
     def _update_table(self, table_name, src, dst, replace=False):
         """
         Updates the contents of a custom table
         """
-
         src_cur = src.cursor(buffered=True)
         dst_cur = dst.cursor()
-
         #find info about the datatype for each column in the source
         h = {}
         src_command = "SHOW COLUMNS FROM %s " % table_name
         src_cur.execute(src_command)
         for c in src_cur:
             h[c[0]] = c[1]
-
         #check what is the status in the destination
         try:
             dst_command= "SELECT MAX(id) FROM %s" % table_name
@@ -450,24 +405,19 @@ class MySQLdbToSQlite(baseSQLconnector):
         except (sqlite3.OperationalError, mysql.connector.errors.ProgrammingError):
             logging.warning("Local table %s appears empty. Rebuilding it from source" % table_name)
             replace = True
-
         if not replace:
-
             last_id_in_dst = 0
             for c in dst_cur:
                 last_id_in_dst = c[0]
                 if last_id_in_dst is None:
                     logging.warning("There seem to be no data in %s, %s stopping here" % (os.path.basename(self._dst_path), table_name))
                     return
-
             #retrieve only new data
             src_command = "SELECT * FROM %s WHERE id > %d" % (table_name, last_id_in_dst)
         
         if replace:
-
             #retrieve all data, not just the new ones
             src_command = "SELECT * FROM %s" % table_name
-
         #grab the data from src
         src_cur.execute(src_command)
         #go through it row by row
@@ -486,24 +436,21 @@ class MySQLdbToSQlite(baseSQLconnector):
             #and add them row by row to destination 
             dst_cur.execute(command, args)
             dst.commit()
-
+            
 class db_diff(baseSQLconnector):
     """
     Class used to compare the status of a local SQLlite3 db to the remote counterpart
     This is used to check if the db backup is in good shape
     """
-
     _remote_user = "ethoscope"
     _remote_pass = "ethoscope"
-
+    
     def __init__(self, db_name, remote_host, filename):
         """
         remote_host is the IP address of the ethoscope we are supposed to check on
         db_name is the name of the remote database
-
         filename is the local SQLlite3 file to check
         """
-    
-        self._remote_host = remote_host
-        self._dst_path = filename
-        self._remote_db_name = db_name
+        super().__init__(remote_host=remote_host, remote_user=self._remote_user, 
+                        remote_pass=self._remote_pass, dst_path=filename, 
+                        remote_db_name=db_name)

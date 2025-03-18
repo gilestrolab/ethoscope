@@ -12,7 +12,7 @@ import bottle
 app = bottle.Bottle()
 
 @app.route('/')
-def status():
+def home():
     bottle.response.content_type = 'application/json'
     return json.dumps({'status': 'running'}, indent=2)
 
