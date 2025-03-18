@@ -252,7 +252,7 @@ if __name__ == '__main__':
     if option_dict["run"] or was_interrupted():
         
         if option_dict["record_video"]:
-            t.action( 'start_record' )
+            ethoscope.action( 'start_record' )
         else:
-            t.action( 'start' )
+            ethoscope.action( 'start' )
         
