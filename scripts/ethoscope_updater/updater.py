@@ -165,36 +165,51 @@ class DeviceUpdater:
 
     def create_python_egg(self) -> None:
         """
-        Creates Python eggs for the 'node' and 'device' components after updates.
-
-        :raises DeviceUpdateError: If egg creation fails.
+        Installs Python packages for the 'node' and 'device' components after updates.
+        Uses modern pip editable installs instead of deprecated setup.py develop.
+        :raises DeviceUpdateError: If package installation fails.
         """
-        egg_dirs = {
+        package_dirs = {
             'node': os.path.join(self._git_working_dir, 'node_src'),
             'device': os.path.join(self._git_working_dir, 'src')
         }
-
         try:
-            for component, path in egg_dirs.items():
+            for component, path in package_dirs.items():
                 if not os.path.isdir(path):
                     msg = f"Directory '{path}' does not exist."
                     logging.error(msg)
                     raise DeviceUpdateError(msg)
-
-                logging.info(f"Generating Python egg for '{component}' in '{path}'.")
-                # Execute the setup.py develop command
-                result = os.system(f'python setup.py develop --prefix={path}')
-                if result != 0:
-                    msg = f"Failed to create Python egg for '{component}'."
+                
+                # Check if pyproject.toml exists to confirm modern packaging
+                pyproject_path = os.path.join(path, 'pyproject.toml')
+                if not os.path.isfile(pyproject_path):
+                    msg = f"pyproject.toml not found in '{path}'. Modern packaging required."
                     logging.error(msg)
                     raise DeviceUpdateError(msg)
-                logging.info(f"Python egg for '{component}' created successfully.")
+                
+                logging.info(f"Installing Python package for '{component}' from '{path}'.")
+                
+                # Use pip install -e for editable installation
+                result = subprocess.run([
+                    'python', '-m', 'pip', 'install', '-e', path, 
+                    '--use-pep517',  # Use modern build system
+                    '--no-deps'      # Optional: skip dependencies if already installed
+                ], capture_output=True, text=True)
+                
+                if result.returncode != 0:
+                    msg = f"Failed to install Python package for '{component}'. Error: {result.stderr}"
+                    logging.error(msg)
+                    raise DeviceUpdateError(msg)
+                
+                logging.info(f"Python package for '{component}' installed successfully.")
+                logging.debug(f"Installation output: {result.stdout}")
+                
         except DeviceUpdateError:
             raise
         except Exception as e:
-            logging.error(f"Unexpected error during Python egg creation: {e}")
+            logging.error(f"Unexpected error during Python package installation: {e}")
             logging.debug(traceback.format_exc())
-            raise DeviceUpdateError("An unexpected error occurred while creating Python eggs.") from e
+            raise DeviceUpdateError("An unexpected error occurred while installing Python packages.") from e
 
 
 class BranchUpdateError(Exception):
