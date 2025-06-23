@@ -1,10 +1,3 @@
-"""
-Ethoscope Node Server - Main application server for managing ethoscope devices.
-
-This module provides a web-based interface for monitoring and controlling
-ethoscope devices, managing experiments, and handling data backup operations.
-"""
-
 import bottle
 import subprocess
 import socket
@@ -20,6 +13,7 @@ import tempfile
 import shutil
 import netifaces
 import json
+import time
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from contextlib import contextmanager
@@ -97,28 +91,40 @@ def warning_decorator(func):
 
 
 class CherootServer(bottle.ServerAdapter):
-    """Custom Cheroot server adapter for Bottle."""
+    """Custom Cheroot server adapter with proper configuration."""
     
     def run(self, handler):
-        from cheroot import wsgi
-        from cheroot.ssl import builtin
+        try:
+            from cheroot import wsgi
+            from cheroot.ssl import builtin
+        except ImportError:
+            raise ImportError("Cheroot server requires 'cheroot' package")
         
-        self.options['bind_addr'] = (self.host, self.port)
-        self.options['wsgi_app'] = handler
+        # Only use supported parameters
+        server_options = {
+            'bind_addr': (self.host, self.port),
+            'wsgi_app': handler,
+        }
         
-        certfile = self.options.pop('certfile', None)
-        keyfile = self.options.pop('keyfile', None)
-        chainfile = self.options.pop('chainfile', None)
+        # Add SSL if certificates are provided
+        certfile = self.options.get('certfile')
+        keyfile = self.options.get('keyfile')
+        chainfile = self.options.get('chainfile')
         
-        server = wsgi.Server(**self.options)
+        server = wsgi.Server(**server_options)
         
         if certfile and keyfile:
             server.ssl_adapter = builtin.BuiltinSSLAdapter(certfile, keyfile, chainfile)
         
         try:
             server.start()
+        except KeyboardInterrupt:
+            pass
         finally:
-            server.stop()
+            try:
+                server.stop()
+            except Exception as e:
+                logging.warning(f"Error stopping Cheroot server: {e}")
 
 
 class EthoscopeNodeServer:
@@ -145,9 +151,34 @@ class EthoscopeNodeServer:
         self.is_dockerized = os.path.exists('/.dockerenv')
         self.systemctl = "/usr/bin/systemctl.py" if self.is_dockerized else "/usr/bin/systemctl"
         
-        # Setup routes
+        # Server state
+        self._server_running = False
+        self._shutdown_requested = False
+        
+        # Setup routes and hooks
         self._setup_routes()
         self._setup_hooks()
+    
+    def _detect_available_server(self):
+        """Detect which server adapter is available."""
+        # Try to import servers in order of preference
+        servers = [
+            ('paste', 'paste.httpserver'),
+            ('cheroot', 'cheroot.wsgi'),
+            ('cherrypy', 'cherrypy.wsgiserver'),
+            ('wsgiref', 'wsgiref.simple_server')  # Built-in fallback
+        ]
+        
+        for server_name, module_name in servers:
+            try:
+                __import__(module_name)
+                self.logger.debug(f"Server {server_name} is available")
+                return server_name
+            except ImportError:
+                continue
+        
+        # If nothing else, use built-in wsgiref
+        return 'wsgiref'
     
     def _setup_routes(self):
         """Setup all application routes."""
@@ -265,7 +296,14 @@ class EthoscopeNodeServer:
     
     def cleanup(self):
         """Clean up all server resources."""
+        if self._shutdown_requested:
+            return  # Already cleaning up
+            
+        self._shutdown_requested = True
         self.logger.info("Cleaning up server resources...")
+        
+        # Stop server flag
+        self._server_running = False
         
         if self.device_scanner:
             try:
@@ -288,31 +326,43 @@ class EthoscopeNodeServer:
             except Exception as e:
                 self.logger.warning(f"Error cleaning tmp directory: {e}")
         
+        # Add a small delay to allow connections to close gracefully
+        time.sleep(0.1)
+        
         self.logger.info("Server cleanup complete")
     
     def run(self):
-        """Start the web server."""
+        """Start the web server with better server detection."""
         self.logger.info(f"Starting web server on port {self.port}")
+        self._server_running = True
+        
+        # Detect available server
+        available_server = self._detect_available_server()
         
         try:
-            # Try Paste server first
-            bottle.run(self.app, host='0.0.0.0', port=self.port, 
-                      debug=self.debug, server='paste')
-        except ImportError:
-            self.logger.info("Paste server not available, trying alternative...")
+            if available_server == 'cheroot':
+                # Register our custom Cheroot server
+                bottle.server_names["cheroot"] = CherootServer
             
-            # Fallback to Cheroot/CherryPy
-            try:
-                from bottle.cherrypy import wsgiserver
-                self.logger.info("Using CherryPy server")
-            except ImportError:
-                bottle.server_names["cherrypy"] = CherootServer(host='0.0.0.0', port=self.port)
-                self.logger.warning("Using Cheroot server (CherryPy >= 9)")
+            self.logger.info(f"Using {available_server} server")
             
             bottle.run(self.app, host='0.0.0.0', port=self.port, 
-                      debug=self.debug, server='cherrypy')
-    
-    # Route handlers - Static files
+                      debug=self.debug, server=available_server, 
+                      quiet=not self.debug)
+                
+        except KeyboardInterrupt:
+            self.logger.info("Server interrupted")
+            raise
+        except Exception as e:
+            self.logger.error(f"Server error: {e}")
+            raise
+        finally:
+            self._server_running = False
+
+    # [Include all the existing route handler methods here - they remain the same]
+    # _serve_static, _serve_tmp_static, _index, _get_devices, etc.
+    # I'll include a few key ones as examples:
+
     def _serve_static(self, filepath):
         return bottle.static_file(filepath, root=STATIC_DIR)
     
@@ -325,21 +375,19 @@ class EthoscopeNodeServer:
     def _get_favicon(self):
         return self._serve_static('img/favicon.ico')
     
-    # Route handlers - Main pages
     def _index(self):
         return bottle.static_file('index.html', root=STATIC_DIR)
     
     def _update_redirect(self):
         return bottle.redirect(self.config.custom('UPDATE_SERVICE_URL'))
     
-    # Route handlers - Device API
     @error_decorator
     def _get_devices(self):
         return self.device_scanner.get_all_devices_info()
     
     def _get_devices_list(self):
         return self._get_devices()
-    
+
     def _manual_add_device(self):
         """Manually add ethoscopes using provided IPs."""
         input_string = bottle.request.body.read().decode("utf-8")
@@ -827,7 +875,8 @@ class EthoscopeNodeServer:
             if os.path.exists(tmp_file):
                 os.remove(tmp_file)
             return ""
-    
+
+
     def _shutdown(self, exit_status=0):
         """Shutdown the server."""
         self.logger.info("Shutting down server")
@@ -862,25 +911,19 @@ def parse_command_line():
 
 
 def main():
-    """Main entry point."""
-    # Parse command line arguments
+    """Main entry point with improved cleanup."""
+    # Parse arguments and setup logging
     args = parse_command_line()
-    
-    # Setup logging
     setup_logging(args.debug)
     logger = logging.getLogger('EthoscopeNodeServer')
     
-    # Initialize server
-    server = EthoscopeNodeServer(
-        port=args.port,
-        debug=args.debug,
-        temp_results_dir=args.temp_results_dir
-    )
+    server = None
     
     def signal_handler(sig, frame):
         """Handle shutdown signals gracefully."""
         logger.info(f"Received signal {sig}, shutting down gracefully...")
-        server.cleanup()
+        if server:
+            server.cleanup()
         sys.exit(0)
     
     # Setup signal handlers
@@ -889,6 +932,12 @@ def main():
     
     try:
         # Initialize and start server
+        server = EthoscopeNodeServer(
+            port=args.port,
+            debug=args.debug,
+            temp_results_dir=args.temp_results_dir
+        )
+        
         server.initialize()
         server.run()
         
@@ -898,17 +947,20 @@ def main():
     except socket.error as e:
         logger.error(f"Socket error: {e}")
         logger.error(f"Port {args.port} is probably not accessible. Try another port with -p option")
-        server.cleanup()
+        if server:
+            server.cleanup()
         sys.exit(1)
         
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
         logger.error(traceback.format_exc())
-        server.cleanup()
+        if server:
+            server.cleanup()
         sys.exit(1)
         
     finally:
-        server.cleanup()
+        if server:
+            server.cleanup()
         logger.info("Server shutdown complete")
 
 

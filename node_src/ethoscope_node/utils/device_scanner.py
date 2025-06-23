@@ -503,7 +503,21 @@ class Ethoscope(BaseDevice):
         # Convert post_data to JSON if provided
         json_data = None
         if post_data:
-            json_data = json.dumps(post_data).encode('utf-8')
+            # Handle different input types
+            if isinstance(post_data, bytes):
+                # Convert bytes to string and parse as JSON, then re-encode
+                json_str = post_data.decode('utf-8')
+                parsed_data = json.loads(json_str)
+                json_data = json.dumps(parsed_data).encode('utf-8')
+            elif isinstance(post_data, str):
+                # Parse JSON string and re-encode to ensure valid format
+                parsed_data = json.loads(post_data)
+                json_data = json.dumps(parsed_data).encode('utf-8')
+            elif isinstance(post_data, dict):
+                # Dictionary - convert directly to JSON
+                json_data = json.dumps(post_data).encode('utf-8')
+            else:
+                raise TypeError(f"Invalid post_data type: {type(post_data)}. Expected bytes, str, or dict.")
         
         # Power operations may not return data
         if instruction in ["poweroff", "reboot", "restart"]:
@@ -516,10 +530,25 @@ class Ethoscope(BaseDevice):
         
         self._update_info()
     
-    def send_settings(self, post_data: Dict) -> Any:
+    def send_settings(self, post_data) -> Any:
         """Send settings update to ethoscope."""
         post_url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['update']}/{self._id}"
-        json_data = json.dumps(post_data).encode('utf-8')
+        
+        # Handle different input types
+        if isinstance(post_data, bytes):
+            # Convert bytes to string and parse as JSON, then re-encode
+            json_str = post_data.decode('utf-8')
+            parsed_data = json.loads(json_str)
+            json_data = json.dumps(parsed_data).encode('utf-8')
+        elif isinstance(post_data, str):
+            # Parse JSON string and re-encode to ensure valid format
+            parsed_data = json.loads(post_data)
+            json_data = json.dumps(parsed_data).encode('utf-8')
+        elif isinstance(post_data, dict):
+            # Dictionary - convert directly to JSON
+            json_data = json.dumps(post_data).encode('utf-8')
+        else:
+            raise TypeError(f"Invalid post_data type: {type(post_data)}. Expected bytes, str, or dict.")
         
         result = self._get_json(post_url, timeout=3, post_data=json_data)
         self._update_info()
