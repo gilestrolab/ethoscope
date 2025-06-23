@@ -814,7 +814,7 @@ class Ethoscope(BaseDevice):
         # Fetch device info
         if not self._fetch_device_info():
             self._handle_unreachable_state(previous_status)
-            return
+            raise ScanException(f"Failed to fetch device info from {self._ip}")
         
         new_status = self._info.get('status', 'offline')
         
