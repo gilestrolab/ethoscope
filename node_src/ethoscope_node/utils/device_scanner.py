@@ -12,7 +12,7 @@ import pickle
 import mysql.connector
 import socket
 import struct
-from threading import Thread, RLock
+from threading import Thread, RLock, Event
 from functools import wraps
 from contextlib import contextmanager
 from typing import Dict, List, Optional, Any, Iterator, Union
@@ -20,14 +20,16 @@ from dataclasses import dataclass
 from zeroconf import ServiceBrowser, Zeroconf, IPVersion
 
 from ethoscope_node.utils.etho_db import ExperimentalDB
-from ethoscope_node.utils.mysql_backup import DBDiff  # Updated import
+from ethoscope_node.utils.mysql_backup import DBDiff
 
 # Constants
 STREAMING_PORT = 8887
 ETHOSCOPE_PORT = 9000
 DB_UPDATE_INTERVAL = 300  # seconds
-DEFAULT_TIMEOUT = 10
-MAX_RETRIES = 3
+DEFAULT_TIMEOUT = 5  # Reduced from 10
+MAX_RETRIES = 2  # Reduced from 3
+INITIAL_RETRY_DELAY = 1  # Reduced from 3
+MAX_RETRY_DELAY = 5  # Cap on retry delay
 
 
 @dataclass
@@ -56,15 +58,17 @@ class DeviceError(ScanException):
     pass
 
 
-def retry(exception_to_check, tries: int = 4, delay: float = 3, backoff: float = 2, logger=None):
+def retry(exception_to_check, tries: int = MAX_RETRIES, delay: float = INITIAL_RETRY_DELAY, 
+         backoff: float = 1.5, max_delay: float = MAX_RETRY_DELAY, logger=None):
     """
-    Retry decorator with exponential backoff.
+    Retry decorator with exponential backoff and maximum delay cap.
     
     Args:
         exception_to_check: Exception type to catch and retry on
         tries: Maximum number of attempts
         delay: Initial delay between attempts
         backoff: Multiplier for delay increase
+        max_delay: Maximum delay between attempts
         logger: Optional logger for retry attempts
     """
     def deco_retry(func):
@@ -76,8 +80,8 @@ def retry(exception_to_check, tries: int = 4, delay: float = 3, backoff: float =
                     return func(*args, **kwargs)
                 except exception_to_check as e:
                     if logger:
-                        logger.warning(f"Retry {tries - mtries + 1}/{tries} for {func.__name__}: {e}")
-                    time.sleep(mdelay)
+                        logger.debug(f"Retry {tries - mtries + 1}/{tries} for {func.__name__}: {e}")
+                    time.sleep(min(mdelay, max_delay))
                     mtries -= 1
                     mdelay *= backoff
             return func(*args, **kwargs)
@@ -98,15 +102,19 @@ class BaseDevice(Thread):
         self._results_dir = results_dir
         self._timeout = timeout
         
-        # Device state - initialize with safe defaults
+        # Device state
         self._info = {"status": "offline", "ip": ip}
         self._id = ""
         self._is_online = True
         self._skip_scanning = False
         
-        # Synchronization
+        # Synchronization and error tracking
         self._lock = RLock()
         self._last_refresh = 0
+        self._consecutive_errors = 0  # Track consecutive errors
+        self._max_consecutive_errors = 3
+        self._error_backoff_time = 0
+        self._base_error_delay = 30  # 30 seconds backoff after errors
         
         # Logging
         self._logger = logging.getLogger(f"{self.__class__.__name__}_{ip}")
@@ -114,43 +122,24 @@ class BaseDevice(Thread):
         # URLs
         self._setup_urls()
         
-        # Initialize device info AFTER all attributes are set
+        # Initialize device info
         self._reset_info()
-        
-        # Only update info if not skipping scanning
-        if not self._skip_scanning:
-            try:
-                self._update_info()
-            except Exception as e:
-                self._logger.warning(f"Initial info update failed: {e}")
-                # Don't fail initialization, just log the warning
     
     def _setup_urls(self):
         """Setup device-specific URLs. Override in subclasses."""
         self._id_url = f"http://{self._ip}:{self._port}/id"
         self._data_url = f"http://{self._ip}:{self._port}/"
     
-    @retry(ScanException, tries=MAX_RETRIES, delay=1, backoff=1)
+    @retry(ScanException, tries=MAX_RETRIES, delay=INITIAL_RETRY_DELAY, backoff=1.5)
     def _get_json(self, url: str, timeout: Optional[float] = None, 
                   post_data: Optional[bytes] = None) -> Dict[str, Any]:
         """
         Fetch JSON data from URL with retry logic and improved error handling.
-        
-        Args:
-            url: URL to fetch
-            timeout: Request timeout
-            post_data: Optional POST data
-            
-        Returns:
-            Parsed JSON response
-            
-        Raises:
-            ScanException: On network or parsing errors
         """
         timeout = timeout or self._timeout
         
         try:
-            headers = {'Content-Type': 'application/json'}
+            headers = {'Content-Type': 'application/json', 'User-Agent': 'EthoscopeNode/1.0'}
             req = urllib.request.Request(url, data=post_data, headers=headers)
             
             with urllib.request.urlopen(req, timeout=timeout) as response:
@@ -174,21 +163,48 @@ class BaseDevice(Thread):
             raise ScanException(f"Unexpected error from {url}: {e}")
     
     def run(self):
-        """Main device monitoring loop."""
+        """Main device monitoring loop with improved error handling."""
         while self._is_online:
             time.sleep(0.2)
             
-            if time.time() - self._last_refresh > self._refresh_period:
+            current_time = time.time()
+            
+            # Check if we're in error backoff period
+            if current_time < self._error_backoff_time:
+                continue
+            
+            if current_time - self._last_refresh > self._refresh_period:
                 if not self._skip_scanning:
                     try:
                         self._update_info()
+                        # Reset error counter on successful update
+                        self._consecutive_errors = 0
                     except Exception as e:
-                        self._logger.error(f"Error updating info: {e}")
-                        self._reset_info()
+                        self._handle_device_error(e)
                 else:
                     self._reset_info()
                     
-                self._last_refresh = time.time()
+                self._last_refresh = current_time
+    
+    def _handle_device_error(self, error):
+        """Handle device errors with exponential backoff."""
+        self._consecutive_errors += 1
+        self._logger.debug(f"Device error (consecutive: {self._consecutive_errors}): {error}")
+        
+        # Reset device info to offline
+        self._reset_info()
+        
+        # If too many consecutive errors, implement backoff
+        if self._consecutive_errors >= self._max_consecutive_errors:
+            backoff_seconds = min(
+                self._base_error_delay * (2 ** (self._consecutive_errors - self._max_consecutive_errors)),
+                300  # Max 5 minutes
+            )
+            self._error_backoff_time = time.time() + backoff_seconds
+            self._logger.warning(
+                f"Device {self._ip} has {self._consecutive_errors} consecutive errors. "
+                f"Backing off for {backoff_seconds} seconds"
+            )
     
     def _update_id(self):
         """Update device ID with proper error handling."""
@@ -207,7 +223,7 @@ class BaseDevice(Thread):
             
             if new_id != old_id:
                 if old_id:
-                    self._logger.warning(f"Device ID changed: {old_id} -> {new_id}")
+                    self._logger.info(f"Device ID changed: {old_id} -> {new_id}")
                 self._reset_info()
             
             self._id = new_id
@@ -230,13 +246,10 @@ class BaseDevice(Thread):
     
     def _update_info(self):
         """Update device information. Override in subclasses."""
-        try:
-            self._update_id()
-            with self._lock:
-                self._info['status'] = 'online'
-                self._info['last_seen'] = time.time()
-        except ScanException:
-            self._reset_info()
+        self._update_id()
+        with self._lock:
+            self._info['status'] = 'online'
+            self._info['last_seen'] = time.time()
     
     def stop(self):
         """Stop the device monitoring thread."""
@@ -245,6 +258,11 @@ class BaseDevice(Thread):
     def skip_scanning(self, value: bool):
         """Enable/disable scanning for this device."""
         self._skip_scanning = value
+    
+    def reset_error_state(self):
+        """Reset error state for this device."""
+        self._consecutive_errors = 0
+        self._error_backoff_time = 0
     
     # Public interface methods
     def ip(self) -> str:
@@ -263,7 +281,9 @@ class BaseDevice(Thread):
     def info(self) -> Dict[str, Any]:
         """Get device information dictionary."""
         with self._lock:
-            return self._info.copy()
+            info_copy = self._info.copy()
+            info_copy['consecutive_errors'] = self._consecutive_errors
+            return info_copy
 
 
 class Sensor(BaseDevice):
@@ -1180,8 +1200,8 @@ class EthoscopeScanner(DeviceScanner):
         return None
     
     def add(self, ip: str, port: int = ETHOSCOPE_PORT, name: Optional[str] = None,
-           device_id: Optional[str] = None, zcinfo: Optional[Dict] = None):  # Keep original param name
-        """Add ethoscope with enhanced ID extraction and error handling."""
+        device_id: Optional[str] = None, zcinfo: Optional[Dict] = None):
+        """Add ethoscope with enhanced error handling and non-blocking initialization."""
         try:
             # Extract name and ID from zeroconf info
             if zcinfo:
@@ -1197,12 +1217,18 @@ class EthoscopeScanner(DeviceScanner):
                         except (IndexError, ValueError):
                             pass
             
-            # Check if device already exists
-            if device_id and device_id in self.current_devices_id:
-                self._logger.info(f"Ethoscope {name} ({device_id}) back online at {ip}")
-                return
+            # Check if device already exists by IP (more immediate than waiting for ID)
+            with self._lock:
+                for existing_device in self.devices:
+                    if existing_device.ip() == ip:
+                        self._logger.debug(f"Device at {ip} already exists, updating zeroconf info")
+                        if hasattr(existing_device, 'zeroconf_name'):
+                            existing_device.zeroconf_name = name
+                        # Reset error state in case it was having issues
+                        existing_device.reset_error_state()
+                        return
             
-            # Create device with explicit error handling
+            # Create device with minimal blocking
             with self._lock:
                 try:
                     device = self._device_class(
@@ -1214,30 +1240,22 @@ class EthoscopeScanner(DeviceScanner):
                     if hasattr(device, 'zeroconf_name'):
                         device.zeroconf_name = name
                     
-                    # Start the device
+                    # Start the device thread immediately (don't wait for ID)
                     device.start()
-                    
-                    # Get actual device ID after initialization
-                    actual_device_id = device.id()
-                    
-                    # Check for duplicates with actual ID
-                    if actual_device_id and actual_device_id in self.current_devices_id:
-                        self._logger.info(f"Device {actual_device_id} already exists, stopping duplicate")
-                        device.stop()
-                        return
-                    
                     self.devices.append(device)
-                    self._logger.info(f"Added ethoscope {name} (ID: {actual_device_id}) at {ip}:{port}")
+                    
+                    # Log with available information
+                    display_id = device_id or "pending"
+                    self._logger.info(f"Added ethoscope {name} (ID: {display_id}) at {ip}:{port}")
                     
                 except Exception as e:
                     self._logger.error(f"Error creating ethoscope device at {ip}:{port}: {e}")
-                    self._logger.error(traceback.format_exc())
-                    # Don't re-raise, just log the error
+                    # Don't re-raise, just log the error to avoid blocking other discoveries
                     
         except Exception as e:
             self._logger.error(f"Error in add method for {ip}:{port}: {e}")
-            self._logger.error(traceback.format_exc())
-    
+
+
     def retire_device(self, device_id: str, active: int = 0) -> Dict[str, Any]:
         """Retire device by updating database status."""
         try:
