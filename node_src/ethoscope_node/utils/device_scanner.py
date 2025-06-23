@@ -663,7 +663,7 @@ class Ethoscope(BaseDevice):
             raise ValueError(f"Unknown instruction: {instruction}")
         
         if current_status not in allowed_statuses:
-            raise ValueError(f"Cannot send '{instruction}' to device in status '{current_status}'")
+            raise DeviceError(f"Cannot send '{instruction}' to device in status '{current_status}'")
     
     def machine_info(self) -> Dict[str, Any]:
         """Get machine information from ethoscope."""
