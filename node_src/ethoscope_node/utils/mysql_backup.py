@@ -2,455 +2,474 @@ import mysql.connector
 import sqlite3
 import os
 import logging
-import re
+import contextlib
+from typing import Dict, Optional, Any, Tuple
+import threading
 
 SQL_CHARSET = 'latin1'
 
 class DBNotReadyError(Exception):
     pass
 
-class baseSQLconnector():
-    """
-    Basic class providing functions to compare the status of a local SQLlite3 db to the remote counterpart
-    This is used to check if the db backup is in good shape
+class DatabaseConnectionManager:
+    """Context manager for database connections with proper cleanup."""
     
-    The SQL command can be run from commandline for debugging purposes:
+    def __init__(self, host: str, user: str, password: str, database: str = None):
+        self.connection_params = {
+            'host': host,
+            'user': user,
+            'passwd': password,
+            'buffered': True,
+            'charset': SQL_CHARSET,
+            'use_unicode': True,
+            'connect_timeout': 45
+        }
+        if database:
+            self.connection_params['db'] = database
     
-    mysql -u ethoscope -p -h 192.168.1.45 -e 'SELECT table_name,table_rows FROM INFORMATION_SCHEMA.tables WHERE table_schema LIKE "ETHOSCOPE%";'
+    def __enter__(self):
+        self.connection = mysql.connector.connect(**self.connection_params)
+        return self.connection
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.connection:
+            self.connection.close()
+
+class BaseSQLConnector:
     """
-    def __init__(self, remote_host="localhost", remote_user="ethoscope", remote_pass="ethoscope", dst_path=None, remote_db_name=None):
+    Base class for SQL operations with improved error handling and resource management.
+    """
+    
+    def __init__(self, remote_host: str = "localhost", remote_user: str = "ethoscope", 
+                 remote_pass: str = "ethoscope", dst_path: str = None, 
+                 remote_db_name: str = None):
         self._remote_host = remote_host
         self._remote_user = remote_user
         self._remote_pass = remote_pass
         self._dst_path = dst_path
         self._remote_db_name = remote_db_name
-        
-    def _get_remote_db_info(self):
-        """
-        This is fast but not reliable when the databases uses InnoDB because the information schema does not necessarily gets updated.
-        One would have to analyse table by table first
-        see: https://bugs.mysql.com/bug.php?id=99022
-        """
-        src = mysql.connector.connect(host=self._remote_host,
-                                      user=self._remote_user,
-                                      passwd=self._remote_pass,
-                                      buffered=True,
-                                      charset=SQL_CHARSET,
-                                      use_unicode=True)
+        self._lock = threading.RLock()
+    
+    def _get_remote_db_info(self) -> Dict[str, int]:
+        """Fast method using INFORMATION_SCHEMA (may be inaccurate with InnoDB)."""
+        with DatabaseConnectionManager(self._remote_host, self._remote_user, self._remote_pass):
+            with DatabaseConnectionManager(self._remote_host, self._remote_user, self._remote_pass) as conn:
+                cursor = conn.cursor(buffered=True)
+                query = """
+                    SELECT table_name, table_rows 
+                    FROM INFORMATION_SCHEMA.tables 
+                    WHERE table_schema LIKE %s
+                """
+                cursor.execute(query, ("ETHOSCOPE%",))
+                tables = cursor.fetchall()
+                return {table_name: row_count for table_name, row_count in tables}
+    
+    def _get_remote_db_info_slow(self) -> Dict[str, Dict[str, int]]:
+        """Accurate method using direct table queries."""
+        with DatabaseConnectionManager(self._remote_host, self._remote_user, self._remote_pass) as conn:
+            cursor = conn.cursor(buffered=True)
             
-        src_cur = src.cursor(buffered=True)
-        
-        command = 'SELECT table_name, table_rows FROM INFORMATION_SCHEMA.tables WHERE table_schema LIKE "ETHOSCOPE%";'
-        src_cur.execute(command)
-        tables = src_cur.fetchall()
-        
-        src.close()
-        
-        return {a[0] : a[1] for a in tables}
-        
-    def _get_remote_db_info_slow(self):
-        """
-        """
-        #fetches data about the size of the remote db ( remote_local_tables_dictionary )
-        src = mysql.connector.connect(host=self._remote_host,
-                                      user=self._remote_user,
-                                      passwd=self._remote_pass,
-                                      buffered=True,
-                                      charset=SQL_CHARSET,
-                                      use_unicode=True)
+            # Get all ETHOSCOPE databases and their tables
+            query = """
+                SELECT TABLE_SCHEMA, TABLE_NAME 
+                FROM information_schema.tables 
+                WHERE TABLE_SCHEMA LIKE %s
+            """
+            cursor.execute(query, ("ETHOSCOPE%",))
+            tables = cursor.fetchall()
             
-        src_cur = src.cursor(buffered=True)
-        
-        command = 'SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.tables WHERE TABLE_SCHEMA LIKE "ETHOSCOPE%";'
-        src_cur.execute(command)
-        tables = src_cur.fetchall()
-        
-        remote_local_tables_dictionary = {dbn : {} for dbn in set([entry[0] for entry in tables])}
-        
-        for entry in tables: 
-            db_name = entry[0]
-            table_name = entry[1]
+            # Group by database
+            db_info = {}
+            for db_name, table_name in tables:
+                if db_name not in db_info:
+                    db_info[db_name] = {}
+                
+                # Choose appropriate count method based on table type
+                if table_name in ["ROI_MAP", "VAR_MAP"] or table_name.startswith("METADATA"):
+                    query = "SELECT COUNT(*) FROM `{}`.`{}`".format(db_name, table_name)
+                else:
+                    query = "SELECT COALESCE(MAX(id), 0) FROM `{}`.`{}`".format(db_name, table_name)
+                
+                try:
+                    cursor.execute(query)
+                    result = cursor.fetchone()
+                    db_info[db_name][table_name] = result[0] if result and result[0] is not None else 0
+                except mysql.connector.Error as e:
+                    logging.warning(f"Error querying table {db_name}.{table_name}: {e}")
+                    db_info[db_name][table_name] = 0
             
-            if table_name in ["ROI_MAP", "VAR_MAP"] or table_name.startswith("METADATA"):
-                #tables that do not have a unique id - slower command
-                command = 'SELECT count(*) from `%s`.`%s`' % (db_name, table_name)
-            else:
-                #tables that do
-                command = 'SELECT max(id) FROM `%s`.`%s`' % (db_name, table_name)
-            
-            src_cur.execute(command)
-            remote_local_tables_dictionary[db_name].update({table_name: src_cur.fetchone()[0]})
-        
-        src.commit()
-        src.close()
-        
-        return remote_local_tables_dictionary
-        
-    def _get_local_db_info(self):
-        """
-        """
-        local_tables_dictionary = {}
-        
-        # now, this is very funny: this returns false if the folder is mounted via ssh - wtf?
-        if os.path.exists(self._dst_path):
-            try:
-                with sqlite3.connect(self._dst_path, check_same_thread=False) as dst:
-                    dst_cur = dst.cursor()
-                    command = 'SELECT name FROM sqlite_master WHERE type ="table" AND name NOT LIKE "sqlite_%";'
-                    dst_cur.execute(command)
-                    tables = dst_cur.fetchall()
-                    for entry in tables:
-                        table_name = entry[0]
-                        
-                        if table_name not in ["ROI_MAP", "VAR_MAP", "METADATA"]:
-                            command = 'SELECT max(id) FROM "%s";' % table_name
-                        else:
-                            command = 'SELECT count(*) FROM "%s";' % table_name
-                        
-                        dst_cur.execute(command)
-                        result = dst_cur.fetchone()
-                        local_tables_dictionary[table_name] = result[0] if result else None
-                return local_tables_dictionary
-            
-            except sqlite3.Error as e:
-                logging.error(f"SQLite error: {e}")
-                return {}
-        else:
+            return db_info
+    
+    def _get_local_db_info(self) -> Dict[str, int]:
+        """Get information about local SQLite database."""
+        if not os.path.exists(self._dst_path):
             logging.error(f"No db file at {self._dst_path}")
             return {}
-            
-    def compare_databases(self, use_fast_mode=False):
-        """
-        """
-        total_remote = 0
-        total_local = 0
         
         try:
+            with sqlite3.connect(self._dst_path, timeout=10.0) as conn:
+                cursor = conn.cursor()
+                
+                # Get all non-system tables
+                cursor.execute("""
+                    SELECT name FROM sqlite_master 
+                    WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+                """)
+                tables = cursor.fetchall()
+                
+                table_info = {}
+                for (table_name,) in tables:
+                    try:
+                        if table_name not in ["ROI_MAP", "VAR_MAP", "METADATA"]:
+                            cursor.execute("SELECT COALESCE(MAX(id), 0) FROM `{}`".format(table_name))
+                        else:
+                            cursor.execute("SELECT COUNT(*) FROM `{}`".format(table_name))
+                        
+                        result = cursor.fetchone()
+                        table_info[table_name] = result[0] if result and result[0] is not None else 0
+                    except sqlite3.Error as e:
+                        logging.warning(f"Error querying local table {table_name}: {e}")
+                        table_info[table_name] = 0
+                
+                return table_info
+                
+        except sqlite3.Error as e:
+            logging.error(f"SQLite error: {e}")
+            return {}
+    
+    def compare_databases(self, use_fast_mode: bool = False) -> float:
+        """
+        Compare remote and local databases.
+        Returns percentage match (0-100) or -1 for errors.
+        """
+        try:
+            # Get remote database info
             if use_fast_mode:
-                remote_tables_info = self._get_remote_db_info()
+                remote_info = self._get_remote_db_info()
+                # Convert to nested dict format for consistency
+                if self._remote_db_name:
+                    remote_tables_info = {self._remote_db_name: remote_info}
+                else:
+                    remote_tables_info = {"default": remote_info}
             else:
                 remote_tables_info = self._get_remote_db_info_slow()
-               
-        except Exception as e:
-            logging.error(f"Problem getting info from the remote database: {self._remote_db_name} - {str(e)}")
-            return -1
-        
-        try:
+            
+            # Get local database info
             local_tables_info = self._get_local_db_info()
-        except Exception as e:
-            logging.error(f"Problem getting info from the local database {self._dst_path} - perhaps it is locked? {str(e)}")
-            return -1
-        
-        try:
-            for table in sorted(local_tables_info):
-                l = local_tables_info[table]
-                
+            
+            if not local_tables_info:
+                return -1
+            
+            total_remote = 0
+            total_local = 0
+            
+            for table_name, local_count in local_tables_info.items():
+                # Find remote count
+                remote_count = 0
                 if use_fast_mode:
-                    if table not in remote_tables_info:
-                        logging.warning(f"Table {table} exists in local database but not in remote database")
-                        continue
-                    r = remote_tables_info[table] # the fast system
+                    remote_count = remote_tables_info.get("default", {}).get(table_name, 0)
                 else:
-                    if self._remote_db_name not in remote_tables_info or table not in remote_tables_info[self._remote_db_name]:
-                        logging.warning(f"Table {table} exists in local database but not in remote database")
-                        continue
-                    r = remote_tables_info[self._remote_db_name][table] # the slow system
+                    db_name = self._remote_db_name or list(remote_tables_info.keys())[0]
+                    remote_count = remote_tables_info.get(db_name, {}).get(table_name, 0)
                 
-                if r is None: r = 0
-                if l is None: l = 0
+                if remote_count is None:
+                    remote_count = 0
+                if local_count is None:
+                    local_count = 0
                 
-                total_remote += int(r)
-                total_local += int(l)
-                
-            if total_remote == 0: return -1
-            else: return total_local/total_remote*100
+                total_remote += int(remote_count)
+                total_local += int(local_count)
+            
+            if total_remote == 0:
+                return -1
+            
+            return (total_local / total_remote) * 100
+            
         except Exception as e:
-            logging.error(f"Error comparing databases: {str(e)}")
+            logging.error(f"Error comparing databases: {e}")
             return -1
 
-class MySQLdbToSQlite(baseSQLconnector):
-    _max_n_rows_to_insert = 10000
-    def __init__(self,
-                 dst_path,
-                 remote_db_name="ethoscope_db",
-                 remote_host="localhost",
-                 remote_user="ethoscope",
-                 remote_pass="ethoscope",
-                 overwrite=False):
-        """
-        A class to backup remote psv MySQL data base into a local sqlite3 one.
-        The name of the static (not updated during run) and the dynamic tables is hardcoded.
-        The `update_roi_tables` method will fetch only the new datapoint at each run.
-        :param dst_path: where to save the data (expect a `.db` file)
-        :param remote_db_name: the name of the remote database
-        :param remote_host: the ip of the database
-        :param remote_user: the user name for the remote database
-        :param remote_pass: teh password for the remote database
-        :param overwrite: whether the destination file should be overwritten. If False, data are appended to it
-
-        """
-        super().__init__(remote_host=remote_host, remote_user=remote_user, remote_pass=remote_pass,
-                         dst_path=dst_path, remote_db_name=remote_db_name)
-
-        self._dst_path=dst_path
-        logging.info("Initializing local database static tables at %s" % self._dst_path)
-        self._dam_file_name = os.path.splitext(self._dst_path)[0] + ".txt"
-
-        # we remove file and create dir, if needed
-        if overwrite:
-            logging.info("Trying to remove old database")
-            try:
-                os.remove(self._dst_path)
-                logging.info("Success")
-            except OSError as e:
-                logging.warning(e)
-                pass
-            logging.info("Trying to remove old DAM file")
-            try:
-                os.remove(self._dam_file_name)
-                logging.info("Success")
-            except OSError as e:
-                logging.warning(e)
-                pass
-        try:
-            logging.info("Making parent directories")
-            os.makedirs(os.path.dirname(self._dst_path))
-            logging.info("Success")
-        except OSError as e:
-            logging.warning(e)
-            pass
-        with open(self._dam_file_name,"a"):
-            logging.info("Ensuring DAM file exists at %s" % self._dam_file_name)
-            pass
-            
-        with mysql.connector.connect(host=self._remote_host,
-                                     user=self._remote_user,
-                                     passwd=self._remote_pass,
-                                     db=self._remote_db_name,
-                                     connect_timeout=45,
-                                     buffered=True,
-                                     charset=SQL_CHARSET,
-                                     use_unicode=True) as src:
-            with sqlite3.connect(self._dst_path, check_same_thread=False) as conn:
-                src_cur = src.cursor(buffered=True)
-                command = "SELECT * FROM VAR_MAP"
-                src_cur.execute(command)
-                #empty var map means no reads are present yet
-                if len([i for i in src_cur]) == 0:
-                    raise DBNotReadyError("No read are available for this database yet")
-                command = "SHOW TABLES"
-                src_cur.execute(command)
-                tables = [c[0] for c in src_cur]
-                for t in tables:
-                    if t == "CSV_DAM_ACTIVITY":
-                        self._copy_table(t, src, conn, dump_in_csv=True)
-                    else:
-                        self._copy_table(t, src, conn, dump_in_csv=False)
-                #TODO checksum of ordered metadata ?
-        logging.info("Database mirroring initialised")
-        
-    def _copy_table(self,table_name, src, dst, dump_in_csv=False):
-        src_cur = src.cursor(buffered=True)
-        dst_cur = dst.cursor()
-        src_command = "SHOW COLUMNS FROM %s " % table_name
-        src_cur.execute(src_command)
-        col_list = []
-        for c in src_cur:
-             col_list.append(" ".join(c[0:2]))
-        formated_cols_names = ", ".join(col_list)
-
-        try:
-            dst_command = "CREATE TABLE %s (%s)" % (table_name ,formated_cols_names)
-            dst_cur.execute(dst_command)
-        except sqlite3.OperationalError:
-            logging.debug("Table %s exists, not copying it" % table_name)
-            return
-            
-        if table_name == "IMG_SNAPSHOTS":
-            self._replace_img_snapshot_table(table_name, src, dst)
-        else:
-            self._replace_table(table_name, src, dst, dump_in_csv)
-            
-    def update_roi_tables(self):
-        """
-        Fetch new ROI tables and new data points in the remote and use them to update local db
-        :return:
-        """
-        with mysql.connector.connect(host=self._remote_host,
-                                     user=self._remote_user,
-                                     passwd=self._remote_pass,
-                                     db=self._remote_db_name,
-                                     buffered=True,
-                                     charset=SQL_CHARSET,
-                                     use_unicode=True) as src:
-            with sqlite3.connect(self._dst_path, check_same_thread=False, timeout=10.0) as dst:
-                dst_cur = dst.cursor()  # Fixed: was src.cursor()
-                command = "SELECT roi_idx FROM ROI_MAP"
-                dst_cur.execute(command)
-                rois_in_src = set([c[0] for c in dst_cur])
-                for i in rois_in_src:
-                    self._update_one_roi_table("ROI_%i" % i, src, dst)
-
-                self._update_one_roi_table("CSV_DAM_ACTIVITY", src, dst, dump_in_csv=True)
-                try:
-                    self._update_one_roi_table("START_EVENTS", src, dst)
-                except mysql.connector.errors.ProgrammingError:
-                    logging.error("Programming Error")
-                    pass
-
-                for table in ["IMG_SNAPSHOTS", "SENSORS"]:
-                    try:
-                        self._update_table(table, src, dst)
-                    except Exception as e:
-                        logging.error("Cannot mirror the '%s' table" % table)
-                        logging.error(str(e))
-
-    def _replace_img_snapshot_table(self, table_name, src, dst):
-        src_cur = src.cursor(buffered=True)
-        dst_cur = dst.cursor()
-        src_command = "SELECT id,t,img FROM %s" % table_name
-        src_cur.execute(src_command)
-        for sc in src_cur:
-            id,t,img = sc
-            command = "INSERT INTO %s (id,t,img) VALUES(?,?,?);" % table_name
-            dst_cur.execute(command, [id,t,sqlite3.Binary(img)])
-            dst.commit()
-            
-    def _replace_table(self,table_name, src, dst, dump_in_csv=False):
-        src_cur = src.cursor(buffered=True)
-        dst_cur = dst.cursor()
-        src_command = "SELECT * FROM %s " % table_name
-        src_cur.execute(src_command)
-        to_insert = []
-        i = 0
-        for sc in src_cur:
-            i+=1
-            tp = tuple([str(v) for v in sc ])
-            to_insert.append(str(tp))
-            if len(to_insert) > self._max_n_rows_to_insert:
-                value_string = ",".join(to_insert)
-                dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string)
-                dst_cur.execute(dst_command)
-                dst.commit()
-                to_insert = []
-            if dump_in_csv:
-                with open(self._dam_file_name,"a") as f:
-                    row = "\t".join(["{0}".format(val) for val in sc])
-                    f.write(row)
-                    f.write("\n")
-        if len(to_insert) > 0:  # Check if there's anything to insert
-            value_string = ",".join(to_insert)
-            dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string)
-            dst_cur.execute(dst_command)
-        dst.commit()
-
-    def _update_one_roi_table(self, table_name, src, dst, dump_in_csv=False):
-        src_cur = src.cursor(buffered=True)
-        dst_cur = dst.cursor()
-        try:
-            dst_command= "SELECT MAX(id) FROM %s" % table_name
-            dst_cur.execute(dst_command)
-        except (sqlite3.OperationalError, mysql.connector.errors.ProgrammingError):
-            logging.warning("Local table %s appears empty. Rebuilding it from source" % table_name)
-            self._replace_table(table_name, src, dst)
-            return
-        last_id_in_dst = 0
-        for c in dst_cur:
-            if c[0] is None:
-                logging.warning("There seem to be no data in %s, %s. Recreating it" % (os.path.basename(self._dst_path), table_name))
-                self._replace_table(table_name, src, dst)
-            else:
-                last_id_in_dst = c[0]
-        src_command = "SELECT * FROM %s WHERE id > %d" % (table_name, last_id_in_dst)
-        src_cur.execute(src_command)
-        to_insert = []
-        i = 0
-        for sc in src_cur:
-            i+=1
-            tp = tuple([str(v) for v in sc ])
-            to_insert.append(str(tp))
-            if len(to_insert) > self._max_n_rows_to_insert:
-                value_string = ",".join(to_insert)
-                dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string)
-                dst_cur.execute(dst_command)
-                dst.commit()
-                to_insert = []
-            if dump_in_csv:
-                with open(self._dam_file_name,"a") as f:
-                    row = "\t".join(["{0}".format(val) for val in sc])
-                    f.write(row)
-                    f.write("\n")
-        if len(to_insert) > 0:  # Check if there's anything to insert
-            value_string = ",".join(to_insert)
-            dst_command = "INSERT INTO %s VALUES %s" % (table_name, value_string)
-            dst_cur.execute(dst_command)
-        dst.commit()
-
-    def _update_table(self, table_name, src, dst, replace=False):
-        """
-        Updates the contents of a custom table
-        """
-        src_cur = src.cursor(buffered=True)
-        dst_cur = dst.cursor()
-        #find info about the datatype for each column in the source
-        h = {}
-        src_command = "SHOW COLUMNS FROM %s " % table_name
-        src_cur.execute(src_command)
-        for c in src_cur:
-            h[c[0]] = c[1]
-        #check what is the status in the destination
-        try:
-            dst_command= "SELECT MAX(id) FROM %s" % table_name
-            dst_cur.execute(dst_command)
-        except (sqlite3.OperationalError, mysql.connector.errors.ProgrammingError):
-            logging.warning("Local table %s appears empty. Rebuilding it from source" % table_name)
-            replace = True
-        if not replace:
-            last_id_in_dst = 0
-            for c in dst_cur:
-                last_id_in_dst = c[0]
-                if last_id_in_dst is None:
-                    logging.warning("There seem to be no data in %s, %s stopping here" % (os.path.basename(self._dst_path), table_name))
-                    return
-            #retrieve only new data
-            src_command = "SELECT * FROM %s WHERE id > %d" % (table_name, last_id_in_dst)
-        
-        if replace:
-            #retrieve all data, not just the new ones
-            src_command = "SELECT * FROM %s" % table_name
-        #grab the data from src
-        src_cur.execute(src_command)
-        #go through it row by row
-        for sc in src_cur:
-            nv = len(sc)
-            command = "INSERT INTO " + table_name + " VALUES(" + ','.join(['?']*nv) + ");"
-            
-            args = []
-            #populate args taking datatype into account
-            for d,k in zip(sc, h):
-                if h[k] == "longblob":
-                    args.append(sqlite3.Binary(d))
-                else:
-                    args.append(d)
-            
-            #and add them row by row to destination 
-            dst_cur.execute(command, args)
-            dst.commit()
-            
-class db_diff(baseSQLconnector):
-    """
-    Class used to compare the status of a local SQLlite3 db to the remote counterpart
-    This is used to check if the db backup is in good shape
-    """
-    _remote_user = "ethoscope"
-    _remote_pass = "ethoscope"
+class MySQLdbToSQLite(BaseSQLConnector):
+    """Optimized MySQL to SQLite backup class."""
     
-    def __init__(self, db_name, remote_host, filename):
-        """
-        remote_host is the IP address of the ethoscope we are supposed to check on
-        db_name is the name of the remote database
-        filename is the local SQLlite3 file to check
-        """
-        super().__init__(remote_host=remote_host, remote_user=self._remote_user, 
-                        remote_pass=self._remote_pass, dst_path=filename, 
-                        remote_db_name=db_name)
+    MAX_BATCH_SIZE = 10000
+    
+    def __init__(self, dst_path: str, remote_db_name: str = "ethoscope_db",
+                 remote_host: str = "localhost", remote_user: str = "ethoscope",
+                 remote_pass: str = "ethoscope", overwrite: bool = False):
+        
+        super().__init__(remote_host=remote_host, remote_user=remote_user,
+                        remote_pass=remote_pass, dst_path=dst_path,
+                        remote_db_name=remote_db_name)
+        
+        self._dam_file_name = os.path.splitext(dst_path)[0] + ".txt"
+        
+        # Setup destination
+        self._setup_destination(overwrite)
+        
+        # Initialize database structure
+        self._initialize_database()
+    
+    def _setup_destination(self, overwrite: bool):
+        """Setup destination files and directories."""
+        if overwrite:
+            for file_path in [self._dst_path, self._dam_file_name]:
+                try:
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
+                        logging.info(f"Removed existing file: {file_path}")
+                except OSError as e:
+                    logging.warning(f"Could not remove {file_path}: {e}")
+        
+        # Create directory structure
+        os.makedirs(os.path.dirname(self._dst_path), exist_ok=True)
+        
+        # Ensure DAM file exists
+        with open(self._dam_file_name, 'a'):
+            pass
+    
+    def _initialize_database(self):
+        """Initialize the SQLite database with remote schema."""
+        try:
+            with DatabaseConnectionManager(self._remote_host, self._remote_user, 
+                                         self._remote_pass, self._remote_db_name) as mysql_conn:
+                with sqlite3.connect(self._dst_path, timeout=30.0) as sqlite_conn:
+                    self._copy_schema_and_static_data(mysql_conn, sqlite_conn)
+        except mysql.connector.Error as e:
+            logging.error(f"MySQL connection error during initialization: {e}")
+            raise
+        except sqlite3.Error as e:
+            logging.error(f"SQLite error during initialization: {e}")
+            raise
+    
+    def _copy_schema_and_static_data(self, mysql_conn, sqlite_conn):
+        """Copy database schema and static data."""
+        mysql_cursor = mysql_conn.cursor(buffered=True)
+        
+        # Check if database is ready
+        mysql_cursor.execute("SELECT COUNT(*) FROM VAR_MAP")
+        if mysql_cursor.fetchone()[0] == 0:
+            raise DBNotReadyError("No data available in VAR_MAP table")
+        
+        # Get all tables
+        mysql_cursor.execute("SHOW TABLES")
+        tables = [row[0] for row in mysql_cursor.fetchall()]
+        
+        for table_name in tables:
+            try:
+                if table_name == "CSV_DAM_ACTIVITY":
+                    self._copy_table(table_name, mysql_conn, sqlite_conn, dump_csv=True)
+                else:
+                    self._copy_table(table_name, mysql_conn, sqlite_conn)
+            except Exception as e:
+                logging.error(f"Error copying table {table_name}: {e}")
+                raise
+    
+    def _copy_table(self, table_name: str, mysql_conn, sqlite_conn, dump_csv: bool = False):
+        """Copy a single table from MySQL to SQLite."""
+        mysql_cursor = mysql_conn.cursor(buffered=True)
+        sqlite_cursor = sqlite_conn.cursor()
+        
+        # Get table schema
+        mysql_cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
+        columns = []
+        for col_info in mysql_cursor.fetchall():
+            col_name, col_type = col_info[0], col_info[1]
+            columns.append(f"`{col_name}` {self._convert_mysql_type_to_sqlite(col_type)}")
+        
+        # Create table if it doesn't exist
+        create_sql = f"CREATE TABLE IF NOT EXISTS `{table_name}` ({', '.join(columns)})"
+        try:
+            sqlite_cursor.execute(create_sql)
+        except sqlite3.OperationalError as e:
+            logging.debug(f"Table {table_name} already exists: {e}")
+            return
+        
+        # Copy data
+        if table_name == "IMG_SNAPSHOTS":
+            self._copy_image_data(table_name, mysql_conn, sqlite_conn)
+        else:
+            self._copy_regular_data(table_name, mysql_conn, sqlite_conn, dump_csv)
+    
+    def _convert_mysql_type_to_sqlite(self, mysql_type: str) -> str:
+        """Convert MySQL data types to SQLite equivalents."""
+        mysql_type = mysql_type.lower()
+        
+        if 'int' in mysql_type:
+            return 'INTEGER'
+        elif any(t in mysql_type for t in ['varchar', 'text', 'char']):
+            return 'TEXT'
+        elif any(t in mysql_type for t in ['float', 'double', 'decimal']):
+            return 'REAL'
+        elif 'blob' in mysql_type:
+            return 'BLOB'
+        else:
+            return 'TEXT'  # Default fallback
+    
+    def _copy_image_data(self, table_name: str, mysql_conn, sqlite_conn):
+        """Copy image data with proper BLOB handling."""
+        mysql_cursor = mysql_conn.cursor(buffered=True)
+        sqlite_cursor = sqlite_conn.cursor()
+        
+        mysql_cursor.execute(f"SELECT id, t, img FROM `{table_name}`")
+        
+        batch = []
+        for row in mysql_cursor:
+            batch.append((row[0], row[1], row[2]))  # id, t, img_blob
+            
+            if len(batch) >= self.MAX_BATCH_SIZE:
+                sqlite_cursor.executemany(
+                    f"INSERT INTO `{table_name}` (id, t, img) VALUES (?, ?, ?)", 
+                    batch
+                )
+                sqlite_conn.commit()
+                batch = []
+        
+        # Insert remaining rows
+        if batch:
+            sqlite_cursor.executemany(
+                f"INSERT INTO `{table_name}` (id, t, img) VALUES (?, ?, ?)", 
+                batch
+            )
+            sqlite_conn.commit()
+    
+    def _copy_regular_data(self, table_name: str, mysql_conn, sqlite_conn, dump_csv: bool = False):
+        """Copy regular table data with batching."""
+        mysql_cursor = mysql_conn.cursor(buffered=True)
+        sqlite_cursor = sqlite_conn.cursor()
+        
+        mysql_cursor.execute(f"SELECT * FROM `{table_name}`")
+        
+        # Get column count for placeholder generation
+        column_count = len(mysql_cursor.description)
+        placeholders = ','.join(['?'] * column_count)
+        
+        batch = []
+        for row in mysql_cursor:
+            batch.append(row)
+            
+            if len(batch) >= self.MAX_BATCH_SIZE:
+                sqlite_cursor.executemany(
+                    f"INSERT INTO `{table_name}` VALUES ({placeholders})", 
+                    batch
+                )
+                sqlite_conn.commit()
+                
+                if dump_csv:
+                    self._write_to_dam_file(batch)
+                
+                batch = []
+        
+        # Insert remaining rows
+        if batch:
+            sqlite_cursor.executemany(
+                f"INSERT INTO `{table_name}` VALUES ({placeholders})", 
+                batch
+            )
+            sqlite_conn.commit()
+            
+            if dump_csv:
+                self._write_to_dam_file(batch)
+    
+    def _write_to_dam_file(self, batch):
+        """Write batch data to DAM file."""
+        try:
+            with open(self._dam_file_name, 'a') as f:
+                for row in batch:
+                    line = '\t'.join(str(val) for val in row)
+                    f.write(line + '\n')
+        except IOError as e:
+            logging.warning(f"Could not write to DAM file: {e}")
+    
+    def update_roi_tables(self):
+        """Update ROI tables with new data."""
+        try:
+            with DatabaseConnectionManager(self._remote_host, self._remote_user,
+                                         self._remote_pass, self._remote_db_name) as mysql_conn:
+                with sqlite3.connect(self._dst_path, timeout=30.0) as sqlite_conn:
+                    self._update_all_roi_tables(mysql_conn, sqlite_conn)
+        except Exception as e:
+            logging.error(f"Error updating ROI tables: {e}")
+            raise
+    
+    def _update_all_roi_tables(self, mysql_conn, sqlite_conn):
+        """Update all ROI-related tables."""
+        sqlite_cursor = sqlite_conn.cursor()
+        
+        # Get ROI indices
+        sqlite_cursor.execute("SELECT DISTINCT roi_idx FROM ROI_MAP")
+        roi_indices = [row[0] for row in sqlite_cursor.fetchall()]
+        
+        # Update each ROI table
+        for roi_idx in roi_indices:
+            self._update_single_table(f"ROI_{roi_idx}", mysql_conn, sqlite_conn)
+        
+        # Update other tables
+        for table_name in ["CSV_DAM_ACTIVITY", "START_EVENTS", "IMG_SNAPSHOTS", "SENSORS"]:
+            try:
+                dump_csv = (table_name == "CSV_DAM_ACTIVITY")
+                self._update_single_table(table_name, mysql_conn, sqlite_conn, dump_csv)
+            except mysql.connector.Error as e:
+                logging.warning(f"Could not update table {table_name}: {e}")
+    
+    def _update_single_table(self, table_name: str, mysql_conn, sqlite_conn, dump_csv: bool = False):
+        """Update a single table with new records."""
+        mysql_cursor = mysql_conn.cursor(buffered=True)
+        sqlite_cursor = sqlite_conn.cursor()
+        
+        # Get the last ID in local table
+        try:
+            sqlite_cursor.execute(f"SELECT COALESCE(MAX(id), 0) FROM `{table_name}`")
+            last_local_id = sqlite_cursor.fetchone()[0] or 0
+        except sqlite3.OperationalError:
+            logging.warning(f"Table {table_name} doesn't exist locally, recreating...")
+            # Table doesn't exist, copy entirely
+            self._copy_table(table_name, mysql_conn, sqlite_conn, dump_csv)
+            return
+        
+        # Get new records from MySQL
+        mysql_cursor.execute(f"SELECT * FROM `{table_name}` WHERE id > %s", (last_local_id,))
+        
+        # Get column count for placeholder generation
+        if mysql_cursor.description:
+            column_count = len(mysql_cursor.description)
+            placeholders = ','.join(['?'] * column_count)
+            
+            batch = []
+            for row in mysql_cursor:
+                batch.append(row)
+                
+                if len(batch) >= self.MAX_BATCH_SIZE:
+                    sqlite_cursor.executemany(
+                        f"INSERT INTO `{table_name}` VALUES ({placeholders})", 
+                        batch
+                    )
+                    sqlite_conn.commit()
+                    
+                    if dump_csv:
+                        self._write_to_dam_file(batch)
+                    
+                    batch = []
+            
+            # Insert remaining rows
+            if batch:
+                sqlite_cursor.executemany(
+                    f"INSERT INTO `{table_name}` VALUES ({placeholders})", 
+                    batch
+                )
+                sqlite_conn.commit()
+                
+                if dump_csv:
+                    self._write_to_dam_file(batch)
+
+class DBDiff(BaseSQLConnector):
+    """Optimized database comparison class."""
+    
+    def __init__(self, db_name: str, remote_host: str, filename: str):
+        super().__init__(
+            remote_host=remote_host,
+            remote_user="ethoscope", 
+            remote_pass="ethoscope",
+            dst_path=filename,
+            remote_db_name=db_name
+        )

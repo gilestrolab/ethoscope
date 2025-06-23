@@ -1,10 +1,18 @@
+"""
+Ethoscope Node Server - Main application server for managing ethoscope devices.
+
+This module provides a web-based interface for monitoring and controlling
+ethoscope devices, managing experiments, and handling data backup operations.
+"""
+
 import bottle
 import subprocess
 import socket
 import logging
 import traceback
 import os
-import optparse
+import signal
+import sys
 import zipfile
 import datetime
 import fnmatch
@@ -12,758 +20,897 @@ import tempfile
 import shutil
 import netifaces
 import json
+from pathlib import Path
+from typing import Dict, List, Optional, Any
+from contextlib import contextmanager
 
 from ethoscope_node.utils.device_scanner import EthoscopeScanner, SensorScanner
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
 from ethoscope_node.utils.backups_helpers import GenericBackupWrapper, BackupClass
-
 from ethoscope_node.utils.etho_db import ExperimentalDB
 
-app = bottle.Bottle()
+# Constants
+DEFAULT_PORT = 80
 STATIC_DIR = "../static"
-DEFAULT_PORT=80
 
-SYSTEM_DAEMONS = {"ethoscope_backup" : {'description' : 'The service that collects data from the ethoscopes and syncs them with the node.', 'available_on_docker' : True}, 
-                  "ethoscope_video_backup" : {'description' : 'The service that collects VIDEOs from the ethoscopes and syncs them with the node', 'available_on_docker' : True}, 
-                  "ethoscope_update_node" : {'description' : 'The service used to update the nodes and the ethoscopes.', 'available_on_docker' : True},
-                  "git-daemon.socket" : {'description' : 'The GIT server that handles git updates for the node and ethoscopes.', 'available_on_docker' : False},
-                  "ntpd" : {'description': 'The NTPd service is syncing time with the ethoscopes.', 'available_on_docker' : True},
-                  "sshd" : {'description': 'The SSH daemon allows power users to access the node terminal from remote.', 'available_on_docker' : False},
-                  "vsftpd" : {'description' : 'The FTP server on the node, used to access the local ethoscope data', 'available_on_docker' : False},
-                  "virtuascope" : {'description' : 'A virtual ethoscope running on the node. Useful for offline tracking', 'available_on_docker' : False}
-                  }
+SYSTEM_DAEMONS = {
+    "ethoscope_backup": {
+        'description': 'The service that collects data from the ethoscopes and syncs them with the node.',
+        'available_on_docker': True
+    },
+    "ethoscope_video_backup": {
+        'description': 'The service that collects VIDEOs from the ethoscopes and syncs them with the node',
+        'available_on_docker': True
+    },
+    "ethoscope_update_node": {
+        'description': 'The service used to update the nodes and the ethoscopes.',
+        'available_on_docker': True
+    },
+    "git-daemon.socket": {
+        'description': 'The GIT server that handles git updates for the node and ethoscopes.',
+        'available_on_docker': False
+    },
+    "ntpd": {
+        'description': 'The NTPd service is syncing time with the ethoscopes.',
+        'available_on_docker': True
+    },
+    "sshd": {
+        'description': 'The SSH daemon allows power users to access the node terminal from remote.',
+        'available_on_docker': False
+    },
+    "vsftpd": {
+        'description': 'The FTP server on the node, used to access the local ethoscope data',
+        'available_on_docker': False
+    },
+    "virtuascope": {
+        'description': 'A virtual ethoscope running on the node. Useful for offline tracking',
+        'available_on_docker': False
+    }
+}
+
+
+class ServerError(Exception):
+    """Custom exception for server errors."""
+    pass
 
 
 def error_decorator(func):
-    """
-    A simple decorator to return an error dict so we can display it in the webUI
-    """
-    def func_wrapper(*args, **kwargs):
+    """Decorator to return error dict for display in webUI."""
+    def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except Exception as e:
             logging.error(traceback.format_exc())
             return {'error': traceback.format_exc()}
-    return func_wrapper
+    return wrapper
+
 
 def warning_decorator(func):
-    """
-    A simple decorator to return an error dict so we can display it in the webUI
-    Less verbose than error
-    """
-    def func_wrapper(*args, **kwargs):
+    """Decorator to return warning dict for display in webUI."""
+    def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except Exception as e:
             logging.error(traceback.format_exc())
             return {'error': str(e)}
-    return func_wrapper
+    return wrapper
 
-@app.route('/static/<filepath:path>')
-def server_static(filepath):
-    return bottle.static_file(filepath, root=STATIC_DIR)
 
-@app.route('/tmp_static/<filepath:path>')
-def server_tmp_static(filepath):
-    return bottle.static_file(filepath, root=tmp_imgs_dir)
-
-@app.route('/download/<filepath:path>')
-def server_download(filepath):
-    return bottle.static_file(filepath, root="/", download=filepath)
-
-@app.route('/')
-def index():
-    return bottle.static_file('index.html', root=STATIC_DIR)
-
-
-@app.route('/update')
-def index():
-    return bottle.redirect(CFG.custom('UPDATE_SERVICE_URL'))
-
-
-@app.hook('after_request')
-def enable_cors():
-    """
-    You need to add some headers to each request.
-    Don't use the wildcard '*' for Access-Control-Allow-Origin in production.
-    """
-    #bottle.response.headers['Access-Control-Allow-Origin'] = 'http://localhost:8888'
-    bottle.response.headers['Access-Control-Allow-Origin'] = '*' # Allowing CORS in development
-    bottle.response.headers['Access-Control-Allow-Methods'] = 'PUT, GET, POST, DELETE, OPTIONS'
-    bottle.response.headers['Access-Control-Allow-Headers'] = 'Origin, Accept, Content-Type, X-Requested-With, X-CSRF-Token'
-
-
-#################################
-# API to connect with ethoscopes
-#################################
-
-"""
-/devices                                GET     returns info about devices
-/device/<id>/data                       GET
-/device/<id>/machineinfo                GET, POST
-/device/<id>/user_options               GET
-/device/<id>/videofiles                 GET
-/device/<id>/last_img                   GET
-/device/<id>/dbg_img                    GET
-/device/<id>/stream                     GET
-/device/<id>/controls/<instruction>     POST
-/device/<id>/log                        GET
-/device/<id>/databases                  GET
-
-
-# RESOURCES ON NODE
-/results_file
-/browse/<folder:path>
-/request-download
-/node/<req>
-/node-actions
-/remove_files
-/list/<type>
-/more
-/experiments
-/ethoscope/<id>
-/device/<id>/ip
-/more/<action>
-"""
-
-@app.get('/favicon.ico')
-def get_favicon():
-    return server_static(STATIC_DIR+'/img/favicon.ico')
-
-
-@app.get('/runs_list')
-@error_decorator
-def runs_list():
-    #bottle.response.content_type = 'application/json'
-    return json.dumps( edb.getRun('all', asdict=True) )
-
-@app.get('/experiments_list')
-@error_decorator
-def experiments_list():
-    #response.content_type = 'application/json'
-    return json.dumps( edb.getExperiment('all', asdict=True) )
-
-@app.get('/devices')
-@error_decorator
-def devices():
-    return device_scanner.get_all_devices_info()
-
-@app.get('/devices_list')
-def get_devices_list():
-    devices()
-
-@app.get('/sensors')
-@error_decorator
-def sensors():
-    return sensor_scanner.get_all_devices_info()
-    
-@app.post('/sensor/set')
-def edit_sensor():
-    input_string = bottle.request.body.read().decode("utf-8")
-    d = eval(input_string)
-    try:
-        sensor = sensor_scanner.get_device(d["id"])
-        return sensor.set({"location" : d["location"] , "sensor_name" : d["name"] })
-    except:
-        pass
-        # a sensor with this ID was not found
-
-@app.get('/list_sensor_csv_files')
-@error_decorator
-def list_csv_files():
-    """
-    Lists CSV files in /ethoscope_data/sensors/
-    """
-    directory = '/ethoscope_data/sensors/'
-    try:
-        csv_files = [f for f in os.listdir(directory) if f.endswith('.csv')]
-        return {'files': csv_files}
-    except:
-        return {'files' : []}
-
-@app.get('/get_sensor_csv_data/<filename>')
-@error_decorator
-def get_csv_data(filename):
-    """
-    Reads the CSV file and returns the data for plotting.
-    """
-    directory = '/ethoscope_data/sensors/'
-    filepath = os.path.join(directory, filename)
-    data = []
-    with open(filepath, 'r') as csvfile:
-        headers = csvfile.readline().strip().split(',')
-        for line in csvfile:
-            data.append(line.strip().split(','))
-    return {'headers': headers, 'data': data}
-
-@app.post('/device/add')
-def manual_add():
-    """
-    Try to manually add one or more ethoscopes using the provided IPs
-    Accept a single IP or a list of comma separated IPs
-    """
-    input_string = bottle.request.body.read().decode("utf-8") 
-    added = [];
-    problems = [];
-    
-    for ip_address in input_string.split(","):
-        ip_address = ip_address.replace(" ", "")
-        
-        try:
-            device_scanner.add ( ip_address )
-            added.append(ip_address)
-        except:
-            problems.append(ip_address)
-        
-        
-    return {"added": added, "problems": problems }
-
-
-#Get the information of one device
-@app.get('/device/<id>/data')
-@warning_decorator
-def get_device_info(id):
-    device = device_scanner.get_device(id)
-    
-    # if we fail to access directly the device, we try the old info map
-    if not device:
-        try:
-            return device_scanner.get_all_devices_info()[id]
-        except:
-            raise Exception("A device with ID %s is unknown to the system" % id)
-
-    return device.info()
-
-#Get the private machine information of one device
-@app.get('/device/<id>/machineinfo')
-@error_decorator
-def get_device_machine_info(id):
-    device = device_scanner.get_device(id)
-    # if we fail to access directly the device, we have the old info map
-    if not device:
-        return device_scanner.get_all_devices_info()[id]
-
-    return device.machine_info()
-
-#Get info about a device connected module
-@app.get('/device/<id>/module')
-@error_decorator
-def get_device_module(id):
-
-    device = device_scanner.get_device(id)
-    
-    if device:
-        return device.connected_module()
-    
-    return {}
-
-@app.post('/device/<id>/machineinfo')
-@error_decorator
-def set_device_machine_info(id):
-
-    post_data = bottle.request.body.read()
-    device = device_scanner.get_device(id)
-    response = device.send_settings(post_data)
-
-    return {**device.machine_info(), "haschanged" : response['haschanged']}
-
-@app.get('/device/<id>/user_options')
-@error_decorator
-def get_device_options(id):
-    try:
-        device = device_scanner.get_device(id)
-        return device.user_options()
-    except:
-        return
-
-@app.get('/device/<id>/videofiles')
-@error_decorator
-def get_device_videofiles(id):
-    device = device_scanner.get_device(id)
-    try:
-        return device.videofiles()
-    except:
-        return []
-
-
-#Get the information of one Sleep Monitor
-@app.get('/device/<id>/last_img')
-@error_decorator
-def get_device_last_img(id):
-    device = device_scanner.get_device(id)
-    if "status" not in list(device.info().keys()) or device.info()["status"] == "not_in use":
-        raise Exception("Device %s is not in use, no image" % id )
-    file_like = device.last_image()
-    if not file_like:
-        raise Exception("No image for %s" % id)
-    basename = os.path.join(tmp_imgs_dir, id + "_last_img.jpg")
-    return cache_img(file_like, basename)
-
-@app.get('/device/<id>/dbg_img')
-@error_decorator
-def get_device_dbg_img(id):
-
-    device = device_scanner.get_device(id)
-    file_like = device.dbg_img()
-    basename = os.path.join(tmp_imgs_dir, id + "_debug.png")
-    return cache_img(file_like, basename)
-
-
-@app.get('/device/<id>/stream')
-@error_decorator
-def get_device_stream(id):
-  
-    device = device_scanner.get_device(id)
-    bottle.response.set_header('Content-type', 'multipart/x-mixed-replace; boundary=frame')
-    return device.relay_stream()
-
-@app.post('/device/<id>/backup')
-@error_decorator
-def force_device_backup(id):
-    '''
-    Forces backup on device with specified id
-    '''
-    results_dir = CFG.content['folders']['results']['path']
-    device_info = get_device_info(id)
-    
-    try:
-        logging.info("Initiating backup for device  %s" % device_info["id"])
-        backup_job = BackupClass(device_info, results_dir=results_dir)
-        logging.info("Running backup for device  %s" % device_info["id"])
-        if backup_job.backup():
-            logging.info("Backup done for device  %s" % device_info["id"])
-        else:
-            logging.error("Backup for device  %s could not be completed" % device_info["id"])
-    
-    except Exception as e:
-        logging.error("Unexpected error in backup. args are: %s" % str(args))
-        logging.error(traceback.format_exc())
-
-@app.get('/device/<id>/dumpSQLdb')
-@error_decorator
-def device_local_dump(id):
-    '''
-    Aks the device to perform a local SQL dump
-    '''
-    device = device_scanner.get_device(id)
-    return device.dumpSQLdb()
-    
-    
-
-@app.get('/device/<id>/retire')
-@error_decorator
-def retire_device(id):
-    '''
-    Changes the status of the device to inactive in the device database
-    '''
-    return device_scanner.retire_device(id)
-
-
-
-
-def cache_img(file_like, basename):
-    if not file_like:
-        #TODO return link to "broken img"
-        return ""
-    local_file = os.path.join(tmp_imgs_dir, basename)
-    tmp_file = tempfile.mktemp(prefix="ethoscope_", suffix=".jpg")
-    with open(tmp_file , "wb") as lf:
-        lf.write(file_like.read())
-    shutil.move(tmp_file, local_file)
-    return server_tmp_static(os.path.basename(local_file))
-
-
-@app.post('/device/<id>/controls/<instruction>')
-@error_decorator
-def post_device_instructions(id, instruction):
-    post_data = bottle.request.body.read()
-    device = device_scanner.get_device(id)
-    device.send_instruction(instruction, post_data)
-    return get_device_info(id)
-
-@app.post('/device/<id>/log')
-@error_decorator
-def get_log(id):
-    device = device_scanner.get_device(id)
-    return device.get_log()
-
-
-#################################
-# NODE Functions
-#################################
-
-
-#Browse, delete and download files from node
-
-@app.get('/result_files/<type>')
-@error_decorator
-def result_file(type):
-    """
-    :param type:'all', 'db' or 'txt'
-    :return: a dict with a single key: "files" which maps a list of matching result files (absolute path)
-    """
-    type="txt"
-    if type == "all":
-        pattern =  '*'
-    else:
-        pattern =  '*.'+type
-    matches = []
-    for root, dirnames, filenames in os.walk(RESULTS_DIR):
-        for f in fnmatch.filter(filenames, pattern):
-            matches.append(os.path.join(root, f))
-        return {"files": matches}
-
-
-@app.get('/browse/<folder:path>')
-@error_decorator
-def browse(folder):
-    if folder == 'null':
-        directory = RESULTS_DIR
-    else:
-        directory = '/'+folder
-    files = {}
-    for (dirpath, dirnames, filenames) in os.walk(directory):
-        for name in filenames:
-            abs_path = os.path.join(dirpath,name)
-            size = os.path.getsize(abs_path)
-            mtime = os.path.getmtime(abs_path)
-            #rel_path = os.path.relpath(abs_path,directory)
-            files[name] = {'abs_path':abs_path, 'size':size, 'mtime': mtime}
-    return {'files': files}
-
-
-@app.post('/request_download/<what>')
-@error_decorator
-def download(what):
-    # zip the files and provide a link to download it
-    if what == 'files':
-        req_files = bottle.request.json
-        t = datetime.datetime.now()
-        #FIXME change the route for this? and old zips need to be erased
-        zip_file_name = os.path.join(RESULTS_DIR,'results_'+t.strftime("%y%m%d_%H%M%S")+'.zip')
-        zf = zipfile.ZipFile(zip_file_name, mode='a')
-        logging.info("Saving files : %s in %s" % (str(req_files['files']), zip_file_name) )
-        for f in req_files['files']:
-            zf.write(f['url'])
-        zf.close()
-        return {'url':zip_file_name}
-    else:
-        raise NotImplementedError()
-
-@app.get('/node/<req>')
-@error_decorator
-def node_info(req):#, device):
-
-    if req == 'info':
-       
-        try:
-            with os.popen('df %s -h' % RESULTS_DIR) as df:
-                disk_free = df.read()
-            disk_usage = disk_free.split("\n")[1].split()
-            #this returns something like ['/dev/sda2', '916G', '330G', '540G', '38%', '/']
-
-        except:
-            disk_usage = []
-
-        if os.path.exists(RESULTS_DIR):
-            RDIR = RESULTS_DIR
-        else:
-            RDIR = "%s is not available" % RESULTS_DIR
-
-        CARDS = {}
-        IPs = []
-        CFG.load()
-
-
-        #the following returns something like this: [['eno1', 'ec:b1:d7:66:2e:3a', '192.168.1.1'], ['enp0s20u12', '74:da:38:49:f8:2a', '155.198.232.206']]
-        adapters_list = [ [i, netifaces.ifaddresses(i)[17][0]['addr'], netifaces.ifaddresses(i)[2][0]['addr']] for i in netifaces.interfaces() if 17 in netifaces.ifaddresses(i) and 2 in netifaces.ifaddresses(i) and netifaces.ifaddresses(i)[17][0]['addr'] != '00:00:00:00:00:00' ]
-        for ad in adapters_list:
-            CARDS [ ad[0] ] = {'MAC' : ad[1], 'IP' : ad[2]}
-            IPs.append (ad[2])
-        
-       
-        with os.popen('git rev-parse --abbrev-ref HEAD') as df:
-            GIT_BRANCH = df.read() or "Not detected"
-        
-        with os.popen('git status -s -uno') as df:
-            NEEDS_UPDATE = df.read() != ""
-        
-        try:
-            with os.popen(f'{SYSTEMCTL} status ethoscope_node.service') as df:
-                ACTIVE_SINCE = df.read().split("\n")[2] 
-        except: 
-            ACTIVE_SINCE = "N/A. Probably not running through systemd"
-            
-            
-
-        #except Exception as e:
-
-        return {'active_since': ACTIVE_SINCE, 'disk_usage': disk_usage, 'RDIR' : RDIR , 'IPs' : IPs , 'CARDS': CARDS, 'GIT_BRANCH': GIT_BRANCH, 'NEEDS_UPDATE': NEEDS_UPDATE}
-                
-    elif req == 'time':
-        return {'time':datetime.datetime.now().isoformat()}
-        
-    elif req == 'timestamp':
-        return {'timestamp': datetime.datetime.now().timestamp() }
-    
-    elif req == 'log':
-        with os.popen("journalctl -u ethoscope_node -rb") as log:
-            l = log.read()
-        return {'log': l}
-    
-    elif req == 'daemons':
-
-        for daemon_name in SYSTEM_DAEMONS.keys():
-        
-            with os.popen(f"{SYSTEMCTL} is-active {daemon_name}") as df:
-                is_active = df.read().strip()
-                is_not_available_on_docker = not SYSTEM_DAEMONS[daemon_name]["available_on_docker"]
-
-                SYSTEM_DAEMONS[daemon_name].update( { 'active'    : is_active, 
-                                                      'not_available' : (IS_DOCKERIZED and is_not_available_on_docker)
-                                                    } )
-        
-        return SYSTEM_DAEMONS
-
-    elif req == 'folders':
-        return CFG.content['folders']
-
-    elif req == 'users':
-        return CFG.content['users']
-
-    elif req == 'incubators':
-        return CFG.content['incubators']
-        
-    elif req == 'sensors':
-        return sensor_scanner.get_all_devices_info()
-        
-    elif req == 'commands':
-        return CFG.content['commands']
-   
-    else:
-        raise NotImplementedError()
-
-@app.post('/node-actions')
-@error_decorator
-def node_actions():
-    action = bottle.request.json
-    
-    if action['action'] == 'restart':
-        logging.info('User requested a service restart.')
-        with os.popen(f"sleep 1; {SYSTEMCTL} restart ethoscope_node.service") as po:
-            r = po.read()
-        
-        return r
-            
-    elif action['action'] == 'close':
-        close()
-    
-    elif action['action'] == 'adduser':
-        return CFG.addUser(action['userdata'])
-
-    elif action['action'] == 'addincubator':
-        return CFG.addIncubator(action['incubatordata'])
-    
-    elif action['action'] == 'addsensor':
-        return CFG.addSensor(action['sensordata'])
-    
-    elif action['action'] == 'updatefolders':
-        for folder in action['folders'].keys():
-            if os.path.exists(action['folders'][folder]['path']): 
-                CFG.content['folders'][folder]['path'] = action['folders'][folder]['path']
-                CFG.save()
-                
-        return CFG.content['folders']
-    
-    elif action['action'] == 'exec_cmd':
-        cmd = CFG.content['commands'][action['cmd_name']]['command']
-        logging.info("Executing command: %s" % cmd)
-
-        #try:
-        with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, shell=True) as po:
-            for line in po.stderr:
-                yield (line)
-
-            for line in po.stdout:
-                yield line
-                
-        yield "Done"
-            
-        #except subprocess.CalledProcessError:
-        #    print (po.stderr)
-        #    return "Error executing the command.\n%s" % po.stderr
-            
-        
-        return po.stdout
-        
-    elif action['action'] == 'toggledaemon':
-
-        if action['status'] == True:
-            cmd = f"{SYSTEMCTL} start %s" % action['daemon_name']
-            logging.info ("Starting daemon %s" % action['daemon_name'])
-            
-        elif  action['status'] == False:
-            cmd = f"{SYSTEMCTL} stop %s" % action['daemon_name']
-            logging.info ("Stopping daemon %s" % action['daemon_name'])
-            
-        with os.popen(cmd) as po:
-            r = po.read()
-           
-        return r
-    
-    else:
-        raise NotImplementedError()
-
-@app.post('/remove_files')
-@error_decorator
-def remove_files():
-    req = bottle.request.json
-    res = []
-    for f in req['files']:
-        rm = subprocess.Popen(['rm', f['url']],
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE)
-        out, err = rm.communicate()
-        logging.info(out)
-        logging.error(err)
-        res.append(f['url'])
-    return {'result': res}
-
-@app.get('/list/<type>')
-def redirection_to_list(type):
-    return bottle.redirect('/#/list/'+type)
-
-#@app.get('/more')
-#def redirection_to_more():
-#    return bottle.redirect('/#/more/')
-    
-@app.get('/ethoscope/<id>')
-def redirection_to_ethoscope(id):
-    return bottle.redirect('/#/ethoscope/'+id)
-
-@app.get('/more/<action>')
-def redirection_to_more(action):
-    return bottle.redirect('/#/more/'+action)
-
-@app.get('/experiments')
-def redirection_to_experiments():
-    return bottle.redirect('/#/experiments')
-
-@app.get('/sensors_data')
-def redirection_to_sensors():
-    return bottle.redirect('/#/sensors_data')
-
-@app.get('/resources')
-def redirection_to_resources():
-    return bottle.redirect('/#/resources')
-
-
-def close(exit_status=0):
-    logging.info("Closing server")
-    os._exit(exit_status)
-
-
-#======================================================================================================================#
-#############
-### CLASSS TO BE REMOVED IF BOTTLE CHANGES TO 0.13
-############
 class CherootServer(bottle.ServerAdapter):
-    def run(self, handler): # pragma: no cover
+    """Custom Cheroot server adapter for Bottle."""
+    
+    def run(self, handler):
         from cheroot import wsgi
         from cheroot.ssl import builtin
+        
         self.options['bind_addr'] = (self.host, self.port)
         self.options['wsgi_app'] = handler
+        
         certfile = self.options.pop('certfile', None)
         keyfile = self.options.pop('keyfile', None)
         chainfile = self.options.pop('chainfile', None)
+        
         server = wsgi.Server(**self.options)
+        
         if certfile and keyfile:
-            server.ssl_adapter = builtin.BuiltinSSLAdapter(
-                    certfile, keyfile, chainfile)
+            server.ssl_adapter = builtin.BuiltinSSLAdapter(certfile, keyfile, chainfile)
+        
         try:
             server.start()
         finally:
             server.stop()
-#############
 
-if __name__ == '__main__':
 
-    CFG = EthoscopeConfiguration()
-
-    logging.getLogger().setLevel(logging.INFO)
-    parser = optparse.OptionParser()
-    parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
-    parser.add_option("-p", "--port", dest="port", default=80, help="port")
-    parser.add_option("-e", "--temporary-results-dir", dest="temp_results_dir", help="Where temporary result files are stored")
-
-    (options, args) = parser.parse_args()
-
-    option_dict = vars(options)
-    PORT = option_dict["port"] or DEFAULT_PORT
-    DEBUG = option_dict["debug"]
-    RESULTS_DIR = option_dict["temp_results_dir"] or CFG.content['folders']['temporary']['path']
-
-    if DEBUG:
-        logging.basicConfig()
-        logging.getLogger().setLevel(logging.DEBUG)
-        logging.info("Logging using DEBUG SETTINGS")
-
-    tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
-
-    # Check if we are inside a docker container. 
-    # If we are, we are not using systemctl to handle processes
-    # but docker-systemctl-replacement
-    IS_DOCKERIZED = os.path.exists('/.dockerenv')
-    if IS_DOCKERIZED:
-        SYSTEMCTL = "/usr/bin/systemctl.py"
-    else:
-        SYSTEMCTL = "/usr/bin/systemctl"
-
-    try:
-        device_scanner = EthoscopeScanner(results_dir=RESULTS_DIR)
-        device_scanner.start()
+class EthoscopeNodeServer:
+    """Main server class for Ethoscope Node."""
+    
+    def __init__(self, port: int = DEFAULT_PORT, debug: bool = False, 
+                 temp_results_dir: Optional[str] = None):
+        self.port = port
+        self.debug = debug
+        self.app = bottle.Bottle()
+        self.logger = logging.getLogger(self.__class__.__name__)
         
-        sensor_scanner = SensorScanner()
-        sensor_scanner.start()
+        # Core components
+        self.config: Optional[EthoscopeConfiguration] = None
+        self.device_scanner: Optional[EthoscopeScanner] = None
+        self.sensor_scanner: Optional[SensorScanner] = None
+        self.database: Optional[ExperimentalDB] = None
         
-        edb = ExperimentalDB()
+        # Paths and directories
+        self.tmp_imgs_dir: Optional[str] = None
+        self.results_dir: Optional[str] = temp_results_dir
         
-#        #manually adds the sensors saved in the configuration file
-#        for sensor in CFG.content['sensors']:
-#            if CFG.content['sensors'][sensor]['active']:
-#                sensor_scanner.add(CFG.content['sensors'][sensor]['name'], CFG.content['sensors'][sensor]['URL'])
+        # System configuration
+        self.is_dockerized = os.path.exists('/.dockerenv')
+        self.systemctl = "/usr/bin/systemctl.py" if self.is_dockerized else "/usr/bin/systemctl"
         
+        # Setup routes
+        self._setup_routes()
+        self._setup_hooks()
+    
+    def _setup_routes(self):
+        """Setup all application routes."""
+        # Static files
+        self.app.route('/static/<filepath:path>')(self._serve_static)
+        self.app.route('/tmp_static/<filepath:path>')(self._serve_tmp_static)
+        self.app.route('/download/<filepath:path>')(self._serve_download)
+        self.app.route('/favicon.ico', method='GET')(self._get_favicon)
+        
+        # Main pages
+        self.app.route('/', method='GET')(self._index)
+        self.app.route('/update', method='GET')(self._update_redirect)
+        
+        # Device API
+        self.app.route('/devices', method='GET')(self._get_devices)
+        self.app.route('/devices_list', method='GET')(self._get_devices_list)
+        self.app.route('/device/add', method='POST')(self._manual_add_device)
+        self.app.route('/device/<id>/data', method='GET')(self._get_device_info)
+        self.app.route('/device/<id>/machineinfo', method='GET')(self._get_device_machine_info)
+        self.app.route('/device/<id>/machineinfo', method='POST')(self._set_device_machine_info)
+        self.app.route('/device/<id>/module', method='GET')(self._get_device_module)
+        self.app.route('/device/<id>/user_options', method='GET')(self._get_device_options)
+        self.app.route('/device/<id>/videofiles', method='GET')(self._get_device_videofiles)
+        self.app.route('/device/<id>/last_img', method='GET')(self._get_device_last_img)
+        self.app.route('/device/<id>/dbg_img', method='GET')(self._get_device_dbg_img)
+        self.app.route('/device/<id>/stream', method='GET')(self._get_device_stream)
+        self.app.route('/device/<id>/backup', method='POST')(self._force_device_backup)
+        self.app.route('/device/<id>/dumpSQLdb', method='GET')(self._device_local_dump)
+        self.app.route('/device/<id>/retire', method='GET')(self._retire_device)
+        self.app.route('/device/<id>/controls/<instruction>', method='POST')(self._post_device_instructions)
+        self.app.route('/device/<id>/log', method='POST')(self._get_log)
+        
+        # Sensor API
+        self.app.route('/sensors', method='GET')(self._get_sensors)
+        self.app.route('/sensor/set', method='POST')(self._edit_sensor)
+        self.app.route('/list_sensor_csv_files', method='GET')(self._list_csv_files)
+        self.app.route('/get_sensor_csv_data/<filename>', method='GET')(self._get_csv_data)
+        
+        # Node API
+        self.app.route('/node/<req>', method='GET')(self._node_info)
+        self.app.route('/node-actions', method='POST')(self._node_actions)
+        
+        # File management
+        self.app.route('/result_files/<type>', method='GET')(self._result_files)
+        self.app.route('/browse/<folder:path>', method='GET')(self._browse)
+        self.app.route('/request_download/<what>', method='POST')(self._download)
+        self.app.route('/remove_files', method='POST')(self._remove_files)
+        
+        # Database API
+        self.app.route('/runs_list', method='GET')(self._runs_list)
+        self.app.route('/experiments_list', method='GET')(self._experiments_list)
+        
+        # Redirects
+        self.app.route('/list/<type>', method='GET')(self._redirection_to_list)
+        self.app.route('/ethoscope/<id>', method='GET')(self._redirection_to_ethoscope)
+        self.app.route('/more/<action>', method='GET')(self._redirection_to_more)
+        self.app.route('/experiments', method='GET')(self._redirection_to_experiments)
+        self.app.route('/sensors_data', method='GET')(self._redirection_to_sensors)
+        self.app.route('/resources', method='GET')(self._redirection_to_resources)
+    
+    def _setup_hooks(self):
+        """Setup application hooks."""
+        @self.app.hook('after_request')
+        def enable_cors():
+            bottle.response.headers['Access-Control-Allow-Origin'] = '*'
+            bottle.response.headers['Access-Control-Allow-Methods'] = 'PUT, GET, POST, DELETE, OPTIONS'
+            bottle.response.headers['Access-Control-Allow-Headers'] = 'Origin, Accept, Content-Type, X-Requested-With, X-CSRF-Token'
+    
+    def initialize(self):
+        """Initialize all server components."""
+        try:
+            self.logger.info("Initializing Ethoscope Node Server...")
+            
+            # Load configuration
+            self.config = EthoscopeConfiguration()
+            self.logger.info("Configuration loaded")
+            
+            # Setup results directory
+            if not self.results_dir:
+                self.results_dir = self.config.content['folders']['temporary']['path']
+            
+            # Create temporary images directory
+            self.tmp_imgs_dir = tempfile.mkdtemp(prefix="ethoscope_node_imgs")
+            self.logger.info(f"Created temporary images directory: {self.tmp_imgs_dir}")
+            
+            # Initialize database
+            self.database = ExperimentalDB()
+            self.logger.info("Database connection established")
+            
+            # Initialize device scanner
+            try:
+                self.device_scanner = EthoscopeScanner(results_dir=self.results_dir)
+                self.device_scanner.start()
+                self.logger.info("Ethoscope scanner started")
+            except Exception as e:
+                self.logger.error(f"Failed to start ethoscope scanner: {e}")
+                raise
+            
+            # Initialize sensor scanner
+            try:
+                self.sensor_scanner = SensorScanner()
+                self.sensor_scanner.start()
+                self.logger.info("Sensor scanner started")
+            except Exception as e:
+                self.logger.warning(f"Failed to start sensor scanner: {e}")
+                self.logger.warning("Continuing without sensor scanner")
+                self.sensor_scanner = None
+            
+            self.logger.info("Server initialization complete")
+            
+        except Exception as e:
+            self.logger.error(f"Server initialization failed: {e}")
+            self.cleanup()
+            raise
+    
+    def cleanup(self):
+        """Clean up all server resources."""
+        self.logger.info("Cleaning up server resources...")
+        
+        if self.device_scanner:
+            try:
+                self.device_scanner.stop()
+                self.logger.info("Device scanner stopped")
+            except Exception as e:
+                self.logger.warning(f"Error stopping device scanner: {e}")
+        
+        if self.sensor_scanner:
+            try:
+                self.sensor_scanner.stop()
+                self.logger.info("Sensor scanner stopped")
+            except Exception as e:
+                self.logger.warning(f"Error stopping sensor scanner: {e}")
+        
+        if self.tmp_imgs_dir and os.path.exists(self.tmp_imgs_dir):
+            try:
+                shutil.rmtree(self.tmp_imgs_dir)
+                self.logger.info("Temporary images directory cleaned up")
+            except Exception as e:
+                self.logger.warning(f"Error cleaning tmp directory: {e}")
+        
+        self.logger.info("Server cleanup complete")
+    
+    def run(self):
+        """Start the web server."""
+        self.logger.info(f"Starting web server on port {self.port}")
         
         try:
-            bottle.run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='paste')
-
-        except:
-        
-            #######TO be remove when bottle changes to version 0.13
-            server = "cherrypy"
+            # Try Paste server first
+            bottle.run(self.app, host='0.0.0.0', port=self.port, 
+                      debug=self.debug, server='paste')
+        except ImportError:
+            self.logger.info("Paste server not available, trying alternative...")
+            
+            # Fallback to Cheroot/CherryPy
             try:
                 from bottle.cherrypy import wsgiserver
-            except:
-                #Trick bottle into thinking that cheroot is cherrypy
-                bottle.server_names["cherrypy"]=CherootServer(host='0.0.0.0', port=PORT)
-                logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
+                self.logger.info("Using CherryPy server")
+            except ImportError:
+                bottle.server_names["cherrypy"] = CherootServer(host='0.0.0.0', port=self.port)
+                self.logger.warning("Using Cheroot server (CherryPy >= 9)")
+            
+            bottle.run(self.app, host='0.0.0.0', port=self.port, 
+                      debug=self.debug, server='cherrypy')
+    
+    # Route handlers - Static files
+    def _serve_static(self, filepath):
+        return bottle.static_file(filepath, root=STATIC_DIR)
+    
+    def _serve_tmp_static(self, filepath):
+        return bottle.static_file(filepath, root=self.tmp_imgs_dir)
+    
+    def _serve_download(self, filepath):
+        return bottle.static_file(filepath, root="/", download=filepath)
+    
+    def _get_favicon(self):
+        return self._serve_static('img/favicon.ico')
+    
+    # Route handlers - Main pages
+    def _index(self):
+        return bottle.static_file('index.html', root=STATIC_DIR)
+    
+    def _update_redirect(self):
+        return bottle.redirect(self.config.custom('UPDATE_SERVICE_URL'))
+    
+    # Route handlers - Device API
+    @error_decorator
+    def _get_devices(self):
+        return self.device_scanner.get_all_devices_info()
+    
+    def _get_devices_list(self):
+        return self._get_devices()
+    
+    def _manual_add_device(self):
+        """Manually add ethoscopes using provided IPs."""
+        input_string = bottle.request.body.read().decode("utf-8")
+        added = []
+        problems = []
+        
+        for ip_address in input_string.split(","):
+            ip_address = ip_address.strip()
+            try:
+                self.device_scanner.add(ip_address)
+                added.append(ip_address)
+            except Exception:
+                problems.append(ip_address)
+        
+        return {"added": added, "problems": problems}
+    
+    @warning_decorator
+    def _get_device_info(self, id):
+        device = self.device_scanner.get_device(id)
+        
+        if not device:
+            try:
+                return self.device_scanner.get_all_devices_info()[id]
+            except KeyError:
+                raise Exception(f"A device with ID {id} is unknown to the system")
+        
+        return device.info()
+    
+    @error_decorator
+    def _get_device_machine_info(self, id):
+        device = self.device_scanner.get_device(id)
+        if not device:
+            return self.device_scanner.get_all_devices_info()[id]
+        return device.machine_info()
+    
+    @error_decorator
+    def _set_device_machine_info(self, id):
+        post_data = bottle.request.body.read()
+        device = self.device_scanner.get_device(id)
+        response = device.send_settings(post_data)
+        return {**device.machine_info(), "haschanged": response['haschanged']}
+    
+    @error_decorator
+    def _get_device_module(self, id):
+        device = self.device_scanner.get_device(id)
+        return device.connected_module() if device else {}
+    
+    @error_decorator
+    def _get_device_options(self, id):
+        device = self.device_scanner.get_device(id)
+        return device.user_options() if device else None
+    
+    @error_decorator
+    def _get_device_videofiles(self, id):
+        device = self.device_scanner.get_device(id)
+        try:
+            return device.videofiles() if device else []
+        except Exception:
+            return []
+    
+    @error_decorator
+    def _get_device_last_img(self, id):
+        device = self.device_scanner.get_device(id)
+        device_info = device.info()
+        
+        if "status" not in device_info or device_info["status"] == "not_in_use":
+            raise Exception(f"Device {id} is not in use, no image")
+        
+        file_like = device.last_image()
+        if not file_like:
+            raise Exception(f"No image for {id}")
+        
+        basename = os.path.join(self.tmp_imgs_dir, f"{id}_last_img.jpg")
+        return self._cache_img(file_like, basename)
+    
+    @error_decorator
+    def _get_device_dbg_img(self, id):
+        device = self.device_scanner.get_device(id)
+        file_like = device.dbg_img()
+        basename = os.path.join(self.tmp_imgs_dir, f"{id}_debug.png")
+        return self._cache_img(file_like, basename)
+    
+    @error_decorator
+    def _get_device_stream(self, id):
+        device = self.device_scanner.get_device(id)
+        bottle.response.set_header('Content-type', 'multipart/x-mixed-replace; boundary=frame')
+        return device.relay_stream()
+    
+    @error_decorator
+    def _force_device_backup(self, id):
+        """Force backup on device with specified id."""
+        device_info = self._get_device_info(id)
+        
+        try:
+            self.logger.info(f"Initiating backup for device {device_info['id']}")
+            backup_job = BackupClass(device_info, results_dir=self.results_dir)
+            
+            self.logger.info(f"Running backup for device {device_info['id']}")
+            success = False
+            for status_update in backup_job.backup():
+                # Process status updates
+                status = json.loads(status_update)
+                self.logger.info(f"Backup status: {status}")
+                if status.get('status') == 'success':
+                    success = True
+            
+            if success:
+                self.logger.info(f"Backup done for device {device_info['id']}")
+            else:
+                self.logger.error(f"Backup for device {device_info['id']} could not be completed")
+                
+            return {'success': success}
+            
+        except Exception as e:
+            self.logger.error(f"Unexpected error in backup: {e}")
+            self.logger.error(traceback.format_exc())
+            raise
+    
+    @error_decorator
+    def _device_local_dump(self, id):
+        """Ask the device to perform a local SQL dump."""
+        device = self.device_scanner.get_device(id)
+        return device.dump_sql_db()
+    
+    @error_decorator
+    def _retire_device(self, id):
+        """Change the status of the device to inactive in the device database."""
+        return self.device_scanner.retire_device(id)
+    
+    @error_decorator
+    def _post_device_instructions(self, id, instruction):
+        post_data = bottle.request.body.read()
+        device = self.device_scanner.get_device(id)
+        device.send_instruction(instruction, post_data)
+        return self._get_device_info(id)
+    
+    @error_decorator
+    def _get_log(self, id):
+        device = self.device_scanner.get_device(id)
+        return device.get_log()
+    
+    # Route handlers - Sensor API
+    @error_decorator
+    def _get_sensors(self):
+        return self.sensor_scanner.get_all_devices_info() if self.sensor_scanner else {}
+    
+    def _edit_sensor(self):
+        input_string = bottle.request.body.read().decode("utf-8")
+        data = eval(input_string)  # Note: This should use json.loads() for security
+        
+        if self.sensor_scanner:
+            try:
+                sensor = self.sensor_scanner.get_device(data["id"])
+                if sensor:
+                    return sensor.set({"location": data["location"], "sensor_name": data["name"]})
+            except Exception:
                 pass
-            #########
-            bottle.run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='cherrypy')
+    
+    @error_decorator
+    def _list_csv_files(self):
+        """List CSV files in /ethoscope_data/sensors/."""
+        directory = '/ethoscope_data/sensors/'
+        try:
+            if os.path.exists(directory):
+                csv_files = [f for f in os.listdir(directory) if f.endswith('.csv')]
+                return {'files': csv_files}
+        except Exception:
+            pass
+        return {'files': []}
+    
+    @error_decorator
+    def _get_csv_data(self, filename):
+        """Read CSV file and return data for plotting."""
+        directory = '/ethoscope_data/sensors/'
+        filepath = os.path.join(directory, filename)
+        
+        data = []
+        with open(filepath, 'r') as csvfile:
+            headers = csvfile.readline().strip().split(',')
+            for line in csvfile:
+                data.append(line.strip().split(','))
+        
+        return {'headers': headers, 'data': data}
+    
+    # Route handlers - Database API
+    @error_decorator
+    def _runs_list(self):
+        return json.dumps(self.database.getRun('all', asdict=True))
+    
+    @error_decorator
+    def _experiments_list(self):
+        return json.dumps(self.database.getExperiment('all', asdict=True))
+    
+    # Route handlers - Node API
+    @error_decorator
+    def _node_info(self, req):
+        """Handle various node information requests."""
+        if req == 'info':
+            return self._get_node_system_info()
+        elif req == 'time':
+            return {'time': datetime.datetime.now().isoformat()}
+        elif req == 'timestamp':
+            return {'timestamp': datetime.datetime.now().timestamp()}
+        elif req == 'log':
+            with os.popen("journalctl -u ethoscope_node -rb") as log:
+                return {'log': log.read()}
+        elif req == 'daemons':
+            return self._get_daemon_status()
+        elif req == 'folders':
+            return self.config.content['folders']
+        elif req == 'users':
+            return self.config.content['users']
+        elif req == 'incubators':
+            return self.config.content['incubators']
+        elif req == 'sensors':
+            return self._get_sensors()
+        elif req == 'commands':
+            return self.config.content['commands']
+        else:
+            raise NotImplementedError(f"Unknown node request: {req}")
+    
+    def _get_node_system_info(self):
+        """Get comprehensive node system information."""
+        try:
+            # Disk usage
+            with os.popen(f'df {self.results_dir} -h') as df:
+                disk_free = df.read()
+            disk_usage = disk_free.split("\n")[1].split()
+        except Exception:
+            disk_usage = []
+        
+        # Results directory status
+        rdir = self.results_dir if os.path.exists(self.results_dir) else f"{self.results_dir} is not available"
+        
+        # Network interfaces
+        cards = {}
+        ips = []
+        
+        try:
+            adapters_list = [
+                [i, netifaces.ifaddresses(i)[17][0]['addr'], netifaces.ifaddresses(i)[2][0]['addr']]
+                for i in netifaces.interfaces()
+                if 17 in netifaces.ifaddresses(i) and 2 in netifaces.ifaddresses(i)
+                and netifaces.ifaddresses(i)[17][0]['addr'] != '00:00:00:00:00:00'
+            ]
+            
+            for adapter_name, mac, ip in adapters_list:
+                cards[adapter_name] = {'MAC': mac, 'IP': ip}
+                ips.append(ip)
+        except Exception:
+            pass
+        
+        # Git information
+        try:
+            with os.popen('git rev-parse --abbrev-ref HEAD') as df:
+                git_branch = df.read().strip() or "Not detected"
+            
+            with os.popen('git status -s -uno') as df:
+                needs_update = df.read() != ""
+        except Exception:
+            git_branch = "Not detected"
+            needs_update = False
+        
+        # Service status
+        try:
+            with os.popen(f'{self.systemctl} status ethoscope_node.service') as df:
+                active_since = df.read().split("\n")[2]
+        except Exception:
+            active_since = "N/A. Probably not running through systemd"
+        
+        return {
+            'active_since': active_since,
+            'disk_usage': disk_usage,
+            'RDIR': rdir,
+            'IPs': ips,
+            'CARDS': cards,
+            'GIT_BRANCH': git_branch,
+            'NEEDS_UPDATE': needs_update
+        }
+    
+    def _get_daemon_status(self):
+        """Get status of system daemons."""
+        daemons = SYSTEM_DAEMONS.copy()
+        
+        for daemon_name in daemons.keys():
+            try:
+                with os.popen(f"{self.systemctl} is-active {daemon_name}") as df:
+                    is_active = df.read().strip()
+                
+                is_not_available_on_docker = not daemons[daemon_name]["available_on_docker"]
+                
+                daemons[daemon_name].update({
+                    'active': is_active,
+                    'not_available': (self.is_dockerized and is_not_available_on_docker)
+                })
+            except Exception:
+                daemons[daemon_name].update({
+                    'active': 'unknown',
+                    'not_available': False
+                })
+        
+        return daemons
+    
+    @error_decorator
+    def _node_actions(self):
+        """Handle various node actions."""
+        action = bottle.request.json
+        action_type = action.get('action')
+        
+        if action_type == 'restart':
+            self.logger.info('User requested a service restart.')
+            with os.popen(f"sleep 1; {self.systemctl} restart ethoscope_node.service") as po:
+                return po.read()
+        
+        elif action_type == 'close':
+            self._shutdown()
+        
+        elif action_type == 'adduser':
+            return self.config.add_user(action['userdata'])
+        
+        elif action_type == 'addincubator':
+            return self.config.add_incubator(action['incubatordata'])
+        
+        elif action_type == 'addsensor':
+            return self.config.add_sensor(action['sensordata'])
+        
+        elif action_type == 'updatefolders':
+            return self._update_folders(action['folders'])
+        
+        elif action_type == 'exec_cmd':
+            return self._execute_command(action['cmd_name'])
+        
+        elif action_type == 'toggledaemon':
+            return self._toggle_daemon(action['daemon_name'], action['status'])
+        
+        else:
+            raise NotImplementedError(f"Unknown action: {action_type}")
+    
+    def _update_folders(self, folders):
+        """Update folder configuration."""
+        for folder in folders.keys():
+            if os.path.exists(folders[folder]['path']):
+                self.config.content['folders'][folder]['path'] = folders[folder]['path']
+        
+        self.config.save()
+        return self.config.content['folders']
+    
+    def _execute_command(self, cmd_name):
+        """Execute a configured command."""
+        cmd = self.config.content['commands'][cmd_name]['command']
+        self.logger.info(f"Executing command: {cmd}")
+        
+        try:
+            with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                universal_newlines=True, shell=True) as po:
+                for line in po.stderr:
+                    yield line
+                for line in po.stdout:
+                    yield line
+            yield "Done"
+        except Exception as e:
+            yield f"Error executing command: {e}"
+    
+    def _toggle_daemon(self, daemon_name, status):
+        """Toggle system daemon on/off."""
+        if status:
+            cmd = f"{self.systemctl} start {daemon_name}"
+            self.logger.info(f"Starting daemon {daemon_name}")
+        else:
+            cmd = f"{self.systemctl} stop {daemon_name}"
+            self.logger.info(f"Stopping daemon {daemon_name}")
+        
+        with os.popen(cmd) as po:
+            return po.read()
+    
+    # Route handlers - File management
+    @error_decorator
+    def _result_files(self, type):
+        """Get result files of specified type."""
+        if type == "all":
+            pattern = '*'
+        else:
+            pattern = f'*.{type}'
+        
+        matches = []
+        for root, dirnames, filenames in os.walk(self.results_dir):
+            for f in fnmatch.filter(filenames, pattern):
+                matches.append(os.path.join(root, f))
+        
+        return {"files": matches}
+    
+    @error_decorator
+    def _browse(self, folder):
+        """Browse directory contents."""
+        directory = self.results_dir if folder == 'null' else f'/{folder}'
+        files = {}
+        
+        for (dirpath, dirnames, filenames) in os.walk(directory):
+            for name in filenames:
+                abs_path = os.path.join(dirpath, name)
+                try:
+                    size = os.path.getsize(abs_path)
+                    mtime = os.path.getmtime(abs_path)
+                    files[name] = {'abs_path': abs_path, 'size': size, 'mtime': mtime}
+                except Exception:
+                    # Skip files that can't be accessed
+                    continue
+        
+        return {'files': files}
+    
+    @error_decorator
+    def _download(self, what):
+        """Create download archives."""
+        if what == 'files':
+            req_files = bottle.request.json
+            timestamp = datetime.datetime.now().strftime("%y%m%d_%H%M%S")
+            zip_file_name = os.path.join(self.results_dir, f'results_{timestamp}.zip')
+            
+            with zipfile.ZipFile(zip_file_name, mode='a') as zf:
+                self.logger.info(f"Creating archive: {zip_file_name}")
+                for f in req_files['files']:
+                    try:
+                        zf.write(f['url'])
+                    except Exception as e:
+                        self.logger.warning(f"Failed to add {f['url']} to archive: {e}")
+            
+            return {'url': zip_file_name}
+        else:
+            raise NotImplementedError(f"Download type '{what}' not supported")
+    
+    @error_decorator
+    def _remove_files(self):
+        """Remove specified files."""
+        req = bottle.request.json
+        results = []
+        
+        for f in req['files']:
+            try:
+                rm = subprocess.run(['rm', f['url']], capture_output=True, text=True)
+                if rm.returncode == 0:
+                    results.append(f['url'])
+                    self.logger.info(f"Removed file: {f['url']}")
+                else:
+                    self.logger.error(f"Failed to remove {f['url']}: {rm.stderr}")
+            except Exception as e:
+                self.logger.error(f"Error removing {f['url']}: {e}")
+        
+        return {'result': results}
+    
+    # Route handlers - Redirects
+    def _redirection_to_list(self, type):
+        return bottle.redirect(f'/#/list/{type}')
+    
+    def _redirection_to_ethoscope(self, id):
+        return bottle.redirect(f'/#/ethoscope/{id}')
+    
+    def _redirection_to_more(self, action):
+        return bottle.redirect(f'/#/more/{action}')
+    
+    def _redirection_to_experiments(self):
+        return bottle.redirect('/#/experiments')
+    
+    def _redirection_to_sensors(self):
+        return bottle.redirect('/#/sensors_data')
+    
+    def _redirection_to_resources(self):
+        return bottle.redirect('/#/resources')
+    
+    # Helper methods
+    def _cache_img(self, file_like, basename):
+        """Cache image file locally."""
+        if not file_like:
+            return ""
+        
+        local_file = os.path.join(self.tmp_imgs_dir, basename)
+        tmp_file = tempfile.mktemp(prefix="ethoscope_", suffix=".jpg")
+        
+        try:
+            with open(tmp_file, "wb") as lf:
+                lf.write(file_like.read())
+            shutil.move(tmp_file, local_file)
+            return self._serve_tmp_static(os.path.basename(local_file))
+        except Exception as e:
+            self.logger.error(f"Error caching image: {e}")
+            if os.path.exists(tmp_file):
+                os.remove(tmp_file)
+            return ""
+    
+    def _shutdown(self, exit_status=0):
+        """Shutdown the server."""
+        self.logger.info("Shutting down server")
+        self.cleanup()
+        os._exit(exit_status)
 
+
+def setup_logging(debug: bool = False):
+    """Setup logging configuration."""
+    level = logging.DEBUG if debug else logging.INFO
+    format_string = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    
+    logging.basicConfig(level=level, format=format_string)
+    
+    if debug:
+        logging.info("Debug logging enabled")
+
+
+def parse_command_line():
+    """Parse command line arguments."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Ethoscope Node Server')
+    parser.add_argument('-D', '--debug', action='store_true',
+                       help='Enable debug mode')
+    parser.add_argument('-p', '--port', type=int, default=DEFAULT_PORT,
+                       help=f'Server port (default: {DEFAULT_PORT})')
+    parser.add_argument('-e', '--temporary-results-dir', dest='temp_results_dir',
+                       help='Directory for temporary result files')
+    
+    return parser.parse_args()
+
+
+def main():
+    """Main entry point."""
+    # Parse command line arguments
+    args = parse_command_line()
+    
+    # Setup logging
+    setup_logging(args.debug)
+    logger = logging.getLogger('EthoscopeNodeServer')
+    
+    # Initialize server
+    server = EthoscopeNodeServer(
+        port=args.port,
+        debug=args.debug,
+        temp_results_dir=args.temp_results_dir
+    )
+    
+    def signal_handler(sig, frame):
+        """Handle shutdown signals gracefully."""
+        logger.info(f"Received signal {sig}, shutting down gracefully...")
+        server.cleanup()
+        sys.exit(0)
+    
+    # Setup signal handlers
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    try:
+        # Initialize and start server
+        server.initialize()
+        server.run()
+        
     except KeyboardInterrupt:
-        logging.info("Stopping server cleanly")
-        pass
-
+        logger.info("Server interrupted by user")
+        
     except socket.error as e:
-        logging.error(traceback.format_exc())
-        logging.error("Port %i is probably not accessible for you. Maybe use another one e.g.`-p 8000`" % PORT)
-
+        logger.error(f"Socket error: {e}")
+        logger.error(f"Port {args.port} is probably not accessible. Try another port with -p option")
+        server.cleanup()
+        sys.exit(1)
+        
     except Exception as e:
-        logging.error(traceback.format_exc())
-        close(1)
+        logger.error(f"Unexpected error: {e}")
+        logger.error(traceback.format_exc())
+        server.cleanup()
+        sys.exit(1)
+        
     finally:
-        device_scanner.stop()
-        sensor_scanner.stop()
-        shutil.rmtree(tmp_imgs_dir)
-        close()
+        server.cleanup()
+        logger.info("Server shutdown complete")
+
+
+if __name__ == '__main__':
+    main()

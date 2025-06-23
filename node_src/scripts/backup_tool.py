@@ -1,15 +1,16 @@
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
 from ethoscope_node.utils.backups_helpers import GenericBackupWrapper
-
 import logging
-import optparse
-import traceback
+import argparse
 import signal
 import sys
-
 import json
 import bottle
+from contextlib import contextmanager
+
+# Global variables
 app = bottle.Bottle()
+gbw = None
 
 @app.route('/')
 def home():
@@ -19,76 +20,128 @@ def home():
 @app.route('/status')
 def status():
     bottle.response.content_type = 'application/json'
+    if gbw is None:
+        return json.dumps({'error': 'Backup wrapper not initialized'}, indent=2)
+    
     with gbw._lock:
         status_copy = gbw.backup_status.copy()
     return json.dumps(status_copy, indent=2)
 
+def setup_logging(debug=False):
+    """Configure logging with appropriate level and format."""
+    level = logging.DEBUG if debug else logging.INFO
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    if debug:
+        logging.info("Debug logging enabled")
 
-if __name__ == '__main__':
+def parse_arguments():
+    """Parse command line arguments using argparse."""
+    parser = argparse.ArgumentParser(description='Ethoscope Backup Tool')
+    parser.add_argument('-D', '--debug', action='store_true', 
+                       help='Enable debug mode')
+    parser.add_argument('-r', '--results-dir', 
+                       help='Directory where result files are stored')
+    parser.add_argument('-i', '--server', default='localhost',
+                       help='Server address for node interrogation')
+    parser.add_argument('-e', '--ethoscope', 
+                       help='Force backup of specific ethoscope numbers (e.g., 007,010,102)')
+    return parser.parse_args()
 
+def parse_ethoscope_list(ethoscope_arg, separator=","):
+    """Parse ethoscope numbers from command line argument."""
+    if not ethoscope_arg:
+        return []
+    
+    try:
+        # Handle single number
+        if separator not in ethoscope_arg:
+            return [int(ethoscope_arg)]
+        # Handle comma-separated list
+        return [int(e.strip()) for e in ethoscope_arg.split(separator)]
+    except ValueError as e:
+        logging.error(f"Invalid ethoscope number format: {ethoscope_arg}")
+        sys.exit(1)
+
+def force_backup_ethoscopes(ethoscope_list):
+    """Force backup for specified ethoscopes."""
+    if not ethoscope_list:
+        return
+    
+    devices = gbw.find_devices()
+    device_map = {device['name']: device for device in devices}
+    
+    for ethoscope_num in ethoscope_list:
+        ethoscope_name = f"ETHOSCOPE_{ethoscope_num:03d}"
+        logging.info(f"Forcing backup for {ethoscope_name}")
+        
+        device = device_map.get(ethoscope_name)
+        if device is None:
+            logging.error(f"{ethoscope_name} is not online or not detected")
+            sys.exit(1)
+        
+        success = gbw.initiate_backup_job(device)
+        if not success:
+            logging.error(f"Backup failed for {ethoscope_name}")
+            sys.exit(1)
+
+def setup_signal_handlers():
+    """Setup signal handlers for graceful shutdown."""
     def signal_handler(sig, frame):
         logging.info("Received shutdown signal. Stopping backup thread...")
-        gbw.stop()  # Signal the thread to stop
-        gbw.join(timeout=10)  # Wait for the thread to finish
+        if gbw:
+            gbw.stop()
+            gbw.join(timeout=10)
         logging.info("Shutdown complete.")
         sys.exit(0)
-
+    
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    CFG = EthoscopeConfiguration()
-    
-    logging.getLogger().setLevel(logging.INFO)
-
-    parser = optparse.OptionParser()
-    parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
-    parser.add_option("-r", "--results-dir", dest="results_dir", help="Where result files are stored")
-    parser.add_option("-i", "--server", dest="NODE_ADDRESS", default="localhost", help="The server on which the node is running will be interrogated first for the device list")
-    parser.add_option("-e", "--ethoscope", dest="ethoscope", help="Force backup of given ethoscope numbers (eg: 007,010,102)")
-    
-    (options, args) = parser.parse_args()
-    option_dict = vars(options)
-
-    RESULTS_DIR = option_dict["results_dir"] or CFG.content['folders']['results']['path']
-    DEBUG = option_dict["debug"]
-
-    ETHO_TO_BACKUP = option_dict["ethoscope"]
-    NODE_ADDRESS = option_dict["NODE_ADDRESS"]
-
-    if DEBUG:
-        logging.basicConfig()
-        logging.getLogger().setLevel(logging.DEBUG)
-        logging.info("Logging using DEBUG SETTINGS")
-
-    
-    # Start the backup wrapper
-    gbw = GenericBackupWrapper( RESULTS_DIR, NODE_ADDRESS )
-    
-    if ETHO_TO_BACKUP:
-        # We have provided an ethoscope or a comma separated list of ethoscopes to backup
-        try:
-            ETHO_TO_BACKUP_LIST = [int(ETHO_TO_BACKUP)]
-        except:
-            ETHO_TO_BACKUP_LIST = [int(e) for e in ETHO_TO_BACKUP.split(",")]
-            
-        for ethoscope in ETHO_TO_BACKUP_LIST:
-            print ("Forcing backup for ethoscope %03d" % ethoscope)
-            
-            bj = None
-            for device in gbw.find_devices():
-                if device['name'] == ("ETHOSCOPE_%03d" % ethoscope):
-                    bj = gbw.initiate_backup_job( device )
-
-            if bj == None: exit("ETHOSCOPE_%03d is not online or not detected" % ethoscope)
-
-    else:
-
-        try:# We start in server mode
-            gbw.start()
-            bottle.run(app, host='0.0.0.0', port=8090)
-
-        except KeyboardInterrupt:
-            logging.info("Stopping server cleanly")
+@contextmanager
+def backup_wrapper_context(results_dir, node_address):
+    """Context manager for backup wrapper initialization and cleanup."""
+    global gbw
+    try:
+        gbw = GenericBackupWrapper(results_dir, node_address)
+        yield gbw
+    finally:
+        if gbw:
             gbw.stop()
-            gbw.join()
-            sys.exit(1)
+            gbw.join(timeout=10)
+
+def main():
+    """Main function with improved structure and error handling."""
+    try:
+        # Parse arguments and setup configuration
+        args = parse_arguments()
+        setup_logging(args.debug)
+        setup_signal_handlers()
+        
+        cfg = EthoscopeConfiguration()
+        results_dir = args.results_dir or cfg.content['folders']['results']['path']
+        
+        # Parse ethoscope list if provided
+        ethoscope_list = parse_ethoscope_list(args.ethoscope)
+        
+        with backup_wrapper_context(results_dir, args.server) as wrapper:
+            if ethoscope_list:
+                # Force backup for specific ethoscopes
+                force_backup_ethoscopes(ethoscope_list)
+            else:
+                # Start server mode
+                logging.info("Starting backup server...")
+                wrapper.start()
+                bottle.run(app, host='0.0.0.0', port=8090, quiet=not args.debug)
+                
+    except KeyboardInterrupt:
+        logging.info("Interrupted by user")
+        sys.exit(0)
+    except Exception as e:
+        logging.error(f"Unexpected error: {e}")
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()
