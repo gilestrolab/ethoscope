@@ -649,21 +649,26 @@ class GenericBackupWrapper(threading.Thread):
             str: JSON-encoded backup status
         """
         with self._lock:
-            # Convert BackupStatus objects to dictionaries
+            # Convert BackupStatus objects to dictionaries for JSON serialization
             serializable_status = {}
             for device_id, status in self.backup_status.items():
-                serializable_status[device_id] = {
-                    'name': status.name,
-                    'status': status.status,
-                    'started': status.started,
-                    'ended': status.ended,
-                    'processing': status.processing,
-                    'count': status.count,
-                    'synced': status.synced,
-                    'progress': status.progress
-                }
+                if hasattr(status, '__dict__'):
+                    # Convert BackupStatus dataclass to dictionary
+                    serializable_status[device_id] = {
+                        'name': status.name,
+                        'status': status.status,
+                        'started': status.started,
+                        'ended': status.ended,
+                        'processing': status.processing,
+                        'count': status.count,
+                        'synced': status.synced,
+                        'progress': status.progress
+                    }
+                else:
+                    # Already a dictionary
+                    serializable_status[device_id] = status
             
-            return json.dumps(serializable_status, indent=2)
+            return json.dumps(serializable_status, indent=2, default=str)
     
     def update_backup_status(self, device_id: str, key: str, value):
         """

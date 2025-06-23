@@ -23,9 +23,32 @@ def status():
     if gbw is None:
         return json.dumps({'error': 'Backup wrapper not initialized'}, indent=2)
     
-    with gbw._lock:
-        status_copy = gbw.backup_status.copy()
-    return json.dumps(status_copy, indent=2)
+    try:
+        with gbw._lock:
+            # Convert BackupStatus objects to dictionaries for JSON serialization
+            status_dict = {}
+            for device_id, backup_status in gbw.backup_status.items():
+                if hasattr(backup_status, '__dict__'):
+                    # If it's a BackupStatus dataclass, convert to dict
+                    status_dict[device_id] = {
+                        'name': getattr(backup_status, 'name', ''),
+                        'status': getattr(backup_status, 'status', ''),
+                        'started': getattr(backup_status, 'started', 0),
+                        'ended': getattr(backup_status, 'ended', 0),
+                        'processing': getattr(backup_status, 'processing', False),
+                        'count': getattr(backup_status, 'count', 0),
+                        'synced': getattr(backup_status, 'synced', {}),
+                        'progress': getattr(backup_status, 'progress', {})
+                    }
+                else:
+                    # If it's already a dictionary, use as-is
+                    status_dict[device_id] = backup_status
+        
+        return json.dumps(status_dict, indent=2, default=str)
+    
+    except Exception as e:
+        logging.error(f"Error serializing backup status: {e}")
+        return json.dumps({'error': f'Failed to get backup status: {str(e)}'}, indent=2)
 
 def setup_logging(debug=False):
     """Configure logging with appropriate level and format."""
@@ -50,17 +73,17 @@ def parse_arguments():
                        help='Force backup of specific ethoscope numbers (e.g., 007,010,102)')
     return parser.parse_args()
 
-def parse_ethoscope_list(ethoscope_arg, separator=","):
+def parse_ethoscope_list(ethoscope_arg):
     """Parse ethoscope numbers from command line argument."""
     if not ethoscope_arg:
         return []
     
     try:
         # Handle single number
-        if separator not in ethoscope_arg:
+        if ',' not in ethoscope_arg:
             return [int(ethoscope_arg)]
         # Handle comma-separated list
-        return [int(e.strip()) for e in ethoscope_arg.split(separator)]
+        return [int(e.strip()) for e in ethoscope_arg.split(',')]
     except ValueError as e:
         logging.error(f"Invalid ethoscope number format: {ethoscope_arg}")
         sys.exit(1)
