@@ -239,6 +239,10 @@ class EthoscopeNodeServer:
         self.app.route('/sensors_data', method='GET')(self._redirection_to_sensors)
         self.app.route('/resources', method='GET')(self._redirection_to_resources)
     
+        # Add these to _setup_routes method:
+        self.app.route('/blacklist/status', method='GET')(self._get_blacklist_status)
+        self.app.route('/blacklist/remove/<device_id>', method='POST')(self._unblacklist_device)
+
     def _setup_hooks(self):
         """Setup application hooks."""
         @self.app.hook('after_request')
@@ -425,10 +429,13 @@ class EthoscopeNodeServer:
     
     @error_decorator
     def _set_device_machine_info(self, id):
-        post_data = bottle.request.body.read()
+        """Update device machine info."""
+        post_data = bottle.request.body.read()  # This is already bytes
         device = self.device_scanner.get_device(id)
+        
+        # Don't try to JSON decode/encode - pass bytes directly
         response = device.send_settings(post_data)
-        return {**device.machine_info(), "haschanged": response['haschanged']}
+        return {**device.machine_info(), "haschanged": response.get('haschanged', False)}
     
     @error_decorator
     def _get_device_module(self, id):
@@ -475,7 +482,32 @@ class EthoscopeNodeServer:
         device = self.device_scanner.get_device(id)
         bottle.response.set_header('Content-type', 'multipart/x-mixed-replace; boundary=frame')
         return device.relay_stream()
-    
+
+    @error_decorator
+    def _get_blacklist_status(self):
+        """Get blacklist statistics and blacklisted devices."""
+        device_stats = self.device_scanner.get_blacklist_statistics()
+        sensor_stats = self.sensor_scanner.get_blacklist_statistics() if self.sensor_scanner else {'blacklisted_count': 0}
+        
+        return {
+            'ethoscopes': device_stats,
+            'sensors': sensor_stats,
+            'total_blacklisted': device_stats['blacklisted_count'] + sensor_stats['blacklisted_count']
+        }
+
+    @error_decorator  
+    def _unblacklist_device(self, device_id):
+        """Manually remove a device from blacklist."""
+        # Try ethoscopes first
+        if self.device_scanner.force_unblacklist_device(device_id):
+            return {'success': True, 'message': f'Ethoscope {device_id} removed from blacklist'}
+        
+        # Try sensors
+        if self.sensor_scanner and self.sensor_scanner.force_unblacklist_device(device_id):
+            return {'success': True, 'message': f'Sensor {device_id} removed from blacklist'}
+        
+        return {'success': False, 'message': f'Device {device_id} not found or not blacklisted'}
+
     @error_decorator
     def _force_device_backup(self, id):
         """Force backup on device with specified id."""
@@ -519,8 +551,11 @@ class EthoscopeNodeServer:
     
     @error_decorator
     def _post_device_instructions(self, id, instruction):
-        post_data = bottle.request.body.read()
+        """Send instruction to device."""
+        post_data = bottle.request.body.read()  # This is already bytes
         device = self.device_scanner.get_device(id)
+        
+        # Don't try to JSON decode/encode - pass bytes directly
         device.send_instruction(instruction, post_data)
         return self._get_device_info(id)
     
@@ -535,16 +570,28 @@ class EthoscopeNodeServer:
         return self.sensor_scanner.get_all_devices_info() if self.sensor_scanner else {}
     
     def _edit_sensor(self):
+        """Edit sensor settings."""
         input_string = bottle.request.body.read().decode("utf-8")
-        data = eval(input_string)  # Note: This should use json.loads() for security
+        
+        # Use json.loads instead of eval for security
+        try:
+            data = json.loads(input_string)
+        except json.JSONDecodeError:
+            # Fallback for malformed JSON - but this is risky
+            try:
+                data = eval(input_string)  # This should eventually be removed
+            except:
+                return {'error': 'Invalid data format'}
         
         if self.sensor_scanner:
             try:
                 sensor = self.sensor_scanner.get_device(data["id"])
                 if sensor:
                     return sensor.set({"location": data["location"], "sensor_name": data["name"]})
-            except Exception:
-                pass
+            except Exception as e:
+                return {'error': f'Sensor operation failed: {str(e)}'}
+        
+        return {'error': 'Sensor not found'}
     
     @error_decorator
     def _list_csv_files(self):

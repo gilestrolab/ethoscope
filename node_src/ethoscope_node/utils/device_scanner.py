@@ -26,10 +26,10 @@ from ethoscope_node.utils.mysql_backup import DBDiff
 STREAMING_PORT = 8887
 ETHOSCOPE_PORT = 9000
 DB_UPDATE_INTERVAL = 300  # seconds
-DEFAULT_TIMEOUT = 5  # Reduced from 10
-MAX_RETRIES = 2  # Reduced from 3
-INITIAL_RETRY_DELAY = 1  # Reduced from 3
-MAX_RETRY_DELAY = 5  # Cap on retry delay
+DEFAULT_TIMEOUT = 5
+MAX_RETRIES = 2
+INITIAL_RETRY_DELAY = 1
+MAX_RETRY_DELAY = 5
 
 
 @dataclass
@@ -111,10 +111,12 @@ class BaseDevice(Thread):
         # Synchronization and error tracking
         self._lock = RLock()
         self._last_refresh = 0
-        self._consecutive_errors = 0  # Track consecutive errors
-        self._max_consecutive_errors = 3
-        self._error_backoff_time = 0
-        self._base_error_delay = 30  # 30 seconds backoff after errors
+        self._consecutive_errors = 0
+        self._max_consecutive_errors = 10  # Blacklist after 10 errors
+        self._is_blacklisted = False
+        self._blacklist_time = 0
+        self._blacklist_duration = 600  # 10 minutes blacklist
+        self._last_successful_contact = time.time()
         
         # Logging
         self._logger = logging.getLogger(f"{self.__class__.__name__}_{ip}")
@@ -163,22 +165,29 @@ class BaseDevice(Thread):
             raise ScanException(f"Unexpected error from {url}: {e}")
     
     def run(self):
-        """Main device monitoring loop with improved error handling."""
+        """Main device monitoring loop with blacklisting support."""
         while self._is_online:
             time.sleep(0.2)
             
             current_time = time.time()
             
-            # Check if we're in error backoff period
-            if current_time < self._error_backoff_time:
-                continue
+            # Check if device is blacklisted and if blacklist period has expired
+            if self._is_blacklisted:
+                if current_time >= self._blacklist_time + self._blacklist_duration:
+                    self._remove_from_blacklist()
+                else:
+                    continue  # Skip this device while blacklisted
             
+            # Check if it's time for regular refresh
             if current_time - self._last_refresh > self._refresh_period:
                 if not self._skip_scanning:
                     try:
                         self._update_info()
                         # Reset error counter on successful update
-                        self._consecutive_errors = 0
+                        if self._consecutive_errors > 0:
+                            self._logger.info(f"Device {self._ip} recovered after {self._consecutive_errors} errors")
+                            self._consecutive_errors = 0
+                        self._last_successful_contact = current_time
                     except Exception as e:
                         self._handle_device_error(e)
                 else:
@@ -187,24 +196,95 @@ class BaseDevice(Thread):
                 self._last_refresh = current_time
     
     def _handle_device_error(self, error):
-        """Handle device errors with exponential backoff."""
+        """Handle device errors with blacklisting after too many failures."""
         self._consecutive_errors += 1
-        self._logger.debug(f"Device error (consecutive: {self._consecutive_errors}): {error}")
         
-        # Reset device info to offline
+        # Always reset device info to offline
         self._reset_info()
         
-        # If too many consecutive errors, implement backoff
         if self._consecutive_errors >= self._max_consecutive_errors:
-            backoff_seconds = min(
-                self._base_error_delay * (2 ** (self._consecutive_errors - self._max_consecutive_errors)),
-                300  # Max 5 minutes
-            )
-            self._error_backoff_time = time.time() + backoff_seconds
-            self._logger.warning(
-                f"Device {self._ip} has {self._consecutive_errors} consecutive errors. "
-                f"Backing off for {backoff_seconds} seconds"
-            )
+            self._add_to_blacklist()
+        else:
+            # Log errors less frequently to reduce noise
+            if self._consecutive_errors == 1:
+                self._logger.info(f"Device {self._ip} connection failed: {str(error)}")
+            elif self._consecutive_errors == 5:
+                self._logger.warning(f"Device {self._ip} has 5 consecutive errors, approaching blacklist threshold")
+            else:
+                self._logger.debug(f"Device {self._ip} error #{self._consecutive_errors}: {str(error)}")
+    
+    def _add_to_blacklist(self):
+        """Add device to blacklist after too many consecutive errors."""
+        self._is_blacklisted = True
+        self._blacklist_time = time.time()
+        
+        # Calculate time since last successful contact
+        time_since_success = time.time() - self._last_successful_contact
+        time_since_success_str = f"{time_since_success/60:.1f} minutes" if time_since_success > 60 else f"{time_since_success:.0f} seconds"
+        
+        self._logger.warning(
+            f"Device {self._ip} blacklisted after {self._consecutive_errors} consecutive errors. "
+            f"Last successful contact: {time_since_success_str} ago. "
+            f"Will retry in {self._blacklist_duration/60:.0f} minutes."
+        )
+        
+        # Update device info to reflect blacklisted state
+        with self._lock:
+            self._info.update({
+                'status': 'blacklisted',
+                'blacklisted': True,
+                'blacklist_time': self._blacklist_time,
+                'consecutive_errors': self._consecutive_errors,
+                'blacklist_expires': self._blacklist_time + self._blacklist_duration
+            })
+    
+    def _remove_from_blacklist(self):
+        """Remove device from blacklist and reset error counters."""
+        self._is_blacklisted = False
+        self._consecutive_errors = 0
+        self._blacklist_time = 0
+        
+        self._logger.info(f"Device {self._ip} removed from blacklist, attempting reconnection")
+        
+        # Reset device info
+        with self._lock:
+            self._info.update({
+                'status': 'offline',
+                'blacklisted': False,
+                'consecutive_errors': 0
+            })
+            # Remove blacklist-specific fields
+            self._info.pop('blacklist_time', None)
+            self._info.pop('blacklist_expires', None)
+    
+    def force_remove_from_blacklist(self):
+        """Manually remove device from blacklist (for external API calls)."""
+        if self._is_blacklisted:
+            self._logger.info(f"Device {self._ip} manually removed from blacklist")
+            self._remove_from_blacklist()
+            return True
+        return False
+    
+    def is_blacklisted(self) -> bool:
+        """Check if device is currently blacklisted."""
+        return self._is_blacklisted
+    
+    def get_blacklist_status(self) -> Dict[str, Any]:
+        """Get detailed blacklist status information."""
+        if not self._is_blacklisted:
+            return {'blacklisted': False}
+        
+        current_time = time.time()
+        time_remaining = max(0, (self._blacklist_time + self._blacklist_duration) - current_time)
+        
+        return {
+            'blacklisted': True,
+            'blacklist_time': self._blacklist_time,
+            'time_remaining': time_remaining,
+            'time_remaining_str': f"{time_remaining/60:.1f} minutes" if time_remaining > 60 else f"{time_remaining:.0f} seconds",
+            'consecutive_errors': self._consecutive_errors,
+            'last_successful_contact': self._last_successful_contact
+        }
     
     def _update_id(self):
         """Update device ID with proper error handling."""
@@ -238,11 +318,22 @@ class BaseDevice(Thread):
     def _reset_info(self):
         """Reset device info to offline state."""
         with self._lock:
-            self._info.update({
-                'status': 'offline',
+            base_info = {
+                'status': 'blacklisted' if self._is_blacklisted else 'offline',
                 'ip': self._ip,
-                'last_seen': time.time()
-            })
+                'last_seen': time.time(),
+                'consecutive_errors': self._consecutive_errors
+            }
+            
+            # Add blacklist info if blacklisted
+            if self._is_blacklisted:
+                base_info.update({
+                    'blacklisted': True,
+                    'blacklist_time': self._blacklist_time,
+                    'blacklist_expires': self._blacklist_time + self._blacklist_duration
+                })
+            
+            self._info.update(base_info)
     
     def _update_info(self):
         """Update device information. Override in subclasses."""
@@ -279,10 +370,19 @@ class BaseDevice(Thread):
         return self._id
         
     def info(self) -> Dict[str, Any]:
-        """Get device information dictionary."""
+        """Get device information dictionary including blacklist status."""
         with self._lock:
             info_copy = self._info.copy()
-            info_copy['consecutive_errors'] = self._consecutive_errors
+            
+            # Add current blacklist status
+            if self._is_blacklisted:
+                current_time = time.time()
+                time_remaining = max(0, (self._blacklist_time + self._blacklist_duration) - current_time)
+                info_copy.update({
+                    'blacklist_time_remaining': time_remaining,
+                    'blacklist_time_remaining_str': f"{time_remaining/60:.1f}m" if time_remaining > 60 else f"{time_remaining:.0f}s"
+                })
+            
             return info_copy
 
 
@@ -480,44 +580,49 @@ class Ethoscope(BaseDevice):
     def _reset_info(self):
         """Reset device info to offline state."""
         with self._lock:
-            self._info.update({
-                'status': 'offline',
+            base_info = {
+                'status': 'blacklisted' if self._is_blacklisted else 'offline',
                 'ip': self._ip,
                 'last_seen': time.time(),
-                'ping': self._ping_count  # Safe access to ping counter
-            })
+                'ping': self._ping_count,
+                'consecutive_errors': self._consecutive_errors
+            }
+            
+            # Add blacklist info if blacklisted
+            if self._is_blacklisted:
+                base_info.update({
+                    'blacklisted': True,
+                    'blacklist_time': self._blacklist_time,
+                    'blacklist_expires': self._blacklist_time + self._blacklist_duration
+                })
+            
+            self._info.update(base_info)
     
-    def send_instruction(self, instruction: str, post_data: Optional[Dict] = None):
+    def send_instruction(self, instruction: str, post_data: Optional[Union[Dict, bytes]] = None):
         """
         Send instruction to ethoscope with validation.
         
         Args:
             instruction: Instruction to send
-            post_data: Optional data to send with instruction
+            post_data: Optional data to send with instruction (can be Dict or bytes)
         """
         self._check_instruction_status(instruction)
         
         post_url = (f"http://{self._ip}:{self._port}/"
-                   f"{self.REMOTE_PAGES['controls']}/{self._id}/{instruction}")
+                f"{self.REMOTE_PAGES['controls']}/{self._id}/{instruction}")
         
-        # Convert post_data to JSON if provided
+        # Handle post_data properly - it might already be bytes or need conversion
         json_data = None
-        if post_data:
-            # Handle different input types
+        if post_data is not None:
             if isinstance(post_data, bytes):
-                # Convert bytes to string and parse as JSON, then re-encode
-                json_str = post_data.decode('utf-8')
-                parsed_data = json.loads(json_str)
-                json_data = json.dumps(parsed_data).encode('utf-8')
-            elif isinstance(post_data, str):
-                # Parse JSON string and re-encode to ensure valid format
-                parsed_data = json.loads(post_data)
-                json_data = json.dumps(parsed_data).encode('utf-8')
-            elif isinstance(post_data, dict):
-                # Dictionary - convert directly to JSON
+                # Already bytes, use as-is
+                json_data = post_data
+            elif isinstance(post_data, (dict, list, str, int, float, bool)):
+                # JSON serializable data, convert to bytes
                 json_data = json.dumps(post_data).encode('utf-8')
             else:
-                raise TypeError(f"Invalid post_data type: {type(post_data)}. Expected bytes, str, or dict.")
+                # Unknown type, try to convert to string then encode
+                json_data = str(post_data).encode('utf-8')
         
         # Power operations may not return data
         if instruction in ["poweroff", "reboot", "restart"]:
@@ -530,25 +635,15 @@ class Ethoscope(BaseDevice):
         
         self._update_info()
     
-    def send_settings(self, post_data) -> Any:
+    def send_settings(self, post_data: Union[Dict, bytes]) -> Any:
         """Send settings update to ethoscope."""
         post_url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['update']}/{self._id}"
         
-        # Handle different input types
+        # Handle post_data properly
         if isinstance(post_data, bytes):
-            # Convert bytes to string and parse as JSON, then re-encode
-            json_str = post_data.decode('utf-8')
-            parsed_data = json.loads(json_str)
-            json_data = json.dumps(parsed_data).encode('utf-8')
-        elif isinstance(post_data, str):
-            # Parse JSON string and re-encode to ensure valid format
-            parsed_data = json.loads(post_data)
-            json_data = json.dumps(parsed_data).encode('utf-8')
-        elif isinstance(post_data, dict):
-            # Dictionary - convert directly to JSON
-            json_data = json.dumps(post_data).encode('utf-8')
+            json_data = post_data
         else:
-            raise TypeError(f"Invalid post_data type: {type(post_data)}. Expected bytes, str, or dict.")
+            json_data = json.dumps(post_data).encode('utf-8')
         
         result = self._get_json(post_url, timeout=3, post_data=json_data)
         self._update_info()
@@ -733,8 +828,7 @@ class Ethoscope(BaseDevice):
         
         self._handle_state_transition(previous_status, new_status)
         self._update_backup_status()
-
-
+    
     def _fetch_device_info(self) -> bool:
         """Fetch latest device information."""
         try:
@@ -899,7 +993,7 @@ class Ethoscope(BaseDevice):
         except Exception as e:
             self._logger.error(f"Error creating backup path: {e}")
             self._info["backup_path"] = None
-
+    
     def _create_backup_path_from_filename(self, filename: str):
         """Create backup path from filename."""
         try:
@@ -930,7 +1024,7 @@ class Ethoscope(BaseDevice):
         except Exception as e:
             self._logger.error(f"Error parsing backup filename {filename}: {e}")
             self._info["backup_path"] = None
-
+    
     def _generate_legacy_backup_path(self, timeout: float):
         """Generate backup path for legacy systems (called only once)."""
         try:
@@ -1091,6 +1185,50 @@ class DeviceScanner:
                     return device
         return None
     
+    def get_blacklisted_devices(self) -> List[Dict[str, Any]]:
+        """Get list of currently blacklisted devices."""
+        blacklisted = []
+        with self._lock:
+            for device in self.devices:
+                if device.is_blacklisted():
+                    blacklist_info = device.get_blacklist_status()
+                    blacklist_info.update({
+                        'ip': device.ip(),
+                        'id': device.id(),
+                        'name': getattr(device, 'name', '')
+                    })
+                    blacklisted.append(blacklist_info)
+        return blacklisted
+    
+    def force_unblacklist_device(self, device_identifier: str) -> bool:
+        """
+        Manually remove a device from blacklist.
+        
+        Args:
+            device_identifier: Device IP or ID
+            
+        Returns:
+            bool: True if device was found and unblacklisted
+        """
+        with self._lock:
+            for device in self.devices:
+                if device.ip() == device_identifier or device.id() == device_identifier:
+                    return device.force_remove_from_blacklist()
+        return False
+    
+    def get_blacklist_statistics(self) -> Dict[str, Any]:
+        """Get statistics about blacklisted devices."""
+        blacklisted_devices = self.get_blacklisted_devices()
+        total_devices = len(self.devices)
+        blacklisted_count = len(blacklisted_devices)
+        
+        return {
+            'total_devices': total_devices,
+            'blacklisted_count': blacklisted_count,
+            'active_count': total_devices - blacklisted_count,
+            'blacklisted_devices': blacklisted_devices
+        }
+    
     def add(self, ip: str, port: int, name: Optional[str] = None, 
            device_id: Optional[str] = None, zcinfo: Optional[Dict] = None):
         """Add a device to the scanner."""
@@ -1100,6 +1238,16 @@ class DeviceScanner:
             
         try:
             with self._lock:
+                # Check if device already exists by IP (more immediate than waiting for ID)
+                for existing_device in self.devices:
+                    if existing_device.ip() == ip:
+                        self._logger.debug(f"Device at {ip} already exists, updating zeroconf info")
+                        if hasattr(existing_device, 'zeroconf_name'):
+                            existing_device.zeroconf_name = name
+                        # Reset error state in case it was having issues
+                        existing_device.reset_error_state()
+                        return
+                
                 # Create and start device
                 device = self._device_class(
                     ip, port=port, 
@@ -1155,6 +1303,7 @@ class DeviceScanner:
     def update_service(self, zeroconf, service_type: str, name: str):
         """Zeroconf callback for service updates."""
         pass
+
 
 class EthoscopeScanner(DeviceScanner):
     """Ethoscope-specific scanner with database integration."""
@@ -1229,8 +1378,12 @@ class EthoscopeScanner(DeviceScanner):
         return None
     
     def add(self, ip: str, port: int = ETHOSCOPE_PORT, name: Optional[str] = None,
-        device_id: Optional[str] = None, zcinfo: Optional[Dict] = None):
+           device_id: Optional[str] = None, zcinfo: Optional[Dict] = None):
         """Add ethoscope with enhanced error handling and non-blocking initialization."""
+        if not self._is_running:
+            self._logger.warning(f"Cannot add device {ip}:{port} - scanner not running")
+            return
+            
         try:
             # Extract name and ID from zeroconf info
             if zcinfo:
@@ -1283,8 +1436,7 @@ class EthoscopeScanner(DeviceScanner):
                     
         except Exception as e:
             self._logger.error(f"Error in add method for {ip}:{port}: {e}")
-
-
+    
     def retire_device(self, device_id: str, active: int = 0) -> Dict[str, Any]:
         """Retire device by updating database status."""
         try:
