@@ -197,39 +197,43 @@ class BaseDevice(Thread):
     
     def _handle_device_error(self, error):
         """Handle device errors with blacklisting after too many failures."""
-        self._consecutive_errors += 1
-        
-        # Always reset device info to offline
-        self._reset_info()
-        
-        if self._consecutive_errors >= self._max_consecutive_errors:
-            self._add_to_blacklist()
-        else:
-            # Log errors less frequently to reduce noise
-            if self._consecutive_errors == 1:
-                self._logger.info(f"Device {self._ip} connection failed: {str(error)}")
-            elif self._consecutive_errors == 5:
-                self._logger.warning(f"Device {self._ip} has 5 consecutive errors, approaching blacklist threshold")
+        with self._lock:
+            self._consecutive_errors += 1
+            
+            # Always reset device info to offline
+            self._reset_info()
+            
+            if self._consecutive_errors >= self._max_consecutive_errors:
+                self._add_to_blacklist()
             else:
-                self._logger.debug(f"Device {self._ip} error #{self._consecutive_errors}: {str(error)}")
+                # Log errors less frequently to reduce noise
+                if self._consecutive_errors == 1:
+                    self._logger.info(f"Device {self._ip} connection failed: {str(error)}")
+                elif self._consecutive_errors == 5:
+                    self._logger.warning(f"Device {self._ip} has 5 consecutive errors, approaching blacklist threshold")
+                else:
+                    self._logger.debug(f"Device {self._ip} error #{self._consecutive_errors}: {str(error)}")
     
     def _add_to_blacklist(self):
         """Add device to blacklist after too many consecutive errors."""
-        self._is_blacklisted = True
-        self._blacklist_time = time.time()
-        
-        # Calculate time since last successful contact
-        time_since_success = time.time() - self._last_successful_contact
-        time_since_success_str = f"{time_since_success/60:.1f} minutes" if time_since_success > 60 else f"{time_since_success:.0f} seconds"
-        
-        self._logger.warning(
-            f"Device {self._ip} blacklisted after {self._consecutive_errors} consecutive errors. "
-            f"Last successful contact: {time_since_success_str} ago. "
-            f"Will retry in {self._blacklist_duration/60:.0f} minutes."
-        )
-        
-        # Update device info to reflect blacklisted state
         with self._lock:
+            if self._is_blacklisted:
+                return
+                
+            self._is_blacklisted = True
+            self._blacklist_time = time.time()
+            
+            # Calculate time since last successful contact
+            time_since_success = self._blacklist_time - self._last_successful_contact
+            time_since_success_str = f"{time_since_success/60:.1f} minutes" if time_since_success > 60 else f"{time_since_success:.0f} seconds"
+            
+            self._logger.warning(
+                f"Device {self._ip} blacklisted after {self._consecutive_errors} consecutive errors. "
+                f"Last successful contact: {time_since_success_str} ago. "
+                f"Will retry in {self._blacklist_duration/60:.0f} minutes."
+            )
+            
+            # Update device info to reflect blacklisted state
             self._info.update({
                 'status': 'blacklisted',
                 'blacklisted': True,
@@ -240,14 +244,17 @@ class BaseDevice(Thread):
     
     def _remove_from_blacklist(self):
         """Remove device from blacklist and reset error counters."""
-        self._is_blacklisted = False
-        self._consecutive_errors = 0
-        self._blacklist_time = 0
-        
-        self._logger.info(f"Device {self._ip} removed from blacklist, attempting reconnection")
-        
-        # Reset device info
         with self._lock:
+            if not self._is_blacklisted:
+                return
+
+            self._is_blacklisted = False
+            self._consecutive_errors = 0
+            self._blacklist_time = 0
+            
+            self._logger.info(f"Device {self._ip} removed from blacklist, attempting reconnection")
+            
+            # Reset device info
             self._info.update({
                 'status': 'offline',
                 'blacklisted': False,
@@ -362,12 +369,8 @@ class BaseDevice(Thread):
         
     def id(self) -> str:
         """Get device ID."""
-        if not self._id:
-            try:
-                self._update_id()
-            except ScanException:
-                pass
-        return self._id
+        with self._lock:
+            return self._id
         
     def info(self) -> Dict[str, Any]:
         """Get device information dictionary including blacklist status."""
@@ -1292,12 +1295,17 @@ class DeviceScanner:
         """Zeroconf callback for removed services."""
         if not self._is_running:
             return
-            
+
+        info = zeroconf.get_service_info(service_type, name)
+        if not info or not info.addresses:
+            return
+
+        ip = socket.inet_ntoa(info.addresses[0])
         with self._lock:
             for device in self.devices:
-                if hasattr(device, 'zeroconf_name') and device.zeroconf_name == name:
+                if device.ip() == ip:
                     self._logger.info(f"{self.DEVICE_TYPE} {device.id()} went offline")
-                    # Don't remove from list to keep history
+                    device.skip_scanning(True)
                     break
     
     def update_service(self, zeroconf, service_type: str, name: str):

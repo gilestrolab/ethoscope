@@ -96,7 +96,11 @@ class CherootServer(bottle.ServerAdapter):
     def run(self, handler):
         try:
             from cheroot import wsgi
-            from cheroot.ssl import builtin
+            try:
+                from cheroot.ssl import builtin
+            except ImportError:
+                # cheroot < 6.0.0
+                pass
         except ImportError:
             raise ImportError("Cheroot server requires 'cheroot' package")
         
@@ -113,8 +117,12 @@ class CherootServer(bottle.ServerAdapter):
         
         server = wsgi.Server(**server_options)
         
-        if certfile and keyfile:
-            server.ssl_adapter = builtin.BuiltinSSLAdapter(certfile, keyfile, chainfile)
+        try:
+            if certfile and keyfile:
+                server.ssl_adapter = builtin.BuiltinSSLAdapter(certfile, keyfile, chainfile)
+        except (NameError, AttributeError):
+            # cheroot < 6.0.0
+            pass
         
         try:
             server.start()
@@ -413,10 +421,7 @@ class EthoscopeNodeServer:
         device = self.device_scanner.get_device(id)
         
         if not device:
-            try:
-                return self.device_scanner.get_all_devices_info()[id]
-            except KeyError:
-                raise Exception(f"A device with ID {id} is unknown to the system")
+            raise Exception(f"A device with ID {id} is unknown to the system")
         
         return device.info()
     
