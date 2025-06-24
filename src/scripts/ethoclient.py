@@ -27,8 +27,9 @@
 from optparse import OptionParser
 import socket
 import json
+import logging
 
-COMM_PACKET_SIZE = 1024*16 # in bytes. This should be large because it has to account for possible raise error messages coming backs
+COMM_PACKET_SIZE = 1024*32 # in bytes. 32KB should be sufficient for normal tracking requests
 
 def listenerIsAlive():
     '''
@@ -73,13 +74,33 @@ def send_command(action, data=None, host='127.0.0.1', port=5000, size=COMM_PACKE
 
               
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(30)  # Set 30 second timeout for socket operations
         s.connect((host, port))
-        s.sendall( json.dumps(message).encode('utf-8') )
+        
+        # Send the message
+        message_data = json.dumps(message).encode('utf-8')
+        s.sendall(message_data)
+        
+        # Receive response
         response = s.recv(size)
         
-        r = json.loads( response )
+        # Handle empty or invalid JSON responses
+        if not response or response.strip() == b'':
+            logging.warning(f"Received empty response for command: {action}")
+            return {}
+        
+        # Decode bytes to string if needed
+        if isinstance(response, bytes):
+            response = response.decode('utf-8')
+        
+        try:
+            r = json.loads(response)
+        except json.JSONDecodeError as e:
+            logging.error(f"Failed to parse JSON response for command '{action}': {response[:100]}...")
+            logging.error(f"JSON decode error: {e}")
+            return {}
     
-    return r['response']
+    return r.get('response', {})
 
 if __name__ == '__main__':
 

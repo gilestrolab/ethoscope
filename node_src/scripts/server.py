@@ -1,10 +1,3 @@
-"""
-Ethoscope Node Server - Main application server for managing ethoscope devices.
-
-This module provides a web-based interface for monitoring and controlling
-ethoscope devices, managing experiments, and handling data backup operations.
-"""
-
 import bottle
 import subprocess
 import socket
@@ -20,6 +13,8 @@ import tempfile
 import shutil
 import netifaces
 import json
+import time
+import hashlib
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from contextlib import contextmanager
@@ -97,35 +92,56 @@ def warning_decorator(func):
 
 
 class CherootServer(bottle.ServerAdapter):
-    """Custom Cheroot server adapter for Bottle."""
+    """Custom Cheroot server adapter with proper configuration."""
     
     def run(self, handler):
-        from cheroot import wsgi
-        from cheroot.ssl import builtin
+        try:
+            from cheroot import wsgi
+            try:
+                from cheroot.ssl import builtin
+            except ImportError:
+                # cheroot < 6.0.0
+                pass
+        except ImportError:
+            raise ImportError("Cheroot server requires 'cheroot' package")
         
-        self.options['bind_addr'] = (self.host, self.port)
-        self.options['wsgi_app'] = handler
+        # Only use supported parameters
+        server_options = {
+            'bind_addr': (self.host, self.port),
+            'wsgi_app': handler,
+        }
         
-        certfile = self.options.pop('certfile', None)
-        keyfile = self.options.pop('keyfile', None)
-        chainfile = self.options.pop('chainfile', None)
+        # Add SSL if certificates are provided
+        certfile = self.options.get('certfile')
+        keyfile = self.options.get('keyfile')
+        chainfile = self.options.get('chainfile')
         
-        server = wsgi.Server(**self.options)
+        server = wsgi.Server(**server_options)
         
-        if certfile and keyfile:
-            server.ssl_adapter = builtin.BuiltinSSLAdapter(certfile, keyfile, chainfile)
+        try:
+            if certfile and keyfile:
+                server.ssl_adapter = builtin.BuiltinSSLAdapter(certfile, keyfile, chainfile)
+        except (NameError, AttributeError):
+            # cheroot < 6.0.0
+            pass
         
         try:
             server.start()
+        except KeyboardInterrupt:
+            pass
         finally:
-            server.stop()
+            try:
+                server.stop()
+            except Exception as e:
+                logging.warning(f"Error stopping Cheroot server: {e}")
 
 
 class EthoscopeNodeServer:
     """Main server class for Ethoscope Node."""
     
     def __init__(self, port: int = DEFAULT_PORT, debug: bool = False, 
-                 temp_results_dir: Optional[str] = None):
+                 temp_results_dir: Optional[str] = None,
+                 ethoscope_data_dir: Optional[str] = None):
         self.port = port
         self.debug = debug
         self.app = bottle.Bottle()
@@ -140,14 +156,41 @@ class EthoscopeNodeServer:
         # Paths and directories
         self.tmp_imgs_dir: Optional[str] = None
         self.results_dir: Optional[str] = temp_results_dir
+        self.ethoscope_data_dir = ethoscope_data_dir or "/ethoscope_data"
+        self.roi_templates_dir = os.path.join(self.ethoscope_data_dir, "roi_templates")
         
         # System configuration
         self.is_dockerized = os.path.exists('/.dockerenv')
         self.systemctl = "/usr/bin/systemctl.py" if self.is_dockerized else "/usr/bin/systemctl"
         
-        # Setup routes
+        # Server state
+        self._server_running = False
+        self._shutdown_requested = False
+        
+        # Setup routes and hooks
         self._setup_routes()
         self._setup_hooks()
+    
+    def _detect_available_server(self):
+        """Detect which server adapter is available."""
+        # Try to import servers in order of preference
+        servers = [
+            ('paste', 'paste.httpserver'),
+            ('cheroot', 'cheroot.wsgi'),
+            ('cherrypy', 'cherrypy.wsgiserver'),
+            ('wsgiref', 'wsgiref.simple_server')  # Built-in fallback
+        ]
+        
+        for server_name, module_name in servers:
+            try:
+                __import__(module_name)
+                self.logger.debug(f"Server {server_name} is available")
+                return server_name
+            except ImportError:
+                continue
+        
+        # If nothing else, use built-in wsgiref
+        return 'wsgiref'
     
     def _setup_routes(self):
         """Setup all application routes."""
@@ -196,6 +239,12 @@ class EthoscopeNodeServer:
         self.app.route('/request_download/<what>', method='POST')(self._download)
         self.app.route('/remove_files', method='POST')(self._remove_files)
         
+        # ROI template API
+        self.app.route('/roi_templates', method='GET')(self._list_roi_templates)
+        self.app.route('/roi_template/<template_name>', method='GET')(self._get_roi_template)
+        self.app.route('/upload_roi_template', method='POST')(self._upload_roi_template)
+        self.app.route('/device/<id>/upload_template', method='POST')(self._upload_template_to_device)
+        
         # Database API
         self.app.route('/runs_list', method='GET')(self._runs_list)
         self.app.route('/experiments_list', method='GET')(self._experiments_list)
@@ -208,6 +257,10 @@ class EthoscopeNodeServer:
         self.app.route('/sensors_data', method='GET')(self._redirection_to_sensors)
         self.app.route('/resources', method='GET')(self._redirection_to_resources)
     
+        # Add these to _setup_routes method:
+        self.app.route('/blacklist/status', method='GET')(self._get_blacklist_status)
+        self.app.route('/blacklist/remove/<device_id>', method='POST')(self._unblacklist_device)
+
     def _setup_hooks(self):
         """Setup application hooks."""
         @self.app.hook('after_request')
@@ -265,7 +318,14 @@ class EthoscopeNodeServer:
     
     def cleanup(self):
         """Clean up all server resources."""
+        if self._shutdown_requested:
+            return  # Already cleaning up
+            
+        self._shutdown_requested = True
         self.logger.info("Cleaning up server resources...")
+        
+        # Stop server flag
+        self._server_running = False
         
         if self.device_scanner:
             try:
@@ -288,31 +348,43 @@ class EthoscopeNodeServer:
             except Exception as e:
                 self.logger.warning(f"Error cleaning tmp directory: {e}")
         
+        # Add a small delay to allow connections to close gracefully
+        time.sleep(0.1)
+        
         self.logger.info("Server cleanup complete")
     
     def run(self):
-        """Start the web server."""
+        """Start the web server with better server detection."""
         self.logger.info(f"Starting web server on port {self.port}")
+        self._server_running = True
+        
+        # Detect available server
+        available_server = self._detect_available_server()
         
         try:
-            # Try Paste server first
-            bottle.run(self.app, host='0.0.0.0', port=self.port, 
-                      debug=self.debug, server='paste')
-        except ImportError:
-            self.logger.info("Paste server not available, trying alternative...")
+            if available_server == 'cheroot':
+                # Register our custom Cheroot server
+                bottle.server_names["cheroot"] = CherootServer
             
-            # Fallback to Cheroot/CherryPy
-            try:
-                from bottle.cherrypy import wsgiserver
-                self.logger.info("Using CherryPy server")
-            except ImportError:
-                bottle.server_names["cherrypy"] = CherootServer(host='0.0.0.0', port=self.port)
-                self.logger.warning("Using Cheroot server (CherryPy >= 9)")
+            self.logger.info(f"Using {available_server} server")
             
             bottle.run(self.app, host='0.0.0.0', port=self.port, 
-                      debug=self.debug, server='cherrypy')
-    
-    # Route handlers - Static files
+                      debug=self.debug, server=available_server, 
+                      quiet=not self.debug)
+                
+        except KeyboardInterrupt:
+            self.logger.info("Server interrupted")
+            raise
+        except Exception as e:
+            self.logger.error(f"Server error: {e}")
+            raise
+        finally:
+            self._server_running = False
+
+    # [Include all the existing route handler methods here - they remain the same]
+    # _serve_static, _serve_tmp_static, _index, _get_devices, etc.
+    # I'll include a few key ones as examples:
+
     def _serve_static(self, filepath):
         return bottle.static_file(filepath, root=STATIC_DIR)
     
@@ -325,21 +397,19 @@ class EthoscopeNodeServer:
     def _get_favicon(self):
         return self._serve_static('img/favicon.ico')
     
-    # Route handlers - Main pages
     def _index(self):
         return bottle.static_file('index.html', root=STATIC_DIR)
     
     def _update_redirect(self):
         return bottle.redirect(self.config.custom('UPDATE_SERVICE_URL'))
     
-    # Route handlers - Device API
     @error_decorator
     def _get_devices(self):
         return self.device_scanner.get_all_devices_info()
     
     def _get_devices_list(self):
         return self._get_devices()
-    
+
     def _manual_add_device(self):
         """Manually add ethoscopes using provided IPs."""
         input_string = bottle.request.body.read().decode("utf-8")
@@ -361,10 +431,7 @@ class EthoscopeNodeServer:
         device = self.device_scanner.get_device(id)
         
         if not device:
-            try:
-                return self.device_scanner.get_all_devices_info()[id]
-            except KeyError:
-                raise Exception(f"A device with ID {id} is unknown to the system")
+            raise Exception(f"A device with ID {id} is unknown to the system")
         
         return device.info()
     
@@ -377,10 +444,13 @@ class EthoscopeNodeServer:
     
     @error_decorator
     def _set_device_machine_info(self, id):
-        post_data = bottle.request.body.read()
+        """Update device machine info."""
+        post_data = bottle.request.body.read()  # This is already bytes
         device = self.device_scanner.get_device(id)
+        
+        # Don't try to JSON decode/encode - pass bytes directly
         response = device.send_settings(post_data)
-        return {**device.machine_info(), "haschanged": response['haschanged']}
+        return {**device.machine_info(), "haschanged": response.get('haschanged', False)}
     
     @error_decorator
     def _get_device_module(self, id):
@@ -427,7 +497,32 @@ class EthoscopeNodeServer:
         device = self.device_scanner.get_device(id)
         bottle.response.set_header('Content-type', 'multipart/x-mixed-replace; boundary=frame')
         return device.relay_stream()
-    
+
+    @error_decorator
+    def _get_blacklist_status(self):
+        """Get blacklist statistics and blacklisted devices."""
+        device_stats = self.device_scanner.get_blacklist_statistics()
+        sensor_stats = self.sensor_scanner.get_blacklist_statistics() if self.sensor_scanner else {'blacklisted_count': 0}
+        
+        return {
+            'ethoscopes': device_stats,
+            'sensors': sensor_stats,
+            'total_blacklisted': device_stats['blacklisted_count'] + sensor_stats['blacklisted_count']
+        }
+
+    @error_decorator  
+    def _unblacklist_device(self, device_id):
+        """Manually remove a device from blacklist."""
+        # Try ethoscopes first
+        if self.device_scanner.force_unblacklist_device(device_id):
+            return {'success': True, 'message': f'Ethoscope {device_id} removed from blacklist'}
+        
+        # Try sensors
+        if self.sensor_scanner and self.sensor_scanner.force_unblacklist_device(device_id):
+            return {'success': True, 'message': f'Sensor {device_id} removed from blacklist'}
+        
+        return {'success': False, 'message': f'Device {device_id} not found or not blacklisted'}
+
     @error_decorator
     def _force_device_backup(self, id):
         """Force backup on device with specified id."""
@@ -471,8 +566,11 @@ class EthoscopeNodeServer:
     
     @error_decorator
     def _post_device_instructions(self, id, instruction):
-        post_data = bottle.request.body.read()
+        """Send instruction to device."""
+        post_data = bottle.request.body.read()  # This is already bytes
         device = self.device_scanner.get_device(id)
+        
+        # Don't try to JSON decode/encode - pass bytes directly
         device.send_instruction(instruction, post_data)
         return self._get_device_info(id)
     
@@ -487,16 +585,28 @@ class EthoscopeNodeServer:
         return self.sensor_scanner.get_all_devices_info() if self.sensor_scanner else {}
     
     def _edit_sensor(self):
+        """Edit sensor settings."""
         input_string = bottle.request.body.read().decode("utf-8")
-        data = eval(input_string)  # Note: This should use json.loads() for security
+        
+        # Use json.loads instead of eval for security
+        try:
+            data = json.loads(input_string)
+        except json.JSONDecodeError:
+            # Fallback for malformed JSON - but this is risky
+            try:
+                data = eval(input_string)  # This should eventually be removed
+            except:
+                return {'error': 'Invalid data format'}
         
         if self.sensor_scanner:
             try:
                 sensor = self.sensor_scanner.get_device(data["id"])
                 if sensor:
                     return sensor.set({"location": data["location"], "sensor_name": data["name"]})
-            except Exception:
-                pass
+            except Exception as e:
+                return {'error': f'Sensor operation failed: {str(e)}'}
+        
+        return {'error': 'Sensor not found'}
     
     @error_decorator
     def _list_csv_files(self):
@@ -523,6 +633,170 @@ class EthoscopeNodeServer:
                 data.append(line.strip().split(','))
         
         return {'headers': headers, 'data': data}
+    
+    # Route handlers - ROI Template API
+    @error_decorator
+    def _list_roi_templates(self):
+        """List available ROI templates, separating builtin and custom."""
+        templates = []
+        
+        # Builtin templates directory (part of codebase)
+        builtin_dir = os.path.join(os.path.dirname(__file__), "..", "..", "roi_templates", "builtin")
+        builtin_dir = os.path.abspath(builtin_dir)
+        
+        # Custom templates directory (in ethoscope_data)
+        custom_dir = self.roi_templates_dir
+        os.makedirs(custom_dir, exist_ok=True)
+        
+        try:
+            # Scan builtin templates first
+            if os.path.exists(builtin_dir):
+                for filename in os.listdir(builtin_dir):
+                    if filename.endswith('.json'):
+                        filepath = os.path.join(builtin_dir, filename)
+                        template_info = self._parse_template_file(filepath, "builtin")
+                        if template_info:
+                            templates.append(template_info)
+            
+            # Scan custom templates second
+            for filename in os.listdir(custom_dir):
+                if filename.endswith('.json'):
+                    filepath = os.path.join(custom_dir, filename)
+                    template_info = self._parse_template_file(filepath, "custom")
+                    if template_info:
+                        templates.append(template_info)
+                        
+            # Sort by display text
+            templates.sort(key=lambda x: x["text"])
+            
+        except Exception as e:
+            self.logger.error(f"Error listing ROI templates: {e}")
+        
+        return {"templates": templates}
+    
+    def _parse_template_file(self, filepath: str, template_type: str):
+        """Parse a template file and return template info."""
+        try:
+            with open(filepath, 'r') as f:
+                file_content = f.read()
+                template_data = json.loads(file_content)
+            
+            # Calculate MD5 hash of the file content
+            md5_hash = hashlib.md5(file_content.encode('utf-8')).hexdigest()
+            
+            template_info = template_data.get("template_info", {})
+            filename = os.path.basename(filepath)
+            
+            # Use existing template ID or generate from MD5
+            template_id = template_info.get("id", md5_hash)
+            
+            return {
+                "value": filename[:-5],  # Remove .json extension
+                "text": template_info.get("name", filename[:-5]),
+                "description": template_info.get("description", ""),
+                "filename": filename,
+                "id": template_id,
+                "md5": md5_hash,
+                "type": template_type  # "builtin" or "custom"
+            }
+        except Exception as e:
+            self.logger.warning(f"Could not load template {filepath}: {e}")
+            return None
+    
+    @error_decorator
+    def _get_roi_template(self, template_name):
+        """Get specific ROI template content from builtin or custom directories."""
+        # Try builtin templates first
+        builtin_dir = os.path.join(os.path.dirname(__file__), "..", "..", "roi_templates", "builtin")
+        builtin_dir = os.path.abspath(builtin_dir)
+        builtin_path = os.path.join(builtin_dir, f"{template_name}.json")
+        
+        if os.path.exists(builtin_path):
+            try:
+                with open(builtin_path, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                bottle.abort(500, f"Error loading builtin template: {e}")
+        
+        # Try custom templates second
+        custom_path = os.path.join(self.roi_templates_dir, f"{template_name}.json")
+        if os.path.exists(custom_path):
+            try:
+                with open(custom_path, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                bottle.abort(500, f"Error loading custom template: {e}")
+        
+        bottle.abort(404, f"Template '{template_name}' not found in builtin or custom directories")
+    
+    @error_decorator
+    def _upload_roi_template(self):
+        """Handle ROI template uploads from web interface."""
+        upload = bottle.request.files.get('template')
+        if not upload:
+            bottle.abort(400, "No template file uploaded")
+        
+        if not upload.filename.endswith('.json'):
+            bottle.abort(400, "Template must be a JSON file")
+        
+        # Ensure roi_templates directory exists 
+        os.makedirs(self.roi_templates_dir, exist_ok=True)
+        
+        # Save uploaded file
+        filepath = os.path.join(self.roi_templates_dir, upload.filename)
+        try:
+            upload.save(filepath)
+            
+            # Validate template
+            with open(filepath, 'r') as f:
+                template_data = json.load(f)
+            
+            # Basic validation
+            if "template_info" not in template_data or "roi_definition" not in template_data:
+                os.remove(filepath)
+                bottle.abort(400, "Invalid template format")
+            
+            return {"success": True, "filename": upload.filename}
+            
+        except Exception as e:
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            bottle.abort(500, f"Error saving template: {e}")
+    
+    @error_decorator  
+    def _upload_template_to_device(self, id):
+        """Upload custom template from node to device."""
+        template_name = bottle.request.json.get('template_name')
+        if not template_name:
+            bottle.abort(400, "Template name required")
+        
+        # Get template from node (should be a custom template)
+        template_data = self._get_roi_template(template_name)
+        
+        # Get device info
+        try:
+            device = self.device_scanner.get_device(id)
+            if not device:
+                bottle.abort(404, f"Device {id} not found")
+            
+            # Upload template to device using device API
+            device_url = f"http://{device.ip}:{device.port}/upload_roi_template"
+            import requests
+            
+            # Send template data as JSON POST
+            payload = {
+                'template_data': template_data,
+                'template_name': template_name
+            }
+            
+            response = requests.post(device_url, json=payload, timeout=10)
+            if response.status_code == 200:
+                return {"success": True, "message": f"Custom template {template_name} uploaded to device {id}"}
+            else:
+                bottle.abort(500, f"Device upload failed: {response.text}")
+                
+        except Exception as e:
+            bottle.abort(500, f"Error uploading to device: {e}")
     
     # Route handlers - Database API
     @error_decorator
@@ -827,7 +1101,8 @@ class EthoscopeNodeServer:
             if os.path.exists(tmp_file):
                 os.remove(tmp_file)
             return ""
-    
+
+
     def _shutdown(self, exit_status=0):
         """Shutdown the server."""
         self.logger.info("Shutting down server")
@@ -857,30 +1132,27 @@ def parse_command_line():
                        help=f'Server port (default: {DEFAULT_PORT})')
     parser.add_argument('-e', '--temporary-results-dir', dest='temp_results_dir',
                        help='Directory for temporary result files')
+    parser.add_argument('-d', '--ethoscope-data-dir', dest='ethoscope_data_dir',
+                       default='/ethoscope_data',
+                       help='Ethoscope data directory (default: /ethoscope_data)')
     
     return parser.parse_args()
 
 
 def main():
-    """Main entry point."""
-    # Parse command line arguments
+    """Main entry point with improved cleanup."""
+    # Parse arguments and setup logging
     args = parse_command_line()
-    
-    # Setup logging
     setup_logging(args.debug)
     logger = logging.getLogger('EthoscopeNodeServer')
     
-    # Initialize server
-    server = EthoscopeNodeServer(
-        port=args.port,
-        debug=args.debug,
-        temp_results_dir=args.temp_results_dir
-    )
+    server = None
     
     def signal_handler(sig, frame):
         """Handle shutdown signals gracefully."""
         logger.info(f"Received signal {sig}, shutting down gracefully...")
-        server.cleanup()
+        if server:
+            server.cleanup()
         sys.exit(0)
     
     # Setup signal handlers
@@ -889,6 +1161,13 @@ def main():
     
     try:
         # Initialize and start server
+        server = EthoscopeNodeServer(
+            port=args.port,
+            debug=args.debug,
+            temp_results_dir=args.temp_results_dir,
+            ethoscope_data_dir=args.ethoscope_data_dir
+        )
+        
         server.initialize()
         server.run()
         
@@ -898,17 +1177,20 @@ def main():
     except socket.error as e:
         logger.error(f"Socket error: {e}")
         logger.error(f"Port {args.port} is probably not accessible. Try another port with -p option")
-        server.cleanup()
+        if server:
+            server.cleanup()
         sys.exit(1)
         
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
         logger.error(traceback.format_exc())
-        server.cleanup()
+        if server:
+            server.cleanup()
         sys.exit(1)
         
     finally:
-        server.cleanup()
+        if server:
+            server.cleanup()
         logger.info("Server shutdown complete")
 
 

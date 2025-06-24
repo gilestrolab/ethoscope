@@ -1,6 +1,7 @@
 __author__ = 'quentin'
 
 import cv2
+import warnings
 
 try:
     CV_VERSION = int(cv2.__version__.split(".")[0])
@@ -269,17 +270,24 @@ class TargetGridROIBuilder(BaseROIBuilder):
 
 class ThirtyFliesMonitorWithTargetROIBuilder(TargetGridROIBuilder):
 
-    _description = {"overview": "The default sleep monitor arena with ten rows of two tubes.",
+    _description = {"overview": "The default sleep monitor arena with ten rows of three tubes. DEPRECATED: Use FileBasedROIBuilder with 'sleep_monitor_30tube' template.",
                     "arguments": []}
 
     def __init__(self):
         r"""
-        Class to build ROIs for a two-columns, ten-rows for the sleep monitor
+        Class to build ROIs for a three-columns, ten-rows for the sleep monitor
         (`see here <https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_10x2_shortTubes>`_).
+        
+        .. deprecated:: 1.1
+            Use FileBasedROIBuilder with 'sleep_monitor_30tube' template instead.
         """
-        #`sleep monitor tube holder arena <todo>`_
+        warnings.warn(
+            "ThirtyFliesMonitorWithTargetROIBuilder is deprecated. Use FileBasedROIBuilder(template_name='sleep_monitor_30tube') instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
 
-        super(SleepMonitorWithTargetROIBuilder, self).__init__(n_rows=10,
+        super(ThirtyFliesMonitorWithTargetROIBuilder, self).__init__(n_rows=10,
                                                                n_cols=3,
                                                                top_margin= 6.99 / 111.00,
                                                                bottom_margin = 6.99 / 111.00,
@@ -291,15 +299,22 @@ class ThirtyFliesMonitorWithTargetROIBuilder(TargetGridROIBuilder):
 
 class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilder):
 
-    _description = {"overview": "The default sleep monitor arena with ten rows of two tubes.",
+    _description = {"overview": "The default sleep monitor arena with ten rows of two tubes. DEPRECATED: Use FileBasedROIBuilder with 'sleep_monitor_20tube' template.",
                     "arguments": []}
 
     def __init__(self):
         r"""
         Class to build ROIs for a two-columns, ten-rows for the sleep monitor
         (`see here <https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_10x2_shortTubes>`_).
+        
+        .. deprecated:: 1.1
+            Use FileBasedROIBuilder with 'sleep_monitor_20tube' template instead.
         """
-        #`sleep monitor tube holder arena <todo>`_
+        warnings.warn(
+            "SleepMonitorWithTargetROIBuilder is deprecated. Use FileBasedROIBuilder(template_name='sleep_monitor_20tube') instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
 
         super(SleepMonitorWithTargetROIBuilder, self).__init__(n_rows=10,
                                                                n_cols=2,
@@ -314,14 +329,21 @@ class SleepMonitorWithTargetROIBuilder(TargetGridROIBuilder):
 
 
 class OlfactionAssayROIBuilder(TargetGridROIBuilder):
-    _description = {"overview": "The default odor assay roi layout with ten rows of single tubes.",
+    _description = {"overview": "The default odor assay roi layout with ten rows of single tubes. DEPRECATED: Use FileBasedROIBuilder with 'olfaction_assay_10tube' template.",
                     "arguments": []}
     def __init__(self):
         """
         Class to build ROIs for a one-column, ten-rows
         (`see here <https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_10x1_longTubes>`_)
+        
+        .. deprecated:: 1.1
+            Use FileBasedROIBuilder with 'olfaction_assay_10tube' template instead.
         """
-        #`olfactory response arena <todo>`_
+        warnings.warn(
+            "OlfactionAssayROIBuilder is deprecated. Use FileBasedROIBuilder(template_name='olfaction_assay_10tube') instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
 
         super(OlfactionAssayROIBuilder, self).__init__(n_rows=10,
                                                                n_cols=1,
@@ -334,14 +356,21 @@ class OlfactionAssayROIBuilder(TargetGridROIBuilder):
                                                                )
 
 class ElectricShockAssayROIBuilder(TargetGridROIBuilder):
-    _description = {"overview": "A ROI layout for the automatic electric shock. 5 rows, 1 column",
+    _description = {"overview": "A ROI layout for the automatic electric shock. 5 rows, 1 column. DEPRECATED: Use FileBasedROIBuilder with 'electric_shock_5tube' template.",
                     "arguments": []}
     def __init__(self):
         """
         Class to build ROIs for a one-column, five-rows
         (`Add gitbook URL when ready`_)
+        
+        .. deprecated:: 1.1
+            Use FileBasedROIBuilder with 'electric_shock_5tube' template instead.
         """
-        #`olfactory response arena <todo>`_
+        warnings.warn(
+            "ElectricShockAssayROIBuilder is deprecated. Use FileBasedROIBuilder(template_name='electric_shock_5tube') instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
 
         super(ElectricShockAssayROIBuilder, self).__init__(n_rows=5,
                                                                n_cols=1,
@@ -355,7 +384,7 @@ class ElectricShockAssayROIBuilder(TargetGridROIBuilder):
 
 
 class HD12TubesRoiBuilder(TargetGridROIBuilder):
-    _description = {"overview": "The default high resolution, 12 tubes (1 row) roi layout",
+    _description = {"overview": "The default high resolution, 12 tubes (1 row) roi layout. DEPRECATED: Use FileBasedROIBuilder with 'hd_12tubes' template.",
                     "arguments": []}
 
 
@@ -363,8 +392,15 @@ class HD12TubesRoiBuilder(TargetGridROIBuilder):
         r"""
         Class to build ROIs for a twelve columns, one row for the HD tracking arena
         (`see here <https://github.com/gilestrolab/ethoscope_hardware/tree/master/arenas/arena_mini_12_tubes>`_)
+        
+        .. deprecated:: 1.1
+            Use FileBasedROIBuilder with 'hd_12tubes' template instead.
         """
-
+        warnings.warn(
+            "HD12TubesRoiBuilder is deprecated. Use FileBasedROIBuilder(template_name='hd_12tubes') instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
 
         super(HD12TubesRoiBuilder, self).__init__( n_rows=1,
                                                    n_cols=12,

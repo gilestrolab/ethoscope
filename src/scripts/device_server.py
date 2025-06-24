@@ -70,6 +70,41 @@ def error_decorator(func):
             return {'error': traceback.format_exc()}
     return func_wrapper
 
+@api.route('/upload_roi_template', method='POST')
+def upload_roi_template():
+    """Upload custom ROI template from node to device."""
+    try:
+        data = bottle.request.json
+        if not data:
+            return {'result': 'fail', 'comment': 'No JSON data provided'}
+        
+        template_data = data.get('template_data')
+        template_name = data.get('template_name', 'uploaded_template')
+        
+        if not template_data:
+            return {'result': 'fail', 'comment': 'No template data provided'}
+        
+        # Ensure custom templates directory exists
+        custom_templates_dir = '/ethoscope_data/roi_templates'
+        os.makedirs(custom_templates_dir, exist_ok=True)
+        
+        # Save template with simple name-based filename
+        filename = f"{template_name}.json"
+        filepath = os.path.join(custom_templates_dir, filename)
+        
+        # Save template
+        with open(filepath, 'w') as f:
+            json.dump(template_data, f, indent=2)
+        
+        return {
+            'result': 'success', 
+            'path': filepath,
+            'message': f'Custom template {template_name} saved to device'
+        }
+        
+    except Exception as e:
+        return {'result': 'fail', 'comment': f'Error saving template: {str(e)}'}
+
 @api.route('/upload/<id>', method='POST')
 def do_upload(id):
     
@@ -85,8 +120,10 @@ def do_upload(id):
         category = 'images'
     elif ext in ('.msk'):
         category = 'masks'
+    elif ext in ('.json'):
+        category = 'templates'
     else:
-        return {'result' : 'fail', 'comment' : "File extension not allowed. You can upload only movies, images, or masks"}
+        return {'result' : 'fail', 'comment' : "File extension not allowed. You can upload only movies, images, masks, or JSON templates"}
 
     save_path = os.path.join(_ETHOSCOPE_UPLOAD, "{category}".format(category=category))
     if not os.path.exists(save_path):
@@ -94,6 +131,32 @@ def do_upload(id):
 
     file_path = "{path}/{file}".format(path=save_path, file=upload.filename)
     upload.save(file_path)
+    
+    # Special handling for ROI templates - also copy to local roi_templates directory
+    if ext == '.json' and category == 'templates':
+        roi_templates_dir = '/ethoscope_data/roi_templates'
+        os.makedirs(roi_templates_dir, exist_ok=True)
+        template_copy_path = os.path.join(roi_templates_dir, upload.filename)
+        
+        # Validate JSON template before copying
+        try:
+            import json
+            with open(file_path, 'r') as f:
+                template_data = json.load(f)
+            
+            # Basic validation - ensure required fields exist
+            if "template_info" in template_data and "roi_definition" in template_data:
+                # Copy validated template to roi_templates directory
+                import shutil
+                shutil.copy2(file_path, template_copy_path)
+                return { 'result' : 'success', 'path' : file_path, 'template_path': template_copy_path }
+            else:
+                return {'result': 'fail', 'comment': 'Invalid ROI template format - missing required fields'}
+        except json.JSONDecodeError:
+            return {'result': 'fail', 'comment': 'Invalid JSON format in template file'}
+        except Exception as e:
+            return {'result': 'fail', 'comment': f'Error validating template: {str(e)}'}
+    
     return { 'result' : 'success', 'path' : file_path }
 
 @api.route('/static/<filepath:path>')
@@ -444,6 +507,116 @@ def info(id):
     
     return runninginfo
 
+def _inject_roi_template_options(tracking_options):
+    """
+    Inject ROI template dropdown options into FileBasedROIBuilder options.
+    
+    Args:
+        tracking_options: Dictionary of tracking options from ControlThread
+        
+    Returns:
+        Modified tracking options with ROI template dropdown
+    """
+    # Scan for available ROI templates
+    template_options = []
+    
+    # Builtin templates directory (part of codebase)
+    builtin_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "roi_templates", "builtin"))
+    
+    # Custom templates directory (in ethoscope_data)
+    custom_dir = "/ethoscope_data/roi_templates"
+    
+    # Scan builtin templates first
+    if os.path.exists(builtin_dir):
+        for filename in os.listdir(builtin_dir):
+            if filename.endswith('.json'):
+                filepath = os.path.join(builtin_dir, filename)
+                try:
+                    with open(filepath, 'r') as f:
+                        template_data = json.load(f)
+                    
+                    template_info = template_data.get("template_info", {})
+                    template_name = template_info.get("name", filename[:-5])
+                    template_value = filename[:-5]  # Remove .json extension
+                    
+                    template_options.append({
+                        "value": template_value,
+                        "text": f"{template_name} (builtin)",
+                        "type": "builtin"
+                    })
+                except Exception:
+                    # Skip invalid templates
+                    continue
+    
+    # Scan custom templates second
+    if os.path.exists(custom_dir):
+        for filename in os.listdir(custom_dir):
+            if filename.endswith('.json'):
+                filepath = os.path.join(custom_dir, filename)
+                try:
+                    with open(filepath, 'r') as f:
+                        template_data = json.load(f)
+                    
+                    template_info = template_data.get("template_info", {})
+                    template_name = template_info.get("name", filename[:-5])
+                    template_value = filename[:-5]  # Remove .json extension
+                    
+                    template_options.append({
+                        "value": template_value,
+                        "text": f"{template_name} (custom)",
+                        "type": "custom"
+                    })
+                except Exception:
+                    # Skip invalid templates
+                    continue
+    
+    # Add default builtin templates if directory is empty
+    if not template_options:
+        template_options = [
+            {"value": "sleep_monitor_20tube", "text": "Sleep Monitor (20 tubes)"},
+            {"value": "sleep_monitor_30tube", "text": "Sleep Monitor (30 tubes)"},
+            {"value": "olfaction_assay_10tube", "text": "Olfaction Assay (10 tubes)"},
+            {"value": "electric_shock_5tube", "text": "Electric Shock (5 tubes)"},
+            {"value": "hd_12tubes", "text": "HD 12 Tubes"},
+            {"value": "default_full_image", "text": "Full Image ROI"}
+        ]
+    
+    # Sort templates by name
+    template_options.sort(key=lambda x: x["text"])
+    
+    # Find and modify FileBasedROIBuilder in tracking options
+    if "roi_builder" in tracking_options:
+        for roi_option in tracking_options["roi_builder"]:
+            if "FileBasedROIBuilder" in roi_option.get("name", ""):
+                # Add template dropdown argument
+                if "arguments" not in roi_option:
+                    roi_option["arguments"] = []
+                
+                # Add template_name dropdown argument
+                template_arg = {
+                    "name": "template_name",
+                    "description": "ROI Template",
+                    "type": "dropdown",
+                    "options": template_options,
+                    "default": template_options[0]["value"] if template_options else "sleep_monitor_20tube"
+                }
+                
+                # Insert at beginning or replace existing template_name argument
+                existing_template_arg = None
+                for i, arg in enumerate(roi_option["arguments"]):
+                    if arg.get("name") == "template_name":
+                        existing_template_arg = i
+                        break
+                
+                if existing_template_arg is not None:
+                    roi_option["arguments"][existing_template_arg] = template_arg
+                else:
+                    roi_option["arguments"].insert(0, template_arg)
+                
+                break
+    
+    return tracking_options
+
 @api.get('/user_options/<id>')
 @error_decorator
 def user_options(id):
@@ -454,9 +627,15 @@ def user_options(id):
         raise WrongMachineID
 
     machine_info = get_machine_info(id)
+    
+    # Get base tracking options
+    tracking_options = ControlThread.user_options()
+    
+    # Inject ROI template dropdown options for FileBasedROIBuilder
+    tracking_options = _inject_roi_template_options(tracking_options)
 
     return {
-        "tracking":ControlThread.user_options(),
+        "tracking": tracking_options,
         "recording":ControlThreadVideoRecording.user_options(),
         "streaming": {},
         "update_machine": { "machine_options": [{"overview": "Machine information that can be set by the user",

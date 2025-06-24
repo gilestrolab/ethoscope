@@ -105,6 +105,9 @@
             $scope.user_options.tracking = data.tracking;
             $scope.user_options.recording = data.recording;
             $scope.user_options.update_machine = data.update_machine;
+            
+            // Load ROI templates from node and update dropdown options
+            $scope.loadRoiTemplates();
 
             $scope.selected_options = {};
             $scope.selected_options.tracking = {};
@@ -119,6 +122,10 @@
                     $scope.selected_options.tracking[k]['arguments'][data.tracking[k][0]['arguments'][j]['name']] = data.tracking[k][0]['arguments'][j]['default'];
                 }
             }
+            
+            // Initialize template file upload status
+            $scope.template_file_status = "";
+            $scope.uploaded_template_data = null;
 
             for (var k in data.recording) {
                 $scope.selected_options.recording[k] = {};
@@ -254,6 +261,7 @@
             }
         }
 
+
         $scope.ethoscope.start_tracking = function(option) {
             $("#startModal").modal('hide');
             spStart = new Spinner(opts).spin();
@@ -274,25 +282,197 @@
                 }
             }
 
-
             //gets info about the sensor, if it is linked to a location            
             option["experimental_info"].arguments["sensor"] = $scope.get_ip_of_sensor(option["experimental_info"].arguments["location"]);
-            console.log(option);
 
-            //send options to the ethoscope and starts tracking
-            $http.post('/device/' + device_id + '/controls/start', data = option)
-                .success(function(data) {
-                    $scope.device.status = data.status;
-                });
+            // Check if we need to handle custom template transfer for FileBasedROIBuilder
+            var templateName = null;
+            var isCustomTemplate = false;
+            
+            if (option.roi_builder && option.roi_builder.arguments && option.roi_builder.arguments.template_name) {
+                templateName = option.roi_builder.arguments.template_name;
+                
+                // Check if this is a custom template by looking at the selected option
+                var selectedTemplateInfo = $scope.getSelectedTemplateInfo(templateName);
+                isCustomTemplate = selectedTemplateInfo && selectedTemplateInfo.type === 'custom';
+            }
 
-            //refresh status
-            $http.get('/devices').success(function(data) {
-                $http.get('/device/' + device_id + '/data').success(function(data) {
-                    $scope.device = data;
+            var startTrackingWithData = function() {
+                console.log(option);
+                
+                //send options to the ethoscope and starts tracking
+                $http.post('/device/' + device_id + '/controls/start', data = option)
+                    .success(function(data) {
+                        $scope.device.status = data.status;
+                    });
+
+                //refresh status
+                $http.get('/devices').success(function(data) {
+                    $http.get('/device/' + device_id + '/data').success(function(data) {
+                        $scope.device = data;
+                    });
+                    $("#startModal").modal('hide');
                 });
-                $("#startModal").modal('hide');
+            };
+
+            if (isCustomTemplate && templateName) {
+                // For custom templates, ensure they're transferred to the device
+                console.log("Custom template detected: " + templateName + ". Uploading to device if needed.");
+                $scope.uploadTemplateToDevice(templateName, function(success) {
+                    if (success) {
+                        console.log("Custom template uploaded successfully");
+                    } else {
+                        console.log("Custom template upload failed, proceeding anyway");
+                    }
+                    startTrackingWithData();
+                });
+            } else {
+                // For builtin templates, no transfer needed
+                if (templateName) {
+                    console.log("Builtin template detected: " + templateName + ". No transfer needed.");
+                }
+                startTrackingWithData();
+            }
+        };
+        
+        // Helper function to get template information by name
+        $scope.getSelectedTemplateInfo = function(templateName) {
+            // This would be populated from the dropdown options
+            // For now, we can check if there are any custom templates
+            if ($scope.available_templates) {
+                for (var i = 0; i < $scope.available_templates.length; i++) {
+                    if ($scope.available_templates[i].value === templateName) {
+                        return $scope.available_templates[i];
+                    }
+                }
+            }
+            return null;
+        };
+        
+        // Handle template selection change (show/hide file upload)
+        $scope.handleTemplateChange = function(category, argName, value) {
+            if (argName === 'template_name' && value === 'custom_upload') {
+                // Show file upload for custom template
+                var fileArg = null;
+                var roiBuilderOptions = $scope.user_options.tracking[category];
+                for (var i = 0; i < roiBuilderOptions.length; i++) {
+                    if (roiBuilderOptions[i].name === $scope.selected_options.tracking[category]['name']) {
+                        for (var j = 0; j < roiBuilderOptions[i].arguments.length; j++) {
+                            if (roiBuilderOptions[i].arguments[j].name === 'template_file') {
+                                roiBuilderOptions[i].arguments[j].hidden = false;
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+            } else if (argName === 'template_name') {
+                // Hide file upload for builtin templates
+                var roiBuilderOptions = $scope.user_options.tracking[category];
+                for (var i = 0; i < roiBuilderOptions.length; i++) {
+                    if (roiBuilderOptions[i].name === $scope.selected_options.tracking[category]['name']) {
+                        for (var j = 0; j < roiBuilderOptions[i].arguments.length; j++) {
+                            if (roiBuilderOptions[i].arguments[j].name === 'template_file') {
+                                roiBuilderOptions[i].arguments[j].hidden = true;
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        };
+        
+        // Handle template file selection
+        $scope.onTemplateFileSelect = function(files) {
+            if (files && files.length > 0) {
+                var file = files[0];
+                if (file.type === 'application/json' || file.name.endsWith('.json')) {
+                    $scope.template_file_status = "Reading file...";
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            var templateData = JSON.parse(e.target.result);
+                            // Validate basic structure
+                            if (templateData.template_info && templateData.roi_definition) {
+                                $scope.uploaded_template_data = templateData;
+                                $scope.template_file_status = "✓ Template loaded: " + (templateData.template_info.name || file.name);
+                                // Set template_data argument
+                                $scope.selected_options.tracking.roi_builder.arguments.template_data = templateData;
+                                $scope.selected_options.tracking.roi_builder.arguments.template_name = null;
+                                $scope.$apply();
+                            } else {
+                                $scope.template_file_status = "❌ Invalid template format";
+                                $scope.$apply();
+                            }
+                        } catch (err) {
+                            $scope.template_file_status = "❌ Invalid JSON file";
+                            $scope.$apply();
+                        }
+                    };
+                    reader.readAsText(file);
+                } else {
+                    $scope.template_file_status = "❌ Please select a .json file";
+                }
+            }
+        };
+        
+        // Load ROI templates from node server
+        $scope.loadRoiTemplates = function() {
+            $http.get('/roi_templates').success(function(data) {
+                // Store template information for later use
+                $scope.available_templates = data.templates;
+                
+                // Update template dropdown options for FileBasedROIBuilder
+                if ($scope.user_options && $scope.user_options.tracking && 
+                    $scope.user_options.tracking.roi_builder) {
+                    
+                    for (var i = 0; i < $scope.user_options.tracking.roi_builder.length; i++) {
+                        var roiBuilder = $scope.user_options.tracking.roi_builder[i];
+                        
+                        // Check if this is a FileBasedROIBuilder
+                        if (roiBuilder.name === 'FileBasedROIBuilder' || 
+                            roiBuilder.class === 'FileBasedROIBuilder') {
+                            
+                            // Find template_name argument
+                            for (var j = 0; j < roiBuilder.arguments.length; j++) {
+                                var arg = roiBuilder.arguments[j];
+                                if (arg.name === 'template_name') {
+                                    // Replace options with templates from node
+                                    arg.options = data.templates.map(function(template) {
+                                        return {
+                                            value: template.value,
+                                            text: template.text
+                                        };
+                                    });
+                                    // Add custom upload option
+                                    arg.options.push({
+                                        value: "custom_upload",
+                                        text: "Upload Custom Template..."
+                                    });
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }).error(function() {
+                console.log("Could not load ROI templates from node server");
             });
-
+        };
+        
+        // Upload template to device when needed
+        $scope.uploadTemplateToDevice = function(templateName, callback) {
+            $http.post('/device/' + device_id + '/upload_template', 
+                      {template_name: templateName})
+                .success(function(data) {
+                    console.log("Template uploaded to device: " + templateName);
+                    if (callback) callback(true);
+                })
+                .error(function(data, status) {
+                    console.log("Failed to upload template to device: " + templateName);
+                    if (callback) callback(false);
+                });
         };
 
         $scope.ethoscope.start_recording = function(option) {
@@ -300,27 +480,53 @@
             $("#recordModal").modal('hide');
             spStart = new Spinner(opts).spin();
             starting_tracking.appendChild(spStart.el);
-            //get only the second parameter in the time array. (linux timestamp).
-            for (opt in option) {
-                for (arg in option[opt].arguments) {
-                    if (option[opt].arguments[arg][0] instanceof Date) {
-                        option[opt].arguments[arg] = option[opt].arguments[arg][1];
+            
+            // Check if we need to upload template to device first
+            var templateName = null;
+            if (option.roi_builder && option.roi_builder.arguments && 
+                option.roi_builder.arguments.template_name &&
+                option.roi_builder.arguments.template_name !== 'custom_upload') {
+                templateName = option.roi_builder.arguments.template_name;
+            }
+            
+            var startRecording = function() {
+                //get only the second parameter in the time array. (linux timestamp).
+                for (opt in option) {
+                    for (arg in option[opt].arguments) {
+                        if (option[opt].arguments[arg][0] instanceof Date) {
+                            option[opt].arguments[arg] = option[opt].arguments[arg][1];
+                        }
                     }
                 }
+
+                $http.post('/device/' + device_id + '/controls/start_record', data = option)
+                    .success(function(data) {
+                        $scope.device.status = data.status;
+                        $scope.device.countdown = data.autostop;
+                    });
+
+                $http.get('/devices').success(function(data) {
+                    $http.get('/device/' + device_id + '/data').success(function(data) {
+                        $scope.device = data;
+                    });
+                    $("#recordModal").modal('hide');
+                });
+            };
+            
+            // Upload template to device if needed, then start recording
+            if (templateName) {
+                $scope.uploadTemplateToDevice(templateName, function(success) {
+                    if (success) {
+                        startRecording();
+                    } else {
+                        // Template upload failed, but continue anyway
+                        console.log("Warning: Template upload failed, proceeding with recording");
+                        startRecording();
+                    }
+                });
+            } else {
+                startRecording();
             }
-
-            $http.post('/device/' + device_id + '/controls/start_record', data = option)
-                .success(function(data) {
-                    $scope.device.status = data.status;
-                    $scope.device.countdown = data.autostop;
-                });
-
-            $http.get('/devices').success(function(data) {
-                $http.get('/device/' + device_id + '/data').success(function(data) {
-                    $scope.device = data;
-                });
-                $("#recordModal").modal('hide');
-            });
         };
 
         $scope.ethoscope.update_machine = function(option) {

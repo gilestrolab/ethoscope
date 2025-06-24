@@ -1,0 +1,522 @@
+"""
+ROI Template Manager for organizing and managing ROI template files.
+
+This module provides utilities for managing ROI template files, including
+loading builtin templates, validating templates, and converting legacy
+ROI builders to template format.
+"""
+
+import os
+import json
+from typing import Dict, List, Union, Optional, Any, Type
+import warnings
+import shutil
+
+from ethoscope.roi_builders.template import ROITemplate, ROITemplateValidationError
+
+
+class ROITemplateManager:
+    """
+    Manager class for ROI templates providing loading, validation, and migration utilities.
+    """
+    
+    def __init__(self, builtin_templates_dir: Optional[str] = None, custom_templates_dir: Optional[str] = None):
+        """
+        Initialize template manager with separate builtin and custom directories.
+        
+        Args:
+            builtin_templates_dir: Directory for builtin templates (part of codebase)
+            custom_templates_dir: Directory for custom templates (in ethoscope_data)
+        """
+        # Builtin templates - part of the codebase, available on both node and ethoscope
+        if builtin_templates_dir is None:
+            self.builtin_dir = os.path.abspath(os.path.join(
+                os.path.dirname(__file__), "..", "..", "..", "roi_templates", "builtin"
+            ))
+        else:
+            self.builtin_dir = builtin_templates_dir
+        
+        # Custom templates - user uploaded, stored in ethoscope_data
+        if custom_templates_dir is None:
+            self.custom_dir = "/ethoscope_data/roi_templates"
+        else:
+            self.custom_dir = custom_templates_dir
+        
+        # Ensure custom directory exists (builtin should always exist as part of codebase)
+        self._ensure_directories()
+    
+    def _ensure_directories(self):
+        """Create custom template directory if it doesn't exist. Builtin should exist as part of codebase."""
+        os.makedirs(self.custom_dir, exist_ok=True)
+    
+    def list_templates(self, include_custom: bool = True) -> List[Dict[str, Any]]:
+        """
+        List all available templates.
+        
+        Args:
+            include_custom: Include custom templates from ethoscope_data
+            
+        Returns:
+            List of template info dictionaries
+        """
+        templates = []
+        
+        # Always include builtin templates (part of codebase)
+        templates.extend(self._scan_directory(self.builtin_dir, "builtin"))
+        
+        # Include custom templates if requested
+        if include_custom:
+            templates.extend(self._scan_directory(self.custom_dir, "custom"))
+        
+        return sorted(templates, key=lambda x: x["name"])
+    
+    def _scan_directory(self, directory: str, source_type: str) -> List[Dict[str, Any]]:
+        """Scan directory for template files."""
+        templates = []
+        
+        if not os.path.exists(directory):
+            return templates
+        
+        for filename in os.listdir(directory):
+            if not filename.endswith('.json'):
+                continue
+                
+            filepath = os.path.join(directory, filename)
+            try:
+                with open(filepath, 'r') as f:
+                    data = json.load(f)
+                
+                template_info = data.get("template_info", {})
+                templates.append({
+                    "name": template_info.get("name", filename[:-5]),  # Remove .json
+                    "version": template_info.get("version", "unknown"),
+                    "description": template_info.get("description", ""),
+                    "author": template_info.get("author", ""),
+                    "hardware_type": template_info.get("hardware_type", ""),
+                    "filename": filename,
+                    "filepath": filepath,
+                    "source_type": source_type
+                })
+            except Exception as e:
+                warnings.warn(f"Could not load template {filepath}: {e}")
+        
+        return templates
+    
+    def load_template(self, name: str) -> ROITemplate:
+        """
+        Load template by name. Checks builtin templates first, then custom.
+        
+        Args:
+            name: Template name (can be filename without .json or display name)
+            
+        Returns:
+            ROITemplate instance
+            
+        Raises:
+            FileNotFoundError: If template is not found
+            ROITemplateValidationError: If template is invalid
+        """
+        # Try builtin templates first (always available on both node and ethoscope)
+        builtin_path = os.path.join(self.builtin_dir, f"{name}.json")
+        if os.path.exists(builtin_path):
+            return ROITemplate.load(builtin_path)
+        
+        # Try custom templates second (may need to be transferred to ethoscope)
+        custom_path = os.path.join(self.custom_dir, f"{name}.json")
+        if os.path.exists(custom_path):
+            return ROITemplate.load(custom_path)
+        
+        # Try name-based search in case it's a display name
+        template_file = self._find_template_file(name)
+        if template_file:
+            return ROITemplate.load(template_file)
+        
+        raise FileNotFoundError(f"Template '{name}' not found in builtin or custom directories")
+    
+    def is_builtin_template(self, name: str) -> bool:
+        """
+        Check if a template is a builtin template.
+        
+        Args:
+            name: Template name
+            
+        Returns:
+            True if template is builtin, False if custom or not found
+        """
+        builtin_path = os.path.join(self.builtin_dir, f"{name}.json")
+        return os.path.exists(builtin_path)
+    
+    def is_custom_template(self, name: str) -> bool:
+        """
+        Check if a template is a custom template.
+        
+        Args:
+            name: Template name
+            
+        Returns:
+            True if template is custom, False if builtin or not found
+        """
+        custom_path = os.path.join(self.custom_dir, f"{name}.json")
+        return os.path.exists(custom_path)
+    
+    def _find_template_file(self, name: str) -> Optional[str]:
+        """Find template file by name or filename. Checks builtin first, then custom."""
+        # Try exact filename match first
+        for directory in [self.builtin_dir, self.custom_dir]:
+            # Try with .json extension
+            filepath = os.path.join(directory, f"{name}.json")
+            if os.path.exists(filepath):
+                return filepath
+            
+            # Try without extension if name already has .json
+            if name.endswith('.json'):
+                filepath = os.path.join(directory, name)
+                if os.path.exists(filepath):
+                    return filepath
+        
+        # Try display name match
+        templates = self.list_templates()
+        for template in templates:
+            if template["name"] == name:
+                return template["filepath"]
+        
+        return None
+    
+    def load_template_by_id(self, template_id: str) -> ROITemplate:
+        """
+        Load template by ID (typically MD5 hash).
+        
+        Args:
+            template_id: Template ID to search for
+            
+        Returns:
+            ROITemplate instance
+            
+        Raises:
+            FileNotFoundError: If template with ID not found
+            ROITemplateValidationError: If template is invalid
+        """
+        import hashlib
+        
+        # Search all directories for template with matching ID
+        search_dirs = [self.builtin_dir, self.custom_dir]
+        
+        for directory in search_dirs:
+            if not os.path.exists(directory):
+                continue
+                
+            for filename in os.listdir(directory):
+                if not filename.endswith('.json'):
+                    continue
+                    
+                filepath = os.path.join(directory, filename)
+                try:
+                    with open(filepath, 'r') as f:
+                        file_content = f.read()
+                        template_data = json.loads(file_content)
+                    
+                    # Check if template has ID field matching
+                    template_info = template_data.get("template_info", {})
+                    if template_info.get("id") == template_id:
+                        return ROITemplate.load(template_data)
+                    
+                    # Also check MD5 of content
+                    content_md5 = hashlib.md5(file_content.encode('utf-8')).hexdigest()
+                    if content_md5 == template_id:
+                        return ROITemplate.load(template_data)
+                        
+                    # Check if filename matches ID
+                    if filename[:-5] == template_id:  # Remove .json extension
+                        return ROITemplate.load(template_data)
+                        
+                except Exception:
+                    # Skip invalid files
+                    continue
+        
+        # Try to load by filename directly
+        for directory in search_dirs:
+            potential_path = os.path.join(directory, f"{template_id}.json")
+            if os.path.exists(potential_path):
+                try:
+                    return ROITemplate.load(potential_path)
+                except Exception:
+                    continue
+        
+        raise FileNotFoundError(f"Template with ID '{template_id}' not found")
+    
+    def validate_template(self, template_data: Union[Dict, str]) -> bool:
+        """
+        Validate template data or file.
+        
+        Args:
+            template_data: Template dictionary or file path
+            
+        Returns:
+            True if valid
+            
+        Raises:
+            ROITemplateValidationError: If template is invalid
+        """
+        try:
+            if isinstance(template_data, str):
+                ROITemplate.load(template_data)
+            else:
+                ROITemplate(template_data)
+            return True
+        except Exception as e:
+            raise ROITemplateValidationError(f"Template validation failed: {e}")
+    
+    def save_template(self, name: str, template_data: Dict[str, Any], 
+                     template_type: str = "custom") -> str:
+        """
+        Save template to appropriate directory.
+        
+        Args:
+            name: Template name (will be used as filename)
+            template_data: Template data dictionary
+            template_type: Type of template ("custom" or "uploaded")
+            
+        Returns:
+            Path to saved template file
+            
+        Raises:
+            ROITemplateValidationError: If template is invalid
+            ValueError: If template_type is invalid
+        """
+        # Validate template first
+        self.validate_template(template_data)
+        
+        # Determine target directory
+        if template_type == "custom":
+            target_dir = self.custom_dir
+        else:
+            raise ValueError(f"Invalid template_type: {template_type}. Use 'custom'")
+        
+        # Ensure name has .json extension
+        if not name.endswith('.json'):
+            name = f"{name}.json"
+        
+        filepath = os.path.join(target_dir, name)
+        
+        # Save template
+        with open(filepath, 'w') as f:
+            json.dump(template_data, f, indent=2)
+        
+        return filepath
+    
+    def delete_template(self, name: str, template_type: Optional[str] = None) -> bool:
+        """
+        Delete template by name.
+        
+        Args:
+            name: Template name
+            template_type: Type of template to delete from. If None, searches all non-builtin.
+            
+        Returns:
+            True if deleted successfully
+            
+        Raises:
+            ValueError: If trying to delete builtin template
+        """
+        template_file = self._find_template_file(name)
+        if not template_file:
+            return False
+        
+        # Don't allow deleting builtin templates
+        if self.builtin_dir in template_file:
+            raise ValueError("Cannot delete builtin templates")
+        
+        os.remove(template_file)
+        return True
+    
+    def migrate_legacy_builder(self, legacy_builder_class, **legacy_params) -> Dict[str, Any]:
+        """
+        Convert legacy ROI builder class and parameters to template format.
+        
+        Args:
+            legacy_builder_class: Legacy ROI builder class
+            **legacy_params: Legacy builder parameters
+            
+        Returns:
+            Template data dictionary
+        """
+        return convert_legacy_to_template(legacy_builder_class, **legacy_params)
+    
+    def create_builtin_templates(self):
+        """Create builtin templates from existing hardcoded ROI builders."""
+        from ethoscope.roi_builders.target_roi_builder import (
+            SleepMonitorWithTargetROIBuilder,
+            ThirtyFliesMonitorWithTargetROIBuilder,
+            OlfactionAssayROIBuilder,
+            ElectricShockAssayROIBuilder,
+            HD12TubesRoiBuilder
+        )
+        
+        # Define builtin template configurations
+        builtin_configs = [
+            {
+                "class": SleepMonitorWithTargetROIBuilder,
+                "name": "sleep_monitor_20tube",
+                "display_name": "Sleep Monitor (20 tubes)",
+                "description": "Standard 20-tube sleep monitoring setup (10x2 grid)",
+                "hardware_type": "sleep_monitor",
+                "params": {}
+            },
+            {
+                "class": ThirtyFliesMonitorWithTargetROIBuilder,
+                "name": "sleep_monitor_30tube",
+                "display_name": "Sleep Monitor (30 tubes)",
+                "description": "Extended 30-tube sleep monitoring setup (10x3 grid)",
+                "hardware_type": "sleep_monitor",
+                "params": {}
+            },
+            {
+                "class": OlfactionAssayROIBuilder,
+                "name": "olfaction_assay_10tube",
+                "display_name": "Olfaction Assay (10 tubes)",
+                "description": "Olfaction assay setup with 10 vertical tubes",
+                "hardware_type": "olfaction_assay",
+                "params": {}
+            },
+            {
+                "class": ElectricShockAssayROIBuilder,
+                "name": "electric_shock_5tube",
+                "display_name": "Electric Shock Assay (5 tubes)",
+                "description": "Electric shock assay with 5 tubes",
+                "hardware_type": "electric_shock",
+                "params": {}
+            },
+            {
+                "class": HD12TubesRoiBuilder,
+                "name": "hd_12tubes",
+                "display_name": "HD 12 Tubes",
+                "description": "High-definition 12-tube horizontal setup",
+                "hardware_type": "hd_tracking",
+                "params": {}
+            }
+        ]
+        
+        for config in builtin_configs:
+            try:
+                template_data = self.migrate_legacy_builder(config["class"], **config["params"])
+                
+                # Update template info
+                template_data["template_info"].update({
+                    "name": config["display_name"],
+                    "description": config["description"],
+                    "hardware_type": config["hardware_type"],
+                    "author": "Gilestro Lab"
+                })
+                
+                filepath = os.path.join(self.builtin_dir, f"{config['name']}.json")
+                with open(filepath, 'w') as f:
+                    json.dump(template_data, f, indent=2)
+                    
+                print(f"Created builtin template: {config['name']}")
+                
+            except Exception as e:
+                warnings.warn(f"Failed to create template for {config['class'].__name__}: {e}")
+
+
+def convert_legacy_to_template(legacy_builder_class: Type, **legacy_params) -> Dict[str, Any]:
+    """
+    Convert legacy ROI builder class to template format.
+    
+    Args:
+        legacy_builder_class: Legacy ROI builder class
+        **legacy_params: Legacy builder parameters
+        
+    Returns:
+        Template data dictionary
+    """
+    class_name = legacy_builder_class.__name__
+    
+    # Extract default parameters from legacy class
+    if hasattr(legacy_builder_class, '__init__'):
+        import inspect
+        sig = inspect.signature(legacy_builder_class.__init__)
+        defaults = {}
+        for param_name, param in sig.parameters.items():
+            if param_name != 'self' and param.default != inspect.Parameter.empty:
+                defaults[param_name] = param.default
+        defaults.update(legacy_params)
+    else:
+        defaults = legacy_params
+    
+    # Create template based on legacy class type
+    if "Target" in class_name or "Grid" in class_name:
+        return _create_grid_template(class_name, defaults)
+    elif "Default" in class_name:
+        return _create_default_template(class_name, defaults)
+    else:
+        # Generic grid template for unknown types
+        return _create_grid_template(class_name, defaults)
+
+
+def _create_grid_template(class_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    """Create grid-based template from legacy parameters."""
+    return {
+        "template_info": {
+            "name": class_name.replace("ROIBuilder", "").replace("Builder", ""),
+            "version": "1.0",
+            "description": f"Migrated from {class_name}",
+            "author": "Legacy Migration",
+            "hardware_type": "generic"
+        },
+        "roi_definition": {
+            "type": "grid_with_targets",
+            "grid": {
+                "n_rows": params.get("n_rows", 10),
+                "n_cols": params.get("n_cols", 2),
+                "orientation": "vertical"
+            },
+            "alignment": {
+                "target_detection": True,
+                "expected_targets": 3,
+                "adaptive_radius": 0.10,
+                "min_target_distance": 10
+            },
+            "positioning": {
+                "margins": {
+                    "top": params.get("top_margin", 0.063),
+                    "bottom": params.get("bottom_margin", 0.063),
+                    "left": params.get("left_margin", -0.033),
+                    "right": params.get("right_margin", -0.033)
+                },
+                "fill_ratios": {
+                    "horizontal": params.get("horizontal_fill", 0.975),
+                    "vertical": params.get("vertical_fill", 0.7)
+                }
+            },
+        },
+        "validation": {
+            "min_roi_area": 100,
+            "max_roi_overlap": 0.05,
+            "required_targets": 3
+        }
+    }
+
+
+def _create_default_template(class_name: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    """Create default single-ROI template."""
+    return {
+        "template_info": {
+            "name": "Full Image ROI",
+            "version": "1.0", 
+            "description": "Single ROI covering entire image",
+            "author": "Legacy Migration",
+            "hardware_type": "generic"
+        },
+        "roi_definition": {
+            "type": "manual_polygons",
+            "manual_rois": [
+                {
+                    "polygon": [[0, 0], [1, 0], [1, 1], [0, 1]],  # Normalized coordinates
+                    "value": 0
+                }
+            ]
+        },
+        "validation": {
+            "min_roi_area": 1000
+        }
+    }
