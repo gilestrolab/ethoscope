@@ -21,7 +21,7 @@ class   BaseStimulator(DescribedObject):
     _tracker = None
     _HardwareInterfaceClass = None
 
-    def __init__(self, hardware_connection, date_range=""):
+    def __init__(self, hardware_connection, date_range="", roi_template_config=None):
         """
         Template class to interact with the tracked animal in a real-time feedback loop.
         Derived classes must have an attribute ``_hardwareInterfaceClass`` defining the class of the
@@ -32,11 +32,17 @@ class   BaseStimulator(DescribedObject):
         :type hardware_connection: :class:`~ethoscope.hardware.interfaces.interfaces.BaseInterface`
         :param date_range: the start and stop date/time for the stimulator. Format described `here <https://github.com/gilestrolab/ethoscope/blob/master/user_manual/schedulers.md>`_
         :type date_range: str
+        :param roi_template_config: ROI template configuration containing stimulator compatibility and mappings
+        :type roi_template_config: dict
         
         """
 
         self._scheduler = Scheduler(date_range)
         self._hardware_connection = hardware_connection
+        self._roi_template_config = roi_template_config
+        
+        # Apply template overrides for ROI-to-channel mappings if available
+        self._apply_template_overrides()
 
     def apply(self):
         """
@@ -75,6 +81,45 @@ class   BaseStimulator(DescribedObject):
     def _deliver(self, **kwargs):
         if self._hardware_connection is not None:
             self._hardware_connection.send_instruction(kwargs)
+
+    def _apply_template_overrides(self):
+        """
+        Apply ROI template overrides for stimulator mappings if available.
+        This allows templates to override default ROI-to-channel mappings.
+        """
+        if not self._roi_template_config:
+            return
+            
+        stimulator_compatibility = self._roi_template_config.get('stimulator_compatibility', {})
+        roi_mappings = stimulator_compatibility.get('roi_mappings', {})
+        
+        # Get the class name of this stimulator
+        stimulator_class = self.__class__.__name__
+        
+        # Check if there's a specific mapping for this stimulator
+        if stimulator_class in roi_mappings:
+            mapping_config = roi_mappings[stimulator_class]
+            
+            # Handle complex mappings (like mAGO with motor/valve channels)
+            if isinstance(mapping_config, dict):
+                if 'motor_channels' in mapping_config:
+                    # Convert string keys to integers for motor channels
+                    self._roi_to_channel_motor = {int(k): v for k, v in mapping_config['motor_channels'].items()}
+                    
+                if 'valve_channels' in mapping_config:
+                    # Convert string keys to integers for valve channels
+                    self._roi_to_channel_valves = {int(k): v for k, v in mapping_config['valve_channels'].items()}
+                    
+                # If it's a simple mapping (direct ROI to channel)
+                if not ('motor_channels' in mapping_config or 'valve_channels' in mapping_config):
+                    # Convert string keys to integers for simple mapping
+                    self._roi_to_channel = {int(k): v for k, v in mapping_config.items()}
+                    
+        # Fallback to default mapping if stimulator not found but default exists
+        elif 'default' in roi_mappings:
+            default_mapping = roi_mappings['default']
+            # Convert string keys to integers for default mapping
+            self._roi_to_channel = {int(k): v for k, v in default_mapping.items()}
 
 
 class DefaultStimulator(BaseStimulator):

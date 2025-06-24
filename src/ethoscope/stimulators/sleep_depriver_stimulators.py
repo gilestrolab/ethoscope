@@ -19,7 +19,7 @@ import logging
 class IsMovingStimulator(BaseStimulator):
     _HardwareInterfaceClass = DefaultInterface
 
-    def __init__(self, hardware_connection=None, velocity_correction_coef=3.0e-3, date_range = "", **kwargs):
+    def __init__(self, hardware_connection=None, velocity_correction_coef=3.0e-3, date_range = "", roi_template_config=None, **kwargs):
         """
         class implementing an stimulator that decides whether an animal has moved though does nothing accordingly.
         :param hardware_connection: a default hardware interface object
@@ -28,7 +28,7 @@ class IsMovingStimulator(BaseStimulator):
         """
         self._velocity_correction_coef = velocity_correction_coef
         self._last_active = 0
-        super(IsMovingStimulator, self).__init__(hardware_connection, date_range)
+        super(IsMovingStimulator, self).__init__(hardware_connection, date_range, roi_template_config)
 
 
     def _has_moved(self):
@@ -93,7 +93,8 @@ class SleepDepStimulator(IsMovingStimulator):
                  velocity_correction_coef=3.0e-3,
                  min_inactive_time=120,  #s
                  stimulus_probability=1.0,
-                 date_range=""
+                 date_range="",
+                 roi_template_config=None
                  ):
         """
         A stimulator to control a sleep depriver module.
@@ -116,7 +117,7 @@ class SleepDepStimulator(IsMovingStimulator):
         else:
             raise ValueError("Probability must be between 0.0 and 1.0")
         
-        super(SleepDepStimulator, self).__init__(hardware_connection, velocity_correction_coef, date_range=date_range)
+        super(SleepDepStimulator, self).__init__(hardware_connection, velocity_correction_coef, date_range=date_range, roi_template_config=roi_template_config)
 
 
 
@@ -171,7 +172,8 @@ class SleepDepStimulatorCR(SleepDepStimulator):
                  hardware_connection,
                  velocity_correction_coef=3.0e-3,
                  min_inactive_time=120,  #s
-                 date_range=""
+                 date_range="",
+                 roi_template_config=None
                  ):
         """
         A stimulator to control a sleep depriver module.
@@ -188,7 +190,7 @@ class SleepDepStimulatorCR(SleepDepStimulator):
         self._inactivity_time_threshold_ms = min_inactive_time *1000 #so we use ms internally
         self._t0 = None
         
-        super(SleepDepStimulator, self).__init__(hardware_connection, velocity_correction_coef, date_range=date_range)
+        super(SleepDepStimulator, self).__init__(hardware_connection, velocity_correction_coef, date_range=date_range, roi_template_config=roi_template_config)
 
 
 
@@ -220,14 +222,15 @@ class OptomotorSleepDepriver(SleepDepStimulator):
                  pulse_duration = 1000,  #ms
                  stimulus_type = 2,  # 1 = opto, 2= moto, 3 = both
                  stimulus_probability = 1.0,
-                 date_range=""
+                 date_range="",
+                 roi_template_config=None
                  ):
 
 
         self._t0 = None
 
         # the inactive time depends on the chanel here
-        super(OptomotorSleepDepriver, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range)
+        super(OptomotorSleepDepriver, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range, roi_template_config)
 
 
 
@@ -263,7 +266,8 @@ class ExperimentalSleepDepStimulator(SleepDepStimulator):
     def __init__(self,
                  hardware_connection,
                  velocity_correction_coef=3.0e-3,
-                 date_range=""
+                 date_range="",
+                 roi_template_config=None
                  ):
         """
         A stimulator to control a sleep depriver module.
@@ -280,7 +284,7 @@ class ExperimentalSleepDepStimulator(SleepDepStimulator):
 
         
         # the inactive time depends on the chanel here
-        super(ExperimentalSleepDepStimulator, self).__init__(hardware_connection, velocity_correction_coef, 0, date_range)
+        super(ExperimentalSleepDepStimulator, self).__init__(hardware_connection, velocity_correction_coef, 0, date_range, roi_template_config)
         self._inactivity_time_threshold_ms = None
 
     # here we override bind tracker so that we also define inactive time for this stimulator
@@ -313,7 +317,8 @@ class MiddleCrossingStimulator(BaseStimulator):
     def __init__(self,
                  hardware_connection,
                  stimulus_probability=1.0,
-                 date_range=""
+                 date_range="",
+                 roi_template_config=None
                  ):
         """
         :param hardware_connection: the sleep depriver module hardware interface
@@ -330,7 +335,7 @@ class MiddleCrossingStimulator(BaseStimulator):
         else:
             raise ValueError("Probability must be between 0.0 and 1.0")
 
-        super(MiddleCrossingStimulator, self).__init__(hardware_connection, date_range=date_range)
+        super(MiddleCrossingStimulator, self).__init__(hardware_connection, date_range=date_range, roi_template_config=roi_template_config)
 
     def _decide(self):
         roi_id = self._tracker._roi.idx
@@ -396,7 +401,8 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
                  interval=120,  # s
                  pulse_duration = 1000,  #ms
                  stimulus_type = 2,  # 1 = opto, 2= moto, 3 = both
-                 date_range=""
+                 date_range="",
+                 roi_template_config=None
                  ):
 
 
@@ -405,7 +411,7 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
 
         super(OptomotorSleepDepriverSystematic, self).__init__(hardware_connection, 0, 0,
                                                                pulse_duration, stimulus_type,
-                                                               date_range)
+                                                               date_range, roi_template_config)
 
         self._t0 = 0
 
@@ -460,14 +466,15 @@ class mAGO(SleepDepStimulator):
                  pulse_duration = 1000,  #ms
                  stimulus_type = 2,  # 1 = opto, 2= moto, 3 = both
                  stimulus_probability = 1.0,
-                 date_range=""
+                 date_range="",
+                 roi_template_config=None
                  ):
 
 
         self._t0 = None
 
         # the inactive time depends on the chanel here
-        super(mAGO, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range)
+        super(mAGO, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range, roi_template_config)
         
         if stimulus_type == 2:
             self._roi_to_channel = self._roi_to_channel_valves
@@ -513,7 +520,8 @@ class AGO(SleepDepStimulator):
                  pulse_duration = 1000,  #ms
                  stimulus_probability = 1.0,
                  number_of_stimuli = 0,
-                 date_range=""
+                 date_range="",
+                 roi_template_config=None
                  ):
 
 
@@ -530,7 +538,7 @@ class AGO(SleepDepStimulator):
         logging.info(f"num stim {self._number_of_stimuli} at start" )
 
         # the inactive time depends on the chanel here
-        super(AGO, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range)
+        super(AGO, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, stimulus_probability, date_range, roi_template_config)
 
         self._roi_to_channel = self._roi_to_channel_valves
 

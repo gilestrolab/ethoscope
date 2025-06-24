@@ -12,7 +12,7 @@ import random
 class HasChangedSideStimulator(BaseStimulator):
     _HardwareInterfaceClass = DefaultInterface
 
-    def __init__(self, hardware_connection=None, middle_line=0.50):
+    def __init__(self, hardware_connection=None, middle_line=0.50, roi_template_config=None):
         """
         class implementing a stimulator that decides whether an animal has change side in its ROI.
         :param hardware_connection: a default hardware interface object
@@ -21,7 +21,7 @@ class HasChangedSideStimulator(BaseStimulator):
         """
         self._middle_line = middle_line
         #self._last_active = 0
-        super(HasChangedSideStimulator, self).__init__(hardware_connection)
+        super(HasChangedSideStimulator, self).__init__(hardware_connection, roi_template_config=roi_template_config)
 
     def _has_changed_side(self):
         positions = self._tracker.positions
@@ -79,7 +79,8 @@ class DynamicOdourDeliverer(HasChangedSideStimulator):
     _side_to_pos = {1:1, 2:2 }
     def __init__(self,
                  hardware_connection,
-                 date_range=""
+                 date_range="",
+                 roi_template_config=None
                  ):
         """
         A stimulator to control a sleep depriver module
@@ -91,7 +92,7 @@ class DynamicOdourDeliverer(HasChangedSideStimulator):
 
         self._t0 = None
         self._scheduler = Scheduler(date_range)
-        super(DynamicOdourDeliverer, self).__init__(hardware_connection)
+        super(DynamicOdourDeliverer, self).__init__(hardware_connection, roi_template_config=roi_template_config)
 
 
 
@@ -138,7 +139,8 @@ class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
                  velocity_correction_coef=3.0e-3 / 2,
                  min_inactive_time=120,  # s
                  stimulus_duration=5,  #s
-                 date_range=""
+                 date_range="",
+                 roi_template_config=None
                  ):
         """
         A stimulator to control an odour sleep depriver module.
@@ -154,7 +156,7 @@ class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
         :return:
         """
         self._stimulus_duration = stimulus_duration
-        super(DynamicOdourSleepDepriver, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, date_range)
+        super(DynamicOdourSleepDepriver, self).__init__(hardware_connection, velocity_correction_coef, min_inactive_time, date_range, roi_template_config)
 
     def _decide(self):
         decide, args = super(DynamicOdourSleepDepriver, self)._decide()
@@ -194,10 +196,11 @@ class MiddleCrossingOdourStimulator(sleep_depriver_stimulators.MiddleCrossingSti
                  p=1.0,
                  refractory_period = 300,
                  stimulus_duration = 5,
-                 date_range=""
+                 date_range="",
+                 roi_template_config=None
                  ):
 
-        super(MiddleCrossingOdourStimulator, self).__init__(hardware_connection, p=p, date_range=date_range)
+        super(MiddleCrossingOdourStimulator, self).__init__(hardware_connection, p=p, date_range=date_range, roi_template_config=roi_template_config)
         self._refractory_period = refractory_period
         self._stimulus_duration = stimulus_duration
 
@@ -238,10 +241,11 @@ class MiddleCrossingOdourStimulatorFlushed(MiddleCrossingOdourStimulator):
                  refractory_period = 300,
                  stimulus_duration = 5,
                  flush_duration=10,
-                 date_range=""
+                 date_range="",
+                 roi_template_config=None
                  ):
 
-        super(MiddleCrossingOdourStimulator, self).__init__(hardware_connection, p=p, date_range=date_range)
+        super(MiddleCrossingOdourStimulator, self).__init__(hardware_connection, p=p, date_range=date_range, roi_template_config=roi_template_config)
         self._refractory_period = refractory_period
         self._stimulus_duration = stimulus_duration
         self._flush_duration = flush_duration
