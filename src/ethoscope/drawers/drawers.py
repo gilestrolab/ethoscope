@@ -141,10 +141,16 @@ class DefaultDrawer(BaseDrawer):
         for track_u in tracking_units:
 
             x,y = track_u.roi.offset
-            y += track_u.roi.rectangle[3]/2
-
-            # label ROI with its number
-            cv2.putText(img, str(track_u.roi.idx), (int(x),int(y)), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1, (255,255,0))
+            # Position text at top-left corner of ROI instead of middle
+            text_x = int(x + 10)  # Small offset from edge
+            text_y = int(y + 40)  # Position further down from top of ROI
+            
+            roi_text = str(track_u.roi.idx)
+            
+            # Draw text with black outline for better visibility
+            cv2.putText(img, roi_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0,0,0), 4)  # Black outline
+            # label ROI with its number - larger, white text
+            cv2.putText(img, roi_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255,255,255), 2)
             
             # draw the shape of the ROI
             black_colour = (0, 0, 0)

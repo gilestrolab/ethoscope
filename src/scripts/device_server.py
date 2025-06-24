@@ -518,13 +518,17 @@ def _inject_roi_template_options(tracking_options):
         Modified tracking options with ROI template dropdown
     """
     # Scan for available ROI templates
-    template_options = []
+    builtin_options = []
+    custom_options = []
     
     # Builtin templates directory (part of codebase)
     builtin_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "roi_templates", "builtin"))
     
     # Custom templates directory (in ethoscope_data)
     custom_dir = "/ethoscope_data/roi_templates"
+    
+    # Ensure custom templates directory exists
+    os.makedirs(custom_dir, exist_ok=True)
     
     # Scan builtin templates first
     if os.path.exists(builtin_dir):
@@ -539,9 +543,9 @@ def _inject_roi_template_options(tracking_options):
                     template_name = template_info.get("name", filename[:-5])
                     template_value = filename[:-5]  # Remove .json extension
                     
-                    template_options.append({
+                    builtin_options.append({
                         "value": template_value,
-                        "text": f"{template_name} (builtin)",
+                        "text": f"{template_name}",
                         "type": "builtin"
                     })
                 except Exception:
@@ -561,28 +565,52 @@ def _inject_roi_template_options(tracking_options):
                     template_name = template_info.get("name", filename[:-5])
                     template_value = filename[:-5]  # Remove .json extension
                     
-                    template_options.append({
+                    custom_options.append({
                         "value": template_value,
-                        "text": f"{template_name} (custom)",
+                        "text": f"{template_name}",
                         "type": "custom"
                     })
-                except Exception:
-                    # Skip invalid templates
+                    logging.info(f"Loaded custom template: {template_name} -> {template_value}")
+                except Exception as e:
+                    # Skip invalid templates but log the error
+                    logging.warning(f"Failed to load custom template {filename}: {e}")
                     continue
+    else:
+        logging.info(f"Custom templates directory does not exist: {custom_dir}")
     
     # Add default builtin templates if directory is empty
-    if not template_options:
-        template_options = [
-            {"value": "sleep_monitor_20tube", "text": "Sleep Monitor (20 tubes)"},
-            {"value": "sleep_monitor_30tube", "text": "Sleep Monitor (30 tubes)"},
-            {"value": "olfaction_assay_10tube", "text": "Olfaction Assay (10 tubes)"},
-            {"value": "electric_shock_5tube", "text": "Electric Shock (5 tubes)"},
-            {"value": "hd_12tubes", "text": "HD 12 Tubes"},
-            {"value": "default_full_image", "text": "Full Image ROI"}
+    if not builtin_options:
+        builtin_options = [
+            {"value": "sleep_monitor_20tube", "text": "Sleep Monitor (20 tubes)", "type": "builtin"},
+            {"value": "sleep_monitor_30tube", "text": "Sleep Monitor (30 tubes)", "type": "builtin"},
+            {"value": "olfaction_assay_10tube", "text": "Olfaction Assay (10 tubes)", "type": "builtin"},
+            {"value": "electric_shock_5tube", "text": "Electric Shock (5 tubes)", "type": "builtin"},
+            {"value": "hd_12tubes", "text": "HD 12 Tubes", "type": "builtin"},
+            {"value": "default_full_image", "text": "Full Image ROI", "type": "builtin"}
         ]
     
-    # Sort templates by name
-    template_options.sort(key=lambda x: x["text"])
+    # Sort each group by name
+    builtin_options.sort(key=lambda x: x["text"])
+    custom_options.sort(key=lambda x: x["text"])
+    
+    # Create grouped options structure
+    template_options = []
+    
+    # Add builtin group
+    if builtin_options:
+        template_options.append({
+            "group": "builtin", 
+            "label": "Built-in Templates",
+            "options": builtin_options
+        })
+    
+    # Add custom group if any exist
+    if custom_options:
+        template_options.append({
+            "group": "custom",
+            "label": "Custom Templates", 
+            "options": custom_options
+        })
     
     # Find and modify FileBasedROIBuilder in tracking options
     if "roi_builder" in tracking_options:
@@ -597,8 +625,8 @@ def _inject_roi_template_options(tracking_options):
                     "name": "template_name",
                     "description": "ROI Template",
                     "type": "dropdown",
-                    "options": template_options,
-                    "default": template_options[0]["value"] if template_options else "sleep_monitor_20tube"
+                    "groups": template_options,
+                    "default": ""
                 }
                 
                 # Insert at beginning or replace existing template_name argument

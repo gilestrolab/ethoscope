@@ -122,10 +122,6 @@
                     $scope.selected_options.tracking[k]['arguments'][data.tracking[k][0]['arguments'][j]['name']] = data.tracking[k][0]['arguments'][j]['default'];
                 }
             }
-            
-            // Initialize template file upload status
-            $scope.template_file_status = "";
-            $scope.uploaded_template_data = null;
 
             for (var k in data.recording) {
                 $scope.selected_options.recording[k] = {};
@@ -349,73 +345,6 @@
             return null;
         };
         
-        // Handle template selection change (show/hide file upload)
-        $scope.handleTemplateChange = function(category, argName, value) {
-            if (argName === 'template_name' && value === 'custom_upload') {
-                // Show file upload for custom template
-                var fileArg = null;
-                var roiBuilderOptions = $scope.user_options.tracking[category];
-                for (var i = 0; i < roiBuilderOptions.length; i++) {
-                    if (roiBuilderOptions[i].name === $scope.selected_options.tracking[category]['name']) {
-                        for (var j = 0; j < roiBuilderOptions[i].arguments.length; j++) {
-                            if (roiBuilderOptions[i].arguments[j].name === 'template_file') {
-                                roiBuilderOptions[i].arguments[j].hidden = false;
-                                break;
-                            }
-                        }
-                        break;
-                    }
-                }
-            } else if (argName === 'template_name') {
-                // Hide file upload for builtin templates
-                var roiBuilderOptions = $scope.user_options.tracking[category];
-                for (var i = 0; i < roiBuilderOptions.length; i++) {
-                    if (roiBuilderOptions[i].name === $scope.selected_options.tracking[category]['name']) {
-                        for (var j = 0; j < roiBuilderOptions[i].arguments.length; j++) {
-                            if (roiBuilderOptions[i].arguments[j].name === 'template_file') {
-                                roiBuilderOptions[i].arguments[j].hidden = true;
-                                break;
-                            }
-                        }
-                        break;
-                    }
-                }
-            }
-        };
-        
-        // Handle template file selection
-        $scope.onTemplateFileSelect = function(files) {
-            if (files && files.length > 0) {
-                var file = files[0];
-                if (file.type === 'application/json' || file.name.endsWith('.json')) {
-                    $scope.template_file_status = "Reading file...";
-                    var reader = new FileReader();
-                    reader.onload = function(e) {
-                        try {
-                            var templateData = JSON.parse(e.target.result);
-                            // Validate basic structure
-                            if (templateData.template_info && templateData.roi_definition) {
-                                $scope.uploaded_template_data = templateData;
-                                $scope.template_file_status = "✓ Template loaded: " + (templateData.template_info.name || file.name);
-                                // Set template_data argument
-                                $scope.selected_options.tracking.roi_builder.arguments.template_data = templateData;
-                                $scope.selected_options.tracking.roi_builder.arguments.template_name = null;
-                                $scope.$apply();
-                            } else {
-                                $scope.template_file_status = "❌ Invalid template format";
-                                $scope.$apply();
-                            }
-                        } catch (err) {
-                            $scope.template_file_status = "❌ Invalid JSON file";
-                            $scope.$apply();
-                        }
-                    };
-                    reader.readAsText(file);
-                } else {
-                    $scope.template_file_status = "❌ Please select a .json file";
-                }
-            }
-        };
         
         // Load ROI templates from node server
         $scope.loadRoiTemplates = function() {
@@ -438,18 +367,46 @@
                             for (var j = 0; j < roiBuilder.arguments.length; j++) {
                                 var arg = roiBuilder.arguments[j];
                                 if (arg.name === 'template_name') {
-                                    // Replace options with templates from node
-                                    arg.options = data.templates.map(function(template) {
+                                    // Separate builtin and custom templates
+                                    var builtinTemplates = data.templates.filter(function(template) {
+                                        return template.type === 'builtin';
+                                    }).map(function(template) {
                                         return {
                                             value: template.value,
                                             text: template.text
                                         };
                                     });
-                                    // Add custom upload option
-                                    arg.options.push({
-                                        value: "custom_upload",
-                                        text: "Upload Custom Template..."
+                                    
+                                    var customTemplates = data.templates.filter(function(template) {
+                                        return template.type === 'custom';
+                                    }).map(function(template) {
+                                        return {
+                                            value: template.value,
+                                            text: template.text
+                                        };
                                     });
+                                    
+                                    // Create grouped structure
+                                    var groups = [];
+                                    if (builtinTemplates.length > 0) {
+                                        groups.push({
+                                            group: "builtin",
+                                            label: "Built-in Templates",
+                                            options: builtinTemplates
+                                        });
+                                    }
+                                    if (customTemplates.length > 0) {
+                                        groups.push({
+                                            group: "custom", 
+                                            label: "Custom Templates",
+                                            options: customTemplates
+                                        });
+                                    }
+                                    
+                                    // Set the groups structure
+                                    arg.groups = groups;
+                                    // Remove old options if it exists
+                                    delete arg.options;
                                     break;
                                 }
                             }
@@ -615,6 +572,39 @@
         $scope.ethoscope.alert = function(message) {
             alert(message);
         };
+
+        // Check if ROI template is properly selected for tracking
+        $scope.isRoiTemplateSelected = function() {
+            if (!$scope.selected_options || !$scope.selected_options.tracking || !$scope.selected_options.tracking.roi_builder) {
+                return false;
+            }
+
+            var roiBuilderOption = $scope.selected_options.tracking.roi_builder;
+            
+            // Check if roi_builder is FileBasedROIBuilder (which requires template selection)
+            if (roiBuilderOption.name && roiBuilderOption.name.includes('FileBasedROIBuilder')) {
+                var args = roiBuilderOption.arguments || {};
+                var templateName = args.template_name;
+                
+                // Valid if we have a non-empty template_name
+                if (templateName && templateName !== '' && templateName !== 'None' && templateName !== 'null' && templateName !== undefined) {
+                    return true;
+                }
+                
+                return false;
+            }
+            
+            // For other ROI builders, no template validation needed
+            return true;
+        };
+
+        // Watch for changes in template selection to update UI
+        $scope.$watch('selected_options.tracking.roi_builder.arguments.template_name', function(newValue, oldValue) {
+            if (newValue !== oldValue) {
+                // Force UI update when template selection changes
+                $scope.$evalAsync();
+            }
+        });
 
         $scope.ethoscope.elapsedtime = function(t) {
             // Get the current timestamp

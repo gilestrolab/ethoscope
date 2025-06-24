@@ -411,6 +411,13 @@ class ControlThread(Thread):
 
         roi_builder = ROIBuilderClass(**roi_builder_kwargs)
         
+        # Validate ROI template selection for FileBasedROIBuilder
+        if ROIBuilderClass.__name__ == 'FileBasedROIBuilder':
+            template_name = roi_builder_kwargs.get('template_name')
+            
+            if not template_name or template_name == '' or template_name == 'None' or template_name == 'null':
+                raise EthoscopeException("No ROI template selected. Please choose a mask/template from the dropdown before starting tracking.")
+        
         try:
             reference_points, rois = roi_builder.build(cam)
         except EthoscopeException as e:

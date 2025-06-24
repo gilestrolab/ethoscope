@@ -400,6 +400,16 @@
                                             <option value="">-- choose {{arg.name}} --</option>
                                             <option ng-repeat="entry in node[arg.asknode]  | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
                                         </select>
+                                        <select ng-if="arg.type == 'dropdown' && !arg.groups" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
+                                            <option value="">-- choose {{arg.description}} --</option>
+                                            <option ng-repeat="opt in arg.options" value="{{opt.value}}">{{opt.text}}</option>
+                                        </select>
+                                        <select ng-if="arg.type == 'dropdown' && arg.groups" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
+                                            <option value="">-- choose {{arg.description}} --</option>
+                                            <optgroup ng-repeat="group in arg.groups" label="{{group.label}}">
+                                                <option ng-repeat="opt in group.options" value="{{opt.value}}">{{opt.text}}</option>
+                                            </optgroup>
+                                        </select>
                                         <div ng-if="arg.type == 'boolean'"><label for="input-{{arg.name}}"><input style="transform: scale(1.5); margin: 3px; margin-right: 10px;" id="input-{{arg.name}}" type="checkbox" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">{{arg.description}}</label></div>
 
                                         <div ng-if="arg.type == 'date_range'" class="input-group">
@@ -421,8 +431,11 @@
                         <hr>
                     </div>
                     <div class="modal-footer">
+                        <div ng-if="!isRoiTemplateSelected()" class="alert alert-warning" style="margin-bottom: 10px;">
+                            <strong>Warning:</strong> Please select a ROI template/mask before starting tracking.
+                        </div>
                         <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
-                        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_tracking(selected_options.tracking)" data-toggle="modal">Start Tracking</button>
+                        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_tracking(selected_options.tracking)" ng-disabled="!isRoiTemplateSelected()" data-toggle="modal">Start Tracking</button>
                     </div>
 
                 </form>
