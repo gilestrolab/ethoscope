@@ -165,7 +165,7 @@ class BaseDevice(Thread):
             raise ScanException(f"Unexpected error from {url}: {e}")
     
     def run(self):
-        """Main device monitoring loop with blacklisting support."""
+        """Main device monitoring loop with blacklisting support and offline handling."""
         while self._is_online:
             time.sleep(0.2)
             
@@ -189,33 +189,87 @@ class BaseDevice(Thread):
                             self._consecutive_errors = 0
                         self._last_successful_contact = current_time
                     except Exception as e:
-                        self._handle_device_error(e)
+                        # Only handle error if not already marked for skipping
+                        if not self._skip_scanning:
+                            self._handle_device_error(e)
                 else:
+                    # Device is marked for skipping - just update status to offline
                     self._reset_info()
                     
                 self._last_refresh = current_time
     
     def _handle_device_error(self, error):
-        """Handle device errors with blacklisting after too many failures."""
+        """Handle device errors. Stop interrogating devices that appear to have shut down ungracefully."""
         with self._lock:
             self._consecutive_errors += 1
             
             # Always reset device info to offline
             self._reset_info()
             
+            error_str = str(error).lower()
+            
+            # Check if this is a "connection refused" error - indicates ungraceful shutdown
+            if 'connection refused' in error_str or 'actively refused' in error_str:
+                # After 3 consecutive connection refused errors, assume device was shut down ungracefully
+                if self._consecutive_errors >= 3:
+                    self._logger.info(f"Device {self._ip} has {self._consecutive_errors} consecutive connection refused errors - appears shut down ungracefully. Stopping interrogation.")
+                    self._skip_scanning = True
+                    self._info.update({
+                        'status': 'offline',
+                        'last_seen': time.time()
+                    })
+                    return
+                else:
+                    self._logger.info(f"Device {self._ip} connection refused (attempt {self._consecutive_errors}/3)")
+                    return
+            
+            # For other types of errors, use original blacklisting logic but with higher threshold
             if self._consecutive_errors >= self._max_consecutive_errors:
-                self._add_to_blacklist()
+                if self._should_blacklist_device(error):
+                    self._add_to_blacklist()
+                else:
+                    # Device seems to have gone offline normally, stop interrogating
+                    self._logger.info(f"Device {self._ip} appears offline after {self._consecutive_errors} errors, stopping interrogation")
+                    self._skip_scanning = True
+                    self._info.update({
+                        'status': 'offline', 
+                        'last_seen': time.time()
+                    })
             else:
                 # Log errors less frequently to reduce noise
                 if self._consecutive_errors == 1:
                     self._logger.info(f"Device {self._ip} connection failed: {str(error)}")
                 elif self._consecutive_errors == 5:
-                    self._logger.warning(f"Device {self._ip} has 5 consecutive errors, approaching blacklist threshold")
+                    self._logger.warning(f"Device {self._ip} has 5 consecutive errors, will stop interrogating at 10")
                 else:
                     self._logger.debug(f"Device {self._ip} error #{self._consecutive_errors}: {str(error)}")
     
+    def _should_blacklist_device(self, error) -> bool:
+        """Determine if device should be blacklisted vs just considered offline."""
+        # Blacklist only if device appears to be advertising via zeroconf but not responding
+        # This is indicated by connection refusal vs timeout/unreachable errors
+        
+        error_str = str(error).lower()
+        
+        # These errors suggest device is actively refusing connections (blacklist-worthy)
+        blacklist_errors = ['connection refused', 'connection reset', 'actively refused']
+        
+        # These errors suggest device is offline/unreachable (not blacklist-worthy)
+        offline_errors = ['timeout', 'unreachable', 'no route to host', 'network is unreachable']
+        
+        for blacklist_pattern in blacklist_errors:
+            if blacklist_pattern in error_str:
+                return True
+                
+        for offline_pattern in offline_errors:
+            if offline_pattern in error_str:
+                return False
+                
+        # Default: if unsure, don't blacklist - err on side of not blacklisting
+        return False
+    
     def _add_to_blacklist(self):
-        """Add device to blacklist after too many consecutive errors."""
+        """Add device to blacklist after determining it's truly problematic."""
         with self._lock:
             if self._is_blacklisted:
                 return
@@ -228,8 +282,8 @@ class BaseDevice(Thread):
             time_since_success_str = f"{time_since_success/60:.1f} minutes" if time_since_success > 60 else f"{time_since_success:.0f} seconds"
             
             self._logger.warning(
-                f"Device {self._ip} blacklisted after {self._consecutive_errors} consecutive errors. "
-                f"Last successful contact: {time_since_success_str} ago. "
+                f"Device {self._ip} blacklisted - advertising via zeroconf but not responding on port {self._port}. "
+                f"Had {self._consecutive_errors} consecutive errors. Last successful contact: {time_since_success_str} ago. "
                 f"Will retry in {self._blacklist_duration/60:.0f} minutes."
             )
             
@@ -356,6 +410,9 @@ class BaseDevice(Thread):
     def skip_scanning(self, value: bool):
         """Enable/disable scanning for this device."""
         self._skip_scanning = value
+        if not value:
+            # Re-enabling scanning - reset error state
+            self._consecutive_errors = 0
     
     def reset_error_state(self):
         """Reset error state for this device."""
@@ -373,18 +430,26 @@ class BaseDevice(Thread):
             return self._id
         
     def info(self) -> Dict[str, Any]:
-        """Get device information dictionary including blacklist status."""
+        """Get device information dictionary. Blacklisted devices return minimal info."""
         with self._lock:
-            info_copy = self._info.copy()
-            
-            # Add current blacklist status
+            # Don't return full info for blacklisted devices
             if self._is_blacklisted:
                 current_time = time.time()
                 time_remaining = max(0, (self._blacklist_time + self._blacklist_duration) - current_time)
-                info_copy.update({
+                return {
+                    'status': 'blacklisted',
+                    'ip': self._ip,
+                    'id': self._id,
+                    'blacklisted': True,
                     'blacklist_time_remaining': time_remaining,
-                    'blacklist_time_remaining_str': f"{time_remaining/60:.1f}m" if time_remaining > 60 else f"{time_remaining:.0f}s"
-                })
+                    'blacklist_time_remaining_str': f"{time_remaining/60:.1f}m" if time_remaining > 60 else f"{time_remaining:.0f}s",
+                    'last_seen': self._info.get('last_seen', 0)
+                }
+            
+            info_copy = self._info.copy()
+            
+            # Add skip_scanning status for debugging
+            info_copy['skip_scanning'] = self._skip_scanning
             
             return info_copy
 
@@ -1244,11 +1309,26 @@ class DeviceScanner:
                 # Check if device already exists by IP (more immediate than waiting for ID)
                 for existing_device in self.devices:
                     if existing_device.ip() == ip:
-                        self._logger.debug(f"Device at {ip} already exists, updating zeroconf info")
+                        was_skipping = existing_device._skip_scanning
+                        device_status = existing_device._info.get('status', 'unknown')
+                        
+                        self._logger.info(f"Device at {ip} already exists (was skipping: {was_skipping}, status: {device_status}), updating zeroconf info")
+                        
                         if hasattr(existing_device, 'zeroconf_name'):
                             existing_device.zeroconf_name = name
-                        # Reset error state in case it was having issues
+                        
+                        # Reset error state and re-enable scanning in case it was offline
                         existing_device.reset_error_state()
+                        existing_device.skip_scanning(False)
+                        
+                        # Explicitly reset status to allow device info to be updated
+                        with existing_device._lock:
+                            existing_device._info.update({
+                                'status': 'offline',  # Will be updated to proper status on next scan
+                                'last_seen': time.time()
+                            })
+                        
+                        self._logger.info(f"Re-enabled scanning for {self.DEVICE_TYPE} at {ip} (was skipping: {was_skipping})")
                         return
                 
                 # Create and start device
@@ -1292,7 +1372,7 @@ class DeviceScanner:
             self._logger.error(f"Error adding zeroconf service {name}: {e}")
     
     def remove_service(self, zeroconf, service_type: str, name: str):
-        """Zeroconf callback for removed services."""
+        """Zeroconf callback for removed services - mark devices as offline."""
         if not self._is_running:
             return
 
@@ -1304,8 +1384,19 @@ class DeviceScanner:
         with self._lock:
             for device in self.devices:
                 if device.ip() == ip:
-                    self._logger.info(f"{self.DEVICE_TYPE} {device.id()} went offline")
+                    device_id = device.id()
+                    self._logger.info(f"{self.DEVICE_TYPE} {device_id or 'unknown'} at {ip} went offline via zeroconf removal")
+                    
+                    # Stop interrogating the device but keep it in the list
                     device.skip_scanning(True)
+                    
+                    # Explicitly set status to offline
+                    with device._lock:
+                        device._info.update({
+                            'status': 'offline',
+                            'last_seen': time.time()
+                        })
+                    
                     break
     
     def update_service(self, zeroconf, service_type: str, name: str):
@@ -1346,7 +1437,7 @@ class EthoscopeScanner(DeviceScanner):
             self._logger.error(f"Error getting devices from database: {e}")
             devices_info = {}
         
-        # Update with online devices  
+        # Update with devices from scanner (includes offline and blacklisted)
         with self._lock:
             for device in self.devices:
                 device_id = device.id()
@@ -1411,11 +1502,26 @@ class EthoscopeScanner(DeviceScanner):
             with self._lock:
                 for existing_device in self.devices:
                     if existing_device.ip() == ip:
-                        self._logger.debug(f"Device at {ip} already exists, updating zeroconf info")
+                        was_skipping = existing_device._skip_scanning
+                        device_status = existing_device._info.get('status', 'unknown')
+                        
+                        self._logger.info(f"Ethoscope at {ip} already exists (was skipping: {was_skipping}, status: {device_status}), updating zeroconf info")
+                        
                         if hasattr(existing_device, 'zeroconf_name'):
                             existing_device.zeroconf_name = name
-                        # Reset error state in case it was having issues
+                        
+                        # Reset error state and re-enable scanning in case it was offline
                         existing_device.reset_error_state()
+                        existing_device.skip_scanning(False)
+                        
+                        # Explicitly reset status to allow device info to be updated
+                        with existing_device._lock:
+                            existing_device._info.update({
+                                'status': 'offline',  # Will be updated to proper status on next scan
+                                'last_seen': time.time()
+                            })
+                        
+                        self._logger.info(f"Re-enabled scanning for ethoscope at {ip} (was skipping: {was_skipping})")
                         return
             
             # Create device with minimal blocking
