@@ -11,7 +11,7 @@ from ethoscope.hardware.input.cameras import MovieVirtualCamera
 from ethoscope.utils.io import SQLiteResultWriter
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.drawers.drawers import DefaultDrawer
-from ethoscope.roi_builders.target_roi_builder import SleepMonitorWithTargetROIBuilder
+from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
 from ethoscope.hardware.interfaces.interfaces import BaseInterface
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection
 from _constants import VIDEO, DRAW_FRAMES
@@ -49,8 +49,8 @@ class TestAPI(unittest.TestCase):
     def test_API(self):
         random.seed(1)
         cam = MovieVirtualCamera(VIDEO)
-        rb = SleepMonitorWithTargetROIBuilder()
-        rois = rb.build(cam)
+        rb = FileBasedROIBuilder(template_name="sleep_monitor_20tube")
+        reference_points, rois = rb.build(cam)
         hc = HardwareConnection(MockInterface)
         stimulators = [MockStimulator(hc) for _ in rois]
 

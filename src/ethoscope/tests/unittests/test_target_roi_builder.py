@@ -3,7 +3,8 @@ __author__ = 'quentin'
 import cv2
 import unittest
 import os
-from ethoscope.roi_builders.target_roi_builder import SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder
+from ethoscope.roi_builders.target_roi_builder import TargetGridROIBuilder
+from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
 
 
 try:
@@ -19,7 +20,8 @@ LOG_DIR = "./test_logs/"
 
 class TestTargetROIBuilder(unittest.TestCase):
 
-    roi_builder = SleepMonitorWithTargetROIBuilder()
+    def setUp(self):
+        self.roi_builder = FileBasedROIBuilder(template_name="sleep_monitor_20tube")
 
     def _draw(self,img, rois):
         for r in rois:
@@ -30,7 +32,7 @@ class TestTargetROIBuilder(unittest.TestCase):
 
         img = cv2.imread(path)
 
-        rois = self.roi_builder.build(img)
+        reference_points, rois = self.roi_builder.build(img)
         self._draw(img, rois)
         cv2.imwrite(out,img)
         self.assertEqual(len(rois),20)

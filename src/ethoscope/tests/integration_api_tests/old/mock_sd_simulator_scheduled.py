@@ -6,7 +6,7 @@ from ethoscope.hardware.input.cameras import MovieVirtualCamera
 from ethoscope.utils.io import SQLiteResultWriter
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.drawers.drawers import DefaultDrawer
-from ethoscope.roi_builders.target_roi_builder import SleepMonitorWithTargetROIBuilder
+from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
 from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator
 from ethoscope.hardware.interfaces.interfaces import BaseInterface
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection
@@ -25,8 +25,8 @@ tmp = tempfile.mkstemp(suffix="_ethoscope_test.db")[1]
 
 print("Making a tmp db: " + tmp)
 cam = MovieVirtualCamera(VIDEO,drop_each=15)
-rb = SleepMonitorWithTargetROIBuilder()
-rois = rb.build(cam)
+rb = FileBasedROIBuilder(template_name="sleep_monitor_20tube")
+reference_points, rois = rb.build(cam)
 cam.restart()
 
 

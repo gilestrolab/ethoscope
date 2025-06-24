@@ -1,6 +1,6 @@
 
-  {   "roi_builder":{"name":"SleepMonitorWithTargetROIBuilder",
-                      "arguments":{}},
+  {   "roi_builder":{"name":"FileBasedROIBuilder",
+                      "arguments":{"template_name": "sleep_monitor_20tube"}},
     "tracker": {"name":"AdaptiveBGModel",
                   "arguments":{}},
     "interactor": {"name":"DefaultInteractor",

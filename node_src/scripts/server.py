@@ -780,7 +780,7 @@ class EthoscopeNodeServer:
                 bottle.abort(404, f"Device {id} not found")
             
             # Upload template to device using device API
-            device_url = f"http://{device.ip}:{device.port}/upload_roi_template"
+            device_url = f"http://{device.ip()}:{device._port}/upload_roi_template"
             import requests
             
             # Send template data as JSON POST

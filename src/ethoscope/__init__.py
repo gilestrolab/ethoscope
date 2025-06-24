@@ -46,8 +46,8 @@ If you want to run this code yourself, you can download the `test video <http://
 >>> from ethoscope.hardware.input.cameras import MovieVirtualCamera
 >>> from ethoscope.drawers.drawers import DefaultDrawer
 >>>
->>> # You can also load other types of ROI builder. This one is for 20 tubes (two columns of ten rows)
->>> from ethoscope.roi_builders.target_roi_builder import SleepMonitorWithTargetROIBuilder
+>>> # You can also load ROI builders using templates. This one is for 20 tubes (two columns of ten rows)
+>>> from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
 >>>
 >>> # change these three variables according to how you name your input/output files
 >>> INPUT_VIDEO = "test_video.mp4"
@@ -57,9 +57,9 @@ If you want to run this code yourself, you can download the `test video <http://
 >>> # We use a video input file as if it was a "camera"
 >>> cam = MovieVirtualCamera(INPUT_VIDEO)
 >>>
->>> # here, we generate ROIs automatically from the targets in the images
->>> roi_builder = SleepMonitorWithTargetROIBuilder()
->>> rois = roi_builder.build(cam)
+>>> # here, we generate ROIs automatically from the targets in the images using a template
+>>> roi_builder = FileBasedROIBuilder(template_name="sleep_monitor_20tube")
+>>> reference_points, rois = roi_builder.build(cam)
 >>> # Then, we go back to the first frame of the video
 >>> cam.restart()
 >>>

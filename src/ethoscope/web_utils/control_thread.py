@@ -15,8 +15,9 @@ import signal
 
 import trace
 from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera, V4L2Camera
-from ethoscope.roi_builders.target_roi_builder import OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder, ElectricShockAssayROIBuilder
+from ethoscope.roi_builders.target_roi_builder import TargetGridROIBuilder
 from ethoscope.roi_builders.roi_builders import  DefaultROIBuilder
+from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
 from ethoscope.core.monitor import Monitor
 from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
@@ -75,7 +76,7 @@ class ControlThread(Thread):
     
     _option_dict = {
         "roi_builder":{
-                "possible_classes":[DefaultROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder, OlfactionAssayROIBuilder, ElectricShockAssayROIBuilder],
+                "possible_classes":[FileBasedROIBuilder, DefaultROIBuilder, TargetGridROIBuilder],
             },
         "tracker":{
                 "possible_classes":[AdaptiveBGModel],
