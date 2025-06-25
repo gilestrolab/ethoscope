@@ -67,7 +67,7 @@ class DynamicOdourDeliverer(HasChangedSideStimulator):
     _description = {"overview": "A stimulator to deliver an odour according to which side the animal of its ROI is in",
                     "arguments": [
                                 {"type": "date_range", "name": "date_range",
-                                 "description": "A date  and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                 "description": "Active time period",
                                  "default": ""}
                                    ]}
 
@@ -123,7 +123,7 @@ class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
             {"type": "number", "min": 1, "max": 3600 * 12, "step": 1, "name": "min_inactive_time",
              "description": "The minimal time after which an inactive animal is awaken", "default": 120},
             {"type": "date_range", "name": "date_range",
-             "description": "A date  and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+             "description": "Active time period",
              "default": ""}
         ]}
 
@@ -176,7 +176,7 @@ class MiddleCrossingOdourStimulator(sleep_depriver_stimulators.MiddleCrossingSti
                         {"type": "number", "min": 2.0, "max": 10.0, "step": 0.5, "name": "stimulus_duration",
                          "description": "How long to send the puff of odour for", "default": 5.0},
                         {"type": "date_range", "name": "date_range",
-                         "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                         "description": "Active time period",
                          "default": ""}
                     ]}
 
@@ -222,7 +222,7 @@ class MiddleCrossingOdourStimulatorFlushed(MiddleCrossingOdourStimulator):
                         {"type": "number", "min": 2.0, "max": 60.0, "step": 0.5, "name": "flush_duration",
                          "description": "How long to flush odour for", "default": 10.0},
                         {"type": "date_range", "name": "date_range",
-                         "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                         "description": "Active time period",
                          "default": ""}
                     ]}
 

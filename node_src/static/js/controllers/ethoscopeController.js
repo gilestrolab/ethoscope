@@ -55,6 +55,25 @@
         device_id = $routeParams.device_id;
         //        var device_ip;
 
+        // Date range picker options with disabled past dates
+        $scope.dateRangeOptions = {
+            timePicker: true,
+            timePicker24Hour: true,
+            timePickerIncrement: 30,
+            drops: 'up',
+            autoApply: true,
+            autoUpdateInput: true,
+            minDate: moment(),
+            locale: {
+                format: 'YYYY-MM-DD HH:mm:ss',
+                separator: ' > ',
+                applyLabel: 'Apply',
+                cancelLabel: 'Cancel',
+                fromLabel: 'From',
+                toLabel: 'To'
+            }
+        };
+
         $scope.node = {
             'users': {},
             'incubators': {}
@@ -116,7 +135,17 @@
                 $scope.selected_options.tracking[k]['name'] = data.tracking[k][0]['name'];
                 $scope.selected_options.tracking[k]['arguments'] = {};
                 for (var j = 0; j < data.tracking[k][0]['arguments'].length; j++) {
-                    $scope.selected_options.tracking[k]['arguments'][data.tracking[k][0]['arguments'][j]['name']] = data.tracking[k][0]['arguments'][j]['default'];
+                    var arg = data.tracking[k][0]['arguments'][j];
+                    if (arg.type === 'date_range') {
+                        // Initialize date_range fields with proper object structure
+                        $scope.selected_options.tracking[k]['arguments'][arg.name] = {
+                            startDate: null,
+                            endDate: null,
+                            formatted: arg.default || ""
+                        };
+                    } else {
+                        $scope.selected_options.tracking[k]['arguments'][arg.name] = arg.default;
+                    }
                 }
             }
 
@@ -125,7 +154,17 @@
                 $scope.selected_options.recording[k]['name'] = data.recording[k][0]['name'];
                 $scope.selected_options.recording[k]['arguments'] = {};
                 for (var j = 0; j < data.recording[k][0]['arguments'].length; j++) {
-                    $scope.selected_options.recording[k]['arguments'][data.recording[k][0]['arguments'][j]['name']] = data.recording[k][0]['arguments'][j]['default'];
+                    var arg = data.recording[k][0]['arguments'][j];
+                    if (arg.type === 'date_range') {
+                        // Initialize date_range fields with proper object structure
+                        $scope.selected_options.recording[k]['arguments'][arg.name] = {
+                            startDate: null,
+                            endDate: null,
+                            formatted: arg.default || ""
+                        };
+                    } else {
+                        $scope.selected_options.recording[k]['arguments'][arg.name] = arg.default;
+                    }
                 }
             }
 
@@ -134,7 +173,17 @@
                 $scope.selected_options.update_machine[k]['name'] = data.update_machine[k][0]['name'];
                 $scope.selected_options.update_machine[k]['arguments'] = {};
                 for (var j = 0; j < data.update_machine[k][0]['arguments'].length; j++) {
-                    $scope.selected_options.update_machine[k]['arguments'][data.update_machine[k][0]['arguments'][j]['name']] = data.update_machine[k][0]['arguments'][j]['default'];
+                    var arg = data.update_machine[k][0]['arguments'][j];
+                    if (arg.type === 'date_range') {
+                        // Initialize date_range fields with proper object structure
+                        $scope.selected_options.update_machine[k]['arguments'][arg.name] = {
+                            startDate: null,
+                            endDate: null,
+                            formatted: arg.default || ""
+                        };
+                    } else {
+                        $scope.selected_options.update_machine[k]['arguments'][arg.name] = arg.default;
+                    }
                 }
             }
 

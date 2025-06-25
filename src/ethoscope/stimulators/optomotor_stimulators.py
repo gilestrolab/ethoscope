@@ -7,7 +7,7 @@ class OptoMidlineCrossStimulator (MiddleCrossingStimulator):
                     "arguments": [
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":0.01, "name": "p", "description": "the probability to move the tube when a beam cross was detected","default":1.0},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "description": "Active time period",
                                      "default": ""}
                                    ]}
     _HardwareInterfaceClass = OptoMotor

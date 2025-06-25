@@ -79,7 +79,7 @@ class SleepDepStimulator(IsMovingStimulator):
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken","default":120},
                                     {"type": "number", "min": 0.0, "max": 1.0, "step": 0.01, "name": "stimulus_probability",  "description": "Probability the stimulus will happen", "default": 1.0},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date and time range in which the device will perform.",
+                                     "description": "Active time period",
                                      "default": ""},
                                    ]}
 
@@ -158,7 +158,7 @@ class SleepDepStimulatorCR(SleepDepStimulator):
                         {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_correction_coef", "description": "Velocity correction coef", "default": 3.0e-3},
                                     {"type": "number", "min": 1, "max": 3600*12, "step":1, "name": "min_inactive_time", "description": "The minimal time after which an inactive animal is awaken","default":120},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "description": "Active time period",
                                      "default": ""}
                                    ]}
 
@@ -201,7 +201,7 @@ class OptomotorSleepDepriver(SleepDepStimulator):
                                     {"type": "number", "min": 0, "max": 3, "step": 1, "name": "stimulus_type",  "description": "1 = opto, 2= moto", "default": 2},
                                     {"type": "number", "min": 0.0, "max": 1.0, "step": 0.1, "name": "stimulus_probability",  "description": "Probability the stimulus will happen", "default": 1.0},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "description": "Active time period",
                                      "default": ""}
                                    ]}
 
@@ -250,7 +250,7 @@ class ExperimentalSleepDepStimulator(SleepDepStimulator):
                     "arguments": [
                         {"type": "number", "min": 0.0, "max": 1.0, "step": 0.0001, "name": "velocity_correction_coef", "description": "Velocity correction coef", "default": 3.0e-3},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date and time range in which the device will perform. Format YYYY-MM-DD HH:mm:ss ",
+                                     "description": "Active time period",
                                      "default": ""}
                                    ]}
 
@@ -300,7 +300,7 @@ class MiddleCrossingStimulator(BaseStimulator):
                     "arguments": [
                                     {"type": "number", "min": 0.0, "max": 1.0, "step":0.1, "name": "stimulus_probability", "description": "the probability to move the tube when a beam cross was detected", "default":1.0},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "description": "Active time period",
                                      "default": ""}
                                    ]}
 
@@ -380,7 +380,7 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
                                     {"type": "number", "min": 50, "max": 10000 , "step": 50, "name": "pulse_duration", "description": "For how long to deliver the stimulus(ms)", "default": 1000},
                                     {"type": "number", "min": 0, "max": 3, "step": 1, "name": "stimulus_type",  "description": "1 = opto, 2= moto", "default": 2},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "description": "Active time period",
                                      "default": ""}
                                    ]}
 
@@ -440,7 +440,7 @@ class mAGO(SleepDepStimulator):
                                     {"type": "number", "min": 0, "max": 3, "step": 1, "name": "stimulus_type",  "description": "1 = motor, 2= valves", "default": 1},
                                     {"type": "number", "min": 0.0, "max": 1.0, "step": 0.1, "name": "stimulus_probability",  "description": "Probability the stimulus will happen", "default": 1.0},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "description": "Active time period",
                                      "default": ""}
                                    ]}
 
@@ -496,7 +496,7 @@ class AGO(SleepDepStimulator):
                                     {"type": "number", "min": 0.0, "max": 1.0, "step": 0.1, "name": "stimulus_probability",  "description": "Probability the stimulus will happen", "default": 1.0},
                                     {"type": "number", "min" : 0, "max": 10000, "name" : "number_of_stimuli", "description" : "The number of stimulus to be given before no more are given. 0 means unlimited.", "default" : 0},
                                     {"type": "date_range", "name": "date_range",
-                                     "description": "A date and time range in which the device will perform (see http://tinyurl.com/jv7k826)",
+                                     "description": "Active time period",
                                      "default": ""}
                                    ]}
 

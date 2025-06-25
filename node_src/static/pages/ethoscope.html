@@ -387,7 +387,7 @@
                                 </div>
                                 <ul ng-if="selected_options.tracking[name]['name']==opt.name">
                                     <li ng-repeat="arg in opt.arguments">
-                                        <label ng-if="arg.type != 'boolean'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
+                                        <label ng-if="arg.type != 'boolean' && arg.type != 'date_range'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
 
 
                                         <select ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
@@ -402,10 +402,27 @@
                                         </select>
                                         <div ng-if="arg.type == 'boolean'"><label for="input-{{arg.name}}"><input style="transform: scale(1.5); margin: 3px; margin-right: 10px;" id="input-{{arg.name}}" type="checkbox" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">{{arg.description}}</label></div>
 
-                                        <div ng-if="arg.type == 'date_range'" class="input-group">
-                                            <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-drp" type=hidden readonly ng-model="selected_options.tracking[name]['arguments'][arg.name]" options="{timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss', separator : ' > ' }}">
-                                            <input ng-if="arg.type == 'date_range'" class="form-control" type=text ng-model="selected_options.tracking[name]['arguments'][arg.name].formatted">
-                                            <span class="input-group-addon"><i class="glyphicon glyphicon-calendar" onclick="$('#input-drp').data('daterangepicker').show();"></i></span>
+                                        <div ng-if="arg.type == 'date_range'" class="form-group">
+                                            <label for="input-{{arg.name}}">{{arg.description}}</label>
+                                            <div class="input-group" style="margin-top: 5px;">
+                                                <input ng-if="arg.type == 'date_range'" 
+                                                       date-range-picker 
+                                                       class="form-control date-picker" 
+                                                       name={{arg.name}} 
+                                                       id="input-drp-{{arg.name}}" 
+                                                       type="text" 
+                                                       readonly 
+                                                       ng-model="selected_options.tracking[name]['arguments'][arg.name]" 
+                                                       placeholder="Click to select start and end date/time"
+                                                       style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;"
+                                                       options="dateRangeOptions">
+                                                <span class="input-group-addon" style="background-color: #337ab7; color: white; cursor: pointer;">
+                                                    <i class="glyphicon glyphicon-time"></i>
+                                                </span>
+                                            </div>
+                                            <small class="help-block text-muted" style="margin-top: 3px;">
+                                                Click to select start and end date/time when stimulator should be active
+                                            </small>
                                         </div>
 
                                         <div ng-if="arg.type == 'datetime'" class="input-group">
@@ -475,9 +492,27 @@
                                             </label>
                                         </div>
 
-                                        <div ng-if="arg.type == 'date_range'" class="input-group">
-                                            <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.update_machine[name]['arguments'][arg.name]" options="{timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss', separator : ' > ' }}">
-                                            <span class="input-group-addon"><i class="glyphicon glyphicon-calendar"></i></span>
+                                        <div ng-if="arg.type == 'date_range'" class="form-group">
+                                            <label for="input-{{arg.name}}">{{arg.description}}</label>
+                                            <div class="input-group" style="margin-top: 5px;">
+                                                <input ng-if="arg.type == 'date_range'" 
+                                                       date-range-picker 
+                                                       class="form-control date-picker" 
+                                                       name={{arg.name}} 
+                                                       id="input-{{arg.name}}" 
+                                                       type="text" 
+                                                       readonly 
+                                                       ng-model="selected_options.update_machine[name]['arguments'][arg.name]" 
+                                                       placeholder="Click to select start and end date/time"
+                                                       style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;"
+                                                       options="dateRangeOptions">
+                                                <span class="input-group-addon" style="background-color: #337ab7; color: white; cursor: pointer;" onclick="$('#input-{{arg.name}}').focus();">
+                                                    <i class="glyphicon glyphicon-time"></i>
+                                                </span>
+                                            </div>
+                                            <small class="help-block text-muted" style="margin-top: 3px;">
+                                                Click to select start and end date/time when stimulator should be active
+                                            </small>
                                         </div>
 
                                         <div ng-if="arg.type == 'datetime'" class="input-group">
@@ -526,7 +561,7 @@
                                 </div>
                                 <ul ng-if="selected_options.recording[name]['name']==opt.name">
                                     <li ng-repeat="arg in opt.arguments">
-                                        <label for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
+                                        <label ng-if="arg.type != 'date_range'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
 
                                         <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=file name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]">
                                         <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}} ng-model="selected_options.recording[name]['arguments'][arg.name]">
@@ -535,9 +570,27 @@
                                             <option ng-repeat="entry in node[arg.asknode] | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
                                         </select>
 
-                                        <div ng-if="arg.type == 'date_range'" class="input-group">
-                                            <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]" options="{timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss', separator : ' > ' }}">
-                                            <span class="input-group-addon"><i class="glyphicon glyphicon-calendar"></i></span>
+                                        <div ng-if="arg.type == 'date_range'" class="form-group">
+                                            <label for="input-{{arg.name}}">{{arg.description}}</label>
+                                            <div class="input-group" style="margin-top: 5px;">
+                                                <input ng-if="arg.type == 'date_range'" 
+                                                       date-range-picker 
+                                                       class="form-control date-picker" 
+                                                       name={{arg.name}} 
+                                                       id="input-{{arg.name}}" 
+                                                       type="text" 
+                                                       readonly 
+                                                       ng-model="selected_options.recording[name]['arguments'][arg.name]" 
+                                                       placeholder="Click to select start and end date/time"
+                                                       style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;"
+                                                       options="dateRangeOptions">
+                                                <span class="input-group-addon" style="background-color: #337ab7; color: white; cursor: pointer;" onclick="$('#input-{{arg.name}}').focus();">
+                                                    <i class="glyphicon glyphicon-time"></i>
+                                                </span>
+                                            </div>
+                                            <small class="help-block text-muted" style="margin-top: 3px;">
+                                                Click to select start and end date/time when stimulator should be active
+                                            </small>
                                         </div>
 
                                         <div ng-if="arg.type == 'datetime'" class="input-group">

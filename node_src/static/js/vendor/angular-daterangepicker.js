@@ -82,7 +82,6 @@
         //The formatter has been modified from original version 
         //to provide a "formatted" field - this makes things easier to handle
         modelCtrl.$formatters.push(function(objValue) {
-          console.log("formatting");
           var f;
           f = function(date) {
             if (!moment.isMoment(date)) {
@@ -93,7 +92,7 @@
           };
           if (opts.singleDatePicker && objValue) {
             return f(objValue);
-          } else if (objValue.startDate) {
+          } else if (objValue && objValue.startDate) {
             if (modelCtrl.$viewValue.length > 0) { 
                 objValue.formatted = modelCtrl.$viewValue + ", " + [f(objValue.startDate), f(objValue.endDate)].join(opts.locale.separator);
             } else {
@@ -106,7 +105,9 @@
         });
 
         el.bind('blur', function() {
-            modelCtrl.$modelValue.formatted = modelCtrl.$viewValue;
+            if (modelCtrl.$modelValue) {
+                modelCtrl.$modelValue.formatted = modelCtrl.$viewValue;
+            }
         });
         
         modelCtrl.$render = function() {
