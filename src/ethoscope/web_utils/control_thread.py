@@ -9,6 +9,7 @@ import cv2
 from threading import Thread
 import pickle
 import secrets
+from collections import OrderedDict
 
 import subprocess
 import signal
@@ -73,14 +74,11 @@ class ControlThread(Thread):
 
     _auto_SQL_backup_at_stop = False
     
-    _option_dict = {
-        "roi_builder":{
-                "possible_classes":[DefaultROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder, OlfactionAssayROIBuilder, ElectricShockAssayROIBuilder],
-            },
-        "tracker":{
-                "possible_classes":[AdaptiveBGModel],
-            },
-        "interactor":{
+    _option_dict = OrderedDict([
+        ("experimental_info", {
+                        "possible_classes":[ExperimentalInformation],
+                }),
+        ("interactor", {
                         "possible_classes":[DefaultStimulator, 
                                             SleepDepStimulator,
                                             OptomotorSleepDepriver,
@@ -97,20 +95,23 @@ class ControlThread(Thread):
                                             mAGO,
                                             AGO
                                             ],
-                    },
-        "drawer":{
+                    }),
+        ("roi_builder", {
+                "possible_classes":[DefaultROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder, OlfactionAssayROIBuilder, ElectricShockAssayROIBuilder],
+            }),
+        ("tracker", {
+                "possible_classes":[AdaptiveBGModel],
+            }),
+        ("drawer", {
                         "possible_classes":[DefaultDrawer, NullDrawer],
-                    },
-        "camera":{
+                    }),
+        ("camera", {
                         "possible_classes":[OurPiCameraAsync, MovieVirtualCamera, V4L2Camera],
-                    },
-        "result_writer":{
+                    }),
+        ("result_writer", {
                         "possible_classes":[ResultWriter, SQLiteResultWriter],
-                },
-        "experimental_info":{
-                        "possible_classes":[ExperimentalInformation],
-                }
-     }
+                }),
+     ])
     
     #some classes do not need to be offered as choices to the user in normal conditions
     #these are shown only if the machine is not a PI

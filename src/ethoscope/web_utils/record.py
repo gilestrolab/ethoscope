@@ -10,6 +10,7 @@ import threading, queue
 import glob
 import datetime
 import os
+from collections import OrderedDict
 
 #from cv2 import VideoWriter, VideoWriter_fourcc, imwrite
 import cv2
@@ -289,20 +290,20 @@ class timedStop(DescribedObject):
 class ControlThreadVideoRecording(ControlThread):
 
     _evanescent = False
-    _option_dict = {
-            "camera": {
-                    "possible_classes":[OurPiCameraAsync, V4L2Camera],
-                    },
-            "recorder": {
-                    "possible_classes":[StandardVideoRecorder, HDVideoRecorder, GeneralVideoRecorder, Streamer],
-                    },
-            "experimental_info":{
+    _option_dict = OrderedDict([
+            ("experimental_info", {
                     "possible_classes":[ExperimentalInformation],
-                    },
-            "time_control":{
+                    }),
+            ("recorder", {
+                    "possible_classes":[StandardVideoRecorder, HDVideoRecorder, GeneralVideoRecorder, Streamer],
+                    }),
+            ("time_control", {
                     "possible_classes":[timedStop],
-                    }
-                }
+                    }),
+            ("camera", {
+                    "possible_classes":[OurPiCameraAsync, V4L2Camera],
+                    }),
+                ])
                 
     for k in _option_dict:
         _option_dict[k]["class"] =_option_dict[k]["possible_classes"][0]
