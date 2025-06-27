@@ -160,17 +160,30 @@ class BaseSQLConnector:
             if not local_tables_info:
                 return -1
             
+            # Get all unique table names from both remote and local
+            if use_fast_mode:
+                remote_tables = set(remote_tables_info.get("default", {}).keys())
+            else:
+                db_name = self._remote_db_name or list(remote_tables_info.keys())[0]
+                remote_tables = set(remote_tables_info.get(db_name, {}).keys())
+            
+            local_tables = set(local_tables_info.keys())
+            all_tables = remote_tables.union(local_tables)
+            
             total_remote = 0
             total_local = 0
             
-            for table_name, local_count in local_tables_info.items():
-                # Find remote count
+            for table_name in all_tables:
+                # Get remote count
                 remote_count = 0
                 if use_fast_mode:
                     remote_count = remote_tables_info.get("default", {}).get(table_name, 0)
                 else:
                     db_name = self._remote_db_name or list(remote_tables_info.keys())[0]
                     remote_count = remote_tables_info.get(db_name, {}).get(table_name, 0)
+                
+                # Get local count
+                local_count = local_tables_info.get(table_name, 0)
                 
                 if remote_count is None:
                     remote_count = 0
@@ -183,7 +196,14 @@ class BaseSQLConnector:
             if total_remote == 0:
                 return -1
             
-            return (total_local / total_remote) * 100
+            # Calculate match percentage
+            match_percentage = (total_local / total_remote) * 100
+            
+            # Log warning if local exceeds remote (indicates duplicate data issue)
+            if match_percentage > 100.0:
+                logging.warning(f"Local database has more records than remote ({match_percentage:.2f}% - this may indicate duplicate data)")
+            
+            return match_percentage
             
         except Exception as e:
             logging.error(f"Error comparing databases: {e}")
@@ -319,7 +339,7 @@ class MySQLdbToSQLite(BaseSQLConnector):
             
             if len(batch) >= self.MAX_BATCH_SIZE:
                 sqlite_cursor.executemany(
-                    f"INSERT INTO `{table_name}` (id, t, img) VALUES (?, ?, ?)", 
+                    f"INSERT OR IGNORE INTO `{table_name}` (id, t, img) VALUES (?, ?, ?)", 
                     batch
                 )
                 sqlite_conn.commit()
@@ -328,7 +348,7 @@ class MySQLdbToSQLite(BaseSQLConnector):
         # Insert remaining rows
         if batch:
             sqlite_cursor.executemany(
-                f"INSERT INTO `{table_name}` (id, t, img) VALUES (?, ?, ?)", 
+                f"INSERT OR IGNORE INTO `{table_name}` (id, t, img) VALUES (?, ?, ?)", 
                 batch
             )
             sqlite_conn.commit()
@@ -350,7 +370,7 @@ class MySQLdbToSQLite(BaseSQLConnector):
             
             if len(batch) >= self.MAX_BATCH_SIZE:
                 sqlite_cursor.executemany(
-                    f"INSERT INTO `{table_name}` VALUES ({placeholders})", 
+                    f"INSERT OR IGNORE INTO `{table_name}` VALUES ({placeholders})", 
                     batch
                 )
                 sqlite_conn.commit()
@@ -363,7 +383,7 @@ class MySQLdbToSQLite(BaseSQLConnector):
         # Insert remaining rows
         if batch:
             sqlite_cursor.executemany(
-                f"INSERT INTO `{table_name}` VALUES ({placeholders})", 
+                f"INSERT OR IGNORE INTO `{table_name}` VALUES ({placeholders})", 
                 batch
             )
             sqlite_conn.commit()
@@ -441,7 +461,7 @@ class MySQLdbToSQLite(BaseSQLConnector):
                 
                 if len(batch) >= self.MAX_BATCH_SIZE:
                     sqlite_cursor.executemany(
-                        f"INSERT INTO `{table_name}` VALUES ({placeholders})", 
+                        f"INSERT OR IGNORE INTO `{table_name}` VALUES ({placeholders})", 
                         batch
                     )
                     sqlite_conn.commit()
@@ -454,7 +474,7 @@ class MySQLdbToSQLite(BaseSQLConnector):
             # Insert remaining rows
             if batch:
                 sqlite_cursor.executemany(
-                    f"INSERT INTO `{table_name}` VALUES ({placeholders})", 
+                    f"INSERT OR IGNORE INTO `{table_name}` VALUES ({placeholders})", 
                     batch
                 )
                 sqlite_conn.commit()
