@@ -1,34 +1,46 @@
-# Ethoscope Node Frontend
+# Ethoscope Node Server
 
-This directory contains the web frontend for the Ethoscope node server, built with Angular 1.8.3 and Bootstrap 4.
+This directory contains the complete Ethoscope node server - both the Python backend and the web frontend built with Angular 1.8.3 and Bootstrap 4.
 
 ## Prerequisites
 
-- Node.js (version 14 or higher)
+- Python 3.7+ with pip
+- Node.js (version 14 or higher) 
 - npm (comes with Node.js)
-- Python 3.7+ for the backend node server
 
 ## Installation
 
-### Quick Setup
+### Complete Installation (Recommended)
+Install both backend and frontend in one command:
 ```bash
-make install
-make build
+make install-all
 ```
 
-### Manual Setup
+### Development Installation
+For development with editable Python package:
 ```bash
+make install-dev
+```
+
+### Manual Installation
+```bash
+# Install Python backend
+pip install .                    # Production
+# OR
+pip install -e .                 # Development (editable)
+
+# Install and build frontend
 npm install
 npm run build
 ```
 
-### Python Package Installation
-For the backend node server:
+### Legacy Installation
+The original installation method (still supported):
 ```bash
 sudo python setup.py develop
 ```
 
-You do *not* need to reinstall the Python package every time you make a change to Python code.
+*Note: You do not need to reinstall the Python package every time you make changes to Python code when using editable installs.*
 
 ## Development
 
@@ -77,8 +89,17 @@ The build system uses Babel to transpile modern JavaScript (ES6+) to browser-com
 For new node installations, ensure the following steps are included:
 
 1. Install Node.js and npm on the system
-2. Run `cd /opt/ethoscope-git/node_src && make install build`
+2. Run `cd /opt/ethoscope-git/node_src && make install-all`
 3. Ensure the ethoscope node service can access the built files
+
+### Production Deployment
+For production environments:
+```bash
+cd /opt/ethoscope-git/node_src
+make install-production
+```
+
+This installs the Python package without editable mode and builds optimized frontend assets.
 
 ## Directory Structure
 
@@ -87,18 +108,24 @@ node_src/
 ├── package.json          # npm configuration and build scripts
 ├── package-lock.json     # Locked dependency versions
 ├── Makefile              # Build system shortcuts
-├── setup.py              # Python package installation
-├── pyproject.toml        # Python package configuration
-├── ethoscope_node/       # Python backend code
+├── setup.py              # Python package installation (legacy)
+├── pyproject.toml        # Python package configuration (modern)
+├── ethoscope_node/       # Python backend package
+│   ├── __init__.py
+│   └── utils/            # Backend utilities
 ├── scripts/              # Backend server scripts
-├── static/
+│   ├── server.py         # Main node server
+│   ├── backup_tool.py    # Backup management
+│   └── video_backup_tool.py
+├── static/               # Frontend web assets
 │   ├── js/
 │   │   ├── controllers/  # Source JavaScript files (edit these)
 │   │   └── script.js     # Main application file
 │   ├── dist/
 │   │   └── js/           # Built JavaScript files (browser loads these)
 │   ├── css/              # CSS files (Bootstrap 4 + custom styles)
-│   └── pages/            # HTML templates
+│   ├── pages/            # HTML templates
+│   └── fonts/            # Web fonts
 └── README.md             # This file
 ```
 
