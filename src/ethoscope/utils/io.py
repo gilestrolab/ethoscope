@@ -1,4 +1,3 @@
-__author__ = 'quentin'
 import multiprocessing
 import time, datetime
 import traceback
@@ -267,6 +266,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
         self._erase_old_db = erase_old_db
 
         self._queue = queue
+        self._ready_event = multiprocessing.Event()
 
         super(AsyncMySQLWriter,self).__init__()
 
@@ -385,6 +385,9 @@ class AsyncMySQLWriter(multiprocessing.Process):
                 self._create_mysql_db()
 
             db = self._get_connection()
+            
+            # Signal that the writer is ready to accept commands
+            self._ready_event.set()
         
             while do_run:
                 try:
@@ -418,10 +421,16 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
         except KeyboardInterrupt as e:
             logging.warning("DB async process interrupted with KeyboardInterrupt")
+            # Ensure ready event is set even if interrupted
+            # This prevents the main thread from hanging indefinitely
+            self._ready_event.set()
             raise e
 
         except Exception as e:
             logging.error("DB async process stopped with an exception")
+            # Ensure ready event is set even if there's an error during startup
+            # This prevents the main thread from hanging indefinitely
+            self._ready_event.set()
             raise e
 
         finally:
@@ -871,6 +880,13 @@ class ResultWriter(object):
         pass
 
     def _write_async_command(self, command, args=None):
+        # Wait for the async writer to be ready before sending commands
+        if not self._async_writer._ready_event.wait(timeout=30):
+            if self._async_writer.is_alive():
+                raise Exception("Async database writer failed to initialize within 30 seconds - check MariaDB connection")
+            else:
+                raise Exception("Async database writer process died during initialization - check MariaDB configuration and logs")
+        
         if not self._async_writer.is_alive():
             raise Exception("Async database writer has stopped unexpectedly")
         self._queue.put((command, args))
@@ -965,10 +981,16 @@ class AsyncSQLiteWriter(multiprocessing.Process):
 
         except KeyboardInterrupt as e:
             logging.warning("DB async process interrupted with KeyboardInterrupt")
+            # Ensure ready event is set even if interrupted
+            # This prevents the main thread from hanging indefinitely
+            self._ready_event.set()
             raise e
 
         except Exception as e:
             logging.error("DB async process stopped with an exception")
+            # Ensure ready event is set even if there's an error during startup
+            # This prevents the main thread from hanging indefinitely
+            self._ready_event.set()
             raise e
 
         finally:
