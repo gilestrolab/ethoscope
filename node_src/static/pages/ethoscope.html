@@ -161,7 +161,7 @@
             <div class="dd-button" id="power-btn">
                 Power
             </div>
-            <input type="checkbox" class="dd-input" id="options-drop">
+            <input type="checkbox" class="dd-input" id="power-drop">
             <ul class="dd-menu">
                 <li data-toggle="modal" data-target="#powerOffAlert">Shutdown</li>
                 <li data-toggle="modal" data-target="#rebootAlert">Reboot</li>
@@ -229,7 +229,7 @@
                 <p>Do you really want to power off the device “{{device.name}}”? Any ongoing acquisition will be ended.</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal">No</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
                 <button type="button" class="btn btn-primary" ng-click="ethoscope.poweroff()" data-dismiss="modal">Yes</button>
             </div>
         </div>
@@ -314,7 +314,7 @@
                 <p>Do you really want to reboot the device “{{device.name}}”? Any ongoing acquisition will be ended.</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal">No</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
                 <button type="button" class="btn btn-primary" ng-click="ethoscope.reboot()" data-dismiss="modal">Yes</button>
             </div>
         </div>
@@ -333,7 +333,7 @@
                 <p>Do you really want to restart the service on the device “{{device.name}}”? Any ongoing acquisition will end.</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal">No</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
                 <button type="button" class="btn btn-primary" ng-click="ethoscope.restart()" data-dismiss="modal">Yes</button>
             </div>
         </div>
@@ -354,7 +354,7 @@
                 <a ng-repeat="file in device.monitor_info.result_files" href="/download{{file}}" target="_blank">Node: {{file}}</a>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
                 <button type="button" class="btn btn-primary" ng-click="ethoscope.poweroff()">Download All</button>
             </div>
         </div>
@@ -375,7 +375,7 @@
                         <h4>{{name}}</h4>
                         <ul class="option-list">
                             <li ng-repeat="opt in option">
-                                <input type=radio name={{opt.name}} value={{opt.name}} ng-model="selected_options.tracking[name]['name']" ng-click="ethoscope.update_user_options.tracking(name)">
+                                <input type=radio name={{opt.name}} value={{opt.name}} ng-model="selected_options.tracking[name]['name']" ng-click="ethoscope.update_user_options.tracking(name, opt.name)">
                                 <strong data-toggle="tooltip" data-placement="top" title=" {{opt.overview}}" ng-init="description[opt.name] = false">{{opt.name}}</strong> <a href="" ng-click="description[opt.name] = true" ng-if="description[opt.name]==false">
                                     <icon class="fa fa-plus-square-o"> </icon>
                                 </a>
@@ -398,7 +398,7 @@
                                         <input ng-if="(arg.type == 'str' && arg.asknode == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
                                         <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" ng-required="true">
                                             <option value="">-- choose {{arg.name}} --</option>
-                                            <option ng-repeat="entry in node[arg.asknode]  | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
+                                            <option ng-repeat="entry in node[arg.asknode] | toArray | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
                                         </select>
                                         <div ng-if="arg.type == 'boolean'"><label for="input-{{arg.name}}"><input style="transform: scale(1.5); margin: 3px; margin-right: 10px;" id="input-{{arg.name}}" type="checkbox" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">{{arg.description}}</label></div>
 
@@ -416,18 +416,22 @@
                                                        placeholder="Click to select start and end date/time"
                                                        style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;"
                                                        options="dateRangeOptions">
-                                                <span class="input-group-addon" style="background-color: #337ab7; color: white; cursor: pointer;">
-                                                    <i class="glyphicon glyphicon-time"></i>
-                                                </span>
+                                                <div class="input-group-append">
+                                                    <span class="input-group-text" style="background-color: #337ab7; color: white; cursor: pointer;">
+                                                        <i class="fa fa-clock"></i>
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <small class="help-block text-muted" style="margin-top: 3px;">
+                                            <small class="form-text text-muted" style="margin-top: 3px;">
                                                 Click to select start and end date/time when stimulator should be active
                                             </small>
                                         </div>
 
                                         <div ng-if="arg.type == 'datetime'" class="input-group">
                                             <input ng-if="arg.type == 'datetime'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-{{arg.name}}" type=text ng-model="selected_options.tracking[name]['arguments'][arg.name]" options="{singleDatePicker: true, timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss' }}">
-                                            <span class="input-group-addon"><i class="glyphicon glyphicon-calendar"></i></span>
+                                            <div class="input-group-append">
+                                                <span class="input-group-text"><i class="fa fa-calendar"></i></span>
+                                            </div>
                                         </div>
 
 
@@ -438,7 +442,7 @@
                         <hr>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
                         <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_tracking(selected_options.tracking)" data-toggle="modal">Start Tracking</button>
                     </div>
 
@@ -462,7 +466,7 @@
                         <!--            <h4>{{name}}</h4> -->
                         <ul class="option-list">
                             <li ng-repeat="opt in option">
-                                <input type=radio name={{opt.name}} value={{opt.name}} ng-model="selected_options.update_machine[name]['name']" ng-click="ethoscope.update_user_options.update_machine(name)">
+                                <input type=radio name={{opt.name}} value={{opt.name}} ng-model="selected_options.update_machine[name]['name']" ng-click="ethoscope.update_user_options.update_machine(name, opt.name)">
                                 <strong data-toggle="tooltip" data-placement="top" title=" {{opt.overview}}" ng-init="description[opt.name] = false">{{opt.name}}</strong> <a href="" ng-click="description[opt.name] = true" ng-if="description[opt.name]==false">
                                     <icon class="fa fa-plus-square-o"> </icon>
                                 </a>
@@ -506,18 +510,22 @@
                                                        placeholder="Click to select start and end date/time"
                                                        style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;"
                                                        options="dateRangeOptions">
-                                                <span class="input-group-addon" style="background-color: #337ab7; color: white; cursor: pointer;" onclick="$('#input-{{arg.name}}').focus();">
-                                                    <i class="glyphicon glyphicon-time"></i>
-                                                </span>
+                                                <div class="input-group-append">
+                                                    <span class="input-group-text" style="background-color: #337ab7; color: white; cursor: pointer;" onclick="$('#input-{{arg.name}}').focus();">
+                                                        <i class="fa fa-clock"></i>
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <small class="help-block text-muted" style="margin-top: 3px;">
+                                            <small class="form-text text-muted" style="margin-top: 3px;">
                                                 Click to select start and end date/time when stimulator should be active
                                             </small>
                                         </div>
 
                                         <div ng-if="arg.type == 'datetime'" class="input-group">
                                             <input ng-if="arg.type == 'datetime'" date-range-picker class="form-control date-picker" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.update_machine[name]['arguments'][arg.name]" options="{singleDatePicker: true, timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss' }}">
-                                            <span class="input-group-addon"><i class="glyphicon glyphicon-calendar"></i></span>
+                                            <div class="input-group-append">
+                                                <span class="input-group-text"><i class="fa fa-calendar"></i></span>
+                                            </div>
                                         </div>
                                     </li>
                                 </ul>
@@ -528,7 +536,7 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
                 <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.update_machine(selected_options.update_machine)" data-toggle="modal">Update</button>
             </div>
         </div>
@@ -549,7 +557,7 @@
                         <h4>{{name}}</h4>
                         <ul class="option-list">
                             <li ng-repeat="opt in option">
-                                <input type=radio name={{opt.name}} value={{opt.name}} ng-model="selected_options.recording[name]['name']" ng-click="ethoscope.update_user_options.recording(name)">
+                                <input type=radio name={{opt.name}} value={{opt.name}} ng-model="selected_options.recording[name]['name']" ng-click="ethoscope.update_user_options.recording(name, opt.name)">
                                 <strong data-toggle="tooltip" data-placement="top" title=" {{opt.overview}}" ng-init="description[opt.name] = false">{{opt.name}}</strong> <a href="" ng-click="description[opt.name] = true" ng-if="description[opt.name]==false">
                                     <icon class="fa fa-plus-square-o"> </icon>
                                 </a>
@@ -567,7 +575,7 @@
                                         <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}} ng-model="selected_options.recording[name]['arguments'][arg.name]">
                                         <input ng-if="(arg.type == 'str' && arg.asknode == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]">
                                         <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]">
-                                            <option ng-repeat="entry in node[arg.asknode] | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
+                                            <option ng-repeat="entry in node[arg.asknode] | toArray | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
                                         </select>
 
                                         <div ng-if="arg.type == 'date_range'" class="form-group">
@@ -584,18 +592,22 @@
                                                        placeholder="Click to select start and end date/time"
                                                        style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;"
                                                        options="dateRangeOptions">
-                                                <span class="input-group-addon" style="background-color: #337ab7; color: white; cursor: pointer;" onclick="$('#input-{{arg.name}}').focus();">
-                                                    <i class="glyphicon glyphicon-time"></i>
-                                                </span>
+                                                <div class="input-group-append">
+                                                    <span class="input-group-text" style="background-color: #337ab7; color: white; cursor: pointer;" onclick="$('#input-{{arg.name}}').focus();">
+                                                        <i class="fa fa-clock"></i>
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <small class="help-block text-muted" style="margin-top: 3px;">
+                                            <small class="form-text text-muted" style="margin-top: 3px;">
                                                 Click to select start and end date/time when stimulator should be active
                                             </small>
                                         </div>
 
                                         <div ng-if="arg.type == 'datetime'" class="input-group">
                                             <input ng-if="arg.type == 'datetime'" date-range-picker class="form-control date-picker" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]" options="{singleDatePicker: true, timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss' }}">
-                                            <span class="input-group-addon"><i class="glyphicon glyphicon-calendar"></i></span>
+                                            <div class="input-group-append">
+                                                <span class="input-group-text"><i class="fa fa-calendar"></i></span>
+                                            </div>
                                         </div>
 
                                     </li>
@@ -607,7 +619,7 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
                 <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_recording(selected_options.recording)" data-toggle="modal">Start recording</button>
             </div>
         </div>
@@ -627,7 +639,7 @@
                 <p>Do you really want to stop the tracking in “{{device.name}}”? Any ongoing acquisition will be ended.</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal">No</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
                 <button type="button" class="btn btn-primary" ng-click="ethoscope.stop()" data-dismiss="modal">Yes, of course!</button>
             </div>
         </div>

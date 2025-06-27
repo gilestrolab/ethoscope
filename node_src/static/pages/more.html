@@ -1,23 +1,41 @@
-<div ng-if="showOptions" class="col-xs-12" ng-cloak>
-    <div ng-repeat="option in options">
-    <a href=""  ng-click="exec_option(option.opt)" data-toggle="tooltip" class="col-xs-1 option {{option.color}}" style={{option.style}} title="{{option.name}}" >
-                <p class="{{option.icon}}"></p>
-<!--                <p>{{option.name}}</p> -->
-        </a>
+<div class="container-fluid">
+    <!-- Options Layout - Horizontal Action Buttons -->
+    <div ng-if="showOptions" ng-cloak>
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex flex-wrap justify-content-start">
+                    <div ng-repeat="option in options" class="p-2">
+                        <a href="" ng-click="exec_option(option.opt)" data-toggle="tooltip" 
+                           class="option {{option.color}} d-flex align-items-center justify-content-center" 
+                           style="{{option.style}}; min-width: 120px; min-height: 80px;" 
+                           title="{{option.name}}">
+                            <p class="{{option.icon}} mb-0"></p>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
 <div id="loading" class="spinner"></div>
 
-<div ng-if="showOption == 'viewLog'" class="col-xs-12" ng-cloak id="logBox">
-<h2>Server Log</h2>
-<div>
-    <pre>
-    <p class="log" ng-repeat="(key,entry) in log | toArray |orderBy: 'key'">{{key}}: {{entry}}</p></pre>
-</div>
-</div>
+    <!-- Server Log Section -->
+    <div ng-if="showOption == 'viewLog'" ng-cloak id="logBox">
+        <div class="row">
+            <div class="col-12">
+                <h2>Server Log</h2>
+                <div>
+                    <pre>
+                        <p class="log" ng-repeat="(key,entry) in log | toArray |orderBy: 'key'">{{key}}: {{entry}}</p>
+                    </pre>
+                </div>
+            </div>
+        </div>
+    </div>
 
-
-<div ng-show="showOption == 'browse'" class="col-xs-12" ng-cloak>
+    <!-- Browse Files Section -->
+    <div ng-show="showOption == 'browse'" ng-cloak>
+        <div class="row">
+            <div class="col-12">
     <h2>Files on the node</h2>
     <div class="alert alert-info ">
         <p>Actions for selected files:</p>
@@ -52,9 +70,11 @@
                 <td>{{file.size}}</td>
                 <td> <input type="checkbox" checklist-model="selected.files" checklist-value="file"></td>
             </tr>
-        </tbody>
-    </table>
-</div>
+                </tbody>
+            </table>
+            </div>
+        </div>
+    </div>
 
 <!-- Modal download -->
 <div class="modal fade" id="downloadModal" tabindex="-1" role="dialog" aria-labelledby="downloadModal" aria-hidden="true">
@@ -70,7 +90,7 @@
        </ul>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
         <a href="{{browse.download_url}}" target="_blank" type="button" class="btn btn-primary">Download as Zip</a>
       </div>
     </div>
@@ -90,25 +110,30 @@
        </ul>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
         <button ng-click="browse.remove_files()" type="button" class="btn btn-danger">Remove Selected</button>
       </div>
     </div>
   </div>
 </div>
-<div ng-if="showOption=='update'" class="col-xs-12">
-    <div ng-if="update_waiting" class="alert alert-warning"><h1 >Wait until all the devices are updated, this can take a while. Do not disconnect them from the mains.</h1></div>
-    <div ng-if="update.error">
-        <h3>Error details: {{update.error}}</h3>
-    </div>
-    <h3>Upstream version: {{origin.version.id | limitTo:6}} ({{origin.version.date}})</h3>
-    <h3>Node version: {{node.version.id | limitTo:6}} ({{node.version.date}})</h3>
-
-    <h4>{{update_text}}</h4>
-    <div >
+    <!-- Update Section -->
+    <div ng-if="showOption=='update'" ng-cloak>
+        <div class="row">
+            <div class="col-12">
+                <div ng-if="update_waiting" class="alert alert-warning">
+                    <h1>Wait until all the devices are updated, this can take a while. Do not disconnect them from the mains.</h1>
+                </div>
+                <div ng-if="update.error">
+                    <h3>Error details: {{update.error}}</h3>
+                </div>
+                <h3>Upstream version: {{origin.version.id | limitTo:6}} ({{origin.version.date}})</h3>
+                <h3>Node version: {{node.version.id | limitTo:6}} ({{node.version.date}})</h3>
+                <h4>{{update_text}}</h4>
+                
+                <div class="mb-3">
         <!--<h2>The following devices will be updated.</h2>-->
         <button class="btn btn-success" ng-click="update_selected('all')" data-toggle="modal" data-target="#updateDevicesModal">Update All Devices</button>
-        <button class="btn btn-default" ng-click="update_selected(devices_to_update_selected)" data-toggle="modal" data-target="#updateDevicesModal">Update Selected</button>
+        <button class="btn btn-secondary" ng-click="update_selected(devices_to_update_selected)" data-toggle="modal" data-target="#updateDevicesModal">Update Selected</button>
         <button ng-if="node.version.id != origin.version.id" class="btn btn-primary" data-toggle="modal" data-target="#updateNodeModal" >Update Node</button>
 
         <table class="table table-striped" >
@@ -188,28 +213,32 @@
                 <td>
                 </td>
             </tr>
-            </tbody>
-        </table>
+                    </tbody>
+                </table>
+                </div>
+            </div>
         </div>
     </div>
 
-</div>
-
-<div ng-if="showOption == 'nodeCommands'" class="col-xs-12">
-    <div>
-        <h2>Custom commands</h2>
-        <p>These BASH commands can be manually specified from within the json configuration file in <code>/etc/ethoscope/ethoscope.conf</code> - the commands are run as root meaning this is potentially very dangerous, so BE VERY AWARE OF WHAT YOU ARE DOING</p>
-            <ul class="list-group col-xs-12">
-                <li class="list-group-item input" ng-repeat="(name, cmd) in commands">
-                        <button class="btn btn-info" data-toggle="modal" data-target="#commandOutput" ng-click="nodeManagement.exec_cmd(name)" title={{cmd.description}} style="width: 260px; bg-color: gray;">{{cmd.name}} <i class="fa fa-lg fa-terminal" style="display: inline; float:right; margin-top: 8px;"></i> </button>
-<!--
-                        <input type="text" value={{cmd.command}} style="width:40em;" readonly >
--->
-                        <pre class="command" width="40">{{cmd.command}}</pre>
-                </li>
-            </ul>        
+    <!-- Custom Commands Section -->
+    <div ng-if="showOption == 'nodeCommands'" ng-cloak>
+        <div class="row">
+            <div class="col-12">
+                <h2>Custom commands</h2>
+                <p>These BASH commands can be manually specified from within the json configuration file in <code>/etc/ethoscope/ethoscope.conf</code> - the commands are run as root meaning this is potentially very dangerous, so BE VERY AWARE OF WHAT YOU ARE DOING</p>
+                <ul class="list-group">
+                    <li class="list-group-item input d-flex justify-content-between align-items-start" ng-repeat="(name, cmd) in commands">
+                        <div class="me-auto">
+                            <button class="btn btn-info mb-2" data-toggle="modal" data-target="#commandOutput" ng-click="nodeManagement.exec_cmd(name)" title="{{cmd.description}}" style="width: 260px;">
+                                {{cmd.name}} <i class="fa fa-lg fa-terminal float-right mt-1"></i>
+                            </button>
+                            <pre class="command">{{cmd.command}}</pre>
+                        </div>
+                    </li>
+                </ul>        
+            </div>
+        </div>
     </div>
-</div>
 
 <!-- Modal power off -->
 <div class="modal fade" id="commandOutput" tabindex="-1" role="dialog" aria-labelledby="commandOutputLabel" aria-hidden="true">
@@ -223,7 +252,7 @@
         <pre class="bash">{{nodeManagement.std_output}}</pre>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Done</button>
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Done</button>
       </div>
     </div>
   </div>
@@ -231,43 +260,58 @@
 
 
 
-<div ng-if="showOption == 'nodeInfo'" class="col-xs-12">
-    <div>
-        <h2>Node Parameters</h2>
-        <p>Time on Network: {{nodeManagement.time}}</p>
-        <p>Service running: {{nodeManagement.info.active_since}}</p>
-        <ul class="list-group col-xs-6">
-        <p>Disk Usage:</p>
-            <li class="list-group-item">Device: {{nodeManagement.info.disk_usage[0]}}</li>
-            <li class="list-group-item">Total Size: {{nodeManagement.info.disk_usage[1]}}</li>
-            <li class="list-group-item">Used: {{nodeManagement.info.disk_usage[2]}}</li>
-            <li class="list-group-item">Available: {{nodeManagement.info.disk_usage[3]}}</li>
-            <li class="list-group-item">% used: {{nodeManagement.info.disk_usage[4]}}</li>
-            <li class="list-group-item">Mounted on: {{nodeManagement.info.disk_usage[5]}}</li>
-            <li class="list-group-item">Result dir: {{nodeManagement.info.RDIR}}</li>
-
-        </ul>
-        <ul class="list-group col-xs-6">
-        <p>Version info: </p>
-            <li class="list-group-item">Current GIT branch: {{nodeManagement.info.GIT_BRANCH}}</li>
-            <li class="list-group-item">Needs update: {{nodeManagement.info.NEEDS_UPDATE}}</li>
-        </ul>
-        <ul class="list-group col-xs-6">
-        <div ng-repeat="(key, entry) in nodeManagement.info.CARDS">
-            <li class="list-group-item">Device Name: {{key}}</li>
-            <li class="list-group-item">Device MAC: {{entry.MAC}}</li>
-            <li class="list-group-item">IP Address: {{entry.IP}}</li>
+    <!-- Node Info Section -->
+    <div ng-if="showOption == 'nodeInfo'" ng-cloak>
+        <div class="row">
+            <div class="col-12">
+                <h2>Node Parameters</h2>
+                <p>Time on Network: {{nodeManagement.time}}</p>
+                <p>Service running: {{nodeManagement.info.active_since}}</p>
+            </div>
         </div>
-        </ul>
+        
+        <!-- Three-column layout for info sections -->
+        <div class="row">
+            <div class="col-md-4">
+                <p><strong>Disk Usage:</strong></p>
+                <ul class="list-group">
+                    <li class="list-group-item">Device: {{nodeManagement.info.disk_usage[0]}}</li>
+                    <li class="list-group-item">Total Size: {{nodeManagement.info.disk_usage[1]}}</li>
+                    <li class="list-group-item">Used: {{nodeManagement.info.disk_usage[2]}}</li>
+                    <li class="list-group-item">Available: {{nodeManagement.info.disk_usage[3]}}</li>
+                    <li class="list-group-item">% used: {{nodeManagement.info.disk_usage[4]}}</li>
+                    <li class="list-group-item">Mounted on: {{nodeManagement.info.disk_usage[5]}}</li>
+                    <li class="list-group-item">Result dir: {{nodeManagement.info.RDIR}}</li>
+                </ul>
+            </div>
+            
+            <div class="col-md-4">
+                <p><strong>Version info:</strong></p>
+                <ul class="list-group">
+                    <li class="list-group-item">Current GIT branch: {{nodeManagement.info.GIT_BRANCH}}</li>
+                    <li class="list-group-item">Needs update: {{nodeManagement.info.NEEDS_UPDATE}}</li>
+                </ul>
+            </div>
+            
+            <div class="col-md-4">
+                <p><strong>Network Cards:</strong></p>
+                <ul class="list-group">
+                    <div ng-repeat="(key, entry) in nodeManagement.info.CARDS">
+                        <li class="list-group-item">Device Name: {{key}}</li>
+                        <li class="list-group-item">Device MAC: {{entry.MAC}}</li>
+                        <li class="list-group-item">IP Address: {{entry.IP}}</li>
+                    </div>
+                </ul>
+            </div>
+        </div>
 
+        <div class="row mt-3">
+            <div class="col-12">
+                <button class="btn btn-danger" data-toggle="modal" data-target="#RestartAlert">Restart Node</button>
+                <a href="ssh://node@{{nodeManagement.info.IPs[0]}}"><button class="btn btn-info">SSH in the Node</button></a>
+            </div>
+        </div>
     </div>
-
-    <div class="col-xs-12">
-        <button class="btn btn-danger" data-toggle="modal" data-target="#RestartAlert">Restart Node</button>
-        <a href="ssh://node@{{nodeManagement.info.IPs[0]}}"><button class="btn btn-info">SSH in the Node</button></a>
-    </div>
-
-</div>
 
 <!-- Modal power off -->
 <div class="modal fade" id="RestartAlert" tabindex="-1" role="dialog" aria-labelledby="RestartAlertLabel" aria-hidden="true">
@@ -281,19 +325,21 @@
        <p>Do you want to restart the Node?</p>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
         <button class="btn btn-danger" ng-click="nodeManagement.action('restart')" data-dismiss="modal">Restart Node</button>
       </div>
     </div>
   </div>
 </div>
 
-<div ng-if="showOption == 'nodeManage'" class="col-xs-8">
-    <div>
-        <h2>Node Administration</h2>
-        <ul class="list-group col-xs-12">
-        <h3>Backup daemons and settings:</h3>
-            <!-- <p class="log" ng-repeat="(key,entry) in daemons | toArray |orderBy: 'key'">{{key}}: {{entry}}</p></pre> -->
+    <!-- Node Management Section -->
+    <div ng-if="showOption == 'nodeManage'" ng-cloak>
+        <div class="row">
+            <div class="col-lg-8">
+                <h2>Node Administration</h2>
+                <ul class="list-group">
+                    <h3>Backup daemons and settings:</h3>
+                    <!-- <p class="log" ng-repeat="(key,entry) in daemons | toArray |orderBy: 'key'">{{key}}: {{entry}}</p></pre> -->
 
             <li class="list-group-item" ng-repeat="(key, entry) in daemons">
 
@@ -312,7 +358,7 @@
               </span>
             </li>
         </ul>
-        <ul class="list-group col-xs-12">
+        <ul class="list-group col-12">
         <h3>Folders</h3>
             <form>
             <li class="list-group-item input" ng-repeat="(name, entry) in folders">
@@ -324,7 +370,7 @@
             <input class="btn btn-success btn-xl" type=submit value="Save" ng-click="nodeManagement.saveFolders()">
             </form>
         </ul>
-        <ul class="list-group col-xs-12">
+        <ul class="list-group col-12">
             <h3>Users</h3>
             <div class="input">
                 <select ng-model="selected['users'].name" ng-change="nodeManagement.loadData('users')">
@@ -334,7 +380,7 @@
                     <button class="btn btn-info" data-toggle="modal" data-target="#addUserModal" ng-click="selected['users'] = {}; "><i class="fa fa-lg fa-plus"></i></button>
             </div>
         </ul>
-        <ul class="list-group col-xs-12">
+        <ul class="list-group col-12">
             <h3>Incubators</h3>
             <div class="input">
                 <select ng-model="selected['incubators'].name" ng-change="nodeManagement.loadData('incubators')">
@@ -344,7 +390,7 @@
                     <button class="btn btn-info" data-toggle="modal" data-target="#addIncubatorModal" ng-click="selected['incubators'] = {}; "><i class="fa fa-lg fa-plus"></i></button>
             </div>
         </ul>
-        <ul class="list-group col-xs-12">
+        <ul class="list-group col-12">
             <h3>Sensors</h3>
             <div class="input">
                 <select ng-model="selected['sensors'].name" ng-change="nodeManagement.loadData('sensors')">
@@ -387,7 +433,7 @@
         
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
         <button class="btn btn-danger" ng-click="nodeManagement.adduser()"  data-dismiss="modal" ng-disabled="adduserForm.$invalid">Save</button>
       </div>
     </div>
@@ -418,7 +464,7 @@
         </form>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
         <button class="btn btn-danger" ng-click="nodeManagement.addincubator()"  data-dismiss="modal" ng-disabled="addIncubatorForm.$invalid">Save</button>
       </div>
     </div>
@@ -452,13 +498,17 @@
         </form>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
         <button class="btn btn-danger" ng-click="nodeManagement.addsensor()"  data-dismiss="modal" ng-disabled="addSensorForm.$invalid">Save</button>
       </div>
     </div>
   </div>
-</div>
+                </ul>
+            </div>
+        </div>
+    </div>
 
+</div> <!-- Close container-fluid -->
 
 <script>
     (function(){

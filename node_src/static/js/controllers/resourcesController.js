@@ -8,13 +8,13 @@
         $scope.hasAccess = false;
         
         $http.get(resourcesURL)
-             .success(function(data, status, headers, config){
+             .then(function(response) { var data = response.data;
                 $scope.resources = data;
                 $scope.hasAccess = true;
         });
 
         $http.get(newsURL)
-             .success(function(data, status, headers, config){
+             .then(function(response) { var data = response.data;
                 $scope.notifications = data.news;
         });
 

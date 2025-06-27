@@ -27,7 +27,7 @@
 
     app.directive('ngEnter', function() {
         return function(scope, element, attrs) {
-            element.bind("keydown keypress", function(event) {
+            element.on("keydown keypress", function(event) {
                 if (event.which === 13) {
                     scope.$apply(function() {
                         scope.$eval(attrs.ngEnter);
@@ -87,8 +87,9 @@
             controller  : 'helpController'
         })*/
         ;
-        // use the HTML5 History API
-        $locationProvider.html5Mode(true);
+        // use hash-based routing for better compatibility
+        $locationProvider.html5Mode(false);
+        $locationProvider.hashPrefix('!');
     });
 
     // create the controller and inject Angular's $scope
@@ -115,24 +116,28 @@
             }
         }
 
-        $http.get('/devices').success(function(data) {
+        $http.get('/devices').then(function(response) {
+            var data = response.data;
             $scope.devices = data;
         });
 
-        $http.get("https://ethoscope-resources.lab.gilest.ro/news").success(function(data) {
+        $http.get("https://ethoscope-resources.lab.gilest.ro/news").then(function(response) {
+            var data = response.data;
             $scope.notifications = data.news;
         });
 
         var get_sensors = function() {
-            $http.get('/sensors').success(function(data) {
+            $http.get('/sensors').then(function(response) {
+            var data = response.data;
                 $scope.sensors = data;
                 $scope.has_sensors = Object.keys($scope.sensors).length;
             })
         };
 
         var update_local_times = function() {
-            $http.get('/node/time').success(function(data) {
-                t = new Date(data.time);
+            $http.get('/node/time').then(function(response) {
+            var data = response.data;
+                var t = new Date(data.time);
                 $scope.time = t.toString();
             });
             var t = new Date();
@@ -140,21 +145,22 @@
         };
 
         var get_devices = function() {
-            $http.get('/devices').success(function(data) {
+            $http.get('/devices').then(function(response) {
+            var data = response.data;
 
-                data_list = [];
+                var data_list = [];
 
-                for (d in data) {
+                for (var d in data) {
                     data_list.push(data[d]);
                 }
 
                 $scope.devices = data_list;
                 $scope.n_devices = $scope.devices.length;
-                status_summary = {};
+                var status_summary = {};
 
-                for (d in $scope.devices) {
+                for (var d in $scope.devices) {
 
-                    dev = $scope.devices[d]
+                    var dev = $scope.devices[d]
 
                     if (!(dev.status in status_summary))
                         status_summary[dev.status] = 0;
@@ -167,7 +173,7 @@
         };
 
         $scope.secToDate = function(secs) {
-            d = new Date(isNaN(secs) ? secs : secs * 1000);
+            var d = new Date(isNaN(secs) ? secs : secs * 1000);
 
             return d.toString();
         };
@@ -227,11 +233,12 @@
 
 
         $scope.groupActions.checkStart = function(selected_devices) {
-            softwareVersion = "";
-            device_version = "";
+            var softwareVersion = "";
+            var device_version = "";
             checkVersionLoop:
                 for (var i = 0; i < selected_devices.length(); i++) {
-                    $http.get('/device/' + selected_devices[i] + '/data').success(function(data) {
+                    $http.get('/device/' + selected_devices[i] + '/data').then(function(response) {
+            var data = response.data;
                         device_version = data.version.id
                     });
                     if (i == 0) {
@@ -245,21 +252,25 @@
 
         $scope.groupActions.start = function() {
             $("#startModal").modal('hide');
-            spStart = new Spinner(opts).spin();
+            var spStart = new Spinner(opts).spin();
             starting_tracking.appendChild(spStart.el);
             $http.post('/device/' + device_id + '/controls/start', data = option)
-                .success(function(data) {
+                .then(function(response) {
+            var data = response.data;
                     $scope.device.status = data.status;
                 });
-            $http.get('/devices').success(function(data) {
-                $http.get('/device/' + device_id + '/data').success(function(data) {
+            $http.get('/devices').then(function(response) {
+            var data = response.data;
+                $http.get('/device/' + device_id + '/data').then(function(response) {
+            var data = response.data;
                     $scope.device = data;
 
                 });
 
-                $http.get('/device/' + device_id + '/ip').success(function(data) {
+                $http.get('/device/' + device_id + '/ip').then(function(response) {
+            var data = response.data;
                     $scope.device.ip = data;
-                    device_ip = data;
+                    var device_ip = data;
                 });
                 $("#startModal").modal('hide');
             });
@@ -290,7 +301,7 @@
                         $('#IPAlertModal').modal('show');
                     }
                 })
-                .error(function() {
+                .catch(function() {
                     spin('stop');
                 })
         };
@@ -313,7 +324,7 @@
         };
 
         // refresh every 5 seconds
-        refresh_data = $interval(refresh_platform, 5 * 1000);
+        var refresh_data = $interval(refresh_platform, 5 * 1000);
 
         //clear interval when scope is destroyed
         $scope.$on("$destroy", function() {

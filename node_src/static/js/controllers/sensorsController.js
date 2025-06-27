@@ -7,8 +7,8 @@
 
         // Load the list of CSV files and remove `.csv` extension before assigning to scope
         $http.get('/list_sensor_csv_files')
-            .success(function(response) {
-                $scope.csvFiles = response.files.map(function(file) {
+            .then(function(response) { var data = response.data;
+                $scope.csvFiles = data.files.map(function(file) {
                     return file.replace('.csv', '');
                 });
 
@@ -20,7 +20,7 @@
                     $scope.fetchAndPlotData();
                 }
             })
-            .error(function(error) {
+            .catch(function(error) {
                 console.error("Error fetching CSV file list:", error);
             });
 
@@ -29,18 +29,18 @@
             if ($scope.selectedFile) {
                 // When fetching data, remember to add `.csv` back to the file name
                 $http.get('/get_sensor_csv_data/' + $scope.selectedFile + '.csv')
-                    .success(function(response) {
-                        $scope.headers = response.headers;
-                        $scope.data = response.data;
+                    .then(function(response) { var data = response.data;
+                        $scope.headers = data.headers;
+                        $scope.data = data.data;
                         plotSensorData($scope.headers, $scope.data);
                     })
-                    .error(function(error) {
+                    .catch(function(error) {
                         console.error("Error fetching CSV data:", error);
                     });
             }
         };
 
-        // Function to plot the sensor data using Plotly
+        // Function to plot the sensor data using Plotly with shared x-axis
         function plotSensorData(headers, data) {
             var dates = [],
                 temperature = [],
@@ -55,57 +55,144 @@
                 light.push(parseFloat(row[4]));
             });
 
-            // Layout configuration function
-            var layout = function(title, yRange = null) {
-                return {
-                    title: title,
-                    xaxis: {
-                        title: 'Date'
+            // Calculate date range for last 15 days
+            var now = new Date();
+            var fifteenDaysAgo = new Date(now.getTime() - (15 * 24 * 60 * 60 * 1000));
+            var firstDate = dates.length > 0 ? dates[0] : fifteenDaysAgo;
+            var lastDate = dates.length > 0 ? dates[dates.length - 1] : now;
+
+            // Create data traces for all sensors
+            var traces = [
+                {
+                    x: dates,
+                    y: temperature,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Temperature',
+                    line: { color: 'red' },
+                    yaxis: 'y1',
+                    xaxis: 'x'
+                },
+                {
+                    x: dates,
+                    y: humidity,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Humidity',
+                    line: { color: 'blue' },
+                    yaxis: 'y2',
+                    xaxis: 'x'
+                },
+                {
+                    x: dates,
+                    y: pressure,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Pressure',
+                    line: { color: 'green' },
+                    yaxis: 'y3',
+                    xaxis: 'x'
+                },
+                {
+                    x: dates,
+                    y: light,
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Light',
+                    line: { color: 'orange' },
+                    yaxis: 'y4',
+                    xaxis: 'x'
+                }
+            ];
+
+            // Create layout with shared x-axis and multiple y-axes
+            var layout = {
+                height: 2000,
+                showlegend: false,
+                title: 'Sensor Data Overview',
+                // Main x-axis (shared)
+                xaxis: {
+                    title: 'Date',
+                    domain: [0, 1],
+                    range: [fifteenDaysAgo, lastDate],
+                    rangeslider: {
+                        visible: true,
+                        range: [firstDate, lastDate]
                     },
-                    yaxis: {
-                        title: 'Value',
-                        range: yRange
-                    },
-                    margin: {
-                        t: 50
-                    },
-                    autosize: true,
-                    //width: 700,
-                    //height: 400
-                };
+                    rangeselector: {
+                        buttons: [
+                            {
+                                count: 1,
+                                label: '1d',
+                                step: 'day',
+                                stepmode: 'backward'
+                            },
+                            {
+                                count: 7,
+                                label: '7d',
+                                step: 'day',
+                                stepmode: 'backward'
+                            },
+                            {
+                                count: 15,
+                                label: '15d',
+                                step: 'day',
+                                stepmode: 'backward'
+                            },
+                            {
+                                count: 30,
+                                label: '30d',
+                                step: 'day',
+                                stepmode: 'backward'
+                            },
+                            {
+                                step: 'all',
+                                label: 'All'
+                            }
+                        ]
+                    }
+                },
+                // Y-axis for Temperature (top subplot)
+                yaxis: {
+                    title: 'Temperature (°C)',
+                    domain: [0.75, 1],
+                    range: [10, 35],
+                    titlefont: { color: 'red' },
+                    tickfont: { color: 'red' }
+                },
+                // Y-axis for Humidity (second subplot)
+                yaxis2: {
+                    title: 'Humidity (%)',
+                    domain: [0.5, 0.7],
+                    range: [20, 80],
+                    titlefont: { color: 'blue' },
+                    tickfont: { color: 'blue' }
+                },
+                // Y-axis for Pressure (third subplot)
+                yaxis3: {
+                    title: 'Pressure (hPa)',
+                    domain: [0.25, 0.45],
+                    range: [980, 1050],
+                    titlefont: { color: 'green' },
+                    tickfont: { color: 'green' }
+                },
+                // Y-axis for Light (bottom subplot)
+                yaxis4: {
+                    title: 'Light (lux)',
+                    domain: [0, 0.2],
+                    titlefont: { color: 'orange' },
+                    tickfont: { color: 'orange' }
+                },
+                margin: {
+                    t: 50,
+                    b: 100,
+                    l: 80,
+                    r: 50
+                }
             };
 
-            // Plot each sensor data in its respective div with specified colors
-            Plotly.newPlot('plotTemperature', [{
-                x: dates,
-                y: temperature,
-                mode: 'lines',
-                name: 'Temperature',
-                line: {
-                    color: 'red'
-                }
-            }], layout('Temperature', [10, 35]));
-            Plotly.newPlot('plotHumidity', [{
-                x: dates,
-                y: humidity,
-                mode: 'lines',
-                name: 'Humidity'
-            }], layout('Humidity', [20, 80]));
-            Plotly.newPlot('plotPressure', [{
-                x: dates,
-                y: pressure,
-                mode: 'lines',
-                name: 'Pressure'
-            }], layout('Pressure', [980, 1050]));
-            Plotly.newPlot('plotLight', [{
-                x: dates,
-                y: light,
-                mode: 'lines',
-                name: 'Light',
-                line: {
-                    color: 'orange'
-                }
-            }], layout('Light'));
+            // Plot the unified chart with shared x-axis
+            Plotly.newPlot('plotContainer', traces, layout);
         }
     };
 

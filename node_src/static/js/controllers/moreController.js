@@ -104,13 +104,13 @@ function maxLengthCheck(object) {
             prev_folder.pop();
             $scope.prev_dir = prev_folder.join('/');
             $http.get("/browse"+folder)
-                     .success(function(res){
-                        filesObj =[];
-                        for (key in res.files){
-                            path = res.files[key].abs_path.split('/');
-                            length = path.length;
-                            size = bytesToSize(res.files[key].size)
-                            file = {'device_id':path[length-4],
+                     .then(function(response) { var res = response.data;
+                        var filesObj =[];
+                        for (var key in res.files){
+                            var path = res.files[key].abs_path.split('/');
+                            var length = path.length;
+                            var size = bytesToSize(res.files[key].size)
+                            var file = {'device_id':path[length-4],
                                     'device_name':path[length-3],
                                     'exp_date':path[length-2],
                                     'file':path[length-1],
@@ -139,7 +139,7 @@ function maxLengthCheck(object) {
                 var loadingContainer = document.getElementById('loading');
                 loadingContainer.appendChild(spinner.el);
                 $http.post('/request_download/files', data=$scope.selected)
-                     .success(function(res){
+                     .then(function(response) { var res = response.data;
                          $scope.browse.download_url = '/download'+res.url;
                          spinner.stop();
                          $scope.selected = {'files':[]};
@@ -150,7 +150,7 @@ function maxLengthCheck(object) {
         };
         $scope.browse.remove_files = function(){
             $http.post('/remove_files', data=$scope.selected)
-                 .success(function(res){
+                 .then(function(response) { var res = response.data;
                         $('#deleteModal').modal('hide');
                         $scope.selected = {'files':[]};
                         $scope.exec_option('browse');
@@ -169,7 +169,7 @@ function maxLengthCheck(object) {
             }
         };
         
-        bytesToSize = function (bytes) {
+        var bytesToSize = function (bytes) {
            if(bytes == 0) return '0 Byte';
            var k = 1000;
            var sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
@@ -181,7 +181,7 @@ function maxLengthCheck(object) {
         $scope.nodeManagement = {};
         
         var get_node_info = function(){
-            $http.get('/node/info').success(function(res){
+            $http.get('/node/info').then(function(response) { var res = response.data;
                 $scope.nodeManagement.info = res;
             })
         }
@@ -191,14 +191,14 @@ function maxLengthCheck(object) {
         
         $scope.nodeManagement.exec_cmd = function(cmd_name){
             $http.post('/node-actions', data = {'action': 'exec_cmd', 'cmd_name' : cmd_name})
-            .success(function(data){
+            .then(function(response) { var data = response.data;
                 $scope.nodeManagement.std_output = data;
             });
         };
         
         $scope.nodeManagement.action = function(action){
                $http.post('/node-actions', data = {'action': action})
-               .success(function(res){
+               .then(function(response) { var res = response.data;
                 $scope.nodeManagement[action]=res;
                });
         };
@@ -206,7 +206,7 @@ function maxLengthCheck(object) {
         $scope.nodeManagement.toggleDaemon = function(daemon_name, status){
             var spinner= new Spinner(opts).spin();
             $http.post('/node-actions', data = {'action': 'toggledaemon', 'daemon_name': daemon_name, 'status': status} )
-                .success(function(data){
+                .then(function(response) { var data = response.data;
                     //$scope.daemons = data;
             });
             spinner.stop();
@@ -215,7 +215,7 @@ function maxLengthCheck(object) {
         $scope.nodeManagement.saveFolders = function(){
             var spinner= new Spinner(opts).spin();
             $http.post('/node-actions', data = {'action': 'updatefolders', 'folders' : $scope.folders} )
-                .success(function(data){
+                .then(function(response) { var data = response.data;
                     $scope.folders = data;
             });
             spinner.stop();
@@ -225,7 +225,7 @@ function maxLengthCheck(object) {
         $scope.nodeManagement.adduser = function(){
             var spinner = new Spinner(opts).spin();
             $http.post('/node-actions', data = {'action': 'adduser', 'userdata' : $scope.selected['users']} )
-                .success(function(data){
+                .then(function(response) { var data = response.data;
                     if ( data['result'] == 'success' ) { $scope.users = data['data'] };
             });
             spinner.stop();
@@ -250,7 +250,7 @@ function maxLengthCheck(object) {
         $scope.nodeManagement.addincubator = function(){
             var spinner = new Spinner(opts).spin();
             $http.post('/node-actions', data = {'action': 'addincubator', 'incubatordata' : $scope.selected['incubators']} )
-                .success(function(data){
+                .then(function(response) { var data = response.data;
                     if ( data['result'] == 'success' ) { $scope.incubators = data['data'] };
             });
             spinner.stop();
@@ -259,7 +259,7 @@ function maxLengthCheck(object) {
         $scope.nodeManagement.addsensor = function(){
             var spinner = new Spinner(opts).spin();
             $http.post('/node-actions', data = {'action': 'addsensor', 'sensordata' : $scope.selected['sensors']} )
-                .success(function(data){
+                .then(function(response) { var data = response.data;
                     if ( data['result'] == 'success' ) { $scope.sensors = data['data'] };
             });
             spinner.stop();
@@ -270,12 +270,12 @@ function maxLengthCheck(object) {
             ///var log_file_path = $scope.device.log_file;
                 spin('start');
                 $http.get('/node/log')
-                     .success(function(data, status, headers, config){
+                     .then(function(response) { var data = response.data;
                         $scope.log = data;
                         $scope.showLog = true;
                         spin('stop');
                      })
-                      .error(function(){
+                      .catch(function(){
                         spin('stop');
                      });
         };
@@ -284,18 +284,18 @@ function maxLengthCheck(object) {
         var getNodeConfiguration = function(){
             ///var log_file_path = $scope.device.log_file;
             $http.get('/node/daemons')
-                 .success(function(data, status, headers, config){
+                 .then(function(response) { var data = response.data;
                     $scope.daemons = data;
             });
 
             $http.get('/node/folders')
-                 .success(function(data, status, headers, config){
+                 .then(function(response) { var data = response.data;
                     $scope.folders = data;
                     $scope.selected['folders'] = data;
             });
 
             $http.get('/node/users')
-                 .success(function(data, status, headers, config){
+                 .then(function(response) { var data = response.data;
                      
                     $scope.groups = [];
                     $scope.users = data;
@@ -312,17 +312,17 @@ function maxLengthCheck(object) {
             
 
             $http.get('/node/incubators')
-                 .success(function(data, status, headers, config){
+                 .then(function(response) { var data = response.data;
                     $scope.incubators = data;
             });
 
             $http.get('/node/sensors')
-                 .success(function(data, status, headers, config){
+                 .then(function(response) { var data = response.data;
                     $scope.sensors = data;
             });
         
             $http.get('/node/commands')
-                 .success(function(data, status, headers, config){
+                 .then(function(response) { var data = response.data;
                     $scope.commands = data;
             });
 

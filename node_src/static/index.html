@@ -15,7 +15,7 @@
 
     <!--JS-->
     <!-- load all JS locally - not via CDN -->
-    <!-- Angular version: 1.7.8 -->
+    <!-- Angular version: 1.8.3 -->
     <script src="static/js/vendor/angular.min.js"></script>
     <script src="static/js/vendor/angular-route.min.js"></script>
     <script src="static/js/vendor/plotly-latest.min.js"></script>
@@ -23,7 +23,7 @@
     <script src="static/js/vendor/spinner.js"></script>
     <script src="static/js/vendor/jquery.min.js"></script>
     <script src="static/js/vendor/bootstrap.min.js"></script>
-    <script src="static/js/script.js"></script>
+    <script src="static/dist/js/script.js"></script>
     <script src="static/js/vendor/dataTables/jquery.dataTables.js"></script>
     <script src="static/js/vendor/dataTables/dataTables.bootstrap.js"></script>
     <script src="static/js/vendor/moment.js"></script>
@@ -32,11 +32,11 @@
     <script src="static/js/directives/checkboxes.js"></script>
     <script src="static/js/directives/pagination/dirPagination.js"></script>
 
-    <script src="static/js/controllers/ethoscopeController.js"></script>
-    <script src="static/js/controllers/moreController.js"></script>
-    <script src="static/js/controllers/experimentsController.js"></script>
-    <script src="static/js/controllers/resourcesController.js"></script>
-    <script src="static/js/controllers/sensorsController.js"></script>
+    <script src="static/dist/js/ethoscopeController.js"></script>
+    <script src="static/dist/js/moreController.js"></script>
+    <script src="static/dist/js/experimentsController.js"></script>
+    <script src="static/dist/js/resourcesController.js"></script>
+    <script src="static/dist/js/sensorsController.js"></script>
 
     <script src="static/js/vendor/daterangepicker.js"></script>
     <script src="static/js/vendor/angular-daterangepicker.js"></script>
@@ -57,10 +57,10 @@
 
                 <ul class="nav navbar-nav navbar-right">
                     <li><a href="/update" target="_blank"><i class="fa fa-refresh"></i>Update System</a></li>
-                    <li><a href="/more/all"><i class="fa fa-cog"></i> Management</a></li>
-                    <li><a href="/sensors_data"><i class="fa fa-temperature-quarter"></i> Sensors</a></li>
-                    <li><a href="/experiments"><i class="fa fa-clipboard-list"></i> Experiments</a></li>
-                    <li><a href="/resources"><i class="fa fa-book"></i> Resources<span id="notification-badge" class="notification-badge" title="">{{notifications.length}}</span></a></li>
+                    <li><a href="#!/more/all"><i class="fa fa-cog"></i> Management</a></li>
+                    <li><a href="#!/sensors_data"><i class="fa fa-temperature-quarter"></i> Sensors</a></li>
+                    <li><a href="#!/experiments"><i class="fa fa-clipboard-list"></i> Experiments</a></li>
+                    <li><a href="#!/resources"><i class="fa fa-book"></i> Resources<span id="notification-badge" class="notification-badge" title="">{{notifications.length}}</span></a></li>
                 </ul>
             </div>
         </nav>

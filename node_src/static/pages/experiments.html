@@ -2,14 +2,15 @@
 <!-- **** ETHOSCOPE LIST TABLE **** -->
 
 <form>
-<div class="form-group">
-  <div class="input-group">
-    <div class="input-group-addon"><i class="fa fa-search"></i></div>
-
-    <input type="text" class="form-control" placeholder="Filter runs" ng-model="filterRuns" id="filterRuns">
-
-  </div>      
-</div>
+<!-- Interface to quickly filter runs in the table -->
+    <div class="form-group" id="userInputs">
+      <div class="input-group">
+        <div class="input-group-prepend">
+            <span class="input-group-text"><i class="fa fa-search"></i></span>
+        </div>
+        <input type="text" class="form-control" placeholder="Filter runs" ng-model="filterRuns" title="Filter experimental runs in the table below">
+      </div>      
+    </div>
 </form>
 
 
@@ -87,7 +88,7 @@
                 <td>{{run.run_id}}</td>
                 <td>
                     <div ng-if="run.status != 'stopped'">
-                        <a ng-href="/#ethoscope/{{run.ethoscope_id}}" target="_blank">
+                        <a ng-href="#!/ethoscope/{{run.ethoscope_id}}" target="_blank">
                         <span>{{run.ethoscope_name}}</span>
                         </a>
                     </div>

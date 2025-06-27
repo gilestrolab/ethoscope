@@ -8,11 +8,11 @@
         // We need to make this call syncronous because the server may take a while to generate these data
         $scope.getBackupInfo = function () { return $http.get('/browse/null') };
 
-        $http.get('/devices').success(function(data){
+        $http.get('/devices').then(function(response) { var data = response.data;
             $scope.devices = data;
         });
         
-        $http.get('/runs_list').success(function(data){
+        $http.get('/runs_list').then(function(response) { var data = response.data;
             $scope.runs = data;
             $scope.totalRuns = 0;
 
@@ -20,7 +20,7 @@
             $scope.getBackupInfo().then(function(data) {
                 $scope.backup_files =  data.data.files;
 
-                for (ix in $scope.runs) {
+                for (var ix in $scope.runs) {
                     
                     $scope.totalRuns++;
                     
@@ -68,7 +68,7 @@
             }
 
 
-        refresh_data = $interval(function () {
+        var refresh_data = $interval(function () {
                console.log("refresh");
            }, 10000);
           
