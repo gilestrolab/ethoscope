@@ -88,6 +88,7 @@
         $scope.isActive = false;
 
         // Date range picker configuration for stimulator scheduling
+        // Initialize with safe defaults, will be updated when moment.js is available
         $scope.dateRangeOptions = {
             timePicker: true,
             timePicker24Hour: true,
@@ -95,7 +96,7 @@
             drops: 'up',
             autoApply: true,
             autoUpdateInput: true,
-            minDate: moment(), // Disable past dates
+            minDate: new Date(), // Will be updated to moment() when available
             locale: {
                 format: 'YYYY-MM-DD HH:mm:ss',
                 separator: ' > ',
@@ -105,6 +106,20 @@
                 toLabel: 'To'
             }
         };
+        
+        // Update dateRangeOptions when moment.js becomes available
+        function updateDateRangeOptions() {
+            if (typeof moment !== 'undefined') {
+                $scope.dateRangeOptions.minDate = moment();
+                console.log('Date range picker updated with moment.js');
+            } else {
+                // Retry after a short delay if moment isn't ready yet
+                setTimeout(updateDateRangeOptions, 100);
+            }
+        }
+        
+        // Start the check
+        updateDateRangeOptions();
 
         // ===========================
         // DATA LOADING FUNCTIONS
@@ -401,9 +416,7 @@
          * @returns {string} Shortened readable URL
          */
         $scope.ethoscope.readable_url = function(url) {
-            // Initialize tooltips (POTENTIAL SIDE EFFECT - consider moving)
-            $('[data-toggle="tooltip"]').tooltip();
-
+            if (!url) return '';
             var parts = url.split("/");
             return ".../" + parts[parts.length - 1];
         };

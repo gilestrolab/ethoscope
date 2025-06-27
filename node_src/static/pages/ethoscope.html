@@ -60,7 +60,7 @@
                 <span ng-if="device.CPU_temp > 70" class="fas fa-temperature-high"></span>
                 <span ng-if="device.CPU_temp <= 70" class="fas fa-temperature-low"></span> CPU temperature: {{device.CPU_temp}} &#8451
             </p>
-            <p>Your file will be saved as: <a ng-if="device.backup_path" href="/download{{device.backup_path}}" target="_blank" data-toggle="tooltip" data-placement="top" title="{{device.backup_path}}">{{ethoscope.readable_url(device.backup_path)}}</a><span ng-if="!device.backup_path">Path not available</span></p>
+            <p>Your file will be saved as: <a ng-if="device.backup_path" href="/download{{device.backup_path}}" target="_blank" title="{{device.backup_path}}">{{ethoscope.readable_url(device.backup_path)}}</a><span ng-if="!device.backup_path">Path not available</span></p>
         </div>
     </div>
 
