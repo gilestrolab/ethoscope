@@ -1,64 +1,99 @@
-# Ethoscope Project - Claude Instructions
+# CLAUDE.md
 
-## Project Overview
-This is the ethoscope platform for automated behavioral monitoring of small model organisms. The project consists of two main components:
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-- **Device package** (`src/`) - Core ethoscope software that runs on individual devices
-- **Node server** (`node_src/`) - Central web interface and coordination server with Angular 1.8.3 + Bootstrap 4
+## Project Architecture
 
-## Framework Status
-- **Angular**: Upgraded from 1.7.8 to 1.8.3 ✅
-- **Bootstrap**: Upgraded from 3.x to 4.x ✅
-- **Build System**: Babel transpilation for ES6+ JavaScript ✅
-- **Race Conditions**: Fixed modal form population issues ✅
-- **Form Ordering**: Implemented consistent ordering with OrderedDict ✅
+The ethoscope platform is a distributed system for automated behavioral monitoring of small model organisms. It consists of two main packages:
 
-## Installation Commands
+### Device Package (`src/`)
+The core ethoscope software that runs on individual Raspberry Pi devices. Key components:
+- **`ethoscope.core`**: Monitor, ROI, and tracking unit abstractions
+- **`ethoscope.trackers`**: Computer vision algorithms (AdaptiveBGModel, etc.)
+- **`ethoscope.stimulators`**: Behavioral intervention modules (sleep deprivation, odour, optomotor)
+- **`ethoscope.hardware`**: Camera interfaces (PiCamera, V4L2) and GPIO control
+- **`ethoscope.web_utils.control_thread`**: Main device control loop and web API
+- **`scripts/device_server.py`**: Web server providing device control interface
 
-### Node Server (node_src) - Complete Installation
+### Node Server (`node_src/`)
+Central coordination server with Python backend and Angular frontend:
+- **`ethoscope_node.utils`**: Device scanning, backup management, database operations
+- **`scripts/server.py`**: Main node web server (Bottle framework)
+- **`static/js/controllers/`**: Angular 1.8.3 frontend controllers (source files)
+- **`static/dist/js/`**: Babel-transpiled JavaScript (browser loads these)
+
+## Development Commands
+
+### Installation
 ```bash
-make install-all        # Install Python backend + npm frontend (recommended)
-make install-dev        # Development mode with editable Python package
-make install-production # Production deployment
+# Node server (Python backend + Angular frontend)
+cd node_src && make install-dev
+
+# Device package (with hardware dependencies)
+cd src && make install-dev
+
+# Test device package
+cd src && make test
 ```
 
-### Device Package (src) - Ethoscope Device
+### Frontend Development (Critical Build Process)
 ```bash
-make install            # Standard installation with device dependencies
-make install-dev        # Development with editable package
-make install-production # Production deployment
-make test               # Run comprehensive test suite
+cd node_src
+
+# Build after editing source files (REQUIRED)
+npm run build
+
+# Watch mode for development
+npm run dev
+
+# Source files: static/js/controllers/*.js
+# Built files: static/dist/js/*.js (browser loads these)
 ```
-
-## Development Workflow
-
-### Frontend Development (node_src)
-- **Source files**: Edit in `static/js/controllers/` 
-- **Built files**: Browser loads from `static/dist/js/`
-- **Build commands**:
-  - `npm run build` - Build production assets
-  - `npm run dev` - Watch mode for development
-  - `make build` - Makefile shortcut
-
-### Important Notes
-- **Always run `npm run build`** after editing JavaScript source files
-- The browser loads built files from `static/dist/js/`, not source files
-- Use `npm run dev` for file watching during development
-- Source vs built files separation is critical for the build system
 
 ### Testing
-- **Node**: Run frontend tests and backend API tests
-- **Device**: `make test` runs unit tests, integration tests, API tests
-- Test both components before committing changes
+```bash
+# Device package comprehensive testing
+cd src && make test                    # All tests
+cd src && make test-unit              # Unit tests only
+cd src && make test-integration       # Integration tests only
 
-## Recent Major Changes
-- Frontend framework modernization (Angular 1.8.3, Bootstrap 4)
-- Unified installation system with Makefiles for both packages
-- Comprehensive documentation (README.md) for both src/ and node_src/
-- Build system integration with Babel transpilation
-- Race condition fixes in modal forms and consistent form section ordering
+# Specific test execution
+cd src && python -m pytest ethoscope/tests/unittests/test_target_roi_builder.py
+cd src && bash ethoscope/tests/integration_server_tests/test_config.sh
+```
 
-## Build System
-- **Frontend**: Babel transpiles ES6+ → browser-compatible JavaScript
-- **Backend**: Standard Python packaging with pyproject.toml
-- **Integration**: Single command installation handles both components
+## Key Architecture Patterns
+
+### Device Control Flow
+Devices run a control thread (`control_thread.py`) that orchestrates:
+1. **Camera input** → **Tracker** → **ROI Builder** → **Monitor**
+2. **Stimulator** modules trigger based on behavioral data
+3. **Web API** exposes control endpoints for the node server
+
+### Node-Device Communication
+- Node scans network for devices using `EthoscopeScanner`
+- Devices register with node and receive experiment configurations
+- Node aggregates data and provides centralized web interface
+
+### Frontend Build System
+- **Source**: Modern ES6+ JavaScript in `static/js/controllers/`
+- **Build**: Babel transpiles to browser-compatible JavaScript
+- **Output**: `static/dist/js/` (what browsers actually load)
+- **Critical**: Always build after editing source files
+
+### Option System Architecture
+Both tracking and recording use `OrderedDict` for consistent form ordering:
+- **`control_thread.py`**: Defines available trackers, stimulators, ROI builders
+- **Frontend**: Dynamically generates forms based on server options
+- **Key fix**: Race condition in form population resolved with `selectedOptionName` parameter
+
+## Branching Strategy
+- **`master`**: Stable releases only (last updated March 2022)
+- **`dev`**: Active development branch used in @gilestrolab
+- **Workflow**: Feature branches → `dev` → testing → `master`
+
+## Hardware Dependencies
+- **Raspberry Pi 3/4**: Primary target platform
+- **Camera modules**: PiCamera or USB cameras via V4L2
+- **GPIO interfaces**: For stimulators and sensors
+- **MySQL/MariaDB**: Data storage on devices
