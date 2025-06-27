@@ -328,13 +328,18 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
 
     def _create_mysql_db(self):
-
-        db = mysql.connector.connect(host=self._db_host,
-                                     user=self._db_user_name,
-                                     passwd=self._db_user_pass,
-                                     buffered=True,
-                                     charset=SQL_CHARSET,
-                                     use_unicode=True)
+        logging.info(f"Connecting to MySQL host {self._db_host} as user {self._db_user_name}")
+        try:
+            db = mysql.connector.connect(host=self._db_host,
+                                         user=self._db_user_name,
+                                         passwd=self._db_user_pass,
+                                         buffered=True,
+                                         charset=SQL_CHARSET,
+                                         use_unicode=True)
+            logging.info("Successfully connected to MySQL for database creation")
+        except Exception as e:
+            logging.error(f"Failed to connect to MySQL: {str(e)}")
+            raise
 
         c = db.cursor()
 
@@ -380,13 +385,19 @@ class AsyncMySQLWriter(multiprocessing.Process):
         do_run = True
         
         try:
+            logging.info("AsyncMySQLWriter starting up...")
             if self._erase_old_db:
+                logging.info("Deleting old database...")
                 self._delete_my_sql_db()
+                logging.info("Creating new database...")
                 self._create_mysql_db()
 
+            logging.info("Getting database connection...")
             db = self._get_connection()
+            logging.info("Database connection established successfully")
             
             # Signal that the writer is ready to accept commands
+            logging.info("AsyncMySQLWriter ready to accept commands")
             self._ready_event.set()
         
             while do_run:
@@ -407,12 +418,26 @@ class AsyncMySQLWriter(multiprocessing.Process):
 
                     db.commit()
 
-                except:
-                    do_run = False
+                except Exception as e:
                     try:
                         logging.error("Failed to run mysql command:\n%s" % command)
+                        logging.error("Error details: %s" % str(e))
+                        logging.error("Traceback: %s" % traceback.format_exc())
+                        
+                        # Check if this is a critical error that should stop the writer
+                        error_str = str(e).lower()
+                        critical_errors = ['access denied', 'connection', 'server has gone away', 'lost connection']
+                        is_critical = any(critical_error in error_str for critical_error in critical_errors)
+                        
+                        if is_critical:
+                            logging.error("Critical database error detected, stopping async writer")
+                            do_run = False
+                        else:
+                            logging.warning("Non-critical database error, continuing operations")
+                            
                     except:
-                        logging.error("Did not retrieve queue value")
+                        logging.error("Did not retrieve queue value or failed to process error")
+                        do_run = False
 
                 finally:
                     if self._queue.empty():
@@ -427,7 +452,8 @@ class AsyncMySQLWriter(multiprocessing.Process):
             raise e
 
         except Exception as e:
-            logging.error("DB async process stopped with an exception")
+            logging.error("DB async process stopped with an exception: %s", str(e))
+            logging.error("Exception traceback: %s", traceback.format_exc())
             # Ensure ready event is set even if there's an error during startup
             # This prevents the main thread from hanging indefinitely
             self._ready_event.set()
@@ -577,11 +603,8 @@ class DAMFileHelper(object):
           "date CHAR(100)",
           "time CHAR(100)"]
 
-        for i in range(7):
-            fields.append("DUMMY_FIELD_%d SMALLINT" % i)
         for r in range(1,self._n_rois +1):
             fields.append("ROI_%d SMALLINT" % r)
-        logging.info("Creating 'CSV_DAM_ACTIVITY' table")
         fields = ",".join(fields)
         return fields
 
@@ -615,8 +638,6 @@ class DAMFileHelper(object):
         date_time_fields = dt.strftime("%d %b %Y,%H:%M:%S").split(",")
         values = [0] + date_time_fields
 
-        for i in range(7):
-            values.append(str(i))
         for i in range(1, self._n_rois +1):
             values.append(int(round(self._scale * vals[i])))
 
@@ -709,8 +730,8 @@ class ResultWriter(object):
             
         else:
             event = "crash_recovery"
-            command = "INSERT INTO START_EVENTS VALUES %s" % str((self._null, int(time.time()), event))
-            self._write_async_command(command)
+            command = "INSERT INTO START_EVENTS VALUES (%s, %s, %s)"
+            self._write_async_command(command, (self._null, int(time.time()), event))
 
         logging.info("Result writer initialised")
         
@@ -743,18 +764,27 @@ class ResultWriter(object):
 
 
         logging.info("Creating 'METADATA' table")
-        self._create_table("METADATA", "field CHAR(100), value VARCHAR(3000)")
+        self._create_table("METADATA", "field CHAR(100), value TEXT")
 
         logging.info("Creating 'START_EVENTS' table")
         self._create_table("START_EVENTS", "id INT  NOT NULL AUTO_INCREMENT PRIMARY KEY, t INT, event CHAR(100)")
         event = "graceful_start"
-        command = "INSERT INTO START_EVENTS VALUES %s" % str((self._null, int(time.time()), event))
-        self._write_async_command(command)
+        command = "INSERT INTO START_EVENTS VALUES (%s, %s, %s)"
+        self._write_async_command(command, (self._null, int(time.time()), event))
 
 
         for k,v in list(self.metadata.items()):
-            command = "INSERT INTO METADATA VALUES %s" % str((k, v))
-            self._write_async_command(command)
+            # Properly serialize complex metadata values to avoid SQL injection and formatting issues
+            v_serialized = json.dumps(str(v)) if not isinstance(v, (str, int, float, bool, type(None))) else v
+            
+            # Truncate extremely large values as a safety measure (TEXT supports up to 65KB)
+            max_value_length = 60000
+            if isinstance(v_serialized, str) and len(v_serialized) > max_value_length:
+                v_serialized = v_serialized[:max_value_length] + "... [TRUNCATED]"
+                logging.warning(f"Metadata value for key '{k}' was truncated due to size limit")
+            
+            command = "INSERT INTO METADATA VALUES (%s, %s)"
+            self._write_async_command(command, (k, v_serialized))
         
         while not self._queue.empty():
             logging.info("waiting for queue to be processed")
@@ -856,8 +886,8 @@ class ResultWriter(object):
             self._insert_dict[k] = ""
 
         try:
-            command = "INSERT INTO METADATA VALUES %s" % str(("stop_date_time", str(int(time.time()))))
-            self._write_async_command(command)
+            command = "INSERT INTO METADATA VALUES (%s, %s)"
+            self._write_async_command(command, ("stop_date_time", str(int(time.time()))))
             while not self._queue.empty():
                 logging.info("waiting for queue to be processed")
                 time.sleep(.1)
@@ -987,7 +1017,8 @@ class AsyncSQLiteWriter(multiprocessing.Process):
             raise e
 
         except Exception as e:
-            logging.error("DB async process stopped with an exception")
+            logging.error("DB async process stopped with an exception: %s", str(e))
+            logging.error("Exception traceback: %s", traceback.format_exc())
             # Ensure ready event is set even if there's an error during startup
             # This prevents the main thread from hanging indefinitely
             self._ready_event.set()
