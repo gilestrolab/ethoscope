@@ -222,8 +222,8 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                 <h4 class="modal-title" id="myModalLabel">Powering Off!</h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
             </div>
             <div class="modal-body">
                 <p>Do you really want to power off the device “{{device.name}}”? Any ongoing acquisition will be ended.</p>
@@ -242,8 +242,8 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                 <h4 class="modal-title" id="myModalLabel">Module connected to {{device.name}}</h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
             </div>
             <div class="modal-body">
 
@@ -262,8 +262,8 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                 <h4 class="modal-title" id="myModalLabel">Backup progress</h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
             </div>
             <div class="modal-body">
 
@@ -283,8 +283,8 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                 <h4 class="modal-title" id="myModalLabel">Backup progress</h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
             </div>
             <div class="modal-body">
 
@@ -307,8 +307,8 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                 <h4 class="modal-title" id="myModalLabel">Rebooting</h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
             </div>
             <div class="modal-body">
                 <p>Do you really want to reboot the device “{{device.name}}”? Any ongoing acquisition will be ended.</p>
@@ -326,8 +326,8 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                 <h4 class="modal-title" id="myModalLabel">Restarting</h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
             </div>
             <div class="modal-body">
                 <p>Do you really want to restart the service on the device “{{device.name}}”? Any ongoing acquisition will end.</p>
@@ -345,8 +345,8 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                 <h4 class="modal-title" id="downloadModalLabel">Download Data</h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
             </div>
             <div class="modal-body">
                 {{device}}
@@ -366,8 +366,8 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                 <h3 class="modal-title" id="startModalLabel">Select tracking type</h3>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
             </div>
             <div class="modal-body">
                 <form name="trackingoptionsform" class="input">
@@ -411,7 +411,6 @@
                                                        name={{arg.name}} 
                                                        id="input-drp-{{arg.name}}" 
                                                        type="text" 
-                                                       readonly 
                                                        ng-model="selected_options.tracking[name]['arguments'][arg.name]" 
                                                        placeholder="Click to select start and end date/time"
                                                        style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;"
@@ -457,8 +456,8 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                 <h3 class="modal-title" id="recordModalLabel">Machine Information</h3>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
             </div>
             <div class="modal-body">
                 <form name="machineinfoform" class="input">
@@ -505,7 +504,6 @@
                                                        name={{arg.name}} 
                                                        id="input-{{arg.name}}" 
                                                        type="text" 
-                                                       readonly 
                                                        ng-model="selected_options.update_machine[name]['arguments'][arg.name]" 
                                                        placeholder="Click to select start and end date/time"
                                                        style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;"
@@ -548,8 +546,8 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                 <h3 class="modal-title" id="recordModalLabel">Select recording type</h3>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
             </div>
             <div class="modal-body">
                 <form name="recordingoptionsform" class="input">
@@ -587,7 +585,6 @@
                                                        name={{arg.name}} 
                                                        id="input-{{arg.name}}" 
                                                        type="text" 
-                                                       readonly 
                                                        ng-model="selected_options.recording[name]['arguments'][arg.name]" 
                                                        placeholder="Click to select start and end date/time"
                                                        style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;"
@@ -632,8 +629,8 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                 <h4 class="modal-title" id="myModalLabel">Stopping</h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
             </div>
             <div class="modal-body">
                 <p>Do you really want to stop the tracking in “{{device.name}}”? Any ongoing acquisition will be ended.</p>

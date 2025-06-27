@@ -12,7 +12,7 @@
   background: #CCC;
   padding: 0.25em 0.5em 0.25em 2em;
   border-radius: 1em;
-  min-width: 2em;
+  min-width: 100px;
   color: #FFF;
   cursor: pointer;
   transition: background-color 0.15s;
@@ -38,7 +38,6 @@
 
 .toggle-check-input:checked ~ .toggle-check-text {
   background: #8ad869;
-  padding-left: 0.5em;
   padding-right: 2em;
 }
 

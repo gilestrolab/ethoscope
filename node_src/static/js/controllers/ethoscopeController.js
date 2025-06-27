@@ -847,6 +847,18 @@
             }
         });
 
+        // Add click handler for radio button labels after DOM is ready
+        setTimeout(function() {
+            // Make strong labels clickable to trigger radio buttons
+            $(document).on('click', '.modal .option-list li strong', function(e) {
+                e.preventDefault();
+                var $radioButton = $(this).siblings('input[type="radio"]');
+                if ($radioButton.length) {
+                    $radioButton.click();
+                }
+            });
+        }, 100);
+
     });
 
 })();

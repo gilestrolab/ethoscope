@@ -74,4 +74,10 @@ docs/_build/
 
 #folders
 Docker/node/etc-ethoscope
+.claude
+Docker/node/.volumes
+node_src/node_modules
+
+#various dev
 sync_from_node.sh
+

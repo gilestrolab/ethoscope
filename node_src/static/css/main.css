@@ -688,12 +688,10 @@ custom-select-wrap .select-icon svg {
     cursor: text;
     pointer-events: none;
     color: #999;
-    /* Input padding + input border */
     padding: 7px;
-    /* Firefox does not respond well to different line heights. Use padding instead. */
     line-height: 17px;
-    /* This gives a little gap between the cursor and the label */
-    margin-left: 2px;
+    margin-top: 2px;
+    /* margin-left: 2px; */
 }
 
 .input input,
@@ -732,18 +730,18 @@ input.ng-invalid {
 }
 
 input.ng-valid {
-    border-left: solid 3px #090;
+    border-left: solid 3px #565656;
 }
 
 /* Align green validation borders in input groups */
 .input-group input.ng-valid {
-    border-left: solid 3px #090;
+    border-left: solid 3px #565656;
     margin-left: 0;
 }
 
 .input-group .input-group-prepend + input.ng-valid,
 .input-group .input-group-append + input.ng-valid {
-    border-left: solid 3px #090;
+    border-left: solid 3px #565656;
 }
 
 /* Ensure consistent icon sizing and container width for alignment */
@@ -880,5 +878,311 @@ pre.command {
 /* Ensure proper spacing between option buttons */
 .d-flex.flex-wrap.justify-content-start .option {
     margin: 0.5rem !important;
+}
+
+/* Modal improvements - proper width, positioning and spacing */
+.modal-dialog {
+    max-width: 600px !important;
+    width: auto !important;
+    margin: 30px auto !important;
+    min-width: 300px !important;
+}
+
+/* Specific sizing for different modal types */
+#startModal .modal-dialog {
+    max-width: 750px !important;
+}
+
+#recordModal .modal-dialog,
+#changeInfo .modal-dialog {
+    max-width: 650px !important;
+}
+
+/* Small modals for simple confirmations */
+#powerOffAlert .modal-dialog,
+#rebootAlert .modal-dialog,
+#restartAlert .modal-dialog,
+#stopTrackingModal .modal-dialog,
+#ModuleTest .modal-dialog {
+    max-width: 450px !important;
+}
+
+/* Ensure modals don't touch screen edges on smaller screens */
+@media (max-width: 768px) {
+    .modal-dialog {
+        margin: 20px !important;
+        max-width: calc(100% - 40px) !important;
+    }
+}
+
+/* Modal header improvements - proper title and close button positioning */
+.modal-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 15px !important;
+    border-bottom: 1px solid #e5e5e5 !important;
+}
+
+.modal-header .modal-title {
+    margin: 0 !important;
+    flex: 1 !important;
+    padding-right: 20px !important;
+}
+
+.modal-header .close {
+    margin-left: auto !important;
+    padding: 0 30px 0 0 !important;
+    background: none !important;
+    border: none !important;
+    font-size: 21px !important;
+    font-weight: bold !important;
+    line-height: 1 !important;
+    color: #000 !important;
+    text-shadow: 0 1px 0 #fff !important;
+    opacity: 0.8 !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+    min-width: 30px !important;
+}
+
+.modal-header .close:hover,
+.modal-header .close:focus {
+    opacity: 0.5 !important;
+}
+
+/* Modal body improvements */
+.modal-body {
+    padding: 20px !important;
+}
+
+/* Modal footer improvements */
+.modal-footer {
+    padding: 15px 20px !important;
+}
+
+/* Form improvements inside modals - tighter spacing */
+.modal .option-list {
+    margin-bottom: 5px !important;
+}
+
+.modal .option-list li {
+    padding: 0px 0px !important;
+    margin-bottom: 2px !important;
+    line-height: 1.2 !important;
+}
+
+.modal .option-items li {
+    padding: 3px 10px !important;
+    margin-bottom: 2px !important;
+    min-height: auto !important;
+    background: transparent !important;
+}
+
+.modal input[type="text"],
+.modal input[type="number"],
+.modal select {
+    max-width: 250px !important;
+    margin-bottom: 3px !important;
+    margin-top: 2px !important;
+    padding: 3px 5px !important;
+}
+
+.modal label {
+    font-size: 13px !important;
+    margin-bottom: 2px !important;
+    padding-top: 2px !important;
+    display: block !important;
+}
+
+/* Compact form layout for modal content */
+.modal .form-group {
+    margin-bottom: 8px !important;
+}
+
+.modal .input-group {
+    max-width: 300px !important;
+    margin-bottom: 5px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+.modal .input-group .form-control {
+    margin-bottom: 0 !important;
+}
+
+.modal .input-group-append {
+    display: flex !important;
+    align-items: center !important;
+}
+
+/* Consistent spacing for all modal sections */
+.modal h4 {
+    margin-top: 12px !important;
+    margin-bottom: 5px !important;
+    font-size: 16px !important;
+}
+
+.modal hr {
+    margin: 8px 0 !important;
+}
+
+/* Reduce excessive spacing in option descriptions */
+.modal .option-list li > div {
+    margin-top: 3px !important;
+    margin-bottom: 3px !important;
+    padding-left: 0 !important;
+}
+
+/* General radio button hiding - overridden by specific li input[type="radio"] rule below */
+
+/* Style labels to be clickable and show selection state */
+.modal .option-list li {
+    cursor: pointer !important;
+    transition: background-color 0.2s ease !important;
+    border-radius: 4px !important;
+    padding: 8px 12px !important;
+    margin-bottom: 3px !important;
+    position: relative !important;
+}
+
+/* Make only the label text clickable, not form elements */
+.modal .option-list li input[type="radio"] {
+    opacity: 0 !important;
+    position: absolute !important;
+    pointer-events: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+/* Make the strong label text clickable by wrapping with a label */
+.modal .option-list li strong {
+    cursor: pointer !important;
+    display: inline-block !important;
+    padding: 4px 8px !important;
+    margin-right: 10px !important;
+}
+
+/* Allow form elements to be interactive */
+.modal .option-list li input[type="text"],
+.modal .option-list li input[type="number"],
+.modal .option-list li select,
+.modal .option-list li input[type="checkbox"],
+.modal .option-list li .input-group,
+.modal .option-list li .form-group {
+    z-index: 10 !important;
+    position: relative !important;
+    pointer-events: auto !important;
+}
+
+.modal .option-list li:hover {
+    background-color: #f8f9fa !important;
+}
+
+/* Selected state styling */
+.modal input[type="radio"]:checked + strong,
+.modal input[type="radio"]:checked ~ * {
+    /* color: #007bff !important; */
+    /* font-weight: bold !important; */
+}
+
+.modal .option-list li:has(input[type="radio"]:checked) {
+    /* background-color: #ffffff !important; */
+    border-left: 4px solid #cbd5cb !important;
+    padding-left: 8px !important;
+}
+
+/* Fallback for browsers that don't support :has() */
+.modal .option-list li.selected {
+    background-color: #e3f2fd !important;
+    border-left: 4px solid #007bff !important;
+    padding-left: 8px !important;
+}
+
+/* Keep checkbox styling separate */
+.modal input[type="checkbox"] {
+    margin-right: 6px !important;
+    margin-bottom: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* Reduce space between form elements */
+.modal ul {
+    margin-bottom: 5px !important;
+    padding-left: 20px !important;
+}
+
+/* Modal action button styling */
+.modal .btn-primary {
+    background-color: #5FA4E7 !important;
+    border-color: #5FA4E7 !important;
+}
+
+.modal .btn-primary:hover,
+.modal .btn-primary:focus {
+    background-color: #4a94d7 !important;
+    border-color: #4a94d7 !important;
+}
+
+.modal .btn-primary:active {
+    background-color: #3d84c7 !important;
+    border-color: #3d84c7 !important;
+}
+
+/* Folder configuration section layout fixes */
+.list-group-item.input {
+    display: block !important;
+    padding: 15px !important;
+}
+
+.list-group-item.input label {
+    display: block !important;
+    margin-bottom: 5px !important;
+    font-weight: bold !important;
+    float: none !important;
+}
+
+.list-group-item.input input[type="text"] {
+    display: block !important;
+    width: 100% !important;
+    max-width: 400px !important;
+    float: none !important;
+    position: static !important;
+    margin-bottom: 8px !important;
+}
+
+.list-group-item.input p {
+    margin: 0 !important;
+    font-size: 13px !important;
+    color: #666 !important;
+    clear: both !important;
+}
+
+/* Configuration sections styling - consistent borders */
+.list-group.col-12 {
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+    margin-bottom: 20px !important;
+    padding: 15px !important;
+    background-color: #fff !important;
+}
+
+.list-group.col-12 h3 {
+    margin-top: 0 !important;
+    margin-bottom: 15px !important;
+    padding-bottom: 10px !important;
+    border-bottom: 1px solid #eee !important;
+}
+
+/* Users, Incubators, Sensors section styling */
+.list-group.col-12 .input {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+.list-group.col-12 .input select {
+    flex: 1 !important;
+    max-width: 300px !important;
 }
 

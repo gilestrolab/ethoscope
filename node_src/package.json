@@ -1,24 +1,8 @@
 {
   "name": "ethoscope-frontend",
   "version": "1.0.0",
-  "description": "Ethoscope web interface",
+  "description": "Ethoscope web interface - simplified without build step",
   "scripts": {
-    "build": "babel static/js/script.js static/js/controllers/ --out-dir static/dist/js --presets=@babel/preset-env",
-    "dev": "babel static/js/script.js static/js/controllers/ --out-dir static/dist/js --presets=@babel/preset-env --watch",
-    "postinstall": "npm run build"
-  },
-  "devDependencies": {
-    "@babel/cli": "^7.23.0",
-    "@babel/core": "^7.23.0", 
-    "@babel/preset-env": "^7.23.0"
-  },
-  "babel": {
-    "presets": [
-      ["@babel/preset-env", {
-        "targets": {
-          "browsers": ["last 2 versions", "> 1%"]
-        }
-      }]
-    ]
+    "test": "echo \"No tests configured\" && exit 0"
   }
 }

@@ -1,72 +1,42 @@
 # Ethoscope Node Server Build System
-# Handles both Python backend and frontend installation
+# Handles Python backend installation (frontend is now source-only)
 
-.PHONY: install-all install-dev install-production install build dev clean help
+.PHONY: install-all install-dev install-production clean help
 
 # Default target - complete installation
 all: install-all
 
-# Complete installation (backend + frontend)
+# Complete installation (backend only - frontend is source-only)
 install-all:
 	@echo "Installing Python backend package..."
 	pip install .
-	@echo "Installing npm dependencies..."
-	npm install
-	@echo "Building frontend assets..."
-	npm run build
-	@echo "✓ Complete installation finished"
+	@echo "✓ Installation finished"
 
 # Development installation (editable Python package)
 install-dev:
 	@echo "Installing Python backend package in development mode..."
 	pip install -e .
-	@echo "Installing npm dependencies..."
-	npm install
-	@echo "Building frontend assets..."
-	npm run build
 	@echo "✓ Development installation finished"
 
-# Production installation (optimized)
+# Production installation
 install-production:
 	@echo "Installing Python backend package (production)..."
 	pip install . --no-deps
-	@echo "Installing npm dependencies..."
-	npm install --production
-	@echo "Building frontend assets..."
-	npm run build
 	@echo "✓ Production installation finished"
 
-# Install npm dependencies only
-install:
-	@echo "Installing npm dependencies..."
-	npm install
-
-# Build production assets
-build: install
-	@echo "Building production assets..."
-	npm run build
-
-# Development mode with file watching
-dev: install
-	@echo "Starting development mode with file watching..."
-	npm run dev
-
-# Clean build artifacts and dependencies
+# Clean build artifacts
 clean:
-	@echo "Cleaning build artifacts and dependencies..."
-	rm -rf node_modules/
-	rm -rf static/dist/
+	@echo "Cleaning build artifacts..."
 	rm -rf build/
 	rm -rf *.egg-info/
 
 # Show available targets
 help:
 	@echo "Available targets:"
-	@echo "  install-all        - Install both Python backend and frontend (recommended)"
+	@echo "  install-all        - Install Python backend (recommended)"
 	@echo "  install-dev        - Install in development mode (editable Python package)"
 	@echo "  install-production - Install for production deployment"
-	@echo "  install            - Install npm dependencies only"
-	@echo "  build              - Build frontend assets"
-	@echo "  dev                - Start development mode with file watching"
-	@echo "  clean              - Clean build artifacts and dependencies"
+	@echo "  clean              - Clean build artifacts"
 	@echo "  help               - Show this help message"
+	@echo ""
+	@echo "Note: Frontend is now source-only (no build step required)"
