@@ -192,7 +192,7 @@ class DeviceUpdater:
                 # Use pip install -e for editable installation
                 result = subprocess.run([
                     'python', '-m', 'pip', 'install', '-e', path, 
-                    '--use-pep517',  # Use modern build system
+                    '--no-build-isolation',  # Use system setuptools (no internet required)
                     '--no-deps',     # Optional: skip dependencies if already installed
                     '--break-system-packages'  # Allow installation in system Python
                 ], capture_output=True, text=True)

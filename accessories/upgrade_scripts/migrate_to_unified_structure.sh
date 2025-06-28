@@ -168,13 +168,13 @@ migrate_node() {
     log "Installing node Python package..."
     if [[ -d "$NEW_UNIFIED_DIR/src/node" ]]; then
         cd "$NEW_UNIFIED_DIR/src/node"
-        pip install -e . --break-system-packages || warn "Failed to install node package"
+        pip install -e . --break-system-packages --no-build-isolation || warn "Failed to install node package"
     fi
     
     log "Installing ethoscope Python package..."
     if [[ -d "$NEW_UNIFIED_DIR/src/ethoscope" ]]; then
         cd "$NEW_UNIFIED_DIR/src/ethoscope"
-        pip install -e . --break-system-packages || warn "Failed to install ethoscope package"
+        pip install -e . --break-system-packages --no-build-isolation || warn "Failed to install ethoscope package"
     fi
     
     # Enable services
@@ -216,7 +216,7 @@ migrate_device() {
     log "Installing ethoscope Python package..."
     if [[ -d "$NEW_UNIFIED_DIR/src/ethoscope" ]]; then
         cd "$NEW_UNIFIED_DIR/src/ethoscope"
-        pip install -e . --break-system-packages || warn "Failed to install ethoscope package"
+        pip install -e . --break-system-packages --no-build-isolation || warn "Failed to install ethoscope package"
     fi
     
     # Enable services
