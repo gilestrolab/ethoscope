@@ -193,7 +193,8 @@ class DeviceUpdater:
                 result = subprocess.run([
                     'python', '-m', 'pip', 'install', '-e', path, 
                     '--use-pep517',  # Use modern build system
-                    '--no-deps'      # Optional: skip dependencies if already installed
+                    '--no-deps',     # Optional: skip dependencies if already installed
+                    '--break-system-packages'  # Allow installation in system Python
                 ], capture_output=True, text=True)
                 
                 if result.returncode != 0:
