@@ -2,32 +2,90 @@
    Author's custom styles
    ========================================================================== */
 
+/* Color Palette - Coherent Design System */
+:root {
+    /* Grays */
+    --warm-gray: rgb(90, 90, 90);
+    --medium-gray: rgb(122, 122, 122);
+    --soft-gray: rgb(155, 139, 155);
+    --cool-gray: rgb(187, 186, 187);
+    --light-gray: rgb(216, 216, 216);
+    --off-white: rgb(245, 245, 245);
+    --pure-white: rgb(255, 255, 255);
+    
+    /* Purples */
+    --deep-purple: rgb(107, 45, 107);
+    --plum: rgb(139, 75, 140);
+    --mauve: rgb(184, 92, 139);
+    --rose-pink: rgb(216, 123, 173);
+    --indigo: rgb(91, 70, 199);
+    --lavender: rgb(123, 95, 231);
+    --light-purple: rgb(155, 139, 235);
+    
+    /* Reds */
+    --deep-red: rgb(209, 51, 49);
+    --coral-red: rgb(241, 80, 81);
+    --light-coral: rgb(243, 122, 122);
+    --pale-coral: rgb(245, 163, 163);
+    
+    /* Oranges */
+    --burnt-orange: rgb(196, 123, 47);
+    --terracotta: rgb(230, 123, 71);
+    --peach: rgb(235, 155, 111);
+    --soft-peach: rgb(240, 188, 151);
+    
+    /* Yellows */
+    --deep-gold: rgb(180, 139, 49);
+    --golden-honey: rgb(212, 164, 65);
+    --light-gold: rgb(221, 189, 106);
+    --pale-yellow: rgb(230, 214, 147);
+    
+    /* Greens */
+    --olive-green: rgb(152, 169, 60);
+    --lime-green: rgb(184, 194, 92);
+    --light-lime: rgb(199, 209, 124);
+    --pale-lime: rgb(214, 224, 156);
+    --deep-green: rgb(60, 159, 60);
+    --forest-green: rgb(92, 184, 92);
+    --light-green: rgb(124, 198, 124);
+    --pale-green: rgb(156, 212, 156);
+    --teal: rgb(60, 159, 127);
+    --mint-green: rgb(92, 184, 151);
+    --light-mint: rgb(124, 198, 175);
+    
+    /* Blues */
+    --deep-blue: rgb(60, 139, 181);
+    --sky-blue: rgb(95, 164, 231);
+    --light-blue: rgb(127, 179, 235);
+    --pale-blue: rgb(159, 194, 239);
+}
+
 .log {
     margin: 0px;
     padding: 0px;
 }
 
 .color-green {
-    color: green;
+    color: var(--deep-green);
 }
 
 .color-red {
-    color: red;
+    color: var(--deep-red);
 }
 
 /* Hard drive Low usage (< 50%) */
 .low-usage {
-    color: gray;
+    color: var(--medium-gray);
 }
 
 /* Medium usage (60% <= used_space < 80%) */
 .medium-usage {
-    color: #ff9966;
+    color: var(--terracotta);
 }
 
 /* High usage (>= 80%) */
 .high-usage {
-    color: #CC3300;
+    color: var(--deep-red);
     animation: pulse 1s infinite;
 }
 
@@ -1207,7 +1265,7 @@ pre.command {
 .time-value {
     font-weight: bold;
     text-align: right;
-    color: #333;
+    color: var(--warm-gray);
 }
 
 /* Table header styling - Override Bootstrap link colors */
@@ -1215,20 +1273,20 @@ table thead th a,
 table thead th a:link,
 table thead th a:visited,
 table thead th a:active {
-    color: #333 !important;
+    color: var(--warm-gray) !important;
     font-weight: bold !important;
     text-decoration: none !important;
 }
 
 table thead th a:hover,
 table thead th a:focus {
-    color: #000 !important;
+    color: var(--deep-purple) !important;
     text-decoration: none !important;
 }
 
 /* More specific override for Bootstrap table styles */
 .table thead th a {
-    color: #333 !important;
+    color: var(--warm-gray) !important;
     font-weight: bold !important;
     text-decoration: none !important;
 }
@@ -1244,41 +1302,41 @@ table thead th a:focus {
 }
 
 .backup-status-success {
-    background-color: #28a745;  /* Green */
+    background-color: var(--deep-green);
 }
 
 .backup-status-error {
-    background-color: #dc3545;  /* Red */
+    background-color: var(--deep-red);
 }
 
 .backup-status-processing {
-    background-color: #ffc107;  /* Yellow/Orange */
+    background-color: var(--golden-honey);
     animation: apple-breathing 2s ease-in-out infinite;
 }
 
 .backup-status-unknown {
-    background-color: #6c757d;  /* Grey */
+    background-color: var(--medium-gray);
 }
 
 .backup-status-offline {
-    background-color: #000000;  /* Black */
+    background-color: var(--warm-gray);
 }
 
 @keyframes apple-breathing {
     0% {
         opacity: 0.3;
         transform: scale(0.8);
-        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+        box-shadow: 0 0 0 0 rgba(212, 164, 65, 0.7);
     }
     50% {
         opacity: 1;
         transform: scale(1.2);
-        box-shadow: 0 0 0 8px rgba(255, 193, 7, 0.1);
+        box-shadow: 0 0 0 8px rgba(212, 164, 65, 0.1);
     }
     100% {
         opacity: 0.3;
         transform: scale(0.8);
-        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+        box-shadow: 0 0 0 0 rgba(212, 164, 65, 0.7);
     }
 }
 
