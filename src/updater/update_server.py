@@ -178,22 +178,104 @@ def group(what):
         data = bottle.request.json
         if what == "update":
             for device in data["devices"]:
-                response = updates_api_wrapper(device['ip'], device['id'], what='device/update')
+                # Handle node updates locally, device updates via API
+                if device['id'] == 'node':
+                    # Update node locally
+                    try:
+                        local_commit, origin_commit = ethoscope_updater.get_local_and_origin_commits()
+                        old_commit = ethoscope_updater.get_current_commit()
+                        ethoscope_updater.update()
+                        new_commit = ethoscope_updater.get_current_commit()
+                        response = {
+                            "status": "success",
+                            "device_id": device['id'],
+                            "old_commit": get_commit_version(old_commit),
+                            "new_commit": get_commit_version(new_commit)
+                        }
+                    except Exception as e:
+                        response = {
+                            "status": "error", 
+                            "device_id": device['id'],
+                            "error": str(e)
+                        }
+                else:
+                    # Update devices via API
+                    response = updates_api_wrapper(device['ip'], device['id'], what='device/update')
                 responses.append(response)
             for device in data["devices"]:
-                response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
+                # Handle node daemon restart locally, device restarts via API
+                if device['id'] == 'node':
+                    try:
+                        reload_node_daemon()
+                        response = {
+                            "status": "daemon_restarted",
+                            "device_id": device['id']
+                        }
+                    except Exception as e:
+                        response = {
+                            "status": "error",
+                            "device_id": device['id'], 
+                            "error": str(e)
+                        }
+                else:
+                    response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
                 responses.append(response)
         elif what == "swBranch":
             for device in data["devices"]:
-                data_one_dev = {'new_branch': device['new_branch']}
-                response = updates_api_wrapper(device['ip'], device['id'], what='device/change_branch', data=data_one_dev)
+                if device['id'] == 'node':
+                    # Handle node branch switching locally
+                    try:
+                        new_branch = device['new_branch']
+                        ethoscope_updater.change_branch(new_branch)
+                        response = {
+                            "status": "success",
+                            "device_id": device['id'],
+                            "new_branch": new_branch
+                        }
+                    except Exception as e:
+                        response = {
+                            "status": "error",
+                            "device_id": device['id'],
+                            "error": str(e)
+                        }
+                else:
+                    data_one_dev = {'new_branch': device['new_branch']}
+                    response = updates_api_wrapper(device['ip'], device['id'], what='device/change_branch', data=data_one_dev)
                 responses.append(response)
             for device in data["devices"]:
-                response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
+                if device['id'] == 'node':
+                    try:
+                        reload_node_daemon()
+                        response = {
+                            "status": "daemon_restarted",
+                            "device_id": device['id']
+                        }
+                    except Exception as e:
+                        response = {
+                            "status": "error",
+                            "device_id": device['id'],
+                            "error": str(e)
+                        }
+                else:
+                    response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
                 responses.append(response)
         elif what == "restart":
             for device in data["devices"]:
-                response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
+                if device['id'] == 'node':
+                    try:
+                        reload_node_daemon()
+                        response = {
+                            "status": "daemon_restarted",
+                            "device_id": device['id']
+                        }
+                    except Exception as e:
+                        response = {
+                            "status": "error",
+                            "device_id": device['id'],
+                            "error": str(e)
+                        }
+                else:
+                    response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
                 responses.append(response)
         return {'response':responses}
 
