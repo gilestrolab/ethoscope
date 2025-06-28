@@ -1,0 +1,620 @@
+/* ==========================================================================
+   Ethoscope Updater - Custom Styles
+   ========================================================================== */
+
+/* Color Palette - Coherent Design System (from node frontend) */
+:root {
+    /* Grays */
+    --warm-gray: rgb(90, 90, 90);
+    --medium-gray: rgb(122, 122, 122);
+    --soft-gray: rgb(155, 139, 155);
+    --cool-gray: rgb(187, 186, 187);
+    --light-gray: rgb(216, 216, 216);
+    --off-white: rgb(245, 245, 245);
+    --pure-white: rgb(255, 255, 255);
+
+    /* Purples */
+    --deep-purple: rgb(107, 45, 107);
+    --plum: rgb(139, 75, 140);
+    --mauve: rgb(184, 92, 139);
+    --rose-pink: rgb(216, 123, 173);
+    --indigo: rgb(91, 70, 199);
+    --lavender: rgb(123, 95, 231);
+    --light-purple: rgb(155, 139, 235);
+
+    /* Reds */
+    --deep-red: rgb(209, 51, 49);
+    --coral-red: rgb(241, 80, 81);
+    --light-coral: rgb(243, 122, 122);
+    --pale-coral: rgb(245, 163, 163);
+
+    /* Oranges */
+    --burnt-orange: rgb(196, 123, 47);
+    --terracotta: rgb(230, 123, 71);
+    --peach: rgb(235, 155, 111);
+    --soft-peach: rgb(240, 188, 151);
+
+    /* Yellows */
+    --deep-gold: rgb(180, 139, 49);
+    --golden-honey: rgb(212, 164, 65);
+    --light-gold: rgb(221, 189, 106);
+    --pale-yellow: rgb(230, 214, 147);
+
+    /* Greens */
+    --olive-green: rgb(152, 169, 60);
+    --lime-green: rgb(184, 194, 92);
+    --light-lime: rgb(199, 209, 124);
+    --pale-lime: rgb(214, 224, 156);
+    --deep-green: rgb(60, 159, 60);
+    --forest-green: rgb(92, 184, 92);
+    --light-green: rgb(124, 198, 124);
+    --pale-green: rgb(156, 213, 156);
+
+    /* Blues */
+    --deep-blue: rgb(60, 139, 199);
+    --sky-blue: rgb(92, 169, 224);
+    --light-blue: rgb(124, 184, 235);
+    --pale-blue: rgb(156, 199, 246);
+    --navy: rgb(45, 107, 169);
+    --steel-blue: rgb(75, 139, 184);
+    --powder-blue: rgb(107, 169, 199);
+    --ice-blue: rgb(139, 199, 214);
+}
+
+/* Base Typography - Match Node Frontend */
+body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+    font-size: 13px !important;
+    line-height: 1.42857143 !important;
+    color: #333 !important;
+    margin: 0;
+    background-color: #fff;
+}
+
+*,
+::after,
+::before {
+    box-sizing: border-box;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    color: #333;
+    font-weight: 500;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+header {
+    display: block;
+}
+
+/* Navbar Styling - Match Node Frontend */
+.navbar-default {
+    background-color: #f8f9fa;
+    border-color: #dee2e6;
+    border-radius: 0;
+    border-width: 0 0 1px 0;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 13px;
+}
+
+.navbar-default .navbar-brand {
+    color: #777;
+    font-size: 16px;
+    /* padding: 8px 15px; */
+}
+
+.navbar-default .navbar-brand:hover,
+.navbar-default .navbar-brand:focus {
+    color: #333;
+    text-decoration: none;
+}
+
+.navbar-default .navbar-nav>li>a {
+    /* color: #333; */
+    font-size: 13px;
+    padding: 15px;
+}
+
+.navbar-default .navbar-nav>li>a:hover,
+.navbar-default .navbar-nav>li>a:focus {
+    color: #333;
+    background-color: #e9ecef;
+}
+
+.navbar-default .navbar-nav>li>a i {
+    margin-right: 5px;
+}
+
+/* Status Colors */
+.color-red {
+    color: var(--deep-red) !important;
+}
+
+.color-green {
+    color: var(--deep-green) !important;
+}
+
+.color-yellow {
+    color: var(--golden-honey) !important;
+}
+
+.color-blue {
+    color: var(--deep-blue) !important;
+}
+
+.color-purple {
+    color: var(--deep-purple) !important;
+}
+
+/* Button Styling */
+.btn {
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-success {
+    background-color: var(--deep-green);
+    border-color: var(--deep-green);
+}
+
+.btn-success:hover,
+.btn-success:focus {
+    background-color: var(--forest-green);
+    border-color: var(--forest-green);
+}
+
+.btn-default {
+    background-color: var(--pure-white);
+    border-color: var(--light-gray);
+    color: var(--warm-gray);
+}
+
+.btn-default:hover,
+.btn-default:focus {
+    background-color: var(--off-white);
+    border-color: var(--medium-gray);
+    color: var(--warm-gray);
+}
+
+.btn-primary {
+    background-color: var(--deep-purple);
+    border-color: var(--deep-purple);
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background-color: var(--plum);
+    border-color: var(--plum);
+}
+
+.btn-xl {
+    padding: 12px 24px;
+    font-size: 1.1em;
+    margin-right: 10px;
+}
+
+.btn-action {
+    padding: 10px 20px;
+    font-size: 0.95em;
+    margin-right: 15px;
+    min-width: 100px;
+    font-weight: 600;
+}
+
+/* Table Styling */
+.table {
+    background-color: var(--pure-white);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.table thead th {
+    background-color: var(--off-white);
+    color: var(--warm-gray);
+    font-weight: 600;
+    border-bottom: 2px solid var(--light-gray);
+    padding: 12px 15px;
+}
+
+.table tbody tr:hover {
+    background-color: var(--off-white);
+}
+
+.table td {
+    padding: 12px 15px;
+    vertical-align: middle;
+}
+
+.table-background {
+    background-color: var(--pure-white);
+    border: 1px solid var(--light-gray);
+    border-radius: 8px;
+    padding: 20px;
+}
+
+/* Jumbotron Styling */
+.jumbotron {
+    background-color: var(--pure-white);
+    border: 1px solid var(--light-gray);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    padding: 30px;
+}
+
+.jumbotron h3 {
+    color: var(--warm-gray);
+    margin-bottom: 15px;
+}
+
+.intro {
+    color: var(--medium-gray);
+    font-size: 1.1em;
+    margin-bottom: 20px;
+}
+
+/* Modal Styling */
+.modal-content {
+    border-radius: 8px;
+    border: none;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+    background-color: var(--off-white);
+    border-bottom: 1px solid var(--light-gray);
+    border-radius: 8px 8px 0 0;
+    padding: 20px;
+    font-weight: 600;
+    color: var(--warm-gray);
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    background-color: var(--off-white);
+    border-top: 1px solid var(--light-gray);
+    border-radius: 0 0 8px 8px;
+    padding: 15px 20px;
+}
+
+/* Alert Styling */
+.alert-neutral {
+    background-color: var(--off-white);
+    border: 1px solid var(--light-gray);
+    color: var(--medium-gray);
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.alert-danger {
+    background-color: var(--pale-coral);
+    border: 1px solid var(--coral-red);
+    color: var(--deep-red);
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 15px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.alert-danger i {
+    margin-right: 8px;
+    font-size: 16px;
+}
+
+/* Toggle Switch Styling - Node Frontend Compatible */
+.toggle-check {
+    position: relative;
+    display: block;
+    cursor: pointer;
+    color: var(--medium-gray);
+    font-weight: 500;
+    width: 100%;
+}
+
+.toggle-check-input {
+    width: 1px;
+    height: 1px;
+    position: absolute;
+    opacity: 0;
+}
+
+.toggle-check-text {
+    display: block;
+    position: relative;
+    float: right;
+    text-transform: uppercase;
+    background: var(--light-gray);
+    padding: 0.25em 0.5em 0.25em 2em;
+    border-radius: 1em;
+    min-width: 100px;
+    color: var(--pure-white);
+    cursor: pointer;
+    transition: background-color 0.15s;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.toggle-check-text:after {
+    content: ' ';
+    display: block;
+    float: right;
+    background: var(--pure-white);
+    width: 1.1em;
+    height: 1.1em;
+    border-radius: 1em;
+    position: absolute;
+    left: 0.3em;
+    top: 0.25em;
+    transition: left 0.15s, margin-left 0.15s;
+}
+
+.toggle-check-text:before {
+    content: 'Inactive';
+}
+
+.toggle-check-input:checked~.toggle-check-text {
+    background: var(--deep-green);
+    padding-right: 2em;
+}
+
+.toggle-check-input:checked~.toggle-check-text:before {
+    content: 'Active';
+}
+
+.toggle-check-input:checked~.toggle-check-text:after {
+    left: 100%;
+    margin-left: -1.4em;
+}
+
+/* Spinner Styling */
+.spinner,
+.spinner_scan {
+    text-align: center;
+    padding: 20px;
+}
+
+.spinner h2 {
+    color: var(--medium-gray);
+    font-size: 1.2em;
+    margin-top: 15px;
+}
+
+/* Error Styling */
+#error {
+    background-color: var(--pale-coral);
+    color: var(--deep-red);
+    padding: 15px;
+    border-radius: 6px;
+    margin: 15px 0;
+    border: 1px solid var(--coral-red);
+}
+
+/* Loading States */
+[ng-cloak] {
+    display: none !important;
+}
+
+/* Checkbox Styling */
+input[type="checkbox"] {
+    transform: scale(1.2);
+    accent-color: var(--deep-purple);
+}
+
+/* Link Styling */
+a {
+    color: var(--deep-purple);
+    text-decoration: none;
+}
+
+a:hover {
+    color: var(--plum);
+    text-decoration: underline;
+}
+
+/* Select Styling */
+select {
+    padding: 8px 12px;
+    border: 1px solid var(--light-gray);
+    border-radius: 4px;
+    background-color: var(--pure-white);
+    color: var(--warm-gray);
+    font-size: 14px;
+    margin: 10px 0;
+    min-width: 200px;
+}
+
+select:focus {
+    outline: none;
+    border-color: var(--deep-purple);
+    box-shadow: 0 0 0 2px rgba(107, 45, 107, 0.2);
+}
+
+/* Responsive Design */
+@media (min-width: 1200px) {
+    .container {
+        width: 1050px;
+    }
+}
+
+@media (max-width: 768px) {
+    .jumbotron {
+        padding: 20px 15px;
+    }
+
+    .btn-xl {
+        padding: 10px 20px;
+        font-size: 1em;
+        margin-bottom: 10px;
+        width: 100%;
+    }
+
+    .table-responsive {
+        border: none;
+    }
+}
+
+/* Animation for status indicators */
+@keyframes pulse {
+    0% {
+        opacity: 0.6;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0.6;
+    }
+}
+
+.fa-circle.color-red,
+.fa-circle.color-green {
+    animation: pulse 2s infinite;
+}
+
+/* Utility Classes */
+.text-center {
+    text-align: center;
+}
+
+.mb-3 {
+    margin-bottom: 1rem;
+}
+
+.mt-3 {
+    margin-top: 1rem;
+}
+
+/* Legacy styles (preserve for compatibility) */
+.log {
+    margin: 0px;
+    padding: 0px;
+}
+
+.last_drawn_img {
+    margin-top: 2em;
+    margin-bottom: 2em;
+    width: 55%;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.option {
+    text-align: center;
+    margin-right: 1em;
+}
+
+.device-list {
+    margin-right: 2em;
+}
+
+.file-list {
+    list-style: none;
+}
+
+.right {
+    float: right;
+}
+
+.option-list li {
+    list-style: none;
+}
+
+p {
+    text-align: left;
+}
+
+#dt_warning {
+    color: var(--deep-red);
+}
+
+li {
+    text-align: left;
+    font-size: 100%;
+}
+
+h2 {
+    text-align: left;
+}
+
+input {
+    padding-top: 0em;
+}
+
+input[type="text"] {
+    width: 200px;
+}
+
+input[type="number"] {
+    width: 75px;
+}
+
+label {
+    display: block;
+    padding-top: 0.5em;
+    font-weight: normal;
+    font-style: italic;
+}
+
+.trim-info {
+    max-width: 50px;
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 15px;
+    position: relative;
+}
+
+.control-box {
+    margin: 0 auto;
+    width: 100px;
+    display: inline;
+    text-align: center;
+}
+
+#main {
+    display: flex;
+    flex-direction: column;
+    min-height: 80vh;
+}
+
+#footer {
+    padding: 1em;
+    margin-top: 4em;
+    background-color: var(--off-white);
+    width: 100%;
+    height: 40px;
+    bottom: 0;
+    left: 0;
+}
+
+.notification-badge {
+    top: 0px;
+    right: -6px;
+    padding: 0px 4px;
+    border-radius: 50%;
+    color: white;
+    position: absolute;
+    background-color: var(--deep-purple);
+    font-size: 12px;
+    font-weight: normal;
+    border-radius: 2px;
+    -moz-border-radius: 2px;
+    -webkit-border-radius: 2px;
+    z-index: 1;
+}
