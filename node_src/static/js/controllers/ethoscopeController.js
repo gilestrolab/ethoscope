@@ -110,8 +110,14 @@
         // Update dateRangeOptions when moment.js becomes available
         function updateDateRangeOptions() {
             if (typeof moment !== 'undefined') {
+                // Ensure moment.js is in default locale to avoid conflicts
+                moment.locale('en');
                 $scope.dateRangeOptions.minDate = moment();
-                console.log('Date range picker updated with moment.js');
+                // Force Angular to update the view
+                if (!$scope.$$phase) {
+                    $scope.$apply();
+                }
+                console.log('Date range picker updated with moment.js (locale: en)');
             } else {
                 // Retry after a short delay if moment isn't ready yet
                 setTimeout(updateDateRangeOptions, 100);
@@ -304,10 +310,17 @@
 
                             if (argument.type === 'datetime') {
                                 // Handle datetime arguments with moment.js formatting
-                                $scope.selected_options[optionType][name].arguments[argument.name] = [
-                                    moment(argument.default).format('LLLL'),
-                                    argument.default
-                                ];
+                                // Ensure moment is using consistent locale
+                                if (typeof moment !== 'undefined') {
+                                    moment.locale('en');
+                                    $scope.selected_options[optionType][name].arguments[argument.name] = [
+                                        moment(argument.default).format('LLLL'),
+                                        argument.default
+                                    ];
+                                } else {
+                                    // Fallback if moment isn't available
+                                    $scope.selected_options[optionType][name].arguments[argument.name] = argument.default;
+                                }
                             } else {
                                 // Set default for other argument types
                                 $scope.selected_options[optionType][name].arguments[argument.name] = argument.default;
