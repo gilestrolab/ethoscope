@@ -303,9 +303,12 @@ class ExperimentalDB(multiprocessing.Process):
             return {}
         
         if asdict:
-            keys = row[0].keys()
-            #return [dict([(key, value) for key, value in zip(keys, line)]) for line in row]
-            return {line['ethoscope_id'] : {key: value for key, value in zip(keys, line)} for line in row}
+            # Convert sqlite3.Row objects to regular dicts to avoid connection leaks
+            result = {}
+            for line in row:
+                line_dict = dict(line)  # Convert sqlite3.Row to dict
+                result[line_dict['ethoscope_id']] = line_dict
+            return result
             
         else:
             return row

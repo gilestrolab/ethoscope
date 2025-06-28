@@ -9,7 +9,6 @@ import time
 import logging
 import traceback
 import pickle
-import mysql.connector
 import socket
 import struct
 from threading import Thread, RLock, Event
@@ -20,12 +19,11 @@ from dataclasses import dataclass
 from zeroconf import ServiceBrowser, Zeroconf, IPVersion
 
 from ethoscope_node.utils.etho_db import ExperimentalDB
-from ethoscope_node.utils.mysql_backup import DBDiff
 
 # Constants
 STREAMING_PORT = 8887
 ETHOSCOPE_PORT = 9000
-DB_UPDATE_INTERVAL = 300  # seconds
+DB_UPDATE_INTERVAL = 30  # seconds
 DEFAULT_TIMEOUT = 5
 MAX_RETRIES = 2
 INITIAL_RETRY_DELAY = 1
@@ -594,12 +592,6 @@ class Sensor(BaseDevice):
 class Ethoscope(BaseDevice):
     """Enhanced Ethoscope device class with improved state management."""
     
-    DB_CREDENTIALS = {
-        "user": "ethoscope",
-        "passwd": "ethoscope", 
-        "db": "ethoscope_db"
-    }
-    
     REMOTE_PAGES = {
         'id': "id",
         'videofiles': "data/listfiles/video",
@@ -889,13 +881,11 @@ class Ethoscope(BaseDevice):
         
         # Only update backup path if status changed or backup_path is None
         if (previous_status != new_status or 
-            self._info.get("backup_path") is None or
-            "backup_filename" in self._info or 
-            "previous_backup_filename" in self._info):
+            self._info.get("backup_path") is None):
             self._make_backup_path()
         
         self._handle_state_transition(previous_status, new_status)
-        self._update_backup_status()
+        self._update_backup_status_from_database_info()
     
     def _fetch_device_info(self) -> bool:
         """Fetch latest device information."""
@@ -996,25 +986,69 @@ class Ethoscope(BaseDevice):
         except Exception as e:
             self._logger.error(f"Error handling state transition: {e}")
     
-    def _update_backup_status(self):
-        """Update backup status information periodically."""
+    def _update_backup_status_from_database_info(self):
+        """Update backup status using database_info from ethoscope instead of direct DB connection."""
         if time.time() - self._last_db_info < DB_UPDATE_INTERVAL:
             return
         
         try:
-            db_name = self._info.get("db_name")
+            # Get database_info from the ethoscope's response
+            database_info = self._info.get("database_info", {})
             backup_path = self._info.get("backup_path")
             
-            if db_name and backup_path:
-                # Use the updated DBDiff class
-                db_diff = DBDiff(db_name, self._ip, backup_path)
-                self._info['backup_status'] = db_diff.compare_databases()
+            if not backup_path:
+                self._logger.debug(f"Device {self._ip}: No backup_path available")
+                self._info['backup_status'] = "No Backup"
+                return
+                
+            # Check if backup file exists
+            if not os.path.exists(backup_path):
+                self._logger.debug(f"Device {self._ip}: Backup file does not exist: {backup_path}")
+                self._info['backup_status'] = "File Missing"
+                return
+            
+            # Check database_info status
+            db_status = database_info.get("db_status", "unknown")
+            if db_status == "error":
+                self._logger.debug(f"Device {self._ip}: Database info shows error status")
+                self._info['backup_status'] = "DB Error"
+                return
+            
+            # Get database size from ethoscope
+            remote_db_size = database_info.get("db_size_bytes", 0)
+            if remote_db_size == 0:
+                self._logger.debug(f"Device {self._ip}: No database size available from ethoscope")
+                self._info['backup_status'] = "No DB Size"
+                return
+            
+            # Get local backup file size
+            try:
+                local_backup_size = os.path.getsize(backup_path)
+            except OSError as e:
+                self._logger.warning(f"Device {self._ip}: Cannot get backup file size for {backup_path}: {e}")
+                self._info['backup_status'] = "File Error"
+                return
+            
+            # Calculate backup percentage
+            if remote_db_size > 0:
+                backup_percentage = (local_backup_size * 100) / remote_db_size
+                backup_percentage = min(backup_percentage, 100)  # Cap at 100%
+                
+                self._info['backup_status'] = backup_percentage
+                self._info['backup_size'] = local_backup_size
+                
+                # Calculate time since last backup update
+                backup_mtime = os.path.getmtime(backup_path)
+                self._info['time_since_backup'] = time.time() - backup_mtime
+                
+                self._logger.debug(f"Device {self._ip}: Backup status {backup_percentage:.1f}% "
+                                 f"({local_backup_size}/{remote_db_size} bytes)")
             else:
-                self._info['backup_status'] = "N/A"
+                self._info['backup_status'] = "No DB Data"
                 
         except Exception as e:
-            self._logger.warning(f"Failed to update backup status: {e}")
-            self._info['backup_status'] = "N/A"
+            self._logger.warning(f"Device {self._ip}: Failed to update backup status from database_info: {e}")
+            self._info['backup_status'] = "Error"
         
         self._last_db_info = time.time()
     
@@ -1102,44 +1136,30 @@ class Ethoscope(BaseDevice):
             
             self._logger.warning(f"Generating legacy backup path for {device_id}")
             
-            # Query database for timestamp
-            credentials = self.DB_CREDENTIALS.copy()
-            credentials["db"] = db_name
+            # Use timestamp from ethoscope's response instead of direct database connection
+            timestamp = self._info.get("time")
             
-            with mysql.connector.connect(
-                host=self._ip,
-                connect_timeout=timeout,
-                **credentials,
-                buffered=True,
-                charset='latin1',
-                use_unicode=True
-            ) as mysql_db:
-                with mysql_db.cursor() as cursor:
-                    cursor.execute("SELECT value FROM METADATA WHERE field = 'date_time'")
-                    result = cursor.fetchone()
-                    
-                    if result:
-                        timestamp = float(result[0])
-                        # Fix the deprecation warning
-                        date_time = datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc)
-                        formatted_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
-                        
-                        filename = f"{formatted_time}_{device_id}.db"
-                        self._info["backup_filename"] = filename
-                        
-                        backup_path = os.path.join(
-                            self._results_dir,
-                            device_id,
-                            device_name,
-                            formatted_time,
-                            filename
-                        )
-                        
-                        self._info["backup_path"] = backup_path
-                        self._logger.debug(f"Generated legacy backup path: {backup_path}")
-                    else:
-                        self._logger.warning(f"No timestamp found in METADATA for {device_id}")
-                        self._info["backup_path"] = None
+            if timestamp:
+                # Fix the deprecation warning
+                date_time = datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc)
+                formatted_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
+                
+                filename = f"{formatted_time}_{device_id}.db"
+                self._info["backup_filename"] = filename
+                
+                backup_path = os.path.join(
+                    self._results_dir,
+                    device_id,
+                    device_name,
+                    formatted_time,
+                    filename
+                )
+                
+                self._info["backup_path"] = backup_path
+                self._logger.debug(f"Generated legacy backup path: {backup_path}")
+            else:
+                self._logger.warning(f"No timestamp available in device info for {device_id}")
+                self._info["backup_path"] = None
                         
         except Exception as e:
             self._logger.error(f"Error generating legacy backup path: {e}")

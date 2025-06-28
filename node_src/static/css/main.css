@@ -1186,3 +1186,99 @@ pre.command {
     max-width: 300px !important;
 }
 
+/* Time section styling */
+.time-info {
+    margin-top: 10px;
+}
+
+.time-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+    padding: 2px 0;
+}
+
+.time-label {
+    font-weight: normal;
+    text-align: left;
+}
+
+.time-value {
+    font-weight: bold;
+    text-align: right;
+    color: #333;
+}
+
+/* Table header styling - Override Bootstrap link colors */
+table thead th a,
+table thead th a:link,
+table thead th a:visited,
+table thead th a:active {
+    color: #333 !important;
+    font-weight: bold !important;
+    text-decoration: none !important;
+}
+
+table thead th a:hover,
+table thead th a:focus {
+    color: #000 !important;
+    text-decoration: none !important;
+}
+
+/* More specific override for Bootstrap table styles */
+.table thead th a {
+    color: #333 !important;
+    font-weight: bold !important;
+    text-decoration: none !important;
+}
+
+/* Backup status circles */
+.backup-status-circle {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+.backup-status-success {
+    background-color: #28a745;  /* Green */
+}
+
+.backup-status-error {
+    background-color: #dc3545;  /* Red */
+}
+
+.backup-status-processing {
+    background-color: #ffc107;  /* Yellow/Orange */
+    animation: apple-breathing 2s ease-in-out infinite;
+}
+
+.backup-status-unknown {
+    background-color: #6c757d;  /* Grey */
+}
+
+.backup-status-offline {
+    background-color: #000000;  /* Black */
+}
+
+@keyframes apple-breathing {
+    0% {
+        opacity: 0.3;
+        transform: scale(0.8);
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.2);
+        box-shadow: 0 0 0 8px rgba(255, 193, 7, 0.1);
+    }
+    100% {
+        opacity: 0.3;
+        transform: scale(0.8);
+        box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7);
+    }
+}
+

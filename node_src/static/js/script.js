@@ -134,14 +134,37 @@
             })
         };
 
+        var get_backup_status = function() {
+            // Get backup status via proxy to avoid CORS issues
+            $http.get('/backup/status').then(function(response) {
+                $scope.backup_status = response.data;
+                $scope.backup_service_available = true;
+            }).catch(function(error) {
+                $scope.backup_status = {};
+                $scope.backup_service_available = false;
+            });
+        };
+
+        var formatConciseTime = function(date) {
+            var options = {
+                weekday: 'short',   // Mon
+                month: 'short',     // Jun  
+                day: 'numeric',     // 28
+                hour: '2-digit',    // 14
+                minute: '2-digit',  // 25
+                timeZoneName: 'short' // BST
+            };
+            return date.toLocaleString('en-GB', options);
+        };
+
         var update_local_times = function() {
             $http.get('/node/time').then(function(response) {
             var data = response.data;
                 var t = new Date(data.time);
-                $scope.time = t.toString();
+                $scope.time = formatConciseTime(t);
             });
             var t = new Date();
-            $scope.localtime = t.toString();
+            $scope.localtime = formatConciseTime(t);
         };
 
         var get_devices = function() {
@@ -174,8 +197,48 @@
 
         $scope.secToDate = function(secs) {
             var d = new Date(isNaN(secs) ? secs : secs * 1000);
+            return formatConciseTime(d);
+        };
 
-            return d.toString();
+        $scope.getBackupStatusClass = function(device) {
+            if (!$scope.backup_service_available) {
+                return 'backup-status-offline';  // black circle
+            }
+            
+            var backup_info = $scope.backup_status[device.id];
+            if (!backup_info) {
+                return 'backup-status-unknown';  // grey circle
+            }
+            
+            if (backup_info.progress && backup_info.progress.status === 'success') {
+                return 'backup-status-success';  // green circle
+            } else if (backup_info.progress && backup_info.progress.status === 'error') {
+                return 'backup-status-error';  // red circle
+            } else if (backup_info.processing) {
+                return 'backup-status-processing';  // yellow/orange circle
+            } else {
+                return 'backup-status-unknown';  // grey circle
+            }
+        };
+
+        $scope.getBackupStatusTitle = function(device) {
+            if (!$scope.backup_service_available) {
+                return 'Backup service offline';
+            }
+            
+            var backup_info = $scope.backup_status[device.id];
+            if (!backup_info) {
+                return 'No backup information available';
+            }
+            
+            var title = 'Backup Status: ' + (backup_info.status || 'unknown');
+            if (backup_info.progress && backup_info.progress.message) {
+                title += ' - ' + backup_info.progress.message;
+            }
+            if (backup_info.count) {
+                title += ' (Backup #' + backup_info.count + ')';
+            }
+            return title;
         };
 
         $scope.elapsedtime = function(t) {
@@ -311,6 +374,7 @@
                 get_devices();
                 update_local_times();
                 get_sensors();
+                get_backup_status();
                 //console.log("refresh platform", new Date());
 
                 // For some reason that I don't understand, angularjs templates cannot access scope from the header so 
@@ -322,6 +386,9 @@
 
             }
         };
+
+        // Initialize backup status on page load
+        get_backup_status();
 
         // refresh every 5 seconds
         var refresh_data = $interval(refresh_platform, 5 * 1000);

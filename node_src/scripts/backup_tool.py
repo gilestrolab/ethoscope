@@ -12,13 +12,27 @@ from contextlib import contextmanager
 app = bottle.Bottle()
 gbw = None
 
+def enable_cors():
+    """Add CORS headers to allow cross-origin requests"""
+    bottle.response.headers['Access-Control-Allow-Origin'] = '*'
+    bottle.response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    bottle.response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+
 @app.route('/')
 def home():
+    enable_cors()
     bottle.response.content_type = 'application/json'
     return json.dumps({'status': 'running'}, indent=2)
 
+@app.route('/status', method='OPTIONS')
+@app.route('/', method='OPTIONS')
+def options_handler():
+    enable_cors()
+    return ""
+
 @app.route('/status')
 def status():
+    enable_cors()
     bottle.response.content_type = 'application/json'
     if gbw is None:
         return json.dumps({'error': 'Backup wrapper not initialized'}, indent=2)

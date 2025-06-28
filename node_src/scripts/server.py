@@ -219,6 +219,9 @@ class EthoscopeNodeServer:
         self.app.route('/device/<id>/controls/<instruction>', method='POST')(self._post_device_instructions)
         self.app.route('/device/<id>/log', method='POST')(self._get_log)
         
+        # Backup API
+        self.app.route('/backup/status', method='GET')(self._get_backup_status)
+        
         # Sensor API
         self.app.route('/sensors', method='GET')(self._get_sensors)
         self.app.route('/sensor/set', method='POST')(self._edit_sensor)
@@ -568,6 +571,22 @@ class EthoscopeNodeServer:
     def _get_log(self, id):
         device = self.device_scanner.get_device(id)
         return device.get_log()
+    
+    # Route handlers - Backup API
+    @error_decorator
+    def _get_backup_status(self):
+        """Proxy backup status from backup tool server to avoid CORS issues."""
+        try:
+            import urllib.request
+            backup_url = 'http://localhost:8090/status'
+            with urllib.request.urlopen(backup_url, timeout=5) as response:
+                data = response.read().decode('utf-8')
+                bottle.response.content_type = 'application/json'
+                return data
+        except Exception as e:
+            self.logger.warning(f"Failed to get backup status: {e}")
+            bottle.response.content_type = 'application/json'
+            return json.dumps({'error': 'Backup service unavailable'})
     
     # Route handlers - Sensor API
     @error_decorator
