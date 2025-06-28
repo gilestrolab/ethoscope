@@ -81,6 +81,7 @@ def device(action, id):
                 reload_node_daemon()
             else:
                 reload_device_daemon()
+            return {"status": "daemon_restarted"}
         else:
             raise UnexpectedAction()
 

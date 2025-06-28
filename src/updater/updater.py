@@ -170,8 +170,8 @@ class DeviceUpdater:
         :raises DeviceUpdateError: If package installation fails.
         """
         package_dirs = {
-            'node': os.path.join(self._git_working_dir, 'node_src'),
-            'device': os.path.join(self._git_working_dir, 'src')
+            'node': os.path.join(self._git_working_dir, 'src', 'node'),
+            'device': os.path.join(self._git_working_dir, 'src', 'ethoscope')
         }
         try:
             for component, path in package_dirs.items():
@@ -279,19 +279,27 @@ class BareRepoUpdater:
             ]
             check_result = subprocess.run(
                 check_cmd,
-                check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True
             )
 
-            # Split the output into lines and strip whitespace
-            safe_directories = [line.strip() for line in check_result.stdout.splitlines()]
-            logging.debug(f"Current safe.directories: {safe_directories}")
+            # Handle case where no safe.directory entries exist (exit code 1)
+            if check_result.returncode == 0:
+                # Split the output into lines and strip whitespace
+                safe_directories = [line.strip() for line in check_result.stdout.splitlines()]
+                logging.debug(f"Current safe.directories: {safe_directories}")
 
-            if self._git_working_dir in safe_directories:
-                logging.info(f"Directory '{self._git_working_dir}' is already in safe.directory.")
-                return  # Directory is already safe; no action needed
+                if self._git_working_dir in safe_directories:
+                    logging.info(f"Directory '{self._git_working_dir}' is already in safe.directory.")
+                    return  # Directory is already safe; no action needed
+            elif check_result.returncode == 1:
+                # No safe.directory entries exist yet, which is normal
+                logging.debug("No safe.directory entries found, will add the first one.")
+                safe_directories = []
+            else:
+                # Some other error occurred
+                raise subprocess.CalledProcessError(check_result.returncode, check_cmd, check_result.stdout, check_result.stderr)
 
             # Construct the Git command to add the safe.directory
             cmd = [
@@ -315,9 +323,13 @@ class BareRepoUpdater:
             logging.info(f"Successfully added '{self._git_working_dir}' to safe.directory.")
             logging.debug(f"Git config output: {result.stdout}")
         except subprocess.CalledProcessError as e:
-            # Handle cases where 'unsafe directory' warning appears
-            if "already exists" in e.stderr.lower():
+            # Handle cases where 'unsafe directory' warning appears or config already exists
+            if "already exists" in e.stderr.lower() or "already exists" in e.stdout.lower():
                 logging.warning(f"Directory '{self._git_working_dir}' is already in safe.directory.")
+                return
+            # Don't treat "not found" as an error for the initial check
+            if e.cmd[0] == "git" and "config" in e.cmd and "--get-all" in e.cmd and e.returncode == 1:
+                logging.debug("No existing safe.directory configuration found.")
                 return
             logging.error(f"Failed to add safe.directory: {e.stderr.strip()}")
             logging.debug(traceback.format_exc())
@@ -444,12 +456,7 @@ class BareRepoUpdater:
             raise
 
 if __name__ == '__main__':
-
-    bare_updater = BareRepoUpdater("/srv/git/ethoscope.git")
-    print (bare_updater._working_repo.branches)
-    #bare_updater.discover_branches()
-    bare_updater.update_all_branches()
-
-    #device_updater = DeviceUpdater("/opt/ethoscope-node")
-    #active_branch = device_updater.active_branch
-    #print (device_updater._origin.refs[str(active_branch)].commit)
+    # This module is designed to be imported, not run directly
+    # For testing, use the update_server.py script instead
+    print("This module should be imported, not run directly.")
+    print("Use update_server.py to run the updater service.")

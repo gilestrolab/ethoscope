@@ -17,8 +17,8 @@ export STABLE_BRANCH=master
 export UPSTREAM_GIT_REPO=https://github.com/gilestrolab/ethoscope.git
 export LOCAL_BARE_PATH=/srv/git/ethoscope.git
 export TARGET_UPDATER_DIR=/opt/ethoscope_updater
-export TARGET_GIT_INSTALL=/opt/ethoscope-git
-export UPDATER_LOCATION_IN_GIT=scripts/ethoscope_updater
+export TARGET_GIT_INSTALL=/opt/ethoscope
+export UPDATER_LOCATION_IN_GIT=src/updater
 export NODE_IP=192.169.123.1
 export WL_INTERFACE=wlan0
 

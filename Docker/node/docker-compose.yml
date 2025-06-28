@@ -14,7 +14,7 @@ services:
     image: ggilestro/ethoscope-node:latest
     restart: unless-stopped
     volumes:
-      # - ../../:/opt/ethoscope-node:ro  # Uncomment if needed - will mount the host ethoscope folder, useful only for development
+      # - ../../:/opt/ethoscope:ro  # Uncomment if needed - will mount the host ethoscope folder, useful only for development
       - ethoscope_data:/ethoscope_data
       - etc_ethoscope:/etc/ethoscope
 
@@ -22,7 +22,7 @@ services:
   ethoscope-node:
     <<: *node-base
     container_name: ethoscope-node
-    command: "/usr/bin/python /opt/ethoscope-node/node_src/scripts/server.py"
+    command: "/usr/bin/python /opt/ethoscope/src/node/scripts/server.py"
     network_mode: host                   # Comment out when running in Windows
     ports:
       - "80:80/tcp"
@@ -31,22 +31,22 @@ services:
   ethoscope-node-backup:
     <<: *node-base
     container_name: ethoscope-node-backup
-    command: "/usr/bin/python /opt/ethoscope-node/node_src/scripts/backup_tool.py"
+    command: "/usr/bin/python /opt/ethoscope/src/node/scripts/backup_tool.py"
     ports:
       - "8090:8090"
 
   ethoscope-node-video-backup:
     <<: *node-base
     container_name: ethoscope-node-video-backup
-    command: "/usr/bin/python /opt/ethoscope-node/node_src/scripts/video_backup_tool.py"
+    command: "/usr/bin/python /opt/ethoscope/src/node/scripts/video_backup_tool.py"
     ports:
       - "8092:8092"
 
   ethoscope-node-update:
     <<: *node-base
     container_name: ethoscope-node-update
-    working_dir: "/opt/ethoscope-node/scripts/ethoscope_updater"
-    command: "/usr/bin/python /opt/ethoscope-node/scripts/ethoscope_updater/update_server.py -g /opt/ethoscope-node -b /srv/git/ethoscope.git"
+    working_dir: "/opt/ethoscope/src/updater"
+    command: "/usr/bin/python /opt/ethoscope/src/updater/update_server.py -g /opt/ethoscope -b /srv/git/ethoscope.git"
     volumes_from:
       - ethoscope-git-server
     ports:

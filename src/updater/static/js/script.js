@@ -19,10 +19,10 @@
         $scope.devices_to_update_selected = [];
         $scope.selected_devices = [];
         $scope.modal = {
-            title: 'title',
-            info: 'Some info',
-            action_text: 'action_text',
-            action: 'action',
+            title: 'Device Action',
+            info: 'Please select an action',
+            action_text: 'Execute',
+            action: 'none',
         };
 
         $scope.branch_to_switch = null;
@@ -37,7 +37,8 @@
         loadingContainer_scan.appendChild($scope.spinner_scan.el);
 
 
-        $http.get('/bare/update').success(function(data) {
+        $http.get('/bare/update').then(function(response) {
+            var data = response.data;
             console.log(data);
             if ('error' in data) {
                 $scope.system.error = data.error;
@@ -50,32 +51,54 @@
             $scope.spinner.stop();
             $scope.spinner = false;
             $scope.spinner_text = null;
-
+        }).catch(function(error) {
+            $scope.system.error = 'Failed to update bare repository: ' + (error.data && error.data.error ? error.data.error : error.statusText);
+            $scope.spinner.stop();
+            $scope.spinner = false;
+            $scope.spinner_text = null;
         });
-        $http.get('/devices').success(function(data) {
-            check_error(data);
-            $scope.devices = data;
+        $http.get('/devices').then(function(response) {
+            var data = response.data;
+            if (!check_error(data)) {
+                $scope.devices = data;
+            }
 
             //slower method is the one that has to stop the spinner
             $scope.spinner_scan.stop();
             $scope.spinner_scan = false;
 
             console.log($scope.devices);
+        }).catch(function(error) {
+            $scope.system.error = 'Failed to load devices: ' + (error.data && error.data.error ? error.data.error : error.statusText);
+            $scope.spinner_scan.stop();
+            $scope.spinner_scan = false;
         });
-        $http.get('/device/check_update/node').success(function(data) {
-            check_error(data);
-            $scope.node.check_update = data;
+        $http.get('/device/check_update/node').then(function(response) {
+            var data = response.data;
+            if (!check_error(data)) {
+                $scope.node.check_update = data;
+            }
+        }).catch(function(error) {
+            $scope.system.error = 'Failed to check node updates: ' + (error.data && error.data.error ? error.data.error : error.statusText);
         });
-        $http.get('/device/active_branch/node').success(function(data) {
-            check_error(data);
-            $scope.node.active_branch = data.active_branch;
+        $http.get('/device/active_branch/node').then(function(response) {
+            var data = response.data;
+            if (!check_error(data)) {
+                $scope.node.active_branch = data.active_branch;
+            }
+        }).catch(function(error) {
+            $scope.system.error = 'Failed to get active branch: ' + (error.data && error.data.error ? error.data.error : error.statusText);
         });
         //aADD A call to node/info
-        $http.get('/node_info').success(function(data) {
-            check_error(data);
-            $scope.node.ip = data.ip;
-            $scope.node.status = data.status;
-            $scope.node.id = data.id;
+        $http.get('/node_info').then(function(response) {
+            var data = response.data;
+            if (!check_error(data)) {
+                $scope.node.ip = data.ip;
+                $scope.node.status = data.status;
+                $scope.node.id = data.id;
+            }
+        }).catch(function(error) {
+            $scope.system.error = 'Failed to get node info: ' + (error.data && error.data.error ? error.data.error : error.statusText);
         });
 
         $scope.toggleAll = function() {
@@ -112,13 +135,13 @@
         $scope.activate_modal = function(devices, action) {
             spin("start");
             // error == false => at least one device  is NOT {stopped, NA, Software broken}
-            error = check_devices_state(devices, ["stopped", "NA", "Software broken"]);
+            var error = check_devices_state(devices, ["stopped", "NA", "Software broken"]);
             if (!error) {
                 switch (action) {
                     case 'update':
                         $scope.modal = {
                             title: 'Update devices',
-                            info: 'This devices are going to be updated. Do not disconnect them.',
+                            info: 'These devices are going to be updated. Do not disconnect them.',
                             action_text: 'Update',
                             action: 'update',
                         }
@@ -147,6 +170,25 @@
         }
 
         $scope.modal_action = function(devices, action) {
+            // Add confirmation for destructive operations
+            var confirmationMessage = '';
+            switch (action) {
+                case 'update':
+                    confirmationMessage = 'Are you sure you want to update ' + devices.length + ' device(s)? This operation cannot be undone.';
+                    break;
+                case 'restart':
+                    confirmationMessage = 'Are you sure you want to restart ' + devices.length + ' device(s)? This will interrupt any running experiments.';
+                    break;
+                case 'swBranch':
+                    confirmationMessage = 'Are you sure you want to switch branches on ' + devices.length + ' device(s)? This may affect running experiments.';
+                    break;
+            }
+            
+            if (confirmationMessage && !confirm(confirmationMessage)) {
+                $("#Modal").modal('hide');
+                return; // User cancelled
+            }
+            
             $("#Modal").modal('hide');
             spin("start");
             switch (action) {
@@ -167,14 +209,18 @@
             data = {
                 "devices": devices
             };
-            $http.post(url, data = data)
-                .success(function(data) {
+            $http.post(url, data)
+                .then(function(response) {
+                    var data = response.data;
                     var error = check_error(data);
                     $scope.update_result = data;
                     spin("stop");
                     if (!error) {
                         $window.location.reload();
                     }
+                }).catch(function(error) {
+                    $scope.system.error = 'Operation failed: ' + (error.data && error.data.error ? error.data.error : error.statusText);
+                    spin("stop");
                 });
         }
 
@@ -185,7 +231,7 @@
             return d.toString();
         };
 
-        spin = function(action) {
+        var spin = function(action) {
             if (action == "start") {
                 $scope.spinner = new Spinner(opts).spin();
                 var loadingContainer = document.getElementById('loading_devices');
@@ -196,7 +242,7 @@
             }
         };
 
-        check_devices_state = function(devices, states) {
+        var check_devices_state = function(devices, states) {
             var states_dic = {};
             for (var i = 0; i < states.length; i++) {
                 states_dic[states[i]] = "";
@@ -221,7 +267,7 @@
             return false;
         };
 
-        check_error = function(data) {
+        var check_error = function(data) {
             if ('error' in data) {
                 $scope.system.error = data.error;
                 return true;

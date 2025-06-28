@@ -4,8 +4,8 @@ Description=Update server for the Ethoscope
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/ethoscope_updater/
-ExecStart=/usr/bin/python3 /opt/ethoscope_updater/update_server.py -g /opt/ethoscope-device
+WorkingDirectory=/opt/ethoscope/src/updater/
+ExecStart=/usr/bin/python3 /opt/ethoscope/src/updater/update_server.py -g /opt/ethoscope
 RestartSec=5
 Restart=always
 

@@ -6,10 +6,10 @@ After=ntpd.service
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/ethoscope-node/node_src/scripts
+WorkingDirectory=/opt/ethoscope/src/node/scripts
 Environment=NODE_PORT=80
 EnvironmentFile=-/etc/ethoscope/environment
-ExecStart=/usr/bin/python /opt/ethoscope-node/node_src/scripts/server.py --port=${NODE_PORT}
+ExecStart=/usr/bin/python /opt/ethoscope/src/node/scripts/server.py --port=${NODE_PORT}
 RestartSec=5
 Restart=always
 

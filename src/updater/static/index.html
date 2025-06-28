@@ -26,7 +26,8 @@
                 </div>
 
                 <ul class="nav navbar-nav navbar-right">
-                    <li><a href=""><i class="fa fa-cog"></i> Help</a></li>
+                    <li><a href="/"><i class="fa fa-home"></i> Back to Node</a></li>
+                    <li><a href=""><i class="fa fa-question-circle"></i> Help</a></li>
                 </ul>
             </div>
         </nav>
@@ -49,7 +50,7 @@
         </div>
 
         <div class="alert alert-neutral" style="background-color:#f2f2f2;">
-            <label class="toggle-check">Show all machines, also those thare are running and up to date
+            <label class="toggle-check">Show all machines, also those that are running and up to date
                 <input name="showAll" type="checkbox" class="toggle-check-input" ng-model="showAll" ng-checked="false">
                 <span class="toggle-check-text"></span>
             </label>
@@ -58,9 +59,9 @@
 
         <div class="jumbotron table-background" ng-cloak>
             <h3>Select some devices to perform the actions below:</h3>
-            <button class="btn btn-success btn-xl" ng-click="activate_modal(selected_devices, 'update')">Update</button>
-            <button class="btn btn-default" ng-click="activate_modal(selected_devices, 'restart')">Restart</button>
-            <button class="btn btn-default" ng-click="activate_modal(selected_devices, 'swBranch')">Switch Branch</button>
+            <button class="btn btn-success btn-action" ng-click="activate_modal(selected_devices, 'update')">Update</button>
+            <button class="btn btn-default btn-action" ng-click="activate_modal(selected_devices, 'restart')">Restart</button>
+            <button class="btn btn-default btn-action" ng-click="activate_modal(selected_devices, 'swBranch')">Switch Branch</button>
             <hr>
 
             <div id="scanning_devices" class="spinner_scan"></div>
@@ -121,10 +122,13 @@
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        {{modal.title}}
+                        <h4 class="modal-title">{{system.modal_error != '' ? 'Error' : modal.title}}</h4>
                     </div>
-                    <div class="model-body" ng-if="system.modal_error != ''">
-                        <h3>{{system.modal_error}}</h3>
+                    <div class="modal-body" ng-if="system.modal_error != ''">
+                        <div class="alert alert-danger">
+                            <i class="fa fa-exclamation-triangle"></i>
+                            {{system.modal_error}}
+                        </div>
                     </div>
 
                     <div class="modal-body " ng-if="system.modal_error == ''">
@@ -146,7 +150,7 @@
 
                                     <td>
                                         <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
-                                            <span ng-if="device.up_to_date==false" class="fa fa-circle colour-red"></span> <span ng-if="device.up_to_date==true" class="fa fa-circle colour-green"></span>
+                                            <span ng-if="device.up_to_date==false" class="fa fa-circle color-red"></span> <span ng-if="device.up_to_date==true" class="fa fa-circle color-green"></span>
                                             <span> {{device.name}}</span>
                                         </a>
                                     </td>
