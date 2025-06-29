@@ -29,7 +29,6 @@ MAX_RETRIES = 2
 INITIAL_RETRY_DELAY = 1
 MAX_RETRY_DELAY = 5
 
-
 @dataclass
 class DeviceInfo:
     """Data class for device information."""
@@ -882,13 +881,10 @@ class Ethoscope(BaseDevice):
         # Check if backup_filename from API response has changed
         current_backup_filename = self._info.get("backup_filename")
         previous_backup_filename = getattr(self, '_last_backup_filename', None)
-        backup_filename_changed = (current_backup_filename != previous_backup_filename and 
-                                 current_backup_filename is not None)
-        
+        backup_filename_changed = (current_backup_filename != previous_backup_filename and current_backup_filename is not None)
+
         # Update backup path if status changed, backup_path is None, or backup_filename changed
-        if (previous_status != new_status or 
-            self._info.get("backup_path") is None or
-            backup_filename_changed):
+        if (previous_status != new_status or self._info.get("backup_path") is None or backup_filename_changed):
             # Force recalculation if backup filename changed
             self._make_backup_path(force_recalculate=backup_filename_changed)
             # Track the backup_filename used for this backup_path
@@ -1063,157 +1059,51 @@ class Ethoscope(BaseDevice):
         self._last_db_info = time.time()
     
     def _make_backup_path(self, timeout: float = 30, force_recalculate: bool = False):
-        """Create backup path for the device."""
+        """
+        Creates the full path for the backup file, gathering info from the ethoscope
+        
+        The full backup_path will look something like:
+        /ethoscope_data/results/0256424ac3f545b6b3c687723085ffcb/ETHOSCOPE_025/2025-06-13_16-05-37/2025-06-13_16-05-37_0256424ac3f545b6b3c687723085ffcb.db
+        """
         try:
             # Skip if backup path is already set and valid (unless forced)
             if self._info.get("backup_path") is not None and not force_recalculate:
                 return
             
-            # Case 1: Device has backup filename (regardless of status)
-            if ("backup_filename" in self._info and 
-                self._info["backup_filename"]):
-                filename = self._info["backup_filename"]
-                self._create_backup_path_from_filename(filename)
-                return
+            output_db_file = None
             
-            # Case 2: Device is stopped and has previous backup filename (fallback)
-            if (self._info["status"] == 'stopped' and 
-                "previous_backup_filename" in self._info and 
-                self._info["previous_backup_filename"]):
-                filename = self._info["previous_backup_filename"]
-                self._create_backup_path_from_filename(filename)
-                return
-            
-            # Case 3: No backup filename info available and no db_name
-            if ("previous_backup_filename" not in self._info and 
-                "backup_filename" not in self._info and
-                "db_name" not in self._info):
-                self._info["backup_path"] = None
-                return
-            
-            # Case 4: Legacy path generation (only if we have db_name but no backup filenames)
-            if ("db_name" in self._info and 
-                "previous_backup_filename" not in self._info and 
-                "backup_filename" not in self._info):
-                self._generate_legacy_backup_path(timeout)
-            else:
-                # If we have db_name but still no backup path set, set to None
-                if self._info.get("backup_path") is None:
-                    self._info["backup_path"] = None
+            # Case 1: Device has backup_filename (regardless of status)
+            if "backup_filename" in self._info and self._info["backup_filename"]:
+                fname, _ = os.path.splitext(self._info["backup_filename"])
+                backup_date, backup_time, etho_id = fname.split("_")
                 
+                output_db_file = os.path.join(self._results_dir,
+                                            etho_id,
+                                            self._info["name"],
+                                            "%s_%s" % (backup_date, backup_time),
+                                            self._info["backup_filename"])
+            
+            # Case 2: Device is stopped and has previous_backup_filename (fallback)
+            elif (self._info["status"] == 'stopped' and 
+                  "previous_backup_filename" in self._info and 
+                  self._info["previous_backup_filename"]):
+                fname, _ = os.path.splitext(self._info["previous_backup_filename"])
+                backup_date, backup_time, etho_id = fname.split("_")
+                
+                output_db_file = os.path.join(self._results_dir,
+                                            etho_id,
+                                            self._info["name"],
+                                            "%s_%s" % (backup_date, backup_time),
+                                            self._info["previous_backup_filename"])
+            
+            # Case 3: No backup filename info available
+            else:
+                output_db_file = None
+            
+            self._info["backup_path"] = output_db_file
+            
         except Exception as e:
             self._logger.error(f"Error creating backup path: {e}")
-            self._info["backup_path"] = None
-    
-    def _create_backup_path_from_filename(self, filename: str):
-        """Create backup path from filename."""
-        try:
-            fname, _ = os.path.splitext(filename)
-            parts = fname.split("_")
-            
-            # Ensure we have at least 3 parts (date, time, etho_id)
-            if len(parts) < 3:
-                self._logger.error(f"Invalid backup filename format: {filename}")
-                self._info["backup_path"] = None
-                return
-            
-            backup_date = parts[0]
-            backup_time = parts[1]
-            etho_id = "_".join(parts[2:])  # Handle IDs that might contain underscores
-            
-            backup_path = os.path.join(
-                self._results_dir,
-                etho_id,
-                self._info.get("name", ""),
-                f"{backup_date}_{backup_time}",
-                filename
-            )
-            
-            self._info["backup_path"] = backup_path
-            self._logger.debug(f"Created backup path: {backup_path}")
-            
-        except Exception as e:
-            self._logger.error(f"Error parsing backup filename {filename}: {e}")
-            self._info["backup_path"] = None
-    
-    def _generate_legacy_backup_path(self, timeout: float):
-        """Generate backup path for legacy systems (should get backup_filename from ethoscope API)."""
-        try:
-            device_id = self._info["id"]
-            device_name = self._info["name"] 
-            
-            self._logger.warning(f"Generating legacy backup path for {device_id}")
-            
-            # Check if backup_filename was provided by ethoscope API response
-            backup_filename = self._info.get("backup_filename")
-            
-            if backup_filename:
-                self._logger.info(f"Using backup filename from ethoscope API: {backup_filename}")
-                
-                # Parse the filename to get the formatted time
-                try:
-                    fname, _ = os.path.splitext(backup_filename)
-                    parts = fname.split("_")
-                    if len(parts) >= 2:
-                        formatted_time = f"{parts[0]}_{parts[1]}"
-                    else:
-                        raise ValueError(f"Invalid backup filename format: {backup_filename}")
-                        
-                    backup_path = os.path.join(
-                        self._results_dir,
-                        device_id,
-                        device_name,
-                        formatted_time,
-                        backup_filename
-                    )
-                    
-                    self._info["backup_path"] = backup_path
-                    self._logger.debug(f"Generated backup path from API backup_filename: {backup_path}")
-                    
-                except Exception as e:
-                    self._logger.error(f"Error parsing backup filename {backup_filename}: {e}")
-                    self._fallback_legacy_backup_path()
-            else:
-                self._logger.warning(f"No backup_filename in ethoscope API response for {device_id}, using fallback")
-                self._fallback_legacy_backup_path()
-                        
-        except Exception as e:
-            self._logger.error(f"Error generating legacy backup path: {e}")
-            self._fallback_legacy_backup_path()
-
-    def _fallback_legacy_backup_path(self):
-        """Fallback method to generate backup path using current timestamp."""
-        try:
-            device_id = self._info["id"]
-            device_name = self._info["name"]
-            
-            # Use timestamp from ethoscope's response instead of direct database connection
-            timestamp = self._info.get("time")
-            
-            if timestamp:
-                # Fix the deprecation warning
-                date_time = datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc)
-                formatted_time = date_time.strftime('%Y-%m-%d_%H-%M-%S')
-                
-                filename = f"{formatted_time}_{device_id}.db"
-                self._info["backup_filename"] = filename
-                
-                backup_path = os.path.join(
-                    self._results_dir,
-                    device_id,
-                    device_name,
-                    formatted_time,
-                    filename
-                )
-                
-                self._info["backup_path"] = backup_path
-                self._logger.debug(f"Generated fallback legacy backup path: {backup_path}")
-            else:
-                self._logger.warning(f"No timestamp available in device info for {device_id}")
-                self._info["backup_path"] = None
-                        
-        except Exception as e:
-            self._logger.error(f"Error generating fallback legacy backup path: {e}")
             self._info["backup_path"] = None
 
 
