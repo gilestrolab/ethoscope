@@ -1128,20 +1128,18 @@ class Ethoscope(BaseDevice):
             self._info["backup_path"] = None
     
     def _generate_legacy_backup_path(self, timeout: float):
-        """Generate backup path for legacy systems by querying metadata table."""
+        """Generate backup path for legacy systems (should get backup_filename from ethoscope API)."""
         try:
             device_id = self._info["id"]
             device_name = self._info["name"] 
-            db_name = self._info["db_name"]
             
             self._logger.warning(f"Generating legacy backup path for {device_id}")
             
-            # Try to get backup filename from metadata table
-            backup_filename = self._get_backup_filename_from_metadata()
+            # Check if backup_filename was provided by ethoscope API response
+            backup_filename = self._info.get("backup_filename")
             
             if backup_filename:
-                self._logger.info(f"Retrieved backup filename from metadata: {backup_filename}")
-                self._info["backup_filename"] = backup_filename
+                self._logger.info(f"Using backup filename from ethoscope API: {backup_filename}")
                 
                 # Parse the filename to get the formatted time
                 try:
@@ -1161,58 +1159,18 @@ class Ethoscope(BaseDevice):
                     )
                     
                     self._info["backup_path"] = backup_path
-                    self._logger.debug(f"Generated backup path from metadata: {backup_path}")
+                    self._logger.debug(f"Generated backup path from API backup_filename: {backup_path}")
                     
                 except Exception as e:
                     self._logger.error(f"Error parsing backup filename {backup_filename}: {e}")
                     self._fallback_legacy_backup_path()
             else:
-                self._logger.warning(f"Could not retrieve backup filename from metadata for {device_id}, using fallback")
+                self._logger.warning(f"No backup_filename in ethoscope API response for {device_id}, using fallback")
                 self._fallback_legacy_backup_path()
                         
         except Exception as e:
             self._logger.error(f"Error generating legacy backup path: {e}")
             self._fallback_legacy_backup_path()
-
-    def _get_backup_filename_from_metadata(self):
-        """Get the backup filename from the ethoscope's metadata table."""
-        try:
-            # Get database credentials from device info
-            db_host = self._ip
-            db_port = 3306
-            db_user = "ethoscope"
-            db_password = "ethoscope"
-            db_name = self._info.get("db_name", "ethoscope_db")
-            
-            self._logger.debug(f"Querying metadata table on {db_host}:{db_port}/{db_name}")
-            
-            import mysql.connector
-            conn = mysql.connector.connect(
-                host=db_host,
-                port=db_port,
-                user=db_user,
-                password=db_password,
-                database=db_name,
-                connection_timeout=5
-            )
-            
-            cursor = conn.cursor()
-            cursor.execute("SELECT backup_filename, date_time FROM METADATA ORDER BY date_time DESC LIMIT 1")
-            result = cursor.fetchone()
-            
-            if result:
-                backup_filename, experiment_time = result
-                self._logger.info(f"Found backup filename in metadata: {backup_filename}")
-                conn.close()
-                return backup_filename
-            else:
-                self._logger.warning("No backup filename found in metadata table")
-                conn.close()
-                return None
-                
-        except Exception as e:
-            self._logger.warning(f"Could not query metadata table: {e}")
-            return None
 
     def _fallback_legacy_backup_path(self):
         """Fallback method to generate backup path using current timestamp."""

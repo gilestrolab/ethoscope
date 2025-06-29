@@ -581,6 +581,12 @@ class ControlThread(Thread):
         # Update database info periodically during tracking
         if self._info.get("status") in ["running", "recording"]:
             self._info["database_info"] = self._get_database_info()
+        
+        # Update backup filename from metadata table if not already set
+        if "backup_filename" not in self._info or not self._info["backup_filename"]:
+            backup_filename = self._get_latest_backup_filename()
+            if backup_filename:
+                self._info["backup_filename"] = backup_filename
 
         self._last_info_t_stamp = wall_time
         self._last_info_frame_idx = frame_idx
