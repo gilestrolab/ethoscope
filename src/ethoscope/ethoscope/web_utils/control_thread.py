@@ -400,6 +400,14 @@ class ControlThread(Thread):
 
         # Initialize database info now that _info is fully constructed
         self._info["database_info"] = self._get_database_info()
+        
+        # Check for existing backup filename from metadata table during initialization
+        # This ensures backup_filename is available immediately for status requests
+        if "backup_filename" not in self._info:
+            existing_backup_filename = self._get_latest_backup_filename()
+            if existing_backup_filename:
+                self._info["backup_filename"] = existing_backup_filename
+                logging.info(f"Found existing backup filename during initialization: {existing_backup_filename}")
 
         self._parse_user_options(data)
         
