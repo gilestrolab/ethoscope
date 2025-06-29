@@ -296,6 +296,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
         #Truncate all tables before dropping db for performance
         command = "SHOW TABLES"
         c.execute(command)
+        tables = c.fetchall()
 
         # In case we use binary logging, we remove bin logs to save space.
         # However, this will throw an error if binary logging is set to off
@@ -307,7 +308,7 @@ class AsyncMySQLWriter(multiprocessing.Process):
             c.execute("RESET MASTER")
 
         to_execute  = []
-        for t in c:
+        for t in tables:
             t = t[0]
             command = "TRUNCATE TABLE %s" % t
             to_execute.append(command)

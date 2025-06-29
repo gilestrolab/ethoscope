@@ -345,9 +345,9 @@ setup_mariadb() {
 CREATE USER IF NOT EXISTS 'ethoscope'@'localhost' IDENTIFIED BY 'ethoscope';
 CREATE USER IF NOT EXISTS 'ethoscope'@'%' IDENTIFIED BY 'ethoscope';
 
--- Grant necessary permissions
-GRANT CREATE, DROP, SELECT, INSERT, UPDATE, DELETE, INDEX, ALTER ON *.* TO 'ethoscope'@'localhost';
-GRANT CREATE, DROP, SELECT, INSERT, UPDATE, DELETE, INDEX, ALTER ON *.* TO 'ethoscope'@'%';
+-- Grant necessary permissions including RELOAD and GRANT OPTION
+GRANT ALL PRIVILEGES ON *.* TO 'ethoscope'@'localhost' WITH GRANT OPTION;
+GRANT ALL PRIVILEGES ON *.* TO 'ethoscope'@'%' WITH GRANT OPTION;
 
 -- Flush privileges to ensure changes take effect
 FLUSH PRIVILEGES;
@@ -468,16 +468,18 @@ configure_raspberry_pi_hardware() {
         echo "Configuring camera for Pi 4..."
         echo 'dtoverlay=vc4-kms-v3d' >> "$BOOTCFG"
         echo 'gpu_mem=256' >> "$BOOTCFG"
+        echo 'dtoverlay=imx219' >> "$BOOTCFG"
         
     elif [[ "$PI_MODEL" == "pi5" ]]; then
         echo "Configuring camera for Pi 5..."
         echo 'dtoverlay=vc4-kms-v3d' >> "$BOOTCFG"
         echo 'gpu_mem=256' >> "$BOOTCFG"
-        # Pi 5 uses libcamera by default, no additional config needed
+        echo 'dtoverlay=imx219' >> "$BOOTCFG"
         
     else
         echo "Unknown Pi model, using basic camera configuration..."
         echo 'gpu_mem=128' >> "$BOOTCFG"
+        echo 'dtoverlay=imx219' >> "$BOOTCFG"
     fi
     
     # Enable camera interface for all models

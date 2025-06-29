@@ -364,6 +364,15 @@ def hasPiCamera():
         with os.popen(vcgencmd) as cmd:
             out_cmd = cmd.read().strip()
         out = dict(x.split('=') for x in out_cmd.split(',')[0].split(' '))
+        
+        # If libcamera interfaces are available but vcgencmd shows detected=0,
+        # fall back to libcamera detection method
+        if 'libcamera' in out_cmd and 'interfaces=1' in out_cmd and out["detected"] == "0":
+            with os.popen("libcamera-hello --list-cameras") as cmd:
+                libcam_out = cmd.read()
+            match = re.search(r'\d+ : (\w+)', libcam_out)
+            return bool(match)
+        
         return out["detected"] == out["supported"] == "1"
 
     if isMachinePI(4):
