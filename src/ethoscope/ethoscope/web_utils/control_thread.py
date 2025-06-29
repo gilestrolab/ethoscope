@@ -582,7 +582,7 @@ class ControlThread(Thread):
         if self._info.get("status") in ["running", "recording"]:
             self._info["database_info"] = self._get_database_info()
         
-        # Update backup filename from metadata table if not already set
+        # Update backup filename from metadata table - always include regardless of status
         if "backup_filename" not in self._info or not self._info["backup_filename"]:
             backup_filename = self._get_latest_backup_filename()
             if backup_filename:
