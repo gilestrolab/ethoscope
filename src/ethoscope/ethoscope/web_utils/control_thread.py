@@ -606,7 +606,26 @@ class ControlThread(Thread):
         logging.info("Setting monitor status as running: '%s'" % self._info["status"])
         
         # Set tracking start time for database metadata
-        self._tracking_start_time = time.time()
+        # Use the original experiment start time from metadata/backup filename, not current time
+        if hasattr(self, '_metadata') and 'date_time' in self._metadata:
+            # Use experiment start time from metadata
+            self._tracking_start_time = self._metadata['date_time']
+            logging.info(f"Using experiment start time from metadata: {self._tracking_start_time}")
+        elif self._info.get('backup_filename'):
+            # Extract start time from backup filename as fallback
+            try:
+                # Format: YYYY-MM-DD_HH-MM-SS_machine_id.db
+                timestamp_part = self._info['backup_filename'].split('_')[:3]
+                timestamp_str = '_'.join(timestamp_part)
+                self._tracking_start_time = time.mktime(time.strptime(timestamp_str, '%Y-%m-%d_%H-%M-%S'))
+                logging.info(f"Using experiment start time from backup filename: {self._tracking_start_time}")
+            except (ValueError, IndexError) as e:
+                logging.warning(f"Could not parse time from backup filename {self._info['backup_filename']}: {e}")
+                self._tracking_start_time = time.time()
+        else:
+            # Fallback to current time if no other information available
+            self._tracking_start_time = time.time()
+            logging.warning("Using current time as tracking start time (no metadata/backup filename available)")
         
         # Initialize database metadata for tracking
         self._info["database_info"] = self._get_database_info()
@@ -698,7 +717,44 @@ class ControlThread(Thread):
         else:
             append_to_db = False
 
-        self._info["backup_filename"] = "%s_%s.db" % ( datetime.datetime.utcfromtimestamp(self._info["time"]).strftime('%Y-%m-%d_%H-%M-%S'), self._info["id"] )
+        # Try to get existing backup filename from metadata table first
+        existing_backup_filename = self._get_latest_backup_filename()
+        
+        if existing_backup_filename and append_to_db:
+            # Use existing backup filename when appending to database
+            self._info["backup_filename"] = existing_backup_filename
+            logging.info(f"Using existing backup filename for append mode: {existing_backup_filename}")
+        elif existing_backup_filename and not append_to_db:
+            # If we're not appending but there's an existing backup filename,
+            # we should still check if we're continuing the same experiment
+            # (e.g., after a reboot during an ongoing experiment)
+            current_time = self._info["time"]
+            
+            # Extract timestamp from existing backup filename to check if it's recent
+            try:
+                # Format: YYYY-MM-DD_HH-MM-SS_machine_id.db
+                timestamp_part = existing_backup_filename.split('_')[:3]  # Get date and time parts
+                timestamp_str = '_'.join(timestamp_part)  # Reconstruct timestamp string
+                existing_time = time.mktime(time.strptime(timestamp_str, '%Y-%m-%d_%H-%M-%S'))
+                
+                # If the existing backup is recent (within 7 days), use it
+                # This handles the case where ethoscope rebooted during an experiment
+                if current_time - existing_time < 7 * 24 * 3600:  # 7 days
+                    self._info["backup_filename"] = existing_backup_filename
+                    logging.info(f"Using existing recent backup filename (experiment likely continuing): {existing_backup_filename}")
+                else:
+                    # Old backup, create new one
+                    self._info["backup_filename"] = "%s_%s.db" % ( datetime.datetime.utcfromtimestamp(current_time).strftime('%Y-%m-%d_%H-%M-%S'), self._info["id"] )
+                    logging.info(f"Creating new backup filename (old experiment): {self._info['backup_filename']}")
+            except (ValueError, IndexError) as e:
+                logging.warning(f"Could not parse existing backup filename {existing_backup_filename}: {e}")
+                # Create new backup filename as fallback
+                self._info["backup_filename"] = "%s_%s.db" % ( datetime.datetime.utcfromtimestamp(current_time).strftime('%Y-%m-%d_%H-%M-%S'), self._info["id"] )
+                logging.info(f"Creating new backup filename (parse error): {self._info['backup_filename']}")
+        else:
+            # No existing backup filename or first time - create new one
+            self._info["backup_filename"] = "%s_%s.db" % ( datetime.datetime.utcfromtimestamp(self._info["time"]).strftime('%Y-%m-%d_%H-%M-%S'), self._info["id"] )
+            logging.info(f"Creating new backup filename (no existing): {self._info['backup_filename']}")
         
         self._info["interactor"] = {}
         self._info["interactor"]["name"] = str(self._option_dict['interactor']['class'])
@@ -706,10 +762,22 @@ class ControlThread(Thread):
 
         # this will be saved in the metadata table
         # and in the pickle file below
+        # Extract original experiment start time from backup filename for consistency
+        original_experiment_time = self._info["time"]  # Default to current time
+        if self._info.get('backup_filename'):
+            try:
+                # Format: YYYY-MM-DD_HH-MM-SS_machine_id.db
+                timestamp_part = self._info['backup_filename'].split('_')[:3]
+                timestamp_str = '_'.join(timestamp_part)
+                original_experiment_time = time.mktime(time.strptime(timestamp_str, '%Y-%m-%d_%H-%M-%S'))
+                logging.info(f"Using original experiment time from backup filename for metadata: {original_experiment_time}")
+            except (ValueError, IndexError) as e:
+                logging.warning(f"Could not parse time from backup filename for metadata: {e}")
+        
         self._metadata = {
             "machine_id": self._info["id"],
             "machine_name": self._info["name"],
-            "date_time": self._info["time"],
+            "date_time": original_experiment_time,
             "frame_width": cam.width,
             "frame_height": cam.height,
             "version": self._info["version"]["id"],
@@ -737,9 +805,41 @@ class ControlThread(Thread):
 
     def _get_latest_backup_filename(self):
         '''
-        Tries to recover the latest backup_filename
+        Tries to recover the latest backup_filename from the metadata table
         '''
-        pass
+        try:
+            # Connect to the MySQL database
+            conn = mysql.connector.connect(
+                host='localhost',
+                user=self._db_credentials["user"],
+                password=self._db_credentials["password"],
+                database=self._db_credentials["name"]
+            )
+            cursor = conn.cursor()
+            
+            # Query the metadata table for the latest backup filename
+            cursor.execute("SELECT backup_filename, date_time FROM METADATA ORDER BY date_time DESC LIMIT 1")
+            result = cursor.fetchone()
+            
+            if result:
+                backup_filename, experiment_time = result
+                logging.info(f"Found existing backup filename from metadata: {backup_filename}")
+                logging.info(f"Original experiment time: {experiment_time}")
+                return backup_filename
+            else:
+                logging.info("No existing backup filename found in metadata table")
+                return None
+                
+        except mysql.connector.Error as e:
+            logging.warning(f"Could not retrieve backup filename from metadata table: {e}")
+            return None
+        except Exception as e:
+            logging.error(f"Unexpected error retrieving backup filename: {e}")
+            return None
+        finally:
+            if 'conn' in locals() and conn.is_connected():
+                cursor.close()
+                conn.close()
         
     
     def run(self):
@@ -759,6 +859,21 @@ class ControlThread(Thread):
                 
                 try:
                     cam, rw, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, self._info = self._set_tracking_from_pickled()
+                    
+                    # IMPORTANT: Validate backup filename from pickle against metadata table
+                    # The pickle file might have an outdated backup filename if the ethoscope rebooted
+                    logging.info(f"Loaded backup filename from pickle: {self._info.get('backup_filename', 'None')}")
+                    
+                    # Get the correct backup filename from metadata table
+                    metadata_backup_filename = self._get_latest_backup_filename()
+                    if metadata_backup_filename and metadata_backup_filename != self._info.get('backup_filename'):
+                        logging.warning(f"Backup filename mismatch! Pickle: {self._info.get('backup_filename')} vs Metadata: {metadata_backup_filename}")
+                        logging.info(f"Using correct backup filename from metadata: {metadata_backup_filename}")
+                        self._info['backup_filename'] = metadata_backup_filename
+                    elif metadata_backup_filename:
+                        logging.info(f"Backup filename validated against metadata: {metadata_backup_filename}")
+                    else:
+                        logging.warning("No backup filename found in metadata table, keeping pickle version")
 
                 except Exception as e:
                     logging.error("Could not load previous state for unexpected reason:")

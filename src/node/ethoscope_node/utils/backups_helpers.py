@@ -11,11 +11,14 @@ import urllib.error
 import urllib.parse
 import json
 import threading
+import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Union, Iterator, Tuple
 import hashlib
+import fcntl
+import tempfile
 
 
 @dataclass
@@ -40,6 +43,105 @@ class BackupStatus:
 class BackupError(Exception):
     """Custom exception for backup operations."""
     pass
+
+
+class BackupLockError(Exception):
+    """Exception raised when backup file is locked by another process."""
+    pass
+
+
+@contextmanager
+def backup_file_lock(backup_path: str):
+    """
+    File locking context manager to prevent concurrent backup operations
+    on the same SQLite database file.
+    """
+    lock_file_path = f"{backup_path}.lock"
+    lock_file = None
+    
+    try:
+        # Create lock file directory if it doesn't exist
+        os.makedirs(os.path.dirname(lock_file_path), exist_ok=True)
+        
+        # Open lock file for writing
+        lock_file = open(lock_file_path, 'w')
+        
+        # Try to acquire exclusive lock (non-blocking)
+        try:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except (IOError, OSError) as e:
+            raise BackupLockError(f"Cannot acquire lock for {backup_path}: {e}")
+        
+        # Write process info to lock file
+        lock_file.write(f"PID: {os.getpid()}\nTimestamp: {datetime.datetime.now()}\n")
+        lock_file.flush()
+        
+        yield lock_file
+        
+    finally:
+        if lock_file:
+            try:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                lock_file.close()
+                # Remove lock file
+                if os.path.exists(lock_file_path):
+                    os.unlink(lock_file_path)
+            except (IOError, OSError):
+                pass  # Ignore cleanup errors
+
+
+def get_backup_completion_file(backup_path: str) -> str:
+    """Get the path to the backup completion marker file."""
+    return f"{backup_path}.completed"
+
+
+def is_backup_recent(backup_path: str, max_age_hours: int = 1) -> bool:
+    """
+    Check if a successful backup was completed recently.
+    
+    Args:
+        backup_path: Path to the backup file
+        max_age_hours: Maximum age in hours to consider backup recent
+        
+    Returns:
+        bool: True if recent successful backup exists
+    """
+    completion_file = get_backup_completion_file(backup_path)
+    
+    if not os.path.exists(completion_file):
+        return False
+    
+    try:
+        completion_time = os.path.getmtime(completion_file)
+        age_hours = (time.time() - completion_time) / 3600
+        return age_hours < max_age_hours
+    except (OSError, IOError):
+        return False
+
+
+def mark_backup_completed(backup_path: str, stats: dict = None):
+    """
+    Mark a backup as successfully completed.
+    
+    Args:
+        backup_path: Path to the backup file
+        stats: Optional backup statistics to store
+    """
+    completion_file = get_backup_completion_file(backup_path)
+    
+    try:
+        completion_data = {
+            'completed_at': datetime.datetime.now().isoformat(),
+            'backup_file': backup_path,
+            'file_size': os.path.getsize(backup_path) if os.path.exists(backup_path) else 0,
+            'stats': stats or {}
+        }
+        
+        with open(completion_file, 'w') as f:
+            json.dump(completion_data, f, indent=2)
+            
+    except (OSError, IOError) as e:
+        logging.warning(f"Could not create completion marker for {backup_path}: {e}")
 
 
 class BaseBackupClass:
@@ -77,6 +179,10 @@ class BackupClass(BaseBackupClass):
         "password": "ethoscope"
     }
     
+    # Database connection timeout (seconds)
+    DB_CONNECTION_TIMEOUT = 30
+    DB_OPERATION_TIMEOUT = 120
+    
     def __init__(self, device_info: Dict, results_dir: str):
         super().__init__(device_info, results_dir)
         self._database_ip = os.path.basename(self._ip)
@@ -84,45 +190,61 @@ class BackupClass(BaseBackupClass):
     def backup(self) -> Iterator[str]:
         """
         Performs database backup with improved error handling and status reporting.
+        Uses MySQLdbToSQLite's built-in max(id) incremental backup approach.
         
         Yields:
             str: JSON-encoded status messages with progress updates
         """
+        start_time = time.time()
+        
         try:
+            self._logger.info(f"[{self._device_id}] === DATABASE BACKUP STARTING ===")
             yield self._yield_status("info", f"Backup initiated for device {self._device_id}")
             
             # Validate backup path
+            self._logger.info(f"[{self._device_id}] Validating backup path...")
             backup_path = self._get_backup_path()
             db_name = f"{self._device_name}_db"
             
+            self._logger.info(f"[{self._device_id}] Backup path validated: {backup_path}")
             yield self._yield_status(
                 "info", 
                 f"Preparing to back up database '{db_name}' to {backup_path}"
             )
             
-            # Perform backup
-            success = self._perform_database_backup(backup_path, db_name)
+            # Perform incremental backup using MySQLdbToSQLite's built-in max(id) logic
+            self._logger.info(f"[{self._device_id}] Starting incremental database backup (max ID approach)...")
+            success, backup_stats = self._perform_database_backup(backup_path, db_name)
+            
+            elapsed_time = time.time() - start_time
             
             if success:
-                yield self._yield_status("success", f"Backup completed successfully for device {self._device_id}")
+                self._logger.info(f"[{self._device_id}] === DATABASE BACKUP COMPLETED SUCCESSFULLY in {elapsed_time:.1f}s ===")
+                yield self._yield_status("success", f"Backup completed successfully for device {self._device_id} in {elapsed_time:.1f}s")
                 return True
             else:
-                yield self._yield_status("error", f"Backup failed for device {self._device_id}")
+                self._logger.error(f"[{self._device_id}] === DATABASE BACKUP FAILED after {elapsed_time:.1f}s ===")
+                yield self._yield_status("error", f"Backup failed for device {self._device_id} after {elapsed_time:.1f}s")
                 return False
                 
         except DBNotReadyError as e:
-            warning_msg = f"Database not ready for device {self._device_id}, will retry later"
-            self._logger.warning(f"{warning_msg}: {e}")
+            elapsed_time = time.time() - start_time
+            warning_msg = f"Database not ready for device {self._device_id}, will retry later (after {elapsed_time:.1f}s)"
+            self._logger.warning(f"[{self._device_id}] {warning_msg}: {e}")
             yield self._yield_status("warning", warning_msg)
             return False
             
         except BackupError as e:
-            yield self._yield_status("error", str(e))
+            elapsed_time = time.time() - start_time
+            self._logger.error(f"[{self._device_id}] BackupError after {elapsed_time:.1f}s: {e}")
+            yield self._yield_status("error", f"Backup error after {elapsed_time:.1f}s: {str(e)}")
             return False
             
         except Exception as e:
-            error_msg = f"Unexpected error during backup for device {self._device_id}: {str(e)}"
-            self._logger.error(traceback.format_exc())
+            elapsed_time = time.time() - start_time
+            error_msg = f"Unexpected error during backup for device {self._device_id} after {elapsed_time:.1f}s: {str(e)}"
+            self._logger.error(f"[{self._device_id}] {error_msg}")
+            self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
             yield self._yield_status("error", error_msg)
             return False
     
@@ -142,10 +264,18 @@ class BackupClass(BaseBackupClass):
         
         return full_backup_path
     
-    def _perform_database_backup(self, backup_path: str, db_name: str) -> bool:
-        """Perform the actual database backup operation."""
+    def _perform_database_backup(self, backup_path: str, db_name: str) -> Tuple[bool, dict]:
+        """
+        Perform the actual database backup operation using MySQLdbToSQLite's 
+        built-in incremental max(id) approach to prevent duplicates.
+        """
+        backup_stats = {}
+        
         try:
-            # Initialize MySQL to SQLite mirror
+            self._logger.info(f"[{self._device_id}] Initializing MySQL to SQLite mirror connection...")
+            self._logger.info(f"[{self._device_id}] Target: {backup_path}, DB: {db_name}, Host: {self._database_ip}")
+            
+            # Initialize MySQL to SQLite mirror (handles incremental updates automatically)
             mirror = MySQLdbToSQLite(
                 backup_path,
                 db_name,
@@ -153,18 +283,32 @@ class BackupClass(BaseBackupClass):
                 remote_user=self.DB_CREDENTIALS["user"],
                 remote_pass=self.DB_CREDENTIALS["password"]
             )
+            self._logger.info(f"[{self._device_id}] MySQL mirror initialized successfully")
             
-            # Update ROI tables
+            # Update ROI tables using built-in max(id) incremental logic
+            self._logger.info(f"[{self._device_id}] Starting incremental ROI tables update (max ID approach)...")
             mirror.update_roi_tables()
+            self._logger.info(f"[{self._device_id}] Incremental ROI tables update completed")
             
             # Verify backup integrity
+            self._logger.info(f"[{self._device_id}] Starting database comparison...")
             comparison_status = mirror.compare_databases()
-            self._logger.info(f"Database comparison: {comparison_status:.2f}% match")
+            self._logger.info(f"[{self._device_id}] Database comparison: {comparison_status:.2f}% match")
             
-            return comparison_status > 0  # Consider any positive match as success
+            backup_stats['comparison_percentage'] = comparison_status
+            backup_stats['backup_success'] = comparison_status > 0
+            
+            if comparison_status > 0:
+                self._logger.info(f"[{self._device_id}] Incremental database backup successful (match: {comparison_status:.2f}%)")
+            else:
+                self._logger.warning(f"[{self._device_id}] Database backup may have issues (match: {comparison_status:.2f}%)")
+            
+            return comparison_status > 0, backup_stats
             
         except Exception as e:
-            self._logger.error(f"Database backup failed: {e}")
+            backup_stats['error'] = str(e)
+            self._logger.error(f"[{self._device_id}] Database backup failed: {e}")
+            self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
             raise BackupError(f"Database backup failed: {e}")
     
     def check_sync_status(self) -> Dict:
@@ -194,21 +338,30 @@ class VideoBackupClass(BaseBackupClass):
         Yields:
             str: JSON-encoded status messages with detailed progress updates
         """
+        start_time = time.time()
         try:
+            self._logger.info(f"[{self._device_id}] === VIDEO BACKUP STARTING ===")
+            self._logger.info(f"[{self._device_id}] Device URL: {self._device_url}")
             yield self._yield_status("info", f"Video backup initiated for device {self._device_id}")
             
             # Get video list
+            self._logger.info(f"[{self._device_id}] Retrieving video list...")
             video_list = self._get_video_list()
             if not video_list:
+                self._logger.info(f"[{self._device_id}] No videos found for download")
                 yield self._yield_status("warning", f"No videos to download for device {self._device_id}")
                 return True
+            
+            self._logger.info(f"[{self._device_id}] Found {len(video_list)} videos to download")
             
             # Download videos
             success_count = 0
             total_videos = len(video_list)
             
             for count, video_path in enumerate(video_list, start=1):
+                video_start_time = time.time()
                 try:
+                    self._logger.info(f"[{self._device_id}] Starting download {count}/{total_videos}: {video_path}")
                     yield self._yield_status(
                         "info", 
                         f"Downloading video {os.path.basename(video_path)} ({count}/{total_videos})"
@@ -217,25 +370,36 @@ class VideoBackupClass(BaseBackupClass):
                     self._download_video(video_path)
                     success_count += 1
                     
+                    video_elapsed = time.time() - video_start_time
+                    self._logger.info(f"[{self._device_id}] Completed download {count}/{total_videos} in {video_elapsed:.1f}s: {video_path}")
+                    
                 except Exception as e:
-                    error_msg = f"Error downloading video {video_path}: {e}"
-                    self._logger.warning(error_msg)
+                    video_elapsed = time.time() - video_start_time
+                    error_msg = f"Error downloading video {video_path} after {video_elapsed:.1f}s: {e}"
+                    self._logger.warning(f"[{self._device_id}] {error_msg}")
+                    self._logger.warning(f"[{self._device_id}] Video download traceback:", exc_info=True)
                     yield self._yield_status("error", error_msg)
+            
+            elapsed_time = time.time() - start_time
             
             # Report final status
             if success_count == total_videos:
-                yield self._yield_status("success", f"All {total_videos} videos downloaded successfully")
+                self._logger.info(f"[{self._device_id}] === VIDEO BACKUP COMPLETED SUCCESSFULLY: {total_videos}/{total_videos} videos in {elapsed_time:.1f}s ===")
+                yield self._yield_status("success", f"All {total_videos} videos downloaded successfully in {elapsed_time:.1f}s")
             else:
+                self._logger.warning(f"[{self._device_id}] === VIDEO BACKUP PARTIALLY COMPLETED: {success_count}/{total_videos} videos in {elapsed_time:.1f}s ===")
                 yield self._yield_status(
                     "warning", 
-                    f"Downloaded {success_count}/{total_videos} videos successfully"
+                    f"Downloaded {success_count}/{total_videos} videos successfully in {elapsed_time:.1f}s"
                 )
             
             return success_count > 0
             
         except Exception as e:
-            error_msg = f"Unexpected error during video backup for device {self._device_id}: {e}"
-            self._logger.error(traceback.format_exc())
+            elapsed_time = time.time() - start_time
+            error_msg = f"Unexpected error during video backup for device {self._device_id} after {elapsed_time:.1f}s: {e}"
+            self._logger.error(f"[{self._device_id}] {error_msg}")
+            self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
             yield self._yield_status("error", error_msg)
             return False
     
@@ -259,8 +423,15 @@ class VideoBackupClass(BaseBackupClass):
     def _download_video(self, video_path: str):
         """Download a single video file."""
         try:
+            self._logger.info(f"[{self._device_id}] Starting download of video: {video_path}")
+            self._logger.info(f"[{self._device_id}] Target URL: {self._static_url}, Output dir: {self._results_dir}")
+            
             get_and_hash(video_path, target_prefix=self._static_url, output_dir=self._results_dir)
+            
+            self._logger.info(f"[{self._device_id}] Successfully downloaded video: {video_path}")
         except Exception as e:
+            self._logger.error(f"[{self._device_id}] Failed to download video {video_path}: {e}")
+            self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
             raise BackupError(f"Failed to download video {video_path}: {e}")
     
     def get_video_list_json(self) -> Optional[Dict[str, Dict[str, str]]]:
@@ -273,19 +444,26 @@ class VideoBackupClass(BaseBackupClass):
         video_list_url = f"{self._device_url}/list_video_files"
         
         try:
+            self._logger.info(f"[{self._device_id}] Requesting video list from: {video_list_url}")
+            self._logger.info(f"[{self._device_id}] Request timeout: {self.REQUEST_TIMEOUT}s")
+            
             with urllib.request.urlopen(video_list_url, timeout=self.REQUEST_TIMEOUT) as response:
-                return json.load(response)
+                self._logger.info(f"[{self._device_id}] Received response from video list API")
+                video_data = json.load(response)
+                self._logger.info(f"[{self._device_id}] Parsed JSON response with {len(video_data) if video_data else 0} videos")
+                return video_data
                 
         except urllib.error.HTTPError as e:
-            self._logger.warning(f"HTTP error getting JSON video list: {e}")
+            self._logger.warning(f"[{self._device_id}] HTTP error getting JSON video list from {video_list_url}: {e}")
             return None
             
         except json.JSONDecodeError as e:
-            self._logger.warning(f"JSON decode error: {e}")
+            self._logger.warning(f"[{self._device_id}] JSON decode error from {video_list_url}: {e}")
             return None
             
         except Exception as e:
-            self._logger.error(f"Unexpected error getting JSON video list: {e}")
+            self._logger.error(f"[{self._device_id}] Unexpected error getting JSON video list from {video_list_url}: {e}")
+            self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
             return None
     
     # Make this an alias for external compatibility
@@ -343,17 +521,26 @@ class VideoBackupClass(BaseBackupClass):
         Returns:
             list: Video file names or None if failed
         """
-        if generate_first:
-            self._generate_remote_index_html()
-        
-        video_list_url = f"{self._static_url}/{index_file}"
-        
         try:
+            if generate_first:
+                self._logger.info(f"[{self._device_id}] Generating remote index HTML first...")
+                if not self._generate_remote_index_html():
+                    self._logger.warning(f"[{self._device_id}] Failed to generate remote index, continuing anyway...")
+            
+            video_list_url = f"{self._static_url}/{index_file}"
+            self._logger.info(f"[{self._device_id}] Requesting HTML video list from: {video_list_url}")
+            
             with urllib.request.urlopen(video_list_url, timeout=self.REQUEST_TIMEOUT) as response:
-                return [line.decode('utf-8').strip() for line in response]
+                video_lines = [line.decode('utf-8').strip() for line in response]
+                self._logger.info(f"[{self._device_id}] Retrieved {len(video_lines)} video entries from HTML")
+                return video_lines
                 
         except urllib.error.HTTPError as e:
-            self._logger.warning(f"Could not get HTML video list from {video_list_url}: {e}")
+            self._logger.warning(f"[{self._device_id}] Could not get HTML video list from {video_list_url}: {e}")
+            return None
+        except Exception as e:
+            self._logger.error(f"[{self._device_id}] Unexpected error getting HTML video list from {video_list_url}: {e}")
+            self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
             return None
     
     # Make this an alias for external compatibility  
@@ -363,10 +550,13 @@ class VideoBackupClass(BaseBackupClass):
         """Ask the remote ethoscope to generate an index file."""
         try:
             index_url = f"{self._device_url}/make_index"
-            with urllib.request.urlopen(index_url, timeout=self.REQUEST_TIMEOUT):
+            self._logger.info(f"[{self._device_id}] Requesting index generation from: {index_url}")
+            
+            with urllib.request.urlopen(index_url, timeout=self.REQUEST_TIMEOUT) as response:
+                self._logger.info(f"[{self._device_id}] Index generation request successful")
                 return True
         except Exception as e:
-            self._logger.warning(f"Could not generate remote index: {e}")
+            self._logger.warning(f"[{self._device_id}] Could not generate remote index from {index_url}: {e}")
             return False
     
     def remove_remote_video(self, target: str) -> bool:
@@ -424,10 +614,14 @@ class GenericBackupWrapper(threading.Thread):
         self.backup_status: Dict[str, BackupStatus] = {}
         self.last_backup = ""
         
+        # Remove retry throttling - incremental backups are safe to run frequently
+        
         # Configuration
         self._backup_interval = self.DEFAULT_BACKUP_INTERVAL
         
-        self._logger = logging.getLogger(self.__class__.__name__)
+        self._logger = logging.getLogger(f"BackupWrapper.{self.__class__.__name__}")
+        # Ensure logs go to root logger as well
+        self._logger.propagate = True
     
     def find_devices(self, only_active: bool = True) -> List[Dict]:
         """
@@ -439,48 +633,99 @@ class GenericBackupWrapper(threading.Thread):
         Returns:
             list: Available device information
         """
+        self._logger.info("Starting device discovery...")
         devices = {}
         
         try:
+            self._logger.info(f"Attempting to get devices from node at {self._node_address}")
             devices = self._get_devices_from_node()
+            self._logger.info(f"Successfully retrieved {len(devices)} devices from node")
         except Exception as e:
             self._logger.warning(f"Could not get devices from node: {e}")
-            devices = self._get_devices_via_scanner()
+            self._logger.info("Falling back to direct device scanning...")
+            try:
+                devices = self._get_devices_via_scanner()
+                self._logger.info(f"Scanner found {len(devices)} devices")
+            except Exception as scanner_error:
+                self._logger.error(f"Scanner also failed: {scanner_error}")
+                return []
         
         if only_active:
-            return [
+            active_devices = [
                 device for device in devices.values() 
                 if (device.get("status") not in ["not_in_use", "offline"] and 
                     device.get("name") != "ETHOSCOPE_000")
             ]
+            self._logger.info(f"Filtered to {len(active_devices)} active devices")
+            return active_devices
         
-        return list(devices.values())
+        all_devices = list(devices.values())
+        self._logger.info(f"Returning all {len(all_devices)} devices")
+        return all_devices
     
     def _get_devices_from_node(self) -> Dict:
         """Get devices from node server."""
         url = f"http://{self._node_address}/devices"
         
         try:
+            self._logger.info(f"Making request to node server: {url}")
+            self._logger.info(f"Request timeout: {self.DEFAULT_DEVICE_SCAN_TIMEOUT}s")
+            
             req = urllib.request.Request(url, headers={'Content-Type': 'application/json'})
             with urllib.request.urlopen(req, timeout=self.DEFAULT_DEVICE_SCAN_TIMEOUT) as response:
-                return json.load(response)
+                self._logger.info(f"Received response from node server (status: {response.status})")
+                devices = json.load(response)
+                self._logger.info(f"Successfully parsed JSON response with {len(devices)} devices")
+                return devices
+        except urllib.error.HTTPError as e:
+            self._logger.error(f"HTTP error from node {self._node_address}: {e.code} {e.reason}")
+            raise
+        except urllib.error.URLError as e:
+            self._logger.error(f"URL error connecting to node {self._node_address}: {e.reason}")
+            raise
+        except json.JSONDecodeError as e:
+            self._logger.error(f"JSON decode error from node {self._node_address}: {e}")
+            raise
         except Exception as e:
-            self._logger.error(f"Failed to get devices from node {self._node_address}: {e}")
+            self._logger.error(f"Unexpected error getting devices from node {self._node_address}: {e}")
+            self._logger.error("Full traceback:", exc_info=True)
             raise
     
     def _get_devices_via_scanner(self) -> Dict:
         """Get devices via direct scanning as fallback."""
         self._logger.info("Using EthoscopeScanner as fallback")
         
-        scanner = EthoscopeScanner()
-        scanner.start()
-        
         try:
+            self._logger.info("Creating EthoscopeScanner instance...")
+            scanner = EthoscopeScanner()
+            
+            self._logger.info("Starting EthoscopeScanner...")
+            scanner.start()
+            
+            self._logger.info(f"Waiting {self.DEFAULT_DEVICE_SCAN_TIMEOUT} seconds for device discovery...")
             time.sleep(self.DEFAULT_DEVICE_SCAN_TIMEOUT)
-            return scanner.get_all_devices_info()
+            
+            self._logger.info("Retrieving discovered devices...")
+            devices = scanner.get_all_devices_info()
+            self._logger.info(f"Scanner discovered {len(devices)} devices")
+            
+            return devices
+            
+        except Exception as e:
+            self._logger.error(f"EthoscopeScanner failed: {e}")
+            self._logger.error("Full traceback:", exc_info=True)
+            raise
         finally:
-            scanner.stop() if hasattr(scanner, 'stop') else None
-            del scanner
+            try:
+                self._logger.info("Stopping EthoscopeScanner...")
+                if hasattr(scanner, 'stop'):
+                    scanner.stop()
+                    self._logger.info("EthoscopeScanner stopped successfully")
+                else:
+                    self._logger.warning("EthoscopeScanner does not have stop method")
+                del scanner
+            except Exception as cleanup_error:
+                self._logger.error(f"Error during scanner cleanup: {cleanup_error}")
     
     def initiate_backup_job(self, device_info: Dict) -> bool:
         """
@@ -493,30 +738,54 @@ class GenericBackupWrapper(threading.Thread):
             bool: True if backup completed successfully
         """
         device_id = device_info.get('id', 'unknown')
+        device_name = device_info.get('name', 'unknown')
+        device_ip = device_info.get('ip', 'unknown')
+        device_status = device_info.get('status', 'unknown')
+        
+        job_start_time = time.time()
         
         try:
-            self._logger.info(f"Initiating backup for device {device_id}")
+            self._logger.info(f"=== INITIATING BACKUP JOB for {device_name} (ID: {device_id}) ===")
+            self._logger.info(f"Device details: IP={device_ip}, Status={device_status}, Video={self._is_video_backup}")
+            
+            # Incremental backups are safe - no need to throttle retry attempts
             
             # Create appropriate backup job
             if self._is_video_backup:
+                self._logger.info(f"Creating VideoBackupClass for device {device_id}")
                 backup_job = VideoBackupClass(device_info, self._results_dir)
             else:
+                self._logger.info(f"Creating BackupClass (database) for device {device_id}")
                 backup_job = BackupClass(device_info, self._results_dir)
             
+            self._logger.info(f"Backup job object created successfully for device {device_id}")
+            
             # Initialize backup status
+            self._logger.info(f"Initializing backup status for device {device_id}")
             self._initialize_backup_status(device_id, device_info)
             
             # Perform backup with real-time status updates
+            self._logger.info(f"Starting backup execution for device {device_id}")
             success = self._execute_backup_job(device_id, backup_job)
             
+            job_elapsed_time = time.time() - job_start_time
+            
             # Update final status
+            self._logger.info(f"Finalizing backup status for device {device_id} (success={success}, elapsed={job_elapsed_time:.1f}s)")
             self._finalize_backup_status(device_id, backup_job, success)
+            
+            if success:
+                self._logger.info(f"=== BACKUP JOB COMPLETED SUCCESSFULLY for {device_name} in {job_elapsed_time:.1f}s ===")
+            else:
+                self._logger.error(f"=== BACKUP JOB FAILED for {device_name} after {job_elapsed_time:.1f}s ===")
             
             return success
             
         except Exception as e:
+            job_elapsed_time = time.time() - job_start_time
+            self._logger.error(f"=== BACKUP JOB CRASHED for {device_name} after {job_elapsed_time:.1f}s ===")
             self._logger.error(f"Backup job failed for device {device_id}: {e}")
-            self._logger.error(traceback.format_exc())
+            self._logger.error("Full traceback:", exc_info=True)
             self._handle_backup_failure(device_id, str(e))
             return False
     
@@ -579,26 +848,48 @@ class GenericBackupWrapper(threading.Thread):
         """
         Main backup loop with improved error handling and resource management.
         """
-        self._logger.info(f"Starting backup wrapper with {self._max_threads} max threads")
+        # Log thread startup with multiple loggers to ensure visibility
+        logging.info("=== BACKUP WRAPPER THREAD STARTING ===")
+        self._logger.info(f"=== BACKUP WRAPPER THREAD STARTING ===")
+        self._logger.info(f"Configuration: max_threads={self._max_threads}, interval={self._backup_interval}s, video_backup={self._is_video_backup}")
+        logging.info(f"Configuration: max_threads={self._max_threads}, interval={self._backup_interval}s, video_backup={self._is_video_backup}")
         
-        with ThreadPoolExecutor(max_workers=self._max_threads, 
-                              thread_name_prefix="BackupWorker") as executor:
-            
-            while not self._stop_event.is_set():
-                try:
-                    self._execute_backup_cycle(executor)
-                except Exception as e:
-                    self._logger.error(f"Error in backup cycle: {e}")
-                    self._logger.error(traceback.format_exc())
+        try:
+            with ThreadPoolExecutor(max_workers=self._max_threads, 
+                                  thread_name_prefix="BackupWorker") as executor:
                 
-                # Wait for next cycle or stop event
-                self._stop_event.wait(self._backup_interval)
+                cycle_count = 0
+                while not self._stop_event.is_set():
+                    cycle_count += 1
+                    logging.info(f"=== Starting backup cycle #{cycle_count} ===")
+                    self._logger.info(f"=== Starting backup cycle #{cycle_count} ===")
+                    
+                    try:
+                        self._execute_backup_cycle(executor)
+                        logging.info(f"=== Backup cycle #{cycle_count} completed successfully ===")
+                        self._logger.info(f"=== Backup cycle #{cycle_count} completed successfully ===")
+                    except Exception as e:
+                        logging.error(f"=== ERROR in backup cycle #{cycle_count}: {e} ===")
+                        self._logger.error(f"=== ERROR in backup cycle #{cycle_count}: {e} ===")
+                        self._logger.error("Full traceback:", exc_info=True)
+                    
+                    if not self._stop_event.is_set():
+                        self._logger.info(f"Waiting {self._backup_interval} seconds until next cycle...")
+                        # Wait for next cycle or stop event
+                        self._stop_event.wait(self._backup_interval)
+                    
+        except Exception as e:
+            self._logger.error(f"=== BACKUP WRAPPER THREAD CRASHED: {e} ===")
+            self._logger.error("Full traceback:", exc_info=True)
+        finally:
+            self._logger.info("=== BACKUP WRAPPER THREAD ENDING ===")
     
     def _execute_backup_cycle(self, executor: ThreadPoolExecutor):
         """Execute a single backup cycle."""
-        self._logger.info("Starting backup cycle")
+        self._logger.info("=== Starting backup cycle ====")
         
         try:
+            self._logger.info("Discovering active devices...")
             active_devices = self.find_devices()
             if not active_devices:
                 self._logger.info("No devices found for backup")
@@ -606,29 +897,52 @@ class GenericBackupWrapper(threading.Thread):
                 return
             
             self._logger.info(f"Found {len(active_devices)} devices for backup")
+            for device in active_devices:
+                device_name = device.get('name', 'unknown')
+                device_status = device.get('status', 'unknown')
+                self._logger.info(f"  - {device_name} (status: {device_status})")
             
         except Exception as e:
             self._logger.error(f"Could not get device list: {e}")
+            self._logger.error("Full traceback:", exc_info=True)
             return
         
         # Submit backup jobs
+        self._logger.info("Submitting backup jobs to thread pool...")
         futures = []
         for device in active_devices:
             try:
+                device_id = device.get('id', 'unknown')
+                device_name = device.get('name', 'unknown')
+                self._logger.info(f"Submitting backup job for device {device_name} (ID: {device_id})")
+                
                 future = executor.submit(self.initiate_backup_job, device)
-                futures.append((future, device.get('id', 'unknown')))
+                futures.append((future, device_id, device_name))
+                
             except Exception as e:
                 self._logger.error(f"Failed to submit backup job for {device}: {e}")
+                self._logger.error("Full traceback:", exc_info=True)
+        
+        self._logger.info(f"Submitted {len(futures)} backup jobs to thread pool")
         
         # Wait for completion with timeout handling
-        for future, device_id in futures:
+        self._logger.info("Waiting for backup jobs to complete...")
+        for future, device_id, device_name in futures:
             try:
+                self._logger.info(f"Waiting for backup completion: {device_name} (ID: {device_id})")
                 # Wait for completion with a timeout
                 future.result(timeout=600)  # 10 minute timeout per job
+                self._logger.info(f"Backup completed successfully: {device_name} (ID: {device_id})")
+                
+            except concurrent.futures.TimeoutError:
+                self._logger.error(f"Backup job timed out (600s) for device {device_name} (ID: {device_id})")
             except Exception as e:
-                self._logger.error(f"Backup job failed for device {device_id}: {e}")
+                self._logger.error(f"Backup job failed for device {device_name} (ID: {device_id}): {e}")
+                self._logger.error("Full traceback:", exc_info=True)
         
+        self._logger.info("All backup jobs completed or timed out")
         self._update_last_backup_time()
+        self._logger.info("=== Backup cycle completed ====")
     
     def _update_last_backup_time(self):
         """Update last backup timestamp."""
