@@ -879,10 +879,19 @@ class Ethoscope(BaseDevice):
         if previous_status == "offline" and new_status != "offline":
             self._handle_device_coming_online()
         
-        # Only update backup path if status changed or backup_path is None
+        # Check if backup_filename from API response has changed
+        current_backup_filename = self._info.get("backup_filename")
+        previous_backup_filename = getattr(self, '_last_backup_filename', None)
+        backup_filename_changed = (current_backup_filename != previous_backup_filename and 
+                                 current_backup_filename is not None)
+        
+        # Update backup path if status changed, backup_path is None, or backup_filename changed
         if (previous_status != new_status or 
-            self._info.get("backup_path") is None):
+            self._info.get("backup_path") is None or
+            backup_filename_changed):
             self._make_backup_path()
+            # Track the backup_filename used for this backup_path
+            self._last_backup_filename = current_backup_filename
         
         self._handle_state_transition(previous_status, new_status)
         self._update_backup_status_from_database_info()

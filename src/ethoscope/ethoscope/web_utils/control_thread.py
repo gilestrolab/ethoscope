@@ -823,14 +823,13 @@ class ControlThread(Thread):
             )
             cursor = conn.cursor()
             
-            # Query the metadata table for the latest backup filename
-            cursor.execute("SELECT backup_filename, date_time FROM METADATA ORDER BY date_time DESC LIMIT 1")
+            # Query the metadata table for the backup filename
+            cursor.execute("SELECT DISTINCT value FROM METADATA WHERE field = 'backup_filename' AND value IS NOT NULL")
             result = cursor.fetchone()
             
             if result:
-                backup_filename, experiment_time = result
+                backup_filename = result[0]
                 logging.info(f"Found existing backup filename from metadata: {backup_filename}")
-                logging.info(f"Original experiment time: {experiment_time}")
                 return backup_filename
             else:
                 logging.info("No existing backup filename found in metadata table")
