@@ -531,7 +531,7 @@ class PiFrameGrabber2(PiFrameGrabber):
 
         from picamera2 import Picamera2, MappedArray
 
-        Picamera2.set_logging(Picamera2.ERROR)
+        Picamera2.set_logging(logging.ERROR)
 
         with Picamera2() as capture:
            
