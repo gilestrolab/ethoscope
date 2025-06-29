@@ -889,7 +889,8 @@ class Ethoscope(BaseDevice):
         if (previous_status != new_status or 
             self._info.get("backup_path") is None or
             backup_filename_changed):
-            self._make_backup_path()
+            # Force recalculation if backup filename changed
+            self._make_backup_path(force_recalculate=backup_filename_changed)
             # Track the backup_filename used for this backup_path
             self._last_backup_filename = current_backup_filename
         
@@ -1061,11 +1062,11 @@ class Ethoscope(BaseDevice):
         
         self._last_db_info = time.time()
     
-    def _make_backup_path(self, timeout: float = 30):
+    def _make_backup_path(self, timeout: float = 30, force_recalculate: bool = False):
         """Create backup path for the device."""
         try:
-            # Skip if backup path is already set and valid
-            if self._info.get("backup_path") is not None:
+            # Skip if backup path is already set and valid (unless forced)
+            if self._info.get("backup_path") is not None and not force_recalculate:
                 return
             
             # Case 1: Device has backup filename (regardless of status)
