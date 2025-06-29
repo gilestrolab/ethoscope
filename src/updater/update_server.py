@@ -3,6 +3,7 @@ import logging
 import traceback
 import os
 import socket
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from optparse import OptionParser
 from helpers import assert_node, WrongMachineID
@@ -78,6 +79,79 @@ def handle_node_daemon_restart():
             "device_id": "node",
             "error": str(e)
         }
+
+
+def process_device_update(device):
+    """Process update for a single device in parallel"""
+    try:
+        logging.info("Starting update for device {}".format(device['id']))
+        
+        # Update device via API
+        update_response = updates_api_wrapper(device['ip'], device['id'], what='device/update')
+        
+        # Restart daemon via API
+        restart_response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
+        
+        logging.info("Completed update for device {}".format(device['id']))
+        
+        return [update_response, restart_response]
+        
+    except Exception as e:
+        logging.error("Error processing device {}: {}".format(device['id'], str(e)))
+        error_response = {
+            "status": "error",
+            "device_id": device['id'],
+            "error": str(e)
+        }
+        return [error_response, error_response]
+
+
+def process_device_branch_switch(device, new_branch):
+    """Process branch switch for a single device in parallel"""
+    try:
+        logging.info("Starting branch switch for device {} to {}".format(device['id'], new_branch))
+        
+        # Switch branch via API
+        data_one_dev = {'new_branch': new_branch}
+        switch_response = updates_api_wrapper(device['ip'], device['id'], what='device/change_branch', data=data_one_dev)
+        
+        # Restart daemon via API
+        restart_response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
+        
+        logging.info("Completed branch switch for device {}".format(device['id']))
+        
+        return [switch_response, restart_response]
+        
+    except Exception as e:
+        logging.error("Error processing device {}: {}".format(device['id'], str(e)))
+        error_response = {
+            "status": "error",
+            "device_id": device['id'],
+            "error": str(e)
+        }
+        return [error_response, error_response]
+
+
+def process_device_restart(device):
+    """Process restart for a single device in parallel"""
+    try:
+        logging.info("Starting restart for device {}".format(device['id']))
+        
+        # Restart daemon via API
+        restart_response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
+        
+        logging.info("Completed restart for device {}".format(device['id']))
+        
+        return [restart_response]
+        
+    except Exception as e:
+        logging.error("Error processing device {}: {}".format(device['id'], str(e)))
+        error_response = {
+            "status": "error",
+            "device_id": device['id'],
+            "error": str(e)
+        }
+        return [error_response]
 
 
 app = bottle.Bottle()
@@ -249,50 +323,119 @@ def group(what):
         if not data or 'devices' not in data:
             return {'error': 'Missing required field: devices'}
         if what == ACTION_UPDATE:
-            for device in data["devices"]:
-                # Handle node updates locally, device updates via API
-                if device['id'] == 'node':
-                    # Update node locally
-                    response = handle_node_update()
-                    responses.append(response)
-                    
-                    # Handle node daemon restart locally
-                    response = handle_node_daemon_restart()
-                    responses.append(response)
-                else:
-                    # Update devices via API
-                    response = updates_api_wrapper(device['ip'], device['id'], what='device/update')
-                    responses.append(response)
-                    # Restart daemon via API
-                    response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
-                    responses.append(response)
-        elif what == ACTION_SWITCH_BRANCH:
-            for device in data["devices"]:
-                if device['id'] == 'node':
-                    # Handle node branch switching locally
-                    if 'new_branch' not in device:
-                        responses.append({'error': 'Missing new_branch for node device', 'device_id': 'node'})
-                        continue
-                    response = handle_node_branch_change(device['new_branch'])
-                    responses.append(response)
-                    
-                    # Handle node daemon restart locally
-                    response = handle_node_daemon_restart()
-                    responses.append(response)
-                else:
-                    data_one_dev = {'new_branch': device['new_branch']}
-                    response = updates_api_wrapper(device['ip'], device['id'], what='device/change_branch', data=data_one_dev)
-                    responses.append(response)
-                    # Restart daemon via API
-                    response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
-                    responses.append(response)
-        elif what == ACTION_RESTART:
-            for device in data["devices"]:
-                if device['id'] == 'node':
-                    response = handle_node_daemon_restart()
-                else:
-                    response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
+            # Separate node and devices for different processing
+            node_devices = [device for device in data["devices"] if device['id'] == 'node']
+            remote_devices = [device for device in data["devices"] if device['id'] != 'node']
+            
+            # Handle node updates locally (still sequential for node)
+            for device in node_devices:
+                response = handle_node_update()
                 responses.append(response)
+                
+                response = handle_node_daemon_restart()
+                responses.append(response)
+            
+            # Handle remote devices in parallel
+            if remote_devices:
+                logging.info("Starting parallel updates for {} devices".format(len(remote_devices)))
+                
+                with ThreadPoolExecutor(max_workers=len(remote_devices)) as executor:
+                    # Submit all device update tasks
+                    future_to_device = {
+                        executor.submit(process_device_update, device): device 
+                        for device in remote_devices
+                    }
+                    
+                    # Collect results as they complete
+                    for future in as_completed(future_to_device):
+                        device = future_to_device[future]
+                        try:
+                            device_responses = future.result()
+                            responses.extend(device_responses)
+                        except Exception as e:
+                            logging.error("Failed to update device {}: {}".format(device['id'], str(e)))
+                            error_response = {
+                                "status": "error",
+                                "device_id": device['id'],
+                                "error": str(e)
+                            }
+                            responses.append(error_response)
+        elif what == ACTION_SWITCH_BRANCH:
+            # Separate node and devices for different processing
+            node_devices = [device for device in data["devices"] if device['id'] == 'node']
+            remote_devices = [device for device in data["devices"] if device['id'] != 'node']
+            
+            # Handle node branch switching locally (still sequential for node)
+            for device in node_devices:
+                if 'new_branch' not in device:
+                    responses.append({'error': 'Missing new_branch for node device', 'device_id': 'node'})
+                    continue
+                response = handle_node_branch_change(device['new_branch'])
+                responses.append(response)
+                
+                response = handle_node_daemon_restart()
+                responses.append(response)
+            
+            # Handle remote devices in parallel
+            if remote_devices:
+                logging.info("Starting parallel branch switches for {} devices".format(len(remote_devices)))
+                
+                with ThreadPoolExecutor(max_workers=len(remote_devices)) as executor:
+                    # Submit all device branch switch tasks
+                    future_to_device = {
+                        executor.submit(process_device_branch_switch, device, device['new_branch']): device 
+                        for device in remote_devices if 'new_branch' in device
+                    }
+                    
+                    # Collect results as they complete
+                    for future in as_completed(future_to_device):
+                        device = future_to_device[future]
+                        try:
+                            device_responses = future.result()
+                            responses.extend(device_responses)
+                        except Exception as e:
+                            logging.error("Failed to switch branch for device {}: {}".format(device['id'], str(e)))
+                            error_response = {
+                                "status": "error",
+                                "device_id": device['id'],
+                                "error": str(e)
+                            }
+                            responses.append(error_response)
+        elif what == ACTION_RESTART:
+            # Separate node and devices for different processing
+            node_devices = [device for device in data["devices"] if device['id'] == 'node']
+            remote_devices = [device for device in data["devices"] if device['id'] != 'node']
+            
+            # Handle node restart locally
+            for device in node_devices:
+                response = handle_node_daemon_restart()
+                responses.append(response)
+            
+            # Handle remote devices in parallel
+            if remote_devices:
+                logging.info("Starting parallel restarts for {} devices".format(len(remote_devices)))
+                
+                with ThreadPoolExecutor(max_workers=len(remote_devices)) as executor:
+                    # Submit all device restart tasks
+                    future_to_device = {
+                        executor.submit(process_device_restart, device): device 
+                        for device in remote_devices
+                    }
+                    
+                    # Collect results as they complete
+                    for future in as_completed(future_to_device):
+                        device = future_to_device[future]
+                        try:
+                            device_responses = future.result()
+                            responses.extend(device_responses)
+                        except Exception as e:
+                            logging.error("Failed to restart device {}: {}".format(device['id'], str(e)))
+                            error_response = {
+                                "status": "error",
+                                "device_id": device['id'],
+                                "error": str(e)
+                            }
+                            responses.append(error_response)
         return {'response':responses}
 
     except Exception as e:
@@ -391,7 +534,7 @@ if __name__ == '__main__':
 
     except socket.error as e:
         logging.error(traceback.format_exc())
-        logging.error(f"Port {options.port} is probably not accessible for you. Maybe use another one e.g.`-p 8000`")
+        logging.error("Port {} is probably not accessible for you. Maybe use another one e.g.`-p 8000`".format(options.port))
 
     except Exception as e:
         logging.error(traceback.format_exc())

@@ -39,14 +39,11 @@
 
         $http.get('/bare/update').then(function(response) {
             var data = response.data;
-            console.log(data);
             if ('error' in data) {
                 $scope.system.error = data.error;
-                console.log($scope.system.isUpdated);
             } else {
                 $scope.system.isUpdated = true;
                 $scope.system.status = data;
-                console.log($scope.system.isUpdated);
             }
             $scope.spinner.stop();
             $scope.spinner = false;
@@ -67,7 +64,6 @@
             $scope.spinner_scan.stop();
             $scope.spinner_scan = false;
 
-            console.log($scope.devices);
         }).catch(function(error) {
             $scope.system.error = 'Failed to load devices: ' + (error.data && error.data.error ? error.data.error : error.statusText);
             $scope.spinner_scan.stop();
@@ -102,37 +98,30 @@
         });
 
         $scope.toggleAll = function() {
-            $scope.selected_devices = [];
-            
             // Valid states for updates (same as used in activate_modal)
             var validStates = ['stopped', 'NA', 'Software broken'];
 
-            angular.forEach($scope.devices, function(device) {
-                if (validStates.includes(device.status)) {
-                    device.selected = $scope.selectAll;
-                    if ($scope.selectAll) {
-                        $scope.selected_devices.push(device);
-                    }
+            // Use $evalAsync to ensure this runs after current digest cycle
+            $scope.$evalAsync(function() {
+                // PRESERVE the array reference - modify in place
+                
+                // First, clear all existing items (preserve reference)
+                $scope.selected_devices.splice(0, $scope.selected_devices.length);
+
+                if ($scope.selectAll) {
+                    // Add valid devices to the SAME array - must match the HTML filter condition
+                    angular.forEach($scope.devices, function(device) {
+                        // Match the HTML filter: (device.status == 'stopped' && device.up_to_date == false) || showAll
+                        var shouldInclude = (device.status == 'stopped' && device.up_to_date == false) || $scope.showAll;
+                        
+                        if (shouldInclude && validStates.includes(device.status)) {
+                            $scope.selected_devices.push(device);
+                        }
+                    });
                 }
             });
-
-            console.log('Selected devices length:', $scope.selected_devices.length);
         };
 
-        $scope.updateSelection = function(device) {
-            device.selected = !device.selected;
-            
-            if (device.selected) {
-                $scope.selected_devices.push(device);
-            } else {
-                const index = $scope.selected_devices.indexOf(device);
-                if (index > -1) {
-                    $scope.selected_devices.splice(index, 1);
-                }
-            }
-
-            console.log('Selected devices length:', $scope.selected_devices.length);
-        };
 
 
         //modal controller
@@ -187,12 +176,12 @@
                     confirmationMessage = 'Are you sure you want to switch branches on ' + devices.length + ' device(s)? This may affect running experiments.';
                     break;
             }
-            
+
             if (confirmationMessage && !confirm(confirmationMessage)) {
                 $("#Modal").modal('hide');
                 return; // User cancelled
             }
-            
+
             $("#Modal").modal('hide');
             spin("start");
             switch (action) {
@@ -203,8 +192,8 @@
                     url = '/group/restart';
                     break;
                 case 'swBranch':
-                    for (device in devices) {
-                        devices[device]['new_branch'] = $scope.modal.branch_to_switch;
+                    for (var i = 0; i < devices.length; i++) {
+                        devices[i]['new_branch'] = $scope.modal.branch_to_switch;
                     }
                     url = '/group/swBranch';
 
@@ -213,17 +202,53 @@
             data = {
                 "devices": devices
             };
-            $http.post(url, data)
+            
+            // Show better progress message
+            $scope.system.info = 'Processing ' + action + ' for ' + devices.length + ' device(s). This may take several minutes...';
+            $scope.system.error = ''; // Clear any previous errors
+            $scope.system.success = ''; // Clear any previous success messages
+            
+            // Configure longer timeout for update operations (10 minutes)
+            var config = {
+                timeout: 600000 // 10 minutes in milliseconds
+            };
+            
+            console.log('Starting', action, 'operation for', devices.length, 'devices');
+            
+            $http.post(url, data, config)
                 .then(function(response) {
+                    console.log('Operation completed successfully for', devices.length, 'devices');
                     var data = response.data;
                     var error = check_error(data);
                     $scope.update_result = data;
+                    $scope.system.info = ''; // Clear progress message
                     spin("stop");
                     if (!error) {
-                        $window.location.reload();
+                        $scope.system.success = 'Operation completed successfully!';
+                        // Delay reload to show success message
+                        $timeout(function() {
+                            $window.location.reload();
+                        }, 2000);
                     }
                 }).catch(function(error) {
-                    $scope.system.error = 'Operation failed: ' + (error.data && error.data.error ? error.data.error : error.statusText);
+                    console.log('Operation failed for', devices.length, 'devices:', error.statusText || 'Unknown error');
+                    $scope.system.info = ''; // Clear progress message
+                    
+                    // Better error handling for different types of failures
+                    var errorMessage = 'Operation failed: ';
+                    if (error.status === 504) {
+                        errorMessage += 'Gateway timeout - the operation may still be running. Please check device status manually.';
+                    } else if (error.status === 408 || error.status === -1) {
+                        errorMessage += 'Request timeout - the operation took too long. Please check if devices are accessible.';
+                    } else if (error.data && error.data.error) {
+                        errorMessage += error.data.error;
+                    } else if (error.statusText) {
+                        errorMessage += error.statusText;
+                    } else {
+                        errorMessage += 'Unknown error occurred';
+                    }
+                    
+                    $scope.system.error = errorMessage;
                     spin("stop");
                 });
         }
@@ -252,7 +277,6 @@
                 states_dic[states[i]] = "";
             }
 
-            var error = false;
             $scope.system.modal_error = "";
             if (devices.length == 0) {
                 $scope.system.modal_error = "No device selected. Please tick some boxes!";
@@ -262,7 +286,6 @@
 
             for (device in devices) {
                 if (!(devices[device]["status"] in states_dic)) {
-                    //console.log(devices[device]["status"])
                     $scope.system.modal_error = "One or more selected devices not one of: {" + states.join(", ") + "} ( so cannot be updated, remove them from the selection)."
                     return true;
 

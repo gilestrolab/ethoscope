@@ -44,8 +44,16 @@
                 <h2>{{spinner_text}}</h2>
             </div>
 
-            <div id="error" ng-if="system.error != null">
-                <p>{{system.error}}</p>
+            <div id="info" ng-if="system.info != null && system.info != ''" class="alert alert-info">
+                <p><i class="fa fa-info-circle"></i> {{system.info}}</p>
+            </div>
+            
+            <div id="success" ng-if="system.success != null && system.success != ''" class="alert alert-success">
+                <p><i class="fa fa-check-circle"></i> {{system.success}}</p>
+            </div>
+            
+            <div id="error" ng-if="system.error != null && system.error != ''" class="alert alert-danger">
+                <p><i class="fa fa-exclamation-triangle"></i> {{system.error}}</p>
             </div>
         </div>
 
@@ -110,7 +118,7 @@
                         <td>{{device.ip}}</td>
                         <td>{{device.id.substring(0,6)}}</td>
                         <td>
-                            <center><input type="checkbox" ng-disabled="device.status != 'stopped' " checklist-model="selected_devices" checklist-value="device" ng-checked="device.selected" ng-click="updateSelection(device)"></center>
+                            <center><input type="checkbox" ng-disabled="device.status != 'stopped' " checklist-model="selected_devices" checklist-value="device"></center>
                         </td>
                     </tr>
                 </tbody>
@@ -146,7 +154,7 @@
                             </thead>
                             <tbody>
 
-                                <tr ng-repeat="(id,device) in selected_devices">
+                                <tr ng-repeat="device in selected_devices track by device.id">
 
                                     <td>
                                         <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
