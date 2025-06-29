@@ -103,9 +103,12 @@
 
         $scope.toggleAll = function() {
             $scope.selected_devices = [];
+            
+            // Valid states for updates (same as used in activate_modal)
+            var validStates = ['stopped', 'NA', 'Software broken'];
 
             angular.forEach($scope.devices, function(device) {
-                if (device.status === 'stopped') {
+                if (validStates.includes(device.status)) {
                     device.selected = $scope.selectAll;
                     if ($scope.selectAll) {
                         $scope.selected_devices.push(device);
@@ -117,16 +120,17 @@
         };
 
         $scope.updateSelection = function(device) {
+            device.selected = !device.selected;
+            
             if (device.selected) {
+                $scope.selected_devices.push(device);
+            } else {
                 const index = $scope.selected_devices.indexOf(device);
                 if (index > -1) {
                     $scope.selected_devices.splice(index, 1);
                 }
-            } else {
-                $scope.selected_devices.push(device);
             }
 
-            device.selected = !device.selected;
             console.log('Selected devices length:', $scope.selected_devices.length);
         };
 
