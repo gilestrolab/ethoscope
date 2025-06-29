@@ -1059,19 +1059,18 @@ class Ethoscope(BaseDevice):
             if self._info.get("backup_path") is not None:
                 return
             
-            # Case 1: Device is stopped and has previous backup filename
+            # Case 1: Device has backup filename (regardless of status)
+            if ("backup_filename" in self._info and 
+                self._info["backup_filename"]):
+                filename = self._info["backup_filename"]
+                self._create_backup_path_from_filename(filename)
+                return
+            
+            # Case 2: Device is stopped and has previous backup filename (fallback)
             if (self._info["status"] == 'stopped' and 
                 "previous_backup_filename" in self._info and 
                 self._info["previous_backup_filename"]):
                 filename = self._info["previous_backup_filename"]
-                self._create_backup_path_from_filename(filename)
-                return
-            
-            # Case 2: Device is running/recording and has current backup filename
-            if (self._info["status"] != 'stopped' and 
-                "backup_filename" in self._info and 
-                self._info["backup_filename"]):
-                filename = self._info["backup_filename"]
                 self._create_backup_path_from_filename(filename)
                 return
             
