@@ -11,6 +11,75 @@ from helpers import get_commit_version, generate_new_device_map, updates_api_wra
 import updater
 
 
+class UnexpectedAction(Exception):
+    """Exception raised when an unexpected action is requested"""
+    pass
+
+
+# Action constants
+ACTION_UPDATE = "update"
+ACTION_SWITCH_BRANCH = "swBranch" 
+ACTION_RESTART = "restart"
+ACTION_CHECK_UPDATE = "check_update"
+ACTION_ACTIVE_BRANCH = "active_branch"
+ACTION_AVAILABLE_BRANCHES = "available_branches"
+ACTION_RESTART_DAEMON = "restart_daemon"
+ACTION_CHANGE_BRANCH = "change_branch"
+
+
+def handle_node_update():
+    """Handle local node update operation"""
+    try:
+        old_commit = ethoscope_updater.get_current_commit()
+        ethoscope_updater.update()
+        new_commit = ethoscope_updater.get_current_commit()
+        return {
+            "status": "success",
+            "device_id": "node",
+            "old_commit": get_commit_version(old_commit),
+            "new_commit": get_commit_version(new_commit)
+        }
+    except Exception as e:
+        return {
+            "status": "error", 
+            "device_id": "node",
+            "error": str(e)
+        }
+
+
+def handle_node_branch_change(new_branch):
+    """Handle local node branch change operation"""
+    try:
+        ethoscope_updater.change_branch(new_branch)
+        return {
+            "status": "success",
+            "device_id": "node",
+            "new_branch": new_branch
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "device_id": "node",
+            "error": str(e)
+        }
+
+
+def handle_node_daemon_restart():
+    """Handle local node daemon restart operation"""
+    try:
+        reload_node_daemon()
+        return {
+            "status": "daemon_restarted",
+            "device_id": "node"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "device_id": "node",
+            "error": str(e)
+        }
+
+
 app = bottle.Bottle()
 STATIC_DIR = "./static"
 
@@ -51,7 +120,7 @@ def device(action, id):
         raise WrongMachineID("Not the same ID")
     
     try:
-        if action == 'check_update':
+        if action == ACTION_CHECK_UPDATE:
             local_commit, origin_commit = ethoscope_updater.get_local_and_origin_commits()
             up_to_date = local_commit == origin_commit
             # @pepelisu you can get
@@ -61,14 +130,14 @@ def device(action, id):
                     "local_commit":get_commit_version(local_commit),
                     "origin_commit":get_commit_version(origin_commit)
                     }
-        if action == 'active_branch':
+        if action == ACTION_ACTIVE_BRANCH:
             return {"active_branch": str(ethoscope_updater.active_branch)}
             
-        if action == 'available_branches':
+        if action == ACTION_AVAILABLE_BRANCHES:
             return {"available_branches": str(ethoscope_updater.available_branches())}
 
 
-        if action == 'update':
+        if action == ACTION_UPDATE:
             old_commit, _= ethoscope_updater.get_local_and_origin_commits()
             ethoscope_updater.update_active_branch()
             new_commit, _= ethoscope_updater.get_local_and_origin_commits()
@@ -76,7 +145,7 @@ def device(action, id):
             return {"old_commit":get_commit_version(old_commit),
                     "new_commit":get_commit_version(new_commit)
                     }
-        if action == "restart_daemon":
+        if action == ACTION_RESTART_DAEMON:
             if is_node:
                 reload_node_daemon()
             else:
@@ -94,13 +163,14 @@ def device(action, id):
 def change_branch(action, id):
 
     if id != device_id:
-        raise WrongMachineID
+        raise WrongMachineID("Not the same ID")
     
-    #todo
     try:
         data = bottle.request.json
+        if not data or 'new_branch' not in data:
+            return {'error': 'Missing required field: new_branch'}
         branch = data['new_branch']
-        if action == 'change_branch':
+        if action == ACTION_CHANGE_BRANCH:
             ethoscope_updater.change_branch(branch)
 
         return {"new_branch": branch}
@@ -176,104 +246,50 @@ def group(what):
     try:
         responses = []
         data = bottle.request.json
-        if what == "update":
+        if not data or 'devices' not in data:
+            return {'error': 'Missing required field: devices'}
+        if what == ACTION_UPDATE:
             for device in data["devices"]:
                 # Handle node updates locally, device updates via API
                 if device['id'] == 'node':
                     # Update node locally
-                    try:
-                        local_commit, origin_commit = ethoscope_updater.get_local_and_origin_commits()
-                        old_commit = ethoscope_updater.get_current_commit()
-                        ethoscope_updater.update()
-                        new_commit = ethoscope_updater.get_current_commit()
-                        response = {
-                            "status": "success",
-                            "device_id": device['id'],
-                            "old_commit": get_commit_version(old_commit),
-                            "new_commit": get_commit_version(new_commit)
-                        }
-                    except Exception as e:
-                        response = {
-                            "status": "error", 
-                            "device_id": device['id'],
-                            "error": str(e)
-                        }
+                    response = handle_node_update()
+                    responses.append(response)
+                    
+                    # Handle node daemon restart locally
+                    response = handle_node_daemon_restart()
+                    responses.append(response)
                 else:
                     # Update devices via API
                     response = updates_api_wrapper(device['ip'], device['id'], what='device/update')
-                responses.append(response)
-            for device in data["devices"]:
-                # Handle node daemon restart locally, device restarts via API
-                if device['id'] == 'node':
-                    try:
-                        reload_node_daemon()
-                        response = {
-                            "status": "daemon_restarted",
-                            "device_id": device['id']
-                        }
-                    except Exception as e:
-                        response = {
-                            "status": "error",
-                            "device_id": device['id'], 
-                            "error": str(e)
-                        }
-                else:
+                    responses.append(response)
+                    # Restart daemon via API
                     response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
-                responses.append(response)
-        elif what == "swBranch":
+                    responses.append(response)
+        elif what == ACTION_SWITCH_BRANCH:
             for device in data["devices"]:
                 if device['id'] == 'node':
                     # Handle node branch switching locally
-                    try:
-                        new_branch = device['new_branch']
-                        ethoscope_updater.change_branch(new_branch)
-                        response = {
-                            "status": "success",
-                            "device_id": device['id'],
-                            "new_branch": new_branch
-                        }
-                    except Exception as e:
-                        response = {
-                            "status": "error",
-                            "device_id": device['id'],
-                            "error": str(e)
-                        }
+                    if 'new_branch' not in device:
+                        responses.append({'error': 'Missing new_branch for node device', 'device_id': 'node'})
+                        continue
+                    response = handle_node_branch_change(device['new_branch'])
+                    responses.append(response)
+                    
+                    # Handle node daemon restart locally
+                    response = handle_node_daemon_restart()
+                    responses.append(response)
                 else:
                     data_one_dev = {'new_branch': device['new_branch']}
                     response = updates_api_wrapper(device['ip'], device['id'], what='device/change_branch', data=data_one_dev)
-                responses.append(response)
-            for device in data["devices"]:
-                if device['id'] == 'node':
-                    try:
-                        reload_node_daemon()
-                        response = {
-                            "status": "daemon_restarted",
-                            "device_id": device['id']
-                        }
-                    except Exception as e:
-                        response = {
-                            "status": "error",
-                            "device_id": device['id'],
-                            "error": str(e)
-                        }
-                else:
+                    responses.append(response)
+                    # Restart daemon via API
                     response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
-                responses.append(response)
-        elif what == "restart":
+                    responses.append(response)
+        elif what == ACTION_RESTART:
             for device in data["devices"]:
                 if device['id'] == 'node':
-                    try:
-                        reload_node_daemon()
-                        response = {
-                            "status": "daemon_restarted",
-                            "device_id": device['id']
-                        }
-                    except Exception as e:
-                        response = {
-                            "status": "error",
-                            "device_id": device['id'],
-                            "error": str(e)
-                        }
+                    response = handle_node_daemon_restart()
                 else:
                     response = updates_api_wrapper(device['ip'], device['id'], what='device/restart_daemon')
                 responses.append(response)
@@ -358,17 +374,16 @@ if __name__ == '__main__':
         device_id = get_machine_id()
 
     try:
-        ####### TO be remove when bottle changes to version 0.13
-        server = "cherrypy"
+        # Use cheroot server (modern replacement for cherrypy)
         try:
             from cherrypy import wsgiserver
-        except:
-            # Trick bottle to think that cheroot is actulay cherrypy server adds the pacth to BOTTLE
+            server = "cherrypy"
+        except ImportError:
+            # Use cheroot server when cherrypy wsgiserver is not available
             bottle.server_names["cherrypy"] = CherootServer(host='0.0.0.0', port=options.port)
-            logging.warning("Cherrypy version is bigger than 9, we have to change to cheroot server")
-            pass
-        #########
-        bottle.run(app, host='0.0.0.0', port=options.port, debug=options.DEBUG, server='cherrypy')
+            server = "cherrypy"
+            
+        bottle.run(app, host='0.0.0.0', port=options.port, debug=options.DEBUG, server=server)
 
     except KeyboardInterrupt:
         logging.info("Stopping update server cleanly")
