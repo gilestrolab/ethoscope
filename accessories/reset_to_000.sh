@@ -9,16 +9,14 @@ fi
 # Function to perform update
 update_repository() {
   echo "Updating repository and changing origin..."
-  cd /opt/
-  rm -rf ethoscope-device
-  git clone https://github.com/gilestrolab/ethoscope.git
-  mv ethoscope ethoscope-device
+  rm -rf /opt/ethoscope*
+  git clone https://github.com/gilestrolab/ethoscope.git /opt/ethoscope
 
-  cd /opt/ethoscope-device
+  cd /opt/ethoscope
   git checkout dev
   git remote set-url origin git://node/ethoscope.git
-  cd /opt/ethoscope-device/src
-  python setup.py develop
+  cd /opt/ethoscope/src/ethoscope
+  pip install -e . --break-system-packages
 
   systemctl enable ethoscope_device
   systemctl enable ethoscope_listener

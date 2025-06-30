@@ -33,13 +33,15 @@ class DuplicateDataFinder:
     
     DEFAULT_TABLES = ['METADATA', 'VAR_MAP']
     
-    def __init__(self, verbose: bool = False):
+    def __init__(self, verbose: bool = False, remove_duplicates: bool = False):
         """Initialize the duplicate finder."""
         self.verbose = verbose
+        self.remove_duplicates = remove_duplicates
         self.setup_logging()
         self.databases_with_duplicates: List[str] = []
         self.total_databases_checked = 0
         self.total_duplicates_found = 0
+        self.total_databases_removed = 0
     
     def setup_logging(self):
         """Configure logging based on verbosity level."""
@@ -171,8 +173,19 @@ class DuplicateDataFinder:
                     return False
                 
                 if has_id_column:
-                    # Fast method: check for gaps or duplicates in id sequence
-                    # If ids are unique and sequential, max(id) should equal count(*)
+                    # Ultra-fast check: if minimum ID appears more than once, we have duplicate IDs
+                    cursor.execute(f"SELECT MIN(id) FROM `{table_name}`")
+                    min_id_result = cursor.fetchone()
+                    if min_id_result and min_id_result[0] is not None:
+                        min_id = min_id_result[0]
+                        cursor.execute(f"SELECT COUNT(*) FROM `{table_name}` WHERE id = ?", (min_id,))
+                        min_id_count = cursor.fetchone()[0]
+                        
+                        if min_id_count > 1:
+                            self.logger.warning(f"CRITICAL: Duplicate IDs found in {table_name}: ID {min_id} appears {min_id_count} times")
+                            return True
+                    
+                    # If ultra-fast check passes, do comprehensive ID duplicate check
                     cursor.execute(f"SELECT MAX(id) FROM `{table_name}`")
                     max_id = cursor.fetchone()[0]
                     
@@ -180,9 +193,7 @@ class DuplicateDataFinder:
                     distinct_ids = cursor.fetchone()[0]
                     
                     # Check for duplicate IDs (this should never happen with AUTO_INCREMENT, but...)
-                    id_duplicates = distinct_ids < total_count
-                    
-                    if id_duplicates:
+                    if distinct_ids < total_count:
                         duplicate_count = total_count - distinct_ids
                         self.logger.warning(f"CRITICAL: Duplicate IDs found in {table_name}: {duplicate_count} duplicate ID rows")
                         return True
@@ -196,8 +207,7 @@ class DuplicateDataFinder:
                             cursor.execute(f"SELECT COUNT(*) FROM (SELECT DISTINCT {column_list} FROM `{table_name}`)")
                             distinct_data_count = cursor.fetchone()[0]
                             
-                            data_duplicates = total_count > distinct_data_count
-                            if data_duplicates:
+                            if total_count > distinct_data_count:
                                 duplicate_count = total_count - distinct_data_count
                                 self.logger.info(f"Data duplicates found in {table_name}: {duplicate_count} duplicate data rows "
                                                f"({total_count} total, {distinct_data_count} unique data combinations)")
@@ -218,16 +228,14 @@ class DuplicateDataFinder:
                     cursor.execute(f"SELECT COUNT(*) FROM (SELECT DISTINCT {column_list} FROM `{table_name}`)")
                     distinct_count = cursor.fetchone()[0]
                     
-                    has_duplicates = total_count > distinct_count
-                    
-                    if has_duplicates:
+                    if total_count > distinct_count:
                         duplicate_count = total_count - distinct_count
                         self.logger.info(f"Duplicates found in {table_name}: {duplicate_count} duplicate rows "
                                        f"({total_count} total, {distinct_count} unique)")
-                    else:
-                        self.logger.debug(f"No duplicates in {table_name} ({total_count} rows)")
+                        return True
                     
-                    return has_duplicates
+                    self.logger.debug(f"No duplicates in {table_name} ({total_count} rows)")
+                    return False
                 
         except sqlite3.Error as e:
             self.logger.error(f"Error checking duplicates in table {table_name} of {db_path}: {e}")
@@ -266,16 +274,14 @@ class DuplicateDataFinder:
                 self.logger.debug(f"No tables to check in database: {db_path}")
                 return False
             
-            # Check each table for duplicates
-            duplicates_found = False
+            # Check each table for duplicates - stop at first duplicate found
             for table_name in sorted(tables_to_check):
                 if self.check_table_duplicates(db_path, table_name):
-                    duplicates_found = True
-                    if not check_all_tables:
-                        # For default mode, we can stop at the first duplicate found
-                        break
+                    self.logger.debug(f"Database {db_path}: Duplicates found in {table_name}, stopping check")
+                    return True
             
-            return duplicates_found
+            # No duplicates found in any table
+            return False
             
         except Exception as e:
             self.logger.error(f"Error checking database {db_path}: {e}")
@@ -313,6 +319,15 @@ class DuplicateDataFinder:
                     databases_with_duplicates.append(db_path)
                     self.total_duplicates_found += 1
                     self.logger.warning(f"DUPLICATES FOUND: {db_path}")
+                    
+                    # Remove database if --remove flag is set
+                    if self.remove_duplicates:
+                        try:
+                            os.remove(db_path)
+                            self.total_databases_removed += 1
+                            self.logger.warning(f"REMOVED: {db_path}")
+                        except OSError as e:
+                            self.logger.error(f"Failed to remove {db_path}: {e}")
                 
                 self.total_databases_checked += 1
                 
@@ -320,8 +335,10 @@ class DuplicateDataFinder:
                 self.logger.error(f"Failed to check database {db_path}: {e}")
         
         # Summary
-        self.logger.info(f"Scan complete: {self.total_databases_checked} databases checked, "
-                        f"{self.total_duplicates_found} contain duplicates")
+        summary_msg = f"Scan complete: {self.total_databases_checked} databases checked, {self.total_duplicates_found} contain duplicates"
+        if self.remove_duplicates:
+            summary_msg += f", {self.total_databases_removed} removed"
+        self.logger.info(summary_msg)
         
         return databases_with_duplicates
 
@@ -336,6 +353,7 @@ Examples:
   %(prog)s                                    # Search default directory for METADATA/VAR_MAP duplicates
   %(prog)s --path /my/data --full             # Search all tables in /my/data
   %(prog)s --verbose                          # Enable verbose logging
+  %(prog)s --remove                           # Find and remove databases with duplicates
         """
     )
     
@@ -358,10 +376,17 @@ Examples:
         help='Enable verbose output with detailed logging'
     )
     
+    parser.add_argument(
+        '--remove', '-r',
+        action='store_true',
+        default=False,
+        help='Remove databases that contain duplicates (DANGEROUS - use with caution)'
+    )
+    
     args = parser.parse_args()
     
     # Create finder instance
-    finder = DuplicateDataFinder(verbose=args.verbose)
+    finder = DuplicateDataFinder(verbose=args.verbose, remove_duplicates=args.remove)
     
     try:
         # Find databases with duplicates
@@ -372,9 +397,16 @@ Examples:
         
         # Output results
         if duplicate_databases:
-            print(f"Found {len(duplicate_databases)} databases with duplicates:")
-            for db_path in duplicate_databases:
-                print(db_path)
+            if args.remove:
+                print(f"Found and removed {finder.total_databases_removed} databases with duplicates:")
+                # Only show paths of databases that were actually removed
+                for db_path in duplicate_databases:
+                    if not os.path.exists(db_path):  # File was successfully removed
+                        print(db_path)
+            else:
+                print(f"Found {len(duplicate_databases)} databases with duplicates:")
+                for db_path in duplicate_databases:
+                    print(db_path)
             sys.exit(1)  # Exit with error code to indicate duplicates found
         else:
             if args.verbose:
