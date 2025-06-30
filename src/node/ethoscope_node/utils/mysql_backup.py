@@ -132,7 +132,7 @@ class BaseSQLConnector:
                     db_info[db_name] = {}
                 
                 # Choose appropriate count method based on table type
-                if table_name in self._TABLE_WITHOUT_KEY or table_name.startswith("METADATA"):
+                if table_name in self._TABLE_WITHOUT_KEY:
                     query = "SELECT COUNT(*) FROM `{}`.`{}`".format(db_name, table_name)
                 else:
                     query = "SELECT COALESCE(MAX(id), 0) FROM `{}`.`{}`".format(db_name, table_name)
@@ -634,8 +634,7 @@ class MySQLdbToSQLite(BaseSQLConnector):
             sqlite_cursor = sqlite_conn.cursor()
             
             # Check if we should clear table to prevent duplicates
-            should_clear = table_name.upper() in [t.upper() for t in self._TABLE_WITHOUT_KEY]
-            if should_clear:
+            if table_name in self._TABLE_WITHOUT_KEY:
                 logging.info(f"Clearing table {table_name} to prevent duplicates")
                 sqlite_cursor.execute(f"DELETE FROM `{table_name}`")
                 sqlite_conn.commit()
@@ -645,7 +644,7 @@ class MySQLdbToSQLite(BaseSQLConnector):
             placeholders = ','.join(['?'] * column_count)
             
             # Choose INSERT strategy based on whether we cleared the table
-            insert_template = "INSERT INTO" if should_clear else "INSERT OR IGNORE INTO"
+            insert_template = "INSERT INTO" if table_name in self._TABLE_WITHOUT_KEY else "INSERT OR IGNORE INTO"
             
             batch = []
             total_rows = 0
