@@ -1,3 +1,60 @@
+"""
+Backup Helpers Module - High-level Backup Orchestration & Management
+
+This module provides the high-level backup orchestration layer that coordinates database and 
+video backups across multiple ethoscope devices. It handles device discovery, backup scheduling,
+progress tracking, and provides a web API for backup status monitoring.
+
+Key Responsibilities:
+====================
+
+1. BACKUP ORCHESTRATION & COORDINATION:
+   - Manages parallel backup operations across multiple ethoscope devices
+   - Coordinates between database backups (via mysql_backup.py) and video file downloads
+   - Implements backup scheduling with configurable intervals (default: 5 minutes)
+   - Handles backup prioritization and resource allocation
+
+2. DEVICE DISCOVERY & MANAGEMENT:
+   - Discovers active ethoscope devices via node server API or direct scanning
+   - Filters devices based on status (active, stopped, running) for backup eligibility
+   - Maintains device state and handles device offline/online transitions
+   - Manages backup path validation and creation
+
+3. BACKUP EXECUTION CLASSES:
+   - BackupClass: Handles database backup operations using MySQLdbToSQLite
+   - VideoBackupClass: Manages video file downloads from ethoscope devices
+   - BaseBackupClass: Common functionality and status reporting for both backup types
+
+4. PROGRESS TRACKING & STATUS REPORTING:
+   - Tracks backup progress, success/failure rates, and timing information
+   - Provides real-time status updates during backup operations
+   - Implements backup completion markers and validation
+   - Detects data duplication issues in METADATA and VAR_MAP tables
+
+5. FILE SYSTEM MANAGEMENT:
+   - Manages backup file locking to prevent concurrent operations
+   - Creates and maintains backup directory structures
+   - Handles backup completion markers and status files
+   - Provides file integrity checking and validation
+
+6. WEB API & MONITORING:
+   - GenericBackupWrapper: Main threading class that runs continuous backup operations
+   - Provides status API endpoints for external monitoring
+   - Handles backup job initiation and progress tracking
+   - Supports both continuous and on-demand backup modes
+
+Classes:
+========
+- BackupStatus: Data class for tracking backup state and progress
+- BaseBackupClass: Common backup functionality and status reporting
+- BackupClass: Database backup operations (uses mysql_backup.py)
+- VideoBackupClass: Video file download and synchronization
+- GenericBackupWrapper: Main backup coordinator and threading manager
+
+This module uses mysql_backup.py for low-level database operations and is used by
+backup_tool.py for the actual backup service implementation.
+"""
+
 from ethoscope_node.utils.device_scanner import EthoscopeScanner
 from ethoscope_node.utils.mysql_backup import MySQLdbToSQLite, DBNotReadyError
 from ethoscope.utils.io import get_and_hash, list_local_video_files
@@ -19,6 +76,7 @@ from typing import Dict, List, Optional, Union, Iterator, Tuple
 import hashlib
 import fcntl
 import tempfile
+import sqlite3
 
 
 @dataclass
@@ -298,6 +356,11 @@ class BackupClass(BaseBackupClass):
             backup_stats['comparison_percentage'] = comparison_status
             backup_stats['backup_success'] = comparison_status > 0
             
+            # Check for data duplication
+            self._logger.info(f"[{self._device_id}] Checking for data duplication...")
+            duplication_found = self._check_data_duplication(backup_path)
+            backup_stats['data_duplication'] = duplication_found
+            
             if comparison_status > 0:
                 self._logger.info(f"[{self._device_id}] Incremental database backup successful (match: {comparison_status:.2f}%)")
             else:
@@ -310,6 +373,66 @@ class BackupClass(BaseBackupClass):
             self._logger.error(f"[{self._device_id}] Database backup failed: {e}")
             self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
             raise BackupError(f"Database backup failed: {e}")
+    
+    def _check_data_duplication(self, backup_path: str) -> bool:
+        """
+        Check for data duplication in METADATA and VAR_MAP tables.
+        
+        Args:
+            backup_path: Path to the SQLite backup file
+            
+        Returns:
+            bool: True if duplicates found in either table, False otherwise
+        """
+        try:
+            self._logger.info(f"[{self._device_id}] Checking for data duplication in backup database...")
+            
+            with sqlite3.connect(backup_path) as conn:
+                cursor = conn.cursor()
+                
+                # Check METADATA table for duplicates
+                metadata_duplicates = False
+                try:
+                    cursor.execute("SELECT COUNT(*) FROM METADATA")
+                    total_metadata = cursor.fetchone()[0]
+                    
+                    cursor.execute("SELECT COUNT(*) FROM (SELECT DISTINCT field, value FROM METADATA)")
+                    distinct_metadata = cursor.fetchone()[0]
+                    
+                    metadata_duplicates = total_metadata > distinct_metadata
+                    self._logger.debug(f"[{self._device_id}] METADATA table: {total_metadata} total, {distinct_metadata} distinct")
+                    
+                except sqlite3.OperationalError as e:
+                    self._logger.warning(f"[{self._device_id}] Could not check METADATA table: {e}")
+                
+                # Check VAR_MAP table for duplicates
+                varmap_duplicates = False
+                try:
+                    cursor.execute("SELECT COUNT(*) FROM VAR_MAP")
+                    total_varmap = cursor.fetchone()[0]
+                    
+                    cursor.execute("SELECT COUNT(*) FROM (SELECT DISTINCT var_name, sql_type, functional_type FROM VAR_MAP)")
+                    distinct_varmap = cursor.fetchone()[0]
+                    
+                    varmap_duplicates = total_varmap > distinct_varmap
+                    self._logger.debug(f"[{self._device_id}] VAR_MAP table: {total_varmap} total, {distinct_varmap} distinct")
+                    
+                except sqlite3.OperationalError as e:
+                    self._logger.warning(f"[{self._device_id}] Could not check VAR_MAP table: {e}")
+                
+                duplicates_found = metadata_duplicates or varmap_duplicates
+                
+                if duplicates_found:
+                    self._logger.warning(f"[{self._device_id}] Data duplication detected - METADATA: {metadata_duplicates}, VAR_MAP: {varmap_duplicates}")
+                else:
+                    self._logger.info(f"[{self._device_id}] No data duplication detected")
+                
+                return duplicates_found
+                
+        except Exception as e:
+            self._logger.error(f"[{self._device_id}] Error checking data duplication: {e}")
+            self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
+            return False  # Return False on error to avoid false positives
     
     def check_sync_status(self) -> Dict:
         """Check synchronization status of the database backup."""

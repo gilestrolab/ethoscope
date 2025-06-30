@@ -1003,9 +1003,15 @@ class Ethoscope(BaseDevice):
             backup_path = self._info.get("backup_path")
             
             if not backup_path:
-                self._logger.debug(f"Device {self._ip}: No backup_path available")
-                self._info['backup_status'] = "No Backup"
-                return
+                self._logger.debug(f"Device {self._ip}: No backup_path available, attempting to create one")
+                self._make_backup_path(force_recalculate=True)
+                backup_path = self._info.get("backup_path")
+                if not backup_path:
+                    self._logger.debug(f"Device {self._ip}: Still no backup_path after creation attempt")
+                    self._info['backup_status'] = "No Backup"
+                    return
+                else:
+                    self._logger.debug(f"Device {self._ip}: Created backup_path: {backup_path}")
                 
             # Check if backup file exists
             if not os.path.exists(backup_path):
@@ -1038,7 +1044,6 @@ class Ethoscope(BaseDevice):
             # Calculate backup percentage
             if remote_db_size > 0:
                 backup_percentage = (local_backup_size * 100) / remote_db_size
-                backup_percentage = min(backup_percentage, 100)  # Cap at 100%
                 
                 self._info['backup_status'] = backup_percentage
                 self._info['backup_size'] = local_backup_size

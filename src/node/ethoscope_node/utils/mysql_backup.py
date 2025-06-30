@@ -1,3 +1,47 @@
+"""
+MySQL Backup Module - Low-level Database Operations
+
+This module handles the core database operations for backing up MySQL data to SQLite files.
+It provides the fundamental database connectivity, schema management, and data transfer 
+functionality that powers the ethoscope backup system.
+
+Key Responsibilities:
+====================
+
+1. DATABASE CONNECTIVITY & MANAGEMENT:
+   - Establishes and manages MySQL connections to remote ethoscope devices
+   - Creates and manages local SQLite backup files
+   - Handles database schema replication from MySQL to SQLite
+   - Provides connection pooling and timeout management
+
+2. INCREMENTAL DATA SYNCHRONIZATION:
+   - Implements max(id) based incremental backup strategy to avoid data duplication
+   - Synchronizes ROI tables (ROI_0, ROI_1, etc.) with new tracking data
+   - Updates auxiliary tables (CSV_DAM_ACTIVITY, START_EVENTS, IMG_SNAPSHOTS, SENSORS)
+   - Maintains data integrity during incremental updates
+
+3. DATA INTEGRITY & VALIDATION:
+   - Compares local vs remote database contents to verify backup completeness
+   - Detects potential data duplication issues (when local > remote)
+   - Provides fast and slow comparison modes for different accuracy needs
+   - Handles schema conversion between MySQL and SQLite data types
+
+4. LOW-LEVEL TABLE OPERATIONS:
+   - Copies complete table schemas and static reference data (METADATA, VAR_MAP, ROI_MAP)
+   - Performs batched data transfers to optimize memory usage and performance
+   - Handles special table types (IMG_SNAPSHOTS with BLOB data, CSV_DAM_ACTIVITY with file export)
+   - Manages table recreation when local schema is outdated
+
+Classes:
+========
+- DatabaseConnectionManager: Context manager for MySQL connections
+- BaseSQLConnector: Base class providing common database operations
+- MySQLdbToSQLite: Main backup class handling MySQL→SQLite replication
+- DBDiff: Database comparison utilities
+
+This module is used by backups_helpers.py for the actual backup orchestration.
+"""
+
 import mysql.connector
 import sqlite3
 import os
@@ -413,74 +457,172 @@ class MySQLdbToSQLite(BaseSQLConnector):
             raise
     
     def _update_all_roi_tables(self, mysql_conn, sqlite_conn):
-        """Update all ROI-related tables."""
+        """Update all ROI-related tables using appropriate method based on table structure."""
         sqlite_cursor = sqlite_conn.cursor()
         
         # Get ROI indices
         sqlite_cursor.execute("SELECT DISTINCT roi_idx FROM ROI_MAP")
         roi_indices = [row[0] for row in sqlite_cursor.fetchall()]
         
-        # Update each ROI table
+        # Update each ROI table (these have ID fields)
         for roi_idx in roi_indices:
             self._update_single_table(f"ROI_{roi_idx}", mysql_conn, sqlite_conn)
         
-        # Update other tables
+        # Update tables with ID fields using chunked incremental backup
         for table_name in ["CSV_DAM_ACTIVITY", "START_EVENTS", "IMG_SNAPSHOTS", "SENSORS"]:
             try:
                 dump_csv = (table_name == "CSV_DAM_ACTIVITY")
                 self._update_single_table(table_name, mysql_conn, sqlite_conn, dump_csv)
             except mysql.connector.Error as e:
                 logging.warning(f"Could not update table {table_name}: {e}")
+        
+        # Update tables without ID fields using row-by-row checking
+        for table_name in ["METADATA", "VAR_MAP"]:
+            try:
+                self._update_table_without_id(table_name, mysql_conn, sqlite_conn)
+            except mysql.connector.Error as e:
+                logging.warning(f"Could not update table {table_name}: {e}")
+            except sqlite3.Error as e:
+                logging.warning(f"SQLite error updating table {table_name}: {e}")
     
     def _update_single_table(self, table_name: str, mysql_conn, sqlite_conn, dump_csv: bool = False):
-        """Update a single table with new records."""
+        """
+        Update a single table with new records using efficient chunked incremental backup.
+        
+        Strategy:
+        1. Get max(id) from local SQLite table as starting point
+        2. Query remote MySQL for 200 rows AFTER that ID  
+        3. Write those rows to SQLite
+        4. Repeat until fewer than 100 rows returned
+        """
         mysql_cursor = mysql_conn.cursor(buffered=True)
         sqlite_cursor = sqlite_conn.cursor()
         
-        # Get the last ID in local table
+        # Step 1: Get the max ID in local table as our starting point
         try:
             sqlite_cursor.execute(f"SELECT COALESCE(MAX(id), 0) FROM `{table_name}`")
-            last_local_id = sqlite_cursor.fetchone()[0] or 0
+            current_max_id = sqlite_cursor.fetchone()[0] or 0
         except sqlite3.OperationalError:
             logging.warning(f"Table {table_name} doesn't exist locally, recreating...")
             # Table doesn't exist, copy entirely
             self._copy_table(table_name, mysql_conn, sqlite_conn, dump_csv)
             return
         
-        # Get new records from MySQL
-        mysql_cursor.execute(f"SELECT * FROM `{table_name}` WHERE id > %s", (last_local_id,))
+        logging.debug(f"Table {table_name}: Starting incremental backup from ID {current_max_id}")
         
-        # Get column count for placeholder generation
-        if mysql_cursor.description:
-            column_count = len(mysql_cursor.description)
-            placeholders = ','.join(['?'] * column_count)
+        # Get column count for placeholder generation (do this once)
+        mysql_cursor.execute(f"SELECT * FROM `{table_name}` LIMIT 1")
+        if not mysql_cursor.description:
+            logging.debug(f"Table {table_name}: No data structure found")
+            return
             
-            batch = []
-            for row in mysql_cursor:
-                batch.append(row)
-                
-                if len(batch) >= self.MAX_BATCH_SIZE:
-                    sqlite_cursor.executemany(
-                        f"INSERT OR IGNORE INTO `{table_name}` VALUES ({placeholders})", 
-                        batch
-                    )
-                    sqlite_conn.commit()
-                    
-                    if dump_csv:
-                        self._write_to_dam_file(batch)
-                    
-                    batch = []
+        column_count = len(mysql_cursor.description)
+        placeholders = ','.join(['?'] * column_count)
+        
+        total_inserted = 0
+        chunk_size = 200
+        min_chunk_threshold = 100
+        
+        # Iterative chunked backup
+        while True:
+            # Step 2: Query remote MySQL for next chunk of rows AFTER current_max_id
+            mysql_cursor.execute(
+                f"SELECT * FROM `{table_name}` WHERE id > %s ORDER BY id LIMIT %s", 
+                (current_max_id, chunk_size)
+            )
             
-            # Insert remaining rows
-            if batch:
+            rows = mysql_cursor.fetchall()
+            rows_count = len(rows)
+            
+            logging.debug(f"Table {table_name}: Retrieved {rows_count} rows starting after ID {current_max_id}")
+            
+            # Step 3: Write rows to SQLite if we got any
+            if rows_count > 0:
                 sqlite_cursor.executemany(
-                    f"INSERT OR IGNORE INTO `{table_name}` VALUES ({placeholders})", 
-                    batch
+                    f"INSERT INTO `{table_name}` VALUES ({placeholders})", 
+                    rows
                 )
                 sqlite_conn.commit()
+                total_inserted += rows_count
                 
+                # Update current_max_id to the highest ID we just inserted
+                current_max_id = rows[-1][0]  # First column is always id
+                
+                logging.debug(f"Table {table_name}: Inserted {rows_count} rows, new max_id = {current_max_id}")
+                
+                # Handle CSV export if needed
                 if dump_csv:
-                    self._write_to_dam_file(batch)
+                    self._write_to_dam_file(rows)
+            
+            # Step 4: Stop if we got fewer than threshold rows (indicates we're caught up)
+            if rows_count < min_chunk_threshold:
+                break
+        
+        if total_inserted > 0:
+            logging.info(f"Table {table_name}: Incremental backup completed - inserted {total_inserted} new records")
+        else:
+            logging.debug(f"Table {table_name}: No new records to backup")
+    
+    def _update_table_without_id(self, table_name: str, mysql_conn, sqlite_conn):
+        """
+        Update tables without ID fields (METADATA, VAR_MAP) using row-by-row duplicate checking.
+        These are small tables so we can afford to check each row individually.
+        """
+        mysql_cursor = mysql_conn.cursor(buffered=True)
+        sqlite_cursor = sqlite_conn.cursor()
+        
+        logging.debug(f"Table {table_name}: Starting row-by-row sync (no ID field)")
+        
+        # Get all rows from remote MySQL table
+        mysql_cursor.execute(f"SELECT * FROM `{table_name}`")
+        remote_rows = mysql_cursor.fetchall()
+        
+        if not remote_rows:
+            logging.debug(f"Table {table_name}: No data in remote table")
+            return
+        
+        # Get column info to build proper WHERE clauses
+        mysql_cursor.execute(f"DESCRIBE `{table_name}`")
+        columns = [row[0] for row in mysql_cursor.fetchall()]
+        
+        if not columns:
+            logging.warning(f"Table {table_name}: No column information available")
+            return
+        
+        # Build placeholders for queries
+        column_list = ', '.join(f'`{col}`' for col in columns)
+        where_conditions = ' AND '.join(f'`{col}` = ?' for col in columns)
+        insert_placeholders = ', '.join(['?'] * len(columns))
+        
+        inserted_count = 0
+        skipped_count = 0
+        
+        # Check each remote row against local table
+        for row in remote_rows:
+            # Check if this exact row already exists locally
+            sqlite_cursor.execute(
+                f"SELECT 1 FROM `{table_name}` WHERE {where_conditions} LIMIT 1",
+                row
+            )
+            
+            if sqlite_cursor.fetchone() is None:
+                # Row doesn't exist, insert it
+                sqlite_cursor.execute(
+                    f"INSERT INTO `{table_name}` ({column_list}) VALUES ({insert_placeholders})",
+                    row
+                )
+                inserted_count += 1
+            else:
+                # Row already exists, skip it
+                skipped_count += 1
+        
+        # Commit all inserts
+        sqlite_conn.commit()
+        
+        if inserted_count > 0:
+            logging.info(f"Table {table_name}: Row-by-row sync completed - inserted {inserted_count} new rows, skipped {skipped_count} duplicates")
+        else:
+            logging.debug(f"Table {table_name}: No new rows to insert, {skipped_count} rows already present")
 
 class DBDiff(BaseSQLConnector):
     """Optimized database comparison class."""

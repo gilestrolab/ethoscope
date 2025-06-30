@@ -55,7 +55,8 @@ def status():
                         'processing': getattr(backup_status, 'processing', False),
                         'count': getattr(backup_status, 'count', 0),
                         'synced': getattr(backup_status, 'synced', {}),
-                        'progress': getattr(backup_status, 'progress', {})
+                        'progress': getattr(backup_status, 'progress', {}),
+                        'data_duplication': getattr(backup_status, 'data_duplication', False)
                     }
                 else:
                     # If it's already a dictionary, use as-is
