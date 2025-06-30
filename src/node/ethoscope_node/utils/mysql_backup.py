@@ -47,6 +47,7 @@ import sqlite3
 import os
 import logging
 import contextlib
+import time
 from typing import Dict, Optional, Any, Tuple
 import threading
 
@@ -330,23 +331,13 @@ class MySQLdbToSQLite(BaseSQLConnector):
                 raise
     
     def _copy_table(self, table_name: str, mysql_conn, sqlite_conn, dump_csv: bool = False):
-        """Copy a single table from MySQL to SQLite."""
+        """Copy a single table from MySQL to SQLite with proper constraint preservation."""
         mysql_cursor = mysql_conn.cursor(buffered=True)
         sqlite_cursor = sqlite_conn.cursor()
         
-        # Get table schema
-        mysql_cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
-        columns = []
-        for col_info in mysql_cursor.fetchall():
-            col_name, col_type = col_info[0], col_info[1]
-            columns.append(f"`{col_name}` {self._convert_mysql_type_to_sqlite(col_type)}")
-        
-        # Create table if it doesn't exist
-        create_sql = f"CREATE TABLE IF NOT EXISTS `{table_name}` ({', '.join(columns)})"
-        try:
-            sqlite_cursor.execute(create_sql)
-        except sqlite3.OperationalError as e:
-            logging.debug(f"Table {table_name} already exists: {e}")
+        # Create table with proper schema (including PRIMARY KEY constraints)
+        if not self._ensure_table_schema(table_name, mysql_conn, sqlite_conn):
+            logging.error(f"Failed to create/verify table schema for {table_name}")
             return
         
         # Copy data
@@ -354,6 +345,240 @@ class MySQLdbToSQLite(BaseSQLConnector):
             self._copy_image_data(table_name, mysql_conn, sqlite_conn)
         else:
             self._copy_regular_data(table_name, mysql_conn, sqlite_conn, dump_csv)
+    
+    def _ensure_table_schema(self, table_name: str, mysql_conn, sqlite_conn) -> bool:
+        """
+        Ensure SQLite table exists with proper schema including PRIMARY KEY constraints.
+        Handles both new table creation and migration of existing tables.
+        """
+        mysql_cursor = mysql_conn.cursor(buffered=True)
+        sqlite_cursor = sqlite_conn.cursor()
+        
+        try:
+            # Get the correct MySQL schema with constraints
+            table_schema = self._get_mysql_table_schema(table_name, mysql_conn)
+            if not table_schema:
+                logging.error(f"Could not retrieve schema for table {table_name}")
+                return False
+            
+            # Check if table exists in SQLite
+            sqlite_cursor.execute("""
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name=?
+            """, (table_name,))
+            
+            table_exists = sqlite_cursor.fetchone() is not None
+            
+            if table_exists:
+                # Check if existing table has proper constraints
+                if self._table_has_proper_constraints(table_name, sqlite_conn, table_schema):
+                    logging.debug(f"Table {table_name} already exists with proper constraints")
+                    return True
+                else:
+                    # Need to migrate existing table
+                    logging.info(f"Table {table_name} exists but lacks proper constraints, migrating...")
+                    return self._migrate_table_schema(table_name, sqlite_conn, table_schema)
+            else:
+                # Create new table with proper constraints
+                logging.debug(f"Creating new table {table_name} with constraints")
+                return self._create_table_with_constraints(table_name, sqlite_conn, table_schema)
+                
+        except Exception as e:
+            logging.error(f"Error ensuring table schema for {table_name}: {e}")
+            return False
+    
+    def _get_mysql_table_schema(self, table_name: str, mysql_conn) -> dict:
+        """
+        Get comprehensive table schema from MySQL including constraints.
+        Returns dict with column info and primary key details.
+        """
+        mysql_cursor = mysql_conn.cursor(buffered=True)
+        
+        try:
+            # Get column information
+            mysql_cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
+            columns_info = mysql_cursor.fetchall()
+            
+            schema = {
+                'columns': [],
+                'primary_key': None,
+                'has_auto_increment': False
+            }
+            
+            for col_info in columns_info:
+                col_name = col_info[0]      # Field name
+                col_type = col_info[1]      # Data type
+                col_null = col_info[2]      # NULL allowed
+                col_key = col_info[3]       # Key type (PRI, UNI, MUL, etc.)
+                col_default = col_info[4]   # Default value
+                col_extra = col_info[5]     # Extra info (auto_increment, etc.)
+                
+                column_def = {
+                    'name': col_name,
+                    'type': self._convert_mysql_type_to_sqlite(col_type),
+                    'null': col_null == 'YES',
+                    'default': col_default,
+                    'is_primary': col_key == 'PRI',
+                    'is_auto_increment': 'auto_increment' in col_extra.lower()
+                }
+                
+                schema['columns'].append(column_def)
+                
+                # Track primary key and auto increment
+                if column_def['is_primary']:
+                    schema['primary_key'] = col_name
+                    schema['has_auto_increment'] = column_def['is_auto_increment']
+            
+            return schema
+            
+        except mysql.connector.Error as e:
+            logging.error(f"Error getting MySQL schema for {table_name}: {e}")
+            return None
+    
+    def _table_has_proper_constraints(self, table_name: str, sqlite_conn, expected_schema: dict) -> bool:
+        """Check if SQLite table has the expected PRIMARY KEY constraints."""
+        sqlite_cursor = sqlite_conn.cursor()
+        
+        try:
+            # Get table info from SQLite
+            sqlite_cursor.execute(f"PRAGMA table_info(`{table_name}`)")
+            sqlite_columns = sqlite_cursor.fetchall()
+            
+            # Check if we have a primary key where expected
+            expected_pk = expected_schema.get('primary_key')
+            if expected_pk:
+                # Look for primary key in SQLite table info
+                for col_info in sqlite_columns:
+                    col_name = col_info[1]
+                    is_pk = col_info[5] == 1  # pk column in PRAGMA table_info
+                    
+                    if col_name == expected_pk and is_pk:
+                        logging.debug(f"Table {table_name} has proper PRIMARY KEY constraint on {expected_pk}")
+                        return True
+                
+                logging.debug(f"Table {table_name} missing PRIMARY KEY constraint on {expected_pk}")
+                return False
+            else:
+                # Table shouldn't have a primary key (like METADATA, VAR_MAP)
+                return True
+                
+        except sqlite3.Error as e:
+            logging.error(f"Error checking SQLite table constraints for {table_name}: {e}")
+            return False
+    
+    def _create_table_with_constraints(self, table_name: str, sqlite_conn, schema: dict) -> bool:
+        """Create a new SQLite table with proper constraints."""
+        sqlite_cursor = sqlite_conn.cursor()
+        
+        try:
+            # Build column definitions
+            column_defs = []
+            for col in schema['columns']:
+                col_def = f"`{col['name']}` {col['type']}"
+                
+                # Add PRIMARY KEY constraint
+                if col['is_primary']:
+                    col_def += " PRIMARY KEY"
+                    # Note: SQLite handles auto-increment automatically for INTEGER PRIMARY KEY
+                
+                # Add NOT NULL if needed (usually implied with PRIMARY KEY)
+                elif not col['null'] and col['default'] is None:
+                    col_def += " NOT NULL"
+                    
+                column_defs.append(col_def)
+            
+            # Create table SQL
+            create_sql = f"CREATE TABLE `{table_name}` ({', '.join(column_defs)})"
+            
+            logging.debug(f"Creating table {table_name} with SQL: {create_sql}")
+            sqlite_cursor.execute(create_sql)
+            sqlite_conn.commit()
+            
+            logging.info(f"Successfully created table {table_name} with PRIMARY KEY constraints")
+            return True
+            
+        except sqlite3.Error as e:
+            logging.error(f"Error creating table {table_name} with constraints: {e}")
+            return False
+    
+    def _migrate_table_schema(self, table_name: str, sqlite_conn, schema: dict) -> bool:
+        """
+        Migrate existing SQLite table to include proper constraints.
+        This is complex and risky, so we use a safe backup-and-recreate approach.
+        """
+        sqlite_cursor = sqlite_conn.cursor()
+        
+        try:
+            logging.info(f"Starting schema migration for table {table_name}")
+            
+            # Step 1: Backup existing data
+            backup_table = f"{table_name}_backup_{int(time.time())}"
+            sqlite_cursor.execute(f"CREATE TABLE `{backup_table}` AS SELECT * FROM `{table_name}`")
+            
+            # Step 2: Drop original table
+            sqlite_cursor.execute(f"DROP TABLE `{table_name}`")
+            
+            # Step 3: Create new table with proper constraints
+            if not self._create_table_with_constraints(table_name, sqlite_conn, schema):
+                # Restore from backup if creation failed
+                sqlite_cursor.execute(f"ALTER TABLE `{backup_table}` RENAME TO `{table_name}`")
+                sqlite_conn.commit()
+                logging.error(f"Failed to create new table {table_name}, restored from backup")
+                return False
+            
+            # Step 4: Copy data back (with duplicate handling for PRIMARY KEY tables)
+            primary_key = schema.get('primary_key')
+            if primary_key:
+                # For tables with PRIMARY KEY, use INSERT OR IGNORE to handle potential duplicates
+                columns = [col['name'] for col in schema['columns']]
+                columns_str = ', '.join(f"`{col}`" for col in columns)
+                placeholders = ', '.join(['?'] * len(columns))
+                
+                # Get all data from backup
+                sqlite_cursor.execute(f"SELECT {columns_str} FROM `{backup_table}` ORDER BY `{primary_key}`")
+                backup_data = sqlite_cursor.fetchall()
+                
+                # Insert with duplicate protection
+                sqlite_cursor.executemany(
+                    f"INSERT OR IGNORE INTO `{table_name}` ({columns_str}) VALUES ({placeholders})",
+                    backup_data
+                )
+                
+                # Check for any skipped duplicates
+                sqlite_cursor.execute(f"SELECT COUNT(*) FROM `{backup_table}`")
+                original_count = sqlite_cursor.fetchone()[0]
+                sqlite_cursor.execute(f"SELECT COUNT(*) FROM `{table_name}`")
+                migrated_count = sqlite_cursor.fetchone()[0]
+                
+                if migrated_count < original_count:
+                    duplicates_removed = original_count - migrated_count
+                    logging.warning(f"Migration of {table_name}: removed {duplicates_removed} duplicate rows")
+                else:
+                    logging.info(f"Migration of {table_name}: all {migrated_count} rows migrated successfully")
+            else:
+                # For tables without PRIMARY KEY, copy all data
+                sqlite_cursor.execute(f"INSERT INTO `{table_name}` SELECT * FROM `{backup_table}`")
+            
+            # Step 5: Clean up backup table
+            sqlite_cursor.execute(f"DROP TABLE `{backup_table}`")
+            sqlite_conn.commit()
+            
+            logging.info(f"Successfully migrated table {table_name} to include PRIMARY KEY constraints")
+            return True
+            
+        except sqlite3.Error as e:
+            logging.error(f"Error migrating table schema for {table_name}: {e}")
+            # Try to restore from backup if it exists
+            try:
+                sqlite_cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name=?", (backup_table,))
+                if sqlite_cursor.fetchone():
+                    sqlite_cursor.execute(f"DROP TABLE IF EXISTS `{table_name}`")
+                    sqlite_cursor.execute(f"ALTER TABLE `{backup_table}` RENAME TO `{table_name}`")
+                    sqlite_conn.commit()
+                    logging.info(f"Restored {table_name} from backup after migration failure")
+            except:
+                pass
+            return False
     
     def _convert_mysql_type_to_sqlite(self, mysql_type: str) -> str:
         """Convert MySQL data types to SQLite equivalents."""
@@ -490,13 +715,19 @@ class MySQLdbToSQLite(BaseSQLConnector):
         Update a single table with new records using efficient chunked incremental backup.
         
         Strategy:
-        1. Get max(id) from local SQLite table as starting point
-        2. Query remote MySQL for 200 rows AFTER that ID  
-        3. Write those rows to SQLite
-        4. Repeat until fewer than 100 rows returned
+        1. Ensure table has proper schema with PRIMARY KEY constraints
+        2. Get max(id) from local SQLite table as starting point
+        3. Query remote MySQL for 200 rows AFTER that ID  
+        4. Write those rows to SQLite using INSERT OR IGNORE
+        5. Repeat until fewer than 100 rows returned
         """
         mysql_cursor = mysql_conn.cursor(buffered=True)
         sqlite_cursor = sqlite_conn.cursor()
+        
+        # Step 0: Ensure table has proper schema including PRIMARY KEY constraints
+        if not self._ensure_table_schema(table_name, mysql_conn, sqlite_conn):
+            logging.error(f"Failed to ensure proper schema for table {table_name}")
+            return
         
         # Step 1: Get the max ID in local table as our starting point
         try:
@@ -538,12 +769,21 @@ class MySQLdbToSQLite(BaseSQLConnector):
             
             # Step 3: Write rows to SQLite if we got any
             if rows_count > 0:
+                # Use INSERT OR IGNORE to handle any potential duplicates gracefully
+                # This is safe now that we have PRIMARY KEY constraints
                 sqlite_cursor.executemany(
-                    f"INSERT INTO `{table_name}` VALUES ({placeholders})", 
+                    f"INSERT OR IGNORE INTO `{table_name}` VALUES ({placeholders})", 
                     rows
                 )
                 sqlite_conn.commit()
-                total_inserted += rows_count
+                
+                # Check how many rows were actually inserted (some might have been ignored due to duplicates)
+                rows_inserted = sqlite_cursor.rowcount if sqlite_cursor.rowcount > 0 else rows_count
+                total_inserted += rows_inserted
+                
+                if rows_inserted < rows_count:
+                    duplicates_skipped = rows_count - rows_inserted
+                    logging.warning(f"Table {table_name}: Skipped {duplicates_skipped} duplicate rows during incremental backup")
                 
                 # Update current_max_id to the highest ID we just inserted
                 current_max_id = rows[-1][0]  # First column is always id
