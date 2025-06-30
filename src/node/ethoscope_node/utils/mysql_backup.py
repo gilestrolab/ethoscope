@@ -84,6 +84,8 @@ class BaseSQLConnector:
     """
     Base class for SQL operations with improved error handling and resource management.
     """
+
+    _TABLE_WITHOUT_KEY = ["ROI_MAP", "VAR_MAP", "METADATA"]
     
     def __init__(self, remote_host: str = "localhost", remote_user: str = "ethoscope", 
                  remote_pass: str = "ethoscope", dst_path: str = None, 
@@ -130,7 +132,7 @@ class BaseSQLConnector:
                     db_info[db_name] = {}
                 
                 # Choose appropriate count method based on table type
-                if table_name in ["ROI_MAP", "VAR_MAP"] or table_name.startswith("METADATA"):
+                if table_name in self._TABLE_WITHOUT_KEY or table_name.startswith("METADATA"):
                     query = "SELECT COUNT(*) FROM `{}`.`{}`".format(db_name, table_name)
                 else:
                     query = "SELECT COALESCE(MAX(id), 0) FROM `{}`.`{}`".format(db_name, table_name)
@@ -165,7 +167,7 @@ class BaseSQLConnector:
                 table_info = {}
                 for (table_name,) in tables:
                     try:
-                        if table_name not in ["ROI_MAP", "VAR_MAP", "METADATA"]:
+                        if table_name not in self._TABLE_WITHOUT_KEY:
                             cursor.execute("SELECT COALESCE(MAX(id), 0) FROM `{}`".format(table_name))
                         else:
                             cursor.execute("SELECT COUNT(*) FROM `{}`".format(table_name))
@@ -631,8 +633,10 @@ class MySQLdbToSQLite(BaseSQLConnector):
             mysql_cursor = mysql_conn.cursor(buffered=False)
             sqlite_cursor = sqlite_conn.cursor()
             
-            if table_name.upper() in {'METADATA', 'VAR_MAP'}:
-                self.logger.info(f"Clearing table {table_name} to prevent duplicates")
+            # Check if we should clear table to prevent duplicates
+            should_clear = table_name.upper() in [t.upper() for t in self._TABLE_WITHOUT_KEY]
+            if should_clear:
+                logging.info(f"Clearing table {table_name} to prevent duplicates")
                 sqlite_cursor.execute(f"DELETE FROM `{table_name}`")
                 sqlite_conn.commit()
             
@@ -675,10 +679,10 @@ class MySQLdbToSQLite(BaseSQLConnector):
                 
                 total_rows += len(batch)
             
-            self.logger.info(f"Copied {total_rows} rows to {table_name}")
+            logging.info(f"Copied {total_rows} rows to {table_name}")
             
         except Exception as e:
-            self.logger.error(f"Error copying data for table {table_name}: {str(e)}")
+            logging.error(f"Error copying data for table {table_name}: {str(e)}")
             sqlite_conn.rollback()
             raise
         finally:
@@ -729,7 +733,7 @@ class MySQLdbToSQLite(BaseSQLConnector):
                 logging.warning(f"Could not update table {table_name}: {e}")
         
         # Update tables without ID fields using row-by-row checking
-        for table_name in ["METADATA", "VAR_MAP"]:
+        for table_name in self._TABLE_WITHOUT_KEY:
             try:
                 self._update_table_without_id(table_name, mysql_conn, sqlite_conn)
             except mysql.connector.Error as e:
@@ -832,7 +836,7 @@ class MySQLdbToSQLite(BaseSQLConnector):
     
     def _update_table_without_id(self, table_name: str, mysql_conn, sqlite_conn):
         """
-        Update tables without ID fields (METADATA, VAR_MAP) using row-by-row duplicate checking.
+        Update tables without ID fields (e.g., METADATA, VAR_MAP, ROI_MAP) using row-by-row duplicate checking.
         These are small tables so we can afford to check each row individually.
         """
         mysql_cursor = mysql_conn.cursor(buffered=True)
