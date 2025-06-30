@@ -39,9 +39,17 @@ def home():
                             if getattr(status, 'processing', False))
             
             # Get device discovery information
+            try:
+                # Get fresh device count by actually discovering devices
+                current_devices = gbw.find_devices() if hasattr(gbw, 'find_devices') else []
+                current_active_count = len(current_devices)
+            except Exception as discovery_error:
+                current_active_count = getattr(gbw, '_last_device_count', 0)
+                
             device_stats = {
                 'total_discovered': getattr(gbw, '_last_device_count', 0),
-                'active_eligible': len(gbw.backup_status) if hasattr(gbw, 'backup_status') else 0,
+                'active_eligible': current_active_count,
+                'devices_with_status': len(gbw.backup_status) if hasattr(gbw, 'backup_status') else 0,
                 'discovery_source': getattr(gbw, '_last_discovery_source', 'unknown'),
                 'last_discovery_time': getattr(gbw, '_last_discovery_time', None)
             }
@@ -91,14 +99,16 @@ def home():
                 'device_discovery': device_stats,
                 'backup_progress': backup_stats,
                 'configuration': config_info,
-                'recent_errors': {
+                'legacy_error_analysis': {
                     'count_last_hour': recent_errors,
                     'error_types': error_types
                 },
                 'thread_status': {
                     'is_alive': gbw.is_alive() if hasattr(gbw, 'is_alive') else False,
-                    'is_running': getattr(gbw, '_running', False)
-                }
+                    'is_running': gbw.is_running() if hasattr(gbw, 'is_running') else False,
+                    'stop_event_set': gbw._stop_event.is_set() if hasattr(gbw, '_stop_event') else None
+                },
+                'health_status': gbw.get_health_status() if hasattr(gbw, 'get_health_status') else {}
             }
             
             return json.dumps(status_response, indent=2, default=str)

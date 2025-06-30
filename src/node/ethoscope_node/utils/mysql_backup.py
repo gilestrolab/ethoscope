@@ -623,23 +623,49 @@ class MySQLdbToSQLite(BaseSQLConnector):
             sqlite_conn.commit()
     
     def _copy_regular_data(self, table_name: str, mysql_conn, sqlite_conn, dump_csv: bool = False):
-        """Copy regular table data with batching."""
-        mysql_cursor = mysql_conn.cursor(buffered=True)
-        sqlite_cursor = sqlite_conn.cursor()
+        """Copy regular table data with batching, preventing duplicates."""
+        mysql_cursor = None
+        sqlite_cursor = None
         
-        mysql_cursor.execute(f"SELECT * FROM `{table_name}`")
-        
-        # Get column count for placeholder generation
-        column_count = len(mysql_cursor.description)
-        placeholders = ','.join(['?'] * column_count)
-        
-        batch = []
-        for row in mysql_cursor:
-            batch.append(row)
+        try:
+            mysql_cursor = mysql_conn.cursor(buffered=False)
+            sqlite_cursor = sqlite_conn.cursor()
             
-            if len(batch) >= self.MAX_BATCH_SIZE:
+            if table_name.upper() in {'METADATA', 'VAR_MAP'}:
+                self.logger.info(f"Clearing table {table_name} to prevent duplicates")
+                sqlite_cursor.execute(f"DELETE FROM `{table_name}`")
+                sqlite_conn.commit()
+            
+            mysql_cursor.execute(f"SELECT * FROM `{table_name}`")
+            column_count = len(mysql_cursor.description)
+            placeholders = ','.join(['?'] * column_count)
+            
+            # Choose INSERT strategy based on whether we cleared the table
+            insert_template = "INSERT INTO" if should_clear else "INSERT OR IGNORE INTO"
+            
+            batch = []
+            total_rows = 0
+            
+            for row in mysql_cursor:
+                batch.append(row)
+                
+                if len(batch) >= self.MAX_BATCH_SIZE:
+                    sqlite_cursor.executemany(
+                        f"{insert_template} `{table_name}` VALUES ({placeholders})", 
+                        batch
+                    )
+                    sqlite_conn.commit()
+                    
+                    if dump_csv:
+                        self._write_to_dam_file(batch)
+                    
+                    total_rows += len(batch)
+                    batch = []
+            
+            # Insert remaining rows
+            if batch:
                 sqlite_cursor.executemany(
-                    f"INSERT OR IGNORE INTO `{table_name}` VALUES ({placeholders})", 
+                    f"{insert_template} `{table_name}` VALUES ({placeholders})", 
                     batch
                 )
                 sqlite_conn.commit()
@@ -647,18 +673,19 @@ class MySQLdbToSQLite(BaseSQLConnector):
                 if dump_csv:
                     self._write_to_dam_file(batch)
                 
-                batch = []
-        
-        # Insert remaining rows
-        if batch:
-            sqlite_cursor.executemany(
-                f"INSERT OR IGNORE INTO `{table_name}` VALUES ({placeholders})", 
-                batch
-            )
-            sqlite_conn.commit()
+                total_rows += len(batch)
             
-            if dump_csv:
-                self._write_to_dam_file(batch)
+            self.logger.info(f"Copied {total_rows} rows to {table_name}")
+            
+        except Exception as e:
+            self.logger.error(f"Error copying data for table {table_name}: {str(e)}")
+            sqlite_conn.rollback()
+            raise
+        finally:
+            if mysql_cursor:
+                mysql_cursor.close()
+            if sqlite_cursor:
+                sqlite_cursor.close()
     
     def _write_to_dam_file(self, batch):
         """Write batch data to DAM file."""

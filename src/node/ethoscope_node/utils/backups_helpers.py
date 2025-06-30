@@ -992,7 +992,7 @@ class GenericBackupWrapper(threading.Thread):
     
     def run(self):
         """
-        Main backup loop with improved error handling and resource management.
+        Main backup loop with comprehensive fault tolerance and auto-recovery.
         """
         # Log thread startup with multiple loggers to ensure visibility
         logging.info("=== BACKUP WRAPPER THREAD STARTING ===")
@@ -1000,43 +1000,228 @@ class GenericBackupWrapper(threading.Thread):
         self._logger.info(f"Configuration: max_threads={self._max_threads}, interval={self._backup_interval}s, video_backup={self._is_video_backup}")
         logging.info(f"Configuration: max_threads={self._max_threads}, interval={self._backup_interval}s, video_backup={self._is_video_backup}")
         
+        # Thread health monitoring
+        consecutive_failures = 0
+        max_consecutive_failures = 5
+        last_successful_cycle = time.time()
+        
         try:
             with ThreadPoolExecutor(max_workers=self._max_threads, 
                                   thread_name_prefix="BackupWorker") as executor:
                 
                 while not self._stop_event.is_set():
+                    cycle_start_time = time.time()
                     self._cycle_count += 1
-                    self._last_cycle_start = time.time()
+                    self._last_cycle_start = cycle_start_time
+                    
                     logging.info(f"=== Starting backup cycle #{self._cycle_count} ===")
                     self._logger.info(f"=== Starting backup cycle #{self._cycle_count} ===")
                     
+                    cycle_success = False
                     try:
-                        self._execute_backup_cycle(executor)
-                        logging.info(f"=== Backup cycle #{self._cycle_count} completed successfully ===")
-                        self._logger.info(f"=== Backup cycle #{self._cycle_count} completed successfully ===")
+                        # Execute backup cycle with comprehensive fault tolerance
+                        self._execute_backup_cycle_with_recovery(executor)
+                        
+                        cycle_success = True
+                        consecutive_failures = 0
+                        last_successful_cycle = time.time()
+                        
+                        cycle_duration = time.time() - cycle_start_time
+                        logging.info(f"=== Backup cycle #{self._cycle_count} completed successfully in {cycle_duration:.1f}s ===")
+                        self._logger.info(f"=== Backup cycle #{self._cycle_count} completed successfully in {cycle_duration:.1f}s ===")
+                        
                     except Exception as e:
-                        logging.error(f"=== ERROR in backup cycle #{self._cycle_count}: {e} ===")
-                        self._logger.error(f"=== ERROR in backup cycle #{self._cycle_count}: {e} ===")
+                        cycle_success = False
+                        consecutive_failures += 1
+                        cycle_duration = time.time() - cycle_start_time
+                        
+                        logging.error(f"=== ERROR in backup cycle #{self._cycle_count} after {cycle_duration:.1f}s: {e} ===")
+                        self._logger.error(f"=== ERROR in backup cycle #{self._cycle_count} after {cycle_duration:.1f}s: {e} ===")
                         self._logger.error("Full traceback:", exc_info=True)
+                        
+                        # Check for critical failure conditions
+                        if consecutive_failures >= max_consecutive_failures:
+                            time_since_success = time.time() - last_successful_cycle
+                            self._logger.error(f"CRITICAL: {consecutive_failures} consecutive backup cycle failures over {time_since_success:.1f}s")
+                            self._logger.error("Attempting emergency recovery procedures...")
+                            
+                            # Emergency recovery
+                            try:
+                                self._perform_emergency_recovery()
+                                consecutive_failures = 0  # Reset after recovery attempt
+                            except Exception as recovery_error:
+                                self._logger.error(f"Emergency recovery failed: {recovery_error}")
                     
+                    # Health monitoring and adaptive behavior
                     if not self._stop_event.is_set():
-                        self._logger.info(f"Waiting {self._backup_interval} seconds until next cycle...")
+                        # Adaptive wait time based on recent failures
+                        wait_time = self._calculate_adaptive_wait_time(consecutive_failures)
+                        
+                        self._logger.info(f"Backup cycle #{self._cycle_count} complete. Waiting {wait_time}s until next cycle...")
+                        self._logger.info(f"Health status: {consecutive_failures} consecutive failures")
+                        
                         # Wait for next cycle or stop event
-                        self._stop_event.wait(self._backup_interval)
+                        self._stop_event.wait(wait_time)
                     
+        except KeyboardInterrupt:
+            self._logger.info("=== BACKUP WRAPPER THREAD INTERRUPTED BY USER ===")
         except Exception as e:
             self._logger.error(f"=== BACKUP WRAPPER THREAD CRASHED: {e} ===")
             self._logger.error("Full traceback:", exc_info=True)
+            
+            # Attempt emergency state preservation
+            try:
+                self._preserve_emergency_state(str(e))
+            except Exception as preserve_error:
+                self._logger.error(f"Failed to preserve emergency state: {preserve_error}")
+                
         finally:
-            self._logger.info("=== BACKUP WRAPPER THREAD ENDING ===")
+            final_stats = {
+                'total_cycles': self._cycle_count,
+                'consecutive_failures': consecutive_failures,
+                'last_successful_cycle': last_successful_cycle
+            }
+            self._logger.info(f"=== BACKUP WRAPPER THREAD ENDING === Final stats: {final_stats}")
+    
+    def _execute_backup_cycle_with_recovery(self, executor: ThreadPoolExecutor):
+        """Execute backup cycle with additional recovery mechanisms."""
+        try:
+            self._execute_backup_cycle(executor)
+        except Exception as e:
+            self._logger.error(f"Backup cycle failed, attempting recovery: {e}")
+            
+            # Attempt to recover from common failure scenarios
+            recovery_success = False
+            
+            # Recovery attempt 1: Clear problematic status entries
+            try:
+                self._clear_problematic_status_entries()
+                recovery_success = True
+                self._logger.info("Recovery attempt 1 successful: cleared problematic status entries")
+            except Exception as recovery_error:
+                self._logger.error(f"Recovery attempt 1 failed: {recovery_error}")
+            
+            # Recovery attempt 2: Reset device discovery state
+            if not recovery_success:
+                try:
+                    self._reset_device_discovery_state()
+                    recovery_success = True
+                    self._logger.info("Recovery attempt 2 successful: reset device discovery state")
+                except Exception as recovery_error:
+                    self._logger.error(f"Recovery attempt 2 failed: {recovery_error}")
+            
+            # If recovery was successful, re-raise the original exception to be caught by the main loop
+            # If recovery failed, the original exception will propagate
+            if not recovery_success:
+                self._logger.error("All recovery attempts failed")
+            
+            # Always re-raise to be handled by the main loop's error handling
+            raise
+    
+    def _calculate_adaptive_wait_time(self, consecutive_failures: int) -> int:
+        """Calculate adaptive wait time based on failure rate."""
+        base_wait = self._backup_interval
+        
+        if consecutive_failures == 0:
+            return base_wait
+        elif consecutive_failures <= 2:
+            return base_wait + 30  # Add 30 seconds for minor issues
+        elif consecutive_failures <= 4:
+            return base_wait + 120  # Add 2 minutes for moderate issues
+        else:
+            return base_wait + 300  # Add 5 minutes for severe issues
+    
+    def _perform_emergency_recovery(self):
+        """Perform emergency recovery procedures."""
+        self._logger.info("=== STARTING EMERGENCY RECOVERY ===")
+        
+        # Recovery step 1: Clear all backup status
+        try:
+            with self._lock:
+                failed_devices = len(self.backup_status)
+                self.backup_status.clear()
+                self._logger.info(f"Cleared {failed_devices} problematic backup status entries")
+        except Exception as e:
+            self._logger.error(f"Emergency recovery step 1 failed: {e}")
+        
+        # Recovery step 2: Reset discovery state
+        try:
+            self._last_device_count = 0
+            self._last_discovery_source = 'recovery_reset'
+            self._last_discovery_time = time.time()
+            self._logger.info("Reset device discovery state")
+        except Exception as e:
+            self._logger.error(f"Emergency recovery step 2 failed: {e}")
+        
+        # Recovery step 3: Force garbage collection
+        try:
+            import gc
+            gc.collect()
+            self._logger.info("Forced garbage collection")
+        except Exception as e:
+            self._logger.error(f"Emergency recovery step 3 failed: {e}")
+        
+        self._logger.info("=== EMERGENCY RECOVERY COMPLETED ===")
+    
+    def _clear_problematic_status_entries(self):
+        """Clear backup status entries that might be causing issues."""
+        with self._lock:
+            problem_devices = []
+            current_time = time.time()
+            
+            for device_id, status in list(self.backup_status.items()):
+                # Remove devices that have been processing for too long
+                if (hasattr(status, 'processing') and status.processing and 
+                    hasattr(status, 'started') and status.started and 
+                    current_time - status.started > 3600):  # 1 hour
+                    problem_devices.append(device_id)
+                
+                # Remove devices with error status older than 24 hours
+                elif (hasattr(status, 'status') and status.status == 'error' and
+                      hasattr(status, 'ended') and status.ended and 
+                      current_time - status.ended > 86400):  # 24 hours
+                    problem_devices.append(device_id)
+            
+            for device_id in problem_devices:
+                del self.backup_status[device_id]
+                self._logger.info(f"Removed problematic status entry for device {device_id}")
+            
+            self._logger.info(f"Cleared {len(problem_devices)} problematic status entries")
+    
+    def _reset_device_discovery_state(self):
+        """Reset device discovery state to recover from discovery issues."""
+        self._last_device_count = 0
+        self._last_discovery_source = 'reset'
+        self._last_discovery_time = time.time()
+        self._logger.info("Reset device discovery state for recovery")
+    
+    def _preserve_emergency_state(self, error_message: str):
+        """Preserve critical state information before thread termination."""
+        emergency_state = {
+            'timestamp': time.time(),
+            'cycle_count': self._cycle_count,
+            'last_cycle_start': self._last_cycle_start,
+            'device_count': self._last_device_count,
+            'discovery_source': self._last_discovery_source,
+            'error_message': error_message,
+            'backup_status_count': len(self.backup_status) if hasattr(self, 'backup_status') else 0
+        }
+        
+        self._logger.error(f"Emergency state preservation: {emergency_state}")
+        
+        # Could write to a file for debugging if needed
+        # with open('/tmp/backup_emergency_state.json', 'w') as f:
+        #     json.dump(emergency_state, f, indent=2)
     
     def _execute_backup_cycle(self, executor: ThreadPoolExecutor):
-        """Execute a single backup cycle."""
+        """Execute a single backup cycle with comprehensive fault isolation."""
         self._logger.info("=== Starting backup cycle ====")
         
+        # Device discovery with robust error handling
+        active_devices = None
         try:
             self._logger.info("Discovering active devices...")
-            active_devices = self.find_devices()
+            active_devices = self._discover_devices_safely()
             if not active_devices:
                 self._logger.info("No devices found for backup")
                 self._update_last_backup_time()
@@ -1049,46 +1234,185 @@ class GenericBackupWrapper(threading.Thread):
                 self._logger.info(f"  - {device_name} (status: {device_status})")
             
         except Exception as e:
-            self._logger.error(f"Could not get device list: {e}")
+            self._logger.error(f"CRITICAL: Device discovery failed completely: {e}")
             self._logger.error("Full traceback:", exc_info=True)
+            self._logger.error("Backup cycle aborted due to device discovery failure")
             return
         
-        # Submit backup jobs
+        # Submit backup jobs with fault isolation
+        futures = self._submit_backup_jobs_safely(executor, active_devices)
+        
+        # Wait for completion with comprehensive error isolation
+        self._wait_for_backup_completion_safely(futures)
+        
+        self._update_last_backup_time()
+        self._logger.info("=== Backup cycle completed ====")
+    
+    def _discover_devices_safely(self) -> List[Dict]:
+        """Discover devices with multiple fallback mechanisms and error isolation."""
+        max_discovery_attempts = 3
+        
+        for attempt in range(1, max_discovery_attempts + 1):
+            try:
+                self._logger.info(f"Device discovery attempt {attempt}/{max_discovery_attempts}")
+                active_devices = self.find_devices()
+                
+                if active_devices:
+                    self._logger.info(f"Successfully discovered {len(active_devices)} devices on attempt {attempt}")
+                    return active_devices
+                else:
+                    self._logger.warning(f"No active devices found on attempt {attempt}")
+                    if attempt < max_discovery_attempts:
+                        time.sleep(5)  # Wait before retry
+                        continue
+                    return []
+                    
+            except Exception as e:
+                self._logger.error(f"Device discovery attempt {attempt} failed: {e}")
+                if attempt == max_discovery_attempts:
+                    self._logger.error("All device discovery attempts failed")
+                    raise
+                else:
+                    self._logger.info(f"Retrying device discovery in 10 seconds...")
+                    time.sleep(10)
+        
+        return []
+    
+    def _submit_backup_jobs_safely(self, executor: ThreadPoolExecutor, active_devices: List[Dict]) -> List[Tuple]:
+        """Submit backup jobs with comprehensive error isolation."""
         self._logger.info("Submitting backup jobs to thread pool...")
         futures = []
+        successful_submissions = 0
+        failed_submissions = 0
+        
         for device in active_devices:
+            device_id = device.get('id', 'unknown')
+            device_name = device.get('name', 'unknown')
+            
             try:
-                device_id = device.get('id', 'unknown')
-                device_name = device.get('name', 'unknown')
                 self._logger.info(f"Submitting backup job for device {device_name} (ID: {device_id})")
                 
-                future = executor.submit(self.initiate_backup_job, device)
+                # Validate device before submission
+                if not self._validate_device_for_backup(device):
+                    self._logger.warning(f"Device {device_name} failed validation, skipping")
+                    failed_submissions += 1
+                    continue
+                
+                # Create fault-isolated backup job wrapper
+                future = executor.submit(self._execute_backup_job_safely, device)
                 futures.append((future, device_id, device_name))
+                successful_submissions += 1
                 
             except Exception as e:
-                self._logger.error(f"Failed to submit backup job for {device}: {e}")
+                self._logger.error(f"CRITICAL: Failed to submit backup job for {device_name} (ID: {device_id}): {e}")
                 self._logger.error("Full traceback:", exc_info=True)
+                failed_submissions += 1
+                
+                # Mark device as failed in status
+                try:
+                    self._handle_backup_failure(device_id, f"Job submission failed: {str(e)}")
+                except Exception as status_error:
+                    self._logger.error(f"Additional error updating status for {device_id}: {status_error}")
         
-        self._logger.info(f"Submitted {len(futures)} backup jobs to thread pool")
+        self._logger.info(f"Job submission summary: {successful_submissions} successful, {failed_submissions} failed")
+        return futures
+    
+    def _validate_device_for_backup(self, device: Dict) -> bool:
+        """Validate that device has required information for backup."""
+        required_fields = ['id', 'name', 'ip']
         
-        # Wait for completion with timeout handling
-        self._logger.info("Waiting for backup jobs to complete...")
+        for field in required_fields:
+            if not device.get(field):
+                self._logger.warning(f"Device missing required field '{field}': {device}")
+                return False
+        
+        return True
+    
+    def _execute_backup_job_safely(self, device: Dict) -> bool:
+        """Execute backup job with comprehensive fault isolation and error recovery."""
+        device_id = device.get('id', 'unknown')
+        device_name = device.get('name', 'unknown')
+        
+        try:
+            # Use the existing initiate_backup_job method which already has error handling
+            return self.initiate_backup_job(device)
+            
+        except DBNotReadyError as e:
+            # Non-critical error - device database not ready
+            self._logger.warning(f"Device {device_name} database not ready, will retry later: {e}")
+            self._handle_backup_failure(device_id, f"Database not ready: {str(e)}")
+            return False
+            
+        except Exception as e:
+            # Critical error - comprehensive logging and recovery
+            self._logger.error(f"CRITICAL: Backup job for {device_name} (ID: {device_id}) crashed with unexpected error: {e}")
+            self._logger.error("Full traceback:", exc_info=True)
+            
+            try:
+                self._handle_backup_failure(device_id, f"Job crashed: {str(e)}")
+            except Exception as status_error:
+                self._logger.error(f"Additional error updating status for {device_id}: {status_error}")
+            
+            # Never let individual job failures propagate up
+            return False
+    
+    def _wait_for_backup_completion_safely(self, futures: List[Tuple]):
+        """Wait for backup job completion with comprehensive fault isolation."""
+        if not futures:
+            self._logger.info("No backup jobs to wait for")
+            return
+        
+        self._logger.info(f"Waiting for {len(futures)} backup jobs to complete...")
+        completed_jobs = 0
+        successful_jobs = 0
+        failed_jobs = 0
+        timed_out_jobs = 0
+        
         for future, device_id, device_name in futures:
             try:
                 self._logger.info(f"Waiting for backup completion: {device_name} (ID: {device_id})")
-                # Wait for completion with a timeout
-                future.result(timeout=600)  # 10 minute timeout per job
-                self._logger.info(f"Backup completed successfully: {device_name} (ID: {device_id})")
+                
+                # Wait for completion with timeout
+                result = future.result(timeout=600)  # 10 minute timeout per job
+                completed_jobs += 1
+                
+                if result:
+                    successful_jobs += 1
+                    self._logger.info(f"✓ Backup SUCCESSFUL: {device_name} (ID: {device_id})")
+                else:
+                    failed_jobs += 1
+                    self._logger.error(f"✗ Backup FAILED: {device_name} (ID: {device_id})")
                 
             except concurrent.futures.TimeoutError:
-                self._logger.error(f"Backup job timed out (600s) for device {device_name} (ID: {device_id})")
+                timed_out_jobs += 1
+                self._logger.error(f"⏰ Backup TIMED OUT (600s): {device_name} (ID: {device_id})")
+                
+                # Cancel the timed out job to free resources
+                try:
+                    future.cancel()
+                    self._handle_backup_failure(device_id, "Backup timed out after 600 seconds")
+                except Exception as cancel_error:
+                    self._logger.error(f"Error canceling timed out job for {device_id}: {cancel_error}")
+                
             except Exception as e:
-                self._logger.error(f"Backup job failed for device {device_name} (ID: {device_id}): {e}")
+                failed_jobs += 1
+                self._logger.error(f"✗ Backup job CRASHED: {device_name} (ID: {device_id}): {e}")
                 self._logger.error("Full traceback:", exc_info=True)
+                
+                try:
+                    self._handle_backup_failure(device_id, f"Job crashed during execution: {str(e)}")
+                except Exception as status_error:
+                    self._logger.error(f"Error updating status for crashed job {device_id}: {status_error}")
         
-        self._logger.info("All backup jobs completed or timed out")
-        self._update_last_backup_time()
-        self._logger.info("=== Backup cycle completed ====")
+        # Log comprehensive backup cycle summary
+        total_jobs = len(futures)
+        self._logger.info(f"=== BACKUP CYCLE SUMMARY ===")
+        self._logger.info(f"Total jobs: {total_jobs}")
+        self._logger.info(f"Successful: {successful_jobs}")
+        self._logger.info(f"Failed: {failed_jobs}")
+        self._logger.info(f"Timed out: {timed_out_jobs}")
+        self._logger.info(f"Success rate: {(successful_jobs/total_jobs*100):.1f}%" if total_jobs > 0 else "N/A")
+        self._logger.info(f"=== END BACKUP CYCLE SUMMARY ===")
     
     def _update_last_backup_time(self):
         """Update last backup timestamp."""
@@ -1152,7 +1476,53 @@ class GenericBackupWrapper(threading.Thread):
     
     def is_running(self) -> bool:
         """Check if the backup wrapper is running."""
-        return not self._stop_event.is_set()
+        return self.is_alive() and not self._stop_event.is_set()
+    
+    def get_health_status(self) -> Dict:
+        """Get comprehensive health status of the backup wrapper."""
+        with self._lock:
+            current_time = time.time()
+            
+            # Count devices by status
+            status_counts = {'processing': 0, 'success': 0, 'error': 0, 'warning': 0, 'unknown': 0}
+            recent_errors = []
+            
+            for device_id, status in self.backup_status.items():
+                if hasattr(status, 'processing') and status.processing:
+                    status_counts['processing'] += 1
+                elif hasattr(status, 'progress') and status.progress:
+                    progress_status = status.progress.get('status', 'unknown')
+                    if progress_status in status_counts:
+                        status_counts[progress_status] += 1
+                    else:
+                        status_counts['unknown'] += 1
+                        
+                    # Collect recent errors
+                    if (progress_status == 'error' and hasattr(status, 'ended') and status.ended and
+                        current_time - status.ended < 3600):  # Last hour
+                        recent_errors.append({
+                            'device_id': device_id,
+                            'device_name': getattr(status, 'name', 'unknown'),
+                            'error_time': status.ended,
+                            'error_message': status.progress.get('message', 'Unknown error')
+                        })
+                else:
+                    status_counts['unknown'] += 1
+            
+            return {
+                'thread_alive': self.is_alive(),
+                'thread_running': not self._stop_event.is_set(),
+                'cycle_count': self._cycle_count,
+                'last_cycle_start': self._last_cycle_start,
+                'device_discovery': {
+                    'last_count': self._last_device_count,
+                    'last_source': self._last_discovery_source,
+                    'last_time': self._last_discovery_time
+                },
+                'device_status_counts': status_counts,
+                'recent_errors': recent_errors,
+                'total_tracked_devices': len(self.backup_status)
+            }
     
     def get_statistics(self) -> Dict:
         """
