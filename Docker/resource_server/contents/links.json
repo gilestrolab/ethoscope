@@ -1,18 +1,22 @@
 {
     "images": [{
             "title": "Ethoscope000, rPI2/3",
-            "filename": "20240130_ethoscope_000.img",
-            "url": "https://imperialcollegelondon.box.com/shared/static/1pqzhhe3podxw4i20s8jjxbfrnk7m3f8.zip",
-            "date": "30 Jan 2024",
-            "md5sum": "ae22646c979b98e6b5024857470270d6"
+            "filename": "20250629_ethoscope_PI3_000.img.zip",
+            "url": "https://imperialcollegelondon.box.com/shared/static/wxvadqrn87v3afgxftuivrndisjecodg.zip",
+            "date": "29 Jun 2025",
+            "md5sum": "8c15cde5dafbc4ff192d57a5ccd0ffa0",
+            "SDsize": "32Gb",
+            "tested_on": "SD"
         },
 
         {
             "title": "Ethoscope000, rPI4",
-            "filename": "20241017_ethoscope_pi4_000.img",
-            "url": "https://imperialcollegelondon.box.com/shared/static/r9q3ldd6a384o29h8c8iwjrppsr7mujd.zip",
-            "date": "17 Oct 2024",
-            "md5sum": "e7fe190f038eb1d1358ed829feaf9fd2"
+            "filename": "20250630_ethoscope_PI4_000.img.zip",
+            "url": "https://imperialcollegelondon.box.com/shared/static/717b5qg4ox3dhvilte7xa7ktr5ibqsw6.zip",
+            "date": "30 Jun 2025",
+            "md5sum": "ca91c431f9501ebdf0381d89860a39a1",
+            "SDsize": "32Gb",
+            "tested_on": "SD"
         },
 
         {

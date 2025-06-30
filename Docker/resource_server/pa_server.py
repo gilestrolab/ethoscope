@@ -5,9 +5,6 @@ import os
 import datetime
 import optparse
 
-FILESVERSION = "1.6"
-FILESDATE = "2020-02-15"
-
 app = bottle.Bottle()
 
 links_file = "./contents/links.json"
@@ -75,7 +72,7 @@ def resources():
     logging.info("%s - Receiving request from %s - %s" % (datetime.datetime.now(), client, resolve))
     
     bottle.response.content_type = 'application/json'
-    return json.dumps({"images": images, "gcodes": gcodes, "onshape": onshape, 'gcodes_zip': gcodes_zip, 'date': FILESDATE, 'version': FILESVERSION})
+    return json.dumps({"images": images, "gcodes": gcodes, "onshape": onshape, 'gcodes_zip': gcodes_zip, 'date': "", 'version': ""})
 
 
 @app.get('/news')
