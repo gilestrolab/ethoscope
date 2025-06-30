@@ -133,17 +133,17 @@ class SQLiteDuplicateCleaner:
     
     def remove_duplicates(self, db_path: str, table_name: str, has_id: bool = True) -> Tuple[int, int]:
         """Remove duplicate rows, keeping the first occurrence."""
+
+        total, duplicates = self.detect_duplicates(db_path, table_name, has_id)
+
         if self.dry_run:
-            total, duplicates = self.detect_duplicates(db_path, table_name, has_id)
             self.logger.info(f"[DRY RUN] Would remove {duplicates} duplicate rows from {table_name}")
             return total, duplicates
         
+        if duplicates == 0:
+            return 0, 0
+
         try:
-            # Create backup
-            backup_path = f"{db_path}.backup_{int(time.time())}"
-            shutil.copy2(db_path, backup_path)
-            self.logger.info(f"Created backup: {backup_path}")
-            
             with sqlite3.connect(db_path, timeout=30.0) as conn:
                 cursor = conn.cursor()
                 
@@ -227,6 +227,12 @@ class SQLiteDuplicateCleaner:
         
         initial_size = self.get_file_size(db_path)
         
+        if not self.dry_run:
+            backup_path = f"{db_path}.backup_{int(time.time())}"
+            shutil.copy2(db_path, backup_path)
+            self.logger.info(f"Created backup: {backup_path}")
+
+
         # Get table information
         table_info = self.get_table_info(db_path)
         if not table_info:
