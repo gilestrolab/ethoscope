@@ -737,6 +737,15 @@ class GenericBackupWrapper(threading.Thread):
         self.backup_status: Dict[str, BackupStatus] = {}
         self.last_backup = ""
         
+        # Device discovery tracking
+        self._last_device_count = 0
+        self._last_discovery_source = 'unknown'
+        self._last_discovery_time = None
+        
+        # Backup cycle tracking
+        self._cycle_count = 0
+        self._last_cycle_start = None
+        
         # Remove retry throttling - incremental backups are safe to run frequently
         
         # Configuration
@@ -763,15 +772,23 @@ class GenericBackupWrapper(threading.Thread):
             self._logger.info(f"Attempting to get devices from node at {self._node_address}")
             devices = self._get_devices_from_node()
             self._logger.info(f"Successfully retrieved {len(devices)} devices from node")
+            self._last_discovery_source = 'node'
         except Exception as e:
             self._logger.warning(f"Could not get devices from node: {e}")
             self._logger.info("Falling back to direct device scanning...")
             try:
                 devices = self._get_devices_via_scanner()
                 self._logger.info(f"Scanner found {len(devices)} devices")
+                self._last_discovery_source = 'scanner'
             except Exception as scanner_error:
                 self._logger.error(f"Scanner also failed: {scanner_error}")
+                self._last_discovery_source = 'failed'
                 return []
+        
+        # Update discovery tracking
+        import time
+        self._last_device_count = len(devices)
+        self._last_discovery_time = time.time()
         
         if only_active:
             active_devices = [
@@ -981,19 +998,19 @@ class GenericBackupWrapper(threading.Thread):
             with ThreadPoolExecutor(max_workers=self._max_threads, 
                                   thread_name_prefix="BackupWorker") as executor:
                 
-                cycle_count = 0
                 while not self._stop_event.is_set():
-                    cycle_count += 1
-                    logging.info(f"=== Starting backup cycle #{cycle_count} ===")
-                    self._logger.info(f"=== Starting backup cycle #{cycle_count} ===")
+                    self._cycle_count += 1
+                    self._last_cycle_start = time.time()
+                    logging.info(f"=== Starting backup cycle #{self._cycle_count} ===")
+                    self._logger.info(f"=== Starting backup cycle #{self._cycle_count} ===")
                     
                     try:
                         self._execute_backup_cycle(executor)
-                        logging.info(f"=== Backup cycle #{cycle_count} completed successfully ===")
-                        self._logger.info(f"=== Backup cycle #{cycle_count} completed successfully ===")
+                        logging.info(f"=== Backup cycle #{self._cycle_count} completed successfully ===")
+                        self._logger.info(f"=== Backup cycle #{self._cycle_count} completed successfully ===")
                     except Exception as e:
-                        logging.error(f"=== ERROR in backup cycle #{cycle_count}: {e} ===")
-                        self._logger.error(f"=== ERROR in backup cycle #{cycle_count}: {e} ===")
+                        logging.error(f"=== ERROR in backup cycle #{self._cycle_count}: {e} ===")
+                        self._logger.error(f"=== ERROR in backup cycle #{self._cycle_count}: {e} ===")
                         self._logger.error("Full traceback:", exc_info=True)
                     
                     if not self._stop_event.is_set():

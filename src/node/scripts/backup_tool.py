@@ -25,7 +25,91 @@ def enable_cors():
 def home():
     enable_cors()
     bottle.response.content_type = 'application/json'
-    return json.dumps({'status': 'running'}, indent=2)
+    
+    if gbw is None:
+        return json.dumps({
+            'status': 'initializing',
+            'error': 'Backup wrapper not initialized'
+        }, indent=2)
+    
+    try:
+        with gbw._lock:
+            # Get basic backup wrapper stats
+            active_jobs = sum(1 for status in gbw.backup_status.values() 
+                            if getattr(status, 'processing', False))
+            
+            # Get device discovery information
+            device_stats = {
+                'total_discovered': getattr(gbw, '_last_device_count', 0),
+                'active_eligible': len(gbw.backup_status) if hasattr(gbw, 'backup_status') else 0,
+                'discovery_source': getattr(gbw, '_last_discovery_source', 'unknown'),
+                'last_discovery_time': getattr(gbw, '_last_discovery_time', None)
+            }
+            
+            # Get backup cycle information
+            backup_stats = {
+                'cycle_number': getattr(gbw, '_cycle_count', 0),
+                'last_cycle_start': getattr(gbw, '_last_cycle_start', None),
+                'active_backup_jobs': active_jobs,
+                'total_devices_tracked': len(gbw.backup_status) if hasattr(gbw, 'backup_status') else 0
+            }
+            
+            # Get configuration information
+            config_info = {
+                'node_address': getattr(gbw, '_node_address', 'unknown'),
+                'results_dir': getattr(gbw, '_results_dir', 'unknown'),
+                'video_backup_enabled': getattr(gbw, '_video', False),
+                'max_threads': getattr(gbw, '_max_threads', 0),
+                'backup_interval': 300  # Default 5 minutes
+            }
+            
+            # Count recent errors (last hour)
+            import time
+            current_time = time.time()
+            recent_errors = 0
+            error_types = {}
+            
+            for device_id, status in gbw.backup_status.items():
+                if hasattr(status, 'status') and hasattr(status, 'ended'):
+                    if (status.status == 'error' and 
+                        status.ended and 
+                        current_time - status.ended < 3600):  # Last hour
+                        recent_errors += 1
+                        # Try to categorize error type from device name/status
+                        error_type = 'unknown'
+                        if hasattr(status, 'progress') and status.progress:
+                            if 'VAR_MAP' in str(status.progress):
+                                error_type = 'database_not_ready'
+                            elif 'connection' in str(status.progress).lower():
+                                error_type = 'connection_error'
+                        error_types[error_type] = error_types.get(error_type, 0) + 1
+            
+            status_response = {
+                'status': 'running',
+                'service': 'ethoscope_backup_tool',
+                'timestamp': current_time,
+                'device_discovery': device_stats,
+                'backup_progress': backup_stats,
+                'configuration': config_info,
+                'recent_errors': {
+                    'count_last_hour': recent_errors,
+                    'error_types': error_types
+                },
+                'thread_status': {
+                    'is_alive': gbw.is_alive() if hasattr(gbw, 'is_alive') else False,
+                    'is_running': getattr(gbw, '_running', False)
+                }
+            }
+            
+            return json.dumps(status_response, indent=2, default=str)
+    
+    except Exception as e:
+        logging.error(f"Error getting home status: {e}")
+        return json.dumps({
+            'status': 'error',
+            'error': f'Failed to get status: {str(e)}',
+            'timestamp': time.time()
+        }, indent=2)
 
 @app.route('/status', method='OPTIONS')
 @app.route('/', method='OPTIONS')
