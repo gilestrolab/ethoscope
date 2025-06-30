@@ -219,7 +219,85 @@ configure_time_sync() {
 enable_system_services() {
     echo "Enabling ethoscope device services..."
     systemctl enable ethoscope_device.service ethoscope_listener.service ethoscope_update.service ethoscope_GPIO_listener.service
-    systemctl enable ntpd.service mysqld.service sshd.service avahi-daemon.service
+    
+    # Enable system services with proper service names for Debian/Raspbian
+    echo "Enabling system services..."
+    
+    # NTP service - handle aliases and find the real service
+    echo "Configuring NTP service..."
+    
+    # First try to resolve the actual service behind ntp.service alias
+    local actual_ntp_service=""
+    
+    # Method 1: Check what ntp.service is aliased to
+    if [ -L "/lib/systemd/system/ntp.service" ]; then
+        actual_ntp_service=$(readlink -f "/lib/systemd/system/ntp.service" | xargs basename)
+        echo "Found ntp.service aliased to: $actual_ntp_service"
+    elif [ -L "/usr/lib/systemd/system/ntp.service" ]; then
+        actual_ntp_service=$(readlink -f "/usr/lib/systemd/system/ntp.service" | xargs basename)
+        echo "Found ntp.service aliased to: $actual_ntp_service"
+    fi
+    
+    # Method 2: Check if ntp.service is a real file (not alias)
+    if [ -z "$actual_ntp_service" ] && [ -f "/lib/systemd/system/ntp.service" ] && [ ! -L "/lib/systemd/system/ntp.service" ]; then
+        actual_ntp_service="ntp.service"
+        echo "Found actual ntp.service file"
+    fi
+    
+    # Method 3: Fall back to common alternatives
+    if [ -z "$actual_ntp_service" ]; then
+        for service in "systemd-timesyncd.service" "ntpd.service" "chronyd.service"; do
+            if systemctl list-unit-files | grep -q "^$service"; then
+                actual_ntp_service="$service"
+                echo "Using fallback NTP service: $service"
+                break
+            fi
+        done
+    fi
+    
+    # Enable the actual service
+    if [ -n "$actual_ntp_service" ]; then
+        if systemctl enable "$actual_ntp_service"; then
+            echo "Successfully enabled $actual_ntp_service"
+        else
+            echo "Warning: Failed to enable $actual_ntp_service, but NTP should still work"
+        fi
+    else
+        echo "Warning: No NTP service found - manual NTP configuration may be required"
+    fi
+    
+    # MariaDB/MySQL service (usually mariadb.service on Debian)
+    if systemctl list-unit-files | grep -q "^mariadb\.service"; then
+        systemctl enable mariadb.service
+        echo "Enabled mariadb.service"
+    elif systemctl list-unit-files | grep -q "^mysql\.service"; then
+        systemctl enable mysql.service
+        echo "Enabled mysql.service"
+    elif systemctl list-unit-files | grep -q "^mysqld\.service"; then
+        systemctl enable mysqld.service
+        echo "Enabled mysqld.service"
+    else
+        echo "Warning: No MySQL/MariaDB service found"
+    fi
+    
+    # SSH service (usually ssh.service on Debian)
+    if systemctl list-unit-files | grep -q "^ssh\.service"; then
+        systemctl enable ssh.service
+        echo "Enabled ssh.service"
+    elif systemctl list-unit-files | grep -q "^sshd\.service"; then
+        systemctl enable sshd.service
+        echo "Enabled sshd.service"
+    else
+        echo "Warning: No SSH service found"
+    fi
+    
+    # Avahi daemon (usually available)
+    if systemctl list-unit-files | grep -q "^avahi-daemon\.service"; then
+        systemctl enable avahi-daemon.service
+        echo "Enabled avahi-daemon.service"
+    else
+        echo "Warning: avahi-daemon.service not found"
+    fi
 }
 
 #===============================================================================
