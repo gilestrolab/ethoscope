@@ -783,12 +783,18 @@ class GenericBackupWrapper(threading.Thread):
             except Exception as scanner_error:
                 self._logger.error(f"Scanner also failed: {scanner_error}")
                 self._last_discovery_source = 'failed'
+                # Still update discovery tracking even on failure
+                import time
+                self._last_device_count = 0
+                self._last_discovery_time = time.time()
                 return []
         
         # Update discovery tracking
         import time
         self._last_device_count = len(devices)
         self._last_discovery_time = time.time()
+        
+        self._logger.debug(f"Updated device discovery tracking: count={self._last_device_count}, source={self._last_discovery_source}, time={self._last_discovery_time}")
         
         if only_active:
             active_devices = [
