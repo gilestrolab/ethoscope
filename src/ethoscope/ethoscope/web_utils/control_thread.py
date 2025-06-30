@@ -516,11 +516,13 @@ class ControlThread(Thread):
             if self._info.get("status") in ["running", "recording"]:
                 # During tracking: query database live and update cache
                 logging.debug(f"Getting live database info for tracking device {self._info.get('name')}")
-                return get_database_metadata(
+                db_info = get_database_metadata(
                     self._db_credentials, 
                     self._tracking_start_time, 
                     self._info.get("name", "")
                 )
+                logging.debug(f"Retrieved database info: size={db_info.get('db_size_bytes', 0)} bytes, status={db_info.get('db_status', 'unknown')}")
+                return db_info
             else:
                 # When stopped: read from most recent cache file
                 cache_dir = "/ethoscope_data/cache"
@@ -588,7 +590,9 @@ class ControlThread(Thread):
 
         # Update database info periodically during tracking
         if self._info.get("status") in ["running", "recording"]:
+            logging.debug(f"Updating database info for running device {self._info.get('name')}")
             self._info["database_info"] = self._get_database_info()
+            logging.debug(f"Database info set: {self._info.get('database_info', {}).get('db_size_bytes', 'missing')}")
         
         # Update backup filename from metadata table - always include regardless of status
         if "backup_filename" not in self._info or not self._info["backup_filename"]:
