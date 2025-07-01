@@ -678,7 +678,7 @@ class MySQLdbToSQLite(BaseSQLConnector):
                 
                 total_rows += len(batch)
             
-            logging.info(f"Copied {total_rows} rows to {table_name}")
+            logging.info(f"Copied {total_rows} rows from {self._remote_db_name}.{table_name}")
             
         except Exception as e:
             logging.error(f"Error copying data for table {table_name}: {str(e)}")
