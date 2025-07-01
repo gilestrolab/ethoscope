@@ -427,7 +427,7 @@ class BackupClass(BaseBackupClass):
             
             # Update ROI tables using built-in max(id) incremental logic
             self._logger.info(f"[{self._device_id}] Starting incremental ROI tables update (max ID approach)...")
-            mirror.update_roi_tables()
+            mirror.update_all_tables()
             self._logger.info(f"[{self._device_id}] Incremental ROI tables update completed")
             
             # Verify backup integrity

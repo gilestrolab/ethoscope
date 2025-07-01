@@ -308,7 +308,8 @@ class MySQLdbToSQLite(BaseSQLConnector):
         except sqlite3.Error as e:
             logging.error(f"SQLite error during initialization: {e}")
             raise
-    
+
+
     def _copy_schema_and_static_data(self, mysql_conn, sqlite_conn):
         """Copy database schema and static data."""
         mysql_cursor = mysql_conn.cursor(buffered=True)
@@ -323,31 +324,10 @@ class MySQLdbToSQLite(BaseSQLConnector):
         tables = [row[0] for row in mysql_cursor.fetchall()]
         
         for table_name in tables:
-            try:
-                if table_name == "CSV_DAM_ACTIVITY":
-                    self._copy_table(table_name, mysql_conn, sqlite_conn, dump_csv=True)
-                else:
-                    self._copy_table(table_name, mysql_conn, sqlite_conn)
-            except Exception as e:
-                logging.error(f"Error copying table {table_name}: {e}")
-                raise
-    
-    def _copy_table(self, table_name: str, mysql_conn, sqlite_conn, dump_csv: bool = False):
-        """Copy a single table from MySQL to SQLite with proper constraint preservation."""
-        mysql_cursor = mysql_conn.cursor(buffered=True)
-        sqlite_cursor = sqlite_conn.cursor()
-        
-        # Create table with proper schema (including PRIMARY KEY constraints)
-        if not self._ensure_table_schema(table_name, mysql_conn, sqlite_conn):
-            logging.error(f"Failed to create/verify table schema for {table_name}")
-            return
-        
-        # Copy data
-        if table_name == "IMG_SNAPSHOTS":
-            self._copy_image_data(table_name, mysql_conn, sqlite_conn)
-        else:
-            self._copy_regular_data(table_name, mysql_conn, sqlite_conn, dump_csv)
-    
+            if not self._ensure_table_schema(table_name, mysql_conn, sqlite_conn):
+                logging.error(f"Failed to create/verify table schema for {table_name}")
+                return
+
     def _ensure_table_schema(self, table_name: str, mysql_conn, sqlite_conn) -> bool:
         """
         Ensure SQLite table exists with proper schema including PRIMARY KEY constraints.
@@ -597,99 +577,6 @@ class MySQLdbToSQLite(BaseSQLConnector):
         else:
             return 'TEXT'  # Default fallback
     
-    def _copy_image_data(self, table_name: str, mysql_conn, sqlite_conn):
-        """Copy image data with proper BLOB handling."""
-        mysql_cursor = mysql_conn.cursor(buffered=True)
-        sqlite_cursor = sqlite_conn.cursor()
-        
-        mysql_cursor.execute(f"SELECT id, t, img FROM `{table_name}`")
-        
-        batch = []
-        for row in mysql_cursor:
-            batch.append((row[0], row[1], row[2]))  # id, t, img_blob
-            
-            if len(batch) >= self.MAX_BATCH_SIZE:
-                sqlite_cursor.executemany(
-                    f"INSERT OR IGNORE INTO `{table_name}` (id, t, img) VALUES (?, ?, ?)", 
-                    batch
-                )
-                sqlite_conn.commit()
-                batch = []
-        
-        # Insert remaining rows
-        if batch:
-            sqlite_cursor.executemany(
-                f"INSERT OR IGNORE INTO `{table_name}` (id, t, img) VALUES (?, ?, ?)", 
-                batch
-            )
-            sqlite_conn.commit()
-    
-    def _copy_regular_data(self, table_name: str, mysql_conn, sqlite_conn, dump_csv: bool = False):
-        """Copy regular table data with batching, preventing duplicates."""
-        mysql_cursor = None
-        sqlite_cursor = None
-        
-        try:
-            mysql_cursor = mysql_conn.cursor(buffered=False)
-            sqlite_cursor = sqlite_conn.cursor()
-            
-            # Check if we should clear table to prevent duplicates
-            if table_name in self._TABLE_WITHOUT_KEY:
-                logging.info(f"Clearing table {table_name} to prevent duplicates")
-                sqlite_cursor.execute(f"DELETE FROM `{table_name}`")
-                sqlite_conn.commit()
-            
-            mysql_cursor.execute(f"SELECT * FROM `{table_name}`")
-            column_count = len(mysql_cursor.description)
-            placeholders = ','.join(['?'] * column_count)
-            
-            # Choose INSERT strategy based on whether we cleared the table
-            insert_template = "INSERT INTO" if table_name in self._TABLE_WITHOUT_KEY else "INSERT OR IGNORE INTO"
-            
-            batch = []
-            total_rows = 0
-            
-            for row in mysql_cursor:
-                batch.append(row)
-                
-                if len(batch) >= self.MAX_BATCH_SIZE:
-                    sqlite_cursor.executemany(
-                        f"{insert_template} `{table_name}` VALUES ({placeholders})", 
-                        batch
-                    )
-                    sqlite_conn.commit()
-                    
-                    if dump_csv:
-                        self._write_to_dam_file(batch)
-                    
-                    total_rows += len(batch)
-                    batch = []
-            
-            # Insert remaining rows
-            if batch:
-                sqlite_cursor.executemany(
-                    f"{insert_template} `{table_name}` VALUES ({placeholders})", 
-                    batch
-                )
-                sqlite_conn.commit()
-                
-                if dump_csv:
-                    self._write_to_dam_file(batch)
-                
-                total_rows += len(batch)
-            
-            logging.info(f"Copied {total_rows} rows from {self._remote_db_name}.{table_name}")
-            
-        except Exception as e:
-            logging.error(f"Error copying data for table {table_name}: {str(e)}")
-            sqlite_conn.rollback()
-            raise
-        finally:
-            if mysql_cursor:
-                mysql_cursor.close()
-            if sqlite_cursor:
-                sqlite_cursor.close()
-    
     def _write_to_dam_file(self, batch):
         """Write batch data to DAM file."""
         try:
@@ -700,47 +587,52 @@ class MySQLdbToSQLite(BaseSQLConnector):
         except IOError as e:
             logging.warning(f"Could not write to DAM file: {e}")
     
-    def update_roi_tables(self):
+    def update_all_tables(self):
         """Update ROI tables with new data."""
         try:
-            with DatabaseConnectionManager(self._remote_host, self._remote_user,
-                                         self._remote_pass, self._remote_db_name) as mysql_conn:
+            with DatabaseConnectionManager(self._remote_host, self._remote_user, self._remote_pass, self._remote_db_name) as mysql_conn:
                 with sqlite3.connect(self._dst_path, timeout=30.0) as sqlite_conn:
-                    self._update_all_roi_tables(mysql_conn, sqlite_conn)
+
+                    # Update tables without ID fields using row-by-row checking
+                    for table_name in self._TABLE_WITHOUT_KEY:
+                        try:
+                            self._update_table_without_ID(table_name, mysql_conn, sqlite_conn)
+                        except mysql.connector.Error as e:
+                            logging.warning(f"Could not update table {table_name}: {e}")
+                        except sqlite3.Error as e:
+                            logging.warning(f"SQLite error updating table {table_name}: {e}")
+
+                    # Then proceed with all the tables that DO have a primary KEY
+                    # First the ROI tables: Get ROI indices, one per table (ROI_1, ROI_2 etc)
+                    sqlite_cursor = sqlite_conn.cursor()
+                    sqlite_cursor.execute("SELECT DISTINCT roi_idx FROM ROI_MAP")
+                    roi_indices = [row[0] for row in sqlite_cursor.fetchall()]
+                    
+                    # Update each ROI table (these have ID fields)
+                    for roi_idx in roi_indices:
+                        self._update_table_with_ID(f"ROI_{roi_idx}", mysql_conn, sqlite_conn)
+                    
+                    # Then do the remaining tables that do not need csv conversion
+                    # Update tables with ID fields using chunked incremental backup
+                    for table_name in ["START_EVENTS", "IMG_SNAPSHOTS", "SENSORS"]:
+                        try:
+                            self._update_table_with_ID(table_name, mysql_conn, sqlite_conn)
+                        except mysql.connector.Error as e:
+                            logging.warning(f"Could not update table {table_name}: {e}")
+
+                    # Finally do the table with primary key that also needs csv conversion
+                    for table_name in ["CSV_DAM_ACTIVITY"]:
+                        try:
+                            self._update_table_with_ID(table_name, mysql_conn, sqlite_conn, dump_csv=True)
+                        except mysql.connector.Error as e:
+                            logging.warning(f"Could not update table {table_name}: {e}")
+        
         except Exception as e:
             logging.error(f"Error updating ROI tables: {e}")
             raise
     
-    def _update_all_roi_tables(self, mysql_conn, sqlite_conn):
-        """Update all ROI-related tables using appropriate method based on table structure."""
-        sqlite_cursor = sqlite_conn.cursor()
-        
-        # Get ROI indices
-        sqlite_cursor.execute("SELECT DISTINCT roi_idx FROM ROI_MAP")
-        roi_indices = [row[0] for row in sqlite_cursor.fetchall()]
-        
-        # Update each ROI table (these have ID fields)
-        for roi_idx in roi_indices:
-            self._update_single_table(f"ROI_{roi_idx}", mysql_conn, sqlite_conn)
-        
-        # Update tables with ID fields using chunked incremental backup
-        for table_name in ["CSV_DAM_ACTIVITY", "START_EVENTS", "IMG_SNAPSHOTS", "SENSORS"]:
-            try:
-                dump_csv = (table_name == "CSV_DAM_ACTIVITY")
-                self._update_single_table(table_name, mysql_conn, sqlite_conn, dump_csv)
-            except mysql.connector.Error as e:
-                logging.warning(f"Could not update table {table_name}: {e}")
-        
-        # Update tables without ID fields using row-by-row checking
-        for table_name in self._TABLE_WITHOUT_KEY:
-            try:
-                self._update_table_without_id(table_name, mysql_conn, sqlite_conn)
-            except mysql.connector.Error as e:
-                logging.warning(f"Could not update table {table_name}: {e}")
-            except sqlite3.Error as e:
-                logging.warning(f"SQLite error updating table {table_name}: {e}")
     
-    def _update_single_table(self, table_name: str, mysql_conn, sqlite_conn, dump_csv: bool = False):
+    def _update_table_with_ID(self, table_name: str, mysql_conn, sqlite_conn, dump_csv: bool = False):
         """
         Update a single table with new records using efficient chunked incremental backup.
         
@@ -764,21 +656,28 @@ class MySQLdbToSQLite(BaseSQLConnector):
             sqlite_cursor.execute(f"SELECT COALESCE(MAX(id), 0) FROM `{table_name}`")
             current_max_id = sqlite_cursor.fetchone()[0] or 0
         except sqlite3.OperationalError:
-            logging.warning(f"Table {table_name} doesn't exist locally, recreating...")
-            # Table doesn't exist, copy entirely
-            self._copy_table(table_name, mysql_conn, sqlite_conn, dump_csv)
-            return
+            logging.warning(f"Table {table_name} doesn't exist locally, starting from beginning...")
+            # Table doesn't exist, start incremental backup from ID 0
+            current_max_id = 0
         
         logging.debug(f"Table {table_name}: Starting incremental backup from ID {current_max_id}")
         
-        # Get column count for placeholder generation (do this once)
-        mysql_cursor.execute(f"SELECT * FROM `{table_name}` LIMIT 1")
-        if not mysql_cursor.description:
-            logging.debug(f"Table {table_name}: No data structure found")
-            return
-            
-        column_count = len(mysql_cursor.description)
-        placeholders = ','.join(['?'] * column_count)
+        # Handle IMG_SNAPSHOTS table specially for BLOB data
+        if table_name == "IMG_SNAPSHOTS":
+            select_columns = "id, t, img"
+            insert_columns = "(id, t, img)"
+            placeholders = "?, ?, ?"
+        else:
+            # Get column count for placeholder generation (do this once)
+            mysql_cursor.execute(f"SELECT * FROM `{table_name}` LIMIT 1")
+            if not mysql_cursor.description:
+                logging.debug(f"Table {table_name}: No data structure found")
+                return
+                
+            column_count = len(mysql_cursor.description)
+            select_columns = "*"
+            insert_columns = ""
+            placeholders = ','.join(['?'] * column_count)
         
         total_inserted = 0
         chunk_size = 200
@@ -788,7 +687,7 @@ class MySQLdbToSQLite(BaseSQLConnector):
         while True:
             # Step 2: Query remote MySQL for next chunk of rows AFTER current_max_id
             mysql_cursor.execute(
-                f"SELECT * FROM `{table_name}` WHERE id > %s ORDER BY id LIMIT %s", 
+                f"SELECT {select_columns} FROM `{table_name}` WHERE id > %s ORDER BY id LIMIT %s", 
                 (current_max_id, chunk_size)
             )
             
@@ -801,10 +700,18 @@ class MySQLdbToSQLite(BaseSQLConnector):
             if rows_count > 0:
                 # Use INSERT OR IGNORE to handle any potential duplicates gracefully
                 # This is safe now that we have PRIMARY KEY constraints
-                sqlite_cursor.executemany(
-                    f"INSERT OR IGNORE INTO `{table_name}` VALUES ({placeholders})", 
-                    rows
-                )
+                if insert_columns:
+                    # For IMG_SNAPSHOTS with specific columns
+                    sqlite_cursor.executemany(
+                        f"INSERT OR IGNORE INTO `{table_name}` {insert_columns} VALUES ({placeholders})", 
+                        rows
+                    )
+                else:
+                    # For regular tables
+                    sqlite_cursor.executemany(
+                        f"INSERT OR IGNORE INTO `{table_name}` VALUES ({placeholders})", 
+                        rows
+                    )
                 sqlite_conn.commit()
                 
                 # Check how many rows were actually inserted (some might have been ignored due to duplicates)
@@ -833,7 +740,7 @@ class MySQLdbToSQLite(BaseSQLConnector):
         else:
             logging.debug(f"Table {table_name}: No new records to backup")
     
-    def _update_table_without_id(self, table_name: str, mysql_conn, sqlite_conn):
+    def _update_table_without_ID(self, table_name: str, mysql_conn, sqlite_conn):
         """
         Update tables without ID fields (e.g., METADATA, VAR_MAP, ROI_MAP) using row-by-row duplicate checking.
         These are small tables so we can afford to check each row individually.
