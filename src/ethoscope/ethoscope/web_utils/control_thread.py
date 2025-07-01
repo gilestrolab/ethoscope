@@ -393,14 +393,13 @@ class ControlThread(Thread):
         
         # Database metadata tracking
         self._tracking_start_time = None
-        self._current_cache_file = None
         
         #todo add 'data' -> how monitor was started to metadata
         self._info = {  "status": "stopped",
                         "time": time.time(), #this is time of last interaction, e.g. last reboot, last start, last stop.
                         "error": None,
-                        "log_file": os.path.join(ethoscope_dir, self._log_file),
-                        "dbg_img": os.path.join(ethoscope_dir, self._dbg_img_file),
+                        "log_file": os.path.join(self._tmp_dir, self._log_file),
+                        "dbg_img": os.path.join(self._tmp_dir, self._dbg_img_file),
                         "last_drawn_img": os.path.join(self._tmp_dir, self._tmp_last_img_file),
                         "db_name": self._db_credentials["name"],
                         "monitor_info": self._default_monitor_info,
@@ -420,6 +419,7 @@ class ControlThread(Thread):
                 self._info.update( pickle.load(fn) )
 
         # Initialize database info now that _info is fully constructed
+        self._cache_dir = os.path.join (ethoscope_dir, 'cache')
         self._info["database_info"] = self._get_database_info()
         
         # Check for existing backup filename from metadata table during initialization
@@ -533,6 +533,7 @@ class ControlThread(Thread):
 
     def _get_database_info(self):
         """Get database metadata based on current status."""
+        device_name = self._info.get("name", "")
         try:
             if self._info.get("status") in ["running", "recording"]:
                 # During tracking: query database live and update cache
@@ -540,22 +541,20 @@ class ControlThread(Thread):
                 db_info = get_database_metadata(
                     self._db_credentials, 
                     self._tracking_start_time, 
-                    self._info.get("name", "")
+                    device_name
                 )
                 logging.debug(f"Retrieved database info: size={db_info.get('db_size_bytes', 0)} bytes, status={db_info.get('db_status', 'unknown')}")
                 return db_info
             else:
                 # When stopped: read from most recent cache file
-                cache_dir = "/ethoscope_data/cache"
-                device_name = self._info.get("name", "")
                 logging.debug(f"Reading cache file for stopped device {device_name}")
-                cache_result = read_latest_cache_file(cache_dir, device_name)
+                cache_result = read_latest_cache_file(self._cache_dir, device_name)
                 
                 # If no cache file found, try a simple database query without cache
                 if cache_result.get("db_size_bytes", 0) == 0:
                     logging.debug(f"No cache found, attempting direct database query for {device_name}")
                     try:
-                        db_info = query_database_metadata(self._db_credentials)
+                        db_info = get_database_metadata(self._db_credentials, self._tracking_start_time, device_name)
                         db_info["db_status"] = "queried_direct"
                         return db_info
                     except Exception as db_e:
@@ -609,11 +608,8 @@ class ControlThread(Thread):
         if frame is not None:
             cv2.imwrite(self._info["last_drawn_img"], frame, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
 
-        # Update database info periodically during tracking
-        if self._info.get("status") in ["running", "recording"]:
-            logging.debug(f"Updating database info for running device {self._info.get('name')}")
-            self._info["database_info"] = self._get_database_info()
-            logging.debug(f"Database info set: {self._info.get('database_info', {}).get('db_size_bytes', 'missing')}")
+        # Update database info
+        self._info["database_info"] = self._get_database_info()
         
         # Update backup filename from metadata table - always include regardless of status
         if "backup_filename" not in self._info or not self._info["backup_filename"]:
