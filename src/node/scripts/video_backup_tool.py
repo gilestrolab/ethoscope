@@ -4,6 +4,7 @@ import optparse
 import traceback
 import sys
 import signal
+from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from ethoscope_node.utils.backups_helpers import GenericBackupWrapper
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
@@ -25,7 +26,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         elif self.path == '/status':
             with gbw._lock:
                 status_copy = gbw.backup_status.copy()
-            self._send_response(status_copy)
+            # Convert BackupStatus objects to dictionaries for JSON serialization
+            status_dict = {key: asdict(value) for key, value in status_copy.items()}
+            self._send_response(status_dict)
         else:
             self.send_error(404, "File not found")
 
@@ -49,7 +52,7 @@ def main():
         parser = optparse.OptionParser()
         parser.add_option("-D", "--debug", dest="debug", default=False, help="Set DEBUG mode ON", action="store_true")
         parser.add_option("-i", "--server", dest="server", default="localhost", help="The server on which the node is running will be interrogated first for the device list")
-        parser.add_option("-r", "--results-dir", dest="video_dir", help="Where video files are stored")
+        parser.add_option("-d", "--destination-dir", dest="video_dir", help="Destination directory for video files")
         parser.add_option("-s", "--safe", dest="safe", default=False, help="Set Safe mode ON", action="store_true")
         parser.add_option("-e", "--ethoscope", dest="ethoscope", help="Force backup of given ethoscope number (eg: 007)")
 

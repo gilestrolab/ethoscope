@@ -115,7 +115,34 @@ def name():
 @api.get('/list_video_files')
 @error_decorator
 def list_video_files():
-    return list_local_video_files(_ETHOSCOPE_VIDEOS_DIR)
+    import subprocess
+    
+    # Get basic video file list (no hashing needed with rsync)
+    video_files = list_local_video_files(_ETHOSCOPE_VIDEOS_DIR, createMD5=False)
+    
+    # Get disk usage for videos directory
+    try:
+        du_result = subprocess.run(['du', '-sb', _ETHOSCOPE_VIDEOS_DIR], 
+                                 capture_output=True, text=True, check=True)
+        disk_usage_bytes = int(du_result.stdout.split()[0])
+    except (subprocess.CalledProcessError, ValueError, IndexError):
+        disk_usage_bytes = 0
+    
+    # Get device IP address
+    device_ip = get_main_ip_address()
+    
+    # Return enhanced JSON with metadata
+    return {
+        'video_files': video_files,
+        'metadata': {
+            'videos_directory': _ETHOSCOPE_VIDEOS_DIR,
+            'total_files': len(video_files),
+            'disk_usage_bytes': disk_usage_bytes,
+            'device_ip': device_ip,
+            'machine_id': _MACHINE_ID,
+            'machine_name': _MACHINE_NAME
+        }
+    }
 
 @api.get('/make_index')
 @error_decorator

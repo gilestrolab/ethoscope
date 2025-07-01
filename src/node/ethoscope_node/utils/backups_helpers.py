@@ -57,7 +57,7 @@ backup_tool.py for the actual backup service implementation.
 
 from ethoscope_node.utils.device_scanner import EthoscopeScanner
 from ethoscope_node.utils.mysql_backup import MySQLdbToSQLite, DBNotReadyError
-from ethoscope.utils.video_utils import list_local_video_files, save_hash_info_file
+from ethoscope.utils.video_utils import list_local_video_files
 import os
 import logging
 import time
@@ -91,12 +91,15 @@ class BackupStatus:
     count: int = 0
     synced: Dict = None
     progress: Dict = None
+    metadata: Dict = None
     
     def __post_init__(self):
         if self.synced is None:
             self.synced = {}
         if self.progress is None:
             self.progress = {}
+        if self.metadata is None:
+            self.metadata = {}
 
 
 class BackupError(Exception):
@@ -442,282 +445,237 @@ class BackupClass(BaseBackupClass):
 
 
 class VideoBackupClass(BaseBackupClass):
-    """Optimized video backup class with better error handling and performance."""
+    """Rsync-based video backup class with real-time progress reporting."""
     
     DEFAULT_PORT = 9000
-    STATIC_DIR = "static"
     REQUEST_TIMEOUT = 30
     
-    def __init__(self, device_info: Dict, results_dir: str, port: int = None, static_dir: str = None):
+    def __init__(self, device_info: Dict, results_dir: str, port: int = None):
         super().__init__(device_info, results_dir)
         self._port = port or self.DEFAULT_PORT
-        self._static_dir = static_dir or self.STATIC_DIR
         self._device_url = f"http://{self._ip}:{self._port}"
-        self._static_url = f"{self._device_url}/{self._static_dir}"
     
     def backup(self) -> Iterator[str]:
         """
-        Performs video backup with improved status reporting and error handling.
+        Performs rsync-based video backup with real-time progress reporting.
         
         Yields:
             str: JSON-encoded status messages with detailed progress updates
         """
+        import subprocess
+        import re
+        
         start_time = time.time()
         try:
-            self._logger.info(f"[{self._device_id}] === VIDEO BACKUP STARTING ===")
-            self._logger.info(f"[{self._device_id}] Device URL: {self._device_url}")
-            yield self._yield_status("info", f"Video backup initiated for device {self._device_id}")
+            self._logger.info(f"[{self._device_id}] === RSYNC VIDEO BACKUP STARTING ===")
+            yield self._yield_status("info", f"Rsync video backup initiated for device {self._device_id}")
             
-            # Get video list
-            self._logger.info(f"[{self._device_id}] Retrieving video list...")
-            video_list = self._get_video_list()
-            if not video_list:
-                self._logger.info(f"[{self._device_id}] No videos found for download")
-                yield self._yield_status("warning", f"No videos to download for device {self._device_id}")
+            # Step 1: Get video information from ethoscope
+            self._logger.info(f"[{self._device_id}] Retrieving video metadata...")
+            video_info = self.get_video_list_json()
+            if not video_info:
+                self._logger.warning(f"[{self._device_id}] Failed to retrieve video information")
+                yield self._yield_status("error", f"Failed to retrieve video information from device {self._device_id}")
+                return False
+            
+            metadata = video_info.get('metadata', {})
+            video_files = video_info.get('video_files', {})
+            
+            if not video_files:
+                self._logger.info(f"[{self._device_id}] No videos found for backup")
+                yield self._yield_status("warning", f"No videos to backup for device {self._device_id}")
                 return True
             
-            self._logger.info(f"[{self._device_id}] Found {len(video_list)} videos to download")
+            # Extract key information
+            source_dir = metadata.get('videos_directory', '/ethoscope_data/videos')
+            device_ip = metadata.get('device_ip', self._ip)
+            total_files = metadata.get('total_files', len(video_files))
+            disk_usage = metadata.get('disk_usage_bytes', 0)
             
-            # Download videos
-            success_count = 0
-            total_videos = len(video_list)
+            self._logger.info(f"[{self._device_id}] Found {total_files} videos ({disk_usage} bytes) in {source_dir}")
+            yield self._yield_status("info", f"Found {total_files} videos to backup from {source_dir}")
             
-            for count, video_path in enumerate(video_list, start=1):
-                video_start_time = time.time()
-                try:
-                    self._logger.info(f"[{self._device_id}] Starting download {count}/{total_videos}: {video_path}")
-                    yield self._yield_status(
-                        "info", 
-                        f"Downloading video {os.path.basename(video_path)} ({count}/{total_videos})"
-                    )
-                    
-                    self._download_video(video_path)
-                    success_count += 1
-                    
-                    video_elapsed = time.time() - video_start_time
-                    self._logger.info(f"[{self._device_id}] Completed download {count}/{total_videos} in {video_elapsed:.1f}s: {video_path}")
-                    
-                except Exception as e:
-                    video_elapsed = time.time() - video_start_time
-                    error_msg = f"Error downloading video {video_path} after {video_elapsed:.1f}s: {e}"
-                    self._logger.warning(f"[{self._device_id}] {error_msg}")
-                    self._logger.warning(f"[{self._device_id}] Video download traceback:", exc_info=True)
-                    yield self._yield_status("error", error_msg)
+            # Store device metadata for status reporting
+            device_metadata = {
+                'total_files': total_files,
+                'disk_usage_bytes': disk_usage,
+                'videos_directory': source_dir,
+                'device_ip': device_ip
+            }
+            yield self._yield_status("metadata", json.dumps(device_metadata))
             
+            # Step 2: Prepare rsync command
+            destination_dir = self._results_dir
+            os.makedirs(destination_dir, exist_ok=True)
+            
+            rsync_source = f"ethoscope@{device_ip}:{source_dir}/"
+            rsync_command = [
+                'rsync', 
+                '-avz',           # archive, verbose, compress
+                '--progress',     # show progress
+                '--partial',      # keep partial files
+                '--timeout=300',  # 5 minute timeout
+                rsync_source, 
+                destination_dir
+            ]
+            
+            self._logger.info(f"[{self._device_id}] Starting rsync: {' '.join(rsync_command)}")
+            yield self._yield_status("info", f"Starting rsync from {rsync_source} to {destination_dir}")
+            
+            # Step 3: Execute rsync with progress monitoring
+            process = subprocess.Popen(
+                rsync_command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True,
+                bufsize=1
+            )
+            
+            files_transferred = 0
+            bytes_transferred = 0
+            current_file = ""
+            
+            for line in iter(process.stdout.readline, ''):
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                self._logger.debug(f"[{self._device_id}] rsync: {line}")
+                
+                # Parse progress information
+                if line.endswith('bytes/sec'):
+                    # Progress line format: "1,234,567  67%   123.45kB/s    0:00:12"
+                    match = re.search(r'(\d{1,3}(?:,\d{3})*)\s+(\d+)%\s+(.+?/s)', line)
+                    if match:
+                        bytes_so_far = int(match.group(1).replace(',', ''))
+                        percentage = int(match.group(2))
+                        speed = match.group(3)
+                        
+                        yield self._yield_status(
+                            "info", 
+                            f"Transferring {current_file}: {percentage}% complete ({speed})"
+                        )
+                        
+                elif line.startswith('./') or '/' in line:
+                    # File being transferred
+                    if not line.startswith('rsync:') and not line.startswith('total size'):
+                        current_file = os.path.basename(line)
+                        files_transferred += 1
+                        yield self._yield_status(
+                            "info", 
+                            f"Transferring file {files_transferred}/{total_files}: {current_file}"
+                        )
+                        
+            # Wait for rsync to complete
+            return_code = process.wait()
             elapsed_time = time.time() - start_time
             
-            # Report final status
-            if success_count == total_videos:
-                self._logger.info(f"[{self._device_id}] === VIDEO BACKUP COMPLETED SUCCESSFULLY: {total_videos}/{total_videos} videos in {elapsed_time:.1f}s ===")
-                yield self._yield_status("success", f"All {total_videos} videos downloaded successfully in {elapsed_time:.1f}s")
+            if return_code == 0:
+                self._logger.info(f"[{self._device_id}] === RSYNC VIDEO BACKUP COMPLETED SUCCESSFULLY in {elapsed_time:.1f}s ===")
+                yield self._yield_status("success", f"Rsync backup completed successfully in {elapsed_time:.1f}s")
+                return True
             else:
-                self._logger.warning(f"[{self._device_id}] === VIDEO BACKUP PARTIALLY COMPLETED: {success_count}/{total_videos} videos in {elapsed_time:.1f}s ===")
-                yield self._yield_status(
-                    "warning", 
-                    f"Downloaded {success_count}/{total_videos} videos successfully in {elapsed_time:.1f}s"
-                )
-            
-            return success_count > 0
-            
+                error_msg = f"Rsync failed with return code {return_code} after {elapsed_time:.1f}s"
+                self._logger.error(f"[{self._device_id}] {error_msg}")
+                yield self._yield_status("error", error_msg)
+                return False
+                
         except Exception as e:
             elapsed_time = time.time() - start_time
-            error_msg = f"Unexpected error during video backup for device {self._device_id} after {elapsed_time:.1f}s: {e}"
+            error_msg = f"Unexpected error during rsync backup for device {self._device_id} after {elapsed_time:.1f}s: {e}"
             self._logger.error(f"[{self._device_id}] {error_msg}")
             self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
             yield self._yield_status("error", error_msg)
             return False
+
     
-    def _get_video_list(self) -> List[str]:
-        """Get list of videos to download, trying JSON first, then HTML."""
-        try:
-            # Try JSON method first (newer, more reliable)
-            video_dict = self._get_video_list_json()
-            if video_dict:
-                # Extract full paths from video metadata
-                return [video_info['path'] for video_info in video_dict.values() if 'path' in video_info]
-        except Exception as e:
-            self._logger.debug(f"JSON video list failed: {e}")
-        
-        try:
-            # Fallback to HTML method
-            return self._get_video_list_html()
-        except Exception as e:
-            self._logger.warning(f"HTML video list failed: {e}")
-            return []
     
-    def _get_and_hash(self, target, target_prefix, output_dir, cut_dirs=2):
+    def get_video_list_json(self) -> Optional[Dict]:
         """
-        Downloads a file from a specified target URL using wget and generates an MD5 checksum file.
-
-        This function constructs a command to use the `wget` utility for downloading a file
-        from a remote server. It calculates the exact local file path based on the target URL,
-        ensures the necessary directories exist, and instructs `wget` to save the file to that path.
-        After downloading, it computes the MD5 checksum of the downloaded file and writes it to
-        an adjacent `.md5sum.txt` file.
-
-        Args:
-            target (str): The target file or directory to download, relative to the target_prefix.
-            target_prefix (str): The base URL prefix to prepend to the target.
-            output_dir (str): The local directory where the files will be downloaded.
-            cut_dirs (int, optional): The number of directory levels to cut from the input URL.
-                                    Defaults to 3.
-
-        Returns:
-            bool: True if the download and MD5 checksum generation were successful; 
-                False if no content was downloaded.
-
-        Raises:
-            Exception: If the wget command fails to execute successfully, an Exception
-                    is raised with the return code and the output from wget.
-            FileNotFoundError: If the downloaded file is not found for MD5 computation.
-        """
+        Get video list in JSON format with metadata from ethoscope device.
         
-        # Ensure the target URL is properly formatted
-        target_url = target_prefix.rstrip('/') + '/' + target.lstrip('/')
-        
-        # Split the target path into its components
-        target_path_parts = target.strip('/').split('/')
-        
-        # Apply 'cut_dirs' to remove the specified number of directory levels
-        if len(target_path_parts) <= cut_dirs:
-            raise ValueError(f"The target path '{target}' does not have enough directories to cut {cut_dirs} levels.")
-        
-        relative_path_parts = target_path_parts[cut_dirs:]
-        relative_path = os.path.join(*relative_path_parts)
-        local_file_path = os.path.join(output_dir, relative_path)
-        
-        # Construct the wget command with '-O' to specify the exact output file path
-        command = [
-            "wget",
-            target_url,
-            "-nv",               # Non-verbose
-            "-c",                # Resume incomplete downloads
-            "-O",                # Specify output file
-            local_file_path
-        ]
-
-        try:
-            os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
-            #logging.info(f"Executing command: {' '.join(command)}")
-            result = subprocess.run(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True,
-                text=True
-            )
-            #logging.debug(f"wget stdout: {result.stdout}")
-            #logging.debug(f"wget stderr: {result.stderr}")
-
-            if result.stdout: 
-                # this is empty if wget finds the file was already downloaded
-                # in that case we do not have to compute the hash
-            
-                if not os.path.isfile(local_file_path):
-                    logging.warning(f"No file found at '{local_file_path}'.")
-                    return False
-                if os.path.getsize(local_file_path) == 0:
-                    logging.warning(f"Downloaded file '{local_file_path}' is empty.")
-                    return False
-                logging.info("File downloaded. Now creating a md5 hash for it")	        
-                save_hash_info_file (local_file_path)
-            
-                return True
-            
-            else:
-                return False
-
-        except subprocess.CalledProcessError as e:
-            logging.error(f"wget failed with return code {e.returncode}: {e.stderr}")
-            raise Exception(f"wget error {e.returncode}: {e.stderr}") from e
-        except FileNotFoundError as fnf_error:
-            logging.error(str(fnf_error))
-            raise
-        except Exception as ex:
-            logging.error(f"An unexpected error occurred: {str(ex)}")
-            raise
-
-    def _download_video(self, video_path: str):
-        """Download a single video file."""
-        try:
-            self._logger.info(f"[{self._device_id}] Starting download of video: {video_path}")
-            self._logger.info(f"[{self._device_id}] Target URL: {self._static_url}, Output dir: {self._results_dir}")
-            
-            self._get_and_hash(video_path, target_prefix=self._static_url, output_dir=self._results_dir, cut_dirs=0)
-            
-            self._logger.info(f"[{self._device_id}] Successfully downloaded video: {video_path}")
-        except Exception as e:
-            self._logger.error(f"[{self._device_id}] Failed to download video {video_path}: {e}")
-            self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
-            raise BackupError(f"Failed to download video {video_path}: {e}")
-    
-    def get_video_list_json(self) -> Optional[Dict[str, Dict[str, str]]]:
-        """
-        Get video list in JSON format with metadata.
+        This method calls the enhanced /list_video_files API endpoint that returns
+        both video file information and device metadata (IP, disk usage, etc.)
         
         Returns:
-            dict: Video files with their metadata (path, hash)
+            dict: Enhanced video information with structure:
+                {
+                    'video_files': {filename: {path, hash, ...}},
+                    'metadata': {
+                        'videos_directory': str,
+                        'total_files': int,
+                        'disk_usage_bytes': int,
+                        'device_ip': str,
+                        'machine_id': str,
+                        'machine_name': str
+                    }
+                }
         """
         video_list_url = f"{self._device_url}/list_video_files"
         
         try:
             self._logger.info(f"[{self._device_id}] Requesting video list from: {video_list_url}")
-            self._logger.info(f"[{self._device_id}] Request timeout: {self.REQUEST_TIMEOUT}s")
             
             with urllib.request.urlopen(video_list_url, timeout=self.REQUEST_TIMEOUT) as response:
-                self._logger.info(f"[{self._device_id}] Received response from video list API")
                 video_data = json.load(response)
-                self._logger.info(f"[{self._device_id}] Parsed JSON response with {len(video_data) if video_data else 0} videos")
-                return video_data
+                
+                # Validate response structure
+                if not isinstance(video_data, dict):
+                    self._logger.warning(f"[{self._device_id}] Invalid response format from enhanced video API")
+                    return None
+                
+                # Extract video files and metadata
+                video_files = video_data.get('video_files', {})
+                metadata = video_data.get('metadata', {})
+                
+                self._logger.info(f"[{self._device_id}] Retrieved video list: {len(video_files)} videos, metadata: {list(metadata.keys())}")
+                
+                return {
+                    'video_files': video_files,
+                    'metadata': metadata
+                }
                 
         except urllib.error.HTTPError as e:
-            self._logger.warning(f"[{self._device_id}] HTTP error getting JSON video list from {video_list_url}: {e}")
+            self._logger.warning(f"[{self._device_id}] HTTP error getting video list from {video_list_url}: {e}")
             return None
             
         except json.JSONDecodeError as e:
-            self._logger.warning(f"[{self._device_id}] JSON decode error from {video_list_url}: {e}")
+            self._logger.warning(f"[{self._device_id}] JSON decode error from video list API {video_list_url}: {e}")
             return None
             
         except Exception as e:
-            self._logger.error(f"[{self._device_id}] Unexpected error getting JSON video list from {video_list_url}: {e}")
+            self._logger.error(f"[{self._device_id}] Unexpected error getting video list from {video_list_url}: {e}")
             self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
             return None
     
-    # Make this an alias for external compatibility
-    _get_video_list_json = get_video_list_json
-    
     def check_sync_status(self) -> Optional[Dict[str, Dict[str, int]]]:
         """
-        Compare sync status between remote and local video files.
+        Compare sync status between remote and local video files (simple file presence check).
+        With rsync, detailed integrity checking is handled by rsync itself.
         
         Returns:
-            dict: Sync status with matching and total file counts
+            dict: Sync status with present and total file counts
         """
         try:
-            remote_videos = self.get_video_list_json()
-            if not remote_videos:
+            video_info = self.get_video_list_json()
+            if not video_info:
                 return None
             
-            local_videos = list_local_video_files(self._results_dir)
+            remote_videos = video_info.get('video_files', {})
+            local_videos = list_local_video_files(self._results_dir, createMD5=False)
             
-            matching_files = 0
+            present_files = 0
             total_files = len(remote_videos)
             
-            for filename, remote_info in remote_videos.items():
-                remote_hash = remote_info.get('hash', '')
-                
+            for filename in remote_videos.keys():
                 if filename in local_videos:
-                    local_hash = local_videos[filename].get('hash', '')
-                    if remote_hash == local_hash:
-                        matching_files += 1
-                    else:
-                        self._logger.debug(f"Hash mismatch for {filename}")
+                    present_files += 1
                 else:
                     self._logger.debug(f"File missing locally: {filename}")
             
             return {
                 'video_files': {
-                    'matching': matching_files,
+                    'present': present_files,
                     'total': total_files
                 }
             }
@@ -725,84 +683,7 @@ class VideoBackupClass(BaseBackupClass):
         except Exception as e:
             self._logger.error(f"Error checking sync status: {e}")
             return None
-    
-    def get_video_list_html(self, index_file: str = "ethoscope_data/results/index.html", 
-                           generate_first: bool = True) -> Optional[List[str]]:
-        """
-        Get video list from HTML index file (fallback method).
-        
-        Args:
-            index_file: Path to index file
-            generate_first: Whether to generate index first
-            
-        Returns:
-            list: Video file names or None if failed
-        """
-        try:
-            if generate_first:
-                self._logger.info(f"[{self._device_id}] Generating remote index HTML first...")
-                if not self._generate_remote_index_html():
-                    self._logger.warning(f"[{self._device_id}] Failed to generate remote index, continuing anyway...")
-            
-            video_list_url = f"{self._static_url}/{index_file}"
-            self._logger.info(f"[{self._device_id}] Requesting HTML video list from: {video_list_url}")
-            
-            with urllib.request.urlopen(video_list_url, timeout=self.REQUEST_TIMEOUT) as response:
-                video_lines = [line.decode('utf-8').strip() for line in response]
-                self._logger.info(f"[{self._device_id}] Retrieved {len(video_lines)} video entries from HTML")
-                return video_lines
-                
-        except urllib.error.HTTPError as e:
-            self._logger.warning(f"[{self._device_id}] Could not get HTML video list from {video_list_url}: {e}")
-            return None
-        except Exception as e:
-            self._logger.error(f"[{self._device_id}] Unexpected error getting HTML video list from {video_list_url}: {e}")
-            self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
-            return None
-    
-    # Make this an alias for external compatibility  
-    _get_video_list_html = get_video_list_html
-    
-    def _generate_remote_index_html(self) -> bool:
-        """Ask the remote ethoscope to generate an index file."""
-        try:
-            index_url = f"{self._device_url}/make_index"
-            self._logger.info(f"[{self._device_id}] Requesting index generation from: {index_url}")
-            
-            with urllib.request.urlopen(index_url, timeout=self.REQUEST_TIMEOUT) as response:
-                self._logger.info(f"[{self._device_id}] Index generation request successful")
-                return True
-        except Exception as e:
-            self._logger.warning(f"[{self._device_id}] Could not generate remote index from {index_url}: {e}")
-            return False
-    
-    def remove_remote_video(self, target: str) -> bool:
-        """
-        Remove remote video file (currently disabled for safety).
-        
-        Args:
-            target: Path to video file to remove
-            
-        Returns:
-            bool: Always False (feature disabled)
-        """
-        # Disabled for safety - uncomment and modify if needed
-        return False
-        
-        # Commented out implementation:
-        # try:
-        #     request_url = f"{self._device_url}/rm_static_file/{self._device_id}"
-        #     data = json.dumps({"file": target})
-        #     req = urllib.request.Request(
-        #         url=request_url, 
-        #         data=data.encode('utf-8'),
-        #         headers={'Content-Type': 'application/json'}
-        #     )
-        #     with urllib.request.urlopen(req, timeout=5):
-        #         return True
-        # except Exception as e:
-        #     self._logger.error(f"Error removing remote video {target}: {e}")
-        #     return False
+
 
 
 class GenericBackupWrapper(threading.Thread):
@@ -1051,7 +932,20 @@ class GenericBackupWrapper(threading.Thread):
         try:
             for message in backup_job.backup():
                 with self._lock:
-                    self.backup_status[device_id].progress = json.loads(message)
+                    progress_data = json.loads(message)
+                    
+                    # Check if this is a metadata message
+                    if progress_data.get('status') == 'metadata':
+                        # Extract and store device metadata
+                        try:
+                            device_metadata = json.loads(progress_data.get('message', '{}'))
+                            self.backup_status[device_id].metadata = device_metadata
+                            self._logger.debug(f"Stored device metadata for {device_id}: {device_metadata}")
+                        except json.JSONDecodeError:
+                            self._logger.warning(f"Could not parse metadata for device {device_id}")
+                    else:
+                        # Store regular progress information
+                        self.backup_status[device_id].progress = progress_data
             return True
             
         except Exception as e:
