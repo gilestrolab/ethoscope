@@ -30,7 +30,7 @@ from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver, M
 from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulator
 
 from ethoscope.utils.debug import EthoscopeException
-from ethoscope.utils.io import ResultWriter, SQLiteResultWriter
+from ethoscope.utils.io import ResultWriter, SQLiteResultWriter, DatabaseMetadataCache
 from ethoscope.utils.description import DescribedObject
 from ethoscope.web_utils.helpers import *
 
@@ -65,217 +65,6 @@ class ExperimentalInformation(DescribedObject):
         @property
         def info_dic(self):
             return self._info_dic
-
-
-def get_database_metadata(db_credentials, tracking_start_time=None, device_name=""):
-    """
-    Get database metadata either by querying MariaDB or reading from cache file.
-    
-    Args:
-        db_credentials: Database connection credentials
-        tracking_start_time: Timestamp when tracking started (for cache file naming)
-        device_name: Device name for cache file naming
-        
-    Returns:
-        dict: Database metadata including size, table counts, etc.
-    """
-    # Determine cache file path
-    cache_dir = "/ethoscope_data/cache"
-    os.makedirs(cache_dir, exist_ok=True)
-    
-    if tracking_start_time and device_name:
-        # Create timestamp string for filename
-        ts_str = time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(tracking_start_time))
-        cache_filename = f"db_metadata_{ts_str}_{device_name}_db.json"
-        cache_file_path = os.path.join(cache_dir, cache_filename)
-    else:
-        cache_file_path = None
-    
-    try:
-        # Try to connect to database and get metadata
-        db_info = query_database_metadata(db_credentials)
-        
-        if cache_file_path:
-            # Update cache file with current metadata
-            update_cache_file(cache_file_path, db_info, db_credentials["name"], 
-                            tracking_start_time, device_name)
-        
-        return db_info
-        
-    except Exception as e:
-        logging.warning(f"Failed to query database: {e}")
-        
-        # If database query fails, try to read from most recent cache file
-        if cache_file_path and os.path.exists(cache_file_path):
-            return read_cache_file(cache_file_path)
-        else:
-            # Find most recent cache file for this device
-            return read_latest_cache_file(cache_dir, device_name)
-
-
-def query_database_metadata(db_credentials):
-    """Query database for metadata including size and table counts."""
-    try:
-        with mysql.connector.connect(
-            host='localhost',
-            user=db_credentials["user"],
-            password=db_credentials["password"],
-            database=db_credentials["name"],
-            charset='latin1',
-            use_unicode=True,
-            connect_timeout=10
-        ) as conn:
-            cursor = conn.cursor()
-            
-            # Get actual database file size (to match SQLite file size comparison)
-            # Try to get physical file size first, fall back to logical size
-            try:
-                cursor.execute("""
-                    SELECT SUM(size) * @@innodb_page_size as db_size
-                    FROM information_schema.INNODB_SYS_TABLESPACES 
-                    WHERE name LIKE %s
-                """, (f"{db_credentials['name']}/%",))
-                result = cursor.fetchone()
-                db_size = result[0] if result and result[0] else 0
-                
-                # If InnoDB method fails or returns 0, use traditional method with overhead
-                if db_size == 0:
-                    cursor.execute("""
-                        SELECT ROUND(SUM(data_length + index_length + data_free)) as db_size 
-                        FROM information_schema.tables 
-                        WHERE table_schema = %s
-                    """, (db_credentials["name"],))
-                    db_size = cursor.fetchone()[0] or 0
-                    
-            except mysql.connector.Error:
-                # Fallback to traditional method if InnoDB queries fail
-                cursor.execute("""
-                    SELECT ROUND(SUM(data_length + index_length + data_free)) as db_size 
-                    FROM information_schema.tables 
-                    WHERE table_schema = %s
-                """, (db_credentials["name"],))
-                db_size = cursor.fetchone()[0] or 0
-            
-            # Get table counts
-            cursor.execute("SHOW TABLES")
-            tables = [row[0] for row in cursor.fetchall()]
-            
-            table_counts = {}
-            for table in tables:
-                try:
-                    if table in ["ROI_MAP", "VAR_MAP", "METADATA"]:
-                        cursor.execute(f"SELECT COUNT(*) FROM `{table}`")
-                    else:
-                        cursor.execute(f"SELECT COALESCE(MAX(id), 0) FROM `{table}`")
-                    
-                    result = cursor.fetchone()
-                    table_counts[table] = result[0] if result and result[0] is not None else 0
-                except mysql.connector.Error:
-                    table_counts[table] = 0
-            
-            return {
-                "db_size_bytes": int(db_size),
-                "table_counts": table_counts,
-                "last_db_update": time.time()
-            }
-            
-    except mysql.connector.Error as e:
-        logging.error(f"Database connection error: {e}")
-        raise
-
-
-def update_cache_file(cache_file_path, db_info, db_name, tracking_start_time, device_name):
-    """Update or create cache file with database metadata."""
-    try:
-        # Check if cache file exists
-        if os.path.exists(cache_file_path):
-            with open(cache_file_path, 'r') as f:
-                cache_data = json.load(f)
-        else:
-            # Create new cache file
-            cache_data = {
-                "db_name": db_name,
-                "device_name": device_name,
-                "tracking_start_time": time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(tracking_start_time)),
-                "creation_timestamp": tracking_start_time,
-                "db_status": "tracking"
-            }
-        
-        # Update with current database info
-        cache_data.update({
-            "last_updated": time.time(),
-            "db_size_bytes": db_info["db_size_bytes"],
-            "table_counts": db_info["table_counts"],
-            "last_db_update": db_info["last_db_update"]
-        })
-        
-        # Write cache file
-        with open(cache_file_path, 'w') as f:
-            json.dump(cache_data, f, indent=2)
-            
-    except Exception as e:
-        logging.warning(f"Failed to update cache file {cache_file_path}: {e}")
-
-
-def read_cache_file(cache_file_path):
-    """Read database metadata from cache file."""
-    try:
-        with open(cache_file_path, 'r') as f:
-            cache_data = json.load(f)
-        
-        return {
-            "db_size_bytes": cache_data.get("db_size_bytes", 0),
-            "table_counts": cache_data.get("table_counts", {}),
-            "last_db_update": cache_data.get("last_db_update", 0),
-            "cache_file": cache_file_path,
-            "db_status": cache_data.get("db_status", "unknown")
-        }
-        
-    except Exception as e:
-        logging.warning(f"Failed to read cache file {cache_file_path}: {e}")
-        return {"db_size_bytes": 0, "table_counts": {}, "last_db_update": 0}
-
-
-def read_latest_cache_file(cache_dir, device_name):
-    """Find and read the most recent cache file for a device."""
-    try:
-        # Find all cache files for this device
-        pattern = f"db_metadata_*_{device_name}_db.json"
-        cache_files = []
-        
-        for filename in os.listdir(cache_dir):
-            if filename.endswith(f"_{device_name}_db.json") and filename.startswith("db_metadata_"):
-                cache_files.append(os.path.join(cache_dir, filename))
-        
-        if not cache_files:
-            return {"db_size_bytes": 0, "table_counts": {}, "last_db_update": 0}
-        
-        # Sort by modification time and get the most recent
-        cache_files.sort(key=lambda x: os.path.getmtime(x), reverse=True)
-        latest_cache = cache_files[0]
-        
-        return read_cache_file(latest_cache)
-        
-    except Exception as e:
-        logging.warning(f"Failed to find latest cache file for {device_name}: {e}")
-        return {"db_size_bytes": 0, "table_counts": {}, "last_db_update": 0}
-
-
-def finalize_cache_file(cache_file_path):
-    """Mark cache file as finalized when tracking stops."""
-    try:
-        if os.path.exists(cache_file_path):
-            with open(cache_file_path, 'r') as f:
-                cache_data = json.load(f)
-            
-            cache_data["db_status"] = "finalised"
-            cache_data["finalized_timestamp"] = time.time()
-            
-            with open(cache_file_path, 'w') as f:
-                json.dump(cache_data, f, indent=2)
-                
-    except Exception as e:
-        logging.warning(f"Failed to finalize cache file {cache_file_path}: {e}")
 
 
 class ControlThread(Thread):
@@ -393,6 +182,7 @@ class ControlThread(Thread):
         
         # Database metadata tracking
         self._tracking_start_time = None
+        self._metadata_cache = DatabaseMetadataCache(self._db_credentials, name, os.path.join(ethoscope_dir, 'cache'))
         
         #todo add 'data' -> how monitor was started to metadata
         self._info = {  "status": "stopped",
@@ -533,40 +323,9 @@ class ControlThread(Thread):
 
     def _get_database_info(self):
         """Get database metadata based on current status."""
-        device_name = self._info.get("name", "")
         try:
-            if self._info.get("status") in ["running", "recording"]:
-                # During tracking: query database live and update cache
-                logging.debug(f"Getting live database info for tracking device {self._info.get('name')}")
-                db_info = get_database_metadata(
-                    self._db_credentials, 
-                    self._tracking_start_time, 
-                    device_name
-                )
-                logging.debug(f"Retrieved database info: size={db_info.get('db_size_bytes', 0)} bytes, status={db_info.get('db_status', 'unknown')}")
-                return db_info
-            else:
-                # When stopped: read from most recent cache file
-                logging.debug(f"Reading cache file for stopped device {device_name}")
-                cache_result = read_latest_cache_file(self._cache_dir, device_name)
-                
-                # If no cache file found, try a simple database query without cache
-                if cache_result.get("db_size_bytes", 0) == 0:
-                    logging.debug(f"No cache found, attempting direct database query for {device_name}")
-                    try:
-                        db_info = get_database_metadata(self._db_credentials, self._tracking_start_time, device_name)
-                        db_info["db_status"] = "queried_direct"
-                        return db_info
-                    except Exception as db_e:
-                        logging.warning(f"Direct database query failed for {device_name}: {db_e}")
-                        return {
-                            "db_size_bytes": 0,
-                            "table_counts": {},
-                            "last_db_update": 0,
-                            "db_status": "no_cache_no_db"
-                        }
-                
-                return cache_result
+            # Use the metadata cache for all database info requests
+            return self._metadata_cache.get_metadata(self._tracking_start_time)
                 
         except Exception as e:
             logging.warning(f"Failed to get database info for {self._info.get('name', 'unknown')}: {e}")
@@ -988,14 +747,10 @@ class ControlThread(Thread):
         self._info["monitor_info"] = self._default_monitor_info
         
         # Finalize database cache file when tracking stops
-        if self._tracking_start_time and self._info.get("name"):
+        if self._tracking_start_time:
             try:
-                cache_dir = "/ethoscope_data/cache"
-                ts_str = time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(self._tracking_start_time))
-                cache_filename = f"db_metadata_{ts_str}_{self._info['name']}_db.json"
-                cache_file_path = os.path.join(cache_dir, cache_filename)
-                finalize_cache_file(cache_file_path)
-                logging.info(f"Finalized database cache file: {cache_file_path}")
+                self._metadata_cache.finalize_cache(self._tracking_start_time)
+                logging.info(f"Finalized database cache file for tracking session")
             except Exception as e:
                 logging.warning(f"Failed to finalize cache file: {e}")
         
