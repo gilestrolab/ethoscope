@@ -4,7 +4,7 @@ import time, datetime
 import logging
 import os
 from ethoscope.utils.debug import EthoscopeException
-from ethoscope.utils.io import save_hash_info_file
+from ethoscope.utils.video_utils import save_hash_info_file
 import threading, queue
 import traceback
 import hashlib
@@ -574,7 +574,7 @@ class PiFrameGrabber2(PiFrameGrabber):
                     if time.time() - self._video_time >= self._VIDEO_CHUNCK_DURATION:
                         logging.info("Splitting video recording into a new H264 chunk.")
                         capture.stop_encoder()
-                        self.save_hash_info_file( self._get_video_chunk_filename (current=True) )
+                        save_hash_info_file( self._get_video_chunk_filename (current=True) )
                         capture.start_encoder(encoder, self._get_video_chunk_filename(self._target_fps))
                         self._video_time = time.time()
 

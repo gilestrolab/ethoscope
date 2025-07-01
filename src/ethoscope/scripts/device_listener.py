@@ -156,7 +156,7 @@ class commandingThread(threading.Thread):
             self.control = ControlThreadVideoRecording ( machine_id = self.ethoscope_info['MACHINE_ID'],
                                name = self.ethoscope_info['MACHINE_NAME'],
                                version = self.ethoscope_info['GIT_VERSION'], 
-                               ethoscope_dir = self.ethoscope_info['ETHOSCOPE_DIR'],
+                               ethoscope_dir = self.ethoscope_info['ETHOSCOPE_VIDEOS_DIR'],
                                data = {'recorder': {'name': 'Streamer', 'arguments': {}}} )
 
             self.control.start()
@@ -166,7 +166,7 @@ class commandingThread(threading.Thread):
             self.control = ControlThreadVideoRecording ( machine_id = self.ethoscope_info['MACHINE_ID'],
                                name = self.ethoscope_info['MACHINE_NAME'],
                                version = self.ethoscope_info['GIT_VERSION'], 
-                               ethoscope_dir = self.ethoscope_info['ETHOSCOPE_DIR'],
+                               ethoscope_dir = self.ethoscope_info['ETHOSCOPE_VIDEOS_DIR'],
                                data = data )
 
             self.control.start()
@@ -219,7 +219,7 @@ if __name__ == '__main__':
     parser.add_option("-r", "--run", dest="run", default=False, help="Runs tracking directly", action="store_true")
     parser.add_option("-v", "--record-video", dest="record_video", default=False, help="Records video instead of tracking", action="store_true")
     parser.add_option("-j", "--json", dest="json", default=None, help="A JSON config file")
-    parser.add_option("-e", "--results-dir", dest="results_dir", default="/ethoscope_data/results", help="Where temporary result files are stored")
+    parser.add_option("-e", "--ethoscope-dir", dest="ethoscope_dir", default="/ethoscope_data", help="Root directory for ethoscope data storage")
     parser.add_option("-D", "--debug", dest="debug", default=False, help="Shows all logging messages", action="store_true")
 
     (options, args) = parser.parse_args()
@@ -237,13 +237,24 @@ if __name__ == '__main__':
         json_data = {}
 
 
+    # Calculate subdirectories from root ethoscope directory
+    ethoscope_root = option_dict['ethoscope_dir']
+   
     ethoscope_info = { 'MACHINE_ID' : get_machine_id(),
       'MACHINE_NAME' : get_machine_name(),
       'GIT_VERSION' : get_git_version(),
-      'ETHOSCOPE_UPLOAD' : '/ethoscope_data/upload',
-      'ETHOSCOPE_DIR' : option_dict['results_dir'],
+      'ETHOSCOPE_DIR' : ethoscope_root,
+      'ETHOSCOPE_VIDEOS_DIR' : os.path.join(ethoscope_root, 'videos'),
+      'ETHOSCOPE_TRACKING_DIR' : os.path.join(ethoscope_root, 'tracking'),
+      'ETHOSCOPE_CACHE_DIR' : os.path.join(ethoscope_root, 'cache'),
+      'ETHOSCOPE_UPLOAD' : os.path.join(ethoscope_root, 'upload'),
       'DATA' : json_data
     }
+
+    # Ensure proper directory structure and migrate from legacy if needed - July 2025 - We will remove this at some point
+    from ethoscope.utils.video_utils import ensure_video_directory_structure
+    ensure_video_directory_structure(ethoscope_root, ethoscope_info['ETHOSCOPE_VIDEOS_DIR'])
+
 
     ethoscope = commandingThread(ethoscope_info)
     ethoscope.start()

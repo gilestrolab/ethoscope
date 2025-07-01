@@ -57,12 +57,13 @@ backup_tool.py for the actual backup service implementation.
 
 from ethoscope_node.utils.device_scanner import EthoscopeScanner
 from ethoscope_node.utils.mysql_backup import MySQLdbToSQLite, DBNotReadyError
-from ethoscope.utils.io import get_and_hash, list_local_video_files
+from ethoscope.utils.video_utils import list_local_video_files, save_hash_info_file
 import os
 import logging
 import time
 import datetime
 import traceback
+import subprocess
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -532,7 +533,8 @@ class VideoBackupClass(BaseBackupClass):
             # Try JSON method first (newer, more reliable)
             video_dict = self._get_video_list_json()
             if video_dict:
-                return list(video_dict.keys())
+                # Extract full paths from video metadata
+                return [video_info['path'] for video_info in video_dict.values() if 'path' in video_info]
         except Exception as e:
             self._logger.debug(f"JSON video list failed: {e}")
         
@@ -543,13 +545,105 @@ class VideoBackupClass(BaseBackupClass):
             self._logger.warning(f"HTML video list failed: {e}")
             return []
     
+    def _get_and_hash(self, target, target_prefix, output_dir, cut_dirs=2):
+        """
+        Downloads a file from a specified target URL using wget and generates an MD5 checksum file.
+
+        This function constructs a command to use the `wget` utility for downloading a file
+        from a remote server. It calculates the exact local file path based on the target URL,
+        ensures the necessary directories exist, and instructs `wget` to save the file to that path.
+        After downloading, it computes the MD5 checksum of the downloaded file and writes it to
+        an adjacent `.md5sum.txt` file.
+
+        Args:
+            target (str): The target file or directory to download, relative to the target_prefix.
+            target_prefix (str): The base URL prefix to prepend to the target.
+            output_dir (str): The local directory where the files will be downloaded.
+            cut_dirs (int, optional): The number of directory levels to cut from the input URL.
+                                    Defaults to 3.
+
+        Returns:
+            bool: True if the download and MD5 checksum generation were successful; 
+                False if no content was downloaded.
+
+        Raises:
+            Exception: If the wget command fails to execute successfully, an Exception
+                    is raised with the return code and the output from wget.
+            FileNotFoundError: If the downloaded file is not found for MD5 computation.
+        """
+        
+        # Ensure the target URL is properly formatted
+        target_url = target_prefix.rstrip('/') + '/' + target.lstrip('/')
+        
+        # Split the target path into its components
+        target_path_parts = target.strip('/').split('/')
+        
+        # Apply 'cut_dirs' to remove the specified number of directory levels
+        if len(target_path_parts) <= cut_dirs:
+            raise ValueError(f"The target path '{target}' does not have enough directories to cut {cut_dirs} levels.")
+        
+        relative_path_parts = target_path_parts[cut_dirs:]
+        relative_path = os.path.join(*relative_path_parts)
+        local_file_path = os.path.join(output_dir, relative_path)
+        
+        # Construct the wget command with '-O' to specify the exact output file path
+        command = [
+            "wget",
+            target_url,
+            "-nv",               # Non-verbose
+            "-c",                # Resume incomplete downloads
+            "-O",                # Specify output file
+            local_file_path
+        ]
+
+        try:
+            os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
+            #logging.info(f"Executing command: {' '.join(command)}")
+            result = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+                text=True
+            )
+            #logging.debug(f"wget stdout: {result.stdout}")
+            #logging.debug(f"wget stderr: {result.stderr}")
+
+            if result.stdout: 
+                # this is empty if wget finds the file was already downloaded
+                # in that case we do not have to compute the hash
+            
+                if not os.path.isfile(local_file_path):
+                    logging.warning(f"No file found at '{local_file_path}'.")
+                    return False
+                if os.path.getsize(local_file_path) == 0:
+                    logging.warning(f"Downloaded file '{local_file_path}' is empty.")
+                    return False
+                logging.info("File downloaded. Now creating a md5 hash for it")	        
+                save_hash_info_file (local_file_path)
+            
+                return True
+            
+            else:
+                return False
+
+        except subprocess.CalledProcessError as e:
+            logging.error(f"wget failed with return code {e.returncode}: {e.stderr}")
+            raise Exception(f"wget error {e.returncode}: {e.stderr}") from e
+        except FileNotFoundError as fnf_error:
+            logging.error(str(fnf_error))
+            raise
+        except Exception as ex:
+            logging.error(f"An unexpected error occurred: {str(ex)}")
+            raise
+
     def _download_video(self, video_path: str):
         """Download a single video file."""
         try:
             self._logger.info(f"[{self._device_id}] Starting download of video: {video_path}")
             self._logger.info(f"[{self._device_id}] Target URL: {self._static_url}, Output dir: {self._results_dir}")
             
-            get_and_hash(video_path, target_prefix=self._static_url, output_dir=self._results_dir)
+            self._get_and_hash(video_path, target_prefix=self._static_url, output_dir=self._results_dir, cut_dirs=0)
             
             self._logger.info(f"[{self._device_id}] Successfully downloaded video: {video_path}")
         except Exception as e:

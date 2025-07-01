@@ -20,7 +20,7 @@ from ethoclient import send_command, listenerIsAlive
 from ethoscope.web_utils.control_thread import ControlThread
 from ethoscope.web_utils.record import ControlThreadVideoRecording
 from ethoscope.web_utils.helpers import *
-from ethoscope.utils.io import list_local_video_files
+from ethoscope.utils.video_utils import list_local_video_files
 
 try:
     from cheroot.wsgi import Server as WSGIServer
@@ -115,7 +115,7 @@ def name():
 @api.get('/list_video_files')
 @error_decorator
 def list_video_files():
-    return list_local_video_files(_ETHOSCOPE_DIR)
+    return list_local_video_files(_ETHOSCOPE_VIDEOS_DIR)
 
 @api.get('/make_index')
 @error_decorator
@@ -124,8 +124,8 @@ def make_index():
     Creates an index of all the video files in the provided formats
     """
     video_formats = ['h264', 'avi', 'mp4']
-    index_file = os.path.join(_ETHOSCOPE_DIR, "index.html")
-    all_video_files = [y for x in os.walk(_ETHOSCOPE_DIR) for y in glob.glob(os.path.join(x[0], '*.*')) if y.endswith(tuple(video_formats))]
+    index_file = os.path.join(_ETHOSCOPE_VIDEOS_DIR, "index.html")
+    all_video_files = [y for x in os.walk(_ETHOSCOPE_VIDEOS_DIR) for y in glob.glob(os.path.join(x[0], '*.*')) if y.endswith(tuple(video_formats))]
     with open(index_file, "w") as index:
         for f in all_video_files:
             index.write(f + "\n")
@@ -313,8 +313,8 @@ def list_data_files(category, id):
         filelist = {'filelist' : [{'filename': i, 'fullpath' : os.path.abspath(os.path.join(path,i))} for i in os.listdir(path)]}
 
     if category == 'video':
-        converted_mp4s = [f for f in [ x[0] for x in os.walk(_ETHOSCOPE_DIR) ] if glob.glob(os.path.join(f, "*.mp4"))]
-        filelist['filelist'] = filelist['filelist'] + [{'filename': os.path.basename(i), 'fullpath' : i} for i in glob.glob(_ETHOSCOPE_DIR+'/**/*.mp4', recursive=True)]
+        converted_mp4s = [f for f in [ x[0] for x in os.walk(_ETHOSCOPE_VIDEOS_DIR) ] if glob.glob(os.path.join(f, "*.mp4"))]
+        filelist['filelist'] = filelist['filelist'] + [{'filename': os.path.basename(i), 'fullpath' : i} for i in glob.glob(_ETHOSCOPE_VIDEOS_DIR+'/**/*.mp4', recursive=True)]
 
 
     return filelist
@@ -474,17 +474,28 @@ def user_options(id):
 
 @api.get('/data/log/<id>')
 @error_decorator
-def get_log(id, n_lines=200):
+def get_log(id, service="ethoscope_listener"):
     '''
-    returns the journalctl log
+    returns the journalctl log since last service start
     '''
-    output = "No log available"
-    try:
-        with os.popen('journalctl -u ethoscope_device.service -rb -n %s' % n_lines) as p:
-            output = p.read()
 
-    except Exception as e:
-        logging.error(traceback.format_exc())
+    services = ["ethoscope_listener", "ethoscope_device"]
+
+    if id != _MACHINE_ID:
+        raise WrongMachineID
+
+    output = ""
+
+    for service in services:
+        try:
+            output += f"==== last available logs for {service} ====\n"
+            with os.popen(f'journalctl -u {service}.service -rb --since "$(systemctl show {service}.service --property=ActiveEnterTimestamp --value)"') as p:
+                output += p.read()
+            output += f"===== end of logs for {service} =====\n\n"
+
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            output = "Error getting logs using journalctl"
 
     return {'message' : output}
 
@@ -536,8 +547,11 @@ if __name__ == '__main__':
     _MACHINE_NAME = get_machine_name()
     _GIT_VERSION = get_git_version()
     
-    _ETHOSCOPE_UPLOAD = '/ethoscope_data/upload'
-    _ETHOSCOPE_DIR = '/ethoscope_data/results'
+    _ETHOSCOPE_DIR = '/ethoscope_data'
+    _ETHOSCOPE_UPLOAD = os.path.join(_ETHOSCOPE_DIR, 'upload')
+    _ETHOSCOPE_VIDEOS_DIR = os.path.join(_ETHOSCOPE_DIR, 'videos')
+    _ETHOSCOPE_TRACKING_DIR = os.path.join(_ETHOSCOPE_DIR, 'tracking')
+    _ETHOSCOPE_CACHE_DIR = os.path.join(_ETHOSCOPE_DIR, 'cache')
 
     if not listenerIsAlive():
         logging.error('An Ethoscope controlling service is not running on this machine! I will be starting one for you but this is not the way this should work. Update your SD card.')
@@ -547,8 +561,11 @@ if __name__ == '__main__':
         ethoscope_info = { 'MACHINE_ID' : _MACHINE_ID,
                       'MACHINE_NAME' : _MACHINE_NAME,
                       'GIT_VERSION' : _GIT_VERSION,
-                      'ETHOSCOPE_UPLOAD' : _ETHOSCOPE_UPLOAD,
                       'ETHOSCOPE_DIR' : _ETHOSCOPE_DIR,
+                      'ETHOSCOPE_UPLOAD' : _ETHOSCOPE_UPLOAD,
+                      'ETHOSCOPE_VIDEOS_DIR' : _ETHOSCOPE_VIDEOS_DIR,
+                      'ETHOSCOPE_TRACKING_DIR' : _ETHOSCOPE_TRACKING_DIR,
+                      'ETHOSCOPE_CACHE_DIR' : _ETHOSCOPE_CACHE_DIR,
                       'DATA' : ''
                     }
 
@@ -596,7 +613,7 @@ if __name__ == '__main__':
         zeroconf.register_service(serviceInfo)
 
         #the webserver on the ethoscope side is quite basic so we can safely run the original bottle version based on WSGIRefServer()
-        bottle.run(api, host='0.0.0.0', port=PORT, debug=DEBUG)
+        bottle.run(api, host='0.0.0.0', port=PORT, debug=DEBUG, quiet=True)
 
     
     #this applies to any network error the will prevent zeroconf or the webserver from working
