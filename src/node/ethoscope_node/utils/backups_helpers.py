@@ -55,7 +55,6 @@ This module uses mysql_backup.py for low-level database operations and is used b
 backup_tool.py for the actual backup service implementation.
 """
 
-from ethoscope_node.utils.device_scanner import EthoscopeScanner
 from ethoscope_node.utils.mysql_backup import MySQLdbToSQLite, DBNotReadyError
 from ethoscope_node.utils.configuration import ensure_ssh_keys
 from ethoscope.utils.video_utils import list_local_video_files
@@ -934,6 +933,9 @@ class GenericBackupWrapper(threading.Thread):
         self._logger.info("Using EthoscopeScanner as fallback")
         
         try:
+            # Import here to avoid circular dependency
+            from ethoscope_node.utils.device_scanner import EthoscopeScanner
+            
             self._logger.info("Creating EthoscopeScanner instance...")
             scanner = EthoscopeScanner()
             
