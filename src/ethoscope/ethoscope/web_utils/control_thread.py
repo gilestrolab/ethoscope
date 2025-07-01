@@ -127,13 +127,34 @@ def query_database_metadata(db_credentials):
         ) as conn:
             cursor = conn.cursor()
             
-            # Get database size
-            cursor.execute("""
-                SELECT ROUND(SUM(data_length + index_length)) as db_size 
-                FROM information_schema.tables 
-                WHERE table_schema = %s
-            """, (db_credentials["name"],))
-            db_size = cursor.fetchone()[0] or 0
+            # Get actual database file size (to match SQLite file size comparison)
+            # Try to get physical file size first, fall back to logical size
+            try:
+                cursor.execute("""
+                    SELECT SUM(size) * @@innodb_page_size as db_size
+                    FROM information_schema.INNODB_SYS_TABLESPACES 
+                    WHERE name LIKE %s
+                """, (f"{db_credentials['name']}/%",))
+                result = cursor.fetchone()
+                db_size = result[0] if result and result[0] else 0
+                
+                # If InnoDB method fails or returns 0, use traditional method with overhead
+                if db_size == 0:
+                    cursor.execute("""
+                        SELECT ROUND(SUM(data_length + index_length + data_free)) as db_size 
+                        FROM information_schema.tables 
+                        WHERE table_schema = %s
+                    """, (db_credentials["name"],))
+                    db_size = cursor.fetchone()[0] or 0
+                    
+            except mysql.connector.Error:
+                # Fallback to traditional method if InnoDB queries fail
+                cursor.execute("""
+                    SELECT ROUND(SUM(data_length + index_length + data_free)) as db_size 
+                    FROM information_schema.tables 
+                    WHERE table_schema = %s
+                """, (db_credentials["name"],))
+                db_size = cursor.fetchone()[0] or 0
             
             # Get table counts
             cursor.execute("SHOW TABLES")

@@ -129,7 +129,7 @@ def list_video_files():
         disk_usage_bytes = 0
     
     # Get device IP address
-    device_ip = get_main_ip_address()
+    device_ip = get_ip_address()
     
     # Return enhanced JSON with metadata
     return {
@@ -530,27 +530,37 @@ def get_log(id, service="ethoscope_listener"):
 def close(exit_status=0):
     os._exit(exit_status)
 
-def get_ip_address(interface_name='wlan0'):
-    try:
-        interface_addresses = ni.ifaddresses(interface_name)
-        ip_address = interface_addresses[ni.AF_INET][0]['addr']
-        return ip_address
-    except (ValueError, KeyError):
-        return False
-
-def get_main_ip_address():
-    for interface in ni.interfaces():
-        addresses = ni.ifaddresses(interface)
+def get_ip_address(interface_name=None):
+    """
+    Get IP address for specified interface or main IP address if no interface specified.
+    
+    Args:
+        interface_name (str, optional): Specific interface name (e.g., 'wlan0', 'eth0').
+                                      If None, returns the main non-loopback IP address.
+    
+    Returns:
+        str or None: IP address string, or None if not found
+    """
+    if interface_name:
+        # Get IP for specific interface
         try:
-            # Attempt to get the IPv4 address of the current interface
-            ipv4_info = addresses[ni.AF_INET][0]
-            ip_address = ipv4_info['addr']
-            if not ip_address.startswith("127.0"):
-                return ip_address
-        except KeyError:
-            # No IPv4 address found for this interface
-            pass
-    return None
+            interface_addresses = ni.ifaddresses(interface_name)
+            ip_address = interface_addresses[ni.AF_INET][0]['addr']
+            return ip_address
+        except (ValueError, KeyError):
+            return None
+    else:
+        # Get main IP address (first non-loopback interface)
+        for interface in ni.interfaces():
+            addresses = ni.ifaddresses(interface)
+            try:
+                ipv4_info = addresses[ni.AF_INET][0]
+                ip_address = ipv4_info['addr']
+                if not ip_address.startswith("127.0"):
+                    return ip_address
+            except KeyError:
+                continue
+        return None
 
 
 if __name__ == '__main__':
@@ -613,7 +623,7 @@ if __name__ == '__main__':
         while ip_address is None and ip_attempts < 60:
 
             try:
-                ip_address = get_main_ip_address()
+                ip_address = get_ip_address()
             except:
                 pass
 
