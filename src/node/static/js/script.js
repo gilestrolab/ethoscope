@@ -252,11 +252,11 @@
             var secs = Math.floor((t - (days * 86400) - (hours * 3600) - (minutes * 60)))
 
             if (days > 0) {
-                var x = days + " days, " + hours + "h, " + minutes + "min,  " + secs + "s ";
+                var x = days + " days, " + hours + "h, " + minutes + "min ";
             } else if (days == 0 && hours > 0) {
-                var x = hours + "h, " + minutes + "min,  " + secs + "s ";
+                var x = hours + "h, " + minutes + "min ";
             } else if (days == 0 && hours == 0 && minutes > 0) {
-                var x = minutes + "min,  " + secs + "s ";
+                var x = minutes + "min ";
             } else if (days == 0 && hours == 0 && minutes == 0 && secs > 0) {
                 var x = secs + " s ";
             }

@@ -14,6 +14,7 @@ import shutil
 import netifaces
 import json
 import time
+import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from contextlib import contextmanager
@@ -595,7 +596,6 @@ class EthoscopeNodeServer:
     def _get_backup_status(self):
         """Proxy backup status from backup tool server to avoid CORS issues."""
         try:
-            import urllib.request
             backup_url = 'http://localhost:8090/status'
             with urllib.request.urlopen(backup_url, timeout=5) as response:
                 data = response.read().decode('utf-8')

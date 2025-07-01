@@ -593,42 +593,43 @@ class MySQLdbToSQLite(BaseSQLConnector):
             with DatabaseConnectionManager(self._remote_host, self._remote_user, self._remote_pass, self._remote_db_name) as mysql_conn:
                 with sqlite3.connect(self._dst_path, timeout=30.0) as sqlite_conn:
 
-                    # Update tables without ID fields using row-by-row checking
-                    for table_name in self._TABLE_WITHOUT_KEY:
+                    # Get all tables from database and iterate through each one
+                    mysql_cursor = mysql_conn.cursor(buffered=True)
+                    mysql_cursor.execute("SHOW TABLES")
+                    all_db_tables = [row[0] for row in mysql_cursor.fetchall()]
+                    
+                    logging.info(f"Starting incremental backup for {len(all_db_tables)} tables")
+                    
+                    # Single iteration with clear categorization
+                    for table_name in all_db_tables:
                         try:
-                            self._update_table_without_ID(table_name, mysql_conn, sqlite_conn)
+                            if table_name in self._TABLE_WITHOUT_KEY:
+                                # Tables without ID: METADATA, VAR_MAP, ROI_MAP
+                                logging.debug(f"Updating table without ID: {table_name}")
+                                self._update_table_without_ID(table_name, mysql_conn, sqlite_conn)
+                            elif table_name.startswith("ROI_"):
+                                # ROI tables: ROI_1, ROI_2, etc.
+                                logging.debug(f"Updating ROI table: {table_name}")
+                                self._update_table_with_ID(table_name, mysql_conn, sqlite_conn)
+                            elif table_name == "CSV_DAM_ACTIVITY":
+                                # CSV export table
+                                logging.debug(f"Updating CSV table: {table_name}")
+                                self._update_table_with_ID(table_name, mysql_conn, sqlite_conn, dump_csv=True)
+                            elif table_name in ["START_EVENTS", "IMG_SNAPSHOTS", "SENSORS"]:
+                                # Regular tables with ID
+                                logging.debug(f"Updating regular table: {table_name}")
+                                self._update_table_with_ID(table_name, mysql_conn, sqlite_conn)
+                            else:
+                                logging.debug(f"Skipping unknown table: {table_name}")
                         except mysql.connector.Error as e:
-                            logging.warning(f"Could not update table {table_name}: {e}")
+                            logging.warning(f"MySQL error updating table {table_name}: {e}")
                         except sqlite3.Error as e:
                             logging.warning(f"SQLite error updating table {table_name}: {e}")
-
-                    # Then proceed with all the tables that DO have a primary KEY
-                    # First the ROI tables: Get ROI indices, one per table (ROI_1, ROI_2 etc)
-                    sqlite_cursor = sqlite_conn.cursor()
-                    sqlite_cursor.execute("SELECT DISTINCT roi_idx FROM ROI_MAP")
-                    roi_indices = [row[0] for row in sqlite_cursor.fetchall()]
                     
-                    # Update each ROI table (these have ID fields)
-                    for roi_idx in roi_indices:
-                        self._update_table_with_ID(f"ROI_{roi_idx}", mysql_conn, sqlite_conn)
-                    
-                    # Then do the remaining tables that do not need csv conversion
-                    # Update tables with ID fields using chunked incremental backup
-                    for table_name in ["START_EVENTS", "IMG_SNAPSHOTS", "SENSORS"]:
-                        try:
-                            self._update_table_with_ID(table_name, mysql_conn, sqlite_conn)
-                        except mysql.connector.Error as e:
-                            logging.warning(f"Could not update table {table_name}: {e}")
-
-                    # Finally do the table with primary key that also needs csv conversion
-                    for table_name in ["CSV_DAM_ACTIVITY"]:
-                        try:
-                            self._update_table_with_ID(table_name, mysql_conn, sqlite_conn, dump_csv=True)
-                        except mysql.connector.Error as e:
-                            logging.warning(f"Could not update table {table_name}: {e}")
+                    logging.info(f"Completed incremental backup for all tables")
         
         except Exception as e:
-            logging.error(f"Error updating ROI tables: {e}")
+            logging.error(f"Error during database backup operation: {e}")
             raise
     
     
@@ -736,9 +737,9 @@ class MySQLdbToSQLite(BaseSQLConnector):
                 break
         
         if total_inserted > 0:
-            logging.info(f"Table {table_name}: Incremental backup completed - inserted {total_inserted} new records")
+            logging.info(f"Table {self._remote_db_name}.{table_name}: Incremental backup completed - inserted {total_inserted} new records")
         else:
-            logging.debug(f"Table {table_name}: No new records to backup")
+            logging.debug(f"Table {self._remote_db_name}.{table_name}: No new records to backup")
     
     def _update_table_without_ID(self, table_name: str, mysql_conn, sqlite_conn):
         """
