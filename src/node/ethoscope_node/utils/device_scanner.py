@@ -21,6 +21,7 @@ from zeroconf import ServiceBrowser, Zeroconf, IPVersion
 
 from ethoscope_node.utils.etho_db import ExperimentalDB
 from ethoscope_node.utils.configuration import ensure_ssh_keys
+from ethoscope_node.utils.backups_helpers import get_sqlite_table_counts, calculate_backup_percentage_from_table_counts
 
 # Constants
 STREAMING_PORT = 8887
@@ -994,8 +995,9 @@ class Ethoscope(BaseDevice):
         except Exception as e:
             self._logger.error(f"Error handling state transition: {e}")
     
+
     def _update_backup_status_from_database_info(self):
-        """Update backup status using database_info from ethoscope instead of direct DB connection."""
+        """Update backup status using table counts from database_info instead of file size."""
         if time.time() - self._last_db_info < DB_UPDATE_INTERVAL:
             return
         
@@ -1028,36 +1030,48 @@ class Ethoscope(BaseDevice):
                 self._info['backup_status'] = "DB Error"
                 return
             
-            # Get database size from ethoscope
-            remote_db_size = database_info.get("db_size_bytes", 0)
-            if remote_db_size == 0:
-                self._logger.debug(f"Device {self._ip}: No database size available from ethoscope")
-                self._info['backup_status'] = "No DB Size"
+            # Get table counts from ethoscope
+            remote_table_counts = database_info.get("table_counts", {})
+            if not remote_table_counts:
+                self._logger.debug(f"Device {self._ip}: No table counts available from ethoscope")
+                self._info['backup_status'] = "No Table Data"
                 return
             
-            # Get local backup file size
+            # Get table counts from backup database
+            backup_table_counts = get_sqlite_table_counts(backup_path)
+            if not backup_table_counts:
+                self._logger.debug(f"Device {self._ip}: Could not read backup database")
+                self._info['backup_status'] = "Backup Read Error"
+                return
+            
+            # Calculate backup percentage based on table counts
+            backup_percentage = calculate_backup_percentage_from_table_counts(
+                remote_table_counts, backup_table_counts)
+            
+            # Get file sizes for additional info
             try:
                 local_backup_size = os.path.getsize(backup_path)
-            except OSError as e:
-                self._logger.warning(f"Device {self._ip}: Cannot get backup file size for {backup_path}: {e}")
-                self._info['backup_status'] = "File Error"
-                return
+                remote_db_size = database_info.get("db_size_bytes", 0)
+            except OSError:
+                local_backup_size = 0
+                remote_db_size = 0
             
-            # Calculate backup percentage
-            if remote_db_size > 0:
-                backup_percentage = (local_backup_size * 100) / remote_db_size
-                
-                self._info['backup_status'] = backup_percentage
-                self._info['backup_size'] = local_backup_size
-                
-                # Calculate time since last backup update
-                backup_mtime = os.path.getmtime(backup_path)
-                self._info['time_since_backup'] = time.time() - backup_mtime
-                
-                self._logger.debug(f"Device {self._ip}: Backup status {backup_percentage:.1f}% "
-                                 f"({local_backup_size}/{remote_db_size} bytes)")
-            else:
-                self._info['backup_status'] = "No DB Data"
+            self._info['backup_status'] = backup_percentage
+            self._info['backup_size'] = local_backup_size
+            self._info['remote_table_counts'] = remote_table_counts
+            self._info['backup_table_counts'] = backup_table_counts
+            
+            # Calculate time since last backup update
+            backup_mtime = os.path.getmtime(backup_path)
+            self._info['time_since_backup'] = time.time() - backup_mtime
+            
+            # Create detailed logging with table comparison
+            total_remote = sum(remote_table_counts.values())
+            total_backup = sum(backup_table_counts.values())
+            
+            self._logger.debug(f"Device {self._ip}: Backup status {backup_percentage:.1f}% "
+                             f"(rows: {total_backup}/{total_remote}, "
+                             f"size: {local_backup_size}/{remote_db_size} bytes)")
                 
         except Exception as e:
             self._logger.warning(f"Device {self._ip}: Failed to update backup status from database_info: {e}")

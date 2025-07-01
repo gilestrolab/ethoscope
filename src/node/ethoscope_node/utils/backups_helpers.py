@@ -81,6 +81,84 @@ import tempfile
 import sqlite3
 
 
+def get_sqlite_table_counts(backup_path: str) -> Dict[str, int]:
+    """
+    Utility function to get row counts for all tables in a SQLite database file.
+    
+    Args:
+        backup_path: Path to the SQLite database file
+        
+    Returns:
+        Dictionary mapping table names to row counts
+    """
+    table_counts = {}
+    try:
+        with sqlite3.connect(backup_path) as conn:
+            cursor = conn.cursor()
+            
+            # Get all table names
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = [row[0] for row in cursor.fetchall()]
+            
+            # Get row count for each table
+            for table in tables:
+                try:
+                    cursor.execute(f"SELECT COUNT(*) FROM `{table}`")
+                    count = cursor.fetchone()[0]
+                    table_counts[table] = count
+                except sqlite3.Error as e:
+                    logging.warning(f"Could not get count for table {table}: {e}")
+                    table_counts[table] = 0
+                    
+    except sqlite3.Error as e:
+        logging.warning(f"Failed to read backup database {backup_path}: {e}")
+        
+    return table_counts
+
+
+def calculate_backup_percentage_from_table_counts(remote_counts: Dict[str, int], 
+                                                backup_counts: Dict[str, int]) -> float:
+    """
+    Calculate backup percentage based on table row counts.
+    
+    Args:
+        remote_counts: Table counts from ethoscope database
+        backup_counts: Table counts from backup database
+        
+    Returns:
+        Backup percentage (0-100)
+    """
+    if not remote_counts:
+        return 0.0
+        
+    total_remote_rows = 0
+    total_backup_rows = 0
+    
+    # Calculate totals for tables that contain actual data (exclude metadata tables)
+    data_tables = [table for table in remote_counts.keys() 
+                  if table not in ['METADATA', 'VAR_MAP', 'ROI_MAP', 'START_EVENTS']]
+    
+    for table in data_tables:
+        remote_count = remote_counts.get(table, 0)
+        backup_count = backup_counts.get(table, 0)
+        
+        total_remote_rows += remote_count
+        # Don't let backup count exceed remote count for individual tables
+        total_backup_rows += min(backup_count, remote_count)
+    
+    if total_remote_rows == 0:
+        # If no data tables have rows, check if backup has the basic structure
+        required_tables = {'METADATA', 'VAR_MAP', 'ROI_MAP'}
+        backup_tables = set(backup_counts.keys())
+        if required_tables.issubset(backup_tables):
+            return 100.0  # Structure exists, no data to backup
+        else:
+            return 0.0
+    
+    percentage = (total_backup_rows * 100.0) / total_remote_rows
+    return min(percentage, 100.0)  # Cap at 100%
+
+
 @dataclass
 class BackupStatus:
     """Data class for backup status tracking."""
@@ -438,6 +516,40 @@ class BackupClass(BaseBackupClass):
             self._logger.error(f"[{self._device_id}] Error checking data duplication: {e}")
             self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
             return False  # Return False on error to avoid false positives
+    
+    def get_sqlite_table_counts(self, backup_path: str) -> Dict[str, int]:
+        """
+        Get row counts for all tables in a SQLite database file.
+        
+        Args:
+            backup_path: Path to the SQLite database file
+            
+        Returns:
+            Dictionary mapping table names to row counts
+        """
+        table_counts = {}
+        try:
+            with sqlite3.connect(backup_path) as conn:
+                cursor = conn.cursor()
+                
+                # Get all table names
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                tables = [row[0] for row in cursor.fetchall()]
+                
+                # Get row count for each table
+                for table in tables:
+                    try:
+                        cursor.execute(f"SELECT COUNT(*) FROM `{table}`")
+                        count = cursor.fetchone()[0]
+                        table_counts[table] = count
+                    except sqlite3.Error as e:
+                        self._logger.warning(f"[{self._device_id}] Could not get count for table {table}: {e}")
+                        table_counts[table] = 0
+                        
+        except sqlite3.Error as e:
+            self._logger.warning(f"[{self._device_id}] Failed to read backup database {backup_path}: {e}")
+            
+        return table_counts
     
     def check_sync_status(self) -> Dict:
         """Check synchronization status of the database backup."""
