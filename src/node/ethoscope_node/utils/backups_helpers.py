@@ -57,6 +57,7 @@ backup_tool.py for the actual backup service implementation.
 
 from ethoscope_node.utils.device_scanner import EthoscopeScanner
 from ethoscope_node.utils.mysql_backup import MySQLdbToSQLite, DBNotReadyError
+from ethoscope_node.utils.configuration import ensure_ssh_keys
 from ethoscope.utils.video_utils import list_local_video_files
 import os
 import logging
@@ -508,6 +509,9 @@ class VideoBackupClass(BaseBackupClass):
             destination_dir = self._results_dir
             os.makedirs(destination_dir, exist_ok=True)
             
+            # Get SSH key path for authentication
+            private_key_path, _ = ensure_ssh_keys()
+            
             rsync_source = f"ethoscope@{device_ip}:{source_dir}/"
             rsync_command = [
                 'rsync', 
@@ -515,6 +519,7 @@ class VideoBackupClass(BaseBackupClass):
                 '--progress',     # show progress
                 '--partial',      # keep partial files
                 '--timeout=300',  # 5 minute timeout
+                '-e', f'ssh -i {private_key_path} -o StrictHostKeyChecking=no',  # SSH key authentication
                 rsync_source, 
                 destination_dir
             ]

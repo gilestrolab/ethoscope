@@ -3,7 +3,9 @@ import json
 import datetime
 import logging
 import shutil
-from typing import Dict, Any, List, Optional
+import subprocess
+import socket
+from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 
 # Configuration validation constants
@@ -539,6 +541,102 @@ class EthoscopeConfiguration:
         """
         self._logger.info("Reloading configuration from file")
         return self.load()
+
+
+def ensure_ssh_keys(keys_dir: str = "/etc/ethoscope/keys") -> Tuple[str, str]:
+    """
+    Ensure SSH keys exist for ethoscope node authentication.
+    
+    Creates RSA key pair if it doesn't exist, sets proper permissions,
+    and returns paths to the private and public keys.
+    
+    Args:
+        keys_dir: Directory to store SSH keys
+        
+    Returns:
+        Tuple of (private_key_path, public_key_path)
+        
+    Raises:
+        ConfigurationError: If key generation or setup fails
+    """
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Ensure keys directory exists
+        keys_path = Path(keys_dir)
+        keys_path.mkdir(parents=True, exist_ok=True)
+        
+        # Set directory permissions to 700 (drwx------)
+        os.chmod(keys_path, 0o700)
+        logger.debug(f"Created/verified SSH keys directory: {keys_path}")
+        
+        # Define key file paths
+        private_key_path = keys_path / "id_rsa"
+        public_key_path = keys_path / "id_rsa.pub"
+        
+        # Check if keys already exist
+        if private_key_path.exists() and public_key_path.exists():
+            logger.info(f"SSH keys already exist at {keys_dir}")
+            # Verify permissions
+            os.chmod(private_key_path, 0o600)
+            os.chmod(public_key_path, 0o644)
+            return str(private_key_path), str(public_key_path)
+        
+        # Generate new SSH key pair
+        logger.info(f"Generating new SSH key pair in {keys_dir}")
+        
+        # Get hostname for key comment
+        try:
+            hostname = socket.gethostname()
+        except Exception:
+            hostname = "ethoscope-node"
+        
+        comment = f"ethoscope-node@{hostname}"
+        
+        # Run ssh-keygen command
+        ssh_keygen_cmd = [
+            "ssh-keygen",
+            "-t", "rsa",           # RSA key type
+            "-b", "2048",          # 2048-bit key
+            "-f", str(private_key_path),  # Output file
+            "-N", "",              # Empty passphrase
+            "-C", comment          # Comment
+        ]
+        
+        result = subprocess.run(
+            ssh_keygen_cmd,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        logger.info(f"Successfully generated SSH keys: {comment}")
+        logger.debug(f"ssh-keygen output: {result.stdout}")
+        
+        # Set proper permissions
+        os.chmod(private_key_path, 0o600)  # -rw-------
+        os.chmod(public_key_path, 0o644)   # -rw-r--r--
+        
+        logger.info(f"Set proper permissions on SSH keys")
+        logger.info(f"Private key: {private_key_path} (600)")
+        logger.info(f"Public key: {public_key_path} (644)")
+        
+        return str(private_key_path), str(public_key_path)
+        
+    except subprocess.CalledProcessError as e:
+        error_msg = f"Failed to generate SSH keys: {e.stderr}"
+        logger.error(error_msg)
+        raise ConfigurationError(error_msg)
+        
+    except PermissionError as e:
+        error_msg = f"Permission denied creating SSH keys in {keys_dir}: {e}"
+        logger.error(error_msg)
+        raise ConfigurationError(error_msg)
+        
+    except Exception as e:
+        error_msg = f"Unexpected error ensuring SSH keys: {e}"
+        logger.error(error_msg)
+        raise ConfigurationError(error_msg)
 
 
 def main():

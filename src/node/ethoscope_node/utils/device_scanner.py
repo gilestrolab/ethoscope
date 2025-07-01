@@ -11,6 +11,7 @@ import traceback
 import pickle
 import socket
 import struct
+import subprocess
 from threading import Thread, RLock, Event
 from functools import wraps
 from contextlib import contextmanager
@@ -19,6 +20,7 @@ from dataclasses import dataclass
 from zeroconf import ServiceBrowser, Zeroconf, IPVersion
 
 from ethoscope_node.utils.etho_db import ExperimentalDB
+from ethoscope_node.utils.configuration import ensure_ssh_keys
 
 # Constants
 STREAMING_PORT = 8887
@@ -1110,6 +1112,56 @@ class Ethoscope(BaseDevice):
         except Exception as e:
             self._logger.error(f"Error creating backup path: {e}")
             self._info["backup_path"] = None
+    
+    def setup_ssh_authentication(self) -> bool:
+        """
+        Setup SSH key authentication for passwordless connection to ethoscope.
+        
+        Uses sshpass to copy the node's SSH public key to the ethoscope device
+        using the ethoscope user with password 'ethoscope'.
+        
+        Returns:
+            bool: True if SSH key setup was successful, False otherwise
+        """
+        try:
+            # Get SSH key paths
+            private_key_path, public_key_path = ensure_ssh_keys()
+            
+            # Use sshpass with ssh-copy-id to setup passwordless authentication
+            cmd = [
+                'sshpass', '-p', 'ethoscope',
+                'ssh-copy-id', 
+                '-i', public_key_path,
+                '-o', 'StrictHostKeyChecking=no',
+                '-o', 'ConnectTimeout=10',
+                f'ethoscope@{self._ip}'
+            ]
+            
+            self._logger.info(f"Setting up SSH key authentication for ethoscope@{self._ip}")
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                self._logger.info(f"SSH key authentication setup successful for {self._ip}")
+                return True
+            else:
+                self._logger.warning(f"SSH key setup failed for {self._ip}: {result.stderr}")
+                return False
+                
+        except subprocess.TimeoutExpired:
+            self._logger.error(f"SSH key setup timed out for {self._ip}")
+            return False
+        except FileNotFoundError:
+            self._logger.error("sshpass command not found. Please install sshpass package")
+            return False
+        except Exception as e:
+            self._logger.error(f"Failed to setup SSH key authentication for {self._ip}: {e}")
+            return False
 
 
 class DeviceScanner:

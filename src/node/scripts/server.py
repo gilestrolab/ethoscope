@@ -19,7 +19,7 @@ from typing import Dict, List, Optional, Any
 from contextlib import contextmanager
 
 from ethoscope_node.utils.device_scanner import EthoscopeScanner, SensorScanner
-from ethoscope_node.utils.configuration import EthoscopeConfiguration
+from ethoscope_node.utils.configuration import EthoscopeConfiguration, ensure_ssh_keys
 from ethoscope_node.utils.backups_helpers import GenericBackupWrapper, BackupClass
 from ethoscope_node.utils.etho_db import ExperimentalDB
 
@@ -271,6 +271,15 @@ class EthoscopeNodeServer:
             self.config = EthoscopeConfiguration()
             self.logger.info("Configuration loaded")
             
+            # Ensure SSH keys exist
+            try:
+                private_key_path, public_key_path = ensure_ssh_keys()
+                self.logger.info(f"SSH keys ready: {private_key_path}, {public_key_path}")
+            except Exception as e:
+                self.logger.error(f"Failed to setup SSH keys: {e}")
+                # Continue without SSH keys for now
+                pass
+            
             # Setup results directory
             if not self.results_dir:
                 self.results_dir = self.config.content['folders']['temporary']['path']
@@ -443,6 +452,15 @@ class EthoscopeNodeServer:
         
         # Don't try to JSON decode/encode - pass bytes directly
         response = device.send_settings(post_data)
+        
+        # Setup SSH key authentication after successful configuration
+        if response.get('haschanged', False):
+            try:
+                ssh_success = device.setup_ssh_authentication()
+                self.logger.info(f"SSH key setup for device {id}: {'successful' if ssh_success else 'failed'}")
+            except Exception as e:
+                self.logger.warning(f"Failed to setup SSH keys for device {id}: {e}")
+        
         return {**device.machine_info(), "haschanged": response.get('haschanged', False)}
     
     @error_decorator
