@@ -212,7 +212,7 @@
         <li>PI camera : {{machine_info.camera}}</li>
     </ul>
 
-    <h4>Ethoscope LOG from last boot</h4>
+    <h4>Ethoscope logs from last service start</h4>
     <pre>
         <p class="log" ng-repeat="(key,entry) in log | toArray |orderBy: 'key'">{{key}}: {{entry}}</p></pre>
 </div>
@@ -405,16 +405,7 @@
                                         <div ng-if="arg.type == 'date_range'" class="form-group">
                                             <label for="input-{{arg.name}}">{{arg.description}}</label>
                                             <div class="input-group" style="margin-top: 5px;">
-                                                <input ng-if="arg.type == 'date_range'" 
-                                                       date-range-picker 
-                                                       class="form-control date-picker" 
-                                                       name={{arg.name}} 
-                                                       id="input-drp-{{arg.name}}" 
-                                                       type="text" 
-                                                       ng-model="selected_options.tracking[name]['arguments'][arg.name]" 
-                                                       placeholder="Click to select start and end date/time"
-                                                       style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;"
-                                                       options="dateRangeOptions">
+                                                <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-drp-{{arg.name}}" type="text" ng-model="selected_options.tracking[name]['arguments'][arg.name]" placeholder="Click to select start and end date/time" style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;" options="dateRangeOptions">
                                                 <div class="input-group-append">
                                                     <span class="input-group-text" style="background-color: #337ab7; color: white; cursor: pointer;">
                                                         <i class="fa fa-clock"></i>
@@ -498,16 +489,7 @@
                                         <div ng-if="arg.type == 'date_range'" class="form-group">
                                             <label for="input-{{arg.name}}">{{arg.description}}</label>
                                             <div class="input-group" style="margin-top: 5px;">
-                                                <input ng-if="arg.type == 'date_range'" 
-                                                       date-range-picker 
-                                                       class="form-control date-picker" 
-                                                       name={{arg.name}} 
-                                                       id="input-{{arg.name}}" 
-                                                       type="text" 
-                                                       ng-model="selected_options.update_machine[name]['arguments'][arg.name]" 
-                                                       placeholder="Click to select start and end date/time"
-                                                       style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;"
-                                                       options="dateRangeOptions">
+                                                <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-{{arg.name}}" type="text" ng-model="selected_options.update_machine[name]['arguments'][arg.name]" placeholder="Click to select start and end date/time" style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;" options="dateRangeOptions">
                                                 <div class="input-group-append">
                                                     <span class="input-group-text" style="background-color: #337ab7; color: white; cursor: pointer;" onclick="$('#input-{{arg.name}}').focus();">
                                                         <i class="fa fa-clock"></i>
@@ -579,16 +561,7 @@
                                         <div ng-if="arg.type == 'date_range'" class="form-group">
                                             <label for="input-{{arg.name}}">{{arg.description}}</label>
                                             <div class="input-group" style="margin-top: 5px;">
-                                                <input ng-if="arg.type == 'date_range'" 
-                                                       date-range-picker 
-                                                       class="form-control date-picker" 
-                                                       name={{arg.name}} 
-                                                       id="input-{{arg.name}}" 
-                                                       type="text" 
-                                                       ng-model="selected_options.recording[name]['arguments'][arg.name]" 
-                                                       placeholder="Click to select start and end date/time"
-                                                       style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;"
-                                                       options="dateRangeOptions">
+                                                <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-{{arg.name}}" type="text" ng-model="selected_options.recording[name]['arguments'][arg.name]" placeholder="Click to select start and end date/time" style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;" options="dateRangeOptions">
                                                 <div class="input-group-append">
                                                     <span class="input-group-text" style="background-color: #337ab7; color: white; cursor: pointer;" onclick="$('#input-{{arg.name}}').focus();">
                                                         <i class="fa fa-clock"></i>
