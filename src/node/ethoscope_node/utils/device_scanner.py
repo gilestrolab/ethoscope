@@ -1605,4 +1605,4 @@ class SensorScanner(DeviceScanner):
     
     def __init__(self, device_refresh_period: float = 300, device_class=Sensor):
         super().__init__(device_refresh_period, device_class)
-        self.results_dir = ""  # Sensors don't need results directory
+        self.results_dir = "/ethoscope_data/sensors"

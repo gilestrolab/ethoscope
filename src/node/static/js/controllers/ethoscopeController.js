@@ -475,9 +475,10 @@
                 }
             }
 
-            // Add sensor IP if location is specified
+            // Add sensor IP based on selected incubator name
             if (option.experimental_info && option.experimental_info.arguments && option.experimental_info.arguments.location) {
-                option.experimental_info.arguments.sensor = $scope.get_ip_of_sensor(option.experimental_info.arguments.location);
+                var selectedIncubatorName = option.experimental_info.arguments.location; // This field contains the incubator name
+                option.experimental_info.arguments.sensor = $scope.get_ip_of_sensor(selectedIncubatorName);
             }
 
             console.log('Starting tracking with options:', option);
