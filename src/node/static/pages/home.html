@@ -110,7 +110,16 @@
                 <h4 class="modal-title" id="myModalLabel">Sensor settings</h4>
             </div>
             <div class="modal-body">
-                <form name="editSensorForm">
+                <!-- Loading spinner while sensor data is being loaded -->
+                <div ng-if="!sensoredit || !sensoredit.id" class="text-center" style="padding: 20px;">
+                    <div class="spinner-border" role="status">
+                        <span class="sr-only">Loading sensor data...</span>
+                    </div>
+                    <p style="margin-top: 10px;">Loading sensor data...</p>
+                </div>
+                
+                <!-- Sensor form - only shown when data is loaded -->
+                <form name="editSensorForm" ng-if="sensoredit && sensoredit.id">
                     <div class="alert alert-warning" ng-if="!editSensorForm.$valid">The fields labeled by a red bar are required.</div>
                     <label class="input" id="sensor_details">{{sensoredit.id}} at {{sensoredit.ip}}</label>
                     <label class="input"><span ng-hide="sensoredit.name != null">Name</span><input type="text" ng-model="sensoredit.name" name="sensor-name" required ng-required="true" style="width: 240px;"></label>
@@ -119,7 +128,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                <button class="btn btn-danger" ng-click="editSensor()" data-dismiss="modal" ng-disabled="editSensorForm.$invalid">Save</button>
+                <button class="btn btn-danger" ng-click="editSensor()" data-dismiss="modal" ng-disabled="!sensoredit || !sensoredit.id || editSensorForm.$invalid">Save</button>
             </div>
         </div>
     </div>
