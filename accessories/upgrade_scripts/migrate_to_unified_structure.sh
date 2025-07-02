@@ -1,19 +1,15 @@
 #!/bin/bash
 
 #===============================================================================
-# Ethoscope Repository Structure Migration Script
+# Ethoscope Fresh Installation Script
 #===============================================================================
 #
-# Purpose: Migrate from old separate directory structure to new unified structure
-#          Old: /opt/ethoscope-device and /opt/ethoscope-node 
-#          New: /opt/ethoscope (unified)
-#
-# This script handles the system-level changes needed after pulling the new
-# dev branch. Git handles the file reorganization.
+# Purpose: Perform fresh installation of ethoscope system
+#          Removes any existing installations and clones fresh from repository
 #
 # Usage:
-#   sudo ./migrate_to_unified_structure.sh           # Interactive migration
-#   sudo ./migrate_to_unified_structure.sh --auto    # Automatic migration
+#   sudo ./migrate_to_unified_structure.sh           # Interactive installation
+#   sudo ./migrate_to_unified_structure.sh --auto    # Automatic installation
 #   sudo ./migrate_to_unified_structure.sh --check   # Check current state only
 #
 # Author: Giorgio Gilestro <giorgio@gilest.ro>
@@ -31,9 +27,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-OLD_DEVICE_DIR="/opt/ethoscope-device"
-OLD_NODE_DIR="/opt/ethoscope-node"
-NEW_UNIFIED_DIR="/opt/ethoscope"
+ETHOSCOPE_DIR="/opt/ethoscope"
 
 # Service files for different installation types
 NODE_SERVICES=(
@@ -76,15 +70,25 @@ check_root() {
     fi
 }
 
-# Detect installation type and current state
+# Detect installation type based on running services
 detect_installation_type() {
-    if [[ -d "$OLD_NODE_DIR" ]]; then
-        echo "node"
-    elif [[ -d "$OLD_DEVICE_DIR" ]]; then
-        echo "device"
-    else
-        echo "none"
-    fi
+    # Check if node services are running
+    for service in "${NODE_SERVICES[@]}"; do
+        if systemctl is-active --quiet "${service}.service" 2>/dev/null; then
+            echo "node"
+            return
+        fi
+    done
+    
+    # Check if device services are running
+    for service in "${DEVICE_SERVICES[@]}"; do
+        if systemctl is-active --quiet "${service}.service" 2>/dev/null; then
+            echo "device" 
+            return
+        fi
+    done
+    
+    echo "none"
 }
 
 # Show current state
@@ -98,8 +102,7 @@ show_status() {
     echo
     
     echo "Directory Status:"
-    echo "  $OLD_DEVICE_DIR: $([ -d "$OLD_DEVICE_DIR" ] && echo "EXISTS" || echo "NOT FOUND")"
-    echo "  $OLD_NODE_DIR: $([ -d "$OLD_NODE_DIR" ] && echo "EXISTS" || echo "NOT FOUND")"
+    echo "  $ETHOSCOPE_DIR: $([ -d "$ETHOSCOPE_DIR" ] && echo "EXISTS" || echo "NOT FOUND")"
     echo
     
     echo "Service Status:"
@@ -138,219 +141,206 @@ stop_services() {
     sleep 2
 }
 
-# Migrate node installation
-migrate_node() {
-    log "Migrating node installation..."
+# Fresh install node
+install_node() {
+    log "Performing fresh node installation..."
     
-    # Move directory
-    log "Moving $OLD_NODE_DIR to $NEW_UNIFIED_DIR..."
-    mv "$OLD_NODE_DIR" "$NEW_UNIFIED_DIR"
+    # Remove old directories and clone fresh
+    log "Removing old ethoscope directories..."
+    rm -rf /opt/ethoscope*
     
-    # Remove old service files
-    log "Removing old service files..."
-    for service in "${NODE_SERVICES[@]}"; do
-        rm -f "/usr/lib/systemd/system/${service}.service"
-        rm -f "/etc/systemd/system/${service}.service"
-    done
-    
-    # Link new service files
-    log "Linking new service files..."
-    for service in "${NODE_SERVICES[@]}"; do
-        if [[ -f "$NEW_UNIFIED_DIR/scripts/${service}.service" ]]; then
-            ln -sf "$NEW_UNIFIED_DIR/scripts/${service}.service" "/usr/lib/systemd/system/"
-            log "Linked ${service}.service"
-        else
-            warn "Service file not found: $NEW_UNIFIED_DIR/scripts/${service}.service"
-        fi
-    done
+    log "Cloning fresh repository..."
+    git clone git://node/ethoscope.git /opt/ethoscope
+    cd /opt/ethoscope && git checkout dev
     
     # Install Python packages
-    log "Installing node Python package..."
-    if [[ -d "$NEW_UNIFIED_DIR/src/node" ]]; then
-        cd "$NEW_UNIFIED_DIR/src/node"
-        pip install -e . --break-system-packages --no-build-isolation || warn "Failed to install node package"
-    fi
-    
     log "Installing ethoscope Python package..."
-    if [[ -d "$NEW_UNIFIED_DIR/src/ethoscope" ]]; then
-        cd "$NEW_UNIFIED_DIR/src/ethoscope"
-        pip install -e . --break-system-packages --no-build-isolation || warn "Failed to install ethoscope package"
-    fi
+    cd /opt/ethoscope/src/ethoscope/
+    pip install -e . --break-system-packages --no-build-isolation || warn "Failed to install ethoscope package"
     
-    # Enable services
-    log "Enabling services..."
-    for service in ethoscope_backup ethoscope_node ethoscope_update_node ethoscope_video_backup; do
-        if [[ -f "/usr/lib/systemd/system/${service}.service" ]]; then
-            systemctl enable "${service}.service" || warn "Failed to enable ${service}.service"
-        fi
-    done
+    log "Installing node Python package..."
+    cd /opt/ethoscope/src/node/
+    pip install -e . --break-system-packages --no-build-isolation || warn "Failed to install node package"
+    
+    # Remove old service files and link new ones
+    log "Removing old service files..."
+    rm -f /usr/lib/systemd/system/ethoscope*
+    
+    log "Linking new service files..."
+    ln -s /opt/ethoscope/scripts/ethoscope_{node,update_node,backup,video_backup}.service virtuascope.service /usr/lib/systemd/system/
+    
+    # Reload systemd
+    log "Reloading systemd daemon..."
+    systemctl daemon-reload
 }
 
-# Migrate device installation
-migrate_device() {
-    log "Migrating device installation..."
+# Fresh install device
+install_device() {
+    log "Performing fresh device installation..."
     
-    # Move directory
-    log "Moving $OLD_DEVICE_DIR to $NEW_UNIFIED_DIR..."
-    mv "$OLD_DEVICE_DIR" "$NEW_UNIFIED_DIR"
+    # Remove old directories and clone fresh
+    log "Removing old ethoscope directories..."
+    rm -rf /opt/ethoscope*
     
-    # Remove old service files
-    log "Removing old service files..."
-    for service in "${DEVICE_SERVICES[@]}"; do
-        rm -f "/usr/lib/systemd/system/${service}.service"
-        rm -f "/etc/systemd/system/${service}.service"
-    done
-    
-    # Link new service files
-    log "Linking new service files..."
-    for service in "${DEVICE_SERVICES[@]}"; do
-        if [[ -f "$NEW_UNIFIED_DIR/scripts/${service}.service" ]]; then
-            ln -sf "$NEW_UNIFIED_DIR/scripts/${service}.service" "/usr/lib/systemd/system/"
-            log "Linked ${service}.service"
-        else
-            warn "Service file not found: $NEW_UNIFIED_DIR/scripts/${service}.service"
-        fi
-    done
+    log "Cloning fresh repository..."
+    git clone git://node/ethoscope.git /opt/ethoscope
+    cd /opt/ethoscope && git checkout dev
     
     # Install Python package
     log "Installing ethoscope Python package..."
-    if [[ -d "$NEW_UNIFIED_DIR/src/ethoscope" ]]; then
-        cd "$NEW_UNIFIED_DIR/src/ethoscope"
-        pip install -e . --break-system-packages --no-build-isolation || warn "Failed to install ethoscope package"
-    fi
+    cd /opt/ethoscope/src/ethoscope/
+    pip install -e . --break-system-packages --no-build-isolation || warn "Failed to install ethoscope package"
     
-    # Enable services
-    log "Enabling services..."
-    for service in ethoscope_device ethoscope_listener ethoscope_GPIO_listener ethoscope_update; do
-        if [[ -f "/usr/lib/systemd/system/${service}.service" ]]; then
-            systemctl enable "${service}.service" || warn "Failed to enable ${service}.service"
-        fi
-    done
-}
-
-# Reload systemd and start services
-finalize_migration() {
-    local install_type="$1"
+    # Remove old service files and link new ones
+    log "Removing old service files..."
+    rm -f /usr/lib/systemd/system/ethoscope*
     
+    log "Linking new service files..."
+    ln -s /opt/ethoscope/scripts/ethoscope_{listener,device,update,GPIO_listener}.service /usr/lib/systemd/system/
+    
+    # Reload systemd
     log "Reloading systemd daemon..."
     systemctl daemon-reload
     
+    # Create ethoscope user
+    log "Creating ethoscope user..."
+    useradd -m ethoscope && passwd ethoscope
+}
+
+# Start services
+finalize_installation() {
+    local install_type="$1"
+    
     log "Starting services..."
-    local services_to_start=()
     
     case "$install_type" in
         "node")
-            services_to_start+=(ethoscope_node ethoscope_backup ethoscope_update_node ethoscope_video_backup)
+            log "Starting node services..."
+            systemctl restart ethoscope_node ethoscope_update_node ethoscope_backup ethoscope_video_backup
             ;;
         "device")
-            services_to_start+=(ethoscope_device ethoscope_listener ethoscope_GPIO_listener ethoscope_update)
+            log "Starting device services..."
+            systemctl restart ethoscope_listener && sleep 2 && systemctl restart ethoscope_device ethoscope_update
             ;;
     esac
-    
-    for service in "${services_to_start[@]}"; do
-        if [[ -f "/usr/lib/systemd/system/${service}.service" ]]; then
-            log "Starting ${service}.service..."
-            systemctl start "${service}.service" || warn "Failed to start ${service}.service"
-        fi
-    done
 }
 
-# Main migration function
-perform_migration() {
+# Main installation function
+perform_installation() {
     local auto_mode="$1"
+    local install_type="$2"
     
-    log "Starting ethoscope repository structure migration..."
+    log "Starting ethoscope fresh installation..."
     
-    # Detect installation type
-    local install_type
-    install_type=$(detect_installation_type)
-    
-    case "$install_type" in
-        "none")
-            log "No ethoscope installation found. Nothing to migrate."
-            exit 0
-            ;;
-        "node"|"device")
-            log "Detected installation type: $install_type"
-            ;;
-        *)
-            error "Unknown installation state: $install_type"
+    # If install type not provided, try to detect it
+    if [[ -z "$install_type" ]]; then
+        install_type=$(detect_installation_type)
+        
+        # If still can't detect, ask user
+        if [[ "$install_type" == "none" && "$auto_mode" != "--auto" ]]; then
+            echo
+            echo "No existing installation detected. Please specify installation type:"
+            echo "1) device - Ethoscope device installation"
+            echo "2) node - Ethoscope node installation"
+            echo
+            read -p "Enter choice (1 or 2): " -n 1 -r
+            echo
+            case "$REPLY" in
+                1)
+                    install_type="device"
+                    ;;
+                2)
+                    install_type="node"
+                    ;;
+                *)
+                    error "Invalid choice. Exiting."
+                    exit 1
+                    ;;
+            esac
+        elif [[ "$install_type" == "none" ]]; then
+            error "Cannot detect installation type and no type specified"
             exit 1
-            ;;
-    esac
+        fi
+    fi
+    
+    log "Installation type: $install_type"
     
     # Interactive confirmation unless in auto mode
     if [[ "$auto_mode" != "--auto" ]]; then
         echo
-        warn "This will migrate your ethoscope installation to the new unified structure."
-        warn "Make sure you have already pulled the latest dev branch changes."
+        warn "This will perform a FRESH installation of ethoscope system."
+        warn "All existing installations will be REMOVED and replaced."
         echo
         log "The script will:"
         echo "  1. Stop running services"
-        echo "  2. Move directories to /opt/ethoscope"
-        echo "  3. Update service file links"
+        echo "  2. Remove all existing ethoscope directories"
+        echo "  3. Clone fresh repository from git://node/ethoscope.git"
         echo "  4. Install Python packages"
-        echo "  5. Enable and start services"
+        echo "  5. Link service files and start services"
         echo
         read -p "Do you want to continue? [y/N]: " -n 1 -r
         echo
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            log "Migration cancelled by user"
+            log "Installation cancelled by user"
             exit 0
         fi
     fi
     
-    # Perform migration steps
+    # Perform installation steps
     stop_services "$install_type"
     
     case "$install_type" in
         "node")
-            migrate_node
+            install_node
             ;;
         "device")
-            migrate_device
+            install_device
+            ;;
+        *)
+            error "Unknown installation type: $install_type"
+            exit 1
             ;;
     esac
     
-    finalize_migration "$install_type"
+    finalize_installation "$install_type"
     
-    success "Migration completed successfully!"
+    success "Fresh installation completed successfully!"
     echo
-    log "New unified structure created at: $NEW_UNIFIED_DIR"
-    echo
-    success "Ethoscope migration to unified structure completed!"
+    log "Ethoscope installed at: $ETHOSCOPE_DIR"
 }
 
 # Print usage information
 usage() {
     cat << EOF
-Ethoscope Repository Structure Migration Script
+Ethoscope Fresh Installation Script
 
-This script migrates from the old separate directory structure to the new unified structure.
-Run this AFTER pulling the latest dev branch changes.
+This script performs a fresh installation of the ethoscope system by removing
+existing installations and cloning fresh from the repository.
 
 Usage:
-  sudo $0 [OPTIONS]
+  sudo $0 [OPTIONS] [TYPE]
 
 Options:
-  --auto      Perform migration automatically without prompts
+  --auto      Perform installation automatically without prompts
   --check     Show current installation state and exit
   --help      Show this help message
 
+Installation Types:
+  device      Install ethoscope device components
+  node        Install ethoscope node components
+
 Examples:
-  sudo $0                    # Interactive migration
-  sudo $0 --auto            # Automatic migration
+  sudo $0                    # Interactive installation (detects type)
+  sudo $0 device            # Interactive device installation
+  sudo $0 --auto node       # Automatic node installation
   sudo $0 --check           # Check current state
 
-Prerequisites:
-  1. Pull latest dev branch: git pull origin dev
-  2. Run this script as root: sudo $0
-
 The script will:
-1. Move /opt/ethoscope-{device,node} to /opt/ethoscope
-2. Update systemd service file links
-3. Install Python packages in development mode
-4. Enable and restart services
+1. Stop running services
+2. Remove all existing ethoscope directories
+3. Clone fresh repository from git://node/ethoscope.git
+4. Install Python packages in development mode
+5. Link service files and start services
 EOF
 }
 
@@ -365,11 +355,27 @@ main() {
             ;;
         --auto)
             check_root
-            perform_migration --auto
+            case "${2:-}" in
+                device|node)
+                    perform_installation --auto "$2"
+                    ;;
+                "")
+                    perform_installation --auto
+                    ;;
+                *)
+                    error "Unknown installation type: $2"
+                    usage
+                    exit 1
+                    ;;
+            esac
+            ;;
+        device|node)
+            check_root
+            perform_installation "" "$1"
             ;;
         "")
             check_root
-            perform_migration
+            perform_installation
             ;;
         *)
             error "Unknown option: $1"
