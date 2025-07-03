@@ -1736,17 +1736,15 @@ class DatabaseMetadataCache:
                 """, (self.db_credentials["name"],))
                 db_size = cursor.fetchone()[0] or 0
             
-            # Get table counts
+            # Get table counts using COUNT(*) for backup percentage calculation
             cursor.execute("SHOW TABLES")
             tables = [row[0] for row in cursor.fetchall()]
             
             table_counts = {}
             for table in tables:
                 try:
-                    if table in ["ROI_MAP", "VAR_MAP", "METADATA"]:
-                        cursor.execute(f"SELECT COUNT(*) FROM `{table}`")
-                    else:
-                        cursor.execute(f"SELECT COALESCE(MAX(id), 0) FROM `{table}`")
+                    # Use COUNT(*) for all tables to match backup percentage calculation expectations
+                    cursor.execute(f"SELECT COUNT(*) FROM `{table}`")
                     
                     result = cursor.fetchone()
                     table_counts[table] = result[0] if result and result[0] is not None else 0
