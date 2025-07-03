@@ -1753,7 +1753,18 @@ class DatabaseMetadataCache:
                 except mysql.connector.Error:
                     table_counts[table] = 0
             
+            # Get database version
+            db_version = "Unknown"
+            try:
+                cursor.execute("SELECT VERSION();")
+                result = cursor.fetchone()
+                if result and result[0]:
+                    db_version = result[0]
+            except Exception as e:
+                logging.warning(f"Failed to get database version: {e}")
+
             return {
+                "db_version" : db_version,
                 "db_size_bytes": int(db_size),
                 "table_counts": table_counts,
                 "last_db_update": time.time()
@@ -1789,7 +1800,8 @@ class DatabaseMetadataCache:
                     "last_updated": time.time(),
                     "db_size_bytes": db_info["db_size_bytes"],
                     "table_counts": db_info["table_counts"],
-                    "last_db_update": db_info["last_db_update"]
+                    "last_db_update": db_info["last_db_update"],
+                    "db_version": db_info["db_version"]
                 })
             
             # Write cache file

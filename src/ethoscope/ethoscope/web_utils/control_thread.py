@@ -330,8 +330,12 @@ class ControlThread(Thread):
     def _get_database_info(self):
         """Get database metadata based on current status."""
         try:
-            # Use the metadata cache for all database info requests
-            return self._metadata_cache.get_metadata(self._tracking_start_time)
+            if self._metadata_cache is not None:
+                # Use the metadata cache for MySQL database info requests
+                return self._metadata_cache.get_metadata(self._tracking_start_time)
+            else:
+                # For SQLite databases, return basic file-based info
+                return self._get_sqlite_database_info()
                 
         except Exception as e:
             logging.warning(f"Failed to get database info for {self._info.get('name', 'unknown')}: {e}")
@@ -340,6 +344,52 @@ class ControlThread(Thread):
                 "table_counts": {},
                 "last_db_update": 0,
                 "db_status": "error"
+            }
+    
+    def _get_sqlite_database_info(self):
+        """Get basic database info for SQLite databases."""
+        try:
+            # For SQLite, we need to determine the database file path
+            # This should match the path used in _set_tracking_from_scratch
+            if hasattr(self, '_metadata') and 'sqlite_source_path' in self._metadata:
+                db_path = self._metadata['sqlite_source_path']
+            else:
+                # Fallback: try to construct the path from backup filename
+                if self._info.get("backup_filename"):
+                    filename_parts = self._info["backup_filename"].replace('.db', '').split("_")
+                    if len(filename_parts) >= 3:
+                        backup_date = filename_parts[0]
+                        backup_time = filename_parts[1] 
+                        etho_id = "_".join(filename_parts[2:])
+                        db_path = f"/ethoscope_data/results/{etho_id}/{self._info['name']}/{backup_date}_{backup_time}/{self._info['backup_filename']}"
+                    else:
+                        raise ValueError("Cannot determine SQLite database path")
+                else:
+                    raise ValueError("No backup filename available for SQLite database")
+            
+            # Get file size
+            if os.path.exists(db_path):
+                db_size = os.path.getsize(db_path)
+                db_status = "active" if self._info["status"] == "running" else "available"
+            else:
+                db_size = 0
+                db_status = "not_found"
+            
+            return {
+                "db_size_bytes": db_size,
+                "table_counts": {},  # SQLite table counts could be added later if needed
+                "last_db_update": time.time(),
+                "db_status": db_status,
+                "db_path": db_path
+            }
+            
+        except Exception as e:
+            logging.warning(f"Failed to get SQLite database info: {e}")
+            return {
+                "db_size_bytes": 0,
+                "table_counts": {},
+                "last_db_update": 0,
+                "db_status": "sqlite_error"
             }
 
     def _update_info(self):
@@ -601,7 +651,7 @@ class ControlThread(Thread):
             'sensor': sensor
         })
         
-        # Configure database credentials based on result writer type
+        # Configure database credentials and metadata cache based on result writer type
         if result_writer_type == "SQLiteResultWriter":
             # SQLite uses the consistent directory structure for database file path
             if sqlite_source_path is None:
@@ -615,9 +665,19 @@ class ControlThread(Thread):
             sqlite_credentials = self._db_credentials.copy()
             sqlite_credentials["name"] = sqlite_source_path
             rw = ResultWriterClass(sqlite_credentials, rois, self._metadata, **result_writer_kwargs)
+            
+            # SQLite doesn't use DatabaseMetadataCache (file-based database)
+            self._metadata_cache = None
         else:
-            # MySQL uses standard credentials
+            # MySQL uses standard credentials and DatabaseMetadataCache
             rw = ResultWriterClass(self._db_credentials, rois, self._metadata, **result_writer_kwargs)
+            
+            # Initialize DatabaseMetadataCache for MySQL databases
+            self._metadata_cache = DatabaseMetadataCache(
+                db_credentials=self._db_credentials,
+                device_name=self._info["name"],
+                cache_dir=self._cache_dir
+            )
 
         return  (cam, rw, rois, reference_points, TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs)
