@@ -77,7 +77,27 @@ def send_command(action, data=None, host='127.0.0.1', port=5000, size=COMM_PACKE
         s.sendall( json.dumps(message).encode('utf-8') )
         response = s.recv(size)
         
-        r = json.loads( response )
+        # Handle empty or invalid responses
+        if not response:
+            raise socket.error("Received empty response from server")
+        
+        # Decode bytes to string
+        response_str = response.decode('utf-8', errors='ignore').strip()
+        
+        # Handle empty string after decoding
+        if not response_str:
+            raise socket.error("Received empty response after decoding")
+        
+        try:
+            r = json.loads(response_str)
+        except json.JSONDecodeError as e:
+            # Log the problematic response for debugging
+            print(f"Failed to parse JSON response: '{response_str[:100]}...' Error: {e}")
+            raise json.JSONDecodeError(f"Invalid JSON response: {e}", response_str, e.pos)
+    
+    # Handle cases where response doesn't have expected structure
+    if not isinstance(r, dict) or 'response' not in r:
+        raise ValueError(f"Invalid response structure: {r}")
     
     return r['response']
 

@@ -252,7 +252,7 @@
             var secs = Math.floor((t - (days * 86400) - (hours * 3600) - (minutes * 60)))
 
             if (days > 0) {
-                var x = days + " days, " + hours + "h, " + minutes + "min ";
+                var x = days + " days, " + hours + "h ";
             } else if (days == 0 && hours > 0) {
                 var x = hours + "h, " + minutes + "min ";
             } else if (days == 0 && hours == 0 && minutes > 0) {
@@ -342,7 +342,21 @@
         $scope.$on('$viewContentLoaded', $scope.get_devices);
 
         $('#editSensorModal').on('show.bs.modal', function(e) {
-            $scope.sensoredit = $(e.relatedTarget).data('sensor');
+            // Clear previous sensor data to show loading state
+            $scope.sensoredit = null;
+            $scope.$apply();
+            
+            // Set sensor data after a brief delay to ensure loading state is visible
+            setTimeout(function() {
+                $scope.sensoredit = $(e.relatedTarget).data('sensor');
+                $scope.$apply();
+            }, 100);
+        });
+        
+        $('#editSensorModal').on('hidden.bs.modal', function(e) {
+            // Clear sensor data when modal is closed
+            $scope.sensoredit = null;
+            $scope.$apply();
         });
 
         $scope.editSensor = function() {

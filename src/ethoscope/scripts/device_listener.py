@@ -83,12 +83,39 @@ class commandingThread(threading.Thread):
                 recv = client.recv(self.size)
                 if recv:
                     message = json.loads (recv)
+                    try:
+                        response_data = self.action( message['command'], message['data'] )
+                        result = json.dumps( {
+                                                'response' : response_data 
+                                              }).encode('utf-8')
+                    except Exception as e:
+                        # Send error response instead of empty response
+                        error_msg = f"Error executing command '{message.get('command', 'unknown')}': {str(e)}"
+                        logging.error(error_msg)
+                        logging.error(traceback.format_exc())
+                        result = json.dumps( {
+                                                'response' : f"ERROR: {error_msg}" 
+                                              }).encode('utf-8')
+                    client.send(result)
+                else:
+                    # Send error response for empty request
                     result = json.dumps( {
-                                            'response' : self.action( message['command'], message['data'] ) 
+                                            'response' : "ERROR: Empty request received" 
                                           }).encode('utf-8')
                     client.send(result)
-            except:
-                pass
+            except Exception as e:
+                # Send error response for JSON parsing or other issues
+                error_msg = f"Error processing request: {str(e)}"
+                logging.error(error_msg)
+                logging.error(traceback.format_exc())
+                try:
+                    result = json.dumps( {
+                                            'response' : f"ERROR: {error_msg}" 
+                                          }).encode('utf-8')
+                    client.send(result)
+                except:
+                    # If we can't even send an error response, just close
+                    pass
         
             client.close()
 
@@ -114,12 +141,31 @@ class commandingThread(threading.Thread):
                 
                 if recv:
                     message = json.loads (recv)
+                    try:
+                        response_data = self.action( message['command'], message['data'] )
+                        result = json.dumps( {
+                                                'response' : response_data 
+                                              }).encode('utf-8')
+                    except Exception as e:
+                        # Send error response instead of closing connection
+                        error_msg = f"Error executing command '{message.get('command', 'unknown')}': {str(e)}"
+                        logging.error(error_msg)
+                        logging.error(traceback.format_exc())
+                        result = json.dumps( {
+                                                'response' : f"ERROR: {error_msg}" 
+                                              }).encode('utf-8')
+                    client.send(result)
+                else:
+                    # Empty request received
                     result = json.dumps( {
-                                            'response' : self.action( message['command'], message['data'] ) 
+                                            'response' : "ERROR: Empty request received" 
                                           }).encode('utf-8')
                     client.send(result)
     
-            except:
+            except Exception as e:
+                # Log the error and close connection
+                logging.error(f"Client communication error: {str(e)}")
+                logging.error(traceback.format_exc())
                 client.close()
                 return False
 
