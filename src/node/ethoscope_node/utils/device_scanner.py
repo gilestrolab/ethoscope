@@ -997,7 +997,7 @@ class Ethoscope(BaseDevice):
     
 
     def _update_backup_status_from_database_info(self):
-        """Update backup status using table counts from database_info instead of file size."""
+        """Update backup status using appropriate method based on database type (SQLite vs MySQL)."""
         if time.time() - self._last_db_info < DB_UPDATE_INTERVAL:
             return
         
@@ -1030,6 +1030,77 @@ class Ethoscope(BaseDevice):
                 self._info['backup_status'] = "DB Error"
                 return
             
+            # Determine database type from metadata or experimental_info
+            result_writer_type = None
+            
+            # Try to get result writer type from experimental_info (which contains selected_options)
+            experimental_info = self._info.get("experimental_info", {})
+            if "selected_options" in experimental_info:
+                try:
+                    # selected_options is stored as a string representation, parse it carefully
+                    selected_options_str = experimental_info["selected_options"]
+                    if "SQLiteResultWriter" in selected_options_str:
+                        result_writer_type = "SQLiteResultWriter"
+                    elif "ResultWriter" in selected_options_str:
+                        result_writer_type = "ResultWriter"
+                except (KeyError, TypeError):
+                    pass
+            
+            # Fallback: check backup path extension if metadata not available
+            if not result_writer_type:
+                result_writer_type = "SQLiteResultWriter" if backup_path.endswith('.db') else "ResultWriter"
+                self._logger.debug(f"Device {self._ip}: Using fallback database type detection: {result_writer_type}")
+            
+            # Store result writer type for backup system reference
+            self._info['result_writer_type'] = result_writer_type
+            
+            if result_writer_type == "SQLiteResultWriter":
+                # Use file-based backup status for SQLite (rsync-compatible)
+                self._update_sqlite_backup_status(database_info, backup_path)
+            else:
+                # Use table count-based backup status for MySQL
+                self._update_mysql_backup_status(database_info, backup_path)
+        except Exception as e:
+            self._logger.warning(f"Device {self._ip}: Failed to update backup status from database_info: {e}")
+            self._info['backup_status'] = "Error"
+        
+        self._last_db_info = time.time()
+    
+    def _update_sqlite_backup_status(self, database_info, backup_path):
+        """Update backup status for SQLite databases using file-based comparison."""
+        try:
+            # Get file sizes
+            local_backup_size = os.path.getsize(backup_path)
+            remote_db_size = database_info.get("db_size_bytes", 0)
+            
+            # Calculate backup percentage based on file size
+            if remote_db_size > 0:
+                backup_percentage = min(100.0, (local_backup_size / remote_db_size) * 100)
+            else:
+                # If no remote size info, assume 100% if file exists
+                backup_percentage = 100.0 if local_backup_size > 0 else 0.0
+            
+            # Calculate time since last backup update
+            backup_mtime = os.path.getmtime(backup_path)
+            time_since_backup = time.time() - backup_mtime
+            
+            self._info['backup_status'] = backup_percentage
+            self._info['backup_size'] = local_backup_size
+            self._info['time_since_backup'] = time_since_backup
+            self._info['backup_type'] = 'sqlite_file'
+            self._info['backup_method'] = 'rsync'  # Indicate rsync-based backup
+            
+            self._logger.debug(f"Device {self._ip}: SQLite backup status {backup_percentage:.1f}% "
+                             f"(size: {local_backup_size}/{remote_db_size} bytes, "
+                             f"age: {time_since_backup/3600:.1f}h)")
+                             
+        except Exception as e:
+            self._logger.warning(f"Device {self._ip}: Failed to update SQLite backup status: {e}")
+            self._info['backup_status'] = "SQLite Error"
+    
+    def _update_mysql_backup_status(self, database_info, backup_path):
+        """Update backup status for MySQL databases using table count comparison."""
+        try:
             # Get table counts from ethoscope
             remote_table_counts = database_info.get("table_counts", {})
             if not remote_table_counts:
@@ -1049,35 +1120,32 @@ class Ethoscope(BaseDevice):
                 remote_table_counts, backup_table_counts)
             
             # Get file sizes for additional info
-            try:
-                local_backup_size = os.path.getsize(backup_path)
-                remote_db_size = database_info.get("db_size_bytes", 0)
-            except OSError:
-                local_backup_size = 0
-                remote_db_size = 0
+            local_backup_size = os.path.getsize(backup_path)
+            remote_db_size = database_info.get("db_size_bytes", 0)
+            
+            # Calculate time since last backup update
+            backup_mtime = os.path.getmtime(backup_path)
+            time_since_backup = time.time() - backup_mtime
             
             self._info['backup_status'] = backup_percentage
             self._info['backup_size'] = local_backup_size
             self._info['remote_table_counts'] = remote_table_counts
             self._info['backup_table_counts'] = backup_table_counts
-            
-            # Calculate time since last backup update
-            backup_mtime = os.path.getmtime(backup_path)
-            self._info['time_since_backup'] = time.time() - backup_mtime
+            self._info['time_since_backup'] = time_since_backup
+            self._info['backup_type'] = 'mysql_table'
+            self._info['backup_method'] = 'incremental'  # Indicate table-based incremental backup
             
             # Create detailed logging with table comparison
             total_remote = sum(remote_table_counts.values())
             total_backup = sum(backup_table_counts.values())
             
-            self._logger.debug(f"Device {self._ip}: Backup status {backup_percentage:.1f}% "
+            self._logger.debug(f"Device {self._ip}: MySQL backup status {backup_percentage:.1f}% "
                              f"(rows: {total_backup}/{total_remote}, "
                              f"size: {local_backup_size}/{remote_db_size} bytes)")
-                
+                             
         except Exception as e:
-            self._logger.warning(f"Device {self._ip}: Failed to update backup status from database_info: {e}")
-            self._info['backup_status'] = "Error"
-        
-        self._last_db_info = time.time()
+            self._logger.warning(f"Device {self._ip}: Failed to update MySQL backup status: {e}")
+            self._info['backup_status'] = "MySQL Error"
     
     def _make_backup_path(self, timeout: float = 30, force_recalculate: bool = False):
         """

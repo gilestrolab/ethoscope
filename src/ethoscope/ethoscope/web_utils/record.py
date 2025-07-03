@@ -347,6 +347,11 @@ class ControlThreadVideoRecording(ControlThread):
         self._parse_user_options(data)
         super(ControlThread, self).__init__()
 
+    @property
+    def controltype(self):
+        return "recording"
+
+
     def _update_info(self):
         if self._recorder is None:
             return

@@ -676,7 +676,9 @@ class OurPiCameraAsync(BaseCamera):
     def __setstate__(self, state):
         self.__init__(*state["args"], **state["kwargs"])
         self._frame_idx = int(state["frame_idx"])
-        self._start_time = int(state["start_time"])
+        # Set start time to current time when resuming after reboot, not the old pickled time
+        # This ensures SQLite database files use current timestamp instead of original experiment time
+        self._start_time = time.time()
 
     def is_opened(self):
         return True

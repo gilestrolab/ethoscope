@@ -4,6 +4,7 @@ import traceback
 import shutil
 import logging
 import time
+import datetime
 import re
 import cv2
 from threading import Thread
@@ -30,7 +31,7 @@ from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver, M
 from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulator
 
 from ethoscope.utils.debug import EthoscopeException
-from ethoscope.utils.io import ResultWriter, SQLiteResultWriter, DatabaseMetadataCache
+from ethoscope.utils.io import MySQLResultWriter, SQLiteResultWriter, DatabaseMetadataCache
 from ethoscope.utils.description import DescribedObject
 from ethoscope.web_utils.helpers import *
 
@@ -111,14 +112,14 @@ class ControlThread(Thread):
                         "possible_classes":[OurPiCameraAsync, MovieVirtualCamera, V4L2Camera],
                     }),
         ("result_writer", {
-                        "possible_classes":[ResultWriter, SQLiteResultWriter],
+                        "possible_classes":[MySQLResultWriter, SQLiteResultWriter],
                 }),
      ])
     
     #some classes do not need to be offered as choices to the user in normal conditions
     #these are shown only if the machine is not a PI
     _is_a_rPi = isMachinePI() and hasPiCamera() and not isExperimental()
-    _hidden_options = {'camera', 'result_writer', 'tracker'}
+    _hidden_options = {'camera', 'tracker'}  # result_writer is now always available
     
     for k in _option_dict:
         _option_dict[k]["class"] =_option_dict[k]["possible_classes"][0]
@@ -182,7 +183,9 @@ class ControlThread(Thread):
         
         # Database metadata tracking
         self._tracking_start_time = None
-        self._metadata_cache = DatabaseMetadataCache(self._db_credentials, name, os.path.join(ethoscope_dir, 'cache'))
+        # DatabaseMetadataCache is only compatible with MySQL databases
+        # For SQLite, we'll create it only when needed (see _get_database_info)
+        self._metadata_cache = None
         
         #todo add 'data' -> how monitor was started to metadata
         self._info = {  "status": "stopped",
@@ -200,7 +203,7 @@ class ControlThread(Thread):
                         "id": machine_id,
                         "name": name,
                         "version": version,
-                        "used_space" : get_partition_info("/ethoscope_data")['Use%'].replace("%","")
+                        "used_space" : get_partition_info(ethoscope_dir)['Use%'].replace("%","")
                         }
         self._monit = None
 
@@ -222,15 +225,20 @@ class ControlThread(Thread):
 
         self._parse_user_options(data)
         
-        DrawerClass = self._option_dict["drawer"]["class"]
-        drawer_kwargs = self._option_dict["drawer"]["kwargs"]
-        self._drawer = DrawerClass(**drawer_kwargs)
-        
         logging.info('Starting a new monitor control thread')
 
         super(ControlThread, self).__init__()
 
+    def _create_backup_filename(self):
+        current_time = self.info["time"]
+        date_and_time = datetime.datetime.utcfromtimestamp(current_time).strftime('%Y-%m-%d_%H-%M-%S')
+        device_id = self._info["id"]
+        return f"{date_and_time}_{device_id}.db"
     
+    @property
+    def controltype(self):
+        return "tracking"
+
     @property
     def hw_info(self):
         """
@@ -319,8 +327,6 @@ class ControlThread(Thread):
             self._option_dict[key]["class"] = Class
             self._option_dict[key]["kwargs"] = kwargs
 
-
-
     def _get_database_info(self):
         """Get database metadata based on current status."""
         try:
@@ -363,9 +369,10 @@ class ControlThread(Thread):
                             "fps": f
                             }
 
-        frame = self._drawer.last_drawn_frame
-        if frame is not None:
-            cv2.imwrite(self._info["last_drawn_img"], frame, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
+        if self._drawer:
+            frame = self._drawer.last_drawn_frame
+            if frame is not None:
+                cv2.imwrite(self._info["last_drawn_img"], frame, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
 
         # Update database info
         self._info["database_info"] = self._get_database_info()
@@ -405,11 +412,12 @@ class ControlThread(Thread):
             # Use experiment start time from metadata
             self._tracking_start_time = self._metadata['date_time']
             logging.info(f"Using experiment start time from metadata: {self._tracking_start_time}")
+
         elif self._info.get('backup_filename'):
             # Extract start time from backup filename as fallback
             try:
                 # Format: YYYY-MM-DD_HH-MM-SS_machine_id.db
-                timestamp_part = self._info['backup_filename'].split('_')[:3]
+                timestamp_part = self._info['backup_filename'].split('_')[:2]  # Only take date and time parts
                 timestamp_str = '_'.join(timestamp_part)
                 self._tracking_start_time = time.mktime(time.strptime(timestamp_str, '%Y-%m-%d_%H-%M-%S'))
                 logging.info(f"Using experiment start time from backup filename: {self._tracking_start_time}")
@@ -472,6 +480,10 @@ class ControlThread(Thread):
         ResultWriterClass = self._option_dict["result_writer"]["class"]
         result_writer_kwargs = self._option_dict["result_writer"]["kwargs"]
 
+        DrawerClass = self._option_dict["drawer"]["class"]
+        drawer_kwargs = self._option_dict["drawer"]["kwargs"]
+        self._drawer = DrawerClass(**drawer_kwargs)
+
         cam = CameraClass(**camera_kwargs)
 
         roi_builder = ROIBuilderClass(**roi_builder_kwargs)
@@ -518,37 +530,15 @@ class ControlThread(Thread):
             # Use existing backup filename when appending to database
             self._info["backup_filename"] = existing_backup_filename
             logging.info(f"Using existing backup filename for append mode: {existing_backup_filename}")
-        elif existing_backup_filename and not append_to_db:
-            # If we're not appending but there's an existing backup filename,
-            # we should still check if we're continuing the same experiment
-            # (e.g., after a reboot during an ongoing experiment)
-            current_time = self._info["time"]
-            
-            # Extract timestamp from existing backup filename to check if it's recent
-            try:
-                # Format: YYYY-MM-DD_HH-MM-SS_machine_id.db
-                timestamp_part = existing_backup_filename.split('_')[:3]  # Get date and time parts
-                timestamp_str = '_'.join(timestamp_part)  # Reconstruct timestamp string
-                existing_time = time.mktime(time.strptime(timestamp_str, '%Y-%m-%d_%H-%M-%S'))
-                
-                # If the existing backup is recent (within 7 days), use it
-                # This handles the case where ethoscope rebooted during an experiment
-                if current_time - existing_time < 7 * 24 * 3600:  # 7 days
-                    self._info["backup_filename"] = existing_backup_filename
-                    logging.info(f"Using existing recent backup filename (experiment likely continuing): {existing_backup_filename}")
-                else:
-                    # Old backup, create new one
-                    self._info["backup_filename"] = "%s_%s.db" % ( datetime.datetime.utcfromtimestamp(current_time).strftime('%Y-%m-%d_%H-%M-%S'), self._info["id"] )
-                    logging.info(f"Creating new backup filename (old experiment): {self._info['backup_filename']}")
-            except (ValueError, IndexError) as e:
-                logging.warning(f"Could not parse existing backup filename {existing_backup_filename}: {e}")
-                # Create new backup filename as fallback
-                self._info["backup_filename"] = "%s_%s.db" % ( datetime.datetime.utcfromtimestamp(current_time).strftime('%Y-%m-%d_%H-%M-%S'), self._info["id"] )
-                logging.info(f"Creating new backup filename (parse error): {self._info['backup_filename']}")
+
+        elif self._has_pickle_file() and existing_backup_filename and not append_to_db:
+            # and when we are recovering from a crash
+            self._info["backup_filename"] = existing_backup_filename
+
         else:
             # No existing backup filename or first time - create new one
-            self._info["backup_filename"] = "%s_%s.db" % ( datetime.datetime.utcfromtimestamp(self._info["time"]).strftime('%Y-%m-%d_%H-%M-%S'), self._info["id"] )
-            logging.info(f"Creating new backup filename (no existing): {self._info['backup_filename']}")
+            self._info["backup_filename"] = self._create_backup_filename()
+            logging.info(f"Creating new backup filename: {self._info['backup_filename']}")
         
         self._info["interactor"] = {}
         self._info["interactor"]["name"] = str(self._option_dict['interactor']['class'])
@@ -557,21 +547,31 @@ class ControlThread(Thread):
         # this will be saved in the metadata table
         # and in the pickle file below
         # Extract original experiment start time from backup filename for consistency
-        original_experiment_time = self._info["time"]  # Default to current time
-        if self._info.get('backup_filename'):
-            try:
-                # Format: YYYY-MM-DD_HH-MM-SS_machine_id.db
-                timestamp_part = self._info['backup_filename'].split('_')[:3]
-                timestamp_str = '_'.join(timestamp_part)
-                original_experiment_time = time.mktime(time.strptime(timestamp_str, '%Y-%m-%d_%H-%M-%S'))
-                logging.info(f"Using original experiment time from backup filename for metadata: {original_experiment_time}")
-            except (ValueError, IndexError) as e:
-                logging.warning(f"Could not parse time from backup filename for metadata: {e}")
+        timestamp_str = '_'.join( self._info["backup_filename"].split('_')[:2] )
+        experiment_time = time.mktime(time.strptime(timestamp_str, '%Y-%m-%d_%H-%M-%S'))
+        
+        # Determine result writer type for backup metadata
+        ResultWriterClass = self._option_dict["result_writer"]["class"]
+        result_writer_type = ResultWriterClass.__name__
+        
+        # For SQLite, construct the source database file path using consistent directory structure
+        # Path: /ethoscope_data/results/{machine_id}/{machine_name}/{date_time}/{backup_filename}
+        sqlite_source_path = None
+        if result_writer_type == "SQLiteResultWriter":
+            # Parse backup filename format: YYYY-MM-DD_HH-MM-SS_machine_id.db
+            filename_parts = self._info["backup_filename"].replace('.db', '').split("_")
+            if len(filename_parts) >= 3:
+                backup_date = filename_parts[0]
+                backup_time = filename_parts[1] 
+                etho_id = "_".join(filename_parts[2:])  # Join remaining parts as machine_id might contain underscores
+                sqlite_source_path = f"/ethoscope_data/results/{etho_id}/{self._info['name']}/{backup_date}_{backup_time}/{self._info['backup_filename']}"
+            else:
+                raise ValueError(f"Invalid backup filename format: {self._info['backup_filename']}")
         
         self._metadata = {
             "machine_id": self._info["id"],
             "machine_name": self._info["name"],
-            "date_time": original_experiment_time,
+            "date_time": experiment_time,
             "frame_width": cam.width,
             "frame_height": cam.height,
             "version": self._info["version"]["id"],
@@ -579,7 +579,9 @@ class ControlThread(Thread):
             "selected_options": str(self._option_dict),
             "hardware_info" : str(self.hw_info),
             "reference_points" : str([(p[0],p[1]) for p in reference_points]),
-            "backup_filename" : self._info["backup_filename"]
+            "backup_filename" : self._info["backup_filename"],
+            "result_writer_type": result_writer_type,
+            "sqlite_source_path": sqlite_source_path
         }
         
         # This is useful to retrieve the latest run's information after a reboot
@@ -592,7 +594,30 @@ class ControlThread(Thread):
                         }, f)
         
         # hardware_interface is a running thread
-        rw = ResultWriter(self._db_credentials, rois, self._metadata, take_frame_shots=True, erase_old_db = (not append_to_db), sensor=sensor,)
+        # Use the selected result writer class and pass appropriate arguments
+        result_writer_kwargs.update({
+            'take_frame_shots': True, 
+            'erase_old_db': (not append_to_db), 
+            'sensor': sensor
+        })
+        
+        # Configure database credentials based on result writer type
+        if result_writer_type == "SQLiteResultWriter":
+            # SQLite uses the consistent directory structure for database file path
+            if sqlite_source_path is None:
+                raise ValueError("SQLite source path is None - backup filename parsing failed")
+                
+            # Ensure the directory structure exists before creating the database
+            sqlite_dir = os.path.dirname(sqlite_source_path)
+            os.makedirs(sqlite_dir, exist_ok=True)
+            logging.info(f"Created SQLite directory structure: {sqlite_dir}")
+            
+            sqlite_credentials = self._db_credentials.copy()
+            sqlite_credentials["name"] = sqlite_source_path
+            rw = ResultWriterClass(sqlite_credentials, rois, self._metadata, **result_writer_kwargs)
+        else:
+            # MySQL uses standard credentials
+            rw = ResultWriterClass(self._db_credentials, rois, self._metadata, **result_writer_kwargs)
 
         return  (cam, rw, rois, reference_points, TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs)
@@ -720,56 +745,56 @@ class ControlThread(Thread):
     def stop (self, error=None):
         """
         """
-        
-        self._info["status"] = "stopping"
-        self._info["time"] = time.time()
-        
-        # we reset all the user data of the latest experiment except the run_id
-        # a new run_id will be created when we start another experiment
-        
-        if "experimental_info" in self._info and "run_id" in self._info["experimental_info"]:
-            self._info["experimental_info"] = { "run_id" : self._info["experimental_info"]["run_id"] }
+        #We stop only if we are actually running - not when the thread simply dies
+        if self.info["status"] in ["running", "starting", "initialising"]:
 
-        logging.info("Stopping monitor")
-        if not self._monit is None:
-            self._monit.stop()
-            self._monit = None
+            self._info["status"] = "stopping"
+            self._info["time"] = time.time()
 
-            if self._auto_SQL_backup_at_stop:
-                logging.info("Performing a SQL dump of the database.")
-                t = Thread( target = SQL_dump )
-                t.start()
+            # we reset all the user data of the latest experiment except the run_id
+            # a new run_id will be created when we start another experiment
+            
+            if "experimental_info" in self._info and "run_id" in self._info["experimental_info"]:
+                self._info["experimental_info"] = { "run_id" : self._info["experimental_info"]["run_id"] }
 
+            if not self._monit is None:
+                self._monit.stop()
+                self._monit = None
 
-        self._info["status"] = "stopped"
-        self._info["time"] = time.time()
-        self._info["error"] = error
-        self._info["monitor_info"] = self._default_monitor_info
-        
-        # Finalize database cache file when tracking stops
-        if self._tracking_start_time:
-            try:
-                self._metadata_cache.finalize_cache(self._tracking_start_time)
-                logging.info(f"Finalized database cache file for tracking session")
-            except Exception as e:
-                logging.warning(f"Failed to finalize cache file: {e}")
-        
-        # Update database info after stopping
-        self._info["database_info"] = self._get_database_info()
-        
-        
-        if "backup_filename" in self._info:
-            self._info["previous_date_time"] = self._info["time"]
-            self._info["previous_backup_filename"] = self._info["backup_filename"]
-            self._info["previous_user"] = self._info["experimental_info"]["name"]
-            self._info["previous_location"] = self._info["experimental_info"]["location"]
+                if self._auto_SQL_backup_at_stop:
+                    logging.info("Performing a SQL dump of the database.")
+                    t = Thread( target = SQL_dump )
+                    t.start()
 
 
-        if error is not None:
-            logging.error("Monitor closed with an error:")
-            logging.error(error)
-        else:
-            logging.info("Monitor closed all right")
+            self._info["status"] = "stopped"
+            self._info["time"] = time.time()
+            self._info["error"] = error
+            self._info["monitor_info"] = self._default_monitor_info
+            
+            # Finalize database cache file when tracking stops (MySQL only)
+            if self._tracking_start_time and self._metadata_cache is not None:
+                try:
+                    self._metadata_cache.finalize_cache(self._tracking_start_time)
+                    logging.info(f"Finalized database cache file for tracking session")
+                except Exception as e:
+                    logging.warning(f"Failed to finalize cache file: {e}")
+            
+            # Update database info after stopping
+            self._info["database_info"] = self._get_database_info()
+            
+            if "backup_filename" in self._info:
+                self._info["previous_date_time"] = self._info["time"]
+                self._info["previous_backup_filename"] = self._info["backup_filename"]
+                self._info["previous_user"] = self._info["experimental_info"].get("name", "")
+                self._info["previous_location"] = self._info["experimental_info"].get("location", "")
+
+
+            if error is not None:
+                logging.error("Monitor closed with an error:")
+                logging.error(error)
+            else:
+                logging.info("Monitor closed all right")
 
     def __del__(self):
         """

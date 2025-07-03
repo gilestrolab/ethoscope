@@ -9,9 +9,9 @@ Class Hierarchy and Relationships:
 ==================================
 
 1. Database Writers (Main Interface):
-   ResultWriter (base class for database storage)
-   ├── SQLiteResultWriter (extends ResultWriter for SQLite-specific behavior)
-   └── rawdatawriter (independent class for numpy array storage)
+   MySQLResultWriter (base class for MySQL database storage)
+   ├── SQLiteResultWriter (extends BaseResultWriter for SQLite-specific behavior)
+   └── RawDataWriter (independent class for numpy array storage)
 
 2. Async Database Processes (Multiprocessing):
    multiprocessing.Process
@@ -19,32 +19,32 @@ Class Hierarchy and Relationships:
    └── AsyncSQLiteWriter (handles SQLite writes in separate process)
 
 3. Helper Classes (Data Formatting):
-   SensorDataToMySQLHelper (formats sensor data for database storage)
-   ImgToMySQLHelper (handles image snapshot storage as BLOBs)
+   SensorDataHelper (formats sensor data for database storage)
+   ImgSnapshotHelper (handles image snapshot storage as BLOBs)
    DAMFileHelper (creates DAM-compatible activity summaries)
 
 4. Utility Classes:
    Null (special NULL representation for SQLite)
-   npyAppendableFile (custom numpy array file format for incremental writes)
+   NpyAppendableFile (custom numpy array file format for incremental writes)
    DatabaseMetadataCache (manages database metadata caching with automatic fallback)
 
 Interaction Flow:
 ================
-1. ResultWriter/SQLiteResultWriter creates an async writer process (AsyncMySQLWriter/AsyncSQLiteWriter)
-2. ResultWriter sends SQL commands through a multiprocessing queue to the async writer
-3. ResultWriter uses helper classes to format different data types:
+1. MySQLResultWriter/SQLiteResultWriter creates an async writer process (AsyncMySQLWriter/AsyncSQLiteWriter)
+2. MySQLResultWriter sends SQL commands through a multiprocessing queue to the async writer
+3. MySQLResultWriter uses helper classes to format different data types:
    - DAMFileHelper for activity summaries
-   - ImgToMySQLHelper for periodic screenshots
-   - SensorDataToMySQLHelper for environmental sensor data
-4. rawdatawriter operates independently, saving raw data directly to numpy array files
+   - ImgSnapshotHelper for periodic screenshots
+   - SensorDataHelper for environmental sensor data
+4. RawDataWriter operates independently, saving raw data directly to numpy array files
 
 Key Design Patterns:
 ===================
 - Multiprocessing: Async writers run in separate processes to prevent I/O blocking
 - Producer-Consumer: Main thread produces SQL commands, async writer consumes them
-- Template Method: ResultWriter provides base implementation, SQLiteResultWriter overrides specific methods
+- Template Method: BaseResultWriter provides base implementation, MySQLResultWriter and SQLiteResultWriter override specific methods
 - Helper Pattern: Separate classes handle formatting for different data types
-- Context Manager: ResultWriter implements __enter__/__exit__ for proper cleanup
+- Context Manager: BaseResultWriter implements __enter__/__exit__ for proper cleanup
 """
 
 import multiprocessing
@@ -53,253 +53,33 @@ import traceback
 import logging
 from collections import OrderedDict
 import tempfile
-import os, glob
-import hashlib
-import subprocess
+import os
 import numpy as np
 import sqlite3
 import mysql.connector
-                
-import urllib.request, urllib.error, urllib.parse
 import json
 from cv2 import imwrite, IMWRITE_JPEG_QUALITY
 
 # Character encoding for MariaDB/MySQL connections
 SQL_CHARSET = 'latin1'
 
-class AsyncMySQLWriter(multiprocessing.Process):
+# Constants
+ASYNC_WRITER_TIMEOUT = 30  # Timeout in seconds for async writer initialization
+SENSOR_DEFAULT_PERIOD = 120.0  # Default sensor sampling period in seconds
+IMG_SNAPSHOT_DEFAULT_PERIOD = 300.0  # Default image snapshot period in seconds (5 minutes)
+DAM_DEFAULT_PERIOD = 60.0  # Default DAM activity sampling period in seconds
+METADATA_MAX_VALUE_LENGTH = 60000  # Maximum length for metadata values before truncation
+QUEUE_CHECK_INTERVAL = 0.1  # Interval for checking queue status in seconds
+
+
+# =============================================================================================================#
+# DATA SPECIFIC HELPERS
+#
+# =============================================================================================================#
+
+class SensorDataHelper(object):
     """
-    Asynchronous MySQL/MariaDB database writer that runs in a separate process.
-    
-    This class handles all database write operations in a separate process to prevent
-    blocking the main data collection thread. It uses a queue to receive SQL commands
-    from the main process and executes them sequentially.
-    
-    Attributes:
-        _db_host (str): Database host address (default: "localhost")
-    """
-    
-    _db_host = "localhost"
-    #_db_host = "node" #uncomment this to save data on the node
-    
-    def __init__(self, db_credentials, queue, erase_old_db=True):
-        """
-        Initialize the async MySQL writer process.
-        
-        Args:
-            db_credentials (dict): Database credentials containing:
-                - name: Database name
-                - user: Database username
-                - password: Database password
-            queue (multiprocessing.Queue): Queue for receiving SQL commands
-            erase_old_db (bool): Whether to drop and recreate the database on startup
-        """
-        self._db_name = db_credentials["name"]
-        self._db_user_name = db_credentials["user"]
-        self._db_user_pass = db_credentials["password"]
-        self._erase_old_db = erase_old_db
-        self._queue = queue
-        self._ready_event = multiprocessing.Event()
-        super(AsyncMySQLWriter,self).__init__()
-
-
-    def _delete_my_sql_db(self):
-        """
-        Delete the existing MySQL database if it exists.
-        
-        This method connects to MySQL, truncates all tables for performance,
-        resets binary logs if enabled, and then drops the entire database.
-        """
-        try:
-            logging.info(f"Attempting to connect to mysql db {self._db_name} on host {self._db_host} as {self._db_user_name}:{self._db_user_name}")
-            db = mysql.connector.connect(host=self._db_host,
-                                         user=self._db_user_name,
-                                         passwd=self._db_user_name,
-                                         db=self._db_name,
-                                         buffered=True,
-                                         charset=SQL_CHARSET,
-                                         use_unicode=True)
-                                         
-        except mysql.connector.errors.OperationalError:
-            logging.warning("Database %s does not exist. Cannot delete it" % self._db_name)
-            return
-            
-        except Exception as e:
-            logging.error(traceback.format_exc())
-            return
-        c = db.cursor()
-        #Truncate all tables before dropping db for performance
-        command = "SHOW TABLES"
-        c.execute(command)
-        tables = c.fetchall()
-        # In case we use binary logging, we remove bin logs to save space.
-        # However, this will throw an error if binary logging is set to off
-        # Which is what we should be doing because it reduces disk access and we do not need it anyway
-        c.execute("SHOW VARIABLES LIKE 'log_bin';")
-        log_bin_status = c.fetchone()
-        if log_bin_status and log_bin_status[1] == 'ON':
-            logging.info("The binary logs are set to true. Resetting them to save space.")
-            c.execute("RESET MASTER")
-        to_execute  = []
-        for t in tables:
-            t = t[0]
-            command = "TRUNCATE TABLE %s" % t
-            to_execute.append(command)
-
-        logging.info("Truncating all database tables")
-
-        for te in to_execute:
-            c.execute(te)
-        db.commit()
-        logging.info("Dropping entire database")
-        command = "DROP DATABASE IF EXISTS %s" % self._db_name
-        c.execute(command)
-        db.commit()
-        db.close()
-
-    def _create_mysql_db(self):
-        """
-        Create a new MySQL database and configure database settings.
-        
-        This method creates the database, sets up a read-only 'node' user for
-        remote access, and configures InnoDB settings for optimal performance.
-        """
-        logging.info(f"Connecting to MySQL host {self._db_host} as user {self._db_user_name}")
-        try:
-            db = mysql.connector.connect(host=self._db_host,
-                                         user=self._db_user_name,
-                                         passwd=self._db_user_pass,
-                                         buffered=True,
-                                         charset=SQL_CHARSET,
-                                         use_unicode=True)
-            logging.info("Successfully connected to MySQL for database creation")
-        except Exception as e:
-            logging.error(f"Failed to connect to MySQL: {str(e)}")
-            raise
-        c = db.cursor()
-        cmd = "CREATE DATABASE %s" % self._db_name
-        c.execute(cmd)
-        logging.info("Database created")
-        
-        #create a read-only node user that the node will use to get data from
-        #it's better to have a second user for remote operation for reasons of debug and have better control
-        cmd = "GRANT SELECT ON %s.* to 'node' identified by 'node'" % self._db_name
-        c.execute(cmd)
-        logging.info("Node user created")
-        
-        #set some innodb specific values that cannot be set on the config file
-        cmd = "SET GLOBAL innodb_file_per_table=1"
-        c.execute(cmd)
-        #"Variable 'innodb_file_format' is a read only variable"
-        #cmd = "SET GLOBAL innodb_file_format=Barracuda"
-        #c.execute(cmd)
-        cmd = "SET GLOBAL autocommit=0"
-        c.execute(cmd)
-        db.close()
-        
-    def _get_connection(self):
-        """
-        Establish a connection to the MySQL database.
-        
-        Returns:
-            mysql.connector.connection: Database connection object
-        """
-        db = mysql.connector.connect(host=self._db_host,
-                                     user=self._db_user_name,
-                                     passwd=self._db_user_pass,
-                                     db=self._db_name,
-                                     buffered=True,
-                                     charset=SQL_CHARSET,
-                                     use_unicode=True)
-        return db
-        
-    def run(self):
-        """
-        Main process loop for the async writer.
-        
-        Continuously processes SQL commands from the queue until a 'DONE' message
-        is received. Handles connection errors and attempts to maintain database
-        connectivity throughout the experiment.
-        """
-        db = None
-        do_run = True
-        
-        try:
-            logging.info("AsyncMySQLWriter starting up...")
-            if self._erase_old_db:
-                logging.info("Deleting old database...")
-                self._delete_my_sql_db()
-                logging.info("Creating new database...")
-                self._create_mysql_db()
-            logging.info("Getting database connection...")
-            db = self._get_connection()
-            logging.info("Database connection established successfully")
-            
-            # Signal that the writer is ready to accept commands
-            logging.info("AsyncMySQLWriter ready to accept commands")
-            self._ready_event.set()
-        
-            while do_run:
-                try:
-                    msg = self._queue.get()
-                    if (msg == 'DONE'):
-                        do_run=False
-                        continue
-                    command, args = msg
-                    c = db.cursor()
-                    if args is None:
-                        c.execute(command)
-                    else:
-                        c.execute(command, args)
-                    db.commit()
-                except Exception as e:
-                    try:
-                        logging.error("Failed to run mysql command:\n%s" % command)
-                        logging.error("Error details: %s" % str(e))
-                        logging.error("Traceback: %s" % traceback.format_exc())
-                        
-                        # Check if this is a critical error that should stop the writer
-                        error_str = str(e).lower()
-                        critical_errors = ['access denied', 'connection', 'server has gone away', 'lost connection']
-                        is_critical = any(critical_error in error_str for critical_error in critical_errors)
-                        
-                        if is_critical:
-                            logging.error("Critical database error detected, stopping async writer")
-                            do_run = False
-                        else:
-                            logging.warning("Non-critical database error, continuing operations")
-                            
-                    except:
-                        logging.error("Did not retrieve queue value or failed to process error")
-                        do_run = False
-                finally:
-                    if self._queue.empty():
-                        #we sleep if we have an empty queue. this way, we don't over use a cpu
-                        time.sleep(.1)
-        except KeyboardInterrupt as e:
-            logging.warning("DB async process interrupted with KeyboardInterrupt")
-            # Ensure ready event is set even if interrupted
-            # This prevents the main thread from hanging indefinitely
-            self._ready_event.set()
-            raise e
-        except Exception as e:
-            logging.error("DB async process stopped with an exception: %s", str(e))
-            logging.error("Exception traceback: %s", traceback.format_exc())
-            # Ensure ready event is set even if there's an error during startup
-            # This prevents the main thread from hanging indefinitely
-            self._ready_event.set()
-            raise e
-        finally:
-            logging.info("Closing async mysql writer")
-            while not self._queue.empty():
-                self._queue.get()
-            self._queue.close()
-            if db is not None:
-                db.close()
-                
-class SensorDataToMySQLHelper(object):
-    """
-    Helper class for saving sensor data to MySQL at regular intervals.
+    Helper class for saving sensor data to database at regular intervals.
     
     This class manages the periodic sampling and storage of sensor readings
     (e.g., temperature, humidity) into the database.
@@ -312,7 +92,7 @@ class SensorDataToMySQLHelper(object):
     _base_headers = {"id" : "INT NOT NULL AUTO_INCREMENT PRIMARY KEY", 
                      "t"  : "INT" }
                           
-    def __init__(self, sensor, period=120.0):
+    def __init__(self, sensor, period=SENSOR_DEFAULT_PERIOD):
         """
         Initialize the sensor data helper.
         
@@ -365,9 +145,9 @@ class SensorDataToMySQLHelper(object):
         """Generate SQL CREATE TABLE command for sensor data."""
         return ",".join([ "%s %s" % (key, self._table_headers[key]) for key in self._table_headers])
 
-class ImgToMySQLHelper(object):
+class ImgSnapshotHelper(object):
     """
-    Helper class for saving image snapshots to MySQL at regular intervals.
+    Helper class for saving image snapshots to database at regular intervals.
     
     This class handles periodic capture and storage of JPEG-compressed images
     from the experiment video feed into the database as BLOBs.
@@ -391,7 +171,7 @@ class ImgToMySQLHelper(object):
         """Generate SQL CREATE TABLE command for image snapshots."""
         return ",".join([ "%s %s" % (key, self._table_headers[key]) for key in self._table_headers])
     
-    def __init__(self, period=300.0):
+    def __init__(self, period=IMG_SNAPSHOT_DEFAULT_PERIOD):
         """
         Initialize the image snapshot helper.
         
@@ -441,7 +221,7 @@ class DAMFileHelper(object):
     Drosophila activity analysis tools.
     """
     
-    def __init__(self, period=60.0, n_rois=32):
+    def __init__(self, period=DAM_DEFAULT_PERIOD, n_rois=32):
         """
         Initialize the DAM file helper.
         
@@ -567,8 +347,782 @@ class DAMFileHelper(object):
             logging.warning("DAM file writer skipping a tick. No data for more than one period!")
         out = [self._make_sql_command(v) for v in list(out.values())]
         return out
+
+
+
+class Null(object):
+    """
+    Special NULL representation for SQLite compatibility.
+    
+    SQLite requires NULL for auto-increment fields instead of 0.
+    """
+    def __repr__(self):
+        return "NULL"
+    def __str__(self):
+        return "NULL"
+
+
+# =============================================================================================================#
+# ASYNC CLASSES
+# BaseAsyncSQLWriter (multiprocessing.Process)
+#     AsyncMySQLWriter (BaseAsyncSQLWriter)
+#     ASyncSQLiteWriter (BaseAsyncSQLWriter)
+#
+# =============================================================================================================#
+
+class BaseAsyncSQLWriter(multiprocessing.Process):
+    """
+    Abstract base class for asynchronous SQL database writers.
+    
+    This class provides a template method pattern for SQL database writers that run
+    in separate processes. It handles the common functionality of queue processing,
+    event signaling, error handling, and cleanup while allowing subclasses to 
+    implement database-specific connection and initialization logic.
+    
+    Attributes:
+        _queue (multiprocessing.Queue): Queue for receiving SQL commands
+        _erase_old_db (bool): Whether to erase existing database on startup
+        _ready_event (multiprocessing.Event): Signals when writer is ready
+    """
+    
+    def __init__(self, queue, erase_old_db=True):
+        """
+        Initialize the base async SQL writer.
         
-class ResultWriter(object):
+        Args:
+            queue (multiprocessing.Queue): Queue for receiving SQL commands
+            erase_old_db (bool): Whether to erase existing database on startup
+        """
+        self._queue = queue
+        self._erase_old_db = erase_old_db
+        self._ready_event = multiprocessing.Event()
+        super(BaseAsyncSQLWriter, self).__init__()
+    
+    def run(self):
+        """
+        Template method for the main process loop.
+        
+        This method implements the common pattern for all async SQL writers:
+        1. Initialize database-specific setup
+        2. Signal ready state
+        3. Process commands from queue until 'DONE'
+        4. Handle errors appropriately
+        5. Clean up resources
+        """
+        db = None
+        do_run = True
+        
+        try:
+            logging.info(f"{self._get_db_type_name()} async writer starting up...")
+            
+            # Database-specific initialization (implemented by subclasses)
+            self._initialize_database()
+            
+            # Get database connection (implemented by subclasses)
+            db = self._get_connection()
+            logging.info(f"{self._get_db_type_name()} database connection established successfully")
+            
+            # Signal that the writer is ready to accept commands
+            logging.info(f"{self._get_db_type_name()} async writer ready to accept commands")
+            self._ready_event.set()
+        
+            # Main command processing loop
+            while do_run:
+                try:
+                    msg = self._queue.get()
+                    if (msg == 'DONE'):
+                        do_run = False
+                        continue
+                    command, args = msg
+                    
+                    c = db.cursor()
+                    if args is None:
+                        c.execute(command)
+                    else:
+                        c.execute(command, args)
+                    db.commit()
+                    
+                except Exception as e:
+                    # Determine if this error should stop the writer
+                    if not self._should_retry_on_error(e):
+                        do_run = False
+                        
+                    try:
+                        logging.error(f"Failed to run {self._get_db_type_name().lower()} command:\n%s" % command)
+                        logging.error("Error details: %s" % str(e))
+                        logging.error("Arguments: %s" % str(args) if 'args' in locals() else "None")
+                        logging.error("Traceback: %s" % traceback.format_exc())
+                        
+                        # Allow subclasses to handle specific error types
+                        self._handle_command_error(e, command, args if 'args' in locals() else None)
+                        
+                    except Exception as log_error:
+                        logging.error("Failed to log error details: %s" % str(log_error))
+                        logging.error("Did not retrieve queue value or failed to log command")
+                        do_run = False
+                finally:
+                    if self._queue.empty():
+                        # Sleep if queue is empty to avoid excessive CPU usage
+                        time.sleep(QUEUE_CHECK_INTERVAL)
+                        
+        except KeyboardInterrupt as e:
+            logging.warning(f"{self._get_db_type_name()} async process interrupted with KeyboardInterrupt")
+            # Ensure ready event is set even if interrupted
+            self._ready_event.set()
+            raise e
+        except Exception as e:
+            logging.error(f"{self._get_db_type_name()} async process stopped with an exception: %s", str(e))
+            logging.error("Exception traceback: %s", traceback.format_exc())
+            # Ensure ready event is set even if there's an error during startup
+            self._ready_event.set()
+            raise e
+        finally:
+            logging.info(f"Closing async {self._get_db_type_name().lower()} writer")
+            while not self._queue.empty():
+                self._queue.get()
+            self._queue.close()
+            if db is not None:
+                db.close()
+    
+    # Abstract methods that subclasses must implement
+    def _initialize_database(self):
+        """Initialize database-specific setup (create, delete, configure)."""
+        raise NotImplementedError("Subclasses must implement _initialize_database()")
+    
+    def _get_connection(self):
+        """Create and return a database connection object."""
+        raise NotImplementedError("Subclasses must implement _get_connection()")
+    
+    def _get_db_type_name(self):
+        """Return the database type name for logging (e.g., 'MySQL', 'SQLite')."""
+        raise NotImplementedError("Subclasses must implement _get_db_type_name()")
+    
+    def _should_retry_on_error(self, error):
+        """
+        Determine whether the writer should continue after an error.
+        
+        Args:
+            error (Exception): The exception that occurred
+            
+        Returns:
+            bool: True if the writer should continue, False if it should stop
+        """
+        raise NotImplementedError("Subclasses must implement _should_retry_on_error()")
+    
+    def _handle_command_error(self, error, command, args):
+        """
+        Handle database-specific error processing.
+        
+        Args:
+            error (Exception): The exception that occurred
+            command (str): The SQL command that failed
+            args (tuple): The command arguments, if any
+        """
+        # Default implementation does nothing; subclasses can override
+        pass
+
+class AsyncMySQLWriter(BaseAsyncSQLWriter):
+    """
+    Asynchronous MySQL/MariaDB database writer that runs in a separate process.
+    
+    This class handles all database write operations in a separate process to prevent
+    blocking the main data collection thread. It uses a queue to receive SQL commands
+    from the main process and executes them sequentially.
+    
+    Attributes:
+        _db_host (str): Database host address
+        _db_name (str): Database name
+        _db_user_name (str): Database username
+        _db_user_pass (str): Database password
+    """
+    
+    _database_type = "MySQL"
+
+    def __init__(self, db_credentials, queue, erase_old_db=True, db_host="localhost"):
+        """
+        Initialize the async MySQL writer process.
+        
+        Args:
+            db_credentials (dict): Database credentials containing:
+                - name: Database name
+                - user: Database username
+                - password: Database password
+            queue (multiprocessing.Queue): Queue for receiving SQL commands
+            erase_old_db (bool): Whether to drop and recreate database
+            db_host (str): Database server hostname or IP address
+        """
+        super(AsyncMySQLWriter, self).__init__(queue, erase_old_db)
+        self._db_name = db_credentials["name"]
+        self._db_user_name = db_credentials["user"]
+        self._db_user_pass = db_credentials["password"]
+        self._db_host = db_host
+
+
+    def _delete_my_sql_db(self):
+        """
+        Delete the existing MySQL database if it exists.
+        
+        This method connects to MySQL, truncates all tables for performance,
+        resets binary logs if enabled, and then drops the entire database.
+        """
+        try:
+            logging.info(f"Attempting to connect to mysql db {self._db_name} on host {self._db_host} as {self._db_user_name}")
+            db = mysql.connector.connect(host=self._db_host,
+                                         user=self._db_user_name,
+                                         passwd=self._db_user_pass,
+                                         db=self._db_name,
+                                         buffered=True,
+                                         charset=SQL_CHARSET,
+                                         use_unicode=True)
+                                         
+        except mysql.connector.errors.OperationalError:
+            logging.warning("Database %s does not exist. Cannot delete it" % self._db_name)
+            return
+            
+        except Exception as e:
+            logging.error(traceback.format_exc())
+            return
+        c = db.cursor()
+        
+        # Reset binary logs if enabled to save space
+        # However, this will throw an error if binary logging is set to off
+        # Which is what we should be doing because it reduces disk access and we do not need it anyway
+        try:
+            c.execute("SHOW VARIABLES LIKE 'log_bin';")
+            log_bin_status = c.fetchone()
+            if log_bin_status and log_bin_status[1] == 'ON':
+                logging.info("The binary logs are set to true. Resetting them to save space.")
+                c.execute("RESET MASTER")
+        except Exception as e:
+            logging.warning(f"Could not reset binary logs: {e}")
+
+        # Drop the entire database directly (no need to truncate tables first)
+        logging.info("Dropping entire database")
+        command = "DROP DATABASE IF EXISTS %s" % self._db_name
+        c.execute(command)
+        db.commit()
+        db.close()
+
+    def _create_mysql_db(self):
+        """
+        Create a new MySQL database and configure database settings.
+        
+        This method creates the database, sets up a read-only 'node' user for
+        remote access, and configures InnoDB settings for optimal performance.
+        """
+        logging.info(f"Connecting to MySQL host {self._db_host} as user {self._db_user_name}")
+        try:
+            db = mysql.connector.connect(host=self._db_host,
+                                         user=self._db_user_name,
+                                         passwd=self._db_user_pass,
+                                         buffered=True,
+                                         charset=SQL_CHARSET,
+                                         use_unicode=True)
+            logging.info("Successfully connected to MySQL for database creation")
+        except Exception as e:
+            logging.error(f"Failed to connect to MySQL: {str(e)}")
+            raise
+        c = db.cursor()
+        cmd = "CREATE DATABASE %s" % self._db_name
+        c.execute(cmd)
+        logging.info("Database created")
+        
+        #create a read-only node user that the node will use to get data from
+        #it's better to have a second user for remote operation for reasons of debug and have better control
+        cmd = "GRANT SELECT ON %s.* to 'node' identified by 'node'" % self._db_name
+        c.execute(cmd)
+        logging.info("Node user created")
+        
+        #set some innodb specific values that cannot be set on the config file
+        cmd = "SET GLOBAL innodb_file_per_table=1"
+        c.execute(cmd)
+        #"Variable 'innodb_file_format' is a read only variable"
+        #cmd = "SET GLOBAL innodb_file_format=Barracuda"
+        #c.execute(cmd)
+        cmd = "SET GLOBAL autocommit=0"
+        c.execute(cmd)
+        db.close()
+        
+    def _get_connection(self):
+        """
+        Establish a connection to the MySQL database.
+        
+        Returns:
+            mysql.connector.connection: Database connection object
+        """
+        db = mysql.connector.connect(host=self._db_host,
+                                     user=self._db_user_name,
+                                     passwd=self._db_user_pass,
+                                     db=self._db_name,
+                                     buffered=True,
+                                     charset=SQL_CHARSET,
+                                     use_unicode=True)
+        return db
+    
+    # Implementation of abstract methods from BaseAsyncSQLWriter
+    def _initialize_database(self):
+        """Initialize MySQL database setup - create/delete database if needed."""
+        if self._erase_old_db:
+            logging.info("Deleting old database...")
+            self._delete_my_sql_db()
+            logging.info("Creating new database...")
+            self._create_mysql_db()
+    
+    def _get_db_type_name(self):
+        """Return database type name for logging."""
+        return "MySQL"
+    
+    def _should_retry_on_error(self, error):
+        """
+        Determine if MySQL writer should continue after an error.
+        
+        MySQL writer uses sophisticated error recovery - continues on non-critical errors.
+        """
+        error_str = str(error).lower()
+        critical_errors = ['access denied', 'connection', 'server has gone away', 'lost connection']
+        is_critical = any(critical_error in error_str for critical_error in critical_errors)
+        
+        if is_critical:
+            logging.error("Critical database error detected, stopping async writer")
+            return False
+        else:
+            logging.warning("Non-critical database error, continuing operations")
+            return True
+
+
+class AsyncSQLiteWriter(BaseAsyncSQLWriter):
+    """
+    Asynchronous SQLite database writer running in a separate process.
+    
+    Similar to AsyncMySQLWriter but for SQLite databases. Uses specific
+    PRAGMA settings for optimal performance with single-writer pattern.
+    Each experiment creates a unique database file, preserving historical data.
+    
+    Attributes:
+        _pragmas (dict): SQLite PRAGMA settings for performance optimization
+        _db_name (str): Path to SQLite database file
+    """
+    
+    _database_type = "SQLite3"
+    _pragmas = {"temp_store": "MEMORY",
+                "journal_mode": "OFF",
+                "locking_mode":  "EXCLUSIVE"}
+                
+    def __init__(self, db_name, queue, erase_old_db=True):
+        """
+        Initialize the async SQLite writer.
+        
+        Args:
+            db_name (str): Path to SQLite database file (typically unique per experiment)
+            queue (multiprocessing.Queue): Queue for receiving SQL commands
+            erase_old_db (bool): Whether to delete existing database (typically False since 
+                                filenames are unique per experiment)
+        """
+        super(AsyncSQLiteWriter, self).__init__(queue, erase_old_db)
+        self._db_name = db_name
+        
+    def _get_connection(self):
+        """
+        Create SQLite database connection.
+        
+        Returns:
+            sqlite3.Connection: Database connection object
+            
+        Raises:
+            Exception: If SQLite connection fails
+        """
+        try:
+            db = sqlite3.connect(self._db_name)
+            return db
+        except sqlite3.Error as e:
+            raise Exception(f"Failed to connect to SQLite database {self._db_name}: {e}")
+    
+    # Implementation of abstract methods from BaseAsyncSQLWriter
+    def _initialize_database(self):
+        """Initialize SQLite database setup - delete file and set PRAGMAs if needed."""
+        if self._erase_old_db:
+            try:
+                os.remove(self._db_name)
+            except:
+                pass
+            conn = self._get_connection()
+            c = conn.cursor()
+            logging.info("Setting DB parameters")
+            for k,v in list(self._pragmas.items()):
+                command = "PRAGMA %s = %s" %(str(k), str(v))
+                c.execute(command)
+            conn.close()
+    
+    def _get_db_type_name(self):
+        """Return database type name for logging."""
+        return "SQLite"
+    
+    def _should_retry_on_error(self, error):
+        """
+        Determine if SQLite writer should continue after an error.
+        
+        SQLite writer uses fail-fast strategy - stops on any error.
+        """
+        return False  # SQLite writer stops on any error
+
+
+# =============================================================================================================#
+# SYNC CLASSES
+# BaseResultWriter (Object)
+#     ResultWriter (BaseResultWriter)
+#     SQLResultWriter (BaseResultWriter)
+#
+# =============================================================================================================#
+
+class BaseResultWriter(object):
+    """
+    Abstract base class for all result writers with common functionality.
+    
+    This class contains all the shared logic for initializing and managing result writers,
+    including helper classes, metadata handling, and database table creation. Subclasses
+    implement database-specific async writer creation and any specialized behavior.
+    
+    Attributes:
+        _max_insert_string_len (int): Maximum length for batched INSERT commands
+        _async_writing_class: Class to use for async database writes (set by subclasses)
+        _null: Value to use for NULL in database (set by subclasses)
+    """
+    
+    # Subclasses must define these class attributes
+    _async_writing_class = None
+    _null = None
+    _max_insert_string_len = 1000
+    
+    def __init__(self, db_credentials, rois, metadata=None, make_dam_like_table=True, 
+                 take_frame_shots=False, erase_old_db=True, sensor=None, **kwargs):
+        """
+        Initialize the base result writer with common functionality.
+        
+        Args:
+            db_credentials (dict): Database connection credentials
+            rois (list): List of ROI objects to track
+            metadata (dict): Experimental metadata to store
+            make_dam_like_table (bool): Whether to create DAM-compatible activity table
+            take_frame_shots (bool): Whether to periodically save image snapshots
+            erase_old_db (bool): Whether to drop and recreate database
+            sensor: Optional sensor object for environmental data collection
+            **kwargs: Additional arguments passed to subclasses
+        """
+        # Create async writer using subclass-specific method
+        self._queue = multiprocessing.JoinableQueue()
+        self._async_writer = self._create_async_writer(db_credentials, erase_old_db, **kwargs)
+        self._async_writer.start()
+        
+        # Initialize common attributes
+        self._last_t, self._last_flush_t, self._last_dam_t = [0] * 3
+        self._metadata = metadata
+        self._rois = rois
+        self._db_credentials = db_credentials
+        self._make_dam_like_table = make_dam_like_table
+        self._take_frame_shots = take_frame_shots
+        
+        # Initialize helper classes
+        if make_dam_like_table:
+            self._dam_file_helper = DAMFileHelper(n_rois=len(rois))
+        else:
+            self._dam_file_helper = None
+        if take_frame_shots:
+            self._shot_saver = ImgSnapshotHelper()
+        else:
+            self._shot_saver = None
+        self._insert_dict = {}
+        if self._metadata is None:
+            self._metadata = {}
+        if sensor is not None:
+            self._sensor_saver = SensorDataHelper(sensor)
+            logging.info("Creating connection to a sensor to store its data in the db")
+        else:
+            self._sensor_saver = None
+        
+        self._var_map_initialised = False
+        
+        # Database initialization - wait for async writer to be ready first
+        if (self._database_type == "MySQL" and erase_old_db) or self._database_type == "SQLite3":
+            logging.warning("Waiting for async writer to initialize database...")
+            # Wait for async writer to complete database initialization
+            if not self._async_writer._ready_event.wait(timeout=ASYNC_WRITER_TIMEOUT):
+                if self._async_writer.is_alive():
+                    raise Exception(f"Async database writer failed to initialize within {ASYNC_WRITER_TIMEOUT} seconds - check database connection")
+                else:
+                    raise Exception("Async database writer process died during initialization - check database configuration and logs")
+            
+            logging.warning("Creating database tables...")
+            self._create_all_tables()
+
+        elif self._database_type == "MySQL" and not erase_old_db:
+            event = "crash_recovery"
+            command = "INSERT INTO START_EVENTS VALUES (%s, %s, %s)"
+            self._write_async_command(command, (self._null, int(time.time()), event))
+
+        logging.info("Result writer initialised")
+    
+    def _create_async_writer(self, db_credentials, erase_old_db, **kwargs):
+        """
+        Create database-specific async writer.
+        
+        This abstract method must be implemented by subclasses to create
+        the appropriate async writer for their database type.
+        
+        Args:
+            db_credentials (dict): Database connection credentials
+            erase_old_db (bool): Whether to erase existing database
+            **kwargs: Additional database-specific arguments
+            
+        Returns:
+            BaseAsyncSQLWriter: The appropriate async writer instance
+        """
+        raise NotImplementedError("Subclasses must implement _create_async_writer()")
+    
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Context manager exit - ensures proper cleanup.
+        
+        Flushes remaining data, writes stop timestamp, and properly
+        shuts down the async writer process.
+        """
+        logging.info("Closing result writer...")
+        for k, v in list(self._insert_dict.items()):
+            self._write_async_command(v)
+            self._insert_dict[k] = ""
+        try:
+            command = "INSERT INTO METADATA VALUES (%s, %s)"
+            self._write_async_command(command, ("stop_date_time", str(int(time.time()))))
+            while not self._queue.empty():
+                logging.info("waiting for queue to be processed")
+                time.sleep(QUEUE_CHECK_INTERVAL)
+        except Exception as e:
+            logging.error("Error writing metadata stop time:")
+            logging.error(traceback.format_exc())
+        finally:
+            logging.info("Closing async queue")
+            self._queue.put("DONE")
+            logging.info("Freeing queue")
+            self._queue.cancel_join_thread()
+            logging.info("Joining thread")
+            self._async_writer.join()
+            logging.info("Joined OK")
+            
+    def close(self):
+        """Placeholder close method."""
+        pass
+        
+    def __getstate__(self):
+        """
+        Prepare object for pickling by excluding non-serializable multiprocessing objects.
+        
+        JoinableQueue and Process objects cannot be pickled, so we store the initialization
+        parameters needed to recreate them after unpickling.
+        """
+        state = self.__dict__.copy()
+        
+        # Store initialization parameters for reconstruction
+        state['_pickle_init_args'] = {
+            'db_credentials': self._db_credentials,
+            'rois': self._rois,
+            'metadata': self._metadata,
+            'make_dam_like_table': self._make_dam_like_table,
+            'take_frame_shots': self._take_frame_shots,
+        }
+        
+        # Remove non-serializable multiprocessing objects
+        state.pop('_queue', None)
+        state.pop('_async_writer', None)
+        
+        return state
+        
+    def __setstate__(self, state):
+        """
+        Restore object from pickled state by recreating multiprocessing objects.
+        
+        This recreates the queue and async writer that were excluded during pickling.
+        """
+        self.__dict__.update(state)
+        
+        # Recreate multiprocessing objects using stored parameters
+        init_args = state.get('_pickle_init_args', {})
+        
+        # Recreate queue and async writer
+        self._queue = multiprocessing.JoinableQueue()
+        self._async_writer = self._create_async_writer(
+            init_args.get('db_credentials', self._db_credentials),
+            False,  # Don't erase database when restoring from pickle
+            **getattr(self, '_pickle_extra_kwargs', {})
+        )
+        # Note: async writer is not started automatically - the calling code should handle this
+    
+    @property
+    def metadata(self):
+        """Get experimental metadata."""
+        return self._metadata
+
+    def write(self, t, roi, data_rows):
+        """
+        Write tracking data for a ROI.
+        
+        Args:
+            t (int): Time in milliseconds
+            roi: ROI object
+            data_rows (list): List of tracking data points
+        """
+        self._last_t = t
+        if not self._var_map_initialised:
+            self._var_map_initialised = True
+            self._initialise_var_map(data_rows[0])
+        
+        # Check if this ROI's table exists, create if needed
+        roi_id = roi.idx
+        table_name = f"ROI_{roi_id}"
+        if not hasattr(self, '_initialized_rois'):
+            self._initialized_rois = set()
+        
+        if roi_id not in self._initialized_rois:
+            self._initialise_roi_table(roi, data_rows[0])
+            self._initialized_rois.add(roi_id)
+            
+        self._add(t, roi, data_rows)
+        
+    def flush(self, t, img=None):
+        """
+        Flush accumulated data to database.
+        
+        This method is called periodically to write batched SQL commands,
+        save snapshots, and collect sensor data.
+        
+        Args:
+            t (int): Current time in milliseconds
+            img (np.ndarray): Optional image for snapshot
+            
+        Returns:
+            bool: Always returns False
+        """
+        if self._dam_file_helper is not None:
+            out = self._dam_file_helper.flush(t)
+            for c in out:
+                self._write_async_command(c)
+        if self._shot_saver is not None and img is not None:
+            c_args = self._shot_saver.flush(t, img)
+            if c_args is not None:
+                self._write_async_command(*c_args)
+        if self._sensor_saver is not None:
+            c_args = self._sensor_saver.flush(t)
+            if c_args is not None:
+                self._write_async_command(*c_args)
+        for k, v in list(self._insert_dict.items()):
+            if len(v) > self._max_insert_string_len:
+                self._write_async_command(v)
+                self._insert_dict[k] = ""
+        return False
+
+    def _add(self, t, roi, data_rows):
+        """
+        Add tracking data to the batch insert buffer.
+        
+        Args:
+            t (int): Time in milliseconds
+            roi: ROI object
+            data_rows (list): Tracking data points
+        """
+        roi_id = roi.idx
+        for dr in data_rows:
+            tp = (self._null, t) + tuple(dr.values())
+            if roi_id not in self._insert_dict or self._insert_dict[roi_id] == "":
+                command = 'INSERT INTO ROI_%i VALUES %s' % (roi_id, str(tp))
+                self._insert_dict[roi_id] = command
+            else:
+                self._insert_dict[roi_id] += ("," + str(tp))
+        
+        # now this is irrelevant when tracking multiple animals
+        if self._dam_file_helper is not None:
+            self._dam_file_helper.input_roi_data(t, roi, data_rows)
+    
+    def _initialise_var_map(self, data_row):
+        """Initialize variable mapping table with data types."""
+        self._write_async_command("DELETE FROM VAR_MAP")
+        for dt in list(data_row.values()):
+            command = "INSERT INTO VAR_MAP VALUES (%s, %s, %s)"
+            self._write_async_command(command, (dt.header_name, dt.sql_data_type, dt.functional_type))
+
+    def _initialise_roi_table(self, roi, data_row):
+        """Initialize ROI-specific database table (MySQL version)."""
+        fields = ["id INT  NOT NULL AUTO_INCREMENT PRIMARY KEY", "t INT"]
+        for dt in list(data_row.values()):
+            fields.append("%s %s" % (dt.header_name, dt.sql_data_type))
+        fields = ", ".join(fields)
+        table_name = "ROI_%i" % roi.idx
+        self._create_table(table_name, fields)
+    
+    def _write_async_command(self, command, args=None):
+        """
+        Send SQL command to async writer process.
+        
+        Args:
+            command (str): SQL command to execute
+            args (tuple): Optional arguments for parameterized query
+            
+        Raises:
+            Exception: If async writer has died
+        """
+        # Check if async writer is still alive (already waited for ready during init)
+        if not self._async_writer.is_alive():
+            raise Exception("Async database writer has stopped unexpectedly")
+        
+        # Send command to queue with error handling
+        try:
+            self._queue.put((command, args))
+        except Exception as e:
+            raise Exception(f"Failed to send command to async writer: {e}")
+
+    def _create_table(self, name, fields, engine="InnoDB"):
+        """
+        Create a database table with specified fields.
+        
+        Args:
+            name (str): Table name
+            fields (str): Field definitions for CREATE TABLE
+            engine (str): Storage engine (default: InnoDB)
+        """
+        if engine:
+            command = "CREATE TABLE IF NOT EXISTS %s (%s) ENGINE=%s" % (name, fields, engine)
+        else:
+            command = "CREATE TABLE IF NOT EXISTS %s (%s)" % (name, fields)
+        logging.info("Creating database table with: " + command)
+        self._write_async_command(command)
+
+    def _insert_metadata(self):
+        """Insert experimental metadata into METADATA table."""
+        for k, v in list(self.metadata.items()):
+            # Properly serialize complex metadata values to avoid SQL injection and formatting issues
+            v_serialized = json.dumps(str(v)) if not isinstance(v, (str, int, float, bool, type(None))) else v
+            
+            # Truncate extremely large values as a safety measure
+            max_value_length = METADATA_MAX_VALUE_LENGTH
+            if isinstance(v_serialized, str) and len(v_serialized) > max_value_length:
+                v_serialized = v_serialized[:max_value_length] + "... [TRUNCATED]"
+                logging.warning(f"Metadata value for key '{k}' was truncated due to size limit")
+            
+            # Use database-specific placeholder syntax
+            if self._database_type == "SQLite3":
+                command = "INSERT INTO METADATA VALUES (?, ?)"
+            else:  # MySQL
+                command = "INSERT INTO METADATA VALUES (%s, %s)"
+            self._write_async_command(command, (k, v_serialized))
+
+    def _wait_for_queue_empty(self):
+        """Wait for queue to be processed."""
+        while not self._queue.empty():
+            logging.info("waiting for queue to be processed")
+            time.sleep(QUEUE_CHECK_INTERVAL)
+
+class MySQLResultWriter(BaseResultWriter):
     """
     Main class for writing experimental results to a MySQL database.
     
@@ -584,15 +1138,25 @@ class ResultWriter(object):
         _async_writing_class: Class to use for async database writes
         _null: Value to use for NULL in database
     """
+    _description = {
+        "overview": "MySQL/MariaDB result writer - stores tracking data to a mySQL/mariadb database server.",
+        "arguments": [
+            {"name": "db_host", "description": "Database server hostname or IP address", "type": "str", "default": "localhost", "options": ["localhost", "node"]},
+            {"name": "take_frame_shots", "description": "Save periodic frame snapshots", "type": "boolean", "default": True},
+            {"name": "make_dam_like_table", "description": "Create DAM-compatible activity summary table", "type": "boolean", "default": False}
+        ]
+    }
+    
+    _database_type = "MySQL"
     # _flush_every_ns = 30 # flush every 10s of data
     _max_insert_string_len = 1000
     _async_writing_class = AsyncMySQLWriter
     _null = 0
     
     def __init__(self, db_credentials, rois, metadata=None, make_dam_like_table=True, 
-                 take_frame_shots=False, erase_old_db=True, sensor=None, *args, **kwargs):
+                 take_frame_shots=False, erase_old_db=True, sensor=None, db_host="localhost", *args, **kwargs):
         """
-        Initialize the result writer with various data collection options.
+        Initialize the MySQL result writer.
         
         Args:
             db_credentials (dict): Database connection credentials
@@ -602,45 +1166,25 @@ class ResultWriter(object):
             take_frame_shots (bool): Whether to periodically save image snapshots
             erase_old_db (bool): Whether to drop and recreate database
             sensor: Optional sensor object for environmental data collection
+            db_host (str): Database server hostname or IP address
         """
-        self._queue = multiprocessing.JoinableQueue()
-        self._async_writer = self._async_writing_class(db_credentials, self._queue, erase_old_db)
-        self._async_writer.start()
-        self._last_t, self._last_flush_t, self._last_dam_t = [0] * 3
-        self._metadata = metadata
-        self._rois = rois
-        self._db_credentials = db_credentials
-        self._make_dam_like_table = make_dam_like_table
-        self._take_frame_shots = take_frame_shots
-        if make_dam_like_table:
-            self._dam_file_helper = DAMFileHelper(n_rois=len(rois))
-        else:
-            self._dam_file_helper = None
-        if take_frame_shots:
-            self._shot_saver = ImgToMySQLHelper()
-        else:
-            self._shot_saver = None
-        self._insert_dict = {}
-        if self._metadata is None:
-            self._metadata  = {}
-        if sensor is not None:
-            self._sensor_saver = SensorDataToMySQLHelper(sensor)
-            logging.info("Creating connection to a sensor to store its data in the db")
-        else:
-            self._sensor_saver = None
-        
-        self._var_map_initialised = False
-        
-        if erase_old_db:
-            logging.warning("Erasing the old database and recreating the tables")
-            self._create_all_tables()
-            
-        else:
-            event = "crash_recovery"
-            command = "INSERT INTO START_EVENTS VALUES (%s, %s, %s)"
-            self._write_async_command(command, (self._null, int(time.time()), event))
-        logging.info("Result writer initialised")
-        
+        # Store MySQL-specific parameters for async writer creation
+        self._db_host = db_host
+        # Call parent initialization with all common logic
+        super(MySQLResultWriter, self).__init__(db_credentials, rois, metadata, make_dam_like_table, 
+                                         take_frame_shots, erase_old_db, sensor, **kwargs)
+    
+    def _create_async_writer(self, db_credentials, erase_old_db, **kwargs):
+        """Create MySQL-specific async writer."""
+        return self._async_writing_class(db_credentials, self._queue, erase_old_db, self._db_host)
+    
+    def __getstate__(self):
+        """Extend base pickle state with MySQL-specific parameters."""
+        state = super(MySQLResultWriter, self).__getstate__()
+        # Store MySQL-specific parameters
+        state['_pickle_extra_kwargs'] = {'db_host': getattr(self, '_db_host', 'localhost')}
+        return state
+
     def _create_all_tables(self):
         """
         Create all necessary database tables for the experiment.
@@ -683,353 +1227,109 @@ class ResultWriter(object):
         command = "INSERT INTO START_EVENTS VALUES (%s, %s, %s)"
         self._write_async_command(command, (self._null, int(time.time()), event))
 
-        for k,v in list(self.metadata.items()):
-            # Properly serialize complex metadata values to avoid SQL injection and formatting issues
-            v_serialized = json.dumps(str(v)) if not isinstance(v, (str, int, float, bool, type(None))) else v
-            
-            # Truncate extremely large values as a safety measure (TEXT supports up to 65KB)
-            max_value_length = 60000
-            if isinstance(v_serialized, str) and len(v_serialized) > max_value_length:
-                v_serialized = v_serialized[:max_value_length] + "... [TRUNCATED]"
-                logging.warning(f"Metadata value for key '{k}' was truncated due to size limit")
-            
-            command = "INSERT INTO METADATA VALUES (%s, %s)"
-            self._write_async_command(command, (k, v_serialized))
+        # Insert experimental metadata using shared method
+        self._insert_metadata()
         
-        while not self._queue.empty():
-            logging.info("waiting for queue to be processed")
-            time.sleep(.1)
-            
-    @property
-    def metadata(self):
-        """Get experimental metadata dictionary."""
-        return self._metadata
-        
-    def write(self, t, roi, data_rows):
-        """
-        Write tracking data for a specific ROI at given time.
-        
-        Args:
-            t (int): Time in milliseconds
-            roi: ROI object being tracked
-            data_rows (list): List of data points for tracked objects in ROI
-        """
-        #fixme
-        dr = data_rows[0]
-        if not self._var_map_initialised:
-            for r in self._rois:
-                self._initialise(r, dr)
-            self._initialise_var_map(dr)
-        self._add(t, roi, data_rows)
-        self._last_t = t
-        # now this is irrelevant when tracking multiple animals
-        if self._dam_file_helper is not None:
-            self._dam_file_helper.input_roi_data(t, roi, dr)
-            
-    def flush(self, t, img=None):
-        """
-        Flush accumulated data to database.
-        
-        This method is called periodically to write batched SQL commands,
-        save snapshots, and collect sensor data.
-        
-        Args:
-            t (int): Current time in milliseconds
-            img (np.ndarray): Optional image for snapshot
-            
-        Returns:
-            bool: Always returns False
-        """
-        if self._dam_file_helper is not None:
-            out = self._dam_file_helper.flush(t)
-            for c in out:
-                self._write_async_command(c)
-        if self._shot_saver is not None and img is not None:
-            c_args = self._shot_saver.flush(t, img)
-            if c_args is not None:
-                self._write_async_command(*c_args)
-        if self._sensor_saver is not None:
-            c_args = self._sensor_saver.flush(t)
-            if c_args is not None:
-                self._write_async_command(*c_args)
-        for k, v in list(self._insert_dict.items()):
-            if len(v) > self._max_insert_string_len:
-                self._write_async_command(v)
-                self._insert_dict[k] = ""
-        return False
+        self._wait_for_queue_empty()
 
-    def _add(self, t, roi, data_rows):
+class SQLiteResultWriter(BaseResultWriter):
+    """
+    SQLite-specific result writer.
+    
+    Extends BaseResultWriter with SQLite-specific modifications including:
+    - Use of AsyncSQLiteWriter instead of AsyncMySQLWriter
+    - NULL instead of 0 for auto-increment fields
+    - Removal of MySQL-specific table options
+    - Automatic placeholder conversion from MySQL (%s) to SQLite (?)
+    """
+    _description = {
+        "overview": "SQLite result writer - stores tracking data to local SQLite database file using consistent directory structure. Each experiment creates a unique file, preserving historical data. Compatible with rsync-based backups.",
+        "arguments": [
+            {"name": "take_frame_shots", "description": "Save periodic frame snapshots", "type": "boolean", "default": True},
+            {"name": "make_dam_like_table", "description": "Create DAM-compatible activity summary table", "type": "boolean", "default": False}
+        ]
+    }
+    
+    _database_type = "SQLite3"
+    _async_writing_class = AsyncSQLiteWriter
+    _null = Null()
+    
+    def __init__(self, db_credentials, rois, metadata=None, make_dam_like_table=False, 
+                 take_frame_shots=False, db_host="localhost", *args, **kwargs):
         """
-        Add tracking data to the batch insert buffer.
+        Initialize SQLite result writer.
         
+        Note: DAM-like tables are disabled by default for SQLite.
         Args:
-            t (int): Time in milliseconds
-            roi: ROI object
-            data_rows (list): Tracking data points
+            db_host: Ignored for SQLite (file-based), kept for compatibility
         """
-        t = int(round(t))
-        roi_id = roi.idx
-        for dr in data_rows:
-            tp = (0, t) + tuple(dr.values())
-            if roi_id not in self._insert_dict  or self._insert_dict[roi_id] == "":
-                command = 'INSERT INTO ROI_%i VALUES %s' % (roi_id, str(tp))
-                self._insert_dict[roi_id] = command
-            else:
-                self._insert_dict[roi_id] += ("," + str(tp))
-                
-    def _initialise_var_map(self,  data_row):
-        """
-        Initialize the variable mapping table with data types.
+        # SQLite-specific parameter overrides
+        # Remove any conflicting arguments from kwargs to avoid duplicate argument errors
+        kwargs.pop('erase_old_db', None)
+        kwargs.pop('sensor', None)
         
-        Args:
-            data_row: Sample data row to extract variable information
-        """
-        logging.info("Filling 'VAR_MAP' with values")
-        # we recreate var map so we do not have duplicate entries
-        self._write_async_command("DELETE FROM VAR_MAP")
-        for dt in list(data_row.values()):
-            command = "INSERT INTO VAR_MAP VALUES %s"% str((dt.header_name, dt.sql_data_type, dt.functional_type))
-            self._write_async_command(command)
-        self._var_map_initialised = True
+        # SQLite doesn't support sensors yet
+        sensor = None
+        # SQLite databases are unique per experiment, don't erase them
+        erase_old_db = False
+        
+        # Call parent initialization with all common logic
+        super(SQLiteResultWriter, self).__init__(db_credentials, rois, metadata, make_dam_like_table, 
+                                                 take_frame_shots, erase_old_db, sensor, **kwargs)
+    
+    def _create_async_writer(self, db_credentials, erase_old_db, **kwargs):
+        """Create SQLite-specific async writer."""
+        # SQLite uses the db path directly from db_credentials["name"]
+        return self._async_writing_class(db_credentials["name"], self._queue, erase_old_db)
+    
+    def __getstate__(self):
+        """Extend base pickle state with SQLite-specific parameters."""
+        state = super(SQLiteResultWriter, self).__getstate__()
+        # SQLite doesn't need extra kwargs, but we set empty dict for consistency
+        state['_pickle_extra_kwargs'] = {}
+        return state
+    
 
-    def _initialise(self, roi, data_row):
-        """
-        Initialize a ROI-specific data table.
-        
-        Args:
-            roi: ROI object
-            data_row: Sample data row to determine column structure
-        """
-        # We make a new dir to store results
-        fields = ["id INT  NOT NULL AUTO_INCREMENT PRIMARY KEY" ,"t INT"]
-        for dt in list(data_row.values()):
-            fields.append("%s %s" % (dt.header_name, dt.sql_data_type))
-        fields = ", ".join(fields)
-        table_name = "ROI_%i" % roi.idx
-        self._create_table(table_name, fields)
-
-    def __enter__(self):
-        """Context manager entry."""
-        return self
-        
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """
-        Context manager exit - ensures proper cleanup.
-        
-        Flushes remaining data, writes stop timestamp, and properly
-        shuts down the async writer process.
-        """
-        logging.info("Closing result writer...")
-        for k, v in list(self._insert_dict.items()):
-            self._write_async_command(v)
-            self._insert_dict[k] = ""
-        try:
-            command = "INSERT INTO METADATA VALUES (%s, %s)"
-            self._write_async_command(command, ("stop_date_time", str(int(time.time()))))
-            while not self._queue.empty():
-                logging.info("waiting for queue to be processed")
-                time.sleep(.1)
-        except Exception as e:
-            logging.error("Error writing metadata stop time:")
-            logging.error(traceback.format_exc())
-        finally:
-            logging.info("Closing mysql async queue")
-            self._queue.put("DONE")
-            logging.info("Freeing queue")
-            self._queue.cancel_join_thread()
-            logging.info("Joining thread")
-            self._async_writer.join()
-            logging.info("Joined OK")
-            
-    def close(self):
-        """Placeholder close method."""
-        pass
-        
     def _write_async_command(self, command, args=None):
         """
-        Send SQL command to async writer process.
+        Send SQL command to async writer process with SQLite placeholder conversion.
         
         Args:
-            command (str): SQL command to execute
+            command (str): SQL command to execute (may contain MySQL placeholders)
             args (tuple): Optional arguments for parameterized query
             
         Raises:
             Exception: If async writer is not ready or has died
         """
+        # Convert MySQL placeholders (%s) to SQLite placeholders (?)
+        if '%s' in command:
+            sqlite_command = command.replace('%s', '?')
+            logging.debug(f"Converting MySQL command to SQLite: {command} -> {sqlite_command}")
+        else:
+            sqlite_command = command
+        
+        # Convert Null() objects to None for SQLite compatibility
+        if args is not None:
+            sqlite_args = []
+            for arg in args:
+                if isinstance(arg, Null):
+                    sqlite_args.append(None)  # SQLite expects None for NULL
+                else:
+                    sqlite_args.append(arg)
+            sqlite_args = tuple(sqlite_args)
+        else:
+            sqlite_args = None
+            
         # Wait for the async writer to be ready before sending commands
-        if not self._async_writer._ready_event.wait(timeout=30):
+        if not self._async_writer._ready_event.wait(timeout=ASYNC_WRITER_TIMEOUT):
             if self._async_writer.is_alive():
-                raise Exception("Async database writer failed to initialize within 30 seconds - check MariaDB connection")
+                raise Exception(f"Async database writer failed to initialize within {ASYNC_WRITER_TIMEOUT} seconds - check SQLite connection")
             else:
-                raise Exception("Async database writer process died during initialization - check MariaDB configuration and logs")
+                raise Exception("Async database writer process died during initialization - check SQLite configuration and logs")
         
         if not self._async_writer.is_alive():
             raise Exception("Async database writer has stopped unexpectedly")
-        self._queue.put((command, args))
-        
-    def _create_table(self, name, fields, engine="InnoDB"):
-        """
-        Create a database table with specified fields.
-        
-        Args:
-            name (str): Table name
-            fields (str): Field definitions for CREATE TABLE
-            engine (str): Storage engine (default: InnoDB)
-        """
-        command = "CREATE TABLE IF NOT EXISTS %s (%s) ENGINE %s KEY_BLOCK_SIZE=16;" % (name, fields, engine)
-        logging.info("Creating database table with: " + command)
-        self._write_async_command(command)
-        
-    def __getstate__(self):
-        """Prepare object for pickling."""
-        return {"args": {"db_credentials": self._db_credentials,
-                         "rois": self._rois,
-                         "metadata": self._metadata,
-                         "make_dam_like_table": self._make_dam_like_table,
-                         "take_frame_shots": self._take_frame_shots,
-                         "erase_old_db": False}}
-                         
-    def __setstate__(self, state):
-        """Restore object from pickled state."""
-        self.__init__(**state["args"])
-
-class AsyncSQLiteWriter(multiprocessing.Process):
-    """
-    Asynchronous SQLite database writer running in a separate process.
-    
-    Similar to AsyncMySQLWriter but for SQLite databases. Uses specific
-    PRAGMA settings for optimal performance with single-writer pattern.
-    
-    Attributes:
-        _pragmas (dict): SQLite PRAGMA settings for performance optimization
-    """
-    _pragmas = {"temp_store": "MEMORY",
-                "journal_mode": "OFF",
-                "locking_mode":  "EXCLUSIVE"}
-                
-    def __init__(self, db_name, queue, erase_old_db=True):
-        """
-        Initialize the async SQLite writer.
-        
-        Args:
-            db_name (str): Path to SQLite database file
-            queue (multiprocessing.Queue): Queue for receiving SQL commands
-            erase_old_db (bool): Whether to delete existing database
-        """
-        self._db_name = db_name
-        self._queue = queue
-        self._erase_old_db =  erase_old_db
-        super(AsyncSQLiteWriter,self).__init__()
-        
-        if erase_old_db:
-            try:
-                os.remove(self._db_name)
-            except:
-                pass
-            conn = self._get_connection()
-            c = conn.cursor()
-            logging.info("Setting DB parameters'")
-            for k,v in list(self._pragmas.items()):
-                command = "PRAGMA %s = %s" %(str(k), str(v))
-                c.execute(command)
-        
-    def _get_connection(self):
-        """
-        Create SQLite database connection.
-        
-        Returns:
-            sqlite3.Connection: Database connection object
-        """
-        db =   sqlite3.connect(self._db_name)
-        return db
-
-    def run(self):
-        """
-        Main process loop for SQLite async writer.
-        
-        Processes SQL commands from queue until 'DONE' message received.
-        """
-        db = None
-        do_run = True
-        try:
-            db = self._get_connection()
-            while do_run:
-                try:
-                    msg = self._queue.get()
-                    if (msg == 'DONE'):
-                        do_run=False
-                        continue
-                    command, args = msg
-
-                    c = db.cursor()
-                    if args is None:
-                        c.execute(command)
-                    else:
-                        c.execute(command, args)
-                    db.commit()
-                except:
-                    do_run=False
-                    try:
-                        logging.error("Failed to run mysql command:\n%s" % command)
-                    except:
-                        logging.error("Did not retrieve queue value")
-                finally:
-                    if self._queue.empty():
-                        #we sleep if we have an empty queue. this way, we don't over use a cpu
-                        time.sleep(.1)
-        except KeyboardInterrupt as e:
-            logging.warning("DB async process interrupted with KeyboardInterrupt")
-            # Ensure ready event is set even if interrupted
-            # This prevents the main thread from hanging indefinitely
-            self._ready_event.set()
-            raise e
-        except Exception as e:
-            logging.error("DB async process stopped with an exception: %s", str(e))
-            logging.error("Exception traceback: %s", traceback.format_exc())
-            # Ensure ready event is set even if there's an error during startup
-            # This prevents the main thread from hanging indefinitely
-            self._ready_event.set()
-            raise e
-        finally:
-            logging.info("Closing async mysql writer")
-            while not self._queue.empty():
-                self._queue.get()
-            self._queue.close()
-            if db is not None:
-                db.close()
-                
-class Null(object):
-    """
-    Special NULL representation for SQLite compatibility.
-    
-    SQLite requires NULL for auto-increment fields instead of 0.
-    """
-    def __repr__(self):
-        return "NULL"
-    def __str__(self):
-        return "NULL"
-        
-class SQLiteResultWriter(ResultWriter):
-    """
-    SQLite-specific result writer.
-    
-    Extends ResultWriter with SQLite-specific modifications including:
-    - Use of AsyncSQLiteWriter instead of AsyncMySQLWriter
-    - NULL instead of 0 for auto-increment fields
-    - Removal of MySQL-specific table options
-    """
-    _async_writing_class = AsyncSQLiteWriter
-    _null= Null()
-    
-    def __init__(self, db_credentials, rois, metadata=None, make_dam_like_table=False, 
-                 take_frame_shots=False, *args, **kwargs):
-        """
-        Initialize SQLite result writer.
-        
-        Note: DAM-like tables are disabled by default for SQLite.
-        """
-        super(SQLiteResultWriter, self).__init__(db_credentials, rois, metadata,
-                                                make_dam_like_table, take_frame_shots, *args, **kwargs)
+        self._queue.put((sqlite_command, sqlite_args))
 
     def _create_table(self, name, fields, engine=None):
         """
@@ -1040,30 +1340,127 @@ class SQLiteResultWriter(ResultWriter):
             fields (str): Field definitions
             engine: Ignored for SQLite
         """
-        fields = fields.replace("NOT NULL", "")
-        command = "CREATE TABLE IF NOT EXISTS %s (%s)" % (name,fields)
+        # Don't modify fields for SQLite - they should already be SQLite-compatible
+        command = "CREATE TABLE IF NOT EXISTS %s (%s)" % (name, fields)
         logging.info("Creating database table with: " + command)
         self._write_async_command(command)
+    
+    def _initialise_roi_table(self, roi, data_row):
+        """Initialize ROI-specific database table with SQLite-compatible syntax."""
+        # SQLite-specific field definitions
+        fields = ["id INTEGER PRIMARY KEY AUTOINCREMENT", "t INTEGER"]
+        for dt in list(data_row.values()):
+            # Convert MySQL types to SQLite equivalents
+            sql_type = dt.sql_data_type.upper()
+            if "INT" in sql_type:
+                sqlite_type = "INTEGER"
+            elif "FLOAT" in sql_type or "DOUBLE" in sql_type:
+                sqlite_type = "REAL"
+            elif "TEXT" in sql_type or "CHAR" in sql_type or "VARCHAR" in sql_type:
+                sqlite_type = "TEXT"
+            else:
+                sqlite_type = "TEXT"  # Default fallback
+            fields.append("%s %s" % (dt.header_name, sqlite_type))
+        fields = ", ".join(fields)
+        table_name = "ROI_%i" % roi.idx
+        self._create_table(table_name, fields, engine=None)
         
     def _add(self, t, roi, data_rows):
         """
         Add data with SQLite-specific NULL handling.
         
-        Uses NULL object instead of 0 for auto-increment primary keys.
+        Uses None instead of Null() object and converts to string properly for SQLite.
         """
         t = int(round(t))
         roi_id = roi.idx
         for dr in data_rows:
-            # here we use NULL because SQLite does not support '0' for auto index
-            tp = (self._null, t) + tuple(dr.values())
-            if roi_id not in self._insert_dict  or self._insert_dict[roi_id] == "":
-                command = 'INSERT INTO ROI_%i VALUES %s' % (roi_id, str(tp))
+            # Convert Null() to None, then build tuple for string representation
+            values = [None if isinstance(self._null, Null) else self._null, t] + list(dr.values())
+            # Convert None to NULL string for SQL, others to their string representation
+            sql_values = []
+            for val in values:
+                if val is None:
+                    sql_values.append("NULL")
+                elif isinstance(val, str):
+                    sql_values.append(f"'{val}'")  # Quote strings
+                else:
+                    sql_values.append(str(val))
+            
+            value_str = "(" + ", ".join(sql_values) + ")"
+            
+            if roi_id not in self._insert_dict or self._insert_dict[roi_id] == "":
+                command = f'INSERT INTO ROI_{roi_id} VALUES {value_str}'
                 self._insert_dict[roi_id] = command
             else:
-                self._insert_dict[roi_id] += ("," + str(tp))
-                
+                self._insert_dict[roi_id] += f",{value_str}"
+        
+        # now this is irrelevant when tracking multiple animals
+        if self._dam_file_helper is not None:
+            self._dam_file_helper.input_roi_data(t, roi, data_rows)
 
-class npyAppendableFile():
+    def _create_all_tables(self):
+        """
+        Create all necessary SQLite database tables for the experiment.
+        
+        Creates SQLite-compatible tables for:
+        - ROI_MAP: ROI definitions and positions
+        - VAR_MAP: Variable type mappings
+        - IMG_SNAPSHOTS: Image snapshot storage (if enabled)
+        - CSV_DAM_ACTIVITY: DAM-compatible activity data (if enabled)
+        - METADATA: Experimental metadata
+        - START_EVENTS: Experiment start/stop events
+        
+        Note: SENSORS table is not created as SQLite doesn't support sensors yet
+        """
+        logging.info("Creating master table 'ROI_MAP'")
+        self._create_table("ROI_MAP", "roi_idx INTEGER, roi_value INTEGER, x INTEGER, y INTEGER, w INTEGER, h INTEGER")
+        for r in self._rois:
+            fd = r.get_feature_dict()
+            command = "INSERT INTO ROI_MAP VALUES (?, ?, ?, ?, ?, ?)"
+            self._write_async_command(command, (fd["idx"], fd["value"], fd["x"], fd["y"], fd["w"], fd["h"]))
+
+        logging.info("Creating variable map table 'VAR_MAP'")
+        self._create_table("VAR_MAP", "var_name TEXT, sql_type TEXT, functional_type TEXT")
+        
+        if self._shot_saver is not None:
+            logging.info("Creating table for IMG_SNAPSHOTS")
+            # SQLite-compatible version of image snapshots table
+            self._create_table("IMG_SNAPSHOTS", "id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER, img BLOB")
+
+        # Note: SQLite doesn't support sensors yet, so we skip SENSORS table
+
+        if self._dam_file_helper is not None:
+            logging.info("Creating 'CSV_DAM_ACTIVITY' table")
+            # Convert DAM table fields to SQLite-compatible format
+            mysql_fields = self._dam_file_helper.make_dam_file_sql_fields()
+            # Convert MySQL field definitions to SQLite equivalents
+            sqlite_fields = mysql_fields.replace("INT  NOT NULL AUTO_INCREMENT PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
+            sqlite_fields = sqlite_fields.replace("CHAR(100)", "TEXT")
+            sqlite_fields = sqlite_fields.replace("SMALLINT", "INTEGER")
+            self._create_table("CSV_DAM_ACTIVITY", sqlite_fields)
+
+        logging.info("Creating 'METADATA' table")
+        self._create_table("METADATA", "field TEXT, value TEXT")
+        
+        logging.info("Creating 'START_EVENTS' table")
+        self._create_table("START_EVENTS", "id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER, event TEXT")
+        event = "graceful_start"
+        command = "INSERT INTO START_EVENTS VALUES (?, ?, ?)"
+        self._write_async_command(command, (None, int(time.time()), event))
+
+        # Insert experimental metadata using shared method
+        self._insert_metadata()
+        
+        self._wait_for_queue_empty()
+
+
+# =============================================================================================================#
+# VARIOUS OTHER CLASSES
+#
+# =============================================================================================================#
+
+
+class NpyAppendableFile():
     """
     Custom file format for efficiently appending numpy arrays.
     
@@ -1172,7 +1569,7 @@ class npyAppendableFile():
                          'fortran_order' : fortran,
                          'shape' : shape}
                          
-class rawdatawriter():
+class RawDataWriter():
     """
     Writer for saving raw tracking data for offline analysis.
     
@@ -1193,7 +1590,7 @@ class rawdatawriter():
         self._basename, _ = os.path.splitext (basename)
         
         self.entities = entities
-        self.files = [ npyAppendableFile (os.path.join("%s_%03d" % (self._basename, n_rois) + ".anpy"), newfile = True ) for r in range(n_rois) ]
+        self.files = [ NpyAppendableFile (os.path.join("%s_%03d" % (self._basename, n_rois) + ".anpy"), newfile = True ) for r in range(n_rois) ]
         
         self.data = dict()
         
@@ -1237,6 +1634,14 @@ class DatabaseMetadataCache:
     """
     
     def __init__(self, db_credentials, device_name="", cache_dir="/ethoscope_data/cache"):
+        """
+        Initialize the database metadata cache.
+        
+        Args:
+            db_credentials (dict): Database connection credentials
+            device_name (str): Name of the device for cache file naming
+            cache_dir (str): Directory path for storing cache files
+        """
         self.db_credentials = db_credentials
         self.device_name = device_name
         self.cache_dir = cache_dir
@@ -1286,28 +1691,8 @@ class DatabaseMetadataCache:
             cache_filename = f"db_metadata_{ts_str}_{self.device_name}_db.json"
             return os.path.join(self.cache_dir, cache_filename)
         
-        # Try to get timestamp from metadata table
-        try:
-            with mysql.connector.connect(
-                host='localhost',
-                user=self.db_credentials["user"],
-                password=self.db_credentials["password"],
-                database=self.db_credentials["name"],
-                charset='latin1',
-                use_unicode=True,
-                connect_timeout=10
-            ) as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT value FROM METADATA WHERE field = 'date_time'")
-                result = cursor.fetchone()
-                if result:
-                    metadata_start_time = float(result[0])
-                    ts_str = time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(metadata_start_time))
-                    cache_filename = f"db_metadata_{ts_str}_{self.device_name}_db.json"
-                    return os.path.join(self.cache_dir, cache_filename)
-        except Exception as e:
-            logging.warning(f"Could not retrieve experiment start time from metadata: {e}")
-        
+        # Don't try to read old database metadata when tracking_start_time is None
+        # This prevents SQLite databases from using timestamps from previous experiments
         return None
     
     def _query_database(self):
@@ -1461,3 +1846,4 @@ class DatabaseMetadataCache:
         
         # Return empty data if no cache available
         return {"db_size_bytes": 0, "table_counts": {}, "last_db_update": 0}
+

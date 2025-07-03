@@ -49,7 +49,7 @@
     <div ng-if="device.status == 'running'">
         <div id="node-info" class="intro">
             <p><span class="fa fa-clock"></span> Running since {{ethoscope.start_date_time(device.time)}}
-                (i.e. {{ethoscope.elapsedtime(device.monitor_info.last_time_stamp)}} ago) - Run ID: {{device.experimental_info.run_id}}
+                (i.e. {{ethoscope.elapsedtime(device.time)}} ago) - Run ID: {{device.experimental_info.run_id}}
                 <br>
                 <span class="fa fa-user"></span> User: {{device.experimental_info.name}}
                 <br>
@@ -395,10 +395,14 @@
                                             <option ng-repeat="entry in videofiles" value="{{entry.fullpath}}">{{entry.filename | limitTo: 40}}{{entry.filename.length < 40 ? '' : '...'}}</option>
                                         </select>
                                         <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
-                                        <input ng-if="(arg.type == 'str' && arg.asknode == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
+                                        <input ng-if="(arg.type == 'str' && arg.asknode == undefined && arg.options == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
                                         <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" ng-required="true">
                                             <option value="">-- choose {{arg.name}} --</option>
                                             <option ng-repeat="entry in node[arg.asknode] | toArray | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
+                                        </select>
+                                        <select ng-if="(arg.type == 'str' && arg.options != undefined)" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
+                                            <option value="">-- choose {{arg.name}} --</option>
+                                            <option ng-repeat="option in arg.options" value="{{option}}">{{option}}</option>
                                         </select>
                                         <div ng-if="arg.type == 'boolean'"><label for="input-{{arg.name}}"><input style="transform: scale(1.5); margin: 3px; margin-right: 10px;" id="input-{{arg.name}}" type="checkbox" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">{{arg.description}}</label></div>
 

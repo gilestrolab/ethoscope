@@ -142,11 +142,13 @@ class commandingThread(threading.Thread):
             return self.control.info['status']
         
         elif action == 'start' and data:
+#            if self.control.controltype != "tracking":
             self.control = ControlThread ( machine_id = self.ethoscope_info['MACHINE_ID'],
-                               name = self.ethoscope_info['MACHINE_NAME'],
-                               version = self.ethoscope_info['GIT_VERSION'], 
-                               ethoscope_dir = self.ethoscope_info['ETHOSCOPE_DIR'],
-                               data = data )
+                                name = self.ethoscope_info['MACHINE_NAME'],
+                                version = self.ethoscope_info['GIT_VERSION'], 
+                                ethoscope_dir = self.ethoscope_info['ETHOSCOPE_DIR'],
+                                data = data )
+
             self.control.start()
 
             logging.info("Starting tracking")
