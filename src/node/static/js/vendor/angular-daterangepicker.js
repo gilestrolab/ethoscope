@@ -45,8 +45,13 @@
         };
         _setDatePoint = function(setter) {
           return function(newValue) {
-            if (_picker && newValue) {
-              return setter(moment(newValue));
+            if (_picker && newValue && typeof moment !== 'undefined') {
+              var momentObj = moment(newValue);
+              if (momentObj.isValid()) {
+                return setter(momentObj);
+              } else {
+                console.warn('Invalid date in _setDatePoint:', newValue);
+              }
             }
           };
         };
@@ -66,8 +71,15 @@
         });
         _validate = function(validator) {
           return function(boundary, actual) {
-            if (boundary && actual) {
-              return validator(moment(boundary), moment(actual));
+            if (boundary && actual && typeof moment !== 'undefined') {
+              var boundaryMoment = moment(boundary);
+              var actualMoment = moment(actual);
+              if (boundaryMoment.isValid() && actualMoment.isValid()) {
+                return validator(boundaryMoment, actualMoment);
+              } else {
+                console.warn('Invalid dates in _validate:', boundary, actual);
+                return false;
+              }
             } else {
               return true;
             }
@@ -84,24 +96,50 @@
         modelCtrl.$formatters.push(function(objValue) {
           var f;
           f = function(date) {
-            if (!moment.isMoment(date)) {
-              return moment(date).format(opts.locale.format);
-            } else {
-              return date.format(opts.locale.format);
+            // Check if moment.js is available and date is valid
+            if (typeof moment === 'undefined') {
+              console.warn('Moment.js not available in daterangepicker formatter');
+              return '';
             }
+            
+            // Handle null/undefined dates
+            if (date === null || date === undefined) {
+              return '';
+            }
+            
+            var momentObj;
+            if (!moment.isMoment(date)) {
+              momentObj = moment(date);
+            } else {
+              momentObj = date;
+            }
+            
+            // Validate the moment object before formatting
+            if (!momentObj.isValid()) {
+              console.warn('Invalid date in daterangepicker formatter:', date);
+              return '';
+            }
+            
+            return momentObj.format(opts.locale.format);
           };
+          
           if (opts.singleDatePicker && objValue) {
             return f(objValue);
           } else if (objValue && objValue.startDate) {
-            if (modelCtrl.$viewValue.length > 0) { 
-                objValue.formatted = modelCtrl.$viewValue + ", " + [f(objValue.startDate), f(objValue.endDate)].join(opts.locale.separator);
-            } else {
-                objValue.formatted = [f(objValue.startDate), f(objValue.endDate)].join(opts.locale.separator);
+            var startFormatted = f(objValue.startDate);
+            var endFormatted = f(objValue.endDate);
+            
+            // Only format if both dates are valid
+            if (startFormatted && endFormatted) {
+              if (modelCtrl.$viewValue && modelCtrl.$viewValue.length > 0) { 
+                  objValue.formatted = modelCtrl.$viewValue + ", " + [startFormatted, endFormatted].join(opts.locale.separator);
+              } else {
+                  objValue.formatted = [startFormatted, endFormatted].join(opts.locale.separator);
+              }
+              return objValue.formatted;
             }
-            return objValue.formatted;
-          } else {
-            return '';
           }
+          return '';
         });
 
         el.bind('blur', function() {
@@ -123,7 +161,12 @@
         modelCtrl.$parsers.push(function(val) {
           var f, objValue, x;
           f = function(value) {
-            return moment(value, opts.locale.format);
+            if (typeof moment === 'undefined') {
+              console.warn('Moment.js not available in daterangepicker parser');
+              return null;
+            }
+            var momentObj = moment(value, opts.locale.format);
+            return momentObj.isValid() ? momentObj : null;
           };
           objValue = {
             startDate: null,
@@ -134,8 +177,11 @@
               objValue = f(val);
             } else {
               x = val.split(opts.locale.separator).map(f);
-              objValue.startDate = x[0];
-              objValue.endDate = x[1];
+              // Only set if both dates are valid
+              if (x[0] && x[1]) {
+                objValue.startDate = x[0];
+                objValue.endDate = x[1];
+              }
             }
           }
           return objValue;
@@ -145,6 +191,19 @@
           return !(angular.isString(val) && val.length > 0);
         };
         _init = function() {
+          // Check if required dependencies are available
+          if (typeof moment === 'undefined') {
+            console.warn('Moment.js not available for daterangepicker initialization, retrying...');
+            $timeout(_init, 100);
+            return;
+          }
+          
+          if (typeof $.fn.daterangepicker === 'undefined') {
+            console.warn('Daterangepicker not available, retrying...');
+            $timeout(_init, 100);
+            return;
+          }
+          
           var eventType, results;
           el.daterangepicker(angular.extend(opts, {
             autoUpdateInput: false
@@ -167,7 +226,9 @@
           }
           return results;
         };
-        _init();
+        
+        // Use $timeout to defer initialization until next digest cycle
+        $timeout(_init, 0);
         $scope.$watch('model.startDate', function(n) {
           return _setStartDate(n);
         });
