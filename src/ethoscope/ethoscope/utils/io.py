@@ -89,21 +89,29 @@ class SensorDataHelper(object):
         _base_headers (dict): Base columns for the sensor table (id and timestamp)
     """
     _table_name = "SENSORS"
-    _base_headers = {"id" : "INT NOT NULL AUTO_INCREMENT PRIMARY KEY", 
-                     "t"  : "INT" }
-                          
-    def __init__(self, sensor, period=SENSOR_DEFAULT_PERIOD):
+    
+    def __init__(self, sensor, period=SENSOR_DEFAULT_PERIOD, database_type="MySQL"):
         """
         Initialize the sensor data helper.
         
         Args:
             sensor: Sensor object with read_all() method and sensor_types property
             period (float): Sampling period in seconds (default: 120s)
+            database_type (str): Database type - "MySQL" or "SQLite3" (default: "MySQL")
         """
         self._period = period
         self._last_tick = 0
         self.sensor = sensor
-        self._table_headers = {**self._base_headers, **self.sensor.sensor_types}
+        self._database_type = database_type
+        
+        # Set appropriate base headers based on database type
+        if database_type == "SQLite3":
+            self._base_headers = {"id": "INTEGER PRIMARY KEY AUTOINCREMENT", "t": "INTEGER"}
+        else:  # MySQL
+            self._base_headers = {"id": "INT NOT NULL AUTO_INCREMENT PRIMARY KEY", "t": "INT"}
+        
+        # Build table headers with appropriate data types
+        self._table_headers = {**self._base_headers, **self._get_sensor_types_for_database()}
         
     def flush(self, t):
         """
@@ -119,14 +127,28 @@ class SensorDataHelper(object):
         if tick == self._last_tick:
             return
         try:
-            values = [str(v) for v in ((0, int(t)) + self.sensor.read_all())]
-            cmd = (
-                    "INSERT into "
-                    + self._table_name
-                    + " VALUES (" 
-                    + ','.join(values) 
-                    + ")"
-                   )
+            if self._database_type == "SQLite3":
+                # For SQLite, don't specify ID - let AUTOINCREMENT handle it
+                values = [str(v) for v in ((int(t),) + self.sensor.read_all())]
+                columns = list(self._table_headers.keys())[1:]  # Skip 'id' column
+                cmd = (
+                        "INSERT into "
+                        + self._table_name
+                        + " (" + ','.join(columns) + ")"
+                        + " VALUES (" 
+                        + ','.join(values) 
+                        + ")"
+                       )
+            else:
+                # For MySQL, explicit ID=0 is fine (will be auto-incremented)
+                values = [str(v) for v in ((0, int(t)) + self.sensor.read_all())]
+                cmd = (
+                        "INSERT into "
+                        + self._table_name
+                        + " VALUES (" 
+                        + ','.join(values) 
+                        + ")"
+                       )
             self._last_tick = tick
             return cmd, None
     
@@ -140,6 +162,35 @@ class SensorDataHelper(object):
         """Get the sensor table name."""
         return self._table_name
         
+    def _get_sensor_types_for_database(self):
+        """
+        Convert sensor types to appropriate database format.
+        
+        Returns:
+            dict: Sensor field names mapped to database-appropriate data types
+        """
+        if not hasattr(self.sensor, 'sensor_types'):
+            return {}
+        
+        sensor_types = {}
+        for field_name, mysql_type in self.sensor.sensor_types.items():
+            if self._database_type == "SQLite3":
+                # Convert MySQL types to SQLite equivalents
+                if mysql_type.upper() in ['FLOAT', 'DOUBLE']:
+                    sqlite_type = 'REAL'
+                elif mysql_type.upper().startswith('INT'):
+                    sqlite_type = 'INTEGER'
+                elif mysql_type.upper().startswith(('CHAR', 'VARCHAR', 'TEXT')):
+                    sqlite_type = 'TEXT'
+                else:
+                    sqlite_type = 'TEXT'  # Default fallback
+                sensor_types[field_name] = sqlite_type
+            else:
+                # Use original MySQL types
+                sensor_types[field_name] = mysql_type
+        
+        return sensor_types
+    
     @property
     def create_command(self):
         """Generate SQL CREATE TABLE command for sensor data."""
@@ -157,9 +208,25 @@ class ImgSnapshotHelper(object):
         _table_headers (dict): Column definitions for the snapshots table
     """
     _table_name = "IMG_SNAPSHOTS"
-    _table_headers = {"id" : "INT NOT NULL AUTO_INCREMENT PRIMARY KEY", 
-                      "t"  : "INT",
-                      "img" : "LONGBLOB"}
+    
+    def __init__(self, period=IMG_SNAPSHOT_DEFAULT_PERIOD, database_type="MySQL"):
+        """
+        Initialize the image snapshot helper.
+        
+        Args:
+            period (float): Snapshot interval in seconds (default: 300s/5min)
+            database_type (str): Database type - "MySQL" or "SQLite3" (default: "MySQL")
+        """
+        self._period = period
+        self._last_tick = 0
+        self._database_type = database_type
+        self._tmp_file = tempfile.mktemp(prefix="ethoscope_", suffix=".jpg")
+        
+        # Set appropriate table headers based on database type
+        if database_type == "SQLite3":
+            self._table_headers = {"id": "INTEGER PRIMARY KEY AUTOINCREMENT", "t": "INTEGER", "img": "BLOB"}
+        else:  # MySQL
+            self._table_headers = {"id": "INT NOT NULL AUTO_INCREMENT PRIMARY KEY", "t": "INT", "img": "LONGBLOB"}
                       
     @property
     def table_name (self):
@@ -170,17 +237,6 @@ class ImgSnapshotHelper(object):
     def create_command(self):
         """Generate SQL CREATE TABLE command for image snapshots."""
         return ",".join([ "%s %s" % (key, self._table_headers[key]) for key in self._table_headers])
-    
-    def __init__(self, period=IMG_SNAPSHOT_DEFAULT_PERIOD):
-        """
-        Initialize the image snapshot helper.
-        
-        Args:
-            period (float): Snapshot interval in seconds (default: 300s/5min)
-        """
-        self._period = period
-        self._last_tick = 0
-        self._tmp_file = tempfile.mktemp(prefix="ethoscope_", suffix=".jpg")
         
     def __del__(self):
         """Cleanup temporary file on object destruction."""
@@ -206,9 +262,16 @@ class ImgSnapshotHelper(object):
         imwrite(self._tmp_file, img, [int(IMWRITE_JPEG_QUALITY), 50])
         with open(self._tmp_file, "rb") as f:
                 bstring = f.read()
-                
-        cmd = 'INSERT INTO ' + self._table_name + '(id,t,img) VALUES (%s,%s,%s)'
-        args = (0, int(t), bstring)
+        
+        if self._database_type == "SQLite3":
+            # For SQLite, don't specify ID - let AUTOINCREMENT handle it
+            cmd = 'INSERT INTO ' + self._table_name + '(t,img) VALUES (?,?)'
+            args = (int(t), bstring)
+        else:
+            # For MySQL, explicit ID=0 is fine (will be auto-incremented)
+            cmd = 'INSERT INTO ' + self._table_name + '(id,t,img) VALUES (%s,%s,%s)'
+            args = (0, int(t), bstring)
+            
         self._last_tick = tick
         return cmd, args
         
@@ -827,14 +890,14 @@ class BaseResultWriter(object):
         else:
             self._dam_file_helper = None
         if take_frame_shots:
-            self._shot_saver = ImgSnapshotHelper()
+            self._shot_saver = ImgSnapshotHelper(database_type=self._database_type)
         else:
             self._shot_saver = None
         self._insert_dict = {}
         if self._metadata is None:
             self._metadata = {}
         if sensor is not None:
-            self._sensor_saver = SensorDataHelper(sensor)
+            self._sensor_saver = SensorDataHelper(sensor, database_type=self._database_type)
             logging.info("Creating connection to a sensor to store its data in the db")
         else:
             self._sensor_saver = None
@@ -1243,7 +1306,7 @@ class SQLiteResultWriter(BaseResultWriter):
     - Automatic placeholder conversion from MySQL (%s) to SQLite (?)
     """
     _description = {
-        "overview": "SQLite result writer - stores tracking data to local SQLite database file using consistent directory structure. Each experiment creates a unique file, preserving historical data. Compatible with rsync-based backups.",
+        "overview": "SQLite result writer - stores tracking data to local SQLite database file using consistent directory structure. Each experiment creates a unique file, preserving historical data. Compatible with rsync-based backups. Supports sensor data collection when sensors are available.",
         "arguments": [
             {"name": "take_frame_shots", "description": "Save periodic frame snapshots", "type": "boolean", "default": True},
             {"name": "make_dam_like_table", "description": "Create DAM-compatible activity summary table", "type": "boolean", "default": False}
@@ -1255,21 +1318,19 @@ class SQLiteResultWriter(BaseResultWriter):
     _null = Null()
     
     def __init__(self, db_credentials, rois, metadata=None, make_dam_like_table=False, 
-                 take_frame_shots=False, db_host="localhost", *args, **kwargs):
+                 take_frame_shots=False, db_host="localhost", sensor=None, *args, **kwargs):
         """
         Initialize SQLite result writer.
         
         Note: DAM-like tables are disabled by default for SQLite.
         Args:
             db_host: Ignored for SQLite (file-based), kept for compatibility
+            sensor: Optional sensor object for environmental data collection
         """
         # SQLite-specific parameter overrides
         # Remove any conflicting arguments from kwargs to avoid duplicate argument errors
         kwargs.pop('erase_old_db', None)
-        kwargs.pop('sensor', None)
         
-        # SQLite doesn't support sensors yet
-        sensor = None
         # SQLite databases are unique per experiment, don't erase them
         erase_old_db = False
         
@@ -1427,7 +1488,10 @@ class SQLiteResultWriter(BaseResultWriter):
             # SQLite-compatible version of image snapshots table
             self._create_table("IMG_SNAPSHOTS", "id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER, img BLOB")
 
-        # Note: SQLite doesn't support sensors yet, so we skip SENSORS table
+        if self._sensor_saver is not None:
+            logging.info("Creating table for SENSORS data")
+            # SensorDataHelper handles SQLite-compatible field generation
+            self._create_table(self._sensor_saver.table_name, self._sensor_saver.create_command)
 
         if self._dam_file_helper is not None:
             logging.info("Creating 'CSV_DAM_ACTIVITY' table")
