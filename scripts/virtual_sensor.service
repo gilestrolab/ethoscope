@@ -5,8 +5,8 @@ Wants=network.target
 
 [Service]
 Type=simple
-User=ethoscope
-Group=ethoscope
+User=node
+Group=node
 ExecStart=/usr/bin/python3 /opt/ethoscope/accessories/etho_sensor/virtual_sensor.py --conf /etc/ethoscope/config_virtual_sensor.json
 WorkingDirectory=/opt/ethoscope/accessories/etho_sensor
 Restart=always
