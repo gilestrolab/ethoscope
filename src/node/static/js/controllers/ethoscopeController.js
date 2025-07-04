@@ -107,20 +107,43 @@
             }
         };
         
-        // Update dateRangeOptions when moment.js becomes available
-        function updateDateRangeOptions() {
-            if (typeof moment !== 'undefined') {
-                // Ensure moment.js is in default locale to avoid conflicts
+        // Centralized moment.js locale configuration
+        var momentLocaleConfigured = false;
+        
+        function ensureMomentLocale() {
+            if (typeof moment !== 'undefined' && moment.locale && !momentLocaleConfigured) {
                 moment.locale('en');
+                momentLocaleConfigured = true;
+                console.log('Moment.js locale configured to: en');
+            }
+            return momentLocaleConfigured;
+        }
+        
+        // Update dateRangeOptions when moment.js becomes available
+        var momentCheckAttempts = 0;
+        var maxMomentCheckAttempts = 50; // Max 5 seconds (50 * 100ms)
+        
+        function updateDateRangeOptions() {
+            if (typeof moment !== 'undefined' && moment.locale) {
+                // Ensure moment.js locale is configured
+                ensureMomentLocale();
                 $scope.dateRangeOptions.minDate = moment();
                 // Force Angular to update the view
                 if (!$scope.$$phase) {
                     $scope.$apply();
                 }
-                console.log('Date range picker updated with moment.js (locale: en)');
+                console.log('Date range picker updated with moment.js');
+                return; // Exit successfully
             } else {
-                // Retry after a short delay if moment isn't ready yet
-                setTimeout(updateDateRangeOptions, 100);
+                momentCheckAttempts++;
+                if (momentCheckAttempts < maxMomentCheckAttempts) {
+                    // Retry after a short delay if moment isn't ready yet
+                    setTimeout(updateDateRangeOptions, 100);
+                } else {
+                    console.warn('Moment.js not available after ' + maxMomentCheckAttempts + ' attempts. Using fallback date configuration.');
+                    // Fallback to native Date for minDate
+                    $scope.dateRangeOptions.minDate = new Date();
+                }
             }
         }
         
@@ -310,13 +333,28 @@
 
                             if (argument.type === 'datetime') {
                                 // Handle datetime arguments with moment.js formatting
-                                // Ensure moment is using consistent locale
                                 if (typeof moment !== 'undefined') {
-                                    moment.locale('en');
-                                    $scope.selected_options[optionType][name].arguments[argument.name] = [
-                                        moment(argument.default).format('LLLL'),
-                                        argument.default
-                                    ];
+                                    // Ensure moment.js locale is configured
+                                    ensureMomentLocale();
+                                    
+                                    // Validate the default value before using it
+                                    var defaultValue = argument.default;
+                                    var momentObj = moment(defaultValue);
+                                    
+                                    if (momentObj.isValid()) {
+                                        $scope.selected_options[optionType][name].arguments[argument.name] = [
+                                            momentObj.format('LLLL'),
+                                            defaultValue
+                                        ];
+                                    } else {
+                                        // Use current time if default is invalid
+                                        var fallbackMoment = moment();
+                                        $scope.selected_options[optionType][name].arguments[argument.name] = [
+                                            fallbackMoment.format('LLLL'),
+                                            fallbackMoment.unix()
+                                        ];
+                                        console.warn('Invalid datetime default value for ' + argument.name + ':', defaultValue, 'Using current time instead.');
+                                    }
                                 } else {
                                     // Fallback if moment isn't available
                                     $scope.selected_options[optionType][name].arguments[argument.name] = argument.default;
