@@ -8,8 +8,8 @@ from uuid import uuid4
 import netifaces
 import git
 
-from ethoscope.utils.rpi_bad_power import new_under_voltage
-from ethoscope.hardware.interfaces.interfaces import connectedUSB, SimpleSerialInterface
+from ethoscope.utils.rpi_bad_power import powerChecker
+
 
 PERSISTENT_STATE = "/var/cache/ethoscope/persistent_state.pkl"
 
@@ -540,7 +540,7 @@ def underPowered():
     Return true if the PI is underpowered, false otherwise
     Code from rpi-bad-power https://github.com/shenxn/rpi-bad-power
     '''
-    under_voltage = new_under_voltage()
+    under_voltage = powerChecker()
     if under_voltage is None:
         return None
     else:
@@ -685,29 +685,3 @@ def loggingStatus( status = None ):
             return loggingStatus()
         except:
             return -1
-
-def getModuleCapabilities(test=False, shallow=False, command=""):
-    '''
-    Tries to get information regarding a possible attached Module
-    '''
-
-    _, found = connectedUSB()
-
-    if shallow and found:
-        found.update({'Smart' : False, 'Connected' : True})
-        return found
-    
-    if found or 'noUSB' in found:
-
-        try:
-            device = SimpleSerialInterface()
-            dev_info = device.interrogate(test=test, command=command)
-            dev_info.update({'Smart' : True, 'Connected' : True})
-            return dev_info
-
-        except:
-            found = False if 'noUSB' in found else found
-            return {'Error': 'A known device is connected but could not open a connection with it.', 'found' : found, 'Smart' : False, 'Connected' : True}
-
-    else:
-            return {'Error': 'No known device is connected.', 'Smart' : False, 'Connected' : False}

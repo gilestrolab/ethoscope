@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The ethoscope platform is a distributed system for automated behavioral monitoring of small model organisms. It consists of two main packages:
 
-### Device Package (`src/`)
+### Device Package (`src/node`)
 The core ethoscope software that runs on individual Raspberry Pi devices. Key components:
 - **`ethoscope.core`**: Monitor, ROI, and tracking unit abstractions
 - **`ethoscope.trackers`**: Computer vision algorithms (AdaptiveBGModel, etc.)
@@ -15,7 +15,7 @@ The core ethoscope software that runs on individual Raspberry Pi devices. Key co
 - **`ethoscope.web_utils.control_thread`**: Main device control loop and web API
 - **`scripts/device_server.py`**: Web server providing device control interface
 
-### Node Server (`node_src/`)
+### Node Server (`src/ethoscope`)
 Central coordination server with Python backend and Angular frontend:
 - **`ethoscope_node.utils`**: Device scanning, backup management, database operations
 - **`scripts/server.py`**: Main node web server (Bottle framework)
@@ -97,3 +97,7 @@ Both tracking and recording use `OrderedDict` for consistent form ordering:
 - **Camera modules**: PiCamera or USB cameras via V4L2
 - **GPIO interfaces**: For stimulators and sensors
 - **MySQL/MariaDB**: Data storage on devices
+
+
+## Local development
+- use `source /home/gg/Data/virtual_envs/python/ethoscope/bin/activate`

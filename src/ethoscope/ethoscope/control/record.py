@@ -1,7 +1,7 @@
 import traceback
 import logging
 import time
-from ethoscope.web_utils.control_thread import ControlThread, ExperimentalInformation
+from ethoscope.control.tracking import ControlThread, ExperimentalInformation
 from ethoscope.utils.description import DescribedObject
 from ethoscope.hardware.input.cameras import V4L2Camera, OurPiCameraAsync
 import tempfile

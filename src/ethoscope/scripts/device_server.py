@@ -17,10 +17,12 @@ import netifaces as ni
 from zeroconf import ServiceInfo, Zeroconf
 
 from ethoclient import send_command, listenerIsAlive
-from ethoscope.web_utils.control_thread import ControlThread
-from ethoscope.web_utils.record import ControlThreadVideoRecording
-from ethoscope.web_utils.helpers import *
+from ethoscope.control.tracking import ControlThread
+from ethoscope.control.record import ControlThreadVideoRecording
+
+from ethoscope.utils import pi
 from ethoscope.utils.video_utils import list_local_video_files
+from ethoscope.hardware.interfaces import interfaces
 
 try:
     from cheroot.wsgi import Server as WSGIServer
@@ -167,7 +169,7 @@ def rm_static_file(id):
     if id != _MACHINE_ID:
         raise WrongMachineID
 
-    if file_in_dir_r( file_to_del, _ETHOSCOPE_DIR ):
+    if pi.file_in_dir_r( file_to_del, _ETHOSCOPE_DIR ):
         os.remove(file_to_del)
     else:
         msg = "Could not delete file %s. It is not allowed to remove files outside of %s" % ( file_to_del, _ETHOSCOPE_DIR )
@@ -229,38 +231,38 @@ def update_machine_info(id):
     update_machine_json_data.update(data['machine_options']['arguments'])
     
     if 'node_ip' in update_machine_json_data and update_machine_json_data['node_ip'] != machine_info['etc_node_ip']:
-        set_etc_hostname(update_machine_json_data['node_ip'])
+        pi.set_etc_hostname(update_machine_json_data['node_ip'])
         haschanged = True
     
     if 'etho_number' in update_machine_json_data and int(update_machine_json_data['etho_number']) != int(machine_info['machine-number']):
-        set_machine_name(update_machine_json_data['etho_number'])
-        set_machine_id(update_machine_json_data['etho_number'])
+        pi.set_machine_name(update_machine_json_data['etho_number'])
+        pi.set_machine_id(update_machine_json_data['etho_number'])
 
         if 'useSTATIC' in update_machine_json_data:
-            set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'], useSTATIC=update_machine_json_data['useSTATIC'])
+            pi.set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'], useSTATIC=update_machine_json_data['useSTATIC'])
         
         haschanged = True
     
     if 'ESSID' in update_machine_json_data and 'Key' in update_machine_json_data and (update_machine_json_data['ESSID'] != machine_info['WIFI_SSID'] or update_machine_json_data['Key'] != machine_info['WIFI_PASSWORD']):
-        set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'])
+        pi.set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'])
         haschanged = True
 
     if 'useSTATIC' in update_machine_json_data and update_machine_json_data['useSTATIC'] != machine_info['useSTATIC']:
-        set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'], useSTATIC=update_machine_json_data['useSTATIC'])
+        pi.set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'], useSTATIC=update_machine_json_data['useSTATIC'])
         haschanged = True
 
     if 'isexperimental' in update_machine_json_data and update_machine_json_data['isexperimental'] != machine_info['isExperimental']:
-        isExperimental(update_machine_json_data['isexperimental'])
+        pi.isExperimental(update_machine_json_data['isexperimental'])
         haschanged = True
 
     if 'remoteLogging' in update_machine_json_data and update_machine_json_data['remoteLogging'] != machine_info['remoteLogging']:
-        loggingStatus(update_machine_json_data['remoteLogging'])
+        pi.loggingStatus(update_machine_json_data['remoteLogging'])
         haschanged = True
     
     #Time comes as number of milliseconds from timestamp
     if 'datetime' in update_machine_json_data and update_machine_json_data['datetime']:
         tn = datetime.datetime.fromtimestamp(update_machine_json_data['datetime'])
-        set_datetime(tn)
+        pi.set_datetime(tn)
         
 
     return {"haschanged": haschanged}
@@ -314,7 +316,7 @@ def controls(id, action):
 
     elif action == 'test_module':
         logging.info("Sending a test command to the connected module.")
-        module_info = getModuleCapabilities(test=True)
+        module_info = interfaces.getModuleCapabilities(test=True)
         return info(id)
                 
     else:
@@ -362,13 +364,13 @@ def get_machine_info(id):
     machine_info['node_ip'] = bottle.request.environ.get('HTTP_X_FORWARDED_FOR') or bottle.request.environ.get('REMOTE_ADDR')
     
     try:
-        machine_info['etc_node_ip'] = get_etc_hostnames()[NODE]
+        machine_info['etc_node_ip'] = pi.get_etc_hostnames()[NODE]
     except:
         machine_info['etc_node_ip'] = "not set"
 
     machine_info['knows_node_ip'] = ( machine_info['node_ip'] == machine_info['etc_node_ip'] )
     machine_info['hostname'] = os.uname()[1]
-    machine_info['isExperimental'] = isExperimental()
+    machine_info['isExperimental'] = pi.isExperimental()
     
     machine_info['machine-name'] = _MACHINE_NAME
     
@@ -380,34 +382,34 @@ def get_machine_info(id):
         
     machine_info['machine-id'] = _MACHINE_ID
     machine_info['kernel'] = os.uname()[2]
-    machine_info['pi_version'] = pi_version()
-    machine_info['camera'] = getPiCameraVersion()
+    machine_info['pi_version'] = pi.pi_version()
+    machine_info['camera'] = pi.getPiCameraVersion()
 
     try:
-        machine_info['WIFI_SSID'] = get_WIFI()['ESSID']
+        machine_info['WIFI_SSID'] = pi.get_WIFI()['ESSID']
     except: 
         machine_info['WIFI_SSID'] = "not set"
 
     try:    
-        machine_info['WIFI_PASSWORD'] = get_WIFI()['Key']
+        machine_info['WIFI_PASSWORD'] = pi.get_WIFI()['Key']
     except:
         machine_info['WIFI_PASSWORD'] = "not set"
 
     try:
-        machine_info['useSTATIC'] = (get_WIFI()['IP'].strip().upper() == 'STATIC')
+        machine_info['useSTATIC'] = (pi.get_WIFI()['IP'].strip().upper() == 'STATIC')
     except:
         machine_info['useSTATIC'] = False
 
     try:
-        machine_info['remoteLogging'] = loggingStatus()
+        machine_info['remoteLogging'] = pi.loggingStatus()
     except:
         machine_info['remoteLogging'] = False
 
-    machine_info['SD_CARD_AGE'] = get_SD_CARD_AGE()
-    machine_info['partitions'] = get_partition_info()
-    machine_info['SD_CARD_NAME'] = get_SD_CARD_NAME()
+    machine_info['SD_CARD_AGE'] = pi.get_SD_CARD_AGE()
+    machine_info['partitions'] = pi.get_partition_info()
+    machine_info['SD_CARD_NAME'] = pi.get_SD_CARD_NAME()
 
-    machine_info['Module'] = getModuleCapabilities(shallow=True)
+    machine_info['Module'] = interfaces.getModuleCapabilities(shallow=True)
 
     return machine_info
 
@@ -422,7 +424,7 @@ def connectedModule(id):
         raise WrongMachineID
     
     else:
-        return getModuleCapabilities(test=False)
+        return interfaces.getModuleCapabilities(test=False)
 
 
 
@@ -456,8 +458,8 @@ def info(id):
         raise WrongMachineID
 
     runninginfo = send_command('info')
-    runninginfo.update ( { "CPU_temp" : get_core_temperature(), 
-                           "underpowered" : underPowered(),
+    runninginfo.update ( { "CPU_temp" : pi.get_core_temperature(), 
+                           "underpowered" : pi.underPowered(),
                            "current_timestamp" : bottle.time.time() } )
         
     # except:
@@ -580,9 +582,9 @@ if __name__ == '__main__':
         logging.getLogger().setLevel(logging.DEBUG)
         logging.info("Logging using DEBUG SETTINGS")
 
-    _MACHINE_ID = get_machine_id()
-    _MACHINE_NAME = get_machine_name()
-    _GIT_VERSION = get_git_version()
+    _MACHINE_ID = pi.get_machine_id()
+    _MACHINE_NAME = pi.get_machine_name()
+    _GIT_VERSION = pi.get_git_version()
     
     _ETHOSCOPE_DIR = '/ethoscope_data'
     _ETHOSCOPE_UPLOAD = os.path.join(_ETHOSCOPE_DIR, 'upload')

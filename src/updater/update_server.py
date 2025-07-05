@@ -512,9 +512,9 @@ if __name__ == '__main__':
 
     else:
         is_node = False
-        from ethoscope.web_utils.helpers import get_machine_id
+        from ethoscope.utils import pi
         bare_repo_updater = None
-        device_id = get_machine_id()
+        device_id = pi.get_machine_id()
 
     try:
         # Use cheroot server (modern replacement for cherrypy)

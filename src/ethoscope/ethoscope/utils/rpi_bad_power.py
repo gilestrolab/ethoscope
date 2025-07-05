@@ -75,7 +75,7 @@ class UnderVoltageLegacy(UnderVoltage):
         )
 
 
-def new_under_voltage() -> Optional[UnderVoltage]:
+def powerChecker() -> Optional[UnderVoltage]:
     """Create new UnderVoltage object."""
     hwmon = get_rpi_volt_hwmon()
     if hwmon:

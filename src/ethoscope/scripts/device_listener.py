@@ -36,9 +36,9 @@ __author__ = 'giorgio'
 import logging
 import traceback
 from optparse import OptionParser
-from ethoscope.web_utils.control_thread import ControlThread
-from ethoscope.web_utils.record import ControlThreadVideoRecording
-from ethoscope.web_utils.helpers import get_machine_id, get_machine_name, get_git_version, was_interrupted, PERSISTENT_STATE, getModuleCapabilities
+from ethoscope.control.tracking import ControlThread
+from ethoscope.control.record import ControlThreadVideoRecording
+from ethoscope.utils import pi
 
 import json
 import socket
@@ -233,8 +233,8 @@ class commandingThread(threading.Thread):
         elif action == 'remove' and self.control.info['status'] not in ['running', 'recording', 'streaming']:
             logging.info("Removing persistent file.")
             try:
-                if os.path.exists(PERSISTENT_STATE):
-                    os.remove(PERSISTENT_STATE)
+                if os.path.exists(pi.PERSISTENT_STATE):
+                    os.remove(pi.PERSISTENT_STATE)
                     return "The persistent file was succesfully removed"
                 else:
                     return "The persistent file does not exist"
@@ -250,11 +250,11 @@ class commandingThread(threading.Thread):
 
         elif action == 'test_module' and not data:
             logging.info("Sending the test command to the connected module")
-            return getModuleCapabilities(test=True)
+            return pi.getModuleCapabilities(test=True)
 
         elif action == 'test_module' and data:
             logging.info("Restarting the ethoscope device service")
-            return getModuleCapabilities(command=data['command'])
+            return pi.getModuleCapabilities(command=data['command'])
 
         else:
             #raise Exception("No such command: %s. Available commands are info, status, start, stop, start_record, stream " % action)
@@ -288,9 +288,9 @@ if __name__ == '__main__':
     # Calculate subdirectories from root ethoscope directory
     ethoscope_root = option_dict['ethoscope_dir']
    
-    ethoscope_info = { 'MACHINE_ID' : get_machine_id(),
-      'MACHINE_NAME' : get_machine_name(),
-      'GIT_VERSION' : get_git_version(),
+    ethoscope_info = { 'MACHINE_ID' : pi.get_machine_id(),
+      'MACHINE_NAME' : pi.get_machine_name(),
+      'GIT_VERSION' : pi.get_git_version(),
       'ETHOSCOPE_DIR' : ethoscope_root,
       'ETHOSCOPE_VIDEOS_DIR' : os.path.join(ethoscope_root, 'videos'),
       'ETHOSCOPE_TRACKING_DIR' : os.path.join(ethoscope_root, 'tracking'),
@@ -308,7 +308,7 @@ if __name__ == '__main__':
     ethoscope.start()
     logging.info ('Ethoscope controlling server started and listening')
 
-    if option_dict["run"] or was_interrupted():
+    if option_dict["run"] or pi.was_interrupted():
         
         if option_dict["record_video"]:
             ethoscope.action( 'start_record' )

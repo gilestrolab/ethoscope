@@ -89,7 +89,7 @@ from . import stimulators
 from . import roi_builders
 from . import trackers
 from . import utils
-from . import web_utils
+from . import control
 
 
 

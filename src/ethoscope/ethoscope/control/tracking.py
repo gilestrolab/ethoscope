@@ -33,7 +33,7 @@ from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulat
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import MySQLResultWriter, SQLiteResultWriter, DatabaseMetadataCache
 from ethoscope.utils.description import DescribedObject
-from ethoscope.web_utils.helpers import *
+from ethoscope.utils import pi
 
 class ExperimentalInformation(DescribedObject):
     
@@ -118,7 +118,7 @@ class ControlThread(Thread):
     
     #some classes do not need to be offered as choices to the user in normal conditions
     #these are shown only if the machine is not a PI
-    _is_a_rPi = isMachinePI() and hasPiCamera() and not isExperimental()
+    _is_a_rPi = pi.isMachinePI() and pi.hasPiCamera() and not pi.isExperimental()
     _hidden_options = {'camera', 'tracker'}  # result_writer is now always available
     
     for k in _option_dict:
@@ -132,7 +132,7 @@ class ControlThread(Thread):
 
     #give the database an ethoscope specific name
     #future proof in case we want to use a remote server
-    _db_credentials = {"name": "%s_db" % get_machine_name(),
+    _db_credentials = {"name": "%s_db" % pi.get_machine_name(),
                       "user": "ethoscope",
                       "password": "ethoscope"}
 
@@ -144,7 +144,7 @@ class ControlThread(Thread):
                             "fps":0
                             }
 
-    _persistent_state_file = PERSISTENT_STATE
+    _persistent_state_file = pi.PERSISTENT_STATE
     _last_run_info = '/var/run/last_run.ethoscope'
 
     def __init__(self, machine_id, name, version, ethoscope_dir, data=None, *args, **kwargs):
@@ -203,7 +203,7 @@ class ControlThread(Thread):
                         "id": machine_id,
                         "name": name,
                         "version": version,
-                        "used_space" : get_partition_info(ethoscope_dir)['Use%'].replace("%","")
+                        "used_space" : pi.get_partition_info(ethoscope_dir)['Use%'].replace("%","")
                         }
         self._monit = None
 
@@ -245,11 +245,11 @@ class ControlThread(Thread):
         This is information about the ethoscope that is not changing in time such as hardware specs and configuration parameters
         """
         return { 'kernel'      : os.uname()[2],
-                 'pi_version'  : pi_version(),
-                 'camera'      : getPiCameraVersion(),
-                 'SD_CARD_AGE' : get_SD_CARD_AGE(),
-                 'partitions'  : get_partition_info(),
-                 'SD_CARD_NAME':  get_SD_CARD_NAME()  }
+                 'pi_version'  : pi.pi_version(),
+                 'camera'      : pi.getPiCameraVersion(),
+                 'SD_CARD_AGE' : pi.get_SD_CARD_AGE(),
+                 'partitions'  : pi.get_partition_info(),
+                 'SD_CARD_NAME':  pi.get_SD_CARD_NAME()  }
 
 
 
@@ -269,16 +269,16 @@ class ControlThread(Thread):
         for key, value in list(self._option_dict.items()):
             # check if the options for the remote class will be visible
             # they will be visible only if they have a description, and if we are on a PC or they are not hidden
-            if key not in self._hidden_options or isExperimental() or not self._is_a_rPi:
+            if key not in self._hidden_options or pi.isExperimental() or not self._is_a_rPi:
                 out[key] = []
                 for p in value["possible_classes"]:
                     try:
-                        if isExperimental():
+                        if pi.isExperimental():
                             d = p.__dict__["_description"]
                             d["name"] = p.__name__
                             out[key].append(d)
                             
-                        elif not isExperimental() and 'hidden' not in p.__dict__['_description'] or not p.__dict__['_description']['hidden']:
+                        elif not pi.isExperimental() and 'hidden' not in p.__dict__['_description'] or not p.__dict__['_description']['hidden']:
                             d = p.__dict__["_description"]
                             d["name"] = p.__name__
                             out[key].append(d)
