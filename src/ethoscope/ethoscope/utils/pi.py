@@ -685,3 +685,183 @@ def loggingStatus( status = None ):
             return loggingStatus()
         except:
             return -1
+
+
+def check_disk_space(ethoscope_dir, threshold_percent=85):
+    """
+    Check disk space usage for the partition containing ethoscope_dir.
+    
+    Args:
+        ethoscope_dir (str): Path to ethoscope data directory
+        threshold_percent (int): Threshold percentage for cleanup trigger
+        
+    Returns:
+        dict: {'usage_percent': float, 'available_gb': float, 'needs_cleanup': bool}
+    """
+    try:
+        partition_info = get_partition_info(ethoscope_dir)
+        if not partition_info:
+            return {'usage_percent': 0, 'available_gb': 0, 'needs_cleanup': False, 'error': 'Cannot get partition info'}
+        
+        # Extract usage percentage (format: "85%" -> 85)
+        usage_str = partition_info.get('Use%', '0%')
+        usage_percent = float(usage_str.rstrip('%'))
+        
+        # Extract available space (format: "1.2G" -> 1.2)
+        available_str = partition_info.get('Avail', '0')
+        available_gb = 0
+        if available_str.endswith('G'):
+            available_gb = float(available_str[:-1])
+        elif available_str.endswith('M'):
+            available_gb = float(available_str[:-1]) / 1024
+        elif available_str.endswith('K'):
+            available_gb = float(available_str[:-1]) / (1024 * 1024)
+        
+        needs_cleanup = usage_percent >= threshold_percent
+        
+        return {
+            'usage_percent': usage_percent,
+            'available_gb': available_gb,
+            'needs_cleanup': needs_cleanup
+        }
+        
+    except Exception as e:
+        logging.error(f"Error checking disk space: {e}")
+        return {'usage_percent': 0, 'available_gb': 0, 'needs_cleanup': False, 'error': str(e)}
+
+
+def cleanup_old_data(ethoscope_dir, max_age_days=60, dry_run=False):
+    """
+    Clean up old data files from videos and tracking directories.
+    
+    Args:
+        ethoscope_dir (str): Path to ethoscope data directory
+        max_age_days (int): Delete files older than this many days
+        dry_run (bool): If True, only simulate cleanup without deleting
+        
+    Returns:
+        dict: Summary of cleanup actions
+    """
+    import glob
+    
+    cleanup_summary = {
+        'files_deleted': 0,
+        'space_freed_mb': 0,
+        'errors': [],
+        'deleted_files': []
+    }
+    
+    try:
+        # Define data directories to clean
+        data_dirs = [
+            os.path.join(ethoscope_dir, 'videos'),
+            os.path.join(ethoscope_dir, 'tracking')
+        ]
+        
+        # Calculate cutoff time (files older than this will be deleted)
+        cutoff_time = time.time() - (max_age_days * 24 * 60 * 60)
+        
+        # Collect all files with their modification times
+        files_to_check = []
+        for data_dir in data_dirs:
+            if os.path.exists(data_dir):
+                # Look for common ethoscope file patterns
+                patterns = ['*.db', '*.h264', '*.mp4', '*.avi', '*.sql', '*.log']
+                for pattern in patterns:
+                    for file_path in glob.glob(os.path.join(data_dir, '**', pattern), recursive=True):
+                        try:
+                            mtime = os.path.getmtime(file_path)
+                            file_size = os.path.getsize(file_path)
+                            files_to_check.append((file_path, mtime, file_size))
+                        except OSError as e:
+                            cleanup_summary['errors'].append(f"Cannot access {file_path}: {e}")
+        
+        # Sort files by modification time (oldest first)
+        files_to_check.sort(key=lambda x: x[1])
+        
+        # Delete old files
+        for file_path, mtime, file_size in files_to_check:
+            if mtime < cutoff_time:
+                try:
+                    if not dry_run:
+                        os.remove(file_path)
+                        logging.info(f"Deleted old file: {file_path}")
+                    else:
+                        logging.info(f"Would delete: {file_path}")
+                    
+                    cleanup_summary['files_deleted'] += 1
+                    cleanup_summary['space_freed_mb'] += file_size / (1024 * 1024)
+                    cleanup_summary['deleted_files'].append(file_path)
+                    
+                except OSError as e:
+                    cleanup_summary['errors'].append(f"Cannot delete {file_path}: {e}")
+                    logging.error(f"Failed to delete {file_path}: {e}")
+        
+        action = "Would delete" if dry_run else "Deleted"
+        logging.info(f"{action} {cleanup_summary['files_deleted']} old files, "
+                    f"freed {cleanup_summary['space_freed_mb']:.2f} MB")
+        
+    except Exception as e:
+        error_msg = f"Error during cleanup: {e}"
+        cleanup_summary['errors'].append(error_msg)
+        logging.error(error_msg)
+    
+    return cleanup_summary
+
+
+def manage_disk_space(ethoscope_dir, threshold_percent=85, max_age_days=60):
+    """
+    Manage disk space by checking usage and cleaning up old files if needed.
+    
+    Args:
+        ethoscope_dir (str): Path to ethoscope data directory  
+        threshold_percent (int): Disk usage percentage that triggers cleanup
+        max_age_days (int): Delete files older than this many days
+        
+    Returns:
+        dict: Summary of space management actions
+    """
+    try:
+        # Check current disk space
+        space_info = check_disk_space(ethoscope_dir, threshold_percent)
+        
+        if 'error' in space_info:
+            logging.warning(f"Disk space check failed: {space_info['error']}")
+            return {'status': 'error', 'details': space_info}
+        
+        result = {
+            'status': 'checked',
+            'usage_percent': space_info['usage_percent'],
+            'available_gb': space_info['available_gb'],
+            'cleanup_performed': False
+        }
+        
+        if space_info['needs_cleanup']:
+            logging.warning(f"Disk usage at {space_info['usage_percent']:.1f}%, "
+                          f"triggering cleanup of files older than {max_age_days} days")
+            
+            # Perform cleanup
+            cleanup_result = cleanup_old_data(ethoscope_dir, max_age_days, dry_run=False)
+            result['cleanup_performed'] = True
+            result['cleanup_summary'] = cleanup_result
+            
+            # Check space again after cleanup
+            new_space_info = check_disk_space(ethoscope_dir, threshold_percent)
+            if 'error' not in new_space_info:
+                result['usage_after_cleanup'] = new_space_info['usage_percent']
+                result['available_after_cleanup'] = new_space_info['available_gb']
+                
+                if cleanup_result['files_deleted'] > 0:
+                    logging.info(f"Cleanup completed: freed {cleanup_result['space_freed_mb']:.2f} MB, "
+                               f"disk usage now {new_space_info['usage_percent']:.1f}%")
+                else:
+                    logging.warning("No files were eligible for cleanup")
+        else:
+            logging.debug(f"Disk usage at {space_info['usage_percent']:.1f}%, no cleanup needed")
+        
+        return result
+        
+    except Exception as e:
+        error_msg = f"Error in disk space management: {e}"
+        logging.error(error_msg)
+        return {'status': 'error', 'details': error_msg}

@@ -179,6 +179,14 @@ class ControlThread(Thread):
         except OSError:
             pass
 
+        # Manage disk space before starting experiment
+        try:
+            space_result = pi.manage_disk_space(ethoscope_dir)
+            if space_result.get('cleanup_performed', False):
+                logging.info(f"Disk space cleanup completed: {space_result.get('cleanup_summary', {}).get('files_deleted', 0)} files removed")
+        except Exception as e:
+            logging.warning(f"Disk space management failed, continuing anyway: {e}")
+
         self._tmp_dir = tempfile.mkdtemp(prefix="ethoscope_")
         
         # Database metadata tracking

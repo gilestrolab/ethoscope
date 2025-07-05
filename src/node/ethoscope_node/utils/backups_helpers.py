@@ -801,6 +801,302 @@ class VideoBackupClass(BaseBackupClass):
             return None
 
 
+class UnifiedRsyncBackupClass(BaseBackupClass):
+    """Unified rsync-based backup class for both results (databases) and videos."""
+    
+    DEFAULT_PORT = 9000
+    REQUEST_TIMEOUT = 30
+    
+    def __init__(self, device_info: Dict, results_dir: str, videos_dir: str = None, 
+                 backup_results: bool = True, backup_videos: bool = True):
+        super().__init__(device_info, results_dir)
+        self._port = self.DEFAULT_PORT
+        self._device_url = f"http://{self._ip}:{self._port}"
+        
+        # Directory configuration
+        self._results_dir = results_dir
+        self._videos_dir = videos_dir or results_dir.replace('/results/', '/videos/')
+        
+        # Backup selection
+        self._backup_results = backup_results
+        self._backup_videos = backup_videos
+        
+        # Ensure at least one backup type is selected
+        if not (self._backup_results or self._backup_videos):
+            raise ValueError("At least one of backup_results or backup_videos must be True")
+    
+    def backup(self) -> Iterator[str]:
+        """
+        Performs unified rsync backup for both results and videos.
+        
+        Yields:
+            str: JSON-encoded status messages with detailed progress updates
+        """
+        import subprocess
+        import re
+        
+        start_time = time.time()
+        try:
+            self._logger.info(f"[{self._device_id}] === UNIFIED RSYNC BACKUP STARTING ===")
+            backup_types = []
+            if self._backup_results:
+                backup_types.append("results")
+            if self._backup_videos:
+                backup_types.append("videos")
+            
+            yield self._yield_status("info", f"Unified rsync backup initiated for {', '.join(backup_types)} on device {self._device_id}")
+            
+            # Get SSH key path for authentication
+            private_key_path, _ = ensure_ssh_keys()
+            
+            total_operations = len(backup_types)
+            completed_operations = 0
+            
+            # Backup results (databases) if requested
+            if self._backup_results:
+                yield self._yield_status("info", f"Starting results backup ({completed_operations + 1}/{total_operations})")
+                success = yield from self._rsync_directory(
+                    source_dir="/ethoscope_data/results/",
+                    destination_dir=self._results_dir,
+                    private_key_path=private_key_path,
+                    operation_name="results"
+                )
+                if not success:
+                    yield self._yield_status("error", "Results backup failed")
+                    return False
+                completed_operations += 1
+            
+            # Backup videos if requested
+            if self._backup_videos:
+                yield self._yield_status("info", f"Starting videos backup ({completed_operations + 1}/{total_operations})")
+                success = yield from self._rsync_directory(
+                    source_dir="/ethoscope_data/videos/",
+                    destination_dir=self._videos_dir,
+                    private_key_path=private_key_path,
+                    operation_name="videos"
+                )
+                if not success:
+                    yield self._yield_status("error", "Videos backup failed")
+                    return False
+                completed_operations += 1
+            
+            elapsed_time = time.time() - start_time
+            self._logger.info(f"[{self._device_id}] === UNIFIED RSYNC BACKUP COMPLETED SUCCESSFULLY in {elapsed_time:.1f}s ===")
+            yield self._yield_status("success", f"Unified backup completed successfully in {elapsed_time:.1f}s")
+            return True
+            
+        except Exception as e:
+            elapsed_time = time.time() - start_time
+            error_msg = f"Unexpected error during unified backup for device {self._device_id} after {elapsed_time:.1f}s: {e}"
+            self._logger.error(f"[{self._device_id}] {error_msg}")
+            self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
+            yield self._yield_status("error", error_msg)
+            return False
+    
+    def _rsync_directory(self, source_dir: str, destination_dir: str, 
+                        private_key_path: str, operation_name: str) -> Iterator[bool]:
+        """
+        Perform rsync for a specific directory.
+        
+        Args:
+            source_dir: Source directory on ethoscope (e.g., "/ethoscope_data/results/")
+            destination_dir: Destination directory on node
+            private_key_path: Path to SSH private key
+            operation_name: Name for logging ("results" or "videos")
+            
+        Yields:
+            str: Progress status messages
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        import subprocess
+        import re
+        
+        try:
+            # Ensure destination directory exists
+            os.makedirs(destination_dir, exist_ok=True)
+            
+            # Construct rsync command
+            rsync_source = f"ethoscope@{self._ip}:{source_dir}"
+            rsync_command = [
+                'rsync', 
+                '-avz',           # archive, verbose, compress
+                '--progress',     # show progress
+                '--partial',      # keep partial files
+                '--timeout=300',  # 5 minute timeout
+                '-e', f'ssh -i {private_key_path} -o StrictHostKeyChecking=no',  # SSH key authentication
+                rsync_source, 
+                destination_dir
+            ]
+            
+            self._logger.info(f"[{self._device_id}] Starting {operation_name} rsync: {' '.join(rsync_command)}")
+            yield self._yield_status("info", f"Starting {operation_name} rsync from {rsync_source} to {destination_dir}")
+            
+            # Execute rsync with progress monitoring
+            process = subprocess.Popen(
+                rsync_command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True,
+                bufsize=1
+            )
+            
+            files_transferred = 0
+            current_file = ""
+            
+            for line in iter(process.stdout.readline, ''):
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                self._logger.debug(f"[{self._device_id}] {operation_name} rsync: {line}")
+                
+                # Parse progress information
+                if line.endswith('bytes/sec'):
+                    # Progress line format: "1,234,567  67%   123.45kB/s    0:00:12"
+                    match = re.search(r'(\d{1,3}(?:,\d{3})*)\s+(\d+)%\s+(.+?/s)', line)
+                    if match:
+                        bytes_so_far = int(match.group(1).replace(',', ''))
+                        percentage = int(match.group(2))
+                        speed = match.group(3)
+                        
+                        yield self._yield_status(
+                            "info", 
+                            f"{operation_name.title()}: {current_file} - {percentage}% complete ({speed})"
+                        )
+                        
+                elif line.startswith('./') or '/' in line:
+                    # File being transferred
+                    if not line.startswith('rsync:') and not line.startswith('total size'):
+                        current_file = os.path.basename(line)
+                        files_transferred += 1
+                        yield self._yield_status(
+                            "info", 
+                            f"{operation_name.title()}: Transferring {current_file} (file #{files_transferred})"
+                        )
+                        
+            # Wait for rsync to complete
+            return_code = process.wait()
+            
+            if return_code == 0:
+                self._logger.info(f"[{self._device_id}] {operation_name.title()} rsync completed successfully")
+                yield self._yield_status("info", f"{operation_name.title()} rsync completed successfully")
+                return True
+            else:
+                error_msg = f"{operation_name.title()} rsync failed with return code {return_code}"
+                self._logger.error(f"[{self._device_id}] {error_msg}")
+                yield self._yield_status("error", error_msg)
+                return False
+                
+        except Exception as e:
+            error_msg = f"Error during {operation_name} rsync: {e}"
+            self._logger.error(f"[{self._device_id}] {error_msg}")
+            self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
+            yield self._yield_status("error", error_msg)
+            return False
+    
+    def check_sync_status(self) -> Optional[Dict]:
+        """
+        Check sync status for both results and videos directories.
+        
+        Returns:
+            dict: Sync status for both backup types
+        """
+        try:
+            status = {}
+            
+            if self._backup_results:
+                status['results'] = self._check_directory_sync_status(
+                    self._results_dir, "results"
+                )
+                
+            if self._backup_videos:
+                status['videos'] = self._check_directory_sync_status(
+                    self._videos_dir, "videos"
+                )
+            
+            return status
+            
+        except Exception as e:
+            self._logger.error(f"Error checking unified sync status: {e}")
+            return None
+    
+    def _check_directory_sync_status(self, local_dir: str, dir_type: str) -> Dict:
+        """
+        Check sync status for a specific directory type.
+        
+        Args:
+            local_dir: Local directory path
+            dir_type: Type of directory ("results" or "videos")
+            
+        Returns:
+            dict: Sync status with file counts and disk usage
+        """
+        try:
+            # Count local files and calculate disk usage
+            local_file_count = 0
+            total_size_bytes = 0
+            
+            if os.path.exists(local_dir):
+                for root, dirs, files in os.walk(local_dir):
+                    local_file_count += len(files)
+                    for file in files:
+                        try:
+                            file_path = os.path.join(root, file)
+                            total_size_bytes += os.path.getsize(file_path)
+                        except (OSError, IOError):
+                            # Skip files that can't be accessed
+                            pass
+            
+            # Convert bytes to human-readable format
+            disk_usage = self._format_bytes(total_size_bytes)
+            
+            return {
+                'local_files': local_file_count,
+                'directory': local_dir,
+                'type': dir_type,
+                'disk_usage_bytes': total_size_bytes,
+                'disk_usage_human': disk_usage
+            }
+            
+        except Exception as e:
+            self._logger.error(f"Error checking {dir_type} sync status: {e}")
+            return {
+                'local_files': 0, 
+                'directory': local_dir, 
+                'type': dir_type, 
+                'disk_usage_bytes': 0,
+                'disk_usage_human': '0 B',
+                'error': str(e)
+            }
+    
+    def _format_bytes(self, bytes_value: int) -> str:
+        """
+        Format bytes into human-readable string.
+        
+        Args:
+            bytes_value: Size in bytes
+            
+        Returns:
+            str: Human-readable size (e.g., "1.5 GB", "234.7 MB")
+        """
+        if bytes_value == 0:
+            return "0 B"
+        
+        units = ['B', 'KB', 'MB', 'GB', 'TB']
+        unit_index = 0
+        size = float(bytes_value)
+        
+        while size >= 1024 and unit_index < len(units) - 1:
+            size /= 1024
+            unit_index += 1
+        
+        if unit_index == 0:
+            return f"{int(size)} {units[unit_index]}"
+        else:
+            return f"{size:.1f} {units[unit_index]}"
+
 
 class GenericBackupWrapper(threading.Thread):
     """

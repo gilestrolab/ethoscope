@@ -322,6 +322,15 @@ class ControlThreadVideoRecording(ControlThread):
         self._last_info_t_stamp = 0
         self._last_info_frame_idx = 0
         
+        # Manage disk space before starting video recording
+        try:
+            from ethoscope.utils import pi
+            space_result = pi.manage_disk_space(ethoscope_dir)
+            if space_result.get('cleanup_performed', False):
+                logging.info(f"Disk space cleanup completed: {space_result.get('cleanup_summary', {}).get('files_deleted', 0)} files removed")
+        except Exception as e:
+            logging.warning(f"Disk space management failed, continuing anyway: {e}")
+
         # Metadata
         self._recorder = None
         self._machine_id = machine_id
