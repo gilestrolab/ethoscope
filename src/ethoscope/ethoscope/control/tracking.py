@@ -31,7 +31,7 @@ from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver, M
 from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulator
 
 from ethoscope.utils.debug import EthoscopeException
-from ethoscope.utils.io import MySQLResultWriter, SQLiteResultWriter, DatabaseMetadataCache
+from ethoscope.utils.io import MySQLResultWriter, SQLiteResultWriter, create_metadata_cache
 from ethoscope.utils.description import DescribedObject
 from ethoscope.utils import pi
 
@@ -214,13 +214,62 @@ class ControlThread(Thread):
                         "used_space" : pi.get_partition_info(ethoscope_dir)['Use%'].replace("%","")
                         }
         self._monit = None
+        self._drawer = None  # Initialize drawer to None until monitor starts
 
-        if os.path.exists(self._last_run_info):
-            with open(self._last_run_info, 'rb') as fn:
-                self._info.update( pickle.load(fn) )
+        # Initialize cache directory first
+        self._cache_dir = os.path.join (ethoscope_dir, 'cache')
+        
+        # Try to get last experiment info from cache files (replaces pickle file)
+        try:
+            # Create temporary cache instance to read last experiment info
+            temp_cache = create_metadata_cache(
+                db_credentials={"name": "temp"},  # Temporary, will be replaced
+                device_name=name,
+                cache_dir=self._cache_dir,
+                database_type="SQLite3"  # Default, auto-detected later
+            )
+            last_experiment_info = temp_cache.get_last_experiment_info()
+            if last_experiment_info and isinstance(last_experiment_info, dict):
+                self._info.update(last_experiment_info)
+                logging.info(f"Loaded last experiment info from cache: user={last_experiment_info.get('previous_user', 'unknown')}")
+            elif last_experiment_info:
+                logging.warning(f"Cache returned non-dict experiment info: {type(last_experiment_info)}")
+        except Exception as e:
+            logging.warning(f"Failed to load last experiment info from cache: {e}")
+            # Ensure _info is still a dictionary even if cache loading fails
+            if not isinstance(self._info, dict):
+                logging.error("self._info became non-dict after cache failure, resetting")
+                self._info = {
+                    "id": machine_id,
+                    "name": name,
+                    "version": version,
+                    "used_space": pi.get_partition_info(ethoscope_dir)['Use%'].replace("%","")
+                }
+        
+        # Fallback: try the old pickle file if cache doesn't have info
+        if os.path.exists(self._last_run_info) and not self._info.get("previous_backup_filename"):
+            try:
+                with open(self._last_run_info, 'rb') as fn:
+                    pickle_data = pickle.load(fn)
+                    if isinstance(pickle_data, dict):
+                        self._info.update(pickle_data)
+                        logging.info("Loaded last experiment info from legacy pickle file")
+                    else:
+                        logging.warning(f"Pickle file contained non-dict data: {type(pickle_data)}")
+            except Exception as e:
+                logging.warning(f"Failed to load from pickle file: {e}")
+        
+        # Final safety check: ensure _info is always a dictionary
+        if not isinstance(self._info, dict):
+            logging.error("self._info is not a dictionary after initialization, creating new one")
+            self._info = {
+                "id": machine_id,
+                "name": name,
+                "version": version,
+                "used_space": pi.get_partition_info(ethoscope_dir)['Use%'].replace("%","")
+            }
 
         # Initialize database info now that _info is fully constructed
-        self._cache_dir = os.path.join (ethoscope_dir, 'cache')
         self._info["database_info"] = self._get_database_info()
         
         # Check for existing backup filename from metadata table during initialization
@@ -264,6 +313,15 @@ class ControlThread(Thread):
     @property
     def info(self):
         self._update_info()
+        # Safety check: ensure we always return a dictionary
+        if not isinstance(self._info, dict):
+            logging.error(f"self._info is not a dictionary ({type(self._info)}), creating emergency fallback")
+            self._info = {
+                "id": getattr(self, '_machine_id', 'unknown'),
+                "name": getattr(self, '_name', 'unknown'),
+                "version": "unknown",
+                "error": "info corruption detected and recovered"
+            }
         return self._info
 
     @property
@@ -643,13 +701,15 @@ class ControlThread(Thread):
         }
         
         # This is useful to retrieve the latest run's information after a reboot
-        with open(self._last_run_info, "wb") as f:
-            pickle.dump( {
-                        "previous_date_time" : self._info["time"],
-                        "previous_backup_filename" : self._info["backup_filename"],
-                        "previous_user" : self._info["experimental_info"]["name"],
-                        "previous_location" : self._info["experimental_info"]["location"]
-                        }, f)
+        # Now stored in cache files instead of separate pickle file
+        experiment_info_to_store = {
+            "date_time": self._info["time"],
+            "backup_filename": self._info["backup_filename"],
+            "user": self._info["experimental_info"]["name"],
+            "location": self._info["experimental_info"]["location"],
+            "result_writer_type": result_writer_type,
+            "sqlite_source_path": sqlite_source_path
+        }
         
         # hardware_interface is a running thread
         # Use the selected result writer class and pass appropriate arguments
@@ -674,18 +734,29 @@ class ControlThread(Thread):
             sqlite_credentials["name"] = sqlite_source_path
             rw = ResultWriterClass(sqlite_credentials, rois, self._metadata, **result_writer_kwargs)
             
-            # SQLite doesn't use DatabaseMetadataCache (file-based database)
-            self._metadata_cache = None
+            # Initialize SQLite metadata cache for JSON file generation
+            self._metadata_cache = create_metadata_cache(
+                db_credentials=sqlite_credentials,
+                device_name=self._info["name"],
+                cache_dir=self._cache_dir,
+                database_type="SQLite3"
+            )
         else:
-            # MySQL uses standard credentials and DatabaseMetadataCache
+            # MySQL uses standard credentials and metadata cache
             rw = ResultWriterClass(self._db_credentials, rois, self._metadata, **result_writer_kwargs)
             
-            # Initialize DatabaseMetadataCache for MySQL databases
-            self._metadata_cache = DatabaseMetadataCache(
+            # Initialize MySQL metadata cache
+            self._metadata_cache = create_metadata_cache(
                 db_credentials=self._db_credentials,
                 device_name=self._info["name"],
-                cache_dir=self._cache_dir
+                cache_dir=self._cache_dir,
+                database_type="MySQL"
             )
+        
+        # Store experiment information in cache (replaces last_run_info file)
+        if self._metadata_cache:
+            tracking_start_time = time.time()
+            self._metadata_cache.store_experiment_info(tracking_start_time, experiment_info_to_store)
 
         return  (cam, rw, rois, reference_points, TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs)

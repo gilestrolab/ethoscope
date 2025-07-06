@@ -458,6 +458,20 @@ def info(id):
         raise WrongMachineID
 
     runninginfo = send_command('info')
+    
+    # Safety check: ensure runninginfo is a dictionary before calling update()
+    if not isinstance(runninginfo, dict):
+        logging.warning(f"send_command('info') returned non-dict: {type(runninginfo)} - {str(runninginfo)[:200]}")
+        # Create fallback info dictionary
+        runninginfo = {
+            "status": 'communication_error',
+            "id": _MACHINE_ID,
+            "name": _MACHINE_NAME,
+            "version": _GIT_VERSION,
+            "error": f"Control thread returned: {type(runninginfo).__name__}",
+            "time": bottle.time.time()
+        }
+    
     runninginfo.update ( { "CPU_temp" : pi.get_core_temperature(), 
                            "underpowered" : pi.underPowered(),
                            "current_timestamp" : bottle.time.time() } )
