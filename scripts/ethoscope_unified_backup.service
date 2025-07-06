@@ -1,5 +1,5 @@
 [Unit]
-Description=Ethoscope video-only backup service using rsync
+Description=Ethoscope unified backup service (videos + results) using rsync
 Wants=ntpd.service clock.service network-online.target
 After=ntpd.service clock.service network-online.target
 
@@ -7,10 +7,9 @@ After=ntpd.service clock.service network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/ethoscope/src/node/scripts/
-ExecStart=/usr/bin/python /opt/ethoscope/src/node/scripts/rsync_backup_tool.py --videos-only
+ExecStart=/usr/bin/python /opt/ethoscope/src/node/scripts/rsync_backup_tool.py --unified
 RestartSec=5
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
-
