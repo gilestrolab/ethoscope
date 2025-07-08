@@ -55,6 +55,16 @@ requires-python = ">=3.7"
 dependencies = [
     "numpy>=1.6.1",
     "scipy>=0.15.1",
+    "picamera>=1.8",
+    "GitPython>=3.1.44",
+    "mysql-connector-python>=8.0.16",
+    "cherrypy>=18.10.0",
+    "pyserial>=3.5",
+    "bottle>=0.13.4",
+    "opencv-python>=4.11.0.86",
+    "zeroconf>=0.147.0",
+    "netifaces>=0.11.0",
+    "requests>=2.32.4"
 ]
 
 [project.urls]
@@ -63,15 +73,6 @@ Repository = "https://github.com/gilestrolab/ethoscope"
 Documentation = "http://lab.gilest.ro/ethoscope"
 
 [project.optional-dependencies]
-device = [
-    "picamera>=1.8",
-    "GitPython>=1.0.1",
-    "mysql-connector-python>=8.0.16",
-    "cherrypy>=3.6.0",
-    "pyserial>=2.7",
-    "bottle>=0.12.8",
-    "opencv-python>=4.0.0"
-]
 dev = [
     "Sphinx>=1.4.4",
     "sphinx_rtd_theme>=0.1.9",
@@ -79,9 +80,14 @@ dev = [
     "pytest>=6.0.0",
     "pytest-cov>=2.10.0"
 ]
+testing = [
+    "psutil>=5.8.0",
+    "requests>=2.32.4"
+]
 
 [project.scripts]
 device_server = "scripts.device_server:main"
+device_server_optimized = "scripts.device_server_optimized:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
