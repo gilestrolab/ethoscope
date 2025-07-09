@@ -29,12 +29,20 @@ DEFAULT_PORT = 80
 STATIC_DIR = "../static"
 
 SYSTEM_DAEMONS = {
-    "ethoscope_backup": {
-        'description': 'The service that collects data from the ethoscopes and syncs them with the node.',
+    "ethoscope_backup_mysql": {
+        'description': 'The service that collects data from the ethoscope mariadb and syncs them with the node.',
         'available_on_docker': True
     },
-    "ethoscope_video_backup": {
-        'description': 'The service that collects VIDEOs from the ethoscopes and syncs them with the node',
+    "ethoscope_backup_video": {
+        'description': 'The service that collects videos in h264 chunks from the ethoscopes and syncs them with the node',
+        'available_on_docker': True
+    },
+    "ethoscope_backup_unified": {
+        'description': 'The service that collects videos and SQLite dbs from the ethoscopes and syncs them with the node',
+        'available_on_docker': True
+    },
+    "ethoscope_backup_sqlite": {
+        'description': 'The service that collects SQLite db from the ethoscopes and syncs them with the node',
         'available_on_docker': True
     },
     "ethoscope_update_node": {
@@ -57,7 +65,7 @@ SYSTEM_DAEMONS = {
         'description': 'The FTP server on the node, used to access the local ethoscope data',
         'available_on_docker': False
     },
-    "virtuascope": {
+    "ethoscope_virtuascope": {
         'description': 'A virtual ethoscope running on the node. Useful for offline tracking',
         'available_on_docker': False
     }
@@ -140,7 +148,7 @@ class EthoscopeNodeServer:
     """Main server class for Ethoscope Node."""
     
     def __init__(self, port: int = DEFAULT_PORT, debug: bool = False, 
-                 temp_results_dir: Optional[str] = None):
+                 results_dir: Optional[str] = None, config_dir: Optional[str] = None):
         self.port = port
         self.debug = debug
         self.app = bottle.Bottle()
@@ -154,7 +162,8 @@ class EthoscopeNodeServer:
         
         # Paths and directories
         self.tmp_imgs_dir: Optional[str] = None
-        self.results_dir: Optional[str] = temp_results_dir
+        self.results_dir: Optional[str] = results_dir
+        self.config_dir: Optional[str] = config_dir
         
         # System configuration
         self.is_dockerized = os.path.exists('/.dockerenv')
@@ -269,12 +278,21 @@ class EthoscopeNodeServer:
             self.logger.info("Initializing Ethoscope Node Server...")
             
             # Load configuration
-            self.config = EthoscopeConfiguration()
-            self.logger.info("Configuration loaded")
+            if self.config_dir:
+                config_file = os.path.join(self.config_dir, 'ethoscope.conf')
+                self.config = EthoscopeConfiguration(config_file)
+                self.logger.info(f"Configuration loaded from {config_file}")
+            else:
+                self.config = EthoscopeConfiguration()
+                self.logger.info("Configuration loaded from default location")
             
             # Ensure SSH keys exist
             try:
-                private_key_path, public_key_path = ensure_ssh_keys()
+                if self.config_dir:
+                    keys_dir = os.path.join(self.config_dir, 'keys')
+                    private_key_path, public_key_path = ensure_ssh_keys(keys_dir)
+                else:
+                    private_key_path, public_key_path = ensure_ssh_keys()
                 self.logger.info(f"SSH keys ready: {private_key_path}, {public_key_path}")
             except Exception as e:
                 self.logger.error(f"Failed to setup SSH keys: {e}")
@@ -290,12 +308,18 @@ class EthoscopeNodeServer:
             self.logger.info(f"Created temporary images directory: {self.tmp_imgs_dir}")
             
             # Initialize database
-            self.database = ExperimentalDB()
+            if self.config_dir:
+                self.database = ExperimentalDB(self.config_dir)
+            else:
+                self.database = ExperimentalDB()
             self.logger.info("Database connection established")
             
             # Initialize device scanner
             try:
-                self.device_scanner = EthoscopeScanner(results_dir=self.results_dir)
+                if self.config_dir:
+                    self.device_scanner = EthoscopeScanner(results_dir=self.results_dir, config_dir=self.config_dir)
+                else:
+                    self.device_scanner = EthoscopeScanner(results_dir=self.results_dir)
                 self.device_scanner.start()
                 self.logger.info("Ethoscope scanner started")
             except Exception as e:
@@ -993,8 +1017,10 @@ def parse_command_line():
                        help='Enable debug mode')
     parser.add_argument('-p', '--port', type=int, default=DEFAULT_PORT,
                        help=f'Server port (default: {DEFAULT_PORT})')
-    parser.add_argument('-e', '--temporary-results-dir', dest='temp_results_dir',
+    parser.add_argument('-e', '--temporary-results-dir', dest='results_dir',
                        help='Directory for temporary result files')
+    parser.add_argument('-c', '--configuration', dest='config_dir',
+                       help='Path to configuration directory (default: /etc/ethoscope)')
     
     return parser.parse_args()
 
@@ -1024,7 +1050,8 @@ def main():
         server = EthoscopeNodeServer(
             port=args.port,
             debug=args.debug,
-            temp_results_dir=args.temp_results_dir
+            results_dir=args.results_dir,
+            config_dir=args.config_dir
         )
         
         server.initialize()

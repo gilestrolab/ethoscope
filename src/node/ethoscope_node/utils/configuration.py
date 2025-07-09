@@ -23,7 +23,7 @@ class ConfigurationValidationError(ConfigurationError):
     pass
 
 
-def migrate_conf_file(file_path: str, destination: str = '/etc/ethoscope/') -> bool:
+def migrate_conf_file(file_path: str, destination: str = '/etc/ethoscope') -> bool:
     """
     Migrate configuration file to new location.
     

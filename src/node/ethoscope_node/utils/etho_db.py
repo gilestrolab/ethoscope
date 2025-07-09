@@ -38,15 +38,21 @@ from ethoscope_node.utils.configuration import migrate_conf_file
 
 class ExperimentalDB(multiprocessing.Process):
     
-    _db_name = "/etc/ethoscope/ethoscope-node.db"
     _runs_table_name = "runs"
     _users_table_name = "users"
     _experiments_table_name = "experiments"
     _ethoscopes_table_name = "ethoscopes"
     
-    def __init__(self):
+    def __init__(self, config_dir: str = "/etc/ethoscope"):
         super().__init__()
-        migrate_conf_file('/etc/ethoscope-node.db')
+        self._config_dir = config_dir
+        self._db_name = os.path.join(config_dir, "ethoscope-node.db")
+        
+        # Ensure config directory exists
+        os.makedirs(config_dir, exist_ok=True)
+        
+        # Handle migration from old location
+        migrate_conf_file('/etc/ethoscope-node.db', config_dir)
         self.create_tables()
 
     def executeSQL(self, command: str):
