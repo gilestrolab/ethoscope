@@ -1,5 +1,3 @@
-__author__ = 'luis'
-
 import logging
 import traceback
 from optparse import OptionParser
@@ -8,6 +6,7 @@ import json
 import os
 import glob
 import time
+import datetime
 
 from threading import Thread 
 
