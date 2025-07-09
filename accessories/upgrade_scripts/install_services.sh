@@ -12,9 +12,42 @@ function show_usage() {
     exit 1
 }
 
+function stop_and_disable_services() {
+    local service_pattern="$1"
+    echo "Stopping and disabling old ethoscope services matching pattern: $service_pattern"
+    
+    # Find all ethoscope services and stop/disable them
+    local services=()
+    
+    # Collect services from both directories
+    if [ -d "/usr/lib/systemd/system" ]; then
+        while IFS= read -r -d '' service; do
+            services+=("$(basename "$service")")
+        done < <(find /usr/lib/systemd/system -name "$service_pattern" -type f -print0 2>/dev/null)
+    fi
+    
+    if [ -d "/etc/systemd/system" ]; then
+        while IFS= read -r -d '' service; do
+            services+=("$(basename "$service")")
+        done < <(find /etc/systemd/system -name "$service_pattern" -type f -print0 2>/dev/null)
+    fi
+    
+    # Remove duplicates and process each service
+    local unique_services=($(printf '%s\n' "${services[@]}" | sort -u))
+    
+    for service in "${unique_services[@]}"; do
+        echo "Stopping and disabling $service"
+        systemctl stop "$service" 2>/dev/null || true
+        systemctl disable "$service" 2>/dev/null || true
+    done
+}
+
 function remove_old_services() {
     local service_pattern="$1"
     echo "Removing old ethoscope services matching pattern: $service_pattern"
+    
+    # First stop and disable all services
+    stop_and_disable_services "$service_pattern"
     
     # Remove from /usr/lib/systemd/system
     if [ -d "/usr/lib/systemd/system" ]; then
