@@ -14,9 +14,9 @@ services:
     image: ggilestro/ethoscope-node:latest
     restart: unless-stopped
     volumes:
-      # - ../../:/opt/ethoscope:ro  # Uncomment if needed - will mount the host ethoscope folder, useful only for development
-      - ethoscope_data:/ethoscope_data
-      - etc_ethoscope:/etc/ethoscope
+      - ../../:/opt/ethoscope:ro  # Uncomment if needed - will mount the host ethoscope folder, useful only for development
+      - /tmp/ethoscope_docker_volumes/ethoscope_data:/ethoscope_data
+      - /tmp/ethoscope_docker_volumes/etc_ethoscope:/etc/ethoscope
 
 
   ethoscope-node:
@@ -35,12 +35,12 @@ services:
     ports:
       - "8090:8090"
 
-  ethoscope-node-video-backup:
+  ethoscope-node-rsync-backup:
     <<: *node-base
-    container_name: ethoscope-node-video-backup
-    command: "/usr/bin/python /opt/ethoscope/src/node/scripts/video_backup_tool.py"
+    container_name: ethoscope-node-rsync-backup
+    command: "/usr/bin/python /opt/ethoscope/src/node/scripts/rsync_backup_tool.py --unified"
     ports:
-      - "8092:8092"
+      - "8093:8093"
 
   ethoscope-node-update:
     <<: *node-base
