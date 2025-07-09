@@ -49,15 +49,18 @@ function remove_old_services() {
     # First stop and disable all services
     stop_and_disable_services "$service_pattern"
     
-    # Remove from /usr/lib/systemd/system
-    if [ -d "/usr/lib/systemd/system" ]; then
-        find /usr/lib/systemd/system -name "$service_pattern" -type f -delete 2>/dev/null || true
-    fi
+    # More explicit removal from both directories
+    for dir in "/usr/lib/systemd/system" "/etc/systemd/system"; do
+        if [ -d "$dir" ]; then
+            echo "Cleaning $dir"
+            # Use shell globbing which is more reliable than find for this case
+            rm -f "$dir"/ethoscope_*.service 2>/dev/null || true
+            rm -f "$dir"/ethoscope_*.timer 2>/dev/null || true
+        fi
+    done
     
-    # Remove from /etc/systemd/system
-    if [ -d "/etc/systemd/system" ]; then
-        find /etc/systemd/system -name "$service_pattern" -type f -delete 2>/dev/null || true
-    fi
+    # Force daemon reload after cleanup
+    systemctl daemon-reload
 }
 
 function link_services() {
