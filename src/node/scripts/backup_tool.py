@@ -197,6 +197,8 @@ def parse_arguments():
                      action='store_true', help='Set Safe mode ON (currently unused)')
     parser.add_option('-p', '--port', dest='port', default=8090, type='int',
                      help='Port for HTTP status server (default: 8090)')
+    parser.add_option('-c', '--configuration', dest='config_dir',
+                     help='Path to configuration directory (default: /etc/ethoscope)')
     
     (options, args) = parser.parse_args()
     return options
@@ -251,10 +253,21 @@ def force_backup_ethoscopes(ethoscope_list):
             sys.exit(1)
         
         logging.info(f"Device found: {device}")
-        logging.info(f"Starting backup job for {ethoscope_name}...")
+        
+        # Validate device has MariaDB database before attempting backup
+        database_info = device.get("database_info", {})
+        active_type = database_info.get("active_type", "none")
+        mariadb_exists = database_info.get("mariadb", {}).get("exists", False)
+        
+        if not mariadb_exists and active_type != "mariadb":
+            logging.warning(f"Skipping {ethoscope_name} - no MariaDB database found (active_type: {active_type})")
+            logging.info(f"This device should be backed up by the rsync backup service instead")
+            continue
+        
+        logging.info(f"MariaDB database validated for {ethoscope_name} - starting backup job...")
         
         try:
-            logging.info(f"Initiating backup job for {ethoscope_name}...")
+            logging.info(f"Initiating MariaDB backup job for {ethoscope_name}...")
             success = gbw.initiate_backup_job(device)
             
             if success:
@@ -328,7 +341,11 @@ def main():
         setup_signal_handlers()
         
         logging.info("Loading ethoscope configuration...")
-        cfg = EthoscopeConfiguration()
+        if options.config_dir:
+            config_file = os.path.join(options.config_dir, 'ethoscope.conf')
+            cfg = EthoscopeConfiguration(config_file)
+        else:
+            cfg = EthoscopeConfiguration()
         results_dir = options.results_dir or cfg.content['folders']['results']['path']
         logging.info(f"Results directory: {results_dir}")
         logging.info(f"Node server address: {options.server}")

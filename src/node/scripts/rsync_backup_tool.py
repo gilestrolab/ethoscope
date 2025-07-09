@@ -5,6 +5,7 @@ import traceback
 import sys
 import signal
 import time
+import os
 from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from ethoscope_node.utils.backups_helpers import GenericBackupWrapper, UnifiedRsyncBackupClass
@@ -200,7 +201,6 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    CFG = EthoscopeConfiguration()
     logging.getLogger().setLevel(logging.INFO)
 
     try:
@@ -225,9 +225,18 @@ def main():
                          help="Backup only database/results files", action="store_true")
         parser.add_option("--videos-only", dest="videos_only", default=False,
                          help="Backup only video files", action="store_true")
+        parser.add_option("-c", "--configuration", dest="config_dir",
+                         help="Path to configuration directory (default: /etc/ethoscope)")
 
         (options, args) = parser.parse_args()
         option_dict = vars(options)
+        
+        # Initialize configuration
+        if option_dict["config_dir"]:
+            config_file = os.path.join(option_dict["config_dir"], 'ethoscope.conf')
+            CFG = EthoscopeConfiguration(config_file)
+        else:
+            CFG = EthoscopeConfiguration()
         
         # Configuration
         RESULTS_DIR = option_dict["results_dir"] or CFG.content['folders']['results']['path']
@@ -283,6 +292,17 @@ def main():
                 bj = None
                 for device in gbw.find_devices():
                     if device['name'] == ("ETHOSCOPE_%03d" % ethoscope):
+                        # Validate device has SQLite database before attempting backup
+                        database_info = device.get("database_info", {})
+                        active_type = database_info.get("active_type", "none")
+                        sqlite_exists = database_info.get("sqlite", {}).get("exists", False)
+                        
+                        if not sqlite_exists and active_type != "sqlite":
+                            print(f"Skipping ETHOSCOPE_%03d - no SQLite database found (active_type: {active_type})" % ethoscope)
+                            print(f"This device should be backed up by the MariaDB backup service instead")
+                            exit("ETHOSCOPE_%03d has no SQLite database for rsync backup" % ethoscope)
+                        
+                        print(f"SQLite database validated for ETHOSCOPE_%03d - starting backup..." % ethoscope)
                         bj = gbw.initiate_backup_job(device)
                 if bj is None:
                     exit("ETHOSCOPE_%03d is not online or not detected" % ethoscope)

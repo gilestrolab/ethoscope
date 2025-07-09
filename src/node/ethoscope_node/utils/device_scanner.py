@@ -623,10 +623,11 @@ class Ethoscope(BaseDevice):
     }
     
     def __init__(self, ip: str, port: int = ETHOSCOPE_PORT, refresh_period: float = 5,
-                 results_dir: str = "/ethoscope_data/results"):
+                 results_dir: str = "/ethoscope_data/results", config_dir: str = "/etc/ethoscope"):
         # Initialize ethoscope-specific attributes BEFORE calling parent
         self._results_dir = results_dir
-        self._edb = ExperimentalDB()
+        self._config_dir = config_dir
+        self._edb = ExperimentalDB(config_dir)
         self._last_db_info = 0
         self._device_controller_created = time.time()
         self._ping_count = 0  # Initialize ping counter
@@ -1147,9 +1148,15 @@ class Ethoscope(BaseDevice):
             self._logger.warning(f"Device {self._ip}: Failed to update MySQL backup status: {e}")
             self._info['backup_status'] = "MySQL Error"
     
-    def _make_backup_path(self, timeout: float = 30, force_recalculate: bool = False):
+    def _make_backup_path(self, timeout: float = 30, force_recalculate: bool = False, service_type: str = "auto"):
         """
-        Creates the full path for the backup file, gathering info from the ethoscope
+        Creates the full path for the backup file, gathering info from the ethoscope.
+        Now supports service-type awareness to prevent backup collisions.
+        
+        Args:
+            timeout: Request timeout
+            force_recalculate: Force recalculation of backup path
+            service_type: Type of backup service ('mariadb', 'sqlite', 'auto')
         
         The full backup_path will look something like:
         /ethoscope_data/results/0256424ac3f545b6b3c687723085ffcb/ETHOSCOPE_025/2025-06-13_16-05-37/2025-06-13_16-05-37_0256424ac3f545b6b3c687723085ffcb.db
@@ -1160,33 +1167,40 @@ class Ethoscope(BaseDevice):
                 return
             
             output_db_file = None
+            backup_filename = None
             
-            # Case 1: Device has backup_filename (regardless of status)
-            if "backup_filename" in self._info and self._info["backup_filename"]:
-                fname, _ = os.path.splitext(self._info["backup_filename"])
-                backup_date, backup_time, etho_id = fname.split("_")
-                
-                output_db_file = os.path.join(self._results_dir,
-                                            etho_id,
-                                            self._info["name"],
-                                            "%s_%s" % (backup_date, backup_time),
-                                            self._info["backup_filename"])
-            
-            # Case 2: Device is stopped and has previous_backup_filename (fallback)
-            elif (self._info["status"] == 'stopped' and 
-                  "previous_backup_filename" in self._info and 
-                  self._info["previous_backup_filename"]):
-                fname, _ = os.path.splitext(self._info["previous_backup_filename"])
-                backup_date, backup_time, etho_id = fname.split("_")
-                
-                output_db_file = os.path.join(self._results_dir,
-                                            etho_id,
-                                            self._info["name"],
-                                            "%s_%s" % (backup_date, backup_time),
-                                            self._info["previous_backup_filename"])
-            
-            # Case 3: No backup filename info available
+            # Determine which backup filename to use based on service type
+            if service_type == "mariadb":
+                backup_filename = self._get_mariadb_backup_filename()
+            elif service_type == "sqlite":
+                backup_filename = self._get_sqlite_backup_filename()
             else:
+                # Auto mode: use the appropriate backup filename based on database type
+                backup_filename = self._get_appropriate_backup_filename()
+            
+            if backup_filename:
+                try:
+                    fname, _ = os.path.splitext(backup_filename)
+                    parts = fname.split("_")
+                    if len(parts) >= 3:
+                        backup_date = parts[0]
+                        backup_time = parts[1] 
+                        etho_id = "_".join(parts[2:])
+                        
+                        output_db_file = os.path.join(self._results_dir,
+                                                    etho_id,
+                                                    self._info["name"],
+                                                    f"{backup_date}_{backup_time}",
+                                                    backup_filename)
+                        self._logger.info(f"Created {service_type} backup path: {output_db_file}")
+                    else:
+                        self._logger.error(f"Invalid backup filename format: {backup_filename}")
+                        output_db_file = None
+                except Exception as e:
+                    self._logger.error(f"Error parsing backup filename '{backup_filename}': {e}")
+                    output_db_file = None
+            else:
+                self._logger.warning(f"No backup filename available for {service_type} backup")
                 output_db_file = None
             
             self._info["backup_path"] = output_db_file
@@ -1194,6 +1208,55 @@ class Ethoscope(BaseDevice):
         except Exception as e:
             self._logger.error(f"Error creating backup path: {e}")
             self._info["backup_path"] = None
+    
+    def _get_mariadb_backup_filename(self) -> str:
+        """Get backup filename specifically for MariaDB databases."""
+        try:
+            database_info = self._info.get("database_info", {})
+            mariadb_info = database_info.get("mariadb", {})
+            if mariadb_info.get("exists", False):
+                mariadb_current = mariadb_info.get("current", {})
+                return mariadb_current.get("backup_filename")
+            return None
+        except Exception as e:
+            self._logger.error(f"Error getting MariaDB backup filename: {e}")
+            return None
+    
+    def _get_sqlite_backup_filename(self) -> str:
+        """Get backup filename specifically for SQLite databases."""
+        try:
+            database_info = self._info.get("database_info", {})
+            sqlite_info = database_info.get("sqlite", {})
+            if sqlite_info.get("exists", False):
+                sqlite_current = sqlite_info.get("current", {})
+                return sqlite_current.get("backup_filename")
+            return None
+        except Exception as e:
+            self._logger.error(f"Error getting SQLite backup filename: {e}")
+            return None
+    
+    def _get_appropriate_backup_filename(self) -> str:
+        """Get the appropriate backup filename based on the active database type."""
+        try:
+            database_info = self._info.get("database_info", {})
+            active_type = database_info.get("active_type", "none")
+            
+            if active_type == "mariadb":
+                return self._get_mariadb_backup_filename()
+            elif active_type == "sqlite":
+                return self._get_sqlite_backup_filename()
+            else:
+                # Fallback to legacy behavior
+                if "backup_filename" in self._info and self._info["backup_filename"]:
+                    return self._info["backup_filename"]
+                elif (self._info.get("status") == 'stopped' and 
+                      "previous_backup_filename" in self._info and 
+                      self._info["previous_backup_filename"]):
+                    return self._info["previous_backup_filename"]
+                return None
+        except Exception as e:
+            self._logger.error(f"Error getting appropriate backup filename: {e}")
+            return None
     
     def setup_ssh_authentication(self) -> bool:
         """
@@ -1207,7 +1270,8 @@ class Ethoscope(BaseDevice):
         """
         try:
             # Get SSH key paths
-            private_key_path, public_key_path = ensure_ssh_keys()
+            keys_dir = os.path.join(self._config_dir, 'keys')
+            private_key_path, public_key_path = ensure_ssh_keys(keys_dir)
             
             # Use sshpass with ssh-copy-id to setup passwordless authentication
             cmd = [
@@ -1432,10 +1496,12 @@ class DeviceScanner:
                         return
                 
                 # Create and start device
+                config_dir = getattr(self, 'config_dir', '/etc/ethoscope')
                 device = self._device_class(
                     ip, port=port, 
                     refresh_period=self.device_refresh_period,
-                    results_dir=getattr(self, 'results_dir', '')
+                    results_dir=getattr(self, 'results_dir', ''),
+                    config_dir=config_dir
                 )
                 
                 if hasattr(device, 'zeroconf_name'):
@@ -1511,10 +1577,12 @@ class EthoscopeScanner(DeviceScanner):
     DEVICE_TYPE = "ethoscope"
     
     def __init__(self, device_refresh_period: float = 5, 
-                 results_dir: str = "/ethoscope_data/results", device_class=Ethoscope):
+                 results_dir: str = "/ethoscope_data/results", device_class=Ethoscope,
+                 config_dir: str = "/etc/ethoscope"):
         super().__init__(device_refresh_period, device_class)
         self.results_dir = results_dir
-        self._edb = ExperimentalDB()
+        self.config_dir = config_dir
+        self._edb = ExperimentalDB(config_dir)
         self.timestarted = datetime.datetime.now()  # Keep original name for compatibility
     
     def get_all_devices_info(self) -> Dict[str, Dict[str, Any]]:
@@ -1630,7 +1698,8 @@ class EthoscopeScanner(DeviceScanner):
                     device = self._device_class(
                         ip, port=port,
                         refresh_period=self.device_refresh_period,
-                        results_dir=self.results_dir
+                        results_dir=self.results_dir,
+                        config_dir=self.config_dir
                     )
                     
                     if hasattr(device, 'zeroconf_name'):

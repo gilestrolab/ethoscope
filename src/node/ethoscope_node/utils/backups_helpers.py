@@ -329,7 +329,7 @@ class BackupClass(BaseBackupClass):
     
     def backup(self) -> Iterator[str]:
         """
-        Performs database backup with improved error handling and status reporting.
+        Performs MariaDB database backup with improved error handling and status reporting.
         Uses MySQLdbToSQLite's built-in max(id) incremental backup approach.
         
         Yields:
@@ -338,12 +338,19 @@ class BackupClass(BaseBackupClass):
         start_time = time.time()
         
         try:
-            self._logger.info(f"[{self._device_id}] === DATABASE BACKUP STARTING ===")
-            yield self._yield_status("info", f"Backup initiated for device {self._device_id}")
+            self._logger.info(f"[{self._device_id}] === MARIADB BACKUP STARTING ===")
+            yield self._yield_status("info", f"MariaDB backup initiated for device {self._device_id}")
             
-            # Validate backup path
-            self._logger.info(f"[{self._device_id}] Validating backup path...")
-            backup_path = self._get_backup_path()
+            # Validate device has MariaDB database
+            if not self._validate_mariadb_database():
+                error_msg = f"Device {self._device_id} does not have a MariaDB database - skipping MariaDB backup"
+                self._logger.warning(f"[{self._device_id}] {error_msg}")
+                yield self._yield_status("warning", error_msg)
+                return False
+            
+            # Validate backup path using MariaDB metadata
+            self._logger.info(f"[{self._device_id}] Validating MariaDB backup path...")
+            backup_path = self._get_mariadb_backup_path()
             db_name = f"{self._device_name}_db"
             
             self._logger.info(f"[{self._device_id}] Backup path validated: {backup_path}")
@@ -388,21 +395,80 @@ class BackupClass(BaseBackupClass):
             yield self._yield_status("error", error_msg)
             return False
     
+    def _validate_mariadb_database(self) -> bool:
+        """Validate that the device has a MariaDB database available for backup."""
+        try:
+            # Check the structured database_info from the enhanced API
+            database_info = self._device_info.get("database_info", {})
+            
+            # Check if MariaDB database exists
+            mariadb_info = database_info.get("mariadb", {})
+            if mariadb_info.get("exists", False):
+                self._logger.info(f"[{self._device_id}] MariaDB database validated for backup")
+                return True
+            
+            # Fallback: check if database_info has active_type = mariadb
+            if database_info.get("active_type") == "mariadb":
+                self._logger.info(f"[{self._device_id}] MariaDB database active (fallback validation)")
+                return True
+            
+            # Check legacy field for backward compatibility
+            result_writer_type = self._device_info.get("result_writer_type", "")
+            if "mariadb" in result_writer_type.lower() or "mysql" in result_writer_type.lower():
+                self._logger.info(f"[{self._device_id}] MariaDB database detected via legacy field")
+                return True
+            
+            self._logger.info(f"[{self._device_id}] No MariaDB database found - active_type: {database_info.get('active_type', 'none')}")
+            return False
+            
+        except Exception as e:
+            self._logger.error(f"[{self._device_id}] Error validating MariaDB database: {e}")
+            return False
+    
+    def _get_mariadb_backup_path(self) -> str:
+        """Get and validate backup path using MariaDB metadata."""
+        try:
+            # Try to get backup filename from MariaDB metadata
+            database_info = self._device_info.get("database_info", {})
+            mariadb_info = database_info.get("mariadb", {})
+            mariadb_current = mariadb_info.get("current", {})
+            mariadb_backup_filename = mariadb_current.get("backup_filename")
+            
+            if mariadb_backup_filename:
+                self._logger.info(f"[{self._device_id}] Using MariaDB backup filename: {mariadb_backup_filename}")
+                # Construct path using MariaDB metadata
+                filename_parts = mariadb_backup_filename.replace('.db', '').split("_")
+                if len(filename_parts) >= 3:
+                    backup_date = filename_parts[0]
+                    backup_time = filename_parts[1] 
+                    etho_id = "_".join(filename_parts[2:])
+                    backup_path = f"{etho_id}/{self._device_name}/{backup_date}_{backup_time}/{mariadb_backup_filename}"
+                else:
+                    raise BackupError(f"Invalid MariaDB backup filename format: {mariadb_backup_filename}")
+            else:
+                # Fallback to legacy backup_path method
+                self._logger.warning(f"[{self._device_id}] No MariaDB backup filename found, using legacy backup_path")
+                if "backup_path" not in self._device_info:
+                    raise BackupError(f"Could not obtain backup path for device {self._device_id}")
+                
+                backup_path = self._device_info["backup_path"]
+                if not backup_path:
+                    raise BackupError(f"Backup path is None for device {self._device_id}")
+            
+            full_backup_path = os.path.join(self._results_dir, backup_path)
+            
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(full_backup_path), exist_ok=True)
+            
+            return full_backup_path
+            
+        except Exception as e:
+            self._logger.error(f"[{self._device_id}] Error getting MariaDB backup path: {e}")
+            raise BackupError(f"Failed to get MariaDB backup path: {e}")
+    
     def _get_backup_path(self) -> str:
-        """Get and validate backup path."""
-        if "backup_path" not in self._device_info:
-            raise BackupError(f"Could not obtain backup path for device {self._device_id}")
-        
-        backup_path = self._device_info["backup_path"]
-        if not backup_path:
-            raise BackupError(f"Backup path is None for device {self._device_id}")
-        
-        full_backup_path = os.path.join(self._results_dir, backup_path)
-        
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(full_backup_path), exist_ok=True)
-        
-        return full_backup_path
+        """Get and validate backup path (legacy method - use _get_mariadb_backup_path instead)."""
+        return self._get_mariadb_backup_path()
     
     def _perform_database_backup(self, backup_path: str, db_name: str) -> Tuple[bool, dict]:
         """
@@ -827,7 +893,7 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
     
     def backup(self) -> Iterator[str]:
         """
-        Performs unified rsync backup for both results and videos.
+        Performs unified rsync backup for SQLite results and videos.
         
         Yields:
             str: JSON-encoded status messages with detailed progress updates
@@ -838,13 +904,28 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
         start_time = time.time()
         try:
             self._logger.info(f"[{self._device_id}] === UNIFIED RSYNC BACKUP STARTING ===")
+            
+            # Validate device has SQLite database if backing up results
+            if self._backup_results and not self._validate_sqlite_database():
+                error_msg = f"Device {self._device_id} does not have a SQLite database - skipping SQLite results backup"
+                self._logger.warning(f"[{self._device_id}] {error_msg}")
+                yield self._yield_status("warning", error_msg)
+                # Still allow video backup to proceed
+                self._backup_results = False
+            
             backup_types = []
             if self._backup_results:
                 backup_types.append("results")
             if self._backup_videos:
                 backup_types.append("videos")
             
-            yield self._yield_status("info", f"Unified rsync backup initiated for {', '.join(backup_types)} on device {self._device_id}")
+            if not backup_types:
+                error_msg = f"No valid backup types for device {self._device_id}"
+                self._logger.warning(f"[{self._device_id}] {error_msg}")
+                yield self._yield_status("warning", error_msg)
+                return False
+            
+            yield self._yield_status("info", f"SQLite rsync backup initiated for {', '.join(backup_types)} on device {self._device_id}")
             
             # Get SSH key path for authentication
             private_key_path, _ = ensure_ssh_keys()
@@ -1096,6 +1177,36 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
             return f"{int(size)} {units[unit_index]}"
         else:
             return f"{size:.1f} {units[unit_index]}"
+    
+    def _validate_sqlite_database(self) -> bool:
+        """Validate that the device has a SQLite database available for backup."""
+        try:
+            # Check the structured database_info from the enhanced API
+            database_info = self._device_info.get("database_info", {})
+            
+            # Check if SQLite database exists
+            sqlite_info = database_info.get("sqlite", {})
+            if sqlite_info.get("exists", False):
+                self._logger.info(f"[{self._device_id}] SQLite database validated for backup")
+                return True
+            
+            # Fallback: check if database_info has active_type = sqlite
+            if database_info.get("active_type") == "sqlite":
+                self._logger.info(f"[{self._device_id}] SQLite database active (fallback validation)")
+                return True
+            
+            # Check legacy field for backward compatibility
+            result_writer_type = self._device_info.get("result_writer_type", "")
+            if "sqlite" in result_writer_type.lower():
+                self._logger.info(f"[{self._device_id}] SQLite database detected via legacy field")
+                return True
+            
+            self._logger.info(f"[{self._device_id}] No SQLite database found - active_type: {database_info.get('active_type', 'none')}")
+            return False
+            
+        except Exception as e:
+            self._logger.error(f"[{self._device_id}] Error validating SQLite database: {e}")
+            return False
 
 
 class GenericBackupWrapper(threading.Thread):

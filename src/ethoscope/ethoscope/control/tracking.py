@@ -394,27 +394,104 @@ class ControlThread(Thread):
             self._option_dict[key]["kwargs"] = kwargs
 
     def _get_database_info(self):
-        """Get database metadata based on current status."""
+        """Get structured database metadata with clear MariaDB/SQLite separation."""
         try:
-            if self._metadata_cache is not None:
-                # Use the metadata cache for MySQL database info requests
-                return self._metadata_cache.get_metadata(self._tracking_start_time)
+            # Determine database types present
+            mariadb_info = self._get_mariadb_database_info()
+            sqlite_info = self._get_sqlite_database_info()
+            
+            # Determine active database type
+            active_type = "sqlite" if sqlite_info.get("exists", False) else ("mariadb" if mariadb_info.get("exists", False) else "none")
+            
+            # Create structured response
+            structured_info = {
+                "active_type": active_type,
+                "mariadb": mariadb_info,
+                "sqlite": sqlite_info
+            }
+            
+            # For backward compatibility, also provide legacy format
+            if active_type == "sqlite":
+                # Merge SQLite info into root level for backward compatibility
+                legacy_info = sqlite_info.get("current", {})
+                structured_info.update(legacy_info)
+            elif active_type == "mariadb":
+                # Merge MariaDB info into root level for backward compatibility
+                legacy_info = mariadb_info.get("current", {})
+                structured_info.update(legacy_info)
             else:
-                # For SQLite databases, return basic file-based info
-                return self._get_sqlite_database_info()
+                # No database available
+                structured_info.update({
+                    "db_size_bytes": 0,
+                    "table_counts": {},
+                    "last_db_update": 0,
+                    "db_status": "no_database"
+                })
+                
+            return structured_info
                 
         except Exception as e:
             logging.warning(f"Failed to get database info for {self._info.get('name', 'unknown')}: {e}")
             return {
+                "active_type": "error",
+                "mariadb": {"exists": False, "error": str(e)},
+                "sqlite": {"exists": False, "error": str(e)},
                 "db_size_bytes": 0,
                 "table_counts": {},
                 "last_db_update": 0,
                 "db_status": "error"
             }
     
-    def _get_sqlite_database_info(self):
-        """Get basic database info for SQLite databases."""
+    def _get_mariadb_database_info(self):
+        """Get MariaDB database information if available."""
         try:
+            if self._metadata_cache is not None:
+                # MariaDB database exists and has metadata cache
+                mariadb_metadata = self._metadata_cache.get_metadata(self._tracking_start_time)
+                
+                # Extract backup filename from MariaDB metadata
+                mariadb_backup_filename = self._get_mariadb_backup_filename()
+                
+                return {
+                    "exists": True,
+                    "current": {
+                        "db_name": self._db_credentials.get("name", "unknown"),
+                        "backup_filename": mariadb_backup_filename,
+                        "db_size_bytes": mariadb_metadata.get("db_size_bytes", 0),
+                        "table_counts": mariadb_metadata.get("table_counts", {}),
+                        "last_db_update": mariadb_metadata.get("last_db_update", 0),
+                        "db_status": mariadb_metadata.get("db_status", "unknown"),
+                        "db_version": mariadb_metadata.get("db_version", "MariaDB"),
+                        "metadata": mariadb_metadata
+                    }
+                }
+            else:
+                return {"exists": False}
+                
+        except Exception as e:
+            logging.warning(f"Failed to get MariaDB database info: {e}")
+            return {"exists": False, "error": str(e)}
+    
+    def _get_mariadb_backup_filename(self):
+        """Extract backup filename specifically from MariaDB METADATA table."""
+        try:
+            if self._metadata_cache is not None:
+                # Query the MariaDB METADATA table directly for backup filename
+                metadata_dict = self._metadata_cache._get_metadata_as_dict()
+                return metadata_dict.get("backup_filename")
+            return None
+        except Exception as e:
+            logging.warning(f"Failed to get MariaDB backup filename: {e}")
+            return None
+    
+    def _get_sqlite_database_info(self):
+        """Get structured SQLite database information."""
+        try:
+            # Check if SQLite database exists (no metadata cache means likely SQLite)
+            if self._metadata_cache is not None:
+                # MariaDB is active, SQLite doesn't exist
+                return {"exists": False}
+            
             # For SQLite, we need to determine the database file path
             # This should match the path used in _set_tracking_from_scratch
             if hasattr(self, '_metadata') and 'sqlite_source_path' in self._metadata:
@@ -433,30 +510,63 @@ class ControlThread(Thread):
                 else:
                     raise ValueError("No backup filename available for SQLite database")
             
-            # Get file size
+            # Get file size and table counts if possible
             if os.path.exists(db_path):
                 db_size = os.path.getsize(db_path)
                 db_status = "active" if self._info["status"] == "running" else "available"
+                
+                # Try to get table counts for SQLite
+                table_counts = self._get_sqlite_table_counts(db_path)
             else:
                 db_size = 0
                 db_status = "not_found"
+                table_counts = {}
             
             return {
-                "db_size_bytes": db_size,
-                "table_counts": {},  # SQLite table counts could be added later if needed
-                "last_db_update": time.time(),
-                "db_status": db_status,
-                "db_path": db_path
+                "exists": True,
+                "current": {
+                    "db_name": self._db_credentials.get("name", "unknown"),
+                    "backup_filename": self._info.get("backup_filename"),
+                    "sqlite_source_path": db_path,
+                    "db_size_bytes": db_size,
+                    "table_counts": table_counts,
+                    "last_db_update": time.time(),
+                    "db_status": db_status,
+                    "db_version": "SQLite 3.x"
+                }
             }
             
         except Exception as e:
             logging.warning(f"Failed to get SQLite database info: {e}")
-            return {
-                "db_size_bytes": 0,
-                "table_counts": {},
-                "last_db_update": 0,
-                "db_status": "sqlite_error"
-            }
+            return {"exists": False, "error": str(e)}
+    
+    def _get_sqlite_table_counts(self, db_path):
+        """Get table counts for SQLite database."""
+        try:
+            import sqlite3
+            with sqlite3.connect(db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Get all table names
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                tables = [row[0] for row in cursor.fetchall()]
+                
+                # Get row count for each table
+                table_counts = {}
+                for table in tables:
+                    try:
+                        cursor.execute(f"SELECT COUNT(*) FROM `{table}`")
+                        count = cursor.fetchone()[0]
+                        table_counts[table] = count
+                    except sqlite3.Error as e:
+                        logging.warning(f"Could not get count for table {table}: {e}")
+                        table_counts[table] = 0
+                        
+                return table_counts
+                        
+        except Exception as e:
+            logging.warning(f"Failed to get SQLite table counts: {e}")
+            return {}
 
     def _update_info(self):
         '''
