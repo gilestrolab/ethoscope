@@ -12,7 +12,6 @@ import pickle
 import secrets
 from collections import OrderedDict
 import json
-import mysql.connector
 
 import subprocess
 import signal
@@ -192,7 +191,7 @@ class ControlThread(Thread):
         # Database metadata tracking
         self._tracking_start_time = None
         # DatabaseMetadataCache is only compatible with MySQL databases
-        # For SQLite, we'll create it only when needed (see _get_database_info)
+        # For SQLite, we'll create it only when needed (see metadata cache initialization)
         self._metadata_cache = None
         
         #todo add 'data' -> how monitor was started to metadata
@@ -270,15 +269,36 @@ class ControlThread(Thread):
             }
 
         # Initialize database info now that _info is fully constructed
-        self._info["database_info"] = self._get_database_info()
+        if self._metadata_cache is not None:
+            try:
+                self._info["database_info"] = self._metadata_cache.get_database_info()
+            except Exception as e:
+                logging.warning(f"Failed to get database info from metadata cache during initialization: {e}")
+                self._info["database_info"] = {
+                    "db_size_bytes": 0,
+                    "table_counts": {},
+                    "last_db_update": 0,
+                    "db_status": "error"
+                }
+        else:
+            self._info["database_info"] = {
+                "db_size_bytes": 0,
+                "table_counts": {},
+                "last_db_update": 0,
+                "db_status": "no_cache"
+            }
         
-        # Check for existing backup filename from metadata table during initialization
+        # Check for existing backup filename from metadata cache during initialization
         # This ensures backup_filename is available immediately for status requests
         if "backup_filename" not in self._info:
-            existing_backup_filename = self._get_latest_backup_filename()
-            if existing_backup_filename:
-                self._info["backup_filename"] = existing_backup_filename
-                logging.info(f"Found existing backup filename during initialization: {existing_backup_filename}")
+            if self._metadata_cache is not None:
+                try:
+                    existing_backup_filename = self._metadata_cache.get_backup_filename()
+                    if existing_backup_filename:
+                        self._info["backup_filename"] = existing_backup_filename
+                        logging.info(f"Found existing backup filename during initialization: {existing_backup_filename}")
+                except Exception as e:
+                    logging.warning(f"Failed to get backup filename from metadata cache during initialization: {e}")
 
         self._parse_user_options(data)
         
@@ -393,180 +413,10 @@ class ControlThread(Thread):
             self._option_dict[key]["class"] = Class
             self._option_dict[key]["kwargs"] = kwargs
 
-    def _get_database_info(self):
-        """Get structured database metadata with clear MariaDB/SQLite separation."""
-        try:
-            # Determine database types present
-            mariadb_info = self._get_mariadb_database_info()
-            sqlite_info = self._get_sqlite_database_info()
-            
-            # Determine active database type
-            active_type = "sqlite" if sqlite_info.get("exists", False) else ("mariadb" if mariadb_info.get("exists", False) else "none")
-            
-            # Create structured response
-            structured_info = {
-                "active_type": active_type,
-                "mariadb": mariadb_info,
-                "sqlite": sqlite_info
-            }
-            
-            # For backward compatibility, also provide legacy format
-            if active_type == "sqlite":
-                # Merge SQLite info into root level for backward compatibility
-                legacy_info = sqlite_info.get("current", {})
-                structured_info.update(legacy_info)
-            elif active_type == "mariadb":
-                # Merge MariaDB info into root level for backward compatibility
-                legacy_info = mariadb_info.get("current", {})
-                structured_info.update(legacy_info)
-            else:
-                # No database available
-                structured_info.update({
-                    "db_size_bytes": 0,
-                    "table_counts": {},
-                    "last_db_update": 0,
-                    "db_status": "no_database"
-                })
-                
-            return structured_info
-                
-        except Exception as e:
-            logging.warning(f"Failed to get database info for {self._info.get('name', 'unknown')}: {e}")
-            return {
-                "active_type": "error",
-                "mariadb": {"exists": False, "error": str(e)},
-                "sqlite": {"exists": False, "error": str(e)},
-                "db_size_bytes": 0,
-                "table_counts": {},
-                "last_db_update": 0,
-                "db_status": "error"
-            }
     
-    def _get_mariadb_database_info(self):
-        """Get MariaDB database information if available."""
-        try:
-            if self._metadata_cache is not None:
-                # MariaDB database exists and has metadata cache
-                mariadb_metadata = self._metadata_cache.get_metadata(self._tracking_start_time)
-                
-                # Extract backup filename from MariaDB metadata
-                mariadb_backup_filename = self._get_mariadb_backup_filename()
-                
-                return {
-                    "exists": True,
-                    "current": {
-                        "db_name": self._db_credentials.get("name", "unknown"),
-                        "backup_filename": mariadb_backup_filename,
-                        "db_size_bytes": mariadb_metadata.get("db_size_bytes", 0),
-                        "table_counts": mariadb_metadata.get("table_counts", {}),
-                        "last_db_update": mariadb_metadata.get("last_db_update", 0),
-                        "db_status": mariadb_metadata.get("db_status", "unknown"),
-                        "db_version": mariadb_metadata.get("db_version", "MariaDB"),
-                        "metadata": mariadb_metadata
-                    }
-                }
-            else:
-                return {"exists": False}
-                
-        except Exception as e:
-            logging.warning(f"Failed to get MariaDB database info: {e}")
-            return {"exists": False, "error": str(e)}
     
-    def _get_mariadb_backup_filename(self):
-        """Extract backup filename specifically from MariaDB METADATA table."""
-        try:
-            if self._metadata_cache is not None:
-                # Query the MariaDB METADATA table directly for backup filename
-                metadata_dict = self._metadata_cache._get_metadata_as_dict()
-                return metadata_dict.get("backup_filename")
-            return None
-        except Exception as e:
-            logging.warning(f"Failed to get MariaDB backup filename: {e}")
-            return None
     
-    def _get_sqlite_database_info(self):
-        """Get structured SQLite database information."""
-        try:
-            # Check if SQLite database exists (no metadata cache means likely SQLite)
-            if self._metadata_cache is not None:
-                # MariaDB is active, SQLite doesn't exist
-                return {"exists": False}
-            
-            # For SQLite, we need to determine the database file path
-            # This should match the path used in _set_tracking_from_scratch
-            if hasattr(self, '_metadata') and 'sqlite_source_path' in self._metadata:
-                db_path = self._metadata['sqlite_source_path']
-            else:
-                # Fallback: try to construct the path from backup filename
-                if self._info.get("backup_filename"):
-                    filename_parts = self._info["backup_filename"].replace('.db', '').split("_")
-                    if len(filename_parts) >= 3:
-                        backup_date = filename_parts[0]
-                        backup_time = filename_parts[1] 
-                        etho_id = "_".join(filename_parts[2:])
-                        db_path = f"/ethoscope_data/results/{etho_id}/{self._info['name']}/{backup_date}_{backup_time}/{self._info['backup_filename']}"
-                    else:
-                        raise ValueError("Cannot determine SQLite database path")
-                else:
-                    raise ValueError("No backup filename available for SQLite database")
-            
-            # Get file size and table counts if possible
-            if os.path.exists(db_path):
-                db_size = os.path.getsize(db_path)
-                db_status = "active" if self._info["status"] == "running" else "available"
-                
-                # Try to get table counts for SQLite
-                table_counts = self._get_sqlite_table_counts(db_path)
-            else:
-                db_size = 0
-                db_status = "not_found"
-                table_counts = {}
-            
-            return {
-                "exists": True,
-                "current": {
-                    "db_name": self._db_credentials.get("name", "unknown"),
-                    "backup_filename": self._info.get("backup_filename"),
-                    "sqlite_source_path": db_path,
-                    "db_size_bytes": db_size,
-                    "table_counts": table_counts,
-                    "last_db_update": time.time(),
-                    "db_status": db_status,
-                    "db_version": "SQLite 3.x"
-                }
-            }
-            
-        except Exception as e:
-            logging.warning(f"Failed to get SQLite database info: {e}")
-            return {"exists": False, "error": str(e)}
     
-    def _get_sqlite_table_counts(self, db_path):
-        """Get table counts for SQLite database."""
-        try:
-            import sqlite3
-            with sqlite3.connect(db_path) as conn:
-                cursor = conn.cursor()
-                
-                # Get all table names
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-                tables = [row[0] for row in cursor.fetchall()]
-                
-                # Get row count for each table
-                table_counts = {}
-                for table in tables:
-                    try:
-                        cursor.execute(f"SELECT COUNT(*) FROM `{table}`")
-                        count = cursor.fetchone()[0]
-                        table_counts[table] = count
-                    except sqlite3.Error as e:
-                        logging.warning(f"Could not get count for table {table}: {e}")
-                        table_counts[table] = 0
-                        
-                return table_counts
-                        
-        except Exception as e:
-            logging.warning(f"Failed to get SQLite table counts: {e}")
-            return {}
 
     def _update_info(self):
         '''
@@ -600,14 +450,35 @@ class ControlThread(Thread):
             if frame is not None:
                 cv2.imwrite(self._info["last_drawn_img"], frame, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
 
-        # Update database info
-        self._info["database_info"] = self._get_database_info()
+        # Update database info using MetadataCache
+        if self._metadata_cache is not None:
+            try:
+                self._info["database_info"] = self._metadata_cache.get_database_info()
+            except Exception as e:
+                logging.warning(f"Failed to get database info from metadata cache: {e}")
+                self._info["database_info"] = {
+                    "db_size_bytes": 0,
+                    "table_counts": {},
+                    "last_db_update": 0,
+                    "db_status": "error"
+                }
+        else:
+            self._info["database_info"] = {
+                "db_size_bytes": 0,
+                "table_counts": {},
+                "last_db_update": 0,
+                "db_status": "no_cache"
+            }
         
-        # Update backup filename from metadata table - always include regardless of status
+        # Update backup filename from metadata cache - always include regardless of status
         if "backup_filename" not in self._info or not self._info["backup_filename"]:
-            backup_filename = self._get_latest_backup_filename()
-            if backup_filename:
-                self._info["backup_filename"] = backup_filename
+            if self._metadata_cache is not None:
+                try:
+                    backup_filename = self._metadata_cache.get_backup_filename()
+                    if backup_filename:
+                        self._info["backup_filename"] = backup_filename
+                except Exception as e:
+                    logging.warning(f"Failed to get backup filename from metadata cache: {e}")
 
         self._last_info_t_stamp = wall_time
         self._last_info_frame_idx = frame_idx
@@ -656,7 +527,24 @@ class ControlThread(Thread):
             logging.warning("Using current time as tracking start time (no metadata/backup filename available)")
         
         # Initialize database metadata for tracking
-        self._info["database_info"] = self._get_database_info()
+        if self._metadata_cache is not None:
+            try:
+                self._info["database_info"] = self._metadata_cache.get_database_info()
+            except Exception as e:
+                logging.warning(f"Failed to get database info from metadata cache for tracking: {e}")
+                self._info["database_info"] = {
+                    "db_size_bytes": 0,
+                    "table_counts": {},
+                    "last_db_update": 0,
+                    "db_status": "error"
+                }
+        else:
+            self._info["database_info"] = {
+                "db_size_bytes": 0,
+                "table_counts": {},
+                "last_db_update": 0,
+                "db_status": "no_cache"
+            }
 
         self._monit.run(result_writer, self._drawer)
 
@@ -749,8 +637,13 @@ class ControlThread(Thread):
         else:
             append_to_db = False
 
-        # Try to get existing backup filename from metadata table first
-        existing_backup_filename = self._get_latest_backup_filename()
+        # Try to get existing backup filename from metadata cache first
+        existing_backup_filename = None
+        if self._metadata_cache is not None:
+            try:
+                existing_backup_filename = self._metadata_cache.get_backup_filename()
+            except Exception as e:
+                logging.warning(f"Failed to get backup filename from metadata cache: {e}")
         
         if existing_backup_filename and append_to_db:
             # Use existing backup filename when appending to database
@@ -871,43 +764,6 @@ class ControlThread(Thread):
         return  (cam, rw, rois, reference_points, TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs)
 
-    def _get_latest_backup_filename(self):
-        '''
-        Tries to recover the latest backup_filename from the metadata table
-        '''
-        try:
-            # Connect to the MySQL database
-            conn = mysql.connector.connect(
-                host='localhost',
-                user=self._db_credentials["user"],
-                password=self._db_credentials["password"],
-                database=self._db_credentials["name"]
-            )
-            cursor = conn.cursor()
-            
-            # Query the metadata table for the backup filename
-            cursor.execute("SELECT DISTINCT value FROM METADATA WHERE field = 'backup_filename' AND value IS NOT NULL")
-            result = cursor.fetchone()
-            
-            if result:
-                backup_filename = result[0]
-                logging.info(f"Found existing backup filename from metadata: {backup_filename}")
-                return backup_filename
-            else:
-                logging.info("No existing backup filename found in metadata table")
-                return None
-                
-        except mysql.connector.Error as e:
-            logging.warning(f"Could not retrieve backup filename from metadata table: {e}")
-            return None
-        except Exception as e:
-            logging.error(f"Unexpected error retrieving backup filename: {e}")
-            return None
-        finally:
-            if 'conn' in locals() and conn.is_connected():
-                cursor.close()
-                conn.close()
-        
     
     def run(self):
         cam = None
@@ -931,8 +787,14 @@ class ControlThread(Thread):
                     # The pickle file might have an outdated backup filename if the ethoscope rebooted
                     logging.info(f"Loaded backup filename from pickle: {self._info.get('backup_filename', 'None')}")
                     
-                    # Get the correct backup filename from metadata table
-                    metadata_backup_filename = self._get_latest_backup_filename()
+                    # Get the correct backup filename from metadata cache
+                    metadata_backup_filename = None
+                    if self._metadata_cache is not None:
+                        try:
+                            metadata_backup_filename = self._metadata_cache.get_backup_filename()
+                        except Exception as e:
+                            logging.warning(f"Failed to get backup filename from metadata cache: {e}")
+                    
                     if metadata_backup_filename and metadata_backup_filename != self._info.get('backup_filename'):
                         logging.warning(f"Backup filename mismatch! Pickle: {self._info.get('backup_filename')} vs Metadata: {metadata_backup_filename}")
                         logging.info(f"Using correct backup filename from metadata: {metadata_backup_filename}")
@@ -940,7 +802,7 @@ class ControlThread(Thread):
                     elif metadata_backup_filename:
                         logging.info(f"Backup filename validated against metadata: {metadata_backup_filename}")
                     else:
-                        logging.warning("No backup filename found in metadata table, keeping pickle version")
+                        logging.warning("No backup filename found in metadata cache, keeping pickle version")
 
                 except Exception as e:
                     logging.error("Could not load previous state for unexpected reason:")
@@ -1030,7 +892,24 @@ class ControlThread(Thread):
                     logging.warning(f"Failed to finalize cache file: {e}")
             
             # Update database info after stopping
-            self._info["database_info"] = self._get_database_info()
+            if self._metadata_cache is not None:
+                try:
+                    self._info["database_info"] = self._metadata_cache.get_database_info()
+                except Exception as e:
+                    logging.warning(f"Failed to get database info from metadata cache after stopping: {e}")
+                    self._info["database_info"] = {
+                        "db_size_bytes": 0,
+                        "table_counts": {},
+                        "last_db_update": 0,
+                        "db_status": "error"
+                    }
+            else:
+                self._info["database_info"] = {
+                    "db_size_bytes": 0,
+                    "table_counts": {},
+                    "last_db_update": 0,
+                    "db_status": "no_cache"
+                }
             
             if "backup_filename" in self._info:
                 self._info["previous_date_time"] = self._info["time"]

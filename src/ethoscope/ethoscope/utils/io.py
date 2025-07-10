@@ -2182,6 +2182,55 @@ class BaseDatabaseMetadataCache:
             "finalized_timestamp": cache_data.get("finalized_timestamp"),
             "experiment_info": cache_data.get("experiment_info", {})
         }
+    
+    def get_database_info(self):
+        """
+        Get structured database information for the current database.
+        
+        This is a convenience method that calls get_metadata() and adds
+        additional status information.
+        
+        Returns:
+            dict: Database information including:
+                - db_name (str): Database name
+                - db_size_bytes (int): Database size in bytes
+                - table_counts (dict): Table name -> row count mapping
+                - last_db_update (float): Timestamp of last update
+                - db_status (str): Database status
+                - db_version (str): Database version
+        """
+        try:
+            # Use existing get_metadata() method to avoid code duplication
+            db_info = self.get_metadata()
+            
+            # Add additional fields not provided by get_metadata()
+            if "db_name" not in db_info:
+                db_info["db_name"] = self.db_credentials.get("name", "unknown")
+            if "db_status" not in db_info:
+                db_info["db_status"] = "active"
+            
+            return db_info
+        except Exception as e:
+            logging.warning(f"Failed to get database info: {e}")
+            return {
+                "db_name": self.db_credentials.get("name", "unknown"),
+                "db_size_bytes": 0,
+                "table_counts": {},
+                "last_db_update": 0,
+                "db_status": "error",
+                "db_version": "Unknown"
+            }
+    
+    def get_backup_filename(self):
+        """
+        Get the backup filename for the current database.
+        
+        Returns:
+            str or None: Backup filename if available, None otherwise
+        """
+        # This is a default implementation that subclasses can override
+        # For now, return None as this is database-specific
+        return None
 
 
 class MySQLDatabaseMetadataCache(BaseDatabaseMetadataCache):
@@ -2266,6 +2315,44 @@ class MySQLDatabaseMetadataCache(BaseDatabaseMetadataCache):
                 "table_counts": table_counts,
                 "last_db_update": time.time()
             }
+    
+    def get_backup_filename(self):
+        """
+        Get the backup filename for the MySQL database from the METADATA table.
+        
+        Returns:
+            str or None: Backup filename if available, None otherwise
+        """
+        try:
+            with mysql.connector.connect(
+                host='localhost',
+                user=self.db_credentials["user"],
+                password=self.db_credentials["password"],
+                database=self.db_credentials["name"],
+                charset='latin1',
+                use_unicode=True,
+                connect_timeout=10
+            ) as conn:
+                cursor = conn.cursor()
+                
+                # Query the metadata table for the backup filename
+                cursor.execute("SELECT DISTINCT value FROM METADATA WHERE field = 'backup_filename' AND value IS NOT NULL")
+                result = cursor.fetchone()
+                
+                if result:
+                    backup_filename = result[0]
+                    logging.info(f"Found backup filename from metadata: {backup_filename}")
+                    return backup_filename
+                else:
+                    logging.info("No backup filename found in metadata table")
+                    return None
+                    
+        except mysql.connector.Error as e:
+            logging.warning(f"Could not retrieve backup filename from metadata table: {e}")
+            return None
+        except Exception as e:
+            logging.error(f"Unexpected error retrieving backup filename: {e}")
+            return None
 
 
 class SQLiteDatabaseMetadataCache(BaseDatabaseMetadataCache):
@@ -2325,6 +2412,59 @@ class SQLiteDatabaseMetadataCache(BaseDatabaseMetadataCache):
             "table_counts": table_counts,
             "last_db_update": time.time()
         }
+    
+    def get_database_info(self):
+        """
+        Get structured database information for the SQLite database.
+        
+        Returns:
+            dict: Database information including sqlite_source_path
+        """
+        try:
+            db_info = super().get_database_info()
+            # Add SQLite-specific information
+            db_info["sqlite_source_path"] = self.db_credentials["name"]
+            return db_info
+        except Exception as e:
+            logging.warning(f"Failed to get SQLite database info: {e}")
+            return {
+                "db_name": self.db_credentials.get("name", "unknown"),
+                "sqlite_source_path": self.db_credentials.get("name", ""),
+                "db_size_bytes": 0,
+                "table_counts": {},
+                "last_db_update": time.time(),
+                "db_status": "error",
+                "db_version": "SQLite 3.x"
+            }
+    
+    def get_backup_filename(self):
+        """
+        Get the backup filename for the SQLite database.
+        
+        For SQLite databases, the backup filename is typically derived from the database path.
+        
+        Returns:
+            str or None: Backup filename if available, None otherwise
+        """
+        try:
+            db_path = self.db_credentials["name"]
+            if db_path and os.path.exists(db_path):
+                # Extract backup filename from the database path
+                # Expected path format: /ethoscope_data/results/{machine_id}/{machine_name}/{date_time}/{backup_filename}
+                backup_filename = os.path.basename(db_path)
+                if backup_filename.endswith('.db'):
+                    logging.info(f"Found SQLite backup filename: {backup_filename}")
+                    return backup_filename
+                else:
+                    logging.warning(f"SQLite database path does not end with .db: {db_path}")
+                    return None
+            else:
+                logging.warning(f"SQLite database path does not exist: {db_path}")
+                return None
+                
+        except Exception as e:
+            logging.error(f"Unexpected error retrieving SQLite backup filename: {e}")
+            return None
 
 
 def create_metadata_cache(db_credentials, device_name="", cache_dir="/ethoscope_data/cache", database_type=None):
