@@ -1722,6 +1722,7 @@ class BaseDatabaseMetadataCache:
         self.db_credentials = db_credentials
         self.device_name = device_name
         self.cache_dir = cache_dir
+        self.current_cache_file_path = None  # Track current active cache file
         os.makedirs(cache_dir, exist_ok=True)
     
     def get_metadata(self, tracking_start_time=None):
@@ -1735,6 +1736,10 @@ class BaseDatabaseMetadataCache:
             dict: Database metadata including size, table counts, etc.
         """
         cache_file_path = self._get_cache_file_path(tracking_start_time)
+        
+        # If no cache file path found and we have a current cache file, use it
+        if not cache_file_path and self.current_cache_file_path:
+            cache_file_path = self.current_cache_file_path
         
         try:
             # Try to query database for fresh metadata
@@ -1756,6 +1761,9 @@ class BaseDatabaseMetadataCache:
         cache_file_path = self._get_cache_file_path(tracking_start_time)
         if cache_file_path:
             self._write_cache(cache_file_path, finalise=True)
+        
+        # Clear current cache file path when session ends
+        self.current_cache_file_path = None
     
     def get_cached_metadata(self, cache_index=0):
         """
@@ -1863,6 +1871,9 @@ class BaseDatabaseMetadataCache:
         cache_file_path = self._get_cache_file_path(tracking_start_time)
         if cache_file_path:
             try:
+                # Store current cache file path for future updates
+                self.current_cache_file_path = cache_file_path
+                
                 # Format experiment info for storage
                 formatted_info = {
                     "date_time": experiment_info.get("date_time"),
