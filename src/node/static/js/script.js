@@ -135,13 +135,30 @@
         };
 
         var get_backup_status = function() {
-            // Get backup status via proxy to avoid CORS issues
+            // Get unified backup status from both MySQL and rsync backup daemons
             $http.get('/backup/status').then(function(response) {
-                $scope.backup_status = response.data;
-                $scope.backup_service_available = true;
+                var data = response.data;
+                
+                // Store the full response for debugging/advanced use
+                $scope.backup_status_full = data;
+                
+                // Extract unified devices for easy access by device ID
+                $scope.backup_status = data.unified_devices || {};
+                
+                // Check if either backup service is available
+                $scope.mysql_backup_available = !data.mysql_backup?.error;
+                $scope.rsync_backup_available = !data.rsync_backup?.error;
+                $scope.backup_service_available = $scope.mysql_backup_available || $scope.rsync_backup_available;
+                
+                // Store service-specific status for advanced display
+                $scope.mysql_backup_status = data.mysql_backup;
+                $scope.rsync_backup_status = data.rsync_backup;
+                
             }).catch(function(error) {
                 $scope.backup_status = {};
                 $scope.backup_service_available = false;
+                $scope.mysql_backup_available = false;
+                $scope.rsync_backup_available = false;
             });
         };
 
@@ -210,14 +227,24 @@
                 return 'backup-status-unknown';  // grey circle
             }
             
-            if (backup_info.progress && backup_info.progress.status === 'success') {
-                return 'backup-status-success';  // green circle
-            } else if (backup_info.progress && backup_info.progress.status === 'error') {
-                return 'backup-status-error';  // red circle
-            } else if (backup_info.processing) {
-                return 'backup-status-processing';  // yellow/orange circle
-            } else {
-                return 'backup-status-unknown';  // grey circle
+            // Check if any backup is currently processing (orange breathing circle)
+            var mysql_processing = backup_info.mysql_backup?.processing;
+            var rsync_processing = backup_info.rsync_backup?.processing;
+            
+            if (mysql_processing || rsync_processing) {
+                return 'backup-status-processing';  // orange breathing circle - backup in progress
+            }
+            
+            // Use the unified overall_status from the new API
+            switch (backup_info.overall_status) {
+                case 'success':
+                    return 'backup-status-success';  // green circle - both backups working
+                case 'partial':
+                    return 'backup-status-partial';  // golden circle (no breathing) - only one backup working
+                case 'error':
+                    return 'backup-status-error';  // red circle - at least one backup failed
+                default:
+                    return 'backup-status-unknown';  // grey circle
             }
         };
 
@@ -231,13 +258,41 @@
                 return 'No backup information available';
             }
             
-            var title = 'Backup Status: ' + (backup_info.status || 'unknown');
-            if (backup_info.progress && backup_info.progress.message) {
-                title += ' - ' + backup_info.progress.message;
+            var title = 'Overall Status: ' + (backup_info.overall_status || 'unknown');
+            
+            // Add MySQL backup details
+            if (backup_info.mysql_backup?.available) {
+                var mysql_status = backup_info.mysql_backup.progress?.status || backup_info.mysql_backup.status;
+                title += '\nMySQL Backup: ' + mysql_status;
+                if (backup_info.mysql_backup.progress?.message) {
+                    title += ' - ' + backup_info.mysql_backup.progress.message;
+                }
+                if (backup_info.mysql_backup.count > 0) {
+                    title += ' (#' + backup_info.mysql_backup.count + ')';
+                }
+            } else {
+                title += '\nMySQL Backup: not available';
             }
-            if (backup_info.count) {
-                title += ' (Backup #' + backup_info.count + ')';
+            
+            // Add rsync backup details
+            if (backup_info.rsync_backup?.available) {
+                var rsync_status = backup_info.rsync_backup.progress?.status || backup_info.rsync_backup.status;
+                title += '\nRsync Backup: ' + rsync_status;
+                if (backup_info.rsync_backup.progress?.message) {
+                    title += ' - ' + backup_info.rsync_backup.progress.message;
+                }
+                if (backup_info.rsync_backup.count > 0) {
+                    title += ' (#' + backup_info.rsync_backup.count + ')';
+                }
+                
+                // Add disk usage info if available
+                if (backup_info.rsync_backup.synced?.results?.disk_usage_human) {
+                    title += '\nData Size: ' + backup_info.rsync_backup.synced.results.disk_usage_human;
+                }
+            } else {
+                title += '\nRsync Backup: not available';
             }
+            
             return title;
         };
 

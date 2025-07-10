@@ -1310,8 +1310,12 @@ table thead th a:focus {
 }
 
 .backup-status-processing {
-    background-color: var(--golden-honey);
+    background-color: var(--burnt-orange);
     animation: apple-breathing 2s ease-in-out infinite;
+}
+
+.backup-status-partial {
+    background-color: var(--golden-honey);
 }
 
 .backup-status-unknown {
@@ -1326,17 +1330,17 @@ table thead th a:focus {
     0% {
         opacity: 0.3;
         transform: scale(0.8);
-        box-shadow: 0 0 0 0 rgba(212, 164, 65, 0.7);
+        box-shadow: 0 0 0 0 rgba(196, 123, 47, 0.7);
     }
     50% {
         opacity: 1;
         transform: scale(1.2);
-        box-shadow: 0 0 0 8px rgba(212, 164, 65, 0.1);
+        box-shadow: 0 0 0 8px rgba(196, 123, 47, 0.1);
     }
     100% {
         opacity: 0.3;
         transform: scale(0.8);
-        box-shadow: 0 0 0 0 rgba(212, 164, 65, 0.7);
+        box-shadow: 0 0 0 0 rgba(196, 123, 47, 0.7);
     }
 }
 

@@ -618,17 +618,104 @@ class EthoscopeNodeServer:
     # Route handlers - Backup API
     @error_decorator
     def _get_backup_status(self):
-        """Proxy backup status from backup tool server to avoid CORS issues."""
+        """Get unified backup status from both MySQL (8090) and rsync (8093) backup daemons."""
+        bottle.response.content_type = 'application/json'
+        
+        # Fetch status from both backup services
+        mysql_status = self._fetch_mysql_backup_status()
+        rsync_status = self._fetch_rsync_backup_status()
+        
+        # Create unified response
+        unified_status = {
+            "mysql_backup": mysql_status,
+            "rsync_backup": rsync_status,
+            "unified_devices": self._merge_backup_status(mysql_status, rsync_status)
+        }
+        
+        return json.dumps(unified_status, indent=2)
+    
+    def _fetch_mysql_backup_status(self):
+        """Fetch backup status from MySQL backup daemon (port 8090)."""
         try:
             backup_url = 'http://localhost:8090/status'
             with urllib.request.urlopen(backup_url, timeout=5) as response:
                 data = response.read().decode('utf-8')
-                bottle.response.content_type = 'application/json'
-                return data
+                return json.loads(data)
         except Exception as e:
-            self.logger.warning(f"Failed to get backup status: {e}")
-            bottle.response.content_type = 'application/json'
-            return json.dumps({'error': 'Backup service unavailable'})
+            self.logger.warning(f"Failed to get MySQL backup status from port 8090: {e}")
+            return {"error": "MySQL backup service unavailable", "service": "mysql_backup"}
+    
+    def _fetch_rsync_backup_status(self):
+        """Fetch backup status from rsync backup daemon (port 8093)."""
+        try:
+            backup_url = 'http://localhost:8093/status'
+            with urllib.request.urlopen(backup_url, timeout=5) as response:
+                data = response.read().decode('utf-8')
+                return json.loads(data)
+        except Exception as e:
+            self.logger.warning(f"Failed to get rsync backup status from port 8093: {e}")
+            return {"error": "Rsync backup service unavailable", "service": "rsync_backup"}
+    
+    def _merge_backup_status(self, mysql_status, rsync_status):
+        """Merge backup status from both services into a unified view per device."""
+        unified_devices = {}
+        
+        # Get devices from MySQL backup status
+        mysql_devices = mysql_status.get("devices", mysql_status) if "error" not in mysql_status else {}
+        
+        # Get devices from rsync backup status  
+        rsync_devices = rsync_status.get("devices", rsync_status) if "error" not in rsync_status else {}
+        
+        # Get all unique device IDs from both services
+        all_device_ids = set(mysql_devices.keys()) | set(rsync_devices.keys())
+        
+        for device_id in all_device_ids:
+            mysql_device = mysql_devices.get(device_id, {})
+            rsync_device = rsync_devices.get(device_id, {})
+            
+            # Create unified device status
+            unified_device = {
+                "name": mysql_device.get("name") or rsync_device.get("name", f"DEVICE_{device_id[:8]}"),
+                "status": mysql_device.get("status") or rsync_device.get("status", "unknown"),
+                "mysql_backup": {
+                    "available": bool(mysql_device),
+                    "status": mysql_device.get("status", "not_available"),
+                    "progress": mysql_device.get("progress", {}),
+                    "synced": mysql_device.get("synced", {}),
+                    "processing": mysql_device.get("processing", False),
+                    "count": mysql_device.get("count", 0),
+                    "started": mysql_device.get("started"),
+                    "ended": mysql_device.get("ended")
+                },
+                "rsync_backup": {
+                    "available": bool(rsync_device),
+                    "status": rsync_device.get("status", "not_available"),
+                    "progress": rsync_device.get("progress", {}),
+                    "synced": rsync_device.get("synced", {}),
+                    "processing": rsync_device.get("processing", False),
+                    "count": rsync_device.get("count", 0),
+                    "started": rsync_device.get("started"),
+                    "ended": rsync_device.get("ended"),
+                    "metadata": rsync_device.get("metadata", {})
+                }
+            }
+            
+            # Determine overall backup health
+            mysql_ok = mysql_device.get("progress", {}).get("status") == "success"
+            rsync_ok = rsync_device.get("progress", {}).get("status") == "success"
+            
+            if mysql_ok and rsync_ok:
+                unified_device["overall_status"] = "success"
+            elif mysql_ok or rsync_ok:
+                unified_device["overall_status"] = "partial"
+            elif mysql_device.get("progress", {}).get("status") == "error" or rsync_device.get("progress", {}).get("status") == "error":
+                unified_device["overall_status"] = "error"
+            else:
+                unified_device["overall_status"] = "unknown"
+            
+            unified_devices[device_id] = unified_device
+        
+        return unified_devices
     
     # Route handlers - Sensor API
     @error_decorator
