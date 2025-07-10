@@ -1496,13 +1496,21 @@ class DeviceScanner:
                         return
                 
                 # Create and start device
-                config_dir = getattr(self, 'config_dir', '/etc/ethoscope')
-                device = self._device_class(
-                    ip, port=port, 
-                    refresh_period=self.device_refresh_period,
-                    results_dir=getattr(self, 'results_dir', ''),
-                    config_dir=config_dir
-                )
+                device_kwargs = {
+                    'ip': ip,
+                    'port': port,
+                    'refresh_period': self.device_refresh_period,
+                    'results_dir': getattr(self, 'results_dir', '')
+                }
+                
+                # Only add config_dir if the device class supports it (for Ethoscope)
+                if hasattr(self, 'config_dir'):
+                    import inspect
+                    sig = inspect.signature(self._device_class.__init__)
+                    if 'config_dir' in sig.parameters:
+                        device_kwargs['config_dir'] = self.config_dir
+                
+                device = self._device_class(**device_kwargs)
                 
                 if hasattr(device, 'zeroconf_name'):
                     device.zeroconf_name = name
@@ -1695,12 +1703,21 @@ class EthoscopeScanner(DeviceScanner):
             # Create device with minimal blocking
             with self._lock:
                 try:
-                    device = self._device_class(
-                        ip, port=port,
-                        refresh_period=self.device_refresh_period,
-                        results_dir=self.results_dir,
-                        config_dir=self.config_dir
-                    )
+                    device_kwargs = {
+                        'ip': ip,
+                        'port': port,
+                        'refresh_period': self.device_refresh_period,
+                        'results_dir': self.results_dir
+                    }
+                    
+                    # Only add config_dir if the device class supports it
+                    if hasattr(self, 'config_dir'):
+                        import inspect
+                        sig = inspect.signature(self._device_class.__init__)
+                        if 'config_dir' in sig.parameters:
+                            device_kwargs['config_dir'] = self.config_dir
+                    
+                    device = self._device_class(**device_kwargs)
                     
                     if hasattr(device, 'zeroconf_name'):
                         device.zeroconf_name = name
