@@ -256,6 +256,72 @@ class BaseSQLConnector:
             logging.error(f"Error comparing databases: {e}")
             return -1
 
+def get_backup_path_from_database(host, ethoscope_number=None):
+    """Connect directly to ethoscope's database and get backup filename from METADATA table."""
+    logging.info(f"Querying METADATA table directly from {host}...")
+    
+    # Determine database name - try to extract from host or use provided number
+    db_name = "ethoscope_db"  # Default fallback
+    
+    if ethoscope_number is not None:
+        db_name = f"ETHOSCOPE_{ethoscope_number:03d}_db"
+        logging.info(f"Using database name from ethoscope number: {db_name}")
+    elif host:
+        # Try to extract ethoscope number from hostname or IP
+        import re
+        # Look for ethoscope number in hostname like "ethoscope070.local"
+        hostname_match = re.search(r'ethoscope(\d+)', host)
+        if hostname_match:
+            number = int(hostname_match.group(1))
+            db_name = f"ETHOSCOPE_{number:03d}_db"
+            logging.info(f"Extracted database name from hostname: {db_name}")
+        # Look for ethoscope number in IP like 192.168.1.27 (where 27 = 20 + 007)
+        elif re.match(r'192\.168\.1\.(\d+)', host):
+            ip_match = re.match(r'192\.168\.1\.(\d+)', host)
+            ip_last_octet = int(ip_match.group(1))
+            if ip_last_octet >= 21:  # Standard ethoscope IP range starts at .21
+                ethoscope_num = ip_last_octet - 20
+                db_name = f"ETHOSCOPE_{ethoscope_num:03d}_db"
+                logging.info(f"Extracted database name from IP: {db_name}")
+    
+    try:
+        # Connect to ethoscope's MariaDB database
+        connection = mysql.connector.connect(
+            host=host,
+            port=3306,
+            user='node',
+            password='node',
+            database=db_name,
+            connect_timeout=10,
+            autocommit=True
+        )
+        
+        cursor = connection.cursor()
+        
+        # Query METADATA table for backup filename
+        cursor.execute("SELECT DISTINCT value FROM METADATA WHERE field = 'backup_filename' AND value IS NOT NULL")
+        result = cursor.fetchone()
+        
+        if result and result[0]:
+            backup_filename = result[0]
+            logging.info(f"Found backup filename from {host}: {backup_filename}")
+            return backup_filename
+        else:
+            raise ValueError(f"No backup_filename found in METADATA table on {host}")
+            
+    except mysql.connector.Error as e:
+        raise ConnectionError(f"Failed to connect to database on {host}: {e}")
+    except Exception as e:
+        raise RuntimeError(f"Error querying METADATA table on {host}: {e}")
+    finally:
+        try:
+            if 'cursor' in locals():
+                cursor.close()
+            if 'connection' in locals():
+                connection.close()
+        except:
+            pass
+
 class MySQLdbToSQLite(BaseSQLConnector):
     """Optimized MySQL to SQLite backup class."""
     

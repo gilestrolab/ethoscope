@@ -1,5 +1,6 @@
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
 from ethoscope_node.utils.backups_helpers import GenericBackupWrapper
+from ethoscope_node.utils.mysql_backup import get_backup_path_from_database
 import logging
 import optparse
 import signal
@@ -9,6 +10,7 @@ import json
 import bottle
 import threading
 import time
+import re
 from contextlib import contextmanager
 
 # Global variables
@@ -192,7 +194,7 @@ def parse_arguments():
     parser.add_option('-i', '--server', dest='server', default='localhost',
                      help='Server address for node interrogation')
     parser.add_option('-e', '--ethoscope', dest='ethoscope',
-                     help='Force backup of specific ethoscope numbers (e.g., 007,010,102)')
+                     help='Force backup of specific ethoscopes by number (007,010), IP (192.168.1.29), or hostname (ethoscope070.local). Uses direct database access, bypassing device discovery.')
     parser.add_option('-s', '--safe', dest='safe', default=False,
                      action='store_true', help='Set Safe mode ON (currently unused)')
     parser.add_option('-p', '--port', dest='port', default=8090, type='int',
@@ -204,77 +206,148 @@ def parse_arguments():
     return options
 
 def parse_ethoscope_list(ethoscope_arg):
-    """Parse ethoscope numbers from command line argument."""
+    """Parse ethoscope targets from command line argument (numbers, IPs, or hostnames)."""
     if not ethoscope_arg:
         return []
     
-    try:
-        # Handle single number
-        if ',' not in ethoscope_arg:
-            return [int(ethoscope_arg)]
-        # Handle comma-separated list
-        return [int(e.strip()) for e in ethoscope_arg.split(',')]
-    except ValueError as e:
-        logging.error(f"Invalid ethoscope number format: {ethoscope_arg}")
+    targets = []
+    entries = [e.strip() for e in ethoscope_arg.split(',')]
+    
+    for entry in entries:
+        if not entry:
+            continue
+            
+        # Try to parse as number first
+        try:
+            num = int(entry)
+            targets.append(('number', num))
+            continue
+        except ValueError:
+            pass
+        
+        # Check if it looks like an IP address
+        ip_pattern = r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$'
+        if re.match(ip_pattern, entry):
+            targets.append(('ip', entry))
+            continue
+        
+        # Otherwise treat as hostname
+        targets.append(('hostname', entry))
+    
+    if not targets:
+        logging.error(f"No valid ethoscope targets found in: {ethoscope_arg}")
         sys.exit(1)
+    
+    return targets
+
+
+def resolve_ethoscope_host(identifier_type, value):
+    """Convert ethoscope identifier to host address."""
+    if identifier_type == 'number':
+        # Convert ethoscope number to hostname format
+        hostname = f"ethoscope{value:03d}.local"
+        logging.info(f"Resolved ethoscope {value:03d} to hostname: {hostname}")
+        return hostname
+    elif identifier_type == 'ip':
+        logging.info(f"Using provided IP: {value}")
+        return value
+    elif identifier_type == 'hostname':
+        logging.info(f"Using provided hostname: {value}")
+        return value
+    else:
+        raise ValueError(f"Unknown identifier type: {identifier_type}")
+
+def create_device_info_from_backup(ethoscope_name, host, backup_filename):
+    """Create minimal device_info dict required for BackupClass from backup filename."""
+    
+    # Extract device ID from backup filename if possible
+    # Format: YYYY-MM-DD_HH-MM-SS_device_id.db
+    device_id = "unknown"
+    try:
+        if backup_filename and '_' in backup_filename:
+            parts = backup_filename.split('_')
+            if len(parts) >= 3:
+                # Take the part before .db extension
+                device_id = parts[2].replace('.db', '')
+        logging.info(f"Extracted device ID from backup filename: {device_id}")
+    except Exception as e:
+        logging.warning(f"Could not extract device ID from backup filename {backup_filename}: {e}")
+    
+    device_info = {
+        'id': device_id,
+        'name': ethoscope_name,
+        'ip': host,
+        'backup_filename': backup_filename,  # Keep for compatibility
+        'status': 'forced_backup',  # Indicate this is a forced backup
+        'database_info': {
+            'active_type': 'mariadb',  # Assume MariaDB since we got backup_filename
+            'mariadb': {
+                'exists': True,
+                'current': {
+                    'backup_filename': backup_filename  # Place where BackupClass expects it
+                }
+            }
+        }
+    }
+    
+    logging.info(f"Created device info for forced backup: {device_info}")
+    return device_info
 
 def force_backup_ethoscopes(ethoscope_list):
-    """Force backup for specified ethoscopes."""
+    """Force backup for specified ethoscopes using direct database access."""
     if not ethoscope_list:
         logging.warning("No ethoscopes specified for forced backup")
         return
     
-    logging.info(f"Starting device discovery for {len(ethoscope_list)} ethoscopes...")
-    try:
-        devices = gbw.find_devices()
-        logging.info(f"Found {len(devices)} devices total")
-        device_map = {device['name']: device for device in devices}
-        
-        # Log all discovered devices
-        logging.info("=== DISCOVERED DEVICES ===")
-        for device_name in sorted(device_map.keys()):
-            device_status = device_map[device_name].get('status', 'unknown')
-            device_ip = device_map[device_name].get('ip', 'unknown')
-            logging.info(f"  {device_name}: status={device_status}, ip={device_ip}")
-        logging.info("=== END DEVICE LIST ===")
-        
-    except Exception as e:
-        logging.error(f"Failed to discover devices: {e}")
-        sys.exit(1)
+    logging.info(f"Starting direct database backup for {len(ethoscope_list)} targets...")
+    logging.info("Skipping device discovery - using direct database connection method")
     
-    for ethoscope_num in ethoscope_list:
-        ethoscope_name = f"ETHOSCOPE_{ethoscope_num:03d}"
-        logging.info(f"=== PROCESSING {ethoscope_name} ===")
-        
-        device = device_map.get(ethoscope_name)
-        if device is None:
-            logging.error(f"{ethoscope_name} is not online or not detected")
-            logging.error(f"Available devices: {list(device_map.keys())}")
-            sys.exit(1)
-        
-        logging.info(f"Device found: {device}")
-        
-        # Validate device has MariaDB database before attempting backup
-        database_info = device.get("database_info", {})
-        active_type = database_info.get("active_type", "none")
-        mariadb_exists = database_info.get("mariadb", {}).get("exists", False)
-        
-        if not mariadb_exists and active_type != "mariadb":
-            logging.warning(f"Skipping {ethoscope_name} - no MariaDB database found (active_type: {active_type})")
-            logging.info(f"This device should be backed up by the rsync backup service instead")
-            continue
-        
-        logging.info(f"MariaDB database validated for {ethoscope_name} - starting backup job...")
-        
+    for identifier_type, value in ethoscope_list:
         try:
-            logging.info(f"Initiating MariaDB backup job for {ethoscope_name}...")
-            success = gbw.initiate_backup_job(device)
+            # Resolve target to hostname/IP
+            host = resolve_ethoscope_host(identifier_type, value)
+            
+            # Generate ethoscope name based on identifier type
+            if identifier_type == 'number':
+                ethoscope_name = f"ETHOSCOPE_{value:03d}"
+            else:
+                # For IP/hostname, try to derive name or use the host as name
+                ethoscope_name = f"ETHOSCOPE_{host.replace('.', '_')}"
+            
+            logging.info(f"=== PROCESSING {ethoscope_name} at {host} ===")
+            
+            # Get backup filename directly from database
+            logging.info(f"Connecting to database on {host} to retrieve backup path...")
+            ethoscope_number = value if identifier_type == 'number' else None
+            backup_filename = get_backup_path_from_database(host, ethoscope_number)
+            
+            if not backup_filename:
+                logging.error(f"No backup filename found for {ethoscope_name}")
+                sys.exit(1)
+            
+            # Create device info for backup
+            device_info = create_device_info_from_backup(ethoscope_name, host, backup_filename)
+            
+            logging.info(f"MariaDB database confirmed for {ethoscope_name} - starting forced backup job...")
+            
+            # Initiate backup using the synthetic device info
+            logging.info(f"Initiating forced MariaDB backup job for {ethoscope_name}...")
+            success = gbw.initiate_backup_job(device_info)
             
             if success:
                 logging.info(f"=== BACKUP COMPLETED SUCCESSFULLY for {ethoscope_name} ===")
             else:
                 logging.error(f"=== BACKUP FAILED for {ethoscope_name} ===")
                 sys.exit(1)
+                
+        except ConnectionError as e:
+            logging.error(f"Database connection failed for {ethoscope_name}: {e}")
+            logging.error("This could mean the ethoscope is offline or database is not accessible")
+            sys.exit(1)
+        except ValueError as e:
+            logging.error(f"Database query failed for {ethoscope_name}: {e}")
+            logging.error("This could mean no experiment is running or backup_filename is not set")
+            sys.exit(1)
         except Exception as e:
             logging.error(f"Backup job crashed for {ethoscope_name}: {e}")
             logging.error("Full traceback:", exc_info=True)
