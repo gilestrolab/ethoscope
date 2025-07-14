@@ -307,18 +307,30 @@ def force_backup_ethoscopes(ethoscope_list):
             # Resolve target to hostname/IP
             host = resolve_ethoscope_host(identifier_type, value)
             
-            # Generate ethoscope name based on identifier type
+            # Generate ethoscope name and extract number for database lookup
+            ethoscope_number = None
             if identifier_type == 'number':
                 ethoscope_name = f"ETHOSCOPE_{value:03d}"
+                ethoscope_number = value
             else:
-                # For IP/hostname, try to derive name or use the host as name
-                ethoscope_name = f"ETHOSCOPE_{host.replace('.', '_')}"
+                # For IP/hostname, try to extract ethoscope number from hostname
+                import re
+                
+                # Try to extract from hostname like "ethoscope265.local"
+                hostname_match = re.search(r'ethoscope(\d+)', host)
+                if hostname_match:
+                    ethoscope_number = int(hostname_match.group(1))
+                    ethoscope_name = f"ETHOSCOPE_{ethoscope_number:03d}"
+                else:
+                    # For IP addresses or other hostnames, we can't determine the ethoscope number
+                    # Use the host as the ethoscope name and let the database lookup handle it
+                    ethoscope_name = f"ETHOSCOPE_{host.replace('.', '_')}"
+                    ethoscope_number = None  # Will rely on database name extraction in get_backup_path_from_database
             
             logging.info(f"=== PROCESSING {ethoscope_name} at {host} ===")
             
             # Get backup filename directly from database
             logging.info(f"Connecting to database on {host} to retrieve backup path...")
-            ethoscope_number = value if identifier_type == 'number' else None
             backup_filename = get_backup_path_from_database(host, ethoscope_number)
             
             if not backup_filename:

@@ -66,6 +66,7 @@ class DatabaseConnectionManager:
             'passwd': password,
             'buffered': True,
             'charset': SQL_CHARSET,
+            'collation': 'latin1_swedish_ci',
             'use_unicode': True,
             'connect_timeout': 45
         }
@@ -293,7 +294,9 @@ def get_backup_path_from_database(host, ethoscope_number=None):
             password='node',
             database=db_name,
             connect_timeout=10,
-            autocommit=True
+            autocommit=True,
+            charset='utf8mb4',
+            collation='utf8mb4_general_ci'
         )
         
         cursor = connection.cursor()
