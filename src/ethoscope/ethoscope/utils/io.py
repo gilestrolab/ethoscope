@@ -768,8 +768,10 @@ class AsyncSQLiteWriter(BaseAsyncSQLWriter):
     
     _database_type = "SQLite3"
     _pragmas = {"temp_store": "MEMORY",
-                "journal_mode": "OFF",
-                "locking_mode":  "EXCLUSIVE"}
+                "journal_mode": "WAL",
+                "locking_mode":  "NORMAL",
+                "busy_timeout": "30000",
+                "synchronous": "NORMAL"}
                 
     def __init__(self, db_name, queue, erase_old_db=True):
         """
@@ -795,7 +797,7 @@ class AsyncSQLiteWriter(BaseAsyncSQLWriter):
             Exception: If SQLite connection fails
         """
         try:
-            db = sqlite3.connect(self._db_name)
+            db = sqlite3.connect(self._db_name, timeout=30.0)
             return db
         except sqlite3.Error as e:
             raise Exception(f"Failed to connect to SQLite database {self._db_name}: {e}")
@@ -824,9 +826,21 @@ class AsyncSQLiteWriter(BaseAsyncSQLWriter):
         """
         Determine if SQLite writer should continue after an error.
         
-        SQLite writer uses fail-fast strategy - stops on any error.
+        Retries on transient errors like database locks, but stops on critical errors.
         """
-        return False  # SQLite writer stops on any error
+        import sqlite3
+        
+        # Retry on transient SQLite errors
+        if isinstance(error, sqlite3.OperationalError):
+            error_msg = str(error).lower()
+            # Retry on database lock, busy, or temporary errors
+            if any(keyword in error_msg for keyword in ['locked', 'busy', 'cannot commit']):
+                logging.warning(f"SQLite transient error, will retry: {error}")
+                return True
+        
+        # Stop on all other errors (corrupted database, disk full, etc.)
+        logging.error(f"SQLite critical error, stopping writer: {error}")
+        return False
 
 
 # =============================================================================================================#
@@ -2387,7 +2401,7 @@ class SQLiteDatabaseMetadataCache(BaseDatabaseMetadataCache):
             db_size = 0
         
         # Connect to SQLite database and get table information
-        with sqlite3.connect(db_path) as conn:
+        with sqlite3.connect(db_path, timeout=30.0) as conn:
             cursor = conn.cursor()
             
             # Get list of tables (excluding sqlite_* system tables)
