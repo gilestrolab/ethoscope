@@ -985,8 +985,11 @@ class BaseResultWriter(object):
             logging.info("Freeing queue")
             self._queue.cancel_join_thread()
             logging.info("Joining thread")
-            self._async_writer.join()
-            logging.info("Joined OK")
+            if self._async_writer.is_alive():
+                self._async_writer.join()
+                logging.info("Joined OK")
+            else:
+                logging.info("Process was not started, skipping join")
             
     def close(self):
         """Placeholder close method."""

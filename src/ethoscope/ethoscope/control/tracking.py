@@ -505,7 +505,7 @@ class ControlThread(Thread):
         
         # Set tracking start time for database metadata
         # Use the original experiment start time from metadata/backup filename, not current time
-        if hasattr(self, '_metadata') and 'date_time' in self._metadata:
+        if hasattr(self, '_metadata') and self._metadata is not None and 'date_time' in self._metadata:
             # Use experiment start time from metadata
             self._tracking_start_time = self._metadata['date_time']
             logging.info(f"Using experiment start time from metadata: {self._tracking_start_time}")
