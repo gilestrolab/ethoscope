@@ -215,22 +215,55 @@
         };
 
         $scope.getBackupStatusClass = function(device) {
-            // Check if device has new backup fields directly
+            // Prioritize comprehensive backup status if available
+            if (!$scope.backup_service_available) {
+                return 'backup-status-offline';  // black circle
+            }
+            
+            var backup_info = $scope.backup_status[device.id];
+            if (backup_info && backup_info.backup_types) {
+                // Use new structured backup information (same as tooltip)
+                var mysql = backup_info.backup_types.mysql;
+                var sqlite = backup_info.backup_types.sqlite;
+                var video = backup_info.backup_types.video;
+                
+                // Check if any backup is currently processing
+                if (mysql?.processing || sqlite?.processing || video?.processing) {
+                    return 'backup-status-processing';  // orange breathing circle
+                }
+                
+                // Use the calculated overall_status
+                switch (backup_info.overall_status) {
+                    case 'success':
+                        return 'backup-status-success';  // green circle
+                    case 'partial':
+                        return 'backup-status-partial';  // golden circle
+                    case 'error':
+                        return 'backup-status-error';  // red circle
+                    case 'processing':
+                        return 'backup-status-processing';  // orange circle
+                    case 'no_backups':
+                        return 'backup-status-unknown';  // grey circle
+                    default:
+                        return 'backup-status-unknown';  // grey circle
+                }
+            }
+            
+            // Fall back to legacy device backup status for backwards compatibility
             if (device.backup_status !== undefined) {
                 if (device.backup_status === 'processing') {
-                    return 'backup-status-processing';  // orange breathing circle - backup in progress
+                    return 'backup-status-processing';
                 } else if (typeof device.backup_status === 'number') {
                     if (device.backup_status >= 90) {
-                        return 'backup-status-success';  // green circle - good backup
+                        return 'backup-status-success';
                     } else if (device.backup_status >= 50) {
-                        return 'backup-status-partial';  // golden circle - partial backup
+                        return 'backup-status-partial';
                     } else if (device.backup_status > 0) {
-                        return 'backup-status-processing';  // orange - backup in progress
+                        return 'backup-status-processing';
                     } else {
-                        return 'backup-status-error';  // red circle - backup failed
+                        return 'backup-status-error';
                     }
                 } else if (typeof device.backup_status === 'string') {
-                    // Handle string statuses
                     switch (device.backup_status.toLowerCase()) {
                         case 'success':
                         case 'completed':
@@ -247,35 +280,8 @@
                 }
             }
             
-            // Fall back to backup service status if device fields not available
-            if (!$scope.backup_service_available) {
-                return 'backup-status-offline';  // black circle
-            }
-            
-            var backup_info = $scope.backup_status[device.id];
-            if (!backup_info) {
-                return 'backup-status-unknown';  // grey circle
-            }
-            
-            // Check if any backup is currently processing (orange breathing circle)
-            var mysql_processing = backup_info.mysql_backup?.processing;
-            var rsync_processing = backup_info.rsync_backup?.processing;
-            
-            if (mysql_processing || rsync_processing) {
-                return 'backup-status-processing';  // orange breathing circle - backup in progress
-            }
-            
-            // Use the unified overall_status from the new API
-            switch (backup_info.overall_status) {
-                case 'success':
-                    return 'backup-status-success';  // green circle - both backups working
-                case 'partial':
-                    return 'backup-status-partial';  // golden circle (no breathing) - only one backup working
-                case 'error':
-                    return 'backup-status-error';  // red circle - at least one backup failed
-                default:
-                    return 'backup-status-unknown';  // grey circle
-            }
+            // Final fallback
+            return 'backup-status-unknown';  // grey circle
         };
 
         $scope.getBackupStatusTitle = function(device) {

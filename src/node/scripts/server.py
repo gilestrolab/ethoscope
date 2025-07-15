@@ -735,13 +735,13 @@ class EthoscopeNodeServer:
             if not video_info:
                 return self._get_empty_backup_info(backup_type)
             
-            # Calculate device-specific video size instead of using total directory size
-            device_video_size, device_video_size_human = self._calculate_device_video_size(device_data, device_id)
+            # Calculate device-specific video size and file count instead of using total directory stats
+            device_video_size, device_video_size_human, device_video_files = self._calculate_device_video_stats(device_data, device_id)
             
             base_info.update({
                 "size": device_video_size,
                 "size_human": device_video_size_human,
-                "files": video_info.get("local_files", 0),
+                "files": device_video_files,
                 "directory": video_info.get("directory", "")
             })
         
@@ -774,15 +774,15 @@ class EthoscopeNodeServer:
                 return value
         return {}
     
-    def _calculate_device_video_size(self, device_data: dict, device_id: str = None):
-        """Calculate the actual video directory size for a specific device."""
+    def _calculate_device_video_stats(self, device_data: dict, device_id: str = None):
+        """Calculate the actual video directory size and file count for a specific device."""
         try:
             # Get device name from device data
             device_name = device_data.get("name", "") if device_data else ""
             
             if not device_id or not device_name:
-                self.logger.warning(f"Could not determine device ID ({device_id}) or name ({device_name}) for video size calculation")
-                return 0, "0 B"
+                self.logger.warning(f"Could not determine device ID ({device_id}) or name ({device_name}) for video stats calculation")
+                return 0, "0 B", 0
             
             # Build the device-specific video path
             # Path structure: /ethoscope_data/videos/{device_id}/{device_name}/
@@ -790,29 +790,47 @@ class EthoscopeNodeServer:
             
             if not os.path.exists(device_video_path):
                 self.logger.warning(f"Device video path does not exist: {device_video_path}")
-                return 0, "0 B"
+                return 0, "0 B", 0
             
-            self.logger.debug(f"Calculating video size for device {device_name} ({device_id}) at path: {device_video_path}")
+            self.logger.debug(f"Calculating video stats for device {device_name} ({device_id}) at path: {device_video_path}")
             
             # Calculate directory size using du command
-            result = subprocess.run(
+            size_result = subprocess.run(
                 ['du', '-sb', device_video_path], 
                 capture_output=True, 
                 text=True, 
                 timeout=10
             )
             
-            if result.returncode == 0:
-                size_bytes = int(result.stdout.split()[0])
+            # Count files in directory using find command
+            files_result = subprocess.run(
+                ['find', device_video_path, '-type', 'f'], 
+                capture_output=True, 
+                text=True, 
+                timeout=10
+            )
+            
+            size_bytes = 0
+            size_human = "0 B"
+            file_count = 0
+            
+            if size_result.returncode == 0:
+                size_bytes = int(size_result.stdout.split()[0])
                 size_human = self._human_readable_size(size_bytes)
-                return size_bytes, size_human
             else:
-                self.logger.error(f"Failed to calculate size for {device_video_path}: {result.stderr}")
-                return 0, "0 B"
+                self.logger.error(f"Failed to calculate size for {device_video_path}: {size_result.stderr}")
+            
+            if files_result.returncode == 0:
+                # Count lines in output (each line is a file)
+                file_count = len([line for line in files_result.stdout.strip().split('\n') if line.strip()])
+            else:
+                self.logger.error(f"Failed to count files for {device_video_path}: {files_result.stderr}")
+            
+            return size_bytes, size_human, file_count
                 
         except Exception as e:
-            self.logger.error(f"Error calculating device video size: {e}")
-            return 0, "0 B"
+            self.logger.error(f"Error calculating device video stats: {e}")
+            return 0, "0 B", 0
     
     def _human_readable_size(self, size_bytes: int) -> str:
         """Convert bytes to human readable format."""
