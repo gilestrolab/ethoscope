@@ -277,17 +277,27 @@ def create_device_info_from_backup(ethoscope_name, host, backup_filename):
         'id': device_id,
         'name': ethoscope_name,
         'ip': host,
-        'backup_filename': backup_filename,  # Keep for compatibility
         'status': 'forced_backup',  # Indicate this is a forced backup
-        'database_info': {
-            'active_type': 'mariadb',  # Assume MariaDB since we got backup_filename
-            'mariadb': {
-                'exists': True,
-                'current': {
-                    'backup_filename': backup_filename  # Place where BackupClass expects it
+        'databases': {
+            'SQLite': {},  # Empty for MariaDB backups
+            'MariaDB': {
+                backup_filename: {
+                    'backup_filename': backup_filename,
+                    'filesize': 0,  # Unknown for forced backups
+                    'version': 'Unknown',
+                    'path': f"{device_id}/{ethoscope_name}",  # Approximate path
+                    'date': time.time(),  # Current time as fallback
+                    'db_status': 'forced_backup',
+                    'table_counts': {},
+                    'file_exists': True
                 }
             }
-        }
+        },
+        'backup_status': 0.0,
+        'backup_size': 0,
+        'time_since_backup': 0.0,
+        'backup_type': 'mariadb_dump',
+        'backup_method': 'mysql_dump'
     }
     
     logging.info(f"Created device info for forced backup: {device_info}")

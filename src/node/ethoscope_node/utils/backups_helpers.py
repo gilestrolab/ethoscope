@@ -398,27 +398,16 @@ class BackupClass(BaseBackupClass):
     def _validate_mariadb_database(self) -> bool:
         """Validate that the device has a MariaDB database available for backup."""
         try:
-            # Check the structured database_info from the enhanced API
-            database_info = self._device_info.get("database_info", {})
+            # Check the new nested databases structure
+            databases = self._device_info.get("databases", {})
+            mariadb_databases = databases.get("MariaDB", {})
             
-            # Check if MariaDB database exists
-            mariadb_info = database_info.get("mariadb", {})
-            if mariadb_info.get("exists", False):
-                self._logger.info(f"[{self._device_id}] MariaDB database validated for backup")
+            # Check if there are any MariaDB databases
+            if len(mariadb_databases) > 0:
+                self._logger.info(f"[{self._device_id}] MariaDB database(s) validated for backup: {list(mariadb_databases.keys())}")
                 return True
             
-            # Fallback: check if database_info has active_type = mariadb
-            if database_info.get("active_type") == "mariadb":
-                self._logger.info(f"[{self._device_id}] MariaDB database active (fallback validation)")
-                return True
-            
-            # Check legacy field for backward compatibility
-            result_writer_type = self._device_info.get("result_writer_type", "")
-            if "mariadb" in result_writer_type.lower() or "mysql" in result_writer_type.lower():
-                self._logger.info(f"[{self._device_id}] MariaDB database detected via legacy field")
-                return True
-            
-            self._logger.info(f"[{self._device_id}] No MariaDB database found - active_type: {database_info.get('active_type', 'none')}")
+            self._logger.info(f"[{self._device_id}] No MariaDB databases found in nested structure")
             return False
             
         except Exception as e:
@@ -426,34 +415,41 @@ class BackupClass(BaseBackupClass):
             return False
     
     def _get_mariadb_backup_path(self) -> str:
-        """Get and validate backup path using MariaDB metadata."""
+        """Get and validate backup path using MariaDB metadata from nested databases structure."""
         try:
-            # Try to get backup filename from MariaDB metadata
-            database_info = self._device_info.get("database_info", {})
-            mariadb_info = database_info.get("mariadb", {})
-            mariadb_current = mariadb_info.get("current", {})
-            mariadb_backup_filename = mariadb_current.get("backup_filename")
+            # Get MariaDB databases from nested structure
+            databases = self._device_info.get("databases", {})
+            mariadb_databases = databases.get("MariaDB", {})
             
-            if mariadb_backup_filename:
-                self._logger.info(f"[{self._device_id}] Using MariaDB backup filename: {mariadb_backup_filename}")
-                # Construct path using MariaDB metadata
-                filename_parts = mariadb_backup_filename.replace('.db', '').split("_")
+            if not mariadb_databases:
+                raise BackupError(f"No MariaDB databases found in nested structure for device {self._device_id}")
+            
+            # For now, take the first MariaDB database (typically there's only one)
+            # In the future, we might need to handle multiple MariaDB databases
+            db_name = list(mariadb_databases.keys())[0]
+            db_info = mariadb_databases[db_name]
+            
+            self._logger.info(f"[{self._device_id}] Using MariaDB database: {db_name}")
+            
+            # Extract backup path from database info
+            if "path" in db_info:
+                backup_path = db_info["path"]
+                self._logger.info(f"[{self._device_id}] Using MariaDB path: {backup_path}")
+            else:
+                # Construct path from backup_filename and device info
+                backup_filename = db_info.get("backup_filename", "")
+                if not backup_filename:
+                    raise BackupError(f"No backup filename found for MariaDB database {db_name}")
+                
+                # Extract components from backup filename
+                filename_parts = backup_filename.replace('.db', '').split("_")
                 if len(filename_parts) >= 3:
                     backup_date = filename_parts[0]
                     backup_time = filename_parts[1] 
                     etho_id = "_".join(filename_parts[2:])
-                    backup_path = f"{etho_id}/{self._device_name}/{backup_date}_{backup_time}/{mariadb_backup_filename}"
+                    backup_path = f"{etho_id}/{self._device_name}/{backup_date}_{backup_time}/{backup_filename}"
                 else:
-                    raise BackupError(f"Invalid MariaDB backup filename format: {mariadb_backup_filename}")
-            else:
-                # Fallback to legacy backup_path method
-                self._logger.warning(f"[{self._device_id}] No MariaDB backup filename found, using legacy backup_path")
-                if "backup_path" not in self._device_info:
-                    raise BackupError(f"Could not obtain backup path for device {self._device_id}")
-                
-                backup_path = self._device_info["backup_path"]
-                if not backup_path:
-                    raise BackupError(f"Backup path is None for device {self._device_id}")
+                    raise BackupError(f"Invalid MariaDB backup filename format: {backup_filename}")
             
             full_backup_path = os.path.join(self._results_dir, backup_path)
             
@@ -1181,27 +1177,16 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
     def _validate_sqlite_database(self) -> bool:
         """Validate that the device has a SQLite database available for backup."""
         try:
-            # Check the structured database_info from the enhanced API
-            database_info = self._device_info.get("database_info", {})
+            # Check the new nested databases structure
+            databases = self._device_info.get("databases", {})
+            sqlite_databases = databases.get("SQLite", {})
             
-            # Check if SQLite database exists
-            sqlite_info = database_info.get("sqlite", {})
-            if sqlite_info.get("exists", False):
-                self._logger.info(f"[{self._device_id}] SQLite database validated for backup")
+            # Check if there are any SQLite databases
+            if len(sqlite_databases) > 0:
+                self._logger.info(f"[{self._device_id}] SQLite database(s) validated for backup: {list(sqlite_databases.keys())}")
                 return True
             
-            # Fallback: check if database_info has active_type = sqlite
-            if database_info.get("active_type") == "sqlite":
-                self._logger.info(f"[{self._device_id}] SQLite database active (fallback validation)")
-                return True
-            
-            # Check legacy field for backward compatibility
-            result_writer_type = self._device_info.get("result_writer_type", "")
-            if "sqlite" in result_writer_type.lower():
-                self._logger.info(f"[{self._device_id}] SQLite database detected via legacy field")
-                return True
-            
-            self._logger.info(f"[{self._device_id}] No SQLite database found - active_type: {database_info.get('active_type', 'none')}")
+            self._logger.info(f"[{self._device_id}] No SQLite databases found in nested structure")
             return False
             
         except Exception as e:
@@ -1437,7 +1422,7 @@ class GenericBackupWrapper(threading.Thread):
             return False
     
     def _initialize_backup_status(self, device_id: str, device_info: Dict):
-        """Initialize backup status for a device."""
+        """Initialize backup status for a device using new comprehensive device data."""
         with self._lock:
             if device_id not in self.backup_status:
                 self.backup_status[device_id] = BackupStatus(
@@ -1450,11 +1435,21 @@ class GenericBackupWrapper(threading.Thread):
             status.started = int(time.time())
             status.ended = 0
             status.processing = True
-            status.progress = {}
             status.count += 1
+            
+            # Extract progress information from new device data format
+            status.progress = {
+                'backup_status': device_info.get('backup_status', 0.0),
+                'backup_size': device_info.get('backup_size', 0),
+                'time_since_backup': device_info.get('time_since_backup', 0.0),
+                'backup_type': device_info.get('backup_type', 'unknown'),
+                'backup_method': device_info.get('backup_method', 'unknown'),
+                'status': 'initializing',
+                'message': f'Starting backup for {device_info.get("name", "unknown")}'
+            }
     
     def _execute_backup_job(self, device_id: str, backup_job) -> bool:
-        """Execute backup job and track progress."""
+        """Execute backup job and track progress using new comprehensive device data."""
         try:
             for message in backup_job.backup():
                 with self._lock:
@@ -1467,11 +1462,26 @@ class GenericBackupWrapper(threading.Thread):
                             device_metadata = json.loads(progress_data.get('message', '{}'))
                             self.backup_status[device_id].metadata = device_metadata
                             self._logger.debug(f"Stored device metadata for {device_id}: {device_metadata}")
+                            
+                            # Update progress with device metadata fields if available
+                            if 'backup_status' in device_metadata:
+                                self.backup_status[device_id].progress['backup_status'] = device_metadata['backup_status']
+                            if 'backup_size' in device_metadata:
+                                self.backup_status[device_id].progress['backup_size'] = device_metadata['backup_size']
+                            if 'time_since_backup' in device_metadata:
+                                self.backup_status[device_id].progress['time_since_backup'] = device_metadata['time_since_backup']
+                            if 'backup_type' in device_metadata:
+                                self.backup_status[device_id].progress['backup_type'] = device_metadata['backup_type']
+                            if 'backup_method' in device_metadata:
+                                self.backup_status[device_id].progress['backup_method'] = device_metadata['backup_method']
+                                
                         except json.JSONDecodeError:
                             self._logger.warning(f"Could not parse metadata for device {device_id}")
                     else:
-                        # Store regular progress information
-                        self.backup_status[device_id].progress = progress_data
+                        # Merge regular progress information with existing device data
+                        current_progress = self.backup_status[device_id].progress.copy()
+                        current_progress.update(progress_data)
+                        self.backup_status[device_id].progress = current_progress
             return True
             
         except Exception as e:
@@ -1492,8 +1502,27 @@ class GenericBackupWrapper(threading.Thread):
             status.processing = False
             status.ended = int(time.time())
             
-            if not success:
-                status.progress = {"status": "error", "message": "Backup failed"}
+            # Update final progress status
+            if success:
+                # Update progress with success status while preserving device data
+                current_progress = status.progress.copy()
+                current_progress.update({
+                    'status': 'completed',
+                    'message': 'Backup completed successfully',
+                    'backup_status': 100.0,  # 100% completion
+                    'completion_time': status.ended
+                })
+                status.progress = current_progress
+            else:
+                # Update progress with error status while preserving device data
+                current_progress = status.progress.copy()
+                current_progress.update({
+                    'status': 'error',
+                    'message': 'Backup failed',
+                    'backup_status': 0.0,  # 0% completion on failure
+                    'completion_time': status.ended
+                })
+                status.progress = current_progress
     
     def _handle_backup_failure(self, device_id: str, error_message: str):
         """Handle backup failure by updating status."""
@@ -1502,7 +1531,16 @@ class GenericBackupWrapper(threading.Thread):
                 status = self.backup_status[device_id]
                 status.processing = False
                 status.ended = -1  # Indicates failure
-                status.progress = {"status": "error", "message": error_message}
+                
+                # Update progress with error status while preserving device data
+                current_progress = status.progress.copy()
+                current_progress.update({
+                    "status": "error",
+                    "message": error_message,
+                    "backup_status": 0.0,  # 0% completion on failure
+                    "completion_time": int(time.time())
+                })
+                status.progress = current_progress
     
     def run(self):
         """

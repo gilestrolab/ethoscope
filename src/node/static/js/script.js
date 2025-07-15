@@ -218,6 +218,39 @@
         };
 
         $scope.getBackupStatusClass = function(device) {
+            // Check if device has new backup fields directly
+            if (device.backup_status !== undefined) {
+                if (device.backup_status === 'processing') {
+                    return 'backup-status-processing';  // orange breathing circle - backup in progress
+                } else if (typeof device.backup_status === 'number') {
+                    if (device.backup_status >= 90) {
+                        return 'backup-status-success';  // green circle - good backup
+                    } else if (device.backup_status >= 50) {
+                        return 'backup-status-partial';  // golden circle - partial backup
+                    } else if (device.backup_status > 0) {
+                        return 'backup-status-processing';  // orange - backup in progress
+                    } else {
+                        return 'backup-status-error';  // red circle - backup failed
+                    }
+                } else if (typeof device.backup_status === 'string') {
+                    // Handle string statuses
+                    switch (device.backup_status.toLowerCase()) {
+                        case 'success':
+                        case 'completed':
+                            return 'backup-status-success';
+                        case 'processing':
+                        case 'running':
+                            return 'backup-status-processing';
+                        case 'error':
+                        case 'failed':
+                            return 'backup-status-error';
+                        default:
+                            return 'backup-status-unknown';
+                    }
+                }
+            }
+            
+            // Fall back to backup service status if device fields not available
             if (!$scope.backup_service_available) {
                 return 'backup-status-offline';  // black circle
             }
@@ -249,6 +282,36 @@
         };
 
         $scope.getBackupStatusTitle = function(device) {
+            // Check if device has new backup fields directly
+            if (device.backup_status !== undefined) {
+                var title = 'Backup Status: ';
+                
+                if (typeof device.backup_status === 'number') {
+                    title += device.backup_status + '%';
+                } else {
+                    title += device.backup_status;
+                }
+                
+                if (device.backup_size !== undefined) {
+                    title += '\nBackup Size: ' + $scope.humanFileSize(device.backup_size);
+                }
+                
+                if (device.time_since_backup !== undefined) {
+                    title += '\nTime Since Backup: ' + $scope.elapsedtime(device.time_since_backup);
+                }
+                
+                if (device.backup_type !== undefined) {
+                    title += '\nBackup Type: ' + device.backup_type;
+                }
+                
+                if (device.backup_method !== undefined) {
+                    title += '\nBackup Method: ' + device.backup_method;
+                }
+                
+                return title;
+            }
+            
+            // Fall back to backup service status if device fields not available
             if (!$scope.backup_service_available) {
                 return 'Backup service offline';
             }
