@@ -669,7 +669,7 @@ class EthoscopeNodeServer:
             # Determine what types of data are being backed up
             mysql_backup_info = self._extract_backup_info("mysql", mysql_device)
             sqlite_backup_info = self._extract_backup_info("sqlite", rsync_device, rsync_synced)
-            video_backup_info = self._extract_backup_info("video", rsync_device, rsync_synced)
+            video_backup_info = self._extract_backup_info("video", rsync_device, rsync_synced, device_id)
             
             # Create structured device status
             device_status = {
@@ -693,7 +693,7 @@ class EthoscopeNodeServer:
         
         return structured_devices
     
-    def _extract_backup_info(self, backup_type: str, device_data: dict, synced_data: dict = None):
+    def _extract_backup_info(self, backup_type: str, device_data: dict, synced_data: dict = None, device_id: str = None):
         """Generic method to extract backup information for any backup type."""
         if not device_data:
             return self._get_empty_backup_info(backup_type)
@@ -735,9 +735,12 @@ class EthoscopeNodeServer:
             if not video_info:
                 return self._get_empty_backup_info(backup_type)
             
+            # Calculate device-specific video size instead of using total directory size
+            device_video_size, device_video_size_human = self._calculate_device_video_size(device_data, device_id)
+            
             base_info.update({
-                "size": video_info.get("disk_usage_bytes", 0),
-                "size_human": video_info.get("disk_usage_human", "0 B"),
+                "size": device_video_size,
+                "size_human": device_video_size_human,
                 "files": video_info.get("local_files", 0),
                 "directory": video_info.get("directory", "")
             })
@@ -770,6 +773,64 @@ class EthoscopeNodeServer:
                 'database' in key.lower()):
                 return value
         return {}
+    
+    def _calculate_device_video_size(self, device_data: dict, device_id: str = None):
+        """Calculate the actual video directory size for a specific device."""
+        try:
+            # Get device name from device data
+            device_name = device_data.get("name", "") if device_data else ""
+            
+            if not device_id or not device_name:
+                self.logger.warning(f"Could not determine device ID ({device_id}) or name ({device_name}) for video size calculation")
+                return 0, "0 B"
+            
+            # Build the device-specific video path
+            # Path structure: /ethoscope_data/videos/{device_id}/{device_name}/
+            device_video_path = f"/ethoscope_data/videos/{device_id}/{device_name}"
+            
+            if not os.path.exists(device_video_path):
+                self.logger.warning(f"Device video path does not exist: {device_video_path}")
+                return 0, "0 B"
+            
+            self.logger.debug(f"Calculating video size for device {device_name} ({device_id}) at path: {device_video_path}")
+            
+            # Calculate directory size using du command
+            result = subprocess.run(
+                ['du', '-sb', device_video_path], 
+                capture_output=True, 
+                text=True, 
+                timeout=10
+            )
+            
+            if result.returncode == 0:
+                size_bytes = int(result.stdout.split()[0])
+                size_human = self._human_readable_size(size_bytes)
+                return size_bytes, size_human
+            else:
+                self.logger.error(f"Failed to calculate size for {device_video_path}: {result.stderr}")
+                return 0, "0 B"
+                
+        except Exception as e:
+            self.logger.error(f"Error calculating device video size: {e}")
+            return 0, "0 B"
+    
+    def _human_readable_size(self, size_bytes: int) -> str:
+        """Convert bytes to human readable format."""
+        if size_bytes == 0:
+            return "0 B"
+        
+        units = ['B', 'K', 'M', 'G', 'T']
+        unit_index = 0
+        size = float(size_bytes)
+        
+        while size >= 1024 and unit_index < len(units) - 1:
+            size /= 1024
+            unit_index += 1
+        
+        if unit_index == 0:
+            return f"{int(size)} {units[unit_index]}"
+        else:
+            return f"{size:.1f}{units[unit_index]}"
     
     def _determine_overall_backup_status(self, mysql_info, sqlite_info, video_info):
         """Determine overall backup status based on all backup types."""

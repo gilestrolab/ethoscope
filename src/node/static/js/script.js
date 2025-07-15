@@ -142,17 +142,14 @@
                 // Store the full response for debugging/advanced use
                 $scope.backup_status_full = data;
                 
-                // Extract unified devices for easy access by device ID
-                $scope.backup_status = data.unified_devices || {};
+                // Extract devices for easy access by device ID
+                $scope.backup_status = data.devices || {};
                 
-                // Check if either backup service is available
-                $scope.mysql_backup_available = !data.mysql_backup?.error;
-                $scope.rsync_backup_available = !data.rsync_backup?.error;
+                // Check backup service availability from summary
+                var summary = data.summary || {};
+                $scope.mysql_backup_available = summary.services?.mysql_service_available || false;
+                $scope.rsync_backup_available = summary.services?.rsync_service_available || false;
                 $scope.backup_service_available = $scope.mysql_backup_available || $scope.rsync_backup_available;
-                
-                // Store service-specific status for advanced display
-                $scope.mysql_backup_status = data.mysql_backup;
-                $scope.rsync_backup_status = data.rsync_backup;
                 
             }).catch(function(error) {
                 $scope.backup_status = {};
@@ -282,8 +279,8 @@
         };
 
         $scope.getBackupStatusTitle = function(device) {
-            // Check if device has new backup fields directly
-            if (device.backup_status !== undefined) {
+            // Check if device has new backup fields directly (for backwards compatibility)
+            if (device.backup_status !== undefined && !$scope.backup_status?.[device.id]?.backup_types) {
                 var title = 'Backup Status: ';
                 
                 if (typeof device.backup_status === 'number') {
@@ -300,60 +297,109 @@
                     title += '\nTime Since Backup: ' + $scope.elapsedtime(device.time_since_backup);
                 }
                 
-                if (device.backup_type !== undefined) {
-                    title += '\nBackup Type: ' + device.backup_type;
-                }
-                
-                if (device.backup_method !== undefined) {
-                    title += '\nBackup Method: ' + device.backup_method;
-                }
-                
                 return title;
             }
             
-            // Fall back to backup service status if device fields not available
+            // Use new structured backup information
             if (!$scope.backup_service_available) {
                 return 'Backup service offline';
             }
             
-            var backup_info = $scope.backup_status[device.id];
-            if (!backup_info) {
+            var backup_info = $scope.backup_status?.[device.id];
+            if (!backup_info || !backup_info.backup_types) {
                 return 'No backup information available';
             }
             
-            var title = 'Overall Status: ' + (backup_info.overall_status || 'unknown');
+            var title = 'Backup Status: ' + (backup_info.overall_status || 'unknown').toUpperCase();
+            title += '\n' + '─'.repeat(30);
             
-            // Add MySQL backup details
-            if (backup_info.mysql_backup?.available) {
-                var mysql_status = backup_info.mysql_backup.progress?.status || backup_info.mysql_backup.status;
-                title += '\nMySQL Backup: ' + mysql_status;
-                if (backup_info.mysql_backup.progress?.message) {
-                    title += ' - ' + backup_info.mysql_backup.progress.message;
-                }
-                if (backup_info.mysql_backup.count > 0) {
-                    title += ' (#' + backup_info.mysql_backup.count + ')';
-                }
-            } else {
-                title += '\nMySQL Backup: not available';
+            // Helper function to extract folder name from path
+            function getFolderName(directory) {
+                if (!directory) return null;
+                var parts = directory.split('/');
+                return parts[parts.length - 1] || parts[parts.length - 2]; // Handle trailing slash
             }
             
-            // Add rsync backup details
-            if (backup_info.rsync_backup?.available) {
-                var rsync_status = backup_info.rsync_backup.progress?.status || backup_info.rsync_backup.status;
-                title += '\nRsync Backup: ' + rsync_status;
-                if (backup_info.rsync_backup.progress?.message) {
-                    title += ' - ' + backup_info.rsync_backup.progress.message;
+            // Add MySQL backup details
+            var mysql = backup_info.backup_types.mysql;
+            if (mysql?.available) {
+                title += '\n📊 MySQL: ' + mysql.status.toUpperCase();
+                if (mysql.records > 0) {
+                    title += ' (' + mysql.records.toLocaleString() + ' records)';
                 }
-                if (backup_info.rsync_backup.count > 0) {
-                    title += ' (#' + backup_info.rsync_backup.count + ')';
+                if (mysql.size > 0) {
+                    title += '\n   Size: ' + $scope.humanFileSize(mysql.size);
                 }
-                
-                // Add disk usage info if available
-                if (backup_info.rsync_backup.synced?.results?.disk_usage_human) {
-                    title += '\nData Size: ' + backup_info.rsync_backup.synced.results.disk_usage_human;
+                var mysqlFolder = getFolderName(mysql.directory);
+                if (mysqlFolder) {
+                    title += '\n   Folder: ' + mysqlFolder;
+                }
+                if (mysql.last_backup) {
+                    var lastBackupTime = (Date.now() / 1000) - mysql.last_backup;
+                    title += '\n   Last: ' + $scope.elapsedtime(lastBackupTime) + ' ago';
+                }
+                if (mysql.message && mysql.message !== 'Backup completed successfully') {
+                    title += '\n   Note: ' + mysql.message;
                 }
             } else {
-                title += '\nRsync Backup: not available';
+                title += '\n📊 MySQL: NOT AVAILABLE';
+            }
+            
+            // Add SQLite backup details
+            var sqlite = backup_info.backup_types.sqlite;
+            if (sqlite?.available) {
+                title += '\n🗃️ SQLite: ' + sqlite.status.toUpperCase();
+                if (sqlite.files > 0) {
+                    title += ' (' + sqlite.files + ' files)';
+                }
+                if (sqlite.size > 0) {
+                    title += '\n   Size: ' + $scope.humanFileSize(sqlite.size);
+                }
+                var sqliteFolder = getFolderName(sqlite.directory);
+                if (sqliteFolder) {
+                    title += '\n   Folder: ' + sqliteFolder;
+                }
+                if (sqlite.last_backup) {
+                    var lastBackupTime = (Date.now() / 1000) - sqlite.last_backup;
+                    title += '\n   Last: ' + $scope.elapsedtime(lastBackupTime) + ' ago';
+                }
+            } else {
+                title += '\n🗃️ SQLite: NOT AVAILABLE';
+            }
+            
+            // Add Video backup details
+            var video = backup_info.backup_types.video;
+            if (video?.available) {
+                title += '\n🎥 Video: ' + video.status.toUpperCase();
+                if (video.files > 0) {
+                    title += ' (' + video.files.toLocaleString() + ' files)';
+                }
+                if (video.size_human) {
+                    title += '\n   Size: ' + video.size_human;
+                } else if (video.size > 0) {
+                    title += '\n   Size: ' + $scope.humanFileSize(video.size);
+                }
+                var videoFolder = getFolderName(video.directory);
+                if (videoFolder) {
+                    title += '\n   Folder: ' + videoFolder;
+                }
+                if (video.last_backup) {
+                    var lastBackupTime = (Date.now() / 1000) - video.last_backup;
+                    title += '\n   Last: ' + $scope.elapsedtime(lastBackupTime) + ' ago';
+                }
+            } else {
+                title += '\n🎥 Video: NOT AVAILABLE';
+            }
+            
+            // Add processing status if any backup is currently running
+            var processing = [];
+            if (mysql?.processing) processing.push('MySQL');
+            if (sqlite?.processing) processing.push('SQLite');
+            if (video?.processing) processing.push('Video');
+            
+            if (processing.length > 0) {
+                title += '\n' + '─'.repeat(30);
+                title += '\n🔄 Currently processing: ' + processing.join(', ');
             }
             
             return title;
