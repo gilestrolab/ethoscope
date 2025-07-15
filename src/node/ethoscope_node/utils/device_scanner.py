@@ -909,12 +909,29 @@ class Ethoscope(BaseDevice):
             with self._lock:
                 self._info.update(new_info)
                 self._info['last_seen'] = time.time()
+                
+                # Update logger name if we have a valid device name
+                self._update_logger_name()
             
             return True
             
         except ScanException as e:
             self._logger.warning(f"Error fetching device info: {e}")
             return False
+    
+    def _update_logger_name(self):
+        """Update logger name to use proper device name if available."""
+        device_name = self._info.get('name', '')
+        
+        # Only update if we have a valid device name and it's different from current
+        if device_name and device_name != 'unknown_name':
+            new_logger_name = f"{self.__class__.__name__}_{device_name}"
+            current_logger_name = self._logger.name
+            
+            # Only update if the name has changed
+            if new_logger_name != current_logger_name:
+                self._logger = logging.getLogger(new_logger_name)
+                self._logger.debug(f"Updated logger name from {current_logger_name} to {new_logger_name}")
     
     def _handle_unreachable_state(self, previous_status: str):
         """Handle unreachable device state."""
