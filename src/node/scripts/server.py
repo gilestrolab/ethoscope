@@ -627,10 +627,6 @@ class EthoscopeNodeServer:
         
         # Create structured response with clear backup type separation
         structured_status = {
-            "services": {
-                "mysql_service": mysql_status,
-                "rsync_service": rsync_status
-            },
             "devices": self._create_structured_backup_status(mysql_status, rsync_status),
             "summary": self._create_backup_summary(mysql_status, rsync_status)
         }
