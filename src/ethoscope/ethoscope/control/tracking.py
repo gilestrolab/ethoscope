@@ -30,7 +30,8 @@ from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver, M
 from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulator
 
 from ethoscope.utils.debug import EthoscopeException
-from ethoscope.utils.io import MySQLResultWriter, SQLiteResultWriter, create_metadata_cache
+from ethoscope.utils.io import MySQLResultWriter, SQLiteResultWriter 
+from ethoscope.utils.cache import create_metadata_cache, get_all_databases_info
 from ethoscope.utils.description import DescribedObject
 from ethoscope.utils import pi
 
@@ -194,6 +195,10 @@ class ControlThread(Thread):
         # For SQLite, we'll create it only when needed (see metadata cache initialization)
         self._metadata_cache = None
         
+        # Cache for databases info to avoid repeated reads
+        self._databases_info_cache = None
+        self._databases_info_cache_time = 0
+        
         #todo add 'data' -> how monitor was started to metadata
         self._info = {  "status": "stopped",
                         "time": time.time(), #this is time of last interaction, e.g. last reboot, last start, last stop.
@@ -301,9 +306,8 @@ class ControlThread(Thread):
                     logging.warning(f"Failed to get backup filename from metadata cache during initialization: {e}")
 
         self._parse_user_options(data)
-        
+       
         logging.info('Starting a new monitor control thread')
-
         super(ControlThread, self).__init__()
 
     def _create_backup_filename(self):
@@ -424,6 +428,10 @@ class ControlThread(Thread):
         Information that is not related to control and it is not experiment-dependent will come from elsewhere
         '''
         
+        # Add comprehensive databases information using existing cache files
+        # This should be available regardless of monitor status
+        self._info["databases"] = self._get_databases_info()
+        
         if self._monit is None:
             return
         t = self._monit.last_time_stamp
@@ -483,6 +491,35 @@ class ControlThread(Thread):
         self._last_info_t_stamp = wall_time
         self._last_info_frame_idx = frame_idx
 
+    def _get_databases_info(self):
+        """
+        Get comprehensive database information using existing cache files.
+        Uses caching to avoid repeated reads within a short time period.
+        
+        Returns:
+            dict: Nested structure with SQLite and MariaDB database information
+        """
+        current_time = time.time()
+        
+        # Cache results for 30 seconds to avoid repeated reads
+        if (self._databases_info_cache is not None and 
+            current_time - self._databases_info_cache_time < 30):
+            return self._databases_info_cache
+        
+        try:
+            databases_info = get_all_databases_info(self._info["name"], self._cache_dir)
+            # Update cache
+            self._databases_info_cache = databases_info
+            self._databases_info_cache_time = current_time
+            return databases_info
+        except Exception as e:
+            logging.warning(f"Failed to get databases info: {e}")
+            return {"SQLite": {}, "MariaDB": {}}
+
+    def _invalidate_databases_cache(self):
+        """Invalidate the databases info cache to force a fresh read."""
+        self._databases_info_cache = None
+        self._databases_info_cache_time = 0
 
     def _start_tracking(self, camera, result_writer, rois, reference_points, TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs):
@@ -502,6 +539,9 @@ class ControlThread(Thread):
         
         self._info["status"] = "running"
         logging.info("Setting monitor status as running: '%s'" % self._info["status"])
+        
+        # Invalidate databases cache when tracking starts
+        self._invalidate_databases_cache()
         
         # Set tracking start time for database metadata
         # Use the original experiment start time from metadata/backup filename, not current time
@@ -861,6 +901,9 @@ class ControlThread(Thread):
 
             self._info["status"] = "stopping"
             self._info["time"] = time.time()
+            
+            # Invalidate databases cache when tracking stops
+            self._invalidate_databases_cache()
 
             # we reset all the user data of the latest experiment except the run_id
             # a new run_id will be created when we start another experiment
