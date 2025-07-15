@@ -451,6 +451,23 @@ class BaseDevice(Thread):
             # Add skip_scanning status for debugging
             info_copy['skip_scanning'] = self._skip_scanning
             
+            # Expose backup status at root level for frontend compatibility
+            progress_info = info_copy.get('progress', {})
+            if progress_info:
+                # Extract backup status from progress and expose at root level
+                backup_status = progress_info.get('status')
+                if backup_status:
+                    info_copy['backup_status'] = backup_status
+                
+                # Also expose backup_size and time_since_backup if available
+                backup_size = progress_info.get('backup_size')
+                if backup_size is not None:
+                    info_copy['backup_size'] = backup_size
+                    
+                time_since_backup = progress_info.get('time_since_backup')
+                if time_since_backup is not None:
+                    info_copy['time_since_backup'] = time_since_backup
+            
             return info_copy
 
 
@@ -1248,7 +1265,7 @@ class Ethoscope(BaseDevice):
             self._logger.warning(f"Device {self._ip}: Failed to update MySQL backup status: {e}")
             self._info['backup_status'] = "MySQL Error"
     
-    def _make_backup_path(self, timeout: float = 30, force_recalculate: bool = False, service_type: str = "auto"):
+    def _make_backup_path(self, force_recalculate: bool = False, service_type: str = "auto"):
         """
         Creates the full path for the backup file, gathering info from the ethoscope.
         Now supports service-type awareness to prevent backup collisions.
@@ -1271,9 +1288,9 @@ class Ethoscope(BaseDevice):
             
             # Determine which backup filename to use based on service type
             if service_type == "mariadb":
-                backup_filename = self._get_mariadb_backup_filename()
+                backup_filename = self._get_backup_filename_for_db_type("MariaDB")
             elif service_type == "sqlite":
-                backup_filename = self._get_sqlite_backup_filename()
+                backup_filename = self._get_backup_filename_for_db_type("SQLite")
             else:
                 # Auto mode: use the appropriate backup filename based on database type
                 backup_filename = self._get_appropriate_backup_filename()
@@ -1309,58 +1326,39 @@ class Ethoscope(BaseDevice):
             self._logger.error(f"Error creating backup path: {e}")
             self._info["backup_path"] = None
     
-    def _get_mariadb_backup_filename(self) -> str:
-        """Get backup filename specifically for MariaDB databases."""
+    def _get_backup_filename_for_db_type(self, db_type: str) -> str:
+        """Get backup filename for a specific database type.
+        
+        Args:
+            db_type: Database type ("MariaDB" or "SQLite")
+            
+        Returns:
+            str: Backup filename or None if not found
+        """
         try:
             # Check new nested databases structure first
             databases = self._info.get("databases", {})
-            mariadb_databases = databases.get("MariaDB", {})
+            db_type_databases = databases.get(db_type, {})
             
-            if mariadb_databases:
-                # For now, take the first MariaDB database (typically there's only one)
-                db_name = list(mariadb_databases.keys())[0]
-                db_info = mariadb_databases[db_name]
+            if db_type_databases:
+                # For now, take the first database (typically there's only one)
+                db_name = list(db_type_databases.keys())[0]
+                db_info = db_type_databases[db_name]
                 backup_filename = db_info.get("backup_filename")
                 if backup_filename:
                     return backup_filename
             
             # Fallback to old structure for backward compatibility
             database_info = self._info.get("database_info", {})
-            mariadb_info = database_info.get("mariadb", {})
-            if mariadb_info.get("exists", False):
-                mariadb_current = mariadb_info.get("current", {})
-                return mariadb_current.get("backup_filename")
+            db_type_key = db_type.lower()  # Convert to lowercase for old structure
+            db_type_info = database_info.get(db_type_key, {})
+            if db_type_info.get("exists", False):
+                db_type_current = db_type_info.get("current", {})
+                return db_type_current.get("backup_filename")
             
             return None
         except Exception as e:
-            self._logger.error(f"Error getting MariaDB backup filename: {e}")
-            return None
-    
-    def _get_sqlite_backup_filename(self) -> str:
-        """Get backup filename specifically for SQLite databases."""
-        try:
-            # Check new nested databases structure first
-            databases = self._info.get("databases", {})
-            sqlite_databases = databases.get("SQLite", {})
-            
-            if sqlite_databases:
-                # For now, take the first SQLite database (typically there's only one)
-                db_name = list(sqlite_databases.keys())[0]
-                db_info = sqlite_databases[db_name]
-                backup_filename = db_info.get("backup_filename")
-                if backup_filename:
-                    return backup_filename
-            
-            # Fallback to old structure for backward compatibility
-            database_info = self._info.get("database_info", {})
-            sqlite_info = database_info.get("sqlite", {})
-            if sqlite_info.get("exists", False):
-                sqlite_current = sqlite_info.get("current", {})
-                return sqlite_current.get("backup_filename")
-            
-            return None
-        except Exception as e:
-            self._logger.error(f"Error getting SQLite backup filename: {e}")
+            self._logger.error(f"Error getting {db_type} backup filename: {e}")
             return None
     
     def _get_appropriate_backup_filename(self) -> str:
@@ -1370,16 +1368,14 @@ class Ethoscope(BaseDevice):
             databases = self._info.get("databases", {})
             
             # Try MariaDB first
-            mariadb_databases = databases.get("MariaDB", {})
-            if mariadb_databases:
-                mariadb_filename = self._get_mariadb_backup_filename()
+            if databases.get("MariaDB"):
+                mariadb_filename = self._get_backup_filename_for_db_type("MariaDB")
                 if mariadb_filename:
                     return mariadb_filename
             
             # Try SQLite next
-            sqlite_databases = databases.get("SQLite", {})
-            if sqlite_databases:
-                sqlite_filename = self._get_sqlite_backup_filename()
+            if databases.get("SQLite"):
+                sqlite_filename = self._get_backup_filename_for_db_type("SQLite")
                 if sqlite_filename:
                     return sqlite_filename
             
@@ -1388,9 +1384,9 @@ class Ethoscope(BaseDevice):
             active_type = database_info.get("active_type", "none")
             
             if active_type == "mariadb":
-                return self._get_mariadb_backup_filename()
+                return self._get_backup_filename_for_db_type("MariaDB")
             elif active_type == "sqlite":
-                return self._get_sqlite_backup_filename()
+                return self._get_backup_filename_for_db_type("SQLite")
             else:
                 # Fallback to legacy behavior
                 if "backup_filename" in self._info and self._info["backup_filename"]:

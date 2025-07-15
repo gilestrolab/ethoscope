@@ -55,7 +55,7 @@ SYSTEM_DAEMONS = {
     },
     "ntpd": {
         'description': 'The NTPd service is syncing time with the ethoscopes.',
-        'available_on_docker': True
+        'available_on_docker': False
     },
     "sshd": {
         'description': 'The SSH daemon allows power users to access the node terminal from remote.',
@@ -618,104 +618,220 @@ class EthoscopeNodeServer:
     # Route handlers - Backup API
     @error_decorator
     def _get_backup_status(self):
-        """Get unified backup status from both MySQL (8090) and rsync (8093) backup daemons."""
+        """Get structured backup status for MySQL, SQLite, and Video backups."""
         bottle.response.content_type = 'application/json'
         
         # Fetch status from both backup services
-        mysql_status = self._fetch_mysql_backup_status()
-        rsync_status = self._fetch_rsync_backup_status()
+        mysql_status = self._fetch_backup_service_status(8090, "MySQL")
+        rsync_status = self._fetch_backup_service_status(8093, "Rsync")
         
-        # Create unified response
-        unified_status = {
-            "mysql_backup": mysql_status,
-            "rsync_backup": rsync_status,
-            "unified_devices": self._merge_backup_status(mysql_status, rsync_status)
+        # Create structured response with clear backup type separation
+        structured_status = {
+            "services": {
+                "mysql_service": mysql_status,
+                "rsync_service": rsync_status
+            },
+            "devices": self._create_structured_backup_status(mysql_status, rsync_status),
+            "summary": self._create_backup_summary(mysql_status, rsync_status)
         }
         
-        return json.dumps(unified_status, indent=2)
+        return json.dumps(structured_status, indent=2)
     
-    def _fetch_mysql_backup_status(self):
-        """Fetch backup status from MySQL backup daemon (port 8090)."""
+    def _fetch_backup_service_status(self, port: int, service_name: str):
+        """Fetch backup status from a backup daemon running on specified port."""
         try:
-            backup_url = 'http://localhost:8090/status'
+            backup_url = f'http://localhost:{port}/status'
             with urllib.request.urlopen(backup_url, timeout=5) as response:
                 data = response.read().decode('utf-8')
                 return json.loads(data)
         except Exception as e:
-            self.logger.warning(f"Failed to get MySQL backup status from port 8090: {e}")
-            return {"error": "MySQL backup service unavailable", "service": "mysql_backup"}
+            self.logger.warning(f"Failed to get {service_name} backup status from port {port}: {e}")
+            return {"error": f"{service_name} backup service unavailable", "service": service_name.lower().replace(" ", "_")}
     
-    def _fetch_rsync_backup_status(self):
-        """Fetch backup status from rsync backup daemon (port 8093)."""
-        try:
-            backup_url = 'http://localhost:8093/status'
-            with urllib.request.urlopen(backup_url, timeout=5) as response:
-                data = response.read().decode('utf-8')
-                return json.loads(data)
-        except Exception as e:
-            self.logger.warning(f"Failed to get rsync backup status from port 8093: {e}")
-            return {"error": "Rsync backup service unavailable", "service": "rsync_backup"}
-    
-    def _merge_backup_status(self, mysql_status, rsync_status):
-        """Merge backup status from both services into a unified view per device."""
-        unified_devices = {}
-        
-        # Get devices from MySQL backup status
+    def _extract_devices_from_status(self, mysql_status, rsync_status):
+        """Extract device information from both backup services."""
         mysql_devices = mysql_status.get("devices", mysql_status) if "error" not in mysql_status else {}
-        
-        # Get devices from rsync backup status  
         rsync_devices = rsync_status.get("devices", rsync_status) if "error" not in rsync_status else {}
-        
-        # Get all unique device IDs from both services
         all_device_ids = set(mysql_devices.keys()) | set(rsync_devices.keys())
+        
+        return mysql_devices, rsync_devices, all_device_ids
+    
+    def _create_structured_backup_status(self, mysql_status, rsync_status):
+        """Create structured backup status with clear MySQL, SQLite, and Video separation."""
+        structured_devices = {}
+        
+        mysql_devices, rsync_devices, all_device_ids = self._extract_devices_from_status(mysql_status, rsync_status)
         
         for device_id in all_device_ids:
             mysql_device = mysql_devices.get(device_id, {})
             rsync_device = rsync_devices.get(device_id, {})
             
-            # Create unified device status
-            unified_device = {
+            # Extract synced information to determine backup types
+            mysql_synced = mysql_device.get("synced", {})
+            rsync_synced = rsync_device.get("synced", {})
+            
+            # Determine what types of data are being backed up
+            mysql_backup_info = self._extract_backup_info("mysql", mysql_device)
+            sqlite_backup_info = self._extract_backup_info("sqlite", rsync_device, rsync_synced)
+            video_backup_info = self._extract_backup_info("video", rsync_device, rsync_synced)
+            
+            # Create structured device status
+            device_status = {
                 "name": mysql_device.get("name") or rsync_device.get("name", f"DEVICE_{device_id[:8]}"),
-                "status": mysql_device.get("status") or rsync_device.get("status", "unknown"),
-                "mysql_backup": {
-                    "available": bool(mysql_device),
-                    "status": mysql_device.get("status", "not_available"),
-                    "progress": mysql_device.get("progress", {}),
-                    "synced": mysql_device.get("synced", {}),
-                    "processing": mysql_device.get("processing", False),
-                    "count": mysql_device.get("count", 0),
-                    "started": mysql_device.get("started"),
-                    "ended": mysql_device.get("ended")
+                "device_status": mysql_device.get("status") or rsync_device.get("status", "unknown"),
+                "last_seen": max(
+                    mysql_device.get("ended", 0) or 0,
+                    rsync_device.get("ended", 0) or 0
+                ),
+                "backup_types": {
+                    "mysql": mysql_backup_info,
+                    "sqlite": sqlite_backup_info, 
+                    "video": video_backup_info
                 },
-                "rsync_backup": {
-                    "available": bool(rsync_device),
-                    "status": rsync_device.get("status", "not_available"),
-                    "progress": rsync_device.get("progress", {}),
-                    "synced": rsync_device.get("synced", {}),
-                    "processing": rsync_device.get("processing", False),
-                    "count": rsync_device.get("count", 0),
-                    "started": rsync_device.get("started"),
-                    "ended": rsync_device.get("ended"),
-                    "metadata": rsync_device.get("metadata", {})
-                }
+                "overall_status": self._determine_overall_backup_status(
+                    mysql_backup_info, sqlite_backup_info, video_backup_info
+                )
             }
             
-            # Determine overall backup health
-            mysql_ok = mysql_device.get("progress", {}).get("status") == "success"
-            rsync_ok = rsync_device.get("progress", {}).get("status") == "success"
-            
-            if mysql_ok and rsync_ok:
-                unified_device["overall_status"] = "success"
-            elif mysql_ok or rsync_ok:
-                unified_device["overall_status"] = "partial"
-            elif mysql_device.get("progress", {}).get("status") == "error" or rsync_device.get("progress", {}).get("status") == "error":
-                unified_device["overall_status"] = "error"
-            else:
-                unified_device["overall_status"] = "unknown"
-            
-            unified_devices[device_id] = unified_device
+            structured_devices[device_id] = device_status
         
-        return unified_devices
+        return structured_devices
+    
+    def _extract_backup_info(self, backup_type: str, device_data: dict, synced_data: dict = None):
+        """Generic method to extract backup information for any backup type."""
+        if not device_data:
+            return self._get_empty_backup_info(backup_type)
+        
+        progress = device_data.get("progress", {})
+        
+        # Base backup info common to all types
+        base_info = {
+            "available": True,
+            "status": progress.get("status", "unknown"),
+            "last_backup": device_data.get("ended"),
+            "processing": device_data.get("processing", False),
+            "message": progress.get("message", ""),
+            "time_since_backup": progress.get("time_since_backup")
+        }
+        
+        # Add type-specific information
+        if backup_type == "mysql":
+            base_info.update({
+                "size": progress.get("backup_size", 0),
+                "records": device_data.get("count", 0)
+            })
+        
+        elif backup_type == "sqlite":
+            # Look for SQLite database info in synced data
+            sqlite_info = self._find_sqlite_info(synced_data or {})
+            if not sqlite_info:
+                return self._get_empty_backup_info(backup_type)
+            
+            base_info.update({
+                "size": sqlite_info.get("disk_usage_bytes", 0),
+                "files": sqlite_info.get("local_files", 0),
+                "directory": sqlite_info.get("directory", "")
+            })
+        
+        elif backup_type == "video":
+            # Look for video info in synced data
+            video_info = (synced_data or {}).get("videos", {})
+            if not video_info:
+                return self._get_empty_backup_info(backup_type)
+            
+            base_info.update({
+                "size": video_info.get("disk_usage_bytes", 0),
+                "size_human": video_info.get("disk_usage_human", "0 B"),
+                "files": video_info.get("local_files", 0),
+                "directory": video_info.get("directory", "")
+            })
+        
+        return base_info
+    
+    def _get_empty_backup_info(self, backup_type: str):
+        """Get empty backup info structure for unavailable backups."""
+        base_empty = {
+            "available": False,
+            "status": "not_available",
+            "last_backup": None,
+            "size": 0
+        }
+        
+        if backup_type == "mysql":
+            base_empty["records"] = 0
+        else:  # sqlite and video
+            base_empty["files"] = 0
+            if backup_type == "video":
+                base_empty["size_human"] = "0 B"
+        
+        return base_empty
+    
+    def _find_sqlite_info(self, synced_data: dict):
+        """Find SQLite database info in synced data."""
+        for key, value in synced_data.items():
+            if (key.lower().endswith('.db') or 
+                'sqlite' in key.lower() or 
+                'database' in key.lower()):
+                return value
+        return {}
+    
+    def _determine_overall_backup_status(self, mysql_info, sqlite_info, video_info):
+        """Determine overall backup status based on all backup types."""
+        statuses = []
+        
+        if mysql_info["available"]:
+            statuses.append(mysql_info["status"])
+        if sqlite_info["available"]:
+            statuses.append(sqlite_info["status"])
+        if video_info["available"]:
+            statuses.append(video_info["status"])
+        
+        if not statuses:
+            return "no_backups"
+        
+        # All successful
+        if all(status in ["success", "completed"] for status in statuses):
+            return "success"
+        
+        # Any failed
+        if any(status in ["error", "failed"] for status in statuses):
+            return "error"
+        
+        # Any processing
+        if any(status in ["processing", "running"] for status in statuses):
+            return "processing"
+        
+        # Partial success
+        if any(status in ["success", "completed"] for status in statuses):
+            return "partial"
+        
+        return "unknown"
+    
+    def _get_service_availability(self, service_status):
+        """Check if a backup service is available based on its status."""
+        return "error" not in service_status
+    
+    def _create_backup_summary(self, mysql_status, rsync_status):
+        """Create summary statistics for backup services."""
+        mysql_available = self._get_service_availability(mysql_status)
+        rsync_available = self._get_service_availability(rsync_status)
+        
+        mysql_devices, rsync_devices, all_device_ids = self._extract_devices_from_status(mysql_status, rsync_status)
+        
+        return {
+            "services": {
+                "mysql_service_available": mysql_available,
+                "rsync_service_available": rsync_available,
+                "mysql_service_status": "online" if mysql_available else "offline",
+                "rsync_service_status": "online" if rsync_available else "offline"
+            },
+            "devices": {
+                "total_devices": len(all_device_ids),
+                "mysql_backed_up": len(mysql_devices),
+                "rsync_backed_up": len(rsync_devices),
+                "both_services": len(set(mysql_devices.keys()) & set(rsync_devices.keys()))
+            }
+        }
     
     # Route handlers - Sensor API
     @error_decorator
