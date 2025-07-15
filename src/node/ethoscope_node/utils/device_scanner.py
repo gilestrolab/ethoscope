@@ -925,7 +925,7 @@ class Ethoscope(BaseDevice):
         
         # Only update if we have a valid device name and it's different from current
         if device_name and device_name != 'unknown_name':
-            new_logger_name = f"{self.__class__.__name__}_{device_name}"
+            new_logger_name = f"{device_name}"
             current_logger_name = self._logger.name
             
             # Only update if the name has changed
