@@ -998,11 +998,27 @@ class Ethoscope(BaseDevice):
     
 
     def _update_backup_status_from_database_info(self):
-        """Update backup status using appropriate method based on database type (SQLite vs MySQL)."""
+        """Update backup status using new comprehensive device data format."""
         if time.time() - self._last_db_info < DB_UPDATE_INTERVAL:
             return
         
         try:
+            # Check if device provides backup status directly (new format)
+            if 'backup_status' in self._info:
+                # Use the backup status provided directly by the device
+                backup_status = self._info['backup_status']
+                backup_size = self._info.get('backup_size', 0)
+                time_since_backup = self._info.get('time_since_backup', 0)
+                
+                # Store additional backup info
+                self._info['backup_size'] = backup_size
+                self._info['time_since_backup'] = time_since_backup
+                
+                self._logger.debug(f"Device {self._ip}: Using device-provided backup status: {backup_status}")
+                self._last_db_info = time.time()
+                return
+            
+            # Fall back to legacy method for backward compatibility
             # Get database_info from the ethoscope's response
             database_info = self._info.get("database_info", {})
             backup_path = self._info.get("backup_path")
@@ -1024,7 +1040,14 @@ class Ethoscope(BaseDevice):
                 self._info['backup_status'] = "File Missing"
                 return
             
-            # Check database_info status
+            # Check if we have new nested databases structure
+            databases = self._info.get("databases", {})
+            if databases:
+                # Use new database structure to determine backup status
+                self._update_backup_status_from_databases(databases, backup_path)
+                return
+            
+            # Check database_info status (old structure)
             db_status = database_info.get("db_status", "unknown")
             if db_status == "error":
                 self._logger.debug(f"Device {self._ip}: Database info shows error status")
@@ -1066,6 +1089,66 @@ class Ethoscope(BaseDevice):
             self._info['backup_status'] = "Error"
         
         self._last_db_info = time.time()
+    
+    def _update_backup_status_from_databases(self, databases: dict, backup_path: str):
+        """Update backup status using new nested databases structure."""
+        try:
+            # Check MariaDB databases first
+            mariadb_databases = databases.get("MariaDB", {})
+            if mariadb_databases:
+                # Use the first MariaDB database (typically there's only one)
+                db_name = list(mariadb_databases.keys())[0]
+                db_info = mariadb_databases[db_name]
+                
+                # Check if we have table counts for backup percentage calculation
+                if 'table_counts' in db_info:
+                    from ethoscope_node.utils.backups_helpers import get_sqlite_table_counts, calculate_backup_percentage_from_table_counts
+                    
+                    remote_table_counts = db_info['table_counts']
+                    backup_table_counts = get_sqlite_table_counts(backup_path)
+                    
+                    backup_percentage = calculate_backup_percentage_from_table_counts(
+                        remote_table_counts, backup_table_counts)
+                    
+                    # Store backup status info
+                    self._info['backup_status'] = backup_percentage
+                    self._info['backup_size'] = db_info.get('filesize', 0)
+                    self._info['time_since_backup'] = time.time() - db_info.get('date', time.time())
+                    
+                    self._logger.debug(f"Device {self._ip}: MariaDB backup status: {backup_percentage}%")
+                    return
+            
+            # Check SQLite databases
+            sqlite_databases = databases.get("SQLite", {})
+            if sqlite_databases:
+                # Use the first SQLite database (typically there's only one) 
+                db_name = list(sqlite_databases.keys())[0]
+                db_info = sqlite_databases[db_name]
+                
+                # For SQLite, use file size comparison
+                local_backup_size = os.path.getsize(backup_path)
+                remote_db_size = db_info.get("filesize", 0)
+                
+                if remote_db_size > 0:
+                    backup_percentage = min(100.0, (local_backup_size / remote_db_size) * 100)
+                else:
+                    backup_percentage = 0.0
+                
+                # Store backup status info
+                self._info['backup_status'] = backup_percentage
+                self._info['backup_size'] = local_backup_size
+                self._info['time_since_backup'] = time.time() - db_info.get('date', time.time())
+                
+                self._logger.debug(f"Device {self._ip}: SQLite backup status: {backup_percentage}%")
+                return
+            
+            # No databases found
+            self._logger.debug(f"Device {self._ip}: No databases found in nested structure")
+            self._info['backup_status'] = "No Database"
+            
+        except Exception as e:
+            self._logger.error(f"Device {self._ip}: Failed to update backup status from databases: {e}")
+            self._info['backup_status'] = "Error"
     
     def _update_sqlite_backup_status(self, database_info, backup_path):
         """Update backup status for SQLite databases using file-based comparison."""
@@ -1212,11 +1295,25 @@ class Ethoscope(BaseDevice):
     def _get_mariadb_backup_filename(self) -> str:
         """Get backup filename specifically for MariaDB databases."""
         try:
+            # Check new nested databases structure first
+            databases = self._info.get("databases", {})
+            mariadb_databases = databases.get("MariaDB", {})
+            
+            if mariadb_databases:
+                # For now, take the first MariaDB database (typically there's only one)
+                db_name = list(mariadb_databases.keys())[0]
+                db_info = mariadb_databases[db_name]
+                backup_filename = db_info.get("backup_filename")
+                if backup_filename:
+                    return backup_filename
+            
+            # Fallback to old structure for backward compatibility
             database_info = self._info.get("database_info", {})
             mariadb_info = database_info.get("mariadb", {})
             if mariadb_info.get("exists", False):
                 mariadb_current = mariadb_info.get("current", {})
                 return mariadb_current.get("backup_filename")
+            
             return None
         except Exception as e:
             self._logger.error(f"Error getting MariaDB backup filename: {e}")
@@ -1225,11 +1322,25 @@ class Ethoscope(BaseDevice):
     def _get_sqlite_backup_filename(self) -> str:
         """Get backup filename specifically for SQLite databases."""
         try:
+            # Check new nested databases structure first
+            databases = self._info.get("databases", {})
+            sqlite_databases = databases.get("SQLite", {})
+            
+            if sqlite_databases:
+                # For now, take the first SQLite database (typically there's only one)
+                db_name = list(sqlite_databases.keys())[0]
+                db_info = sqlite_databases[db_name]
+                backup_filename = db_info.get("backup_filename")
+                if backup_filename:
+                    return backup_filename
+            
+            # Fallback to old structure for backward compatibility
             database_info = self._info.get("database_info", {})
             sqlite_info = database_info.get("sqlite", {})
             if sqlite_info.get("exists", False):
                 sqlite_current = sqlite_info.get("current", {})
                 return sqlite_current.get("backup_filename")
+            
             return None
         except Exception as e:
             self._logger.error(f"Error getting SQLite backup filename: {e}")
@@ -1238,6 +1349,24 @@ class Ethoscope(BaseDevice):
     def _get_appropriate_backup_filename(self) -> str:
         """Get the appropriate backup filename based on the active database type."""
         try:
+            # Check new nested databases structure first
+            databases = self._info.get("databases", {})
+            
+            # Try MariaDB first
+            mariadb_databases = databases.get("MariaDB", {})
+            if mariadb_databases:
+                mariadb_filename = self._get_mariadb_backup_filename()
+                if mariadb_filename:
+                    return mariadb_filename
+            
+            # Try SQLite next
+            sqlite_databases = databases.get("SQLite", {})
+            if sqlite_databases:
+                sqlite_filename = self._get_sqlite_backup_filename()
+                if sqlite_filename:
+                    return sqlite_filename
+            
+            # Fallback to old structure for backward compatibility
             database_info = self._info.get("database_info", {})
             active_type = database_info.get("active_type", "none")
             
