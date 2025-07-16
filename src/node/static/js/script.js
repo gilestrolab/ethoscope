@@ -485,6 +485,11 @@
                 return 'backup-status-processing';
             }
             
+            // If there are no video files, show as unknown/nothing to do
+            if (video.files === 0) {
+                return 'backup-status-unknown';
+            }
+            
             switch (video.status) {
                 case 'success':
                 case 'completed':
@@ -569,6 +574,11 @@
                 return 'Video backup not available';
             }
             
+            // Special case: no video files to backup
+            if (video.files === 0) {
+                return 'Video Backup: Nothing to do\nNo video files found';
+            }
+            
             var title = 'Video Backup: ' + video.status.toUpperCase();
             
             if (video.files > 0) {
@@ -586,16 +596,75 @@
                 title += '\nLast backup: ' + $scope.elapsedtime(lastBackupTime) + ' ago';
             }
             
-            var videoFolder = getFolderName(video.directory);
-            if (videoFolder) {
-                title += '\nFolder: ' + videoFolder;
-            }
-            
             if (video.processing) {
                 title += '\n🔄 Currently processing...';
             }
             
             return title;
+        };
+
+        $scope.getBackupStatusText = function(device) {
+            if (!$scope.backup_service_available) {
+                return 'Service offline';
+            }
+            
+            var backup_info = $scope.backup_status[device.id];
+            if (!backup_info || !backup_info.backup_types) {
+                return 'No backup info';
+            }
+            
+            var mysql = backup_info.backup_types.mysql;
+            var sqlite = backup_info.backup_types.sqlite;
+            var video = backup_info.backup_types.video;
+            
+            var text = '';
+            var parts = [];
+            
+            // Check if any backup is processing
+            if (mysql?.processing || sqlite?.processing || video?.processing) {
+                return 'Processing...';
+            }
+            
+            // Calculate total size for display
+            var totalSize = 0;
+            if (mysql?.available && mysql.size) totalSize += mysql.size;
+            if (sqlite?.available && sqlite.size) totalSize += sqlite.size;
+            if (video?.available && video.size) totalSize += video.size;
+            
+            // Show size if we have any backups
+            if (totalSize > 0) {
+                text = $scope.humanFileSize(totalSize);
+            }
+            
+            // Show last backup time if available (take the most recent)
+            var lastBackupTime = 0;
+            if (mysql?.last_backup) lastBackupTime = Math.max(lastBackupTime, mysql.last_backup);
+            if (sqlite?.last_backup) lastBackupTime = Math.max(lastBackupTime, sqlite.last_backup);
+            if (video?.last_backup) lastBackupTime = Math.max(lastBackupTime, video.last_backup);
+            
+            if (lastBackupTime > 0) {
+                var timeSinceBackup = (Date.now() / 1000) - lastBackupTime;
+                if (text) text += ' - ';
+                text += $scope.elapsedtime(timeSinceBackup) + ' ago';
+            }
+            
+            // If no meaningful info, show overall status
+            if (!text) {
+                switch (backup_info.overall_status) {
+                    case 'success':
+                        return 'All backups OK';
+                    case 'partial':
+                        return 'Partial backup';
+                    case 'error':
+                        return 'Backup failed';
+                    case 'no_backups':
+                        return 'No backups configured';
+                    default:
+                        return 'Unknown status';
+                }
+            }
+            
+            return text;
         };
 
         // Helper function for folder name extraction (used in video tooltip)
