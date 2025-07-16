@@ -160,10 +160,21 @@ class ExperimentalDB(multiprocessing.Process):
                                 status TEXT
                             );""" % self._ethoscopes_table_name
 
+        sql_create_alert_logs_table = """CREATE TABLE IF NOT EXISTS alert_logs (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                device_id TEXT NOT NULL,
+                                alert_type TEXT NOT NULL,
+                                message TEXT NOT NULL,
+                                recipients TEXT,
+                                created_at TIMESTAMP NOT NULL,
+                                updated_at TIMESTAMP NOT NULL
+                            );"""
+
         self.executeSQL ( sql_create_runs_table )
         self.executeSQL ( sql_create_experiments_table )
         self.executeSQL ( sql_create_users_table )
         self.executeSQL ( sql_create_ethoscopes_table )
+        self.executeSQL ( sql_create_alert_logs_table )
 
     def getRun (self, run_id, asdict=False):
         """
@@ -346,6 +357,144 @@ class ExperimentalDB(multiprocessing.Process):
             logging.warning("Adding a new ethoscope to the db. Welcome %s with id %s" % (ethoscope_name, ethoscope_id))
 
         return self.executeSQL(sql_update_ethoscope)
+    
+    def getUserByName(self, username: str, asdict: bool = False):
+        """
+        Get user information by username.
+        
+        Args:
+            username: Username to look up
+            asdict: Return as dictionary if True
+            
+        Returns:
+            User data from database or empty dict if not found
+        """
+        sql_get_user = "SELECT * FROM %s WHERE username = '%s'" % (self._users_table_name, username)
+        
+        row = self.executeSQL(sql_get_user)
+        
+        if type(row) != list or len(row) == 0:
+            return {}
+        
+        if asdict:
+            return dict(row[0])
+        else:
+            return row[0]
+    
+    def getUserByEmail(self, email: str, asdict: bool = False):
+        """
+        Get user information by email address.
+        
+        Args:
+            email: Email address to look up
+            asdict: Return as dictionary if True
+            
+        Returns:
+            User data from database or empty dict if not found
+        """
+        sql_get_user = "SELECT * FROM %s WHERE email = '%s'" % (self._users_table_name, email)
+        
+        row = self.executeSQL(sql_get_user)
+        
+        if type(row) != list or len(row) == 0:
+            return {}
+        
+        if asdict:
+            return dict(row[0])
+        else:
+            return row[0]
+    
+    def getUsersForDevice(self, device_id: str, asdict: bool = False):
+        """
+        Get all users who have run experiments on a specific device.
+        
+        Args:
+            device_id: Device ID to look up
+            asdict: Return as dictionary if True
+            
+        Returns:
+            List of user data for users who have used this device
+        """
+        sql_get_users = """
+        SELECT DISTINCT u.* FROM %s u 
+        JOIN %s r ON u.username = r.user_name 
+        WHERE r.ethoscope_id = '%s' AND u.active = 1
+        """ % (self._users_table_name, self._runs_table_name, device_id)
+        
+        rows = self.executeSQL(sql_get_users)
+        
+        if type(rows) != list or len(rows) == 0:
+            return []
+        
+        if asdict:
+            return [dict(row) for row in rows]
+        else:
+            return rows
+    
+    def logAlert(self, device_id: str, alert_type: str, message: str, recipients: str = ""):
+        """
+        Log an alert that was sent.
+        
+        Args:
+            device_id: Device ID that triggered the alert
+            alert_type: Type of alert (device_stopped, storage_warning, etc.)
+            message: Alert message content
+            recipients: Comma-separated list of email recipients
+            
+        Returns:
+            ID of the inserted alert log entry
+        """
+        timestamp = datetime.datetime.now()
+        
+        sql_log_alert = """
+        INSERT INTO alert_logs VALUES(
+            NULL, '%s', '%s', '%s', '%s', '%s', '%s'
+        )
+        """ % (device_id, alert_type, message.replace("'", "''"), recipients, timestamp, timestamp)
+        
+        return self.executeSQL(sql_log_alert)
+    
+    def getAlertHistory(self, device_id: str = None, alert_type: str = None, 
+                       limit: int = 100, asdict: bool = False):
+        """
+        Get alert history with optional filtering.
+        
+        Args:
+            device_id: Filter by device ID (optional)
+            alert_type: Filter by alert type (optional)
+            limit: Maximum number of records to return
+            asdict: Return as dictionary if True
+            
+        Returns:
+            List of alert log entries
+        """
+        sql_conditions = []
+        
+        if device_id:
+            sql_conditions.append("device_id = '%s'" % device_id)
+        
+        if alert_type:
+            sql_conditions.append("alert_type = '%s'" % alert_type)
+        
+        where_clause = ""
+        if sql_conditions:
+            where_clause = " WHERE " + " AND ".join(sql_conditions)
+        
+        sql_get_alerts = """
+        SELECT * FROM alert_logs%s 
+        ORDER BY created_at DESC 
+        LIMIT %d
+        """ % (where_clause, limit)
+        
+        rows = self.executeSQL(sql_get_alerts)
+        
+        if type(rows) != list:
+            return []
+        
+        if asdict:
+            return [dict(row) for row in rows]
+        else:
+            return rows
         
 class simpleDB(object):
     '''

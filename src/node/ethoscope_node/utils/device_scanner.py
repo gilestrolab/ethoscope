@@ -20,8 +20,9 @@ from dataclasses import dataclass
 from zeroconf import ServiceBrowser, Zeroconf, IPVersion
 
 from ethoscope_node.utils.etho_db import ExperimentalDB
-from ethoscope_node.utils.configuration import ensure_ssh_keys
+from ethoscope_node.utils.configuration import ensure_ssh_keys, EthoscopeConfiguration
 from ethoscope_node.utils.backups_helpers import get_sqlite_table_counts, calculate_backup_percentage_from_table_counts
+from ethoscope_node.utils.notification import EmailNotificationService
 
 # Constants
 STREAMING_PORT = 8887
@@ -640,7 +641,8 @@ class Ethoscope(BaseDevice):
     }
     
     def __init__(self, ip: str, port: int = ETHOSCOPE_PORT, refresh_period: float = 5,
-                 results_dir: str = "/ethoscope_data/results", config_dir: str = "/etc/ethoscope"):
+                 results_dir: str = "/ethoscope_data/results", config_dir: str = "/etc/ethoscope",
+                 config: Optional[EthoscopeConfiguration] = None):
         # Initialize ethoscope-specific attributes BEFORE calling parent
         self._results_dir = results_dir
         self._config_dir = config_dir
@@ -648,6 +650,10 @@ class Ethoscope(BaseDevice):
         self._last_db_info = 0
         self._device_controller_created = time.time()
         self._ping_count = 0  # Initialize ping counter
+        
+        # Use provided configuration or create new one
+        self._config = config or EthoscopeConfiguration()
+        self._notification_service = EmailNotificationService(self._config, self._edb)
         
         # Call parent initialization
         super().__init__(ip, port, refresh_period, results_dir)
@@ -913,6 +919,9 @@ class Ethoscope(BaseDevice):
         
         self._handle_state_transition(previous_status, new_status)
         self._update_backup_status_from_database_info()
+        
+        # Check for storage warnings
+        self._check_storage_warnings()
     
     def _fetch_device_info(self) -> bool:
         """Fetch latest device information."""
@@ -1027,8 +1036,76 @@ class Ethoscope(BaseDevice):
             if transition_key in transitions:
                 transitions[transition_key]()
                 
+            # Send alerts for specific state transitions
+            self._send_state_transition_alerts(previous_status, new_status, run_id)
+                
         except Exception as e:
             self._logger.error(f"Error handling state transition: {e}")
+    
+    def _send_state_transition_alerts(self, previous_status: str, new_status: str, run_id: str):
+        """Send email alerts for state transitions."""
+        try:
+            device_name = self._info.get('name', self._id)
+            
+            # Send alert when device stops unexpectedly (from running to stopped)
+            if previous_status == 'running' and new_status == 'stopped':
+                last_seen = datetime.datetime.fromtimestamp(self._info.get('last_seen', time.time()))
+                self._notification_service.send_device_stopped_alert(
+                    device_id=self._id,
+                    device_name=device_name,
+                    run_id=run_id,
+                    last_seen=last_seen
+                )
+            
+            # Send alert when device becomes unreachable
+            elif new_status == 'unreached':
+                last_seen = datetime.datetime.fromtimestamp(self._info.get('last_seen', time.time()))
+                self._notification_service.send_device_unreachable_alert(
+                    device_id=self._id,
+                    device_name=device_name,
+                    last_seen=last_seen
+                )
+                
+        except Exception as e:
+            self._logger.error(f"Error sending state transition alerts: {e}")
+    
+    def _check_storage_warnings(self):
+        """Check for storage warnings and send alerts if necessary."""
+        try:
+            # Get storage information from device
+            machine_info = self._info.get('machine_info', {})
+            
+            # Check for disk usage information
+            disk_usage = machine_info.get('disk_usage', {})
+            if not disk_usage:
+                return
+            
+            # Get alert threshold from configuration
+            alert_config = self._config.get_custom('alerts') or {}
+            threshold = alert_config.get('storage_warning_threshold', 80)
+            
+            # Check each mounted filesystem
+            for mount_point, usage_info in disk_usage.items():
+                if isinstance(usage_info, dict):
+                    used_percent = usage_info.get('used_percent', 0)
+                    available_space = usage_info.get('available', 'unknown')
+                    
+                    if used_percent >= threshold:
+                        device_name = self._info.get('name', self._id)
+                        
+                        # Format available space for display
+                        if isinstance(available_space, (int, float)):
+                            available_space = f"{available_space / (1024**3):.1f} GB"
+                        
+                        self._notification_service.send_storage_warning_alert(
+                            device_id=self._id,
+                            device_name=device_name,
+                            storage_percent=used_percent,
+                            available_space=str(available_space)
+                        )
+                        
+        except Exception as e:
+            self._logger.error(f"Error checking storage warnings: {e}")
     
 
     def _update_backup_status_from_database_info(self):
@@ -1728,10 +1805,12 @@ class EthoscopeScanner(DeviceScanner):
     
     def __init__(self, device_refresh_period: float = 5, 
                  results_dir: str = "/ethoscope_data/results", device_class=Ethoscope,
-                 config_dir: str = "/etc/ethoscope"):
+                 config_dir: str = "/etc/ethoscope", 
+                 config: Optional[EthoscopeConfiguration] = None):
         super().__init__(device_refresh_period, device_class)
         self.results_dir = results_dir
         self.config_dir = config_dir
+        self.config = config  # Store config to pass to devices
         self._edb = ExperimentalDB(config_dir)
         self.timestarted = datetime.datetime.now()  # Keep original name for compatibility
     
@@ -1858,6 +1937,13 @@ class EthoscopeScanner(DeviceScanner):
                         sig = inspect.signature(self._device_class.__init__)
                         if 'config_dir' in sig.parameters:
                             device_kwargs['config_dir'] = self.config_dir
+                    
+                    # Add config parameter if supported to avoid duplicate configuration loading
+                    if hasattr(self, 'config') and self.config is not None:
+                        import inspect
+                        sig = inspect.signature(self._device_class.__init__)
+                        if 'config' in sig.parameters:
+                            device_kwargs['config'] = self.config
                     
                     device = self._device_class(**device_kwargs)
                     

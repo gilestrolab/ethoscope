@@ -317,9 +317,9 @@ class EthoscopeNodeServer:
             # Initialize device scanner
             try:
                 if self.config_dir:
-                    self.device_scanner = EthoscopeScanner(results_dir=self.results_dir, config_dir=self.config_dir)
+                    self.device_scanner = EthoscopeScanner(results_dir=self.results_dir, config_dir=self.config_dir, config=self.config)
                 else:
-                    self.device_scanner = EthoscopeScanner(results_dir=self.results_dir)
+                    self.device_scanner = EthoscopeScanner(results_dir=self.results_dir, config=self.config)
                 self.device_scanner.start()
                 self.logger.info("Ethoscope scanner started")
             except Exception as e:

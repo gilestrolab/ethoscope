@@ -79,7 +79,7 @@ class EthoscopeConfiguration:
                 'description': 'Where video chunks (h264) will be saved by the backup daemon'
             },
             'temporary': {
-                'path': '/ethoscope_data/results',
+                'path': '/tmp/ethoscope',
                 'description': 'A temporary location for downloading data.'
             }
         },
@@ -116,10 +116,25 @@ class EthoscopeConfiguration:
         },
         'custom': {
             'UPDATE_SERVICE_URL': 'http://localhost:8888'
+        },
+        'smtp': {
+            'enabled': False,
+            'host': 'localhost',
+            'port': 587,
+            'use_tls': True,
+            'username': '',
+            'password': '',
+            'from_email': 'ethoscope@localhost'
+        },
+        'alerts': {
+            'enabled': True,
+            'cooldown_seconds': 3600,
+            'storage_warning_threshold': 80,
+            'device_timeout_minutes': 30
         }
     }
     
-    REQUIRED_SECTIONS = ['folders', 'users', 'incubators', 'sensors', 'commands', 'custom']
+    REQUIRED_SECTIONS = ['folders', 'users', 'incubators', 'sensors', 'commands', 'custom', 'smtp', 'alerts']
     REQUIRED_FOLDERS = ['results', 'video', 'temporary']
     
     def __init__(self, config_file: str = "/etc/ethoscope/ethoscope.conf"):
@@ -194,9 +209,14 @@ class EthoscopeConfiguration:
             if not isinstance(user_data, dict):
                 raise ConfigurationValidationError(f"User '{user_name}' must be a dictionary")
             
+            # Check for missing required fields (only validate, don't warn since we fix them in merge)
             missing_user_keys = set(USERS_KEYS) - set(user_data.keys())
             if missing_user_keys:
-                self._logger.warning(f"User '{user_name}' missing fields: {missing_user_keys}")
+                # Only critical fields that can't have defaults should cause errors
+                critical_missing = {'name', 'email'} & missing_user_keys
+                if critical_missing:
+                    raise ConfigurationValidationError(f"User '{user_name}' missing critical fields: {critical_missing}")
+                # Non-critical missing fields are handled in merge step
     
     def _merge_with_defaults(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -220,7 +240,37 @@ class EthoscopeConfiguration:
                     target[key] = value
             return target
         
-        return deep_merge(merged, config_data)
+        # First, do the basic merge
+        merged = deep_merge(merged, config_data)
+        
+        # Then, ensure all user fields have default values
+        self._merge_user_fields(merged)
+        
+        return merged
+    
+    def _merge_user_fields(self, config_data: Dict[str, Any]) -> None:
+        """
+        Ensure all users have all required fields with default values.
+        
+        Args:
+            config_data: Configuration data to update in-place
+        """
+        users = config_data.get('users', {})
+        
+        # Default values for missing user fields
+        user_field_defaults = {
+            'telephone': '',
+            'group': '',
+            'isAdmin': False
+        }
+        
+        for user_name, user_data in users.items():
+            if isinstance(user_data, dict):
+                # Add any missing fields with default values
+                for field, default_value in user_field_defaults.items():
+                    if field not in user_data:
+                        user_data[field] = default_value
+                        self._logger.debug(f"Added default value for user '{user_name}' field '{field}': {default_value}")
     
     @property
     def content(self) -> Dict[str, Any]:
@@ -282,11 +332,11 @@ class EthoscopeConfiguration:
                 except json.JSONDecodeError as e:
                     raise ConfigurationError(f"Invalid JSON in configuration file: {e}")
             
-            # Validate configuration
-            self._validate_configuration(loaded_config)
-            
-            # Merge with defaults
+            # Merge with defaults first to ensure all sections are present
             self._settings = self._merge_with_defaults(loaded_config)
+            
+            # Validate the merged configuration
+            self._validate_configuration(self._settings)
             
             # Save merged configuration back to file
             self.save()
