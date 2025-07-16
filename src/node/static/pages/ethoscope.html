@@ -396,10 +396,13 @@
                                         </select>
                                         <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
                                         <input ng-if="(arg.type == 'str' && arg.asknode == undefined && arg.options == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
-                                        <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" ng-required="true">
-                                            <option value="">-- choose {{arg.name}} --</option>
+                                        <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" ng-required="{{arg.required == 'required'}}">
+                                            <option value="">-- choose {{arg.name}}{{arg.required == 'required' ? ' *' : ''}} --</option>
                                             <option ng-repeat="entry in node[arg.asknode] | toArray | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
                                         </select>
+                                        <div ng-if="(arg.type == 'str' && arg.asknode != undefined && arg.required == 'required')" class="text-danger" ng-show="trackingoptionsform[arg.name].$invalid && trackingoptionsform[arg.name].$touched">
+                                            <small>{{arg.name}} is required</small>
+                                        </div>
                                         <select ng-if="(arg.type == 'str' && arg.options != undefined)" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
                                             <option value="">-- choose {{arg.name}} --</option>
                                             <option ng-repeat="option in arg.options" value="{{option}}">{{option}}</option>
@@ -437,7 +440,7 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
-                        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_tracking(selected_options.tracking)" data-toggle="modal">Start Tracking</button>
+                        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_tracking(selected_options.tracking)" data-toggle="modal" ng-disabled="trackingoptionsform.$invalid">Start Tracking</button>
                     </div>
 
                 </form>
