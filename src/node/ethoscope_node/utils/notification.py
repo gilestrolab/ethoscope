@@ -43,11 +43,11 @@ class EmailNotificationService:
         
     def _get_smtp_config(self) -> Dict[str, Any]:
         """Get SMTP configuration from settings."""
-        return self.config.get_custom('smtp') or {}
+        return self.config.content.get('smtp', {})
     
     def _get_alert_config(self) -> Dict[str, Any]:
         """Get alert configuration from settings."""
-        return self.config.get_custom('alerts') or {}
+        return self.config.content.get('alerts', {})
     
     def _should_send_alert(self, device_id: str, alert_type: str) -> bool:
         """
@@ -174,13 +174,20 @@ class EmailNotificationService:
             return False
         
         try:
-            server = smtplib.SMTP(
-                smtp_config.get('host', 'localhost'),
-                smtp_config.get('port', 587)
-            )
+            port = smtp_config.get('port', 587)
+            host = smtp_config.get('host', 'localhost')
             
-            if smtp_config.get('use_tls', True):
-                server.starttls()
+            # Auto-detect protocol based on standard ports
+            # Port 465: SMTP over SSL (SMTPS)
+            # Port 587: SMTP with STARTTLS 
+            # Port 25: Plain SMTP (usually with optional STARTTLS)
+            if port == 465:
+                server = smtplib.SMTP_SSL(host, port)
+            else:
+                server = smtplib.SMTP(host, port)
+                # Use STARTTLS for ports 587 and 25 (if use_tls is not explicitly disabled)
+                if smtp_config.get('use_tls', True):
+                    server.starttls()
             
             username = smtp_config.get('username')
             password = smtp_config.get('password')
