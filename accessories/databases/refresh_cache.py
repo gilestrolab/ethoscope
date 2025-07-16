@@ -289,7 +289,7 @@ def refresh_mysql_cache(mysql_db_info, dry_run=False):
         
         # Generate backup filename from timestamp
         ts_str = time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(timestamp))
-        backup_filename = f"{ts_str}_{pi.get_machine_id()}_mysql.db"
+        backup_filename = f"{ts_str}_{pi.get_machine_id()}.db"
         
         # Prepare experiment info
         experiment_info = {
