@@ -495,6 +495,82 @@ class ExperimentalDB(multiprocessing.Process):
             return [dict(row) for row in rows]
         else:
             return rows
+    
+    def retire_inactive_devices(self, threshold_days: int = 90) -> int:
+        """
+        Retire devices that haven't been seen for more than threshold_days.
+        
+        Args:
+            threshold_days: Number of days after which to retire inactive devices
+            
+        Returns:
+            Number of devices that were retired
+        """
+        cutoff_date = datetime.datetime.now() - datetime.timedelta(days=threshold_days)
+        cutoff_str = cutoff_date.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Get count of devices that will be retired
+        sql_count = "SELECT COUNT(*) FROM %s WHERE last_seen < '%s' AND active = 1" % (
+            self._ethoscopes_table_name, cutoff_str
+        )
+        
+        count_result = self.executeSQL(sql_count)
+        if isinstance(count_result, list) and len(count_result) > 0:
+            devices_to_retire = count_result[0][0]
+        else:
+            devices_to_retire = 0
+        
+        if devices_to_retire > 0:
+            # Retire the devices
+            sql_retire = "UPDATE %s SET active = 0 WHERE last_seen < '%s' AND active = 1" % (
+                self._ethoscopes_table_name, cutoff_str
+            )
+            
+            result = self.executeSQL(sql_retire)
+            if result != -1:
+                logging.info(f"Retired {devices_to_retire} inactive devices (offline for >{threshold_days} days)")
+                return devices_to_retire
+            else:
+                logging.error(f"Failed to retire inactive devices")
+                return 0
+        else:
+            logging.info(f"No devices found to retire (offline for >{threshold_days} days)")
+            return 0
+    
+    def purge_unnamed_devices(self) -> int:
+        """
+        Purge devices that have no name (None or empty string).
+        
+        Returns:
+            Number of devices that were purged
+        """
+        # Get count of devices that will be purged
+        sql_count = "SELECT COUNT(*) FROM %s WHERE ethoscope_name IS NULL OR ethoscope_name = '' OR ethoscope_name = 'None'" % (
+            self._ethoscopes_table_name
+        )
+        
+        count_result = self.executeSQL(sql_count)
+        if isinstance(count_result, list) and len(count_result) > 0:
+            devices_to_purge = count_result[0][0]
+        else:
+            devices_to_purge = 0
+        
+        if devices_to_purge > 0:
+            # Purge the devices
+            sql_purge = "DELETE FROM %s WHERE ethoscope_name IS NULL OR ethoscope_name = '' OR ethoscope_name = 'None'" % (
+                self._ethoscopes_table_name
+            )
+            
+            result = self.executeSQL(sql_purge)
+            if result != -1:
+                logging.info(f"Purged {devices_to_purge} unnamed devices from database")
+                return devices_to_purge
+            else:
+                logging.error(f"Failed to purge unnamed devices")
+                return 0
+        else:
+            logging.info(f"No unnamed devices found to purge")
+            return 0
         
 class simpleDB(object):
     '''

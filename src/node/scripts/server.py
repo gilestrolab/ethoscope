@@ -213,6 +213,7 @@ class EthoscopeNodeServer:
         # Device API
         self.app.route('/devices', method='GET')(self._get_devices)
         self.app.route('/devices_list', method='GET')(self._get_devices_list)
+        self.app.route('/devices/retire-inactive', method='POST')(self._retire_inactive_devices)
         self.app.route('/device/add', method='POST')(self._manual_add_device)
         self.app.route('/device/<id>/data', method='GET')(self._get_device_info)
         self.app.route('/device/<id>/machineinfo', method='GET')(self._get_device_machine_info)
@@ -436,6 +437,45 @@ class EthoscopeNodeServer:
     
     def _get_devices_list(self):
         return self._get_devices()
+    
+    @error_decorator
+    def _retire_inactive_devices(self):
+        """Retire devices that haven't been seen for more than the configured threshold."""
+        try:
+            # Get threshold from request body or use default
+            request_data = bottle.request.body.read().decode("utf-8")
+            threshold_days = 90  # Default value
+            
+            if request_data:
+                try:
+                    import json
+                    data = json.loads(request_data)
+                    threshold_days = data.get('threshold_days', 90)
+                except (json.JSONDecodeError, ValueError):
+                    # If parsing fails, use default
+                    pass
+            
+            # First purge unnamed devices
+            purged_count = self.database.purge_unnamed_devices()
+            
+            # Then retire inactive devices
+            retired_count = self.database.retire_inactive_devices(threshold_days)
+            
+            return {
+                'success': True,
+                'retired_count': retired_count,
+                'purged_count': purged_count,
+                'threshold_days': threshold_days,
+                'message': f'Purged {purged_count} unnamed devices and retired {retired_count} devices that were offline for more than {threshold_days} days'
+            }
+            
+        except Exception as e:
+            logging.error(f"Error retiring inactive devices: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'message': 'Failed to retire inactive devices'
+            }
 
     def _manual_add_device(self):
         """Manually add ethoscopes using provided IPs."""
