@@ -254,8 +254,8 @@
                 <span ng-if="device.underpowered == true" class="fa fa-bolt" title="The device is underpowered!"></span></td>
             <td>{{secToDate(device.time)}}</td>
             <td>
-                <span class="fa fa-database backup-status-icon" ng-class="getDatabaseBackupStatusClass(device)" title="{{getDatabaseBackupStatusTitle(device)}}"></span>
                 <span class="fa fa-video-camera backup-status-icon" ng-class="getVideoBackupStatusClass(device)" title="{{getVideoBackupStatusTitle(device)}}"></span>
+                <span class="fa fa-database backup-status-icon" ng-class="getDatabaseBackupStatusClass(device)" title="{{getDatabaseBackupStatusTitle(device)}}"></span>
                 <span>{{getBackupStatusText(device)}}</span>
             </td>
             <td>
