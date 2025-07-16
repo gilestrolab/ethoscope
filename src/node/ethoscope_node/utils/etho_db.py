@@ -507,35 +507,72 @@ class ExperimentalDB(multiprocessing.Process):
             Number of devices that were retired
         """
         cutoff_date = datetime.datetime.now() - datetime.timedelta(days=threshold_days)
-        cutoff_str = cutoff_date.strftime('%Y-%m-%d %H:%M:%S')
+        cutoff_timestamp = cutoff_date.timestamp()
         
-        # Get count of devices that will be retired
-        sql_count = "SELECT COUNT(*) FROM %s WHERE last_seen < '%s' AND active = 1" % (
-            self._ethoscopes_table_name, cutoff_str
-        )
+        # Get all active devices and check their timestamps manually
+        # This handles different timestamp formats more robustly
+        sql_get_active = "SELECT ethoscope_id, last_seen FROM %s WHERE active = 1" % self._ethoscopes_table_name
         
-        count_result = self.executeSQL(sql_count)
-        if isinstance(count_result, list) and len(count_result) > 0:
-            devices_to_retire = count_result[0][0]
-        else:
-            devices_to_retire = 0
+        active_devices = self.executeSQL(sql_get_active)
+        if not isinstance(active_devices, list):
+            return 0
         
-        if devices_to_retire > 0:
-            # Retire the devices
-            sql_retire = "UPDATE %s SET active = 0 WHERE last_seen < '%s' AND active = 1" % (
-                self._ethoscopes_table_name, cutoff_str
+        devices_to_retire = []
+        
+        for device in active_devices:
+            ethoscope_id = device[0]
+            last_seen = device[1]
+            
+            try:
+                # Try to parse the last_seen timestamp
+                if isinstance(last_seen, str):
+                    # Try different datetime formats
+                    for fmt in ['%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S.%f %Z']:
+                        try:
+                            last_seen_dt = datetime.datetime.strptime(last_seen, fmt)
+                            break
+                        except ValueError:
+                            continue
+                    else:
+                        # If no format worked, try parsing as timestamp
+                        try:
+                            last_seen_dt = datetime.datetime.fromtimestamp(float(last_seen))
+                        except:
+                            # If all parsing fails, consider it for retirement
+                            devices_to_retire.append(ethoscope_id)
+                            continue
+                else:
+                    # Try as numeric timestamp
+                    last_seen_dt = datetime.datetime.fromtimestamp(float(last_seen))
+                
+                # Check if device should be retired
+                if last_seen_dt.timestamp() < cutoff_timestamp:
+                    devices_to_retire.append(ethoscope_id)
+                    
+            except Exception as e:
+                # If any parsing fails, consider device for retirement
+                logging.warning(f"Failed to parse timestamp for device {ethoscope_id}: {e}")
+                devices_to_retire.append(ethoscope_id)
+        
+        # Retire the devices
+        retired_count = 0
+        for ethoscope_id in devices_to_retire:
+            sql_retire = "UPDATE %s SET active = 0 WHERE ethoscope_id = '%s'" % (
+                self._ethoscopes_table_name, ethoscope_id
             )
             
             result = self.executeSQL(sql_retire)
             if result != -1:
-                logging.info(f"Retired {devices_to_retire} inactive devices (offline for >{threshold_days} days)")
-                return devices_to_retire
+                retired_count += 1
             else:
-                logging.error(f"Failed to retire inactive devices")
-                return 0
+                logging.error(f"Failed to retire device {ethoscope_id}")
+        
+        if retired_count > 0:
+            logging.info(f"Retired {retired_count} inactive devices (offline for >{threshold_days} days)")
         else:
             logging.info(f"No devices found to retire (offline for >{threshold_days} days)")
-            return 0
+        
+        return retired_count
     
     def purge_unnamed_devices(self) -> int:
         """
@@ -544,47 +581,77 @@ class ExperimentalDB(multiprocessing.Process):
         Returns:
             Number of devices that were purged
         """
-        # Get count of devices that will be purged (unnamed OR invalid timestamps)
-        sql_count = """SELECT COUNT(*) FROM %s WHERE 
-                       ethoscope_name IS NULL OR 
-                       ethoscope_name = '' OR 
-                       ethoscope_name = 'None' OR
-                       last_seen IS NULL OR
-                       last_seen = '' OR
-                       first_seen IS NULL OR
-                       first_seen = ''""" % (
-            self._ethoscopes_table_name
-        )
+        # Get all devices and check them manually for better detection
+        sql_get_all = "SELECT ethoscope_id, ethoscope_name, last_seen, first_seen FROM %s" % self._ethoscopes_table_name
         
-        count_result = self.executeSQL(sql_count)
-        if isinstance(count_result, list) and len(count_result) > 0:
-            devices_to_purge = count_result[0][0]
-        else:
-            devices_to_purge = 0
+        all_devices = self.executeSQL(sql_get_all)
+        if not isinstance(all_devices, list):
+            return 0
         
-        if devices_to_purge > 0:
-            # Purge the devices
-            sql_purge = """DELETE FROM %s WHERE 
-                          ethoscope_name IS NULL OR 
-                          ethoscope_name = '' OR 
-                          ethoscope_name = 'None' OR
-                          last_seen IS NULL OR
-                          last_seen = '' OR
-                          first_seen IS NULL OR
-                          first_seen = ''""" % (
-                self._ethoscopes_table_name
+        devices_to_purge = []
+        
+        for device in all_devices:
+            ethoscope_id = device[0]
+            ethoscope_name = device[1]
+            last_seen = device[2]
+            first_seen = device[3]
+            
+            should_purge = False
+            
+            # Check for unnamed devices
+            if not ethoscope_name or ethoscope_name in ['', 'None', 'NULL']:
+                should_purge = True
+            
+            # Check for invalid timestamps
+            if not should_purge:
+                for timestamp_field in [last_seen, first_seen]:
+                    if timestamp_field is None or timestamp_field == '':
+                        should_purge = True
+                        break
+                    
+                    # Try to parse timestamp to see if it's valid
+                    if isinstance(timestamp_field, str):
+                        try:
+                            # Try different formats
+                            for fmt in ['%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S.%f %Z']:
+                                try:
+                                    datetime.datetime.strptime(timestamp_field, fmt)
+                                    break
+                                except ValueError:
+                                    continue
+                            else:
+                                # If no format worked, try as timestamp
+                                try:
+                                    datetime.datetime.fromtimestamp(float(timestamp_field))
+                                except:
+                                    should_purge = True
+                                    break
+                        except:
+                            should_purge = True
+                            break
+            
+            if should_purge:
+                devices_to_purge.append(ethoscope_id)
+        
+        # Purge the devices
+        purged_count = 0
+        for ethoscope_id in devices_to_purge:
+            sql_purge = "DELETE FROM %s WHERE ethoscope_id = '%s'" % (
+                self._ethoscopes_table_name, ethoscope_id
             )
             
             result = self.executeSQL(sql_purge)
             if result != -1:
-                logging.info(f"Purged {devices_to_purge} unnamed/invalid devices from database")
-                return devices_to_purge
+                purged_count += 1
             else:
-                logging.error(f"Failed to purge unnamed/invalid devices")
-                return 0
+                logging.error(f"Failed to purge device {ethoscope_id}")
+        
+        if purged_count > 0:
+            logging.info(f"Purged {purged_count} unnamed/invalid devices from database")
         else:
             logging.info(f"No unnamed/invalid devices found to purge")
-            return 0
+        
+        return purged_count
         
 class simpleDB(object):
     '''

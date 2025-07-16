@@ -42,7 +42,7 @@ class ExperimentalInformation(DescribedObject):
                                     {"type": "str", "name": "name", "description": "Who are you?", "default" : "", "asknode" : "users", "required" : "required"},
                                     {"type": "str", "name": "location", "description": "Where is your device","default" : "", "asknode" : "incubators"},
                                     {"type": "str", "name": "code", "description": "Would you like to add any code to the resulting filename or metadata?", "default" : ""},
-                                    {"type": "boolean", "name": "append", "description": "Append tracking data to the existing database", "default": False},
+                                #    {"type": "boolean", "name": "append", "description": "Append tracking data to the existing database", "default": False},
                                     {"type": "str", "name": "sensor", "description": "url to access the relevant ethoscope sensor", "default": "", "asknode" : "sensors", "hidden" : "true"}
                                    ]}
                                    

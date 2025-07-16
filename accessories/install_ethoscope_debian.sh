@@ -124,14 +124,17 @@ install_apt_packages() {
         python3-bottle python3-cheroot python3-cherrypy3 python3-opencv python3-pymysql \
         python3-git python3-matplotlib python3-mock python3-netifaces python3-serial \
         python3-usb python3-sklearn python3-setuptools python3-zeroconf python3-protobuf \
-        python3-picamera2 python3-pip python3-venv
+        python3-picamera2 python3-pip python3-venv python3-picamera python3-bottle \
+        python3-zeroconf python3-requests python3-numpy python3-scipy
+        #opencv-python mysql-connector-python GitPython
     
+    # Install the remaining stuff
+    apt-get install -y mariadb-server mariadb-client sqlite3 ntp systemd-resolved
+    systemctl restart systemd-networkd systemd-resolved
+
     # Install mysql-connector with fallback logic
     install_mysql_connector
 
-    # Install the remaining stuff
-    apt-get install -y mariadb-server mariadb-client sqlite3 ntp systemd-resolved
-    
     echo "All necessary packages were installed. Now reboot."        
 }
 
@@ -175,7 +178,7 @@ install_ethoscope_software() {
 
     echo "Installing systemd service files..."
     rm -rf /usr/lib/systemd/system/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_update}.service >> /dev/null
-    ln -s /opt/ethoscope/scripts/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_update}.service /usr/lib/systemd/system/
+    ln -s /opt/ethoscope/services/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_update}.service /usr/lib/systemd/system/
 
     echo "Creating ethoclient command line tool..."
     echo $'#!/bin/env bash\npython /opt/ethoscope/src/ethoscope/scripts/ethoclient.py $@' > /usr/bin/ethoclient
