@@ -255,7 +255,7 @@
             <td>{{secToDate(device.time)}}</td>
             <td>
                 <span class="fa fa-database backup-status-icon" ng-class="getDatabaseBackupStatusClass(device)" title="{{getDatabaseBackupStatusTitle(device)}}"></span>
-                <span class="fa fa-film backup-status-icon" ng-class="getVideoBackupStatusClass(device)" title="{{getVideoBackupStatusTitle(device)}}"></span>
+                <span class="fa fa-video-camera backup-status-icon" ng-class="getVideoBackupStatusClass(device)" title="{{getVideoBackupStatusTitle(device)}}"></span>
                 <span ng-if="device.backup_status > 0">({{device.backup_status | number : 0}}% or {{humanFileSize(device.backup_size)}}) {{elapsedtime(device.time_since_backup)}}</span>
                 <span ng-if="device.backup_status <= 0 && angular.isNumber(device.backup_status)">N/A</span>
                 <span ng-if="angular.isString(device.backup_status)">{{device.backup_status}}</span>

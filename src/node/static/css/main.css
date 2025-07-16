@@ -1316,28 +1316,28 @@ table thead th a:focus {
 }
 
 .backup-status-success {
-    background-color: var(--deep-green);
+    color: var(--deep-green);
 }
 
 .backup-status-error {
-    background-color: var(--deep-red);
+    color: var(--deep-red);
 }
 
 .backup-status-processing {
-    background-color: var(--burnt-orange);
+    color: var(--burnt-orange);
     animation: apple-breathing 2s ease-in-out infinite;
 }
 
 .backup-status-partial {
-    background-color: var(--golden-honey);
+    color: var(--golden-honey);
 }
 
 .backup-status-unknown {
-    background-color: var(--medium-gray);
+    color: var(--medium-gray);
 }
 
 .backup-status-offline {
-    background-color: var(--warm-gray);
+    color: var(--warm-gray);
 }
 
 @keyframes apple-breathing {
