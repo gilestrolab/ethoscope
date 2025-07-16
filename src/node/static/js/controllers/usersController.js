@@ -84,11 +84,17 @@ function maxLengthCheck(object) {
                 active: true,
                 isAdmin: false
             };
+            console.log('Clear user - selectedUser:', $scope.selectedUser);
         };
 
         // Edit user
         $scope.editUser = function(user) {
             $scope.selectedUser = angular.copy(user);
+            // Ensure we have an id property for edit mode detection
+            if (!$scope.selectedUser.id && $scope.selectedUser.key) {
+                $scope.selectedUser.id = $scope.selectedUser.key;
+            }
+            console.log('Edit user - selectedUser:', $scope.selectedUser);
         };
 
         // Create username from full name
@@ -207,6 +213,26 @@ function maxLengthCheck(object) {
         // Initialize data on controller load
         $scope.$on('$viewContentLoaded', function() {
             loadUsersData();
+        });
+
+        // Modal event handlers to ensure proper state management
+        $('#addUserModal').on('show.bs.modal', function(e) {
+            // Check if we're editing a user (button has data-user attribute) or adding new
+            var button = $(e.relatedTarget);
+            var isEditMode = button.hasClass('edit-user-btn');
+            
+            if (!isEditMode) {
+                // This is for adding a new user
+                $scope.clearSelectedUser();
+                $scope.$apply();
+            }
+            // For edit mode, editUser() should have already been called
+        });
+
+        // Reset modal state when hidden
+        $('#addUserModal').on('hidden.bs.modal', function() {
+            $scope.selectedUser = {};
+            $scope.$apply();
         });
 
         // Refresh data periodically (every 30 seconds)
