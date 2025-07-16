@@ -1822,14 +1822,15 @@ class EthoscopeScanner(DeviceScanner):
             devices_info = {}
             
             for device_id, device_data in db_devices.items():
-                if device_data.get('active') == 1:
-                    devices_info[device_id] = {
-                        'name': device_data.get('ethoscope_name', ''),
-                        'id': device_id,
-                        'status': 'offline',
-                        'ip': device_data.get('last_ip', ''),
-                        'time': device_data.get('last_seen', 0)
-                    }
+                devices_info[device_id] = {
+                    'name': device_data.get('ethoscope_name', ''),
+                    'id': device_id,
+                    'status': 'offline',
+                    'ip': device_data.get('last_ip', ''),
+                    'last_ip': device_data.get('last_ip', ''),
+                    'time': device_data.get('last_seen', 0),
+                    'active': device_data.get('active', 1)
+                }
         except Exception as e:
             self._logger.error(f"Error getting devices from database: {e}")
             devices_info = {}
