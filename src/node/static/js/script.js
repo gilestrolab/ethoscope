@@ -149,8 +149,8 @@
 
                 // Check backup service availability from summary
                 var summary = data.summary || {};
-                $scope.mysql_backup_available = summary.services ? .mysql_service_available || false;
-                $scope.rsync_backup_available = summary.services ? .rsync_service_available || false;
+                $scope.mysql_backup_available = summary.services && summary.services.mysql_service_available || false;
+                $scope.rsync_backup_available = summary.services && summary.services.rsync_service_available || false;
                 $scope.backup_service_available = $scope.mysql_backup_available || $scope.rsync_backup_available;
 
             }).catch(function(error) {
@@ -230,7 +230,7 @@
                 var video = backup_info.backup_types.video;
 
                 // Check if any backup is currently processing
-                if (mysql ? .processing || sqlite ? .processing || video ? .processing) {
+                if ((mysql && mysql.processing) || (sqlite && sqlite.processing) || (video && video.processing)) {
                     return 'backup-status-processing'; // orange breathing circle
                 }
 
@@ -288,7 +288,7 @@
 
         $scope.getBackupStatusTitle = function(device) {
             // Check if device has new backup fields directly (for backwards compatibility)
-            if (device.backup_status !== undefined && !$scope.backup_status ? . [device.id] ? .backup_types) {
+            if (device.backup_status !== undefined && !($scope.backup_status && $scope.backup_status[device.id] && $scope.backup_status[device.id].backup_types)) {
                 var title = 'Backup Status: ';
 
                 if (typeof device.backup_status === 'number') {
@@ -313,7 +313,7 @@
                 return 'Backup service offline';
             }
 
-            var backup_info = $scope.backup_status ? . [device.id];
+            var backup_info = $scope.backup_status && $scope.backup_status[device.id];
             if (!backup_info || !backup_info.backup_types) {
                 return 'No backup information available';
             }
@@ -330,7 +330,7 @@
 
             // Add MySQL backup details
             var mysql = backup_info.backup_types.mysql;
-            if (mysql ? .available) {
+            if (mysql && mysql.available) {
                 title += '\n📊 MySQL: ' + mysql.status.toUpperCase();
                 if (mysql.records > 0) {
                     title += ' (' + mysql.records.toLocaleString() + ' records)';
@@ -355,7 +355,7 @@
 
             // Add SQLite backup details
             var sqlite = backup_info.backup_types.sqlite;
-            if (sqlite ? .available) {
+            if (sqlite && sqlite.available) {
                 title += '\n🗃️ SQLite: ' + sqlite.status.toUpperCase();
                 if (sqlite.files > 0) {
                     title += ' (' + sqlite.files + ' files)';
@@ -377,7 +377,7 @@
 
             // Add Video backup details
             var video = backup_info.backup_types.video;
-            if (video ? .available) {
+            if (video && video.available) {
                 title += '\n🎥 Video: ' + video.status.toUpperCase();
                 if (video.files > 0) {
                     title += ' (' + video.files.toLocaleString() + ' files)';
@@ -401,9 +401,9 @@
 
             // Add processing status if any backup is currently running
             var processing = [];
-            if (mysql ? .processing) processing.push('MySQL');
-            if (sqlite ? .processing) processing.push('SQLite');
-            if (video ? .processing) processing.push('Video');
+            if (mysql && mysql.processing) processing.push('MySQL');
+            if (sqlite && sqlite.processing) processing.push('SQLite');
+            if (video && video.processing) processing.push('Video');
 
             if (processing.length > 0) {
                 title += '\n' + '─'.repeat(30);
@@ -428,13 +428,13 @@
             var sqlite = backup_info.backup_types.sqlite;
 
             // Check if any database backup is processing
-            if (mysql ? .processing || sqlite ? .processing) {
+            if ((mysql && mysql.processing) || (sqlite && sqlite.processing)) {
                 return 'backup-status-processing';
             }
 
             // Determine combined database status
-            var mysqlStatus = mysql ? .available ? mysql.status : 'not_available';
-            var sqliteStatus = sqlite ? .available ? sqlite.status : 'not_available';
+            var mysqlStatus = mysql && mysql.available ? mysql.status : 'not_available';
+            var sqliteStatus = sqlite && sqlite.available ? sqlite.status : 'not_available';
 
             var successStatuses = ['success', 'completed'];
             var errorStatuses = ['error', 'failed'];
@@ -445,11 +445,11 @@
             var sqliteError = errorStatuses.includes(sqliteStatus);
 
             // Both available and successful
-            if (mysql ? .available && sqlite ? .available && mysqlOk && sqliteOk) {
+            if (mysql && mysql.available && sqlite && sqlite.available && mysqlOk && sqliteOk) {
                 return 'backup-status-success';
             }
             // At least one available and successful
-            else if ((mysql ? .available && mysqlOk) || (sqlite ? .available && sqliteOk)) {
+            else if ((mysql && mysql.available && mysqlOk) || (sqlite && sqlite.available && sqliteOk)) {
                 // But check if other has error
                 if (mysqlError || sqliteError) {
                     return 'backup-status-partial';
@@ -479,7 +479,7 @@
 
             var video = backup_info.backup_types.video;
 
-            if (!video ? .available) {
+            if (!video || !video.available) {
                 return 'backup-status-unknown';
             }
 
@@ -524,7 +524,7 @@
             title += '\n' + '─'.repeat(20);
 
             // MySQL info
-            if (mysql ? .available) {
+            if (mysql && mysql.available) {
                 title += '\n📊 MySQL: ' + mysql.status.toUpperCase();
                 if (mysql.records > 0) {
                     title += ' (' + mysql.records.toLocaleString() + ' records)';
@@ -541,7 +541,7 @@
             }
 
             // SQLite info
-            if (sqlite ? .available) {
+            if (sqlite && sqlite.available) {
                 title += '\n🗃️ SQLite: ' + sqlite.status.toUpperCase();
                 if (sqlite.files > 0) {
                     title += ' (' + sqlite.files + ' files)';
@@ -572,7 +572,7 @@
 
             var video = backup_info.backup_types.video;
 
-            if (!video ? .available) {
+            if (!video || !video.available) {
                 return 'Video backup not available';
             }
 
@@ -623,15 +623,15 @@
             var parts = [];
 
             // Check if any backup is processing
-            if (mysql ? .processing || sqlite ? .processing || video ? .processing) {
+            if ((mysql && mysql.processing) || (sqlite && sqlite.processing) || (video && video.processing)) {
                 return 'Processing...';
             }
 
             // Calculate total size for display
             var totalSize = 0;
-            if (mysql ? .available && mysql.size) totalSize += mysql.size;
-            if (sqlite ? .available && sqlite.size) totalSize += sqlite.size;
-            if (video ? .available && video.size) totalSize += video.size;
+            if (mysql && mysql.available && mysql.size) totalSize += mysql.size;
+            if (sqlite && sqlite.available && sqlite.size) totalSize += sqlite.size;
+            if (video && video.available && video.size) totalSize += video.size;
 
             // Show size if we have any backups
             if (totalSize > 0) {
@@ -640,9 +640,9 @@
 
             // Show last backup time if available (take the most recent)
             var lastBackupTime = 0;
-            if (mysql ? .last_backup) lastBackupTime = Math.max(lastBackupTime, mysql.last_backup);
-            if (sqlite ? .last_backup) lastBackupTime = Math.max(lastBackupTime, sqlite.last_backup);
-            if (video ? .last_backup) lastBackupTime = Math.max(lastBackupTime, video.last_backup);
+            if (mysql && mysql.last_backup) lastBackupTime = Math.max(lastBackupTime, mysql.last_backup);
+            if (sqlite && sqlite.last_backup) lastBackupTime = Math.max(lastBackupTime, sqlite.last_backup);
+            if (video && video.last_backup) lastBackupTime = Math.max(lastBackupTime, video.last_backup);
 
             if (lastBackupTime > 0) {
                 var timeSinceBackup = (Date.now() / 1000) - lastBackupTime;
