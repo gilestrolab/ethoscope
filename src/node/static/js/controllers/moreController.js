@@ -18,7 +18,6 @@ function maxLengthCheck(object) {
             }
 
         $scope.folders = {};
-        $scope.users = {};
         $scope.incubators = {};
         $scope.sensors = {};
         
@@ -26,7 +25,6 @@ function maxLengthCheck(object) {
 
         $scope.selected = { 'files': [],
                             'folders' : {},
-                            'users' : {},
                             'incubators' : {},
                             'sensors' : {}
                           };
@@ -222,24 +220,6 @@ function maxLengthCheck(object) {
         };
 
 
-        $scope.nodeManagement.adduser = function(){
-            var spinner = new Spinner(opts).spin();
-            $http.post('/node-actions', data = {'action': 'adduser', 'userdata' : $scope.selected['users']} )
-                .then(function(response) { var data = response.data;
-                    if ( data['result'] == 'success' ) { $scope.users = data['data'] };
-            });
-            spinner.stop();
-        };
-
-        $scope.nodeManagement.createUsername = function(){
-            if($scope.selected['users'].fullname != '') {
-                 var username = $scope.selected['users'].fullname.split(' ')[0].substr(0,1) + $scope.selected['users'].fullname.split(' ')[1].substr(0,49);
-                 username = username.replace(/\s+/g, '');
-                 username = username.replace(/\'+/g, '');
-                 username = username.replace(/-+/g, '');
-                 username = username.toLowerCase();
-                 $scope.selected['users'].name = username;}
-        };
 
 
         $scope.nodeManagement.loadData = function (type) {
@@ -294,21 +274,6 @@ function maxLengthCheck(object) {
                     $scope.selected['folders'] = data;
             });
 
-            $http.get('/node/users')
-                 .then(function(response) { var data = response.data;
-                     
-                    $scope.groups = [];
-                    $scope.users = data;
-
-                    
-                    for (var user in $scope.users) {
-                        
-                       if (($scope.users[user]['group'] !== "") && (!$scope.groups.includes($scope.users[user]['group']))) {
-                            $scope.groups.push ( $scope.users[user]['group'] ); 
-                            }
-                      }
-                    
-            });
             
 
             $http.get('/node/incubators')

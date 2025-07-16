@@ -1,0 +1,312 @@
+<form>
+    <!-- Interface to quickly filter users in the table -->
+    <div class="form-group" id="userInputs">
+        <div class="input-group">
+            <div class="input-group-prepend">
+                <span class="input-group-text"><i class="fa fa-search"></i></span>
+            </div>
+            <input type="text" class="form-control" placeholder="Filter users" ng-model="searchText" title="Filter users in the table below">
+        </div>
+    </div>
+
+    <!-- Interface to manually add users -->
+    <div class="input-group">
+        <div class="input-group-prepend">
+            <span class="input-group-text"><i class="fa fa-plus" ng-click="clearSelectedUser()" data-toggle="modal" data-target="#addUserModal"></i></span>
+        </div>
+        <input type="text" class="form-control" placeholder="Add new user" ng-click="clearSelectedUser()" data-toggle="modal" data-target="#addUserModal" title="Add a new user" readonly>
+    </div>
+</form>
+
+<!-- Toggle to quickly filter between active users only or all users -->
+<div class="alert alert-neutral" style="background-color:#f2f2f2; margin-top: 15px;">
+    <label class="toggle-check">Show all users, including inactive ones
+        <input name="showAll" type="checkbox" class="toggle-check-input" ng-model="showAll" ng-checked="false">
+        <span class="toggle-check-text"></span>
+    </label>
+</div>
+
+<!-- **** USERS LIST TABLE **** -->
+<table class="table table-striped" ng-cloak>
+    <thead>
+        <th>
+            <a href="#" ng-click="sortType = 'fullname'; sortReverse = !sortReverse">
+                Full Name
+                <span ng-show="sortType == 'fullname' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'fullname' && sortReverse" class="fa fa-caret-up"></span>
+            </a>
+        </th>
+        <th>
+            <a href="#" ng-click="sortType = 'name'; sortReverse = !sortReverse">
+                Username
+                <span ng-show="sortType == 'name' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'name' && sortReverse" class="fa fa-caret-up"></span>
+            </a>
+        </th>
+        <th>
+            <a href="#" ng-click="sortType = 'email'; sortReverse = !sortReverse">
+                Email
+                <span ng-show="sortType == 'email' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'email' && sortReverse" class="fa fa-caret-up"></span>
+            </a>
+        </th>
+        <th>
+            <a href="#" ng-click="sortType = 'group'; sortReverse = !sortReverse">
+                Group
+                <span ng-show="sortType == 'group' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'group' && sortReverse" class="fa fa-caret-up"></span>
+            </a>
+        </th>
+        <th>
+            <a href="#" ng-click="sortType = 'telephone'; sortReverse = !sortReverse">
+                Phone
+                <span ng-show="sortType == 'telephone' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'telephone' && sortReverse" class="fa fa-caret-up"></span>
+            </a>
+        </th>
+        <th>
+            <a href="#" ng-click="sortType = 'active'; sortReverse = !sortReverse">
+                Status
+                <span ng-show="sortType == 'active' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'active' && sortReverse" class="fa fa-caret-up"></span>
+            </a>
+        </th>
+        <th>Actions</th>
+    </thead>
+    <tbody>
+        <tr ng-repeat="user in userFilter(users, searchText, showAll) | orderBy:sortType:sortReverse">
+            <td>
+                <div ng-if="user.active">
+                    <span class="fa fa-user"></span>
+                    <span>{{user.fullname}}</span>
+                    <span ng-if="user.isAdmin" class="fa fa-shield-alt" title="Administrator" style="color: #ff9800;"></span>
+                </div>
+                <div ng-if="!user.active" style="color: grey;">
+                    <span class="fa fa-user"></span>
+                    <span>{{user.fullname}}</span>
+                    <span ng-if="user.isAdmin" class="fa fa-shield-alt" title="Administrator" style="color: #ff9800;"></span>
+                </div>
+            </td>
+            <td>
+                <span ng-if="user.active">{{user.name}}</span>
+                <span ng-if="!user.active" style="color: grey;">{{user.name}}</span>
+            </td>
+            <td>
+                <a href="mailto:{{user.email}}" ng-if="user.email && user.active">{{user.email}}</a>
+                <span ng-if="user.email && !user.active" style="color: grey;">{{user.email}}</span>
+                <span ng-if="!user.email">—</span>
+            </td>
+            <td>
+                <span ng-if="user.group && user.active">{{user.group}}</span>
+                <span ng-if="user.group && !user.active" style="color: grey;">{{user.group}}</span>
+                <span ng-if="!user.group">—</span>
+            </td>
+            <td>
+                <span ng-if="user.telephone && user.active">{{user.telephone}}</span>
+                <span ng-if="user.telephone && !user.active" style="color: grey;">{{user.telephone}}</span>
+                <span ng-if="!user.telephone">—</span>
+            </td>
+            <td>
+                <span ng-if="user.active" class="fa fa-check-circle color-green" title="Active"></span>
+                <span ng-if="!user.active" class="fa fa-times-circle" title="Inactive"></span>
+            </td>
+            <td>
+                <a data-toggle="modal" data-target="#addUserModal" ng-click="editUser(user)" href="" title="Edit User">
+                    <span class="fa fa-edit"></span>
+                </a>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<!-- Add/Edit User Modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1" role="dialog" aria-labelledby="addUserLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="addUserLabel">
+                    <i class="fa fa-user-plus" ng-if="!selectedUser.id"></i>
+                    <i class="fa fa-user-edit" ng-if="selectedUser.id"></i>
+                    {{selectedUser.id ? 'Edit User' : 'Add New User'}}
+                </h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form name="userForm" novalidate>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Full Name <span class="text-danger">*</span></label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       name="fullname" 
+                                       ng-model="selectedUser.fullname" 
+                                       ng-blur="createUsername()"
+                                       required>
+                                <div class="invalid-feedback" ng-show="userForm.fullname.$invalid && userForm.fullname.$touched">
+                                    Full name is required.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Username</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       name="username" 
+                                       ng-model="selectedUser.name" 
+                                       readonly>
+                                <small class="form-text text-muted">Generated automatically from full name</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Email Address <span class="text-danger">*</span></label>
+                                <input type="email" 
+                                       class="form-control" 
+                                       name="email" 
+                                       ng-model="selectedUser.email" 
+                                       required>
+                                <div class="invalid-feedback" ng-show="userForm.email.$invalid && userForm.email.$touched">
+                                    Valid email address is required.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">PIN <span class="text-danger">*</span></label>
+                                <input type="number" 
+                                       class="form-control" 
+                                       name="PIN" 
+                                       ng-model="selectedUser.PIN" 
+                                       maxlength="4" 
+                                       oninput="maxLengthCheck(this)" 
+                                       required>
+                                <div class="invalid-feedback" ng-show="userForm.PIN.$invalid && userForm.PIN.$touched">
+                                    4-digit PIN is required.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Phone Number</label>
+                                <input type="tel" 
+                                       class="form-control" 
+                                       name="telephone" 
+                                       ng-model="selectedUser.telephone" 
+                                       ng-pattern="phonePattern">
+                                <div class="invalid-feedback" ng-show="userForm.telephone.$invalid && userForm.telephone.$touched">
+                                    Please enter a valid phone number.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Laboratory/Group</label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       name="group" 
+                                       ng-model="selectedUser.group" 
+                                       uib-typeahead="group for group in groups | filter:$viewValue"
+                                       typeahead-min-length="0">
+                                <small class="form-text text-muted">Start typing to see existing groups</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <div class="form-check">
+                                    <input class="form-check-input" 
+                                           type="checkbox" 
+                                           id="activeCheck" 
+                                           name="active" 
+                                           ng-model="selectedUser.active">
+                                    <label class="form-check-label" for="activeCheck">
+                                        <i class="fa fa-toggle-on"></i> User is Active
+                                    </label>
+                                    <small class="form-text text-muted">Active users can use ethoscopes</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <div class="form-check">
+                                    <input class="form-check-input" 
+                                           type="checkbox" 
+                                           id="adminCheck" 
+                                           name="isAdmin" 
+                                           ng-model="selectedUser.isAdmin">
+                                    <label class="form-check-label" for="adminCheck">
+                                        <i class="fa fa-shield-alt"></i> User is Administrator
+                                    </label>
+                                    <small class="form-text text-muted">Admins have administrative privileges</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fa fa-times"></i> Cancel
+                </button>
+                <button type="button" 
+                        class="btn btn-primary" 
+                        ng-click="saveUser()" 
+                        ng-disabled="userForm.$invalid"
+                        data-dismiss="modal">
+                    <i class="fa fa-save"></i> {{selectedUser.id ? 'Update User' : 'Add User'}}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1" role="dialog" aria-labelledby="deleteUserLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title text-danger" id="deleteUserLabel">
+                    <i class="fa fa-exclamation-triangle"></i> Confirm Delete
+                </h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete user <strong>{{userToDelete.fullname}}</strong>?</p>
+                <p class="text-muted">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fa fa-times"></i> Cancel
+                </button>
+                <button type="button" 
+                        class="btn btn-danger" 
+                        ng-click="deleteUser()"
+                        data-dismiss="modal">
+                    <i class="fa fa-trash"></i> Delete User
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Ensure maxLengthCheck function is available
+function maxLengthCheck(object) {
+    if (object.value.length > object.maxLength)
+        object.value = object.value.slice(0, object.maxLength)
+}
+</script>

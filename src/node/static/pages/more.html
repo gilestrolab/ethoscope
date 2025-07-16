@@ -371,16 +371,6 @@
             </form>
         </ul>
         <ul class="list-group col-12">
-            <h3>Users</h3>
-            <div class="input">
-                <select ng-model="selected['users'].name" ng-change="nodeManagement.loadData('users')">
-                  <option ng-repeat="(key, entry) in users" value="{{key}}" >{{key}}</option>
-                </select>
-                    <button class="btn btn-info" data-toggle="modal" data-target="#addUserModal"><i class="fa fa-lg fa-edit"></i></button>
-                    <button class="btn btn-info" data-toggle="modal" data-target="#addUserModal" ng-click="selected['users'] = {}; "><i class="fa fa-lg fa-plus"></i></button>
-            </div>
-        </ul>
-        <ul class="list-group col-12">
             <h3>Incubators</h3>
             <div class="input">
                 <select ng-model="selected['incubators'].name" ng-change="nodeManagement.loadData('incubators')">
@@ -406,39 +396,6 @@
 </div>
 
 
-<!-- Modal ADD or EDIT User -->
-<div class="modal fade" id="addUserModal" tabindex="-1" role="dialog" aria-labelledby="addUserLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="myModalLabel">User Editor</h4>
-      </div>
-      <div class="modal-body">
-        <form name="adduserForm">
-            <div class="form-group" hidden>
-                <label class="input"><span>ID</span><input type="number" min="1" name='id' readonly="readonly" ng-model="selected['users'].id" style="display:inline"></label>
-                <label class="input"><span>name</span><input type="text" name='name' readonly="readonly" ng-model="selected['users'].name" style="display:inline" required ng-required="true" ></label>
-            </div>
-            <div class="alert alert-warning" ng-if="!adduserForm.$valid">The fields labeled by a red bar are required.</div>
-
-            <label class="input"><span ng-hide="selected['users'].fullname != null">Full Name</span><input type="text" name="fullname" ng-model="selected['users'].fullname" ng-blur="nodeManagement.createUsername()" required ng-required="true" style="width: 240px;"></label>
-            <label class="input"><span ng-hide="selected['users'].PIN != null">PIN</span><input type="number" name="PIN" ng-model="selected['users'].PIN" maxlength="4" required oninput="maxLengthCheck(this)" required ng-required="true"></label>
-            <label class="input"><span ng-hide="selected['users'].email != null">Email address</span><input type="email" name="email" ng-model="selected['users'].email" required ng-required="true" required ng-required="true" style="width: 240px;"></label>
-            <label class="input"><span ng-hide="selected['users'].telephone != null">Telephone number</span><input type="tel" name="telephone" ng-model="selected['users'].telephone" ng-pattern="phoneNumbr" style="width: 240px;"></label>
-            <label class="input"><span ng-hide="selected['users'].group != null">Laboratory or team</span><input type="text" class="form-control autocomplete"  name="group" ng-model="selected['users'].group" style="width: 240px;" uib-typeahead="group for group in groups | filter:$viewValue"></label>
-            <label><input type="checkbox" name='active' ng-model="selected['users'].active" title="Can this user use ethoscopes?"><span> is Active?</span></label>
-            <label><input type="checkbox" name='isAdmin' ng-model="selected['users'].isAdmin" title="Does this user have admin priviledges?"><span> is Admin?</span></label>
-        </form>
-        
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-        <button class="btn btn-danger" ng-click="nodeManagement.adduser()"  data-dismiss="modal" ng-disabled="adduserForm.$invalid">Save</button>
-      </div>
-    </div>
-  </div>
-</div>
 
 
 <!-- Modal ADD or EDIT Incubator -->

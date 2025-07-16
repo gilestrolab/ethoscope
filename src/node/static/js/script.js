@@ -80,6 +80,12 @@
                 controller: 'sensorsController',
             })
 
+            // route for the users management page
+            .when('/users', {
+                templateUrl: '/static/pages/users.html',
+                controller: 'usersController',
+            })
+
 
         // route for the help page
         /*.when('/help', {
