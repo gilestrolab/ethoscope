@@ -850,7 +850,7 @@
                         var data = response.data;
                         if (data.success) {
                             if (data.purged_count > 0) {
-                                console.log('Purged ' + data.purged_count + ' unnamed devices');
+                                console.log('Purged ' + data.purged_count + ' unnamed/invalid devices');
                             }
                             if (data.retired_count > 0) {
                                 console.log('Retired ' + data.retired_count + ' inactive devices');

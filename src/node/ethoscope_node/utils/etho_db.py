@@ -539,13 +539,20 @@ class ExperimentalDB(multiprocessing.Process):
     
     def purge_unnamed_devices(self) -> int:
         """
-        Purge devices that have no name (None or empty string).
+        Purge devices that have no name (None or empty string) or invalid timestamps.
         
         Returns:
             Number of devices that were purged
         """
-        # Get count of devices that will be purged
-        sql_count = "SELECT COUNT(*) FROM %s WHERE ethoscope_name IS NULL OR ethoscope_name = '' OR ethoscope_name = 'None'" % (
+        # Get count of devices that will be purged (unnamed OR invalid timestamps)
+        sql_count = """SELECT COUNT(*) FROM %s WHERE 
+                       ethoscope_name IS NULL OR 
+                       ethoscope_name = '' OR 
+                       ethoscope_name = 'None' OR
+                       last_seen IS NULL OR
+                       last_seen = '' OR
+                       first_seen IS NULL OR
+                       first_seen = ''""" % (
             self._ethoscopes_table_name
         )
         
@@ -557,19 +564,26 @@ class ExperimentalDB(multiprocessing.Process):
         
         if devices_to_purge > 0:
             # Purge the devices
-            sql_purge = "DELETE FROM %s WHERE ethoscope_name IS NULL OR ethoscope_name = '' OR ethoscope_name = 'None'" % (
+            sql_purge = """DELETE FROM %s WHERE 
+                          ethoscope_name IS NULL OR 
+                          ethoscope_name = '' OR 
+                          ethoscope_name = 'None' OR
+                          last_seen IS NULL OR
+                          last_seen = '' OR
+                          first_seen IS NULL OR
+                          first_seen = ''""" % (
                 self._ethoscopes_table_name
             )
             
             result = self.executeSQL(sql_purge)
             if result != -1:
-                logging.info(f"Purged {devices_to_purge} unnamed devices from database")
+                logging.info(f"Purged {devices_to_purge} unnamed/invalid devices from database")
                 return devices_to_purge
             else:
-                logging.error(f"Failed to purge unnamed devices")
+                logging.error(f"Failed to purge unnamed/invalid devices")
                 return 0
         else:
-            logging.info(f"No unnamed devices found to purge")
+            logging.info(f"No unnamed/invalid devices found to purge")
             return 0
         
 class simpleDB(object):

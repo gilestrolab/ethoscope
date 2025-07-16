@@ -455,7 +455,7 @@ class EthoscopeNodeServer:
                     # If parsing fails, use default
                     pass
             
-            # First purge unnamed devices
+            # First purge unnamed and invalid devices
             purged_count = self.database.purge_unnamed_devices()
             
             # Then retire inactive devices
@@ -466,7 +466,7 @@ class EthoscopeNodeServer:
                 'retired_count': retired_count,
                 'purged_count': purged_count,
                 'threshold_days': threshold_days,
-                'message': f'Purged {purged_count} unnamed devices and retired {retired_count} devices that were offline for more than {threshold_days} days'
+                'message': f'Purged {purged_count} unnamed/invalid devices and retired {retired_count} devices that were offline for more than {threshold_days} days'
             }
             
         except Exception as e:
