@@ -185,7 +185,11 @@
         };
 
         var get_devices = function() {
-            $http.get('/devices').then(function(response) {
+            var url = '/devices';
+            if ($scope.showAll) {
+                url += '?include_inactive=true';
+            }
+            $http.get(url).then(function(response) {
                 var data = response.data;
 
                 var data_list = [];

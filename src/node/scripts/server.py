@@ -433,7 +433,9 @@ class EthoscopeNodeServer:
     
     @error_decorator
     def _get_devices(self):
-        return self.device_scanner.get_all_devices_info()
+        # Check if request wants inactive devices too
+        include_inactive = bottle.request.query.get('include_inactive', '').lower() == 'true'
+        return self.device_scanner.get_all_devices_info(include_inactive=include_inactive)
     
     def _get_devices_list(self):
         return self._get_devices()

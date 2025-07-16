@@ -1814,7 +1814,7 @@ class EthoscopeScanner(DeviceScanner):
         self._edb = ExperimentalDB(config_dir)
         self.timestarted = datetime.datetime.now()  # Keep original name for compatibility
     
-    def get_all_devices_info(self) -> Dict[str, Dict[str, Any]]:
+    def get_all_devices_info(self, include_inactive: bool = False) -> Dict[str, Dict[str, Any]]:
         """Get device info including offline devices from database."""
         # Start with database devices
         try:
@@ -1822,15 +1822,17 @@ class EthoscopeScanner(DeviceScanner):
             devices_info = {}
             
             for device_id, device_data in db_devices.items():
-                devices_info[device_id] = {
-                    'name': device_data.get('ethoscope_name', ''),
-                    'id': device_id,
-                    'status': 'offline',
-                    'ip': device_data.get('last_ip', ''),
-                    'last_ip': device_data.get('last_ip', ''),
-                    'time': device_data.get('last_seen', 0),
-                    'active': device_data.get('active', 1)
-                }
+                # Include device if it's active, or if include_inactive is True
+                if device_data.get('active') == 1 or include_inactive:
+                    devices_info[device_id] = {
+                        'name': device_data.get('ethoscope_name', ''),
+                        'id': device_id,
+                        'status': 'offline',
+                        'ip': device_data.get('last_ip', ''),
+                        'last_ip': device_data.get('last_ip', ''),
+                        'time': device_data.get('last_seen', 0),
+                        'active': device_data.get('active', 1)
+                    }
         except Exception as e:
             self._logger.error(f"Error getting devices from database: {e}")
             devices_info = {}
