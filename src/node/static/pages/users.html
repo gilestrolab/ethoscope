@@ -225,32 +225,26 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
-                                <div class="form-check">
-                                    <input class="form-check-input" 
-                                           type="checkbox" 
-                                           id="activeCheck" 
+                                <label class="toggle-check">User is Active
+                                    <input type="checkbox" 
+                                           class="toggle-check-input" 
                                            name="active" 
                                            ng-model="selectedUser.active">
-                                    <label class="form-check-label" for="activeCheck">
-                                        <i class="fa fa-toggle-on"></i> User is Active
-                                    </label>
-                                    <small class="form-text text-muted">Active users can use ethoscopes</small>
-                                </div>
+                                    <span class="toggle-check-text"></span>
+                                </label>
+                                <small class="form-text text-muted">Active users can use ethoscopes</small>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
-                                <div class="form-check">
-                                    <input class="form-check-input" 
-                                           type="checkbox" 
-                                           id="adminCheck" 
+                                <label class="toggle-check">User is Administrator
+                                    <input type="checkbox" 
+                                           class="toggle-check-input" 
                                            name="isAdmin" 
                                            ng-model="selectedUser.isAdmin">
-                                    <label class="form-check-label" for="adminCheck">
-                                        <i class="fa fa-shield-alt"></i> User is Administrator
-                                    </label>
-                                    <small class="form-text text-muted">Admins have administrative privileges</small>
-                                </div>
+                                    <span class="toggle-check-text"></span>
+                                </label>
+                                <small class="form-text text-muted">Admins have administrative privileges</small>
                             </div>
                         </div>
                     </div>
