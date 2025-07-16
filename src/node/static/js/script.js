@@ -411,6 +411,200 @@
             return title;
         };
 
+        $scope.getDatabaseBackupStatusClass = function(device) {
+            // Check backup service availability
+            if (!$scope.backup_service_available) {
+                return 'backup-status-offline';
+            }
+            
+            var backup_info = $scope.backup_status[device.id];
+            if (!backup_info || !backup_info.backup_types) {
+                return 'backup-status-unknown';
+            }
+            
+            var mysql = backup_info.backup_types.mysql;
+            var sqlite = backup_info.backup_types.sqlite;
+            
+            // Check if any database backup is processing
+            if (mysql?.processing || sqlite?.processing) {
+                return 'backup-status-processing';
+            }
+            
+            // Determine combined database status
+            var mysqlStatus = mysql?.available ? mysql.status : 'not_available';
+            var sqliteStatus = sqlite?.available ? sqlite.status : 'not_available';
+            
+            var successStatuses = ['success', 'completed'];
+            var errorStatuses = ['error', 'failed'];
+            
+            var mysqlOk = successStatuses.includes(mysqlStatus);
+            var sqliteOk = successStatuses.includes(sqliteStatus);
+            var mysqlError = errorStatuses.includes(mysqlStatus);
+            var sqliteError = errorStatuses.includes(sqliteStatus);
+            
+            // Both available and successful
+            if (mysql?.available && sqlite?.available && mysqlOk && sqliteOk) {
+                return 'backup-status-success';
+            }
+            // At least one available and successful
+            else if ((mysql?.available && mysqlOk) || (sqlite?.available && sqliteOk)) {
+                // But check if other has error
+                if (mysqlError || sqliteError) {
+                    return 'backup-status-partial';
+                }
+                return 'backup-status-success';
+            }
+            // Any error
+            else if (mysqlError || sqliteError) {
+                return 'backup-status-error';
+            }
+            // No databases available
+            else {
+                return 'backup-status-unknown';
+            }
+        };
+
+        $scope.getVideoBackupStatusClass = function(device) {
+            // Check backup service availability
+            if (!$scope.backup_service_available) {
+                return 'backup-status-offline';
+            }
+            
+            var backup_info = $scope.backup_status[device.id];
+            if (!backup_info || !backup_info.backup_types) {
+                return 'backup-status-unknown';
+            }
+            
+            var video = backup_info.backup_types.video;
+            
+            if (!video?.available) {
+                return 'backup-status-unknown';
+            }
+            
+            if (video.processing) {
+                return 'backup-status-processing';
+            }
+            
+            switch (video.status) {
+                case 'success':
+                case 'completed':
+                    return 'backup-status-success';
+                case 'error':
+                case 'failed':
+                    return 'backup-status-error';
+                case 'processing':
+                case 'running':
+                    return 'backup-status-processing';
+                default:
+                    return 'backup-status-unknown';
+            }
+        };
+
+        $scope.getDatabaseBackupStatusTitle = function(device) {
+            if (!$scope.backup_service_available) {
+                return 'Database backup service offline';
+            }
+            
+            var backup_info = $scope.backup_status[device.id];
+            if (!backup_info || !backup_info.backup_types) {
+                return 'No database backup information available';
+            }
+            
+            var mysql = backup_info.backup_types.mysql;
+            var sqlite = backup_info.backup_types.sqlite;
+            
+            var title = 'Database Backups';
+            title += '\n' + '─'.repeat(20);
+            
+            // MySQL info
+            if (mysql?.available) {
+                title += '\n📊 MySQL: ' + mysql.status.toUpperCase();
+                if (mysql.records > 0) {
+                    title += ' (' + mysql.records.toLocaleString() + ' records)';
+                }
+                if (mysql.size > 0) {
+                    title += '\n   Size: ' + $scope.humanFileSize(mysql.size);
+                }
+                if (mysql.last_backup) {
+                    var lastBackupTime = (Date.now() / 1000) - mysql.last_backup;
+                    title += '\n   Last: ' + $scope.elapsedtime(lastBackupTime) + ' ago';
+                }
+            } else {
+                title += '\n📊 MySQL: NOT AVAILABLE';
+            }
+            
+            // SQLite info
+            if (sqlite?.available) {
+                title += '\n🗃️ SQLite: ' + sqlite.status.toUpperCase();
+                if (sqlite.files > 0) {
+                    title += ' (' + sqlite.files + ' files)';
+                }
+                if (sqlite.size > 0) {
+                    title += '\n   Size: ' + $scope.humanFileSize(sqlite.size);
+                }
+                if (sqlite.last_backup) {
+                    var lastBackupTime = (Date.now() / 1000) - sqlite.last_backup;
+                    title += '\n   Last: ' + $scope.elapsedtime(lastBackupTime) + ' ago';
+                }
+            } else {
+                title += '\n🗃️ SQLite: NOT AVAILABLE';
+            }
+            
+            return title;
+        };
+
+        $scope.getVideoBackupStatusTitle = function(device) {
+            if (!$scope.backup_service_available) {
+                return 'Video backup service offline';
+            }
+            
+            var backup_info = $scope.backup_status[device.id];
+            if (!backup_info || !backup_info.backup_types) {
+                return 'No video backup information available';
+            }
+            
+            var video = backup_info.backup_types.video;
+            
+            if (!video?.available) {
+                return 'Video backup not available';
+            }
+            
+            var title = 'Video Backup: ' + video.status.toUpperCase();
+            
+            if (video.files > 0) {
+                title += '\nFiles: ' + video.files.toLocaleString();
+            }
+            
+            if (video.size_human) {
+                title += '\nSize: ' + video.size_human;
+            } else if (video.size > 0) {
+                title += '\nSize: ' + $scope.humanFileSize(video.size);
+            }
+            
+            if (video.last_backup) {
+                var lastBackupTime = (Date.now() / 1000) - video.last_backup;
+                title += '\nLast backup: ' + $scope.elapsedtime(lastBackupTime) + ' ago';
+            }
+            
+            var videoFolder = getFolderName(video.directory);
+            if (videoFolder) {
+                title += '\nFolder: ' + videoFolder;
+            }
+            
+            if (video.processing) {
+                title += '\n🔄 Currently processing...';
+            }
+            
+            return title;
+        };
+
+        // Helper function for folder name extraction (used in video tooltip)
+        function getFolderName(directory) {
+            if (!directory) return null;
+            var parts = directory.split('/');
+            return parts[parts.length - 1] || parts[parts.length - 2];
+        }
+
         $scope.elapsedtime = function(t) {
             // Calculate the number of days left
             var days = Math.floor(t / 86400);

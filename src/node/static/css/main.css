@@ -1301,6 +1301,20 @@ table thead th a:focus {
     vertical-align: middle;
 }
 
+/* Backup status icons */
+.backup-status-icon {
+    display: inline-block;
+    margin-right: 6px;
+    vertical-align: middle;
+    font-size: 14px;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.backup-status-icon:hover {
+    opacity: 1.0;
+}
+
 .backup-status-success {
     background-color: var(--deep-green);
 }
