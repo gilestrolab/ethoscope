@@ -147,8 +147,7 @@ class ExperimentalDB(multiprocessing.Process):
 
 
         sql_create_ethoscopes_table = """CREATE TABLE IF NOT EXISTS %s (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                ethoscope_id TEXT NOT NULL,
+                                ethoscope_id TEXT PRIMARY KEY,
                                 ethoscope_name TEXT NOT NULL,
                                 first_seen TIMESTAMP NOT NULL,
                                 last_seen TIMESTAMP NOT NULL,
@@ -175,6 +174,78 @@ class ExperimentalDB(multiprocessing.Process):
         self.executeSQL ( sql_create_users_table )
         self.executeSQL ( sql_create_ethoscopes_table )
         self.executeSQL ( sql_create_alert_logs_table )
+        
+        # Run database migrations
+        self._migrate_database()
+    
+    def _migrate_database(self):
+        """
+        Handle database schema migrations.
+        """
+        try:
+            # Migration 1: Convert ethoscopes table to use ethoscope_id as primary key
+            self._migrate_ethoscopes_primary_key()
+        except Exception as e:
+            logging.error(f"Error during database migration: {e}")
+    
+    def _migrate_ethoscopes_primary_key(self):
+        """
+        Migrate ethoscopes table to use ethoscope_id as primary key instead of auto-incrementing id.
+        """
+        try:
+            # Check if the table has the old structure (id column exists)
+            check_old_structure = f"PRAGMA table_info({self._ethoscopes_table_name})"
+            table_info = self.executeSQL(check_old_structure)
+            
+            if not isinstance(table_info, list):
+                return
+            
+            # Check if 'id' column exists (old structure) and ethoscope_id is not primary key
+            has_id_column = any(col[1] == 'id' for col in table_info)
+            ethoscope_id_is_primary = any(col[1] == 'ethoscope_id' and col[5] == 1 for col in table_info)
+            
+            if has_id_column and not ethoscope_id_is_primary:
+                logging.info("Migrating ethoscopes table to use ethoscope_id as primary key")
+                
+                # Create new table with correct structure
+                sql_create_new_table = f"""CREATE TABLE {self._ethoscopes_table_name}_new (
+                    ethoscope_id TEXT PRIMARY KEY,
+                    ethoscope_name TEXT NOT NULL,
+                    first_seen TIMESTAMP NOT NULL,
+                    last_seen TIMESTAMP NOT NULL,
+                    active INTEGER,
+                    last_ip TEXT,
+                    machineinfo TEXT,
+                    problems TEXT,
+                    comments TEXT,
+                    status TEXT
+                )"""
+                
+                # Copy data from old table to new table, handling duplicates by keeping the most recent
+                sql_copy_data = f"""INSERT INTO {self._ethoscopes_table_name}_new 
+                    (ethoscope_id, ethoscope_name, first_seen, last_seen, active, last_ip, machineinfo, problems, comments, status)
+                    SELECT ethoscope_id, ethoscope_name, first_seen, last_seen, active, last_ip, machineinfo, problems, comments, status
+                    FROM {self._ethoscopes_table_name}
+                    WHERE id IN (
+                        SELECT MAX(id) FROM {self._ethoscopes_table_name} GROUP BY ethoscope_id
+                    )"""
+                
+                # Drop old table
+                sql_drop_old = f"DROP TABLE {self._ethoscopes_table_name}"
+                
+                # Rename new table
+                sql_rename_new = f"ALTER TABLE {self._ethoscopes_table_name}_new RENAME TO {self._ethoscopes_table_name}"
+                
+                # Execute migration
+                self.executeSQL(sql_create_new_table)
+                self.executeSQL(sql_copy_data)
+                self.executeSQL(sql_drop_old)
+                self.executeSQL(sql_rename_new)
+                
+                logging.info("Successfully migrated ethoscopes table to use ethoscope_id as primary key")
+                
+        except Exception as e:
+            logging.error(f"Error migrating ethoscopes table: {e}")
 
     def getRun (self, run_id, asdict=False):
         """
@@ -353,7 +424,7 @@ class ExperimentalDB(multiprocessing.Process):
 
         else:
             active = 1
-            sql_update_ethoscope = "INSERT INTO %s VALUES( NULL, '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % (self._ethoscopes_table_name, ethoscope_id, ethoscope_name, now, now, active, last_ip, machineinfo, problems, comments, status)
+            sql_update_ethoscope = "INSERT INTO %s VALUES( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % (self._ethoscopes_table_name, ethoscope_id, ethoscope_name, now, now, active, last_ip, machineinfo, problems, comments, status)
             logging.warning("Adding a new ethoscope to the db. Welcome %s with id %s" % (ethoscope_name, ethoscope_id))
 
         return self.executeSQL(sql_update_ethoscope)
