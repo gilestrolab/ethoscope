@@ -186,7 +186,7 @@
 
         var get_devices = function() {
             // Always fetch all active devices from database
-            $http.get('/devices?include_inactive=true').then(function(response) {
+            $http.get('/devices?include_inactive=false').then(function(response) {
                 var data = response.data;
 
                 var data_list = [];
