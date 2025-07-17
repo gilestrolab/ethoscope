@@ -73,6 +73,24 @@
     color: var(--deep-red);
 }
 
+.color-coral-red {
+    color: var(--coral-red);
+}
+
+/* Slow flashing animation for unreachable devices */
+@keyframes flash-slow {
+    0%, 50% {
+        opacity: 1;
+    }
+    51%, 100% {
+        opacity: 0.3;
+    }
+}
+
+.flash-slow {
+    animation: flash-slow 2s infinite;
+}
+
 /* Hard drive Low usage (< 50%) */
 .low-usage {
     color: var(--medium-gray);
@@ -1137,12 +1155,12 @@ pre.command {
     background-color: #f8f9fa !important;
 }
 
-/* Selected state styling */
-.modal input[type="radio"]:checked + strong,
+/* Selected state styling - currently disabled */
+/* .modal input[type="radio"]:checked + strong,
 .modal input[type="radio"]:checked ~ * {
-    /* color: #007bff !important; */
-    /* font-weight: bold !important; */
-}
+    color: #007bff !important;
+    font-weight: bold !important;
+} */
 
 .modal .option-list li:has(input[type="radio"]:checked) {
     /* background-color: #ffffff !important; */

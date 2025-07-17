@@ -117,7 +117,7 @@
                     </div>
                     <p style="margin-top: 10px;">Loading sensor data...</p>
                 </div>
-                
+
                 <!-- Sensor form - only shown when data is loaded -->
                 <form name="editSensorForm" ng-if="sensoredit && sensoredit.id">
                     <div class="alert alert-warning" ng-if="!editSensorForm.$valid">The fields labeled by a red bar are required.</div>
@@ -246,12 +246,13 @@
                 </div>
             </td>
             <td>
+                <span ng-if="device.status == 'offline'" class="fas fa-times" title={{device.status}}></span>
                 <span ng-if="device.status == 'initialising'" class="fas fa-spinner" title={{device.status}}></span>
                 <span ng-if="device.status == 'running'" class="fa fa-play-circle color-green" title={{device.status}}></span>
                 <span ng-if="device.status == 'recording'" class="fa fa-play-circle color-red" title={{device.status}}></span>
                 <span ng-if="device.status == 'streaming'" class="fa fa-play-circle color-red" title={{device.status}}></span>
                 <span ng-if="device.status == 'stopped'" class="fa fa-stop-circle" title={{device.status}}></span>
-                <span ng-if="device.status == 'unreached'" class="fa fa-wifi color-red" title="Device temporarily unreachable"></span>
+                <span ng-if="device.status == 'unreached'" class="fa fa-wifi color-coral-red flash-slow" title="Device temporarily unreachable"></span>
                 <span ng-if="device.underpowered == true" class="fa fa-bolt" title="The device is underpowered!"></span></td>
             <td>{{secToDate(device.time || device.last_seen)}}</td>
             <td>
@@ -267,14 +268,11 @@
                 <span ng-if="device.experimental_info.location != ''">{{device.experimental_info.location}}</span>
                 <span ng-if="device.previous_location != '' && device.status == 'stopped'" style="color:grey;">{{device.previous_location}}</span>
             <td>
-                <span ng-if="device.status == 'offline' && device.last_ip" 
-                      ng-click="pokeDevice(device)" 
-                      class="poke-ip-button"
-                      title="Click to attempt re-adding this device ({{device.last_ip}})">
+                <span ng-if="device.status == 'offline' && device.last_ip" ng-click="pokeDevice(device)" class="poke-ip-button" title="Click to attempt re-adding this device ({{device.last_ip}})">
                     <span class="fa fa-refresh fa-xs"></span> {{device.last_ip}}
                 </span>
                 <span ng-if="device.status == 'offline' && !device.last_ip" title="No IP available" style="color: grey;">No IP</span>
-                <span ng-if="device.status == 'unreached'" title="Last known IP (device unreachable)" style="color: orange;">{{device.last_ip || device.ip || 'No IP'}}</span>
+                <span ng-if="device.status == 'unreached'" title="Last known IP (device unreachable)" style="color: grey;">{{device.last_ip || device.ip || 'No IP'}}</span>
                 <span ng-if="device.status != 'offline' && device.status != 'unreached'" title="pinged: {{device.ping}} times">{{device.ip}}</span>
             </td>
             <td title="{{device.id}}">{{device.id.substring(0,6)}}</td>

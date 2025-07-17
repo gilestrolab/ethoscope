@@ -53,7 +53,7 @@ class DeviceStatus:
     # Valid status types
     VALID_STATUSES = {
         'online', 'offline', 'running', 'stopped', 'unreached', 
-        'initialising', 'stopping', 'recording', 'streaming'
+        'initialising', 'stopping', 'recording', 'streaming', 'busy'
     }
     
     # Graceful operation types
@@ -150,8 +150,8 @@ class DeviceStatus:
         if self.is_graceful_operation():
             return False
         
-        # For unreachable status, only alert after timeout
-        if self._status_name == 'unreached':
+        # For unreachable/busy status, only alert after timeout
+        if self._status_name in ['unreached', 'busy']:
             return self.is_timeout_exceeded(unreachable_timeout_minutes)
         
         # Alert for autonomous stops and other system issues
@@ -328,7 +328,7 @@ class BaseDevice(Thread):
         
         # Device state with DeviceStatus
         self._device_status = DeviceStatus("offline", trigger_source="system")
-        self._info = {"status": "offline", "ip": ip}
+        self._info = {"ip": ip}
         self._id = ""
         self._is_online = True
         self._skip_scanning = False
@@ -423,14 +423,23 @@ class BaseDevice(Thread):
             
             error_str = str(error).lower()
             
-            # Check if this is a "connection refused" error - indicates ungraceful shutdown
+            # Check if this is a "connection refused" error - indicates potential shutdown
             if 'connection refused' in error_str or 'actively refused' in error_str:
-                # After 3 consecutive connection refused errors, assume device was shut down ungracefully
+                # After 3 consecutive connection refused errors, determine if this is graceful or ungraceful
                 if self._consecutive_errors >= 3:
-                    self._logger.info(f"Device {self._ip} has {self._consecutive_errors} consecutive connection refused errors - appears shut down ungracefully. Stopping interrogation.")
-                    self._skip_scanning = True
+                    # Check if this might be a graceful shutdown
+                    is_graceful = self._is_graceful_shutdown()
+                    
+                    if is_graceful:
+                        self._logger.info(f"Device {self._ip} appears to have been shut down gracefully (recent user action). Stopping interrogation.")
+                        self._skip_scanning = True
+                        self._update_device_status("offline", trigger_source="graceful", metadata={"reason": "graceful_shutdown"})
+                    else:
+                        self._logger.info(f"Device {self._ip} has {self._consecutive_errors} consecutive connection refused errors - appears shut down ungracefully. Stopping interrogation.")
+                        self._skip_scanning = True
+                        self._update_device_status("offline", trigger_source="system", metadata={"reason": "ungraceful_shutdown"})
+                    
                     self._info.update({
-                        'status': 'offline',
                         'last_seen': time.time()
                     })
                     return
@@ -442,8 +451,8 @@ class BaseDevice(Thread):
                 # Device seems to have gone offline normally, stop interrogating
                 self._logger.info(f"Device {self._ip} appears offline after {self._consecutive_errors} errors, stopping interrogation")
                 self._skip_scanning = True
+                self._update_device_status("offline", trigger_source="system", metadata={"reason": "max_errors_reached"})
                 self._info.update({
-                    'status': 'offline', 
                     'last_seen': time.time()
                 })
             else:
@@ -515,8 +524,7 @@ class BaseDevice(Thread):
             # Update device status
             self._device_status = new_status
             
-            # Update legacy info dict for backward compatibility
-            self._info['status'] = status_name
+            # Update info dict (no longer storing status directly)
             self._info['last_seen'] = time.time()
             self._info['consecutive_errors'] = new_status.consecutive_errors
             
@@ -536,7 +544,6 @@ class BaseDevice(Thread):
             self._update_device_status("offline", trigger_source="system")
             
             base_info = {
-                'status': 'offline',
                 'ip': self._ip,
                 'last_seen': time.time(),
                 'consecutive_errors': self._consecutive_errors
@@ -573,6 +580,17 @@ class BaseDevice(Thread):
         self._consecutive_errors = 0
         self._error_backoff_time = 0
     
+    def _is_graceful_shutdown(self) -> bool:
+        """
+        Check if a connection refused error is likely due to graceful shutdown.
+        
+        Returns:
+            True if this appears to be a graceful shutdown
+        """
+        # The DeviceStatus class already handles graceful operation detection
+        current_status = self.get_device_status()
+        return current_status and current_status.is_graceful_operation()
+    
     # Public interface methods
     def ip(self) -> str:
         """Get device IP address."""
@@ -601,6 +619,10 @@ class BaseDevice(Thread):
                     alert_config = self._config.get_custom('alerts') or {}
                     unreachable_timeout = alert_config.get('unreachable_timeout_minutes', 20)
                 
+                # Add status at root level for backward compatibility
+                info_copy['status'] = self._device_status.status_name
+                
+                # Add detailed status information
                 info_copy['status_details'] = {
                     'status': self._device_status.status_name,
                     'is_user_triggered': self._device_status.is_user_triggered,
@@ -695,7 +717,7 @@ class Sensor(BaseDevice):
             
             with self._lock:
                 self._info.update(resp)
-                self._info['status'] = 'online'
+                self._update_device_status("online", trigger_source="system")
                 self._info['last_seen'] = time.time()
             
             # Save to CSV if enabled
@@ -775,6 +797,7 @@ class Ethoscope(BaseDevice):
     
     REMOTE_PAGES = {
         'id': "id",
+        'data' : "data",
         'videofiles': "data/listfiles/video",
         'stream': "stream.mjpg",
         'user_options': "user_options",
@@ -826,8 +849,8 @@ class Ethoscope(BaseDevice):
     def _setup_urls(self):
         """Setup ethoscope-specific URLs."""
         self._id_url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['id']}"
-        self._data_url = f"http://{self._ip}:{self._port}/data"
-    
+        self._data_url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['data']}/{self._id}"
+
     def _reset_info(self):
         """Reset device info to offline state."""
         with self._lock:
@@ -836,8 +859,8 @@ class Ethoscope(BaseDevice):
             preserved_id = self._info.get('id', self._id)
             
             base_info = {
-                'status': 'offline',
                 'ip': self._ip,
+                'last_ip' : self._ip,
                 'last_seen': time.time(),
                 'ping': self._ping_count,
                 'consecutive_errors': self._consecutive_errors
@@ -873,9 +896,6 @@ class Ethoscope(BaseDevice):
         self._last_user_action = time.time()
         self._last_user_instruction = instruction
         
-        post_url = (f"http://{self._ip}:{self._port}/"
-                f"{self.REMOTE_PAGES['controls']}/{self._id}/{instruction}")
-        
         # Handle post_data properly - it might already be bytes or need conversion
         json_data = None
         if post_data is not None:
@@ -889,28 +909,29 @@ class Ethoscope(BaseDevice):
                 # Unknown type, try to convert to string then encode
                 json_data = str(post_data).encode('utf-8')
         
-        # Power operations may not return data
-        if instruction in ["poweroff", "reboot", "restart"]:
-            try:
-                self._get_json(post_url, timeout=3, post_data=json_data)
-            except ScanException:
-                pass  # Expected for power operations
-        else:
+
+        post_url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['controls']}/{self._id}/{instruction}"
+        try:
             self._get_json(post_url, timeout=3, post_data=json_data)
-        
+        except ScanException:
+            if instruction in ["poweroff", "reboot", "restart"]:
+                pass  # Expected for power operations
+            else:
+                raise DeviceError(f"Cannot send '{instruction}' to device in status '{current_status}'")
+       
         self._update_info()
     
     def send_settings(self, post_data: Union[Dict, bytes]) -> Any:
         """Send settings update to ethoscope."""
-        post_url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['update']}/{self._id}"
-        
+
         # Handle post_data properly
         if isinstance(post_data, bytes):
             json_data = post_data
         else:
             json_data = json.dumps(post_data).encode('utf-8')
-        
-        result = self._get_json(post_url, timeout=3, post_data=json_data)
+
+        update_url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['update']}/{self._id}"
+        result = self._get_json(update_url, timeout=3, post_data=json_data)
         self._update_info()
         return result
     
@@ -918,7 +939,7 @@ class Ethoscope(BaseDevice):
         """Validate that instruction is allowed for current status."""
         self._update_info()
         
-        current_status = self._info.get("status", "offline")
+        current_status = self._device_status.status_name
         allowed_statuses = self.ALLOWED_INSTRUCTIONS.get(instruction)
         
         if allowed_statuses is None:
@@ -987,7 +1008,7 @@ class Ethoscope(BaseDevice):
     
     def last_image(self):
         """Get the last drawn image from ethoscope."""
-        if self._info["status"] not in self.ALLOWED_INSTRUCTIONS["stop"]:
+        if self._device_status.status_name not in self.ALLOWED_INSTRUCTIONS["stop"]:
             return None
         
         try:
@@ -1085,6 +1106,13 @@ class Ethoscope(BaseDevice):
         is_user_triggered = self._is_user_initiated_stop()
         trigger_source = "user" if is_user_triggered else "system"
         
+        # Special case: If device is found in an active tracking state, it must be user-initiated
+        # Tracking cannot start without user intervention
+        if new_status in ['running', 'recording', 'streaming'] and previous_status == 'offline':
+            is_user_triggered = True
+            trigger_source = "user"
+            self._logger.info(f"Device {self._id} found in tracking state {new_status} - marking as user-initiated")
+        
         # Check if this is a graceful operation
         alert_config = self._config.get_custom('alerts') or {}
         graceful_grace_minutes = alert_config.get('graceful_shutdown_grace_minutes', 5)
@@ -1127,9 +1155,9 @@ class Ethoscope(BaseDevice):
             if not self._id:
                 self._update_id()
             
-            data_url = f"http://{self._ip}:{self._port}/data/{self._id}"
-            new_info = self._get_json(data_url)
-            
+            _data_url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['data']}/{self._id}"
+            new_info = self._get_json(_data_url)
+           
             with self._lock:
                 self._info.update(new_info)
                 self._info['last_seen'] = time.time()
@@ -1138,10 +1166,22 @@ class Ethoscope(BaseDevice):
                 self._update_logger_name()
             
             return True
-            
+
         except ScanException as e:
-            self._logger.warning(f"Error fetching device info: {e}")
-            return False
+            try:
+                did = self._get_json(self._id_url)
+                if did:
+                    with self._lock:
+                        self._info['last_seen'] = time.time()
+                        self._update_device_status("busy", trigger_source="network")
+
+                self._logger.warning(f"The device is online and responding but cannot communicate its status. Flagged as busy. {e}")
+                return False
+            
+            except ScanException as e:
+
+                self._logger.warning(f"Error fetching device info: {e}")
+                return False
     
     def _update_logger_name(self):
         """Update logger name to use proper device name if available."""
@@ -1166,19 +1206,23 @@ class Ethoscope(BaseDevice):
         alert_config = self._config.get_custom('alerts') or {}
         unreachable_timeout = alert_config.get('unreachable_timeout_minutes', 20)
         
-        if current_status.status_name == 'unreached':
+        if current_status.status_name == 'busy':
+                self._logger.info(f"Device {self._id} has been busy for longer than timeout allowed ({unreachable_timeout}m), but it's still online.")
+                self._update_device_status("busy", trigger_source="system", metadata={"reason": "unreachable_timeout"})
+                self._edb.updateEthoscopes(ethoscope_id=self._id, status="busy")
+                return
+
+        elif current_status.status_name == 'unreached':
             # Device is already unreachable, check for timeout
             if current_status.is_timeout_exceeded(unreachable_timeout):
                 self._logger.info(f"Device {self._id} unreachable timeout exceeded ({unreachable_timeout}m), marking as offline")
-                self._update_device_status("offline", trigger_source="system",
-                                         metadata={"reason": "unreachable_timeout"})
+                self._update_device_status("offline", trigger_source="system", metadata={"reason": "unreachable_timeout"})
                 self._edb.updateEthoscopes(ethoscope_id=self._id, status="offline")
                 return
         else:
             # Device is becoming unreachable for the first time
             self._logger.info(f"Device {self._id} becoming unreachable (was {previous_status})")
-            self._update_device_status("unreached", trigger_source="network",
-                                     metadata={"previous_status": previous_status})
+            self._update_device_status("unreached", trigger_source="network", metadata={"previous_status": previous_status})
         
         # Handle running experiments
         if 'experimental_info' in self._info and 'run_id' in self._info['experimental_info']:
@@ -1301,34 +1345,24 @@ class Ethoscope(BaseDevice):
                                  f"graceful: {current_status.is_graceful_operation()})")
                 return
             
-            # Send alert when device stops unexpectedly (from running to stopped)
-            if previous_status == 'running' and new_status == 'stopped':
-                last_seen = datetime.datetime.fromtimestamp(self._info.get('last_seen', time.time()))
+            # Send appropriate alerts based on status transition
+            last_seen = datetime.datetime.fromtimestamp(self._info.get('last_seen', time.time()))
+            
+            if new_status == 'stopped':
+                # Send stopped alert (DeviceStatus already filtered out tracking->stopped transitions)
                 self._notification_service.send_device_stopped_alert(
                     device_id=self._id,
                     device_name=device_name,
                     run_id=run_id,
                     last_seen=last_seen
                 )
-            
-            # Send alert when device becomes unreachable (only after timeout)
             elif new_status == 'unreached':
-                # Get timeout from configuration
-                alert_config = self._config.get_custom('alerts') or {}
-                unreachable_timeout = alert_config.get('unreachable_timeout_minutes', 20)
-                
-                # Only send alert if the unreachable timeout has been exceeded
-                if current_status.is_timeout_exceeded(unreachable_timeout):
-                    last_seen = datetime.datetime.fromtimestamp(self._info.get('last_seen', time.time()))
-                    self._notification_service.send_device_unreachable_alert(
-                        device_id=self._id,
-                        device_name=device_name,
-                        last_seen=last_seen
-                    )
-                else:
-                    self._logger.debug(f"Unreachable alert suppressed - timeout not exceeded "
-                                     f"(age: {current_status.get_age_minutes():.1f}m, "
-                                     f"threshold: {unreachable_timeout}m)")
+                # Send unreachable alert (DeviceStatus already checked timeout)
+                self._notification_service.send_device_unreachable_alert(
+                    device_id=self._id,
+                    device_name=device_name,
+                    last_seen=last_seen
+                )
                 
         except Exception as e:
             self._logger.error(f"Error sending state transition alerts: {e}")
@@ -1658,7 +1692,7 @@ class Ethoscope(BaseDevice):
                     self._logger.error(f"Error parsing backup filename '{backup_filename}': {e}")
                     output_db_file = None
             else:
-                self._logger.warning(f"No backup filename available for {service_type} backup")
+                #self._logger.warning(f"No backup filename available for {service_type} backup")
                 output_db_file = None
             
             self._info["backup_path"] = output_db_file
@@ -1732,7 +1766,7 @@ class Ethoscope(BaseDevice):
                 # Fallback to legacy behavior
                 if "backup_filename" in self._info and self._info["backup_filename"]:
                     return self._info["backup_filename"]
-                elif (self._info.get("status") == 'stopped' and 
+                elif (self._device_status.status_name == 'stopped' and 
                       "previous_backup_filename" in self._info and 
                       self._info["previous_backup_filename"]):
                     return self._info["previous_backup_filename"]
@@ -1913,7 +1947,7 @@ class DeviceScanner:
                 for existing_device in self.devices:
                     if existing_device.ip() == ip:
                         was_skipping = existing_device._skip_scanning
-                        device_status = existing_device._info.get('status', 'unknown')
+                        device_status = existing_device._device_status.status_name
                         
                         self._logger.info(f"Device at {ip} already exists (was skipping: {was_skipping}, status: {device_status}), updating zeroconf info")
                         
@@ -1926,8 +1960,8 @@ class DeviceScanner:
                         
                         # Explicitly reset status to allow device info to be updated
                         with existing_device._lock:
+                            existing_device._update_device_status("offline", trigger_source="system")
                             existing_device._info.update({
-                                'status': 'offline',  # Will be updated to proper status on next scan
                                 'last_seen': time.time()
                             })
                         
@@ -2005,8 +2039,8 @@ class DeviceScanner:
                     
                     # Explicitly set status to offline
                     with device._lock:
+                        device._update_device_status("offline", trigger_source="system")
                         device._info.update({
-                            'status': 'offline',
                             'last_seen': time.time()
                         })
                     
@@ -2047,7 +2081,7 @@ class EthoscopeScanner(DeviceScanner):
                     devices_info[device_id] = {
                         'name': device_data.get('ethoscope_name', ''),
                         'id': device_id,
-                        'status': 'offline',
+                        'status': device_data.get('status', 'offline'),  # Default to offline for database-only devices
                         'ip': device_data.get('last_ip', ''),
                         'last_ip': device_data.get('last_ip', ''),
                         'time': device_data.get('last_seen', 0),
@@ -2123,7 +2157,7 @@ class EthoscopeScanner(DeviceScanner):
                 for existing_device in self.devices:
                     if existing_device.ip() == ip:
                         was_skipping = existing_device._skip_scanning
-                        device_status = existing_device._info.get('status', 'unknown')
+                        device_status = existing_device._device_status.status_name
                         
                         self._logger.info(f"Ethoscope at {ip} already exists (was skipping: {was_skipping}, status: {device_status}), updating zeroconf info")
                         
@@ -2136,8 +2170,8 @@ class EthoscopeScanner(DeviceScanner):
                         
                         # Explicitly reset status to allow device info to be updated
                         with existing_device._lock:
+                            existing_device._update_device_status("offline", trigger_source="system")
                             existing_device._info.update({
-                                'status': 'offline',  # Will be updated to proper status on next scan
                                 'last_seen': time.time()
                             })
                         

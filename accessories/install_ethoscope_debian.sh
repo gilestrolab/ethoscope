@@ -124,9 +124,9 @@ install_apt_packages() {
         python3-bottle python3-cheroot python3-cherrypy3 python3-opencv python3-pymysql \
         python3-git python3-matplotlib python3-mock python3-netifaces python3-serial \
         python3-usb python3-sklearn python3-setuptools python3-zeroconf python3-protobuf \
-        python3-picamera2 python3-pip python3-venv python3-picamera python3-bottle \
+        python3-picamera2 python3-pip python3-venv python3-bottle \
         python3-zeroconf python3-requests python3-numpy python3-scipy
-        #opencv-python mysql-connector-python GitPython
+        #opencv-python mysql-connector-python GitPython python3-picamera
     
     # Install the remaining stuff
     apt-get install -y mariadb-server mariadb-client sqlite3 ntp systemd-resolved

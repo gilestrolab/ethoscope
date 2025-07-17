@@ -654,7 +654,7 @@ class EthoscopeNodeServer:
                 data = response.read().decode('utf-8')
                 return json.loads(data)
         except Exception as e:
-            self.logger.warning(f"Failed to get {service_name} backup status from port {port}: {e}")
+            #self.logger.warning(f"Failed to get {service_name} backup status from port {port}: {e}")
             return {"error": f"{service_name} backup service unavailable", "service": service_name.lower().replace(" ", "_")}
     
     def _extract_devices_from_status(self, mysql_status, rsync_status):
