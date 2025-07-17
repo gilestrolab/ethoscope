@@ -130,7 +130,10 @@ class EthoscopeConfiguration:
             'enabled': True,
             'cooldown_seconds': 3600,
             'storage_warning_threshold': 80,
-            'device_timeout_minutes': 30
+            'device_timeout_minutes': 30,
+            'unreachable_timeout_minutes': 20,
+            'graceful_shutdown_grace_minutes': 5,
+            'user_action_timeout_seconds': 30
         }
     }
     

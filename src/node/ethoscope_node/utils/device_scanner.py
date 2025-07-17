@@ -44,6 +44,229 @@ class DeviceInfo:
     last_seen: Optional[float] = None
 
 
+class DeviceStatus:
+    """
+    Sophisticated device status management class that tracks status changes,
+    user interactions, and provides intelligent alerting logic.
+    """
+    
+    # Valid status types
+    VALID_STATUSES = {
+        'online', 'offline', 'running', 'stopped', 'unreached', 
+        'initialising', 'stopping', 'recording', 'streaming'
+    }
+    
+    # Graceful operation types
+    GRACEFUL_OPERATIONS = {'poweroff', 'reboot', 'restart'}
+    
+    def __init__(self, status_name: str, is_user_triggered: bool = False, 
+                 trigger_source: str = "system", metadata: Optional[Dict[str, Any]] = None):
+        """
+        Initialize device status.
+        
+        Args:
+            status_name: Name of the status (must be in VALID_STATUSES)
+            is_user_triggered: Whether this status change was triggered by user action
+            trigger_source: Source of the trigger ("user", "system", "network", "graceful")
+            metadata: Additional metadata about the status change
+        """
+        if status_name not in self.VALID_STATUSES:
+            raise ValueError(f"Invalid status: {status_name}. Must be one of: {self.VALID_STATUSES}")
+        
+        self._status_name = status_name
+        self._is_user_triggered = is_user_triggered
+        self._trigger_source = trigger_source
+        self._timestamp = time.time()
+        self._previous_status = None
+        self._metadata = metadata or {}
+        self._unreachable_start_time = None
+        self._consecutive_errors = 0
+        
+        # Set unreachable start time if this is an unreached status
+        if status_name == 'unreached':
+            self._unreachable_start_time = self._timestamp
+    
+    @property
+    def status_name(self) -> str:
+        """Get the status name."""
+        return self._status_name
+    
+    @property
+    def is_user_triggered(self) -> bool:
+        """Check if this status change was triggered by user action."""
+        return self._is_user_triggered
+    
+    @property
+    def trigger_source(self) -> str:
+        """Get the trigger source."""
+        return self._trigger_source
+    
+    @property
+    def timestamp(self) -> float:
+        """Get the timestamp when this status was set."""
+        return self._timestamp
+    
+    @property
+    def metadata(self) -> Dict[str, Any]:
+        """Get status metadata."""
+        return self._metadata.copy()
+    
+    @property
+    def consecutive_errors(self) -> int:
+        """Get the number of consecutive errors."""
+        return self._consecutive_errors
+    
+    def set_previous_status(self, previous_status: Optional['DeviceStatus']):
+        """Set the previous status for transition tracking."""
+        self._previous_status = previous_status
+    
+    def get_previous_status(self) -> Optional['DeviceStatus']:
+        """Get the previous status."""
+        return self._previous_status
+    
+    def increment_errors(self):
+        """Increment the consecutive error count."""
+        self._consecutive_errors += 1
+    
+    def reset_errors(self):
+        """Reset the consecutive error count."""
+        self._consecutive_errors = 0
+    
+    def should_send_alert(self, unreachable_timeout_minutes: int = 20) -> bool:
+        """
+        Determine if an alert should be sent for this status.
+        
+        Args:
+            unreachable_timeout_minutes: Minutes to wait before alerting for unreachable devices
+        
+        Returns:
+            True if an alert should be sent
+        """
+        # No alerts for user-triggered actions
+        if self._is_user_triggered:
+            return False
+        
+        # No alerts for graceful operations within grace period
+        if self.is_graceful_operation():
+            return False
+        
+        # For unreachable status, only alert after timeout
+        if self._status_name == 'unreached':
+            return self.is_timeout_exceeded(unreachable_timeout_minutes)
+        
+        # Alert for autonomous stops and other system issues
+        if self._status_name in ['stopped', 'offline'] and self._trigger_source == 'system':
+            return True
+        
+        return False
+    
+    def is_timeout_exceeded(self, timeout_minutes: int) -> bool:
+        """
+        Check if the timeout has been exceeded for unreachable devices.
+        
+        Args:
+            timeout_minutes: Timeout in minutes
+            
+        Returns:
+            True if timeout has been exceeded
+        """
+        if not self._unreachable_start_time:
+            return False
+        
+        elapsed_minutes = (time.time() - self._unreachable_start_time) / 60
+        return elapsed_minutes > timeout_minutes
+    
+    def is_graceful_operation(self) -> bool:
+        """
+        Check if this status resulted from a graceful operation.
+        
+        Returns:
+            True if this is a graceful operation
+        """
+        return self._trigger_source == 'graceful'
+    
+    def get_age_seconds(self) -> float:
+        """
+        Get the age of this status in seconds.
+        
+        Returns:
+            Age in seconds
+        """
+        return time.time() - self._timestamp
+    
+    def get_age_minutes(self) -> float:
+        """
+        Get the age of this status in minutes.
+        
+        Returns:
+            Age in minutes
+        """
+        return self.get_age_seconds() / 60
+    
+    def update_metadata(self, key: str, value: Any):
+        """
+        Update metadata for this status.
+        
+        Args:
+            key: Metadata key
+            value: Metadata value
+        """
+        self._metadata[key] = value
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert status to dictionary for serialization.
+        
+        Returns:
+            Dictionary representation of the status
+        """
+        return {
+            'status_name': self._status_name,
+            'is_user_triggered': self._is_user_triggered,
+            'trigger_source': self._trigger_source,
+            'timestamp': self._timestamp,
+            'metadata': self._metadata,
+            'unreachable_start_time': self._unreachable_start_time,
+            'consecutive_errors': self._consecutive_errors
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'DeviceStatus':
+        """
+        Create DeviceStatus from dictionary.
+        
+        Args:
+            data: Dictionary representation
+            
+        Returns:
+            DeviceStatus instance
+        """
+        status = cls(
+            status_name=data['status_name'],
+            is_user_triggered=data.get('is_user_triggered', False),
+            trigger_source=data.get('trigger_source', 'system'),
+            metadata=data.get('metadata', {})
+        )
+        
+        status._timestamp = data.get('timestamp', time.time())
+        status._unreachable_start_time = data.get('unreachable_start_time')
+        status._consecutive_errors = data.get('consecutive_errors', 0)
+        
+        return status
+    
+    def __str__(self) -> str:
+        """String representation of the status."""
+        age_minutes = self.get_age_minutes()
+        return f"DeviceStatus({self._status_name}, {self._trigger_source}, {age_minutes:.1f}m ago)"
+    
+    def __repr__(self) -> str:
+        """Detailed string representation."""
+        return (f"DeviceStatus(status_name='{self._status_name}', "
+                f"is_user_triggered={self._is_user_triggered}, "
+                f"trigger_source='{self._trigger_source}', "
+                f"age_minutes={self.get_age_minutes():.1f})")
+
+
 class ScanException(Exception):
     """Custom exception for scanning operations."""
     pass
@@ -103,7 +326,8 @@ class BaseDevice(Thread):
         self._results_dir = results_dir
         self._timeout = timeout
         
-        # Device state
+        # Device state with DeviceStatus
+        self._device_status = DeviceStatus("offline", trigger_source="system")
         self._info = {"status": "offline", "ip": ip}
         self._id = ""
         self._is_online = True
@@ -260,12 +484,56 @@ class BaseDevice(Thread):
         except Exception as e:
             raise ScanException(f"Failed to update device ID: {e}")
     
+    def _update_device_status(self, status_name: str, is_user_triggered: bool = False,
+                             trigger_source: str = "system", metadata: Optional[Dict[str, Any]] = None):
+        """
+        Update device status using DeviceStatus object.
+        
+        Args:
+            status_name: New status name
+            is_user_triggered: Whether this was triggered by user action
+            trigger_source: Source of the trigger
+            metadata: Additional metadata
+        """
+        with self._lock:
+            # Create new status object
+            previous_status = self._device_status
+            new_status = DeviceStatus(
+                status_name=status_name,
+                is_user_triggered=is_user_triggered,
+                trigger_source=trigger_source,
+                metadata=metadata or {}
+            )
+            
+            # Set previous status for transition tracking
+            new_status.set_previous_status(previous_status)
+            
+            # Update consecutive errors from previous status
+            if previous_status:
+                new_status._consecutive_errors = previous_status.consecutive_errors
+            
+            # Update device status
+            self._device_status = new_status
+            
+            # Update legacy info dict for backward compatibility
+            self._info['status'] = status_name
+            self._info['last_seen'] = time.time()
+            self._info['consecutive_errors'] = new_status.consecutive_errors
+            
+            # Log status change
+            if previous_status and previous_status.status_name != status_name:
+                self._logger.info(f"Status changed: {previous_status.status_name} -> {status_name} "
+                                f"(trigger: {trigger_source}, user: {is_user_triggered})")
+    
     def _reset_info(self):
         """Reset device info to offline state."""
         with self._lock:
             # Preserve important identifying information
             preserved_name = self._info.get('name', '')
             preserved_id = self._info.get('id', self._id)
+            
+            # Update status using DeviceStatus
+            self._update_device_status("offline", trigger_source="system")
             
             base_info = {
                 'status': 'offline',
@@ -286,7 +554,7 @@ class BaseDevice(Thread):
         """Update device information. Override in subclasses."""
         self._update_id()
         with self._lock:
-            self._info['status'] = 'online'
+            self._update_device_status("online", trigger_source="system")
             self._info['last_seen'] = time.time()
     
     def stop(self):
@@ -314,11 +582,33 @@ class BaseDevice(Thread):
         """Get device ID."""
         with self._lock:
             return self._id
+    
+    def get_device_status(self) -> DeviceStatus:
+        """Get the current DeviceStatus object."""
+        with self._lock:
+            return self._device_status
         
     def info(self) -> Dict[str, Any]:
         """Get device information dictionary."""
         with self._lock:
             info_copy = self._info.copy()
+            
+            # Add enhanced status information from DeviceStatus
+            if self._device_status:
+                # Get timeout from configuration if available (for Ethoscope devices)
+                unreachable_timeout = 20  # Default
+                if hasattr(self, '_config'):
+                    alert_config = self._config.get_custom('alerts') or {}
+                    unreachable_timeout = alert_config.get('unreachable_timeout_minutes', 20)
+                
+                info_copy['status_details'] = {
+                    'status': self._device_status.status_name,
+                    'is_user_triggered': self._device_status.is_user_triggered,
+                    'trigger_source': self._device_status.trigger_source,
+                    'age_minutes': self._device_status.get_age_minutes(),
+                    'consecutive_errors': self._device_status.consecutive_errors,
+                    'should_alert': self._device_status.should_send_alert(unreachable_timeout)
+                }
             
             # Add skip_scanning status for debugging
             info_copy['skip_scanning'] = self._skip_scanning
@@ -522,6 +812,10 @@ class Ethoscope(BaseDevice):
         self._device_controller_created = time.time()
         self._ping_count = 0  # Initialize ping counter
         
+        # User action tracking for enhanced status management
+        self._last_user_action = None
+        self._last_user_instruction = None
+        
         # Use provided configuration or create new one
         self._config = config or EthoscopeConfiguration()
         self._notification_service = EmailNotificationService(self._config, self._edb)
@@ -559,13 +853,25 @@ class Ethoscope(BaseDevice):
     
     def send_instruction(self, instruction: str, post_data: Optional[Union[Dict, bytes]] = None):
         """
-        Send instruction to ethoscope with validation.
+        Send instruction to ethoscope with validation and user action tracking.
         
         Args:
             instruction: Instruction to send
             post_data: Optional data to send with instruction (can be Dict or bytes)
         """
         self._check_instruction_status(instruction)
+        
+        # Determine trigger source and type
+        is_user_triggered = True
+        trigger_source = "user"
+        
+        # Check if this is a graceful operation
+        if instruction in DeviceStatus.GRACEFUL_OPERATIONS:
+            trigger_source = "graceful"
+            
+        # Track user action timestamp for later status updates
+        self._last_user_action = time.time()
+        self._last_user_instruction = instruction
         
         post_url = (f"http://{self._ip}:{self._port}/"
                 f"{self.REMOTE_PAGES['controls']}/{self._id}/{instruction}")
@@ -761,7 +1067,8 @@ class Ethoscope(BaseDevice):
     
     def _update_info(self):
         """Enhanced info update with state management."""
-        previous_status = self._info.get('status', 'offline')
+        previous_status_obj = self.get_device_status()
+        previous_status = previous_status_obj.status_name if previous_status_obj else "offline"
         
         # Safely increment ping counter
         self._ping_count += 1
@@ -773,6 +1080,24 @@ class Ethoscope(BaseDevice):
             raise ScanException(f"Failed to fetch device info from {self._ip}")
         
         new_status = self._info.get('status', 'offline')
+        
+        # Update device status using DeviceStatus system
+        is_user_triggered = self._is_user_initiated_stop()
+        trigger_source = "user" if is_user_triggered else "system"
+        
+        # Check if this is a graceful operation
+        alert_config = self._config.get_custom('alerts') or {}
+        graceful_grace_minutes = alert_config.get('graceful_shutdown_grace_minutes', 5)
+        graceful_grace_seconds = graceful_grace_minutes * 60
+        
+        if (self._last_user_instruction in DeviceStatus.GRACEFUL_OPERATIONS and 
+            self._last_user_action and (time.time() - self._last_user_action) < graceful_grace_seconds):
+            trigger_source = "graceful"
+        
+        # Update status if it changed
+        if previous_status != new_status:
+            self._update_device_status(new_status, is_user_triggered, trigger_source,
+                                     metadata={"previous_status": previous_status})
         
         # Handle device states
         if previous_status == "offline" and new_status != "offline":
@@ -833,8 +1158,27 @@ class Ethoscope(BaseDevice):
                 self._logger.debug(f"Updated logger name from {current_logger_name} to {new_logger_name}")
     
     def _handle_unreachable_state(self, previous_status: str):
-        """Handle unreachable device state."""
-        new_status = 'unreached'
+        """Handle unreachable device state with timeout logic."""
+        # Check if device is already unreachable and if timeout has been exceeded
+        current_status = self.get_device_status()
+        
+        # Get timeout from configuration
+        alert_config = self._config.get_custom('alerts') or {}
+        unreachable_timeout = alert_config.get('unreachable_timeout_minutes', 20)
+        
+        if current_status.status_name == 'unreached':
+            # Device is already unreachable, check for timeout
+            if current_status.is_timeout_exceeded(unreachable_timeout):
+                self._logger.info(f"Device {self._id} unreachable timeout exceeded ({unreachable_timeout}m), marking as offline")
+                self._update_device_status("offline", trigger_source="system",
+                                         metadata={"reason": "unreachable_timeout"})
+                self._edb.updateEthoscopes(ethoscope_id=self._id, status="offline")
+                return
+        else:
+            # Device is becoming unreachable for the first time
+            self._logger.info(f"Device {self._id} becoming unreachable (was {previous_status})")
+            self._update_device_status("unreached", trigger_source="network",
+                                     metadata={"previous_status": previous_status})
         
         # Handle running experiments
         if 'experimental_info' in self._info and 'run_id' in self._info['experimental_info']:
@@ -869,6 +1213,31 @@ class Ethoscope(BaseDevice):
             )
         except Exception as e:
             self._logger.error(f"Error updating device info: {e}")
+    
+    def _is_user_initiated_stop(self) -> bool:
+        """
+        Check if a recent status change was user-initiated.
+        
+        Returns:
+            True if the status change was likely user-initiated
+        """
+        if not self._last_user_action:
+            return False
+        
+        # Get timeout from configuration
+        alert_config = self._config.get_custom('alerts') or {}
+        timeout_seconds = alert_config.get('user_action_timeout_seconds', 30)
+        
+        # Check if user action was recent
+        time_since_action = time.time() - self._last_user_action
+        if time_since_action > timeout_seconds:
+            return False
+        
+        # Check if the last instruction was a stop command
+        if self._last_user_instruction in ['stop', 'poweroff', 'reboot', 'restart']:
+            return True
+        
+        return False
     
     def _handle_state_transition(self, previous_status: str, new_status: str):
         """Handle state transitions for experiment tracking."""
@@ -916,9 +1285,21 @@ class Ethoscope(BaseDevice):
             self._logger.error(f"Error handling state transition: {e}")
     
     def _send_state_transition_alerts(self, previous_status: str, new_status: str, run_id: str):
-        """Send email alerts for state transitions."""
+        """Send email alerts for state transitions using DeviceStatus logic."""
         try:
             device_name = self._info.get('name', self._id)
+            current_status = self.get_device_status()
+            
+            # Get timeout from configuration
+            alert_config = self._config.get_custom('alerts') or {}
+            unreachable_timeout = alert_config.get('unreachable_timeout_minutes', 20)
+            
+            # Use DeviceStatus logic to determine if alert should be sent
+            if not current_status.should_send_alert(unreachable_timeout):
+                self._logger.debug(f"Alert suppressed for status change {previous_status} -> {new_status} "
+                                 f"(user_triggered: {current_status.is_user_triggered}, "
+                                 f"graceful: {current_status.is_graceful_operation()})")
+                return
             
             # Send alert when device stops unexpectedly (from running to stopped)
             if previous_status == 'running' and new_status == 'stopped':
@@ -930,14 +1311,24 @@ class Ethoscope(BaseDevice):
                     last_seen=last_seen
                 )
             
-            # Send alert when device becomes unreachable
+            # Send alert when device becomes unreachable (only after timeout)
             elif new_status == 'unreached':
-                last_seen = datetime.datetime.fromtimestamp(self._info.get('last_seen', time.time()))
-                self._notification_service.send_device_unreachable_alert(
-                    device_id=self._id,
-                    device_name=device_name,
-                    last_seen=last_seen
-                )
+                # Get timeout from configuration
+                alert_config = self._config.get_custom('alerts') or {}
+                unreachable_timeout = alert_config.get('unreachable_timeout_minutes', 20)
+                
+                # Only send alert if the unreachable timeout has been exceeded
+                if current_status.is_timeout_exceeded(unreachable_timeout):
+                    last_seen = datetime.datetime.fromtimestamp(self._info.get('last_seen', time.time()))
+                    self._notification_service.send_device_unreachable_alert(
+                        device_id=self._id,
+                        device_name=device_name,
+                        last_seen=last_seen
+                    )
+                else:
+                    self._logger.debug(f"Unreachable alert suppressed - timeout not exceeded "
+                                     f"(age: {current_status.get_age_minutes():.1f}m, "
+                                     f"threshold: {unreachable_timeout}m)")
                 
         except Exception as e:
             self._logger.error(f"Error sending state transition alerts: {e}")
