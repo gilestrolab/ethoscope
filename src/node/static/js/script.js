@@ -104,7 +104,7 @@
         $scope.sortReverse = false; // set the default sort order
         $scope.filterEthoscopes = ''; // set the default search/filter term
         $scope.notifications = {};
-        $scope.showAll = false; // show all devices including inactive ones
+        $scope.showOnline = true; // show only online devices by default
 
         $scope.groupActions = {};
 

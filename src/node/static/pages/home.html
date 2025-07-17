@@ -173,10 +173,10 @@
     </div>
 </div>
 
-<!-- Toggle to quickly filter between all machines in the db or only active ones -->
+<!-- Toggle to filter between online devices and offline/unreached devices -->
 <div class="alert alert-neutral" style="background-color:#f2f2f2; margin-top: 15px;">
-    <label class="toggle-check">Show all machines, even if no longer connected
-        <input name="showAll" type="checkbox" class="toggle-check-input" ng-model="showAll" ng-checked="false">
+    <label class="toggle-check">Show online devices only
+        <input name="showOnline" type="checkbox" class="toggle-check-input" ng-model="showOnline" ng-checked="true">
         <span class="toggle-check-text"></span>
     </label>
 </div>
@@ -234,7 +234,7 @@
         </th>
     </thead>
     <tbody>
-        <tr ng-repeat="device in devices | orderObjectBy:sortType:sortReverse:orderEthoscopes | filter:filterEthoscopes" ng-if="(device.status != 'offline' && device.status != 'unreached') || showAll">
+        <tr ng-repeat="device in devices | orderObjectBy:sortType:sortReverse:orderEthoscopes | filter:filterEthoscopes" ng-if="showOnline ? (device.status != 'offline' && device.status != 'unreached') : (device.status == 'offline' || device.status == 'unreached')">
             <td>
                 <div ng-if="device.status != 'offline' && device.status != 'unreached'">
                     <a ng-href="#!/ethoscope/{{device.id}}" target="_blank">
