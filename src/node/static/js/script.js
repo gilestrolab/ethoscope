@@ -214,7 +214,22 @@
         };
 
         $scope.secToDate = function(secs) {
-            var d = new Date(isNaN(secs) ? secs : secs * 1000);
+            if (!secs) return 'No date';
+            
+            var d;
+            if (isNaN(secs)) {
+                // Handle string dates
+                d = new Date(secs);
+            } else {
+                // Handle timestamp (seconds)
+                d = new Date(secs * 1000);
+            }
+            
+            // Check if date is valid
+            if (isNaN(d.getTime())) {
+                return 'Invalid date';
+            }
+            
             return formatConciseTime(d);
         };
 

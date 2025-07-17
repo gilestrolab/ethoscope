@@ -238,11 +238,11 @@
             <td>
                 <div ng-if="device.status != 'offline'">
                     <a ng-href="#!/ethoscope/{{device.id}}" target="_blank">
-                        <span>{{device.name}}</span>
+                        <span>{{device.name || device.id}}</span>
                     </a>
                 </div>
                 <div ng-if="device.status == 'offline'">
-                    <span>{{device.name}}</span>
+                    <span>{{device.name || device.id}}</span>
                 </div>
             </td>
             <td>
@@ -253,7 +253,7 @@
                 <span ng-if="device.status == 'stopped'" class="fa fa-stop-circle" title={{device.status}}></span>
                 <span ng-if="device.status == 'unreached'" class="fa fa-wifi color-red" title="Device temporarily unreachable"></span>
                 <span ng-if="device.underpowered == true" class="fa fa-bolt" title="The device is underpowered!"></span></td>
-            <td>{{secToDate(device.time)}}</td>
+            <td>{{secToDate(device.time || device.last_seen)}}</td>
             <td>
                 <span class="fa fa-video-camera backup-status-icon" ng-class="getVideoBackupStatusClass(device)" title="{{getVideoBackupStatusTitle(device)}}"></span>
                 <span class="fa fa-database backup-status-icon" ng-class="getDatabaseBackupStatusClass(device)" title="{{getDatabaseBackupStatusTitle(device)}}"></span>
