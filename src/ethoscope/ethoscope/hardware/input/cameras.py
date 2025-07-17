@@ -20,18 +20,20 @@ except ImportError:
     from cv2 import CAP_PROP_FRAME_WIDTH, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_COUNT, CAP_PROP_POS_MSEC, CAP_PROP_FPS
 
 try:
-    import picamera
-    USE_PICAMERA2 = False
+    import picamera2
+    USE_PICAMERA2 = True
     CAMERA_AVAILABLE = True
-except ImportError:
+except (ImportError, OSError) as e:
+    logging.warning(f"Failed to import picamera2: {e}")
     try:
-        import picamera2
-        USE_PICAMERA2 = True
+        import picamera
+        USE_PICAMERA2 = False
         CAMERA_AVAILABLE = True
-    except ImportError:
+        logging.info("Using picamera instead of picamera2")
+    except (ImportError, OSError) as e:
         USE_PICAMERA2 = None  # None or some other value to indicate both imports failed
         CAMERA_AVAILABLE = False
-        logging.warning("No picamera library available. Camera functionality will be disabled.")
+        logging.warning(f"No camera library available (picamera also failed: {e}). Camera functionality will be disabled.")
 
 class BaseCamera(object):
     capture = None
@@ -443,7 +445,7 @@ class PiFrameGrabber(threading.Thread):
         try:
             import picamera
             import picamera.array
-        except ImportError as e:
+        except (ImportError, OSError) as e:
             logging.error(f"Failed to import picamera: {e}")
             self._queue.task_done()
             return
@@ -544,7 +546,7 @@ class PiFrameGrabber2(PiFrameGrabber):
 
         try:
             from picamera2 import Picamera2, MappedArray
-        except ImportError as e:
+        except (ImportError, OSError) as e:
             logging.error(f"Failed to import picamera2: {e}")
             self._queue.task_done()
             return
