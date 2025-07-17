@@ -393,8 +393,9 @@ class BaseDevice(Thread):
             
             current_time = time.time()
             
-            # Check if it's time for regular refresh
-            if current_time - self._last_refresh > self._refresh_period:
+            # Check if it's time for regular refresh (use dynamic refresh period)
+            effective_refresh_period = self._get_effective_refresh_period()
+            if current_time - self._last_refresh > effective_refresh_period:
                 if not self._skip_scanning:
                     try:
                         self._update_info()
@@ -590,6 +591,18 @@ class BaseDevice(Thread):
         # The DeviceStatus class already handles graceful operation detection
         current_status = self.get_device_status()
         return current_status and current_status.is_graceful_operation()
+    
+    def _get_effective_refresh_period(self) -> float:
+        """
+        Get the effective refresh period based on device status.
+        
+        Returns:
+            Refresh period in seconds (60s for busy devices, normal for others)
+        """
+        current_status = self.get_device_status()
+        if current_status and current_status.status_name == 'busy':
+            return 60.0  # Busy devices refresh every 60 seconds
+        return self._refresh_period  # Normal refresh period
     
     # Public interface methods
     def ip(self) -> str:
