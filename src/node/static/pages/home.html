@@ -234,14 +234,14 @@
         </th>
     </thead>
     <tbody>
-        <tr ng-repeat="device in devices | orderObjectBy:sortType:sortReverse:orderEthoscopes | filter:filterEthoscopes" ng-if="(device.status != 'offline') || showAll">
+        <tr ng-repeat="device in devices | orderObjectBy:sortType:sortReverse:orderEthoscopes | filter:filterEthoscopes" ng-if="(device.status != 'offline' && device.status != 'unreached') || showAll">
             <td>
-                <div ng-if="device.status != 'offline'">
+                <div ng-if="device.status != 'offline' && device.status != 'unreached'">
                     <a ng-href="#!/ethoscope/{{device.id}}" target="_blank">
                         <span>{{device.name}}</span>
                     </a>
                 </div>
-                <div ng-if="device.status == 'offline'">
+                <div ng-if="device.status == 'offline' || device.status == 'unreached'">
                     <span>{{device.name}}</span>
                 </div>
             </td>
@@ -266,14 +266,14 @@
                 <span ng-if="device.experimental_info.location != ''">{{device.experimental_info.location}}</span>
                 <span ng-if="device.previous_location != '' && device.status == 'stopped'" style="color:grey;">{{device.previous_location}}</span>
             <td>
-                <span ng-if="device.status == 'offline' && device.last_ip" 
+                <span ng-if="(device.status == 'offline' || device.status == 'unreached') && device.last_ip" 
                       ng-click="pokeDevice(device)" 
                       class="poke-ip-button"
                       title="Click to attempt re-adding this device ({{device.last_ip}})">
                     <span class="fa fa-refresh fa-xs"></span> {{device.last_ip}}
                 </span>
-                <span ng-if="device.status == 'offline' && !device.last_ip" title="No IP available" style="color: grey;">No IP</span>
-                <span ng-if="device.status != 'offline'" title="pinged: {{device.ping}} times">{{device.ip}}</span>
+                <span ng-if="(device.status == 'offline' || device.status == 'unreached') && !device.last_ip" title="No IP available" style="color: grey;">No IP</span>
+                <span ng-if="device.status != 'offline' && device.status != 'unreached'" title="pinged: {{device.ping}} times">{{device.ip}}</span>
             </td>
             <td title="{{device.id}}">{{device.id.substring(0,6)}}</td>
         </tr>
