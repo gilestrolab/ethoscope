@@ -263,12 +263,23 @@ class BaseDevice(Thread):
     def _reset_info(self):
         """Reset device info to offline state."""
         with self._lock:
+            # Preserve important identifying information
+            preserved_name = self._info.get('name', '')
+            preserved_id = self._info.get('id', self._id)
+            
             base_info = {
                 'status': 'offline',
                 'ip': self._ip,
                 'last_seen': time.time(),
                 'consecutive_errors': self._consecutive_errors
             }
+            
+            # Preserve name and id if they exist
+            if preserved_name:
+                base_info['name'] = preserved_name
+            if preserved_id:
+                base_info['id'] = preserved_id
+                
             self._info.update(base_info)
     
     def _update_info(self):
@@ -526,6 +537,10 @@ class Ethoscope(BaseDevice):
     def _reset_info(self):
         """Reset device info to offline state."""
         with self._lock:
+            # Preserve important identifying information
+            preserved_name = self._info.get('name', '')
+            preserved_id = self._info.get('id', self._id)
+            
             base_info = {
                 'status': 'offline',
                 'ip': self._ip,
@@ -533,6 +548,12 @@ class Ethoscope(BaseDevice):
                 'ping': self._ping_count,
                 'consecutive_errors': self._consecutive_errors
             }
+            
+            # Preserve name and id if they exist
+            if preserved_name:
+                base_info['name'] = preserved_name
+            if preserved_id:
+                base_info['id'] = preserved_id
             
             self._info.update(base_info)
     
