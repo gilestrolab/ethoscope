@@ -260,10 +260,6 @@ class EthoscopeNodeServer:
         self.app.route('/experiments', method='GET')(self._redirection_to_experiments)
         self.app.route('/sensors_data', method='GET')(self._redirection_to_sensors)
         self.app.route('/resources', method='GET')(self._redirection_to_resources)
-    
-        # Add these to _setup_routes method:
-        self.app.route('/blacklist/status', method='GET')(self._get_blacklist_status)
-        self.app.route('/blacklist/remove/<device_id>', method='POST')(self._unblacklist_device)
 
     def _setup_hooks(self):
         """Setup application hooks."""
@@ -575,31 +571,6 @@ class EthoscopeNodeServer:
         device = self.device_scanner.get_device(id)
         bottle.response.set_header('Content-type', 'multipart/x-mixed-replace; boundary=frame')
         return device.relay_stream()
-
-    @error_decorator
-    def _get_blacklist_status(self):
-        """Get blacklist statistics and blacklisted devices."""
-        device_stats = self.device_scanner.get_blacklist_statistics()
-        sensor_stats = self.sensor_scanner.get_blacklist_statistics() if self.sensor_scanner else {'blacklisted_count': 0}
-        
-        return {
-            'ethoscopes': device_stats,
-            'sensors': sensor_stats,
-            'total_blacklisted': device_stats['blacklisted_count'] + sensor_stats['blacklisted_count']
-        }
-
-    @error_decorator  
-    def _unblacklist_device(self, device_id):
-        """Manually remove a device from blacklist."""
-        # Try ethoscopes first
-        if self.device_scanner.force_unblacklist_device(device_id):
-            return {'success': True, 'message': f'Ethoscope {device_id} removed from blacklist'}
-        
-        # Try sensors
-        if self.sensor_scanner and self.sensor_scanner.force_unblacklist_device(device_id):
-            return {'success': True, 'message': f'Sensor {device_id} removed from blacklist'}
-        
-        return {'success': False, 'message': f'Device {device_id} not found or not blacklisted'}
 
     @error_decorator
     def _force_device_backup(self, id):

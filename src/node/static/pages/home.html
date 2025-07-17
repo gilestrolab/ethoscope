@@ -266,13 +266,13 @@
                 <span ng-if="device.experimental_info.location != ''">{{device.experimental_info.location}}</span>
                 <span ng-if="device.previous_location != '' && device.status == 'stopped'" style="color:grey;">{{device.previous_location}}</span>
             <td>
-                <button ng-if="device.status == 'offline' && device.active == 0 && device.last_ip" 
+                <button ng-if="device.status == 'offline' && device.last_ip" 
                         ng-click="pokeDevice(device)" 
                         class="btn btn-sm btn-outline-primary"
                         title="Click to attempt re-adding this device ({{device.last_ip}})">
                     <span class="fa fa-refresh"></span> {{device.last_ip}}
                 </button>
-                <span ng-if="device.status == 'offline' && (device.active == 1 || !device.last_ip)" title="Last known IP: {{device.last_ip}}" style="color: grey;">{{device.last_ip || 'No IP'}}</span>
+                <span ng-if="device.status == 'offline' && !device.last_ip" title="No IP available" style="color: grey;">No IP</span>
                 <span ng-if="device.status != 'offline'" title="pinged: {{device.ping}} times">{{device.ip}}</span>
             </td>
             <td title="{{device.id}}">{{device.id.substring(0,6)}}</td>

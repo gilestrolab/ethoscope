@@ -113,10 +113,7 @@ class BaseDevice(Thread):
         self._lock = RLock()
         self._last_refresh = 0
         self._consecutive_errors = 0
-        self._max_consecutive_errors = 10  # Blacklist after 10 errors
-        self._is_blacklisted = False
-        self._blacklist_time = 0
-        self._blacklist_duration = 600  # 10 minutes blacklist
+        self._max_consecutive_errors = 10 
         self._last_successful_contact = time.time()
         
         # Logging
@@ -166,18 +163,11 @@ class BaseDevice(Thread):
             raise ScanException(f"Unexpected error from {url}: {e}")
     
     def run(self):
-        """Main device monitoring loop with blacklisting support and offline handling."""
+        """Main device monitoring loop"""
         while self._is_online:
             time.sleep(0.2)
             
             current_time = time.time()
-            
-            # Check if device is blacklisted and if blacklist period has expired
-            if self._is_blacklisted:
-                if current_time >= self._blacklist_time + self._blacklist_duration:
-                    self._remove_from_blacklist()
-                else:
-                    continue  # Skip this device while blacklisted
             
             # Check if it's time for regular refresh
             if current_time - self._last_refresh > self._refresh_period:
@@ -224,18 +214,14 @@ class BaseDevice(Thread):
                     self._logger.info(f"Device {self._ip} connection refused (attempt {self._consecutive_errors}/3)")
                     return
             
-            # For other types of errors, use original blacklisting logic but with higher threshold
             if self._consecutive_errors >= self._max_consecutive_errors:
-                if self._should_blacklist_device(error):
-                    self._add_to_blacklist()
-                else:
-                    # Device seems to have gone offline normally, stop interrogating
-                    self._logger.info(f"Device {self._ip} appears offline after {self._consecutive_errors} errors, stopping interrogation")
-                    self._skip_scanning = True
-                    self._info.update({
-                        'status': 'offline', 
-                        'last_seen': time.time()
-                    })
+                # Device seems to have gone offline normally, stop interrogating
+                self._logger.info(f"Device {self._ip} appears offline after {self._consecutive_errors} errors, stopping interrogation")
+                self._skip_scanning = True
+                self._info.update({
+                    'status': 'offline', 
+                    'last_seen': time.time()
+                })
             else:
                 # Log errors less frequently to reduce noise
                 if self._consecutive_errors == 1:
@@ -244,109 +230,6 @@ class BaseDevice(Thread):
                     self._logger.warning(f"Device {self._ip} has 5 consecutive errors, will stop interrogating at 10")
                 else:
                     self._logger.debug(f"Device {self._ip} error #{self._consecutive_errors}: {str(error)}")
-    
-    def _should_blacklist_device(self, error) -> bool:
-        """Determine if device should be blacklisted vs just considered offline."""
-        # Blacklist only if device appears to be advertising via zeroconf but not responding
-        # This is indicated by connection refusal vs timeout/unreachable errors
-        
-        error_str = str(error).lower()
-        
-        # These errors suggest device is actively refusing connections (blacklist-worthy)
-        blacklist_errors = ['connection refused', 'connection reset', 'actively refused']
-        
-        # These errors suggest device is offline/unreachable (not blacklist-worthy)
-        offline_errors = ['timeout', 'unreachable', 'no route to host', 'network is unreachable']
-        
-        for blacklist_pattern in blacklist_errors:
-            if blacklist_pattern in error_str:
-                return True
-                
-        for offline_pattern in offline_errors:
-            if offline_pattern in error_str:
-                return False
-                
-        # Default: if unsure, don't blacklist - err on side of not blacklisting
-        return False
-    
-    def _add_to_blacklist(self):
-        """Add device to blacklist after determining it's truly problematic."""
-        with self._lock:
-            if self._is_blacklisted:
-                return
-                
-            self._is_blacklisted = True
-            self._blacklist_time = time.time()
-            
-            # Calculate time since last successful contact
-            time_since_success = self._blacklist_time - self._last_successful_contact
-            time_since_success_str = f"{time_since_success/60:.1f} minutes" if time_since_success > 60 else f"{time_since_success:.0f} seconds"
-            
-            self._logger.warning(
-                f"Device {self._ip} blacklisted - advertising via zeroconf but not responding on port {self._port}. "
-                f"Had {self._consecutive_errors} consecutive errors. Last successful contact: {time_since_success_str} ago. "
-                f"Will retry in {self._blacklist_duration/60:.0f} minutes."
-            )
-            
-            # Update device info to reflect blacklisted state
-            self._info.update({
-                'status': 'blacklisted',
-                'blacklisted': True,
-                'blacklist_time': self._blacklist_time,
-                'consecutive_errors': self._consecutive_errors,
-                'blacklist_expires': self._blacklist_time + self._blacklist_duration
-            })
-    
-    def _remove_from_blacklist(self):
-        """Remove device from blacklist and reset error counters."""
-        with self._lock:
-            if not self._is_blacklisted:
-                return
-
-            self._is_blacklisted = False
-            self._consecutive_errors = 0
-            self._blacklist_time = 0
-            
-            self._logger.info(f"Device {self._ip} removed from blacklist, attempting reconnection")
-            
-            # Reset device info
-            self._info.update({
-                'status': 'offline',
-                'blacklisted': False,
-                'consecutive_errors': 0
-            })
-            # Remove blacklist-specific fields
-            self._info.pop('blacklist_time', None)
-            self._info.pop('blacklist_expires', None)
-    
-    def force_remove_from_blacklist(self):
-        """Manually remove device from blacklist (for external API calls)."""
-        if self._is_blacklisted:
-            self._logger.info(f"Device {self._ip} manually removed from blacklist")
-            self._remove_from_blacklist()
-            return True
-        return False
-    
-    def is_blacklisted(self) -> bool:
-        """Check if device is currently blacklisted."""
-        return self._is_blacklisted
-    
-    def get_blacklist_status(self) -> Dict[str, Any]:
-        """Get detailed blacklist status information."""
-        if not self._is_blacklisted:
-            return {'blacklisted': False}
-        
-        current_time = time.time()
-        time_remaining = max(0, (self._blacklist_time + self._blacklist_duration) - current_time)
-        
-        return {
-            'blacklisted': True,
-            'blacklist_time': self._blacklist_time,
-            'time_remaining': time_remaining,
-            'time_remaining_str': f"{time_remaining/60:.1f} minutes" if time_remaining > 60 else f"{time_remaining:.0f} seconds",
-            'consecutive_errors': self._consecutive_errors,
-            'last_successful_contact': self._last_successful_contact
-        }
     
     def _update_id(self):
         """Update device ID with proper error handling."""
@@ -381,20 +264,11 @@ class BaseDevice(Thread):
         """Reset device info to offline state."""
         with self._lock:
             base_info = {
-                'status': 'blacklisted' if self._is_blacklisted else 'offline',
+                'status': 'offline',
                 'ip': self._ip,
                 'last_seen': time.time(),
                 'consecutive_errors': self._consecutive_errors
             }
-            
-            # Add blacklist info if blacklisted
-            if self._is_blacklisted:
-                base_info.update({
-                    'blacklisted': True,
-                    'blacklist_time': self._blacklist_time,
-                    'blacklist_expires': self._blacklist_time + self._blacklist_duration
-                })
-            
             self._info.update(base_info)
     
     def _update_info(self):
@@ -431,22 +305,8 @@ class BaseDevice(Thread):
             return self._id
         
     def info(self) -> Dict[str, Any]:
-        """Get device information dictionary. Blacklisted devices return minimal info."""
+        """Get device information dictionary."""
         with self._lock:
-            # Don't return full info for blacklisted devices
-            if self._is_blacklisted:
-                current_time = time.time()
-                time_remaining = max(0, (self._blacklist_time + self._blacklist_duration) - current_time)
-                return {
-                    'status': 'blacklisted',
-                    'ip': self._ip,
-                    'id': self._id,
-                    'blacklisted': True,
-                    'blacklist_time_remaining': time_remaining,
-                    'blacklist_time_remaining_str': f"{time_remaining/60:.1f}m" if time_remaining > 60 else f"{time_remaining:.0f}s",
-                    'last_seen': self._info.get('last_seen', 0)
-                }
-            
             info_copy = self._info.copy()
             
             # Add skip_scanning status for debugging
@@ -667,20 +527,12 @@ class Ethoscope(BaseDevice):
         """Reset device info to offline state."""
         with self._lock:
             base_info = {
-                'status': 'blacklisted' if self._is_blacklisted else 'offline',
+                'status': 'offline',
                 'ip': self._ip,
                 'last_seen': time.time(),
                 'ping': self._ping_count,
                 'consecutive_errors': self._consecutive_errors
             }
-            
-            # Add blacklist info if blacklisted
-            if self._is_blacklisted:
-                base_info.update({
-                    'blacklisted': True,
-                    'blacklist_time': self._blacklist_time,
-                    'blacklist_expires': self._blacklist_time + self._blacklist_duration
-                })
             
             self._info.update(base_info)
     
@@ -1636,50 +1488,6 @@ class DeviceScanner:
                     return device
         return None
     
-    def get_blacklisted_devices(self) -> List[Dict[str, Any]]:
-        """Get list of currently blacklisted devices."""
-        blacklisted = []
-        with self._lock:
-            for device in self.devices:
-                if device.is_blacklisted():
-                    blacklist_info = device.get_blacklist_status()
-                    blacklist_info.update({
-                        'ip': device.ip(),
-                        'id': device.id(),
-                        'name': getattr(device, 'name', '')
-                    })
-                    blacklisted.append(blacklist_info)
-        return blacklisted
-    
-    def force_unblacklist_device(self, device_identifier: str) -> bool:
-        """
-        Manually remove a device from blacklist.
-        
-        Args:
-            device_identifier: Device IP or ID
-            
-        Returns:
-            bool: True if device was found and unblacklisted
-        """
-        with self._lock:
-            for device in self.devices:
-                if device.ip() == device_identifier or device.id() == device_identifier:
-                    return device.force_remove_from_blacklist()
-        return False
-    
-    def get_blacklist_statistics(self) -> Dict[str, Any]:
-        """Get statistics about blacklisted devices."""
-        blacklisted_devices = self.get_blacklisted_devices()
-        total_devices = len(self.devices)
-        blacklisted_count = len(blacklisted_devices)
-        
-        return {
-            'total_devices': total_devices,
-            'blacklisted_count': blacklisted_count,
-            'active_count': total_devices - blacklisted_count,
-            'blacklisted_devices': blacklisted_devices
-        }
-    
     def add(self, ip: str, port: int, name: Optional[str] = None, 
            device_id: Optional[str] = None, zcinfo: Optional[Dict] = None):
         """Add a device to the scanner."""
@@ -1837,11 +1645,11 @@ class EthoscopeScanner(DeviceScanner):
             self._logger.error(f"Error getting devices from database: {e}")
             devices_info = {}
         
-        # Update with devices from scanner (includes offline and blacklisted)
+        # Update with devices from scanner (includes offline)
         with self._lock:
             for device in self.devices:
                 device_id = device.id()
-                device_name = getattr(device, 'name', device_id)
+                device_name = getattr(device, 'name', 'N/A')
                 
                 if device_name != "ETHOSCOPE_000":
                     info = device.info()

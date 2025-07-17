@@ -68,7 +68,8 @@ class DatabaseConnectionManager:
             'charset': SQL_CHARSET,
             'collation': 'latin1_swedish_ci',
             'use_unicode': True,
-            'connect_timeout': 45
+            'connect_timeout': 45,
+            'ssl_disabled': True
         }
         if database:
             self.connection_params['db'] = database
@@ -296,7 +297,8 @@ def get_backup_path_from_database(host, ethoscope_number=None):
             connect_timeout=10,
             autocommit=True,
             charset='utf8mb4',
-            collation='utf8mb4_general_ci'
+            collation='utf8mb4_general_ci',
+            ssl_disabled=True
         )
         
         cursor = connection.cursor()

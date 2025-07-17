@@ -185,11 +185,8 @@
         };
 
         var get_devices = function() {
-            var url = '/devices';
-            if ($scope.showAll) {
-                url += '?include_inactive=true';
-            }
-            $http.get(url).then(function(response) {
+            // Always fetch all active devices from database
+            $http.get('/devices?include_inactive=true').then(function(response) {
                 var data = response.data;
 
                 var data_list = [];
@@ -845,29 +842,8 @@
         // Initialize backup status on page load
         get_backup_status();
 
-        // Add watcher for showAll toggle to trigger retirement check
-        $scope.$watch('showAll', function(newVal, oldVal) {
-            if (newVal && !oldVal) {
-                // When showAll is turned on, trigger retirement check
-                $http.post('/devices/retire-inactive', {})
-                    .then(function(response) {
-                        var data = response.data;
-                        if (data.success) {
-                            if (data.purged_count > 0) {
-                                console.log('Purged ' + data.purged_count + ' unnamed/invalid devices');
-                            }
-                            if (data.retired_count > 0) {
-                                console.log('Retired ' + data.retired_count + ' inactive devices');
-                            }
-                            // Refresh devices to show updated status
-                            get_devices();
-                        }
-                    })
-                    .catch(function(error) {
-                        console.error('Error retiring inactive devices:', error);
-                    });
-            }
-        });
+        // Note: showAll now only controls frontend filtering by device.status
+        // No longer triggers retirement - devices are fetched based on database active status
 
         // Add poke device function
         $scope.pokeDevice = function(device) {
