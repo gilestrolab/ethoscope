@@ -117,23 +117,33 @@ install_mysql_connector() {
 
 install_apt_packages() {
     echo "Installing system packages and Python dependencies on $PI_MODEL..."
-    apt-get update && apt-get upgrade -y
+    sudo apt-get update && apt-get upgrade -y
 
-    # Install all the python packages
-    apt-get install -y \
-        python3-bottle python3-cheroot python3-cherrypy3 python3-opencv python3-pymysql \
-        python3-git python3-matplotlib python3-mock python3-netifaces python3-serial \
-        python3-usb python3-sklearn python3-setuptools python3-zeroconf python3-protobuf \
-        python3-picamera2 python3-pip python3-venv python3-bottle \
-        python3-zeroconf python3-requests python3-numpy python3-scipy
-        #opencv-python mysql-connector-python GitPython python3-picamera
-    
-    # Install the remaining stuff
-    apt-get install -y mariadb-server mariadb-client sqlite3 ntp systemd-resolved
-    systemctl restart systemd-networkd systemd-resolved
+    echo "Installing basic system packages..."
+    sudo apt-get install -y \
+        mariadb-server \
+        mariadb-client \
+        sqlite3 \
+        systemd-resolved \
+        build-essential \
+        python3-dev \
+        libcap-dev \
+        pkg-config \
+        ntp
 
-    # Install mysql-connector with fallback logic
-    install_mysql_connector
+    echo "Restarting network services..."
+    sudo systemctl restart systemd-networkd systemd-resolved
+
+    echo "Installing Python system packages..."
+    sudo apt-get install -y \
+        python3-pip \
+        python3-venv \
+        python3-setuptools \
+        python3-picamera2 \
+        python3-usb \
+        python3-protobuf
+
+    #the rest will be installed via pip
 
     echo "All necessary packages were installed. Now reboot."        
 }
@@ -159,6 +169,13 @@ setup_ethoscope_user() {
 #===============================================================================
 
 install_ethoscope_software() {
+
+    # Create system-wide pip config
+    cat > /etc/pip.conf << 'EOF'
+[global]
+break-system-packages = true
+EOF
+
     echo "Cloning ethoscope software repository..."
     if [[ -d "/opt/ethoscope" ]]; then
         echo "Removing existing /opt/ethoscope directory for clean installation..."
@@ -425,13 +442,15 @@ setup_mariadb() {
     # Set up ethoscope database user
     echo "Creating ethoscope database user..."
     mysql -u root <<EOF
--- Create ethoscope user for local and network connections
+-- Create users for local and network connections
 CREATE USER IF NOT EXISTS 'ethoscope'@'localhost' IDENTIFIED BY 'ethoscope';
-CREATE USER IF NOT EXISTS 'ethoscope'@'%' IDENTIFIED BY 'ethoscope';
+CREATE USER IF NOT EXISTS 'node'@'%' IDENTIFIED BY 'node';
 
--- Grant necessary permissions including RELOAD and GRANT OPTION
+-- Grant necessary permissions to ethoscope (full access)
 GRANT ALL PRIVILEGES ON *.* TO 'ethoscope'@'localhost' WITH GRANT OPTION;
-GRANT ALL PRIVILEGES ON *.* TO 'ethoscope'@'%' WITH GRANT OPTION;
+
+-- Grant ONLY reading privileges to node user
+GRANT SELECT ON *.* TO 'node'@'%';
 
 -- Flush privileges to ensure changes take effect
 FLUSH PRIVILEGES;
