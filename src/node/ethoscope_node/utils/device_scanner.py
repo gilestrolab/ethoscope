@@ -2116,7 +2116,21 @@ class EthoscopeScanner(DeviceScanner):
                         "time_since_backup": self._get_last_backup_time(device),
                         "backup_size": self._get_backup_size(device)
                     })
-                    devices_info[device_id] = info
+                    
+                    # Preserve name from database if device doesn't have a proper name
+                    if device_id in devices_info:
+                        db_name = devices_info[device_id].get('name', '')
+                        scanner_name = info.get('name', '')
+                        
+                        # If scanner has no name or unknown name, preserve database name
+                        if not scanner_name or scanner_name in ['', 'unknown_name', 'N/A']:
+                            if db_name:
+                                info['name'] = db_name
+                        
+                        # Merge with existing database info, scanner info takes precedence except for name preservation above
+                        devices_info[device_id].update(info)
+                    else:
+                        devices_info[device_id] = info
                 else:
                     # Special case for ETHOSCOPE_000
                     devices_info[device_name] = device.info()
