@@ -22,12 +22,16 @@ except ImportError:
 try:
     import picamera
     USE_PICAMERA2 = False
+    CAMERA_AVAILABLE = True
 except ImportError:
     try:
         import picamera2
         USE_PICAMERA2 = True
+        CAMERA_AVAILABLE = True
     except ImportError:
         USE_PICAMERA2 = None  # None or some other value to indicate both imports failed
+        CAMERA_AVAILABLE = False
+        logging.warning("No picamera library available. Camera functionality will be disabled.")
 
 class BaseCamera(object):
     capture = None
@@ -436,8 +440,13 @@ class PiFrameGrabber(threading.Thread):
         # https://www.bountysource.com/issues/86094172-python-3-8-1-typeerror-vc_dispmanx_element_add-argtypes-item-9-in-_argtypes_-passes-a-union-by-value-which-is-unsupported
         # this should now be fixed in Python 3.8.2 (6/5/2020)
         
-        import picamera
-        import picamera.array
+        try:
+            import picamera
+            import picamera.array
+        except ImportError as e:
+            logging.error(f"Failed to import picamera: {e}")
+            self._queue.task_done()
+            return
 
         try:
             with picamera.PiCamera(
@@ -505,7 +514,14 @@ class PiFrameGrabber(threading.Thread):
                         self._queue.put(frame.array[:, :, 0])  # Get first channel (Y) for grayscale
 
         except Exception as e:
-            logging.warning(f"Some problem acquiring frames from the camera: {e}")
+            # Check if this is a camera hardware issue
+            error_msg = str(e).lower()
+            if "libbcm_host.so" in error_msg or "camera" in error_msg or "mmal" in error_msg:
+                logging.error(f"Camera hardware not available: {e}")
+                # Put a special frame to signal no camera hardware
+                self._queue.put(None)
+            else:
+                logging.warning(f"Some problem acquiring frames from the camera: {e}")
 
         finally:
             if self._record_video:
@@ -526,11 +542,17 @@ class PiFrameGrabber2(PiFrameGrabber):
         Run stops if the _stop_queue is not empty.
         """
 
-        from picamera2 import Picamera2, MappedArray
+        try:
+            from picamera2 import Picamera2, MappedArray
+        except ImportError as e:
+            logging.error(f"Failed to import picamera2: {e}")
+            self._queue.task_done()
+            return
 
         Picamera2.set_logging(logging.ERROR)
 
-        with Picamera2() as capture:
+        try:
+            with Picamera2() as capture:
            
             # The appropriate size of the image acquisition is tricky and depends on the actual hardware. 
             # With IMX219 640x480 will not return the full FoV. 960x720 does.
@@ -601,6 +623,20 @@ class PiFrameGrabber2(PiFrameGrabber):
                 self._stop_queue.task_done()
                 capture.stop()
 
+        except Exception as e:
+            # Check if this is a camera hardware issue
+            error_msg = str(e).lower()
+            if "libbcm_host.so" in error_msg or "camera" in error_msg or "mmal" in error_msg:
+                logging.error(f"Camera hardware not available: {e}")
+                # Put a special frame to signal no camera hardware
+                self._queue.put(None)
+            else:
+                logging.warning(f"Some problem acquiring frames from the camera: {e}")
+
+        finally:
+            self._queue.task_done()  # Indicates to the parent that the thread can be closed
+            logging.warning("Camera Frame grabber stopped acquisition cleanly.")
+
 
 class OurPiCameraAsync(BaseCamera):
     _description = {"overview": "Default class to acquire frames from the raspberry pi camera asynchronously.",
@@ -640,6 +676,12 @@ class OurPiCameraAsync(BaseCamera):
         
         try:
             self._frame = first_frame = self._queue.get(timeout=10)
+            
+            # Check if camera hardware is not available
+            if first_frame is None:
+                logging.error("Camera hardware not available - no video capabilities")
+                self._p.join(5)
+                raise EthoscopeException("Camera hardware not available. Video tracking and recording are disabled.")
             
         except Exception as e:
             logging.error("Could not get any frame from the camera after the initialisation!")

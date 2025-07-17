@@ -50,7 +50,13 @@ class cameraCaptureThread(threading.Thread):
         self._record_video = video_prefix is not None
         if self._record_video: self._create_recording_folder()
 
-        self.camera = cameraClass ( target_fps = fps , target_resolution = (width, height), video_prefix = video_prefix, quality = quality, **camera_kwargs )
+        try:
+            self.camera = cameraClass ( target_fps = fps , target_resolution = (width, height), video_prefix = video_prefix, quality = quality, **camera_kwargs )
+        except EthoscopeException as e:
+            if "Camera hardware not available" in str(e):
+                raise EthoscopeException("Recording disabled: No camera hardware available.")
+            else:
+                raise e
         self._local_recording = self._record_video is True and self.camera.isPiCamera is False
 
         self.video_file_index = 0
@@ -416,10 +422,17 @@ class ControlThreadVideoRecording(ControlThread):
             cameraClass = self._option_dict["camera"]["class"]
             camera_kwargs = self._option_dict["camera"]["kwargs"]
            
-            self._recorder = RecorderClass( cameraClass, camera_kwargs, 
-                                            video_prefix = self._output_video_full_prefix,
-                                            img_path = self._info["last_drawn_img"],
-                                            **recorder_kwargs)
+            try:
+                self._recorder = RecorderClass( cameraClass, camera_kwargs, 
+                                                video_prefix = self._output_video_full_prefix,
+                                                img_path = self._info["last_drawn_img"],
+                                                **recorder_kwargs)
+            except EthoscopeException as e:
+                if "Camera hardware not available" in str(e):
+                    logging.error("Cannot start recording: No camera hardware detected")
+                    raise EthoscopeException("Recording disabled: No camera hardware available. This ethoscope cannot perform video recording without camera hardware.")
+                else:
+                    raise e
 
             self._info["status"] = self._recorder.status # "recording" or "streaming"
             logging.info( "Started %s" % self._recorder.status )

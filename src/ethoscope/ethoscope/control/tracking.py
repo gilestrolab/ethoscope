@@ -638,7 +638,14 @@ class ControlThread(Thread):
         drawer_kwargs = self._option_dict["drawer"]["kwargs"]
         self._drawer = DrawerClass(**drawer_kwargs)
 
-        cam = CameraClass(**camera_kwargs)
+        try:
+            cam = CameraClass(**camera_kwargs)
+        except EthoscopeException as e:
+            if "Camera hardware not available" in str(e):
+                logging.error("Cannot start tracking: No camera hardware detected")
+                raise EthoscopeException("Tracking disabled: No camera hardware available. This ethoscope cannot perform video tracking or recording without camera hardware.")
+            else:
+                raise e
 
         roi_builder = ROIBuilderClass(**roi_builder_kwargs)
         

@@ -414,7 +414,7 @@ def getPiCameraVersion():
         return camera_info
     else:
         
-        return False
+        return "No camera hardware detected - video capabilities disabled"
 
 def isSuperscope():
     """
