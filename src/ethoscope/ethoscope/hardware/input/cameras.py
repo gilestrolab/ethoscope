@@ -554,74 +554,74 @@ class PiFrameGrabber2(PiFrameGrabber):
         try:
             with Picamera2() as capture:
            
-            # The appropriate size of the image acquisition is tricky and depends on the actual hardware. 
-            # With IMX219 640x480 will not return the full FoV. 960x720 does.
-            # See https://picamera.readthedocs.io/en/release-1.13/fov.html for a full description
+                # The appropriate size of the image acquisition is tricky and depends on the actual hardware. 
+                # With IMX219 640x480 will not return the full FoV. 960x720 does.
+                # See https://picamera.readthedocs.io/en/release-1.13/fov.html for a full description
 
 
-            w, h = self._target_resolution
+                w, h = self._target_resolution
 
-            config = capture.create_video_configuration(
-                            main = { 'size' : (w, h), 'format': 'YUV420' },
-                            buffer_count = 2, #Still image capture normally configures only a single buffer, as this is all you need. But if you're doing some form of burst capture, increasing the buffer count may enable the application to receive images more quickly.
-                            controls = { 'FrameRate': self._target_fps },
-                            )
-            capture.configure(config)
+                config = capture.create_video_configuration(
+                                main = { 'size' : (w, h), 'format': 'YUV420' },
+                                buffer_count = 2, #Still image capture normally configures only a single buffer, as this is all you need. But if you're doing some form of burst capture, increasing the buffer count may enable the application to receive images more quickly.
+                                controls = { 'FrameRate': self._target_fps },
+                                )
+                capture.configure(config)
 
-            self._save_camera_info (capture.global_camera_info()[0])
+                self._save_camera_info (capture.global_camera_info()[0])
 
-            if self._record_video:
+                if self._record_video:
 
-                from picamera2.encoders import H264Encoder
-                encoder = H264Encoder(bitrate=10000000)
+                    from picamera2.encoders import H264Encoder
+                    encoder = H264Encoder(bitrate=10000000)
 
-                self._video_time = time.time()
-                self._refresh_interval = time.time()
+                    self._video_time = time.time()
+                    self._refresh_interval = time.time()
 
-                capture.start()
-                capture.start_encoder(encoder, self._get_video_chunk_filename(self._target_fps))
+                    capture.start()
+                    capture.start_encoder(encoder, self._get_video_chunk_filename(self._target_fps))
 
-                while self._stop_queue.empty():
+                    while self._stop_queue.empty():
 
-                    if time.time() - self._refresh_interval >= self._PREVIEW_REFRESH_TIME:
-                        request = capture.capture_request()
-                        with MappedArray(request, "main") as frame:
-                            self._queue.put(frame.array[:h, :])
-                        request.release()
-                        self._refresh_interval = time.time()
+                        if time.time() - self._refresh_interval >= self._PREVIEW_REFRESH_TIME:
+                            request = capture.capture_request()
+                            with MappedArray(request, "main") as frame:
+                                self._queue.put(frame.array[:h, :])
+                            request.release()
+                            self._refresh_interval = time.time()
 
-                    if time.time() - self._video_time >= self._VIDEO_CHUNCK_DURATION:
-                        logging.info("Splitting video recording into a new H264 chunk.")
-                        capture.stop_encoder()
-                        capture.start_encoder(encoder, self._get_video_chunk_filename(self._target_fps))
-                        self._video_time = time.time()
+                        if time.time() - self._video_time >= self._VIDEO_CHUNCK_DURATION:
+                            logging.info("Splitting video recording into a new H264 chunk.")
+                            capture.stop_encoder()
+                            capture.start_encoder(encoder, self._get_video_chunk_filename(self._target_fps))
+                            self._video_time = time.time()
 
-                self._stop_queue.get()
-                self._stop_queue.task_done()
-                capture.stop_encoder()
-                capture.stop()
+                    self._stop_queue.get()
+                    self._stop_queue.task_done()
+                    capture.stop_encoder()
+                    capture.stop()
 
 
-            else:
+                else:
 
-                capture.start()
+                    capture.start()
 
-                while self._stop_queue.empty():
+                    while self._stop_queue.empty():
 
-                    frame = capture.capture_array("main")
+                        frame = capture.capture_array("main")
 
-                    # As for picamera, we take arrays in YUV420 format and then get only the Y channel. The slicing, however, is different.
-                    # from the picamera2 manual, pg 37 https://datasheets.raspberrypi.com/camera/picamera2-manual.pdf
-                    # YUv420 is a slightly special case because the first height rows give the Y channel, the next height/4 rows contain the U
-                    # channel and the final height/4 rows contain the V channel. For the other formats, where there is an "alpha" value it will
-                    # take the fixed value 255
+                        # As for picamera, we take arrays in YUV420 format and then get only the Y channel. The slicing, however, is different.
+                        # from the picamera2 manual, pg 37 https://datasheets.raspberrypi.com/camera/picamera2-manual.pdf
+                        # YUv420 is a slightly special case because the first height rows give the Y channel, the next height/4 rows contain the U
+                        # channel and the final height/4 rows contain the V channel. For the other formats, where there is an "alpha" value it will
+                        # take the fixed value 255
 
-                    self._queue.put(frame[:h, :])
+                        self._queue.put(frame[:h, :])
 
-                logging.info("The stop queue is not empty. This signals it is time to stop acquiring frames")
-                self._stop_queue.get()
-                self._stop_queue.task_done()
-                capture.stop()
+                    logging.info("The stop queue is not empty. This signals it is time to stop acquiring frames")
+                    self._stop_queue.get()
+                    self._stop_queue.task_done()
+                    capture.stop()
 
         except Exception as e:
             # Check if this is a camera hardware issue
