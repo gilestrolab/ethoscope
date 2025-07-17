@@ -802,7 +802,7 @@ class EthoscopeNodeServer:
             device_video_path = f"/ethoscope_data/videos/{device_id}/{device_name}"
             
             if not os.path.exists(device_video_path):
-                self.logger.warning(f"Device video path does not exist: {device_video_path}")
+                #self.logger.warning(f"Device video path does not exist: {device_video_path}")
                 return 0, "0 B", 0
             
             self.logger.debug(f"Calculating video stats for device {device_name} ({device_id}) at path: {device_video_path}")
