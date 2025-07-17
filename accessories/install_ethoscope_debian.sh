@@ -85,36 +85,6 @@ determine_config_paths() {
 # PACKAGE INSTALLATION
 #===============================================================================
 
-install_mysql_connector() {
-    echo "Installing python3-mysql.connector..."
-    
-    # Try Raspberry Pi OS repositories first (safest for ARM architecture)
-    if ! dpkg -l | grep -q python3-mysql.connector; then
-        echo "Trying Raspberry Pi OS repositories..."
-        if apt-cache show python3-mysql.connector >/dev/null 2>&1; then
-            apt-get install -y python3-mysql.connector
-        else
-            echo "python3-mysql.connector not available in Raspberry Pi OS repos"
-        fi
-    fi
-    
-    # Verify installation works, use pip as fallback
-    if ! python3 -c "import mysql.connector; print('mysql.connector is working')" 2>/dev/null; then
-        echo "System package not available, installing via pip..."
-        pip3 install mysql-connector-python --break-system-packages
-        
-        # Final verification
-        if ! python3 -c "import mysql.connector; print('mysql.connector is working')" 2>/dev/null; then
-            echo "ERROR: Could not install mysql.connector module"
-            exit 1
-        else
-            echo "mysql.connector successfully installed via pip"
-        fi
-    else
-        echo "mysql.connector is working"
-    fi
-}
-
 install_apt_packages() {
     echo "Installing system packages and Python dependencies on $PI_MODEL..."
     sudo apt-get update && apt-get upgrade -y
@@ -192,6 +162,9 @@ EOF
     echo "Installing ethoscope Python package..."
     cd /opt/ethoscope/src/ethoscope
     pip3 install -e . --break-system-packages
+
+    #Make sure we use only picamera2 (if the PI is at least a PI3?)
+    pip3 uninstall -y picamera 2>/dev/null && pip3 install picamera2
 
     echo "Installing systemd service files..."
     rm -rf /usr/lib/systemd/system/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_update}.service >> /dev/null

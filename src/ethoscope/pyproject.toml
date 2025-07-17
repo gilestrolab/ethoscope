@@ -51,23 +51,21 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
+
 requires-python = ">=3.8"
 dependencies = [
     "numpy>=1.21.0,<1.26.0",
-    "scipy>=1.7.0",  
-    "opencv-python>=4.8.0",
-    "matplotlib>=3.5.0",
-    "scikit-learn>=1.1.0",
+    "scipy>=1.7.0",
     "GitPython>=3.1.44",
     "mysql-connector-python>=8.0.16",
     "cherrypy>=18.10.0",
     "pyserial>=3.5",
     "bottle>=0.13.4",
+    "opencv-python>=4.8.0",
     "zeroconf>=0.147.0",
     "netifaces>=0.11.0",
     "requests>=2.32.4",
-    "mock>=4.0.0",
-    "picamera2"
+    "picamera2",
 ]
 
 [project.urls]
