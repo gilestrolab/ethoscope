@@ -81,20 +81,85 @@ make clean
 ```
 
 ### Testing
-- Tests are located in `src/ethoscope/ethoscope/tests/`
-- Use `python -m pytest` to run tests
-- Integration tests require mock devices/hardware
-- Test configuration files are in `tests/integration_server_tests/`
+
+The project has a comprehensive testing infrastructure with standardized structure across both packages:
+
+**Test Structure:**
+- **Device Package**: `src/ethoscope/ethoscope/tests/` (unit, integration, fixtures)
+- **Node Package**: `src/node/tests/` (unit, integration, functional, fixtures)
+- **Central Test Requirements**: `test-requirements.txt` with all testing dependencies
+- **Documentation**: `TESTING.md` with comprehensive guidelines
+
+**Running Tests:**
+```bash
+# Project-wide test runner
+python run_tests.py                    # Run all tests
+python run_tests.py --coverage         # Run with coverage
+python run_tests.py --package device   # Device tests only
+python run_tests.py --package node     # Node tests only
+
+# Device package tests
+cd src/ethoscope/
+make test              # All tests
+make test-unit         # Unit tests only
+make test-integration  # Integration tests only
+./ethoscope/tests/run_all_tests.sh     # Shell script
+
+# Node package tests
+cd src/node/
+make test              # All tests
+make test-unit         # Unit tests only
+make test-integration  # Integration tests only
+make test-functional   # Functional tests only
+./run_tests.sh         # Shell script
+```
+
+**Test Categories:**
+- **Unit Tests**: Fast, isolated component tests with mocked dependencies
+- **Integration Tests**: Component interaction tests with realistic scenarios
+- **Functional Tests**: End-to-end workflow tests (node package only)
+- **Hardware Tests**: Real hardware integration tests (marked with `@pytest.mark.hardware`)
+
+**Mock Objects & Fixtures:**
+- **Hardware Mocks**: Complete camera, stimulator, sensor, GPIO, and serial port implementations
+- **Device Mocks**: Ethoscope device fleet simulation with network discovery
+- **Database Mocks**: SQLite and generic database mocking with test data
+- **Test Fixtures**: Comprehensive fixtures in `conftest.py` for both packages
+
+**Coverage & Quality:**
+- **Coverage Targets**: 70% overall, 85% unit tests, 90% critical components
+- **Reports**: HTML, XML, and terminal coverage reports
+- **Quality Checks**: Integrated flake8, mypy, and bandit security scanning
+- **CI/CD Ready**: Standardized structure compatible with automated testing
+
+**Best Practices:**
+- Always write tests when adding new functionality
+- Use appropriate test types (unit for components, integration for interactions)
+- Mock external dependencies (hardware, network, databases)
+- Run tests before committing changes
+- Use descriptive test names and include docstrings
+- Mark slow tests with `@pytest.mark.slow` and hardware tests with `@pytest.mark.hardware`
 
 ## Key System Services
 
-The system uses systemd services for deployment:
+The system uses systemd services for deployment, all find in `/services`.
+These can be reinstalled using `accessories/
 
-- `ethoscope_device.service` - Main device tracking service
+On the ethoscope:
+- `ethoscope_device.service` - WEB facing API / interacts with listener through a socket
+- `ethoscope_listener.service` - Main device tracking/recording service
+- `ethoscope_update.service` - Software update management for the ethoscope
+- `ethoscope_GPIO_listener.service` - Listens to buttons connected to the PI GPIO and associates actions
+
+On the node:
 - `ethoscope_node.service` - Central node management server
-- `ethoscope_backup.service` - Data backup and synchronization
-- `ethoscope_video_backup.service` - Video file backup
-- `ethoscope_update.service` - Software update management
+- `ethoscope_backup_node.service` - Central node backup management server
+- `ethoscope_backup_mysql.service` - Data backup for mariadbdata
+- `ethoscope_backup_video.service` - rsync based file backup for videos (h264)
+- `ethoscope_backup_sqlite.service` - rsync based file backup for SQLite db
+- `ethoscope_backup_unified.service` - Covers both rsync backup services (default)
+- `ethoscope_sensor_virtual.service` - Provides a virtual sensor that gives real life weather info about a specified location
+- `ethoscope_virtuascope.service` - Starts a virtual ethoscope on the node
 
 ## Development Workflow
 

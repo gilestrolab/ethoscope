@@ -99,7 +99,7 @@ install_apt_packages() {
         python3-dev \
         libcap-dev \
         pkg-config \
-        ntp
+        ntp git
 
     echo "Restarting network services..."
     sudo systemctl restart systemd-networkd systemd-resolved
