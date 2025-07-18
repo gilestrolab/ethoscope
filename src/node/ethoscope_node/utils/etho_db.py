@@ -423,6 +423,11 @@ class ExperimentalDB(multiprocessing.Process):
             sql_update_ethoscope = "UPDATE " + self._ethoscopes_table_name + " SET last_seen = '" + str(now) + "', " + values + " WHERE ethoscope_id = '" + str(ethoscope_id) + "'"
 
         else:
+            # Don't create new ethoscope entries without a valid name
+            if not ethoscope_name or ethoscope_name in ['', 'None', 'NULL'] or ethoscope_name is None:
+                logging.warning("Refusing to create new ethoscope entry without valid name. ID: %s, Name: %s" % (ethoscope_id, ethoscope_name))
+                return None
+            
             active = 1
             sql_update_ethoscope = "INSERT INTO %s VALUES( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % (self._ethoscopes_table_name, ethoscope_id, ethoscope_name, now, now, active, last_ip, machineinfo, problems, comments, status)
             logging.warning("Adding a new ethoscope to the db. Welcome %s with id %s" % (ethoscope_name, ethoscope_id))
@@ -670,7 +675,7 @@ class ExperimentalDB(multiprocessing.Process):
             should_purge = False
             
             # Check for unnamed devices
-            if not ethoscope_name or ethoscope_name in ['', 'None', 'NULL']:
+            if not ethoscope_name or ethoscope_name in ['', 'None', 'NULL'] or ethoscope_name is None:
                 should_purge = True
             
             # Check for invalid timestamps
