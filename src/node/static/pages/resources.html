@@ -1,0 +1,69 @@
+<!-- Resources -->
+<div ng-if="!hasAccess">
+    <h3>Wait a few second while we load this. Your node must be connected to the Internet for this page to work.</h3>
+</div>
+<div ng-if="hasAccess">
+    <h2>Notifications</h2>
+    <div class="alert alert-neutral" style="background-color:#f2f2f2;" ng-repeat="news in notifications | orderBy:date:reverse">{{news.date}} - {{news.content}}</div>
+
+
+    <h2>Making Ethoscopes</h2>
+
+    <div>
+        <h3>SD cards for Ethoscopes</h3>
+        <ul>
+            <li ng-repeat="sd_image in resources.images">{{sd_image['title']}}: <a href="{{sd_image['url']}}">{{sd_image['filename']}}</a>
+                <pre style="display: inline; margin: 0; padding: 0px;">MD5SUM: {{sd_image['md5sum']}}</pre> ({{sd_image['date']}})
+            </li>
+        </ul>
+    </div>
+
+    <div>
+        <h3>Case files</h3>
+        <div>
+            <h4>Onshape links</h4>
+            Link to the most recent models on onshape - Last updated on {{resources.date}} - version {{resources.version}}
+            <ul>
+                <li ng-repeat="onshape in resources.onshape"><a href="{{onshape.url}}">{{onshape.name}}</a></li>
+            </ul>
+        </div>
+        <div>
+            <h4>GCODE files</h4>
+            Created on CURA for printing on UltiMaker 2+ using PLA as filament
+            <table class="table table-striped" ng-cloak>
+                <thead>
+                    <th>File</th>
+                    <th>Content</th>
+                    <th>Material</th>
+                </thead>
+                <tbody>
+                    <tr ng-repeat="gcode in resources.gcodes">
+                        <td><a href="{{gcode.url}}">{{gcode.filename}}</a></td>
+                        <td>{{gcode.prints}}</td>
+                        </td>
+                        <td>{{gcode.material}}</td>
+                    </tr>
+                    </tr>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td><a href="{{resources.gcodes_zip.url}}">All the files above as one zip folder - includes GCODES and STLs from Onshape</a></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+    </div>
+    <div>
+        <img src="/static/img/000_ethoscope_2025.png">
+    </div>
+    <h4></h4>
+    <div>
+        Assuming you have a compatible printer, the easiest way to print is to download the gcode zip file and use the gcodes files found inside.
+        Alternatively, you can create your own gcodes starting from the STL files inside the same zip files or that can be exported from onshape.
+        Onshape always has the latest developmental version but sometimes things can be work in progress.
+
+        We also recommend using A4 mirror paper <a href="https://www.amazon.co.uk/gp/product/B0785GSQW4/ref=ppx_yo_dt_b_asin_title_o01_s00?ie=UTF8&psc=1">like this one</a> to cover the lightbox. It will create more homogenous and stronger IR illumination.
+        A PDF template to print on the BACK of the mirror paper is found in the zip file</a>.
+    </div>
+</div>

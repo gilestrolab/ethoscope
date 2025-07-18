@@ -1,0 +1,1405 @@
+/* ==========================================================================
+   Author's custom styles
+   ========================================================================== */
+
+/* Color Palette - Coherent Design System */
+:root {
+    /* Grays */
+    --warm-gray: rgb(90, 90, 90);
+    --medium-gray: rgb(122, 122, 122);
+    --soft-gray: rgb(155, 139, 155);
+    --cool-gray: rgb(187, 186, 187);
+    --light-gray: rgb(216, 216, 216);
+    --off-white: rgb(245, 245, 245);
+    --pure-white: rgb(255, 255, 255);
+    
+    /* Purples */
+    --deep-purple: rgb(107, 45, 107);
+    --plum: rgb(139, 75, 140);
+    --mauve: rgb(184, 92, 139);
+    --rose-pink: rgb(216, 123, 173);
+    --indigo: rgb(91, 70, 199);
+    --lavender: rgb(123, 95, 231);
+    --light-purple: rgb(155, 139, 235);
+    
+    /* Reds */
+    --deep-red: rgb(209, 51, 49);
+    --coral-red: rgb(241, 80, 81);
+    --light-coral: rgb(243, 122, 122);
+    --pale-coral: rgb(245, 163, 163);
+    
+    /* Oranges */
+    --burnt-orange: rgb(196, 123, 47);
+    --terracotta: rgb(230, 123, 71);
+    --peach: rgb(235, 155, 111);
+    --soft-peach: rgb(240, 188, 151);
+    
+    /* Yellows */
+    --deep-gold: rgb(180, 139, 49);
+    --golden-honey: rgb(212, 164, 65);
+    --light-gold: rgb(221, 189, 106);
+    --pale-yellow: rgb(230, 214, 147);
+    
+    /* Greens */
+    --olive-green: rgb(152, 169, 60);
+    --lime-green: rgb(184, 194, 92);
+    --light-lime: rgb(199, 209, 124);
+    --pale-lime: rgb(214, 224, 156);
+    --deep-green: rgb(60, 159, 60);
+    --forest-green: rgb(92, 184, 92);
+    --light-green: rgb(124, 198, 124);
+    --pale-green: rgb(156, 212, 156);
+    --teal: rgb(60, 159, 127);
+    --mint-green: rgb(92, 184, 151);
+    --light-mint: rgb(124, 198, 175);
+    
+    /* Blues */
+    --deep-blue: rgb(60, 139, 181);
+    --sky-blue: rgb(95, 164, 231);
+    --light-blue: rgb(127, 179, 235);
+    --pale-blue: rgb(159, 194, 239);
+}
+
+.log {
+    margin: 0px;
+    padding: 0px;
+}
+
+.color-green {
+    color: var(--deep-green);
+}
+
+.color-red {
+    color: var(--deep-red);
+}
+
+.color-coral-red {
+    color: var(--coral-red);
+}
+
+/* Slow flashing animation for unreachable devices */
+@keyframes flash-slow {
+    0%, 50% {
+        opacity: 1;
+    }
+    51%, 100% {
+        opacity: 0.3;
+    }
+}
+
+.flash-slow {
+    animation: flash-slow 2s infinite;
+}
+
+/* Hard drive Low usage (< 50%) */
+.low-usage {
+    color: var(--medium-gray);
+}
+
+/* Medium usage (60% <= used_space < 80%) */
+.medium-usage {
+    color: var(--terracotta);
+}
+
+/* High usage (>= 80%) */
+.high-usage {
+    color: var(--deep-red);
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+}
+
+.last_drawn_img {
+    margin-top: 2em;
+    margin-bottom: 2em;
+    width: 55%;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.last_drawn_img img {
+    height: 480px;
+    background-image: url("/static/img/rotating_spin.gif")
+}
+
+
+.option {
+    text-align: center;
+    margin-right: 1em;
+}
+
+.device-list {
+    margin-right: 2em;
+}
+
+.file-list {
+    list-style: none;
+}
+
+.right {
+    float: right;
+}
+
+.intro {
+    margin: 1em;
+}
+
+.option-items li {
+    list-style: none;
+    min-height: 60px;
+    margin-bottom: 10px;
+    margin-top: 10px;
+    background: #f5f5f5;
+}
+
+
+
+
+p {
+    text-align: left;
+}
+
+#dt_warning {
+    color: red;
+}
+
+/* Bootstrap 4 compatibility fixes - restore original font sizes and appearance */
+body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif !important;
+    font-size: 13px !important;
+    line-height: 1.42857143 !important;
+    color: #333 !important;
+}
+
+/* Custom link colors - exclude navbar/header links */
+body a:not(.navbar-brand):not(.navbar-nav > li > a) {
+    color: #304674 !important;
+}
+
+body a:not(.navbar-brand):not(.navbar-nav > li > a):hover,
+body a:not(.navbar-brand):not(.navbar-nav > li > a):focus {
+    color: #1f2c4d !important;
+    text-decoration: underline !important;
+}
+
+body a:not(.navbar-brand):not(.navbar-nav > li > a):visited {
+    color: #304674 !important;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-size: inherit;
+}
+
+h1 { font-size: 28px !important; }
+h2 { font-size: 22px !important; }
+h3 { font-size: 18px !important; }
+h4 { font-size: 16px !important; }
+h5 { font-size: 13px !important; }
+h6 { font-size: 12px !important; }
+
+.table {
+    font-size: 13px !important;
+}
+
+.table th,
+.table td {
+    padding: 7px 6px !important;
+    font-size: 13px !important;
+}
+
+.jumbotron {
+    font-size: 13px !important;
+}
+
+.jumbotron h1 {
+    font-size: 24px !important;
+}
+
+.jumbotron h2 {
+    font-size: 20px !important;
+}
+
+/* Container width to match original */
+.container {
+    max-width: 1050px !important;
+    width: 1050px !important;
+}
+
+/* Bootstrap 4 compatibility fixes - restore original navbar appearance */
+.navbar-default {
+    background-color: #f8f8f8;
+    border-color: #e7e7e7;
+    border: 1px solid #e7e7e7;
+    border-radius: 4px;
+}
+
+.navbar-default .navbar-brand {
+    color: #777;
+}
+
+.navbar-default .navbar-brand:hover,
+.navbar-default .navbar-brand:focus {
+    color: #5e5e5e;
+}
+
+.navbar-default .navbar-nav > li > a {
+    color: #777;
+    padding: 8px 12px;
+    line-height: 18px;
+    font-size: 13px;
+}
+
+.navbar-default .navbar-nav > li > a:hover,
+.navbar-default .navbar-nav > li > a:focus {
+    color: #333;
+    background-color: transparent;
+}
+
+.navbar-default .navbar-brand {
+    color: #777;
+    font-size: 16px;
+    padding: 8px 15px;
+}
+
+.navbar-nav {
+    margin: 0;
+    display: flex !important;
+    flex-direction: row !important;
+    list-style: none;
+}
+
+.navbar-nav > li {
+    float: left;
+    display: flex;
+}
+
+.navbar-nav > li > a {
+    padding: 8px 12px;
+    display: block;
+    font-size: 13px;
+}
+
+.navbar-right {
+    float: right !important;
+    margin-left: auto !important;
+}
+
+.navbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 35px;
+    padding: 2px 0;
+    margin-bottom: 20px;
+}
+
+.navbar-header {
+    float: left;
+}
+
+.notification-badge {
+    background-color: #d9534f;
+    color: white;
+    padding: 3px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    margin-left: 4px;
+    display: inline-block;
+    min-width: 18px;
+    text-align: center;
+}
+
+/* Table improvements for Bootstrap 4 - maintain original appearance */
+.table th {
+    border-top: none;
+    background-color: transparent;
+    font-weight: normal;
+}
+
+.table th a {
+    color: #304674 !important;
+    text-decoration: none;
+}
+
+.table th a:hover {
+    color: #1f2c4d !important;
+    text-decoration: underline !important;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+/* Maintain original jumbotron styling */
+.jumbotron {
+    background-color: #eee;
+    border-radius: 6px;
+    padding: 30px;
+}
+
+/* Start Tracking modal - make 30% larger */
+#startModal .modal-dialog {
+    max-width: 780px !important;
+    width: 90% !important;
+}
+
+#startModal .modal-dialog .modal-content {
+    min-height: 600px;
+}
+
+/* Date range picker - make much smaller (only in modals) */
+.modal .date-picker {
+    max-width: 250px !important;
+    width: 250px !important;
+    font-size: 12px !important;
+}
+
+.modal .input-group .date-picker {
+    max-width: 220px !important;
+    width: 220px !important;
+}
+
+.modal .input-group:has(.date-picker) {
+    max-width: 260px !important;
+    width: 260px !important;
+}
+
+/* Alternative selector for browsers that don't support :has() */
+.modal div[ng-if*="date_range"] .input-group {
+    max-width: 260px !important;
+    width: 260px !important;
+}
+
+
+li {
+    text-align: left;
+    font-size: 100%;
+    list-style: none;
+}
+
+h2 {
+    text-align: left;
+}
+
+input {
+    padding-top: 0em;
+}
+
+input[type="text"] {
+    width: 200px;
+}
+
+input[type="number"] {
+    width: 75px;
+}
+
+
+label {
+    display: block;
+    padding-top: 0.5em;
+    font-weight: normal;
+    font-style: italic;
+}
+
+.custom-tooltip {
+    position: absolute;
+    background-color: #333;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 1000;
+    white-space: nowrap;
+    display: block;
+    transform: translateY(-100%);
+    margin-top: -10px;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.tooltip-visible {
+    opacity: 1;
+    transform: translateY(-110%);
+}
+
+.tooltip-hidden {
+    opacity: 0;
+    transform: translateY(-100%);
+}
+
+/*  <div class="trim-info" tooltip="{{modal.title}}">{{modal.title}}</div> */
+.trim-info {
+    max-width: 50px;
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 15px;
+    position: relative;
+}
+
+
+.control-box {
+    margin: 0 auto;
+    width: 100px;
+    display: inline;
+    text-align: center;
+}
+
+
+/* Dropdown Button */
+/* https://codepen.io/raneio/pen/NbbZEM */
+
+
+label.dropdown {
+    font-weight: normal;
+    font-style: normal;
+    color: #000000;
+}
+
+/* Dropdown */
+
+.dropdown {
+    display: inline-block;
+    position: relative;
+}
+
+.dd-button {
+
+    margin-bottom: 0;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.42857143;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: middle;
+    -ms-touch-action: manipulation;
+    touch-action: manipulation;
+    cursor: pointer;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    background-image: none;
+    border: 1px solid #4cae4c;
+    border-radius: 4px;
+
+    display: inline-block;
+    padding: 0.45em 2.5em 0.40em 1em;
+    background-color: #5cb85c;
+    cursor: pointer;
+    white-space: nowrap;
+    color: white;
+}
+
+.dd-button.disabled {
+    opacity: 0.6;
+}
+
+.dd-button.disabled:hover {
+    background-color: none;
+}
+
+.dd-button:after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 15px;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid black;
+}
+
+.dd-button:hover {
+    background-color: #4cA84c;
+}
+
+.dd-button#tracking-btn {
+    background-color: #5cb85c;
+    border: 1px solid #4cae4c;
+}
+
+.dd-button#video-btn {
+    background-color: #5cb85c;
+    border: 1px solid #4cae4c;
+}
+
+.dd-button#options-btn {
+    background-color: #5FA4E7;
+    border: 1px solid #5FA4E7;
+}
+
+.dd-button#power-btn {
+    background-color: #F15051;
+    border: 1px solid #F15051;
+}
+
+.dd-input {
+    display: none;
+}
+
+.dd-menu {
+    position: absolute;
+    top: 100%;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 0;
+    margin: 2px 0 0 0;
+    box-shadow: 0 0 6px 0 rgba(0, 0, 0, 0.1);
+    background-color: #ffffff;
+    list-style-type: none;
+}
+
+.dd-menu li.disabled {
+    color: #aaaaaa;
+}
+
+.dd-input+.dd-menu {
+    display: none;
+}
+
+.dd-input:checked+.dd-menu {
+    display: block;
+}
+
+.dd-menu li {
+    padding: 10px 20px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.dd-menu li:hover {
+    background-color: #f6f6f6;
+}
+
+.dd-menu li.disabled:hover {
+    background-color: #ffffff;
+}
+
+
+.dd-menu li a {
+    display: block;
+    margin: -10px -20px;
+    padding: 10px 20px;
+}
+
+.dd-menu li.divider {
+    padding: 0;
+    border-bottom: 1px solid #cccccc;
+}
+
+/*
+ * Adapted from: https://codepen.io/nazarelen/pen/rLgLrA
+ * 
+ * 
+ */
+
+.header ul {
+    margin: 0;
+    width: 100%;
+    list-style: none;
+    position: unset;
+    bottom: 30px;
+    left: 0;
+    padding: 0 1%;
+}
+
+.header ul:after {
+    content: '';
+    display: table;
+    clear: both;
+}
+
+.header li {
+    width: 31.3333333333%;
+    margin: 0 1%;
+    float: left;
+    padding: 10px;
+    border: 2px solid #363636;
+    border-radius: 4px;
+    position: relative;
+    text-align: center;
+    color: #4E203C;
+}
+
+.header li:before {
+    position: absolute;
+    top: -25px;
+    left: 50%;
+    margin-left: -15px;
+    width: 30px;
+    height: 30px;
+    background: #363636;
+    color: white;
+    line-height: 30px;
+    text-align: center;
+    border-radius: 50%;
+    font-family: FontAwesome;
+}
+
+.header li:nth-child(1):before {
+    content: "\f1eb"
+}
+
+.header li:nth-child(2):before {
+    content: "\f017"
+}
+
+.header li:nth-child(3):before {
+    content: "\f0eb"
+}
+
+.header h1 {
+    text-transform: uppercase;
+    font-weight: 400;
+    line-height: 1;
+    margin-top: 10px;
+    margin-bottom: 40px;
+    text-align: center;
+    font-size: 40px;
+}
+
+.header h1 span {
+    color: #4E203C;
+    display: block;
+    font-size: .45em;
+    letter-spacing: 3px;
+}
+
+.header h1 i {
+    font-style: normal;
+    text-transform: none;
+    font-family: 'Playfair Display', serif;
+}
+
+/*
+Larger and nicer select section
+*/
+
+.custom-select-wrap {
+    border-radius: 3px;
+    position: relative;
+    z-index: 1;
+    height: 42px;
+    background: #fff;
+}
+
+.custom-select-wrap .select-icon {
+    z-index: 1;
+    padding: 1px;
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 160px;
+    top: 12px;
+    pointer-events: none;
+}
+
+custom-select-wrap .select-icon svg {
+    width: 14px;
+    height: 30px;
+    position: absolute;
+    fill: #5a5f73;
+    padding: 1px;
+}
+
+.custom-select-wrap .select-icon svg:first-child {
+    -webkit-transform: rotate(180deg);
+    transform: rotate(180deg);
+    top: -12px;
+}
+
+.custom-select-wrap select {
+    z-index: 0;
+    position: relative;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 180px;
+    border: none;
+    cursor: pointer;
+    padding: 0 24px 0 12px;
+    height: 42px;
+    line-height: 42px;
+    font-size: 1.2em;
+    color: #5a5f73;
+    background: transparent;
+}
+
+.select-icon svg {
+    width: 14px;
+    height: 30px;
+    position: absolute;
+    fill: #5a5f73;
+    padding: 1px;
+}
+
+/*
+ * Labels inside form fields and nicer looking text inputs
+ * Inspiration from http://steadicat.github.io/labels/
+ * 
+*/
+
+.input {
+    display: block;
+}
+
+.input span {
+    position: absolute;
+    z-index: 1;
+    cursor: text;
+    pointer-events: none;
+    color: #999;
+    padding: 7px;
+    line-height: 17px;
+    margin-top: 2px;
+    /* margin-left: 2px; */
+}
+
+.input input,
+.input textarea,
+.input select {
+    z-index: 0;
+    padding: 6px;
+    margin: 0;
+    font: inherit;
+    line-height: 17px;
+}
+
+.input select {
+    padding: 5px;
+    /* Unfortunately selects don't respond well to padding. They need an explicit height. */
+    height: 31px;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 180px;
+    color: #5a5f73;
+    background: transparent;
+
+    /* SVG background image */
+    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' fill='black'><polygon points='0,0 100,0 50,50'/></svg>") no-repeat;
+    background-size: 12px;
+    background-position: calc(100% - 10px) center;
+    background-repeat: no-repeat;
+}
+
+input.ng-invalid {
+    border-left: solid 3px #900;
+    /*
+  background-color: pink;
+*/
+}
+
+input.ng-valid {
+    border-left: solid 3px #565656;
+}
+
+/* Align green validation borders in input groups */
+.input-group input.ng-valid {
+    border-left: solid 3px #565656;
+    margin-left: 0;
+}
+
+.input-group .input-group-prepend + input.ng-valid,
+.input-group .input-group-append + input.ng-valid {
+    border-left: solid 3px #565656;
+}
+
+/* Ensure consistent icon sizing and container width for alignment */
+.input-group-text {
+    min-width: 42px !important;
+    justify-content: center !important;
+}
+
+.input-group-text .fa-plus {
+    font-size: 14px !important;
+    font-weight: bold !important;
+}
+
+.input-group-text .fa-search {
+    font-size: 14px !important;
+}
+
+
+#main {
+    display: flex;
+    flex-direction: column;
+    min-height: 80vh;
+}
+
+#footer {
+    padding: 1em;
+    margin-top: 4em;
+    background-color: #f5f5f5;
+    width: 100%;
+    height: 40px;
+    bottom: 0;
+    left: 0;
+}
+
+.notification-badge {
+    top: 0px;
+    right: -6x;
+    padding: 0px 4px;
+    border-radius: 50%;
+    color: white;
+    position: absolute;
+    background-color: #23527C;
+    font-size: 12px;
+    font-weight: normal;
+    border-radius: 2px;
+    -moz-border-radius: 2px;
+    -webkit-border-radius: 2px;
+    z-index: 1;
+}
+
+pre.bash {
+    background-color: black;
+    color: white;
+    font-family: Consolas, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace;
+    height: 20em;
+    overflow: auto;
+    word-break: normal !important;
+    word-wrap: normal !important;
+    white-space: pre !important;
+}
+
+pre.command {
+    display: inline;
+    background-color: black;
+    color: white;
+    font-family: Consolas, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace;
+    overflow: auto;
+    width: min-content;
+}
+
+/* Management page (more.html) aesthetic adjustments */
+/* Reduce size of option buttons with icons */
+.option {
+    text-align: center;
+    margin-right: 1em;
+    max-width: 120px !important;
+    min-width: 100px !important;
+}
+
+.option a {
+    min-width: 100px !important;
+    min-height: 60px !important;
+    max-width: 120px !important;
+    max-height: 80px !important;
+    font-size: 12px !important;
+    padding: 8px !important;
+}
+
+/* Make command textbox wider to match original */
+pre.command {
+    display: inline-block !important;
+    width: auto !important;
+    max-width: 500px !important;
+    min-width: 300px !important;
+    padding: 8px 12px !important;
+    margin: 0 !important;
+    border-radius: 3px !important;
+    font-family: 'Courier New', Courier, 'Lucida Console', 'Monaco', monospace !important;
+    font-size: 11px !important;
+    vertical-align: center !important;
+}
+
+/* Adjust spacing for custom commands section */
+.list-group-item.input {
+    padding: 10px 15px !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    flex-wrap: wrap !important;
+}
+
+.list-group-item.input .btn {
+    width: 200px !important;
+    font-size: 12px !important;
+    padding: 6px 12px !important;
+    margin-bottom: 0 !important;
+    margin-right: 0 !important;
+    flex-shrink: 0 !important;
+}
+
+.list-group-item.input .me-auto {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    width: 100% !important;
+    gap: 15px !important;
+}
+
+/* Option buttons container adjustments */
+.d-flex.flex-wrap.justify-content-start .p-2 {
+    padding: 0.25rem !important;
+    margin: 0.25rem !important;
+}
+
+/* Ensure proper spacing between option buttons */
+.d-flex.flex-wrap.justify-content-start .option {
+    margin: 0.5rem !important;
+}
+
+/* Modal improvements - proper width, positioning and spacing */
+.modal-dialog {
+    max-width: 600px !important;
+    width: auto !important;
+    margin: 30px auto !important;
+    min-width: 300px !important;
+}
+
+/* Specific sizing for different modal types */
+#startModal .modal-dialog {
+    max-width: 750px !important;
+}
+
+#recordModal .modal-dialog,
+#changeInfo .modal-dialog {
+    max-width: 650px !important;
+}
+
+/* Small modals for simple confirmations */
+#powerOffAlert .modal-dialog,
+#rebootAlert .modal-dialog,
+#restartAlert .modal-dialog,
+#stopTrackingModal .modal-dialog,
+#ModuleTest .modal-dialog {
+    max-width: 450px !important;
+}
+
+/* Ensure modals don't touch screen edges on smaller screens */
+@media (max-width: 768px) {
+    .modal-dialog {
+        margin: 20px !important;
+        max-width: calc(100% - 40px) !important;
+    }
+}
+
+/* Modal header improvements - proper title and close button positioning */
+.modal-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 15px !important;
+    border-bottom: 1px solid #e5e5e5 !important;
+}
+
+.modal-header .modal-title {
+    margin: 0 !important;
+    flex: 1 !important;
+    padding-right: 20px !important;
+}
+
+.modal-header .close {
+    margin-left: auto !important;
+    padding: 0 30px 0 0 !important;
+    background: none !important;
+    border: none !important;
+    font-size: 21px !important;
+    font-weight: bold !important;
+    line-height: 1 !important;
+    color: #000 !important;
+    text-shadow: 0 1px 0 #fff !important;
+    opacity: 0.8 !important;
+    cursor: pointer !important;
+    flex-shrink: 0 !important;
+    min-width: 30px !important;
+}
+
+.modal-header .close:hover,
+.modal-header .close:focus {
+    opacity: 0.5 !important;
+}
+
+/* Modal body improvements */
+.modal-body {
+    padding: 20px !important;
+}
+
+/* Modal footer improvements */
+.modal-footer {
+    padding: 15px 20px !important;
+}
+
+/* Form improvements inside modals - tighter spacing */
+.modal .option-list {
+    margin-bottom: 5px !important;
+}
+
+.modal .option-list li {
+    padding: 0px 0px !important;
+    margin-bottom: 2px !important;
+    line-height: 1.2 !important;
+}
+
+.modal .option-items li {
+    padding: 3px 10px !important;
+    margin-bottom: 2px !important;
+    min-height: auto !important;
+    background: transparent !important;
+}
+
+.modal input[type="text"],
+.modal input[type="number"],
+.modal select {
+    max-width: 250px !important;
+    margin-bottom: 3px !important;
+    margin-top: 2px !important;
+    padding: 3px 5px !important;
+}
+
+.modal label {
+    font-size: 13px !important;
+    margin-bottom: 2px !important;
+    padding-top: 2px !important;
+    display: block !important;
+}
+
+/* Compact form layout for modal content */
+.modal .form-group {
+    margin-bottom: 8px !important;
+}
+
+.modal .input-group {
+    max-width: 300px !important;
+    margin-bottom: 5px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+.modal .input-group .form-control {
+    margin-bottom: 0 !important;
+}
+
+.modal .input-group-append {
+    display: flex !important;
+    align-items: center !important;
+}
+
+/* Consistent spacing for all modal sections */
+.modal h4 {
+    margin-top: 12px !important;
+    margin-bottom: 5px !important;
+    font-size: 16px !important;
+}
+
+.modal hr {
+    margin: 8px 0 !important;
+}
+
+/* Reduce excessive spacing in option descriptions */
+.modal .option-list li > div {
+    margin-top: 3px !important;
+    margin-bottom: 3px !important;
+    padding-left: 0 !important;
+}
+
+/* General radio button hiding - overridden by specific li input[type="radio"] rule below */
+
+/* Style labels to be clickable and show selection state */
+.modal .option-list li {
+    cursor: pointer !important;
+    transition: background-color 0.2s ease !important;
+    border-radius: 4px !important;
+    padding: 8px 12px !important;
+    margin-bottom: 3px !important;
+    position: relative !important;
+}
+
+/* Make only the label text clickable, not form elements */
+.modal .option-list li input[type="radio"] {
+    opacity: 0 !important;
+    position: absolute !important;
+    pointer-events: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+/* Make the strong label text clickable by wrapping with a label */
+.modal .option-list li strong {
+    cursor: pointer !important;
+    display: inline-block !important;
+    padding: 4px 8px !important;
+    margin-right: 10px !important;
+}
+
+/* Allow form elements to be interactive */
+.modal .option-list li input[type="text"],
+.modal .option-list li input[type="number"],
+.modal .option-list li select,
+.modal .option-list li input[type="checkbox"],
+.modal .option-list li .input-group,
+.modal .option-list li .form-group {
+    z-index: 10 !important;
+    position: relative !important;
+    pointer-events: auto !important;
+}
+
+.modal .option-list li:hover {
+    background-color: #f8f9fa !important;
+}
+
+/* Selected state styling - currently disabled */
+/* .modal input[type="radio"]:checked + strong,
+.modal input[type="radio"]:checked ~ * {
+    color: #007bff !important;
+    font-weight: bold !important;
+} */
+
+.modal .option-list li:has(input[type="radio"]:checked) {
+    /* background-color: #ffffff !important; */
+    border-left: 4px solid #cbd5cb !important;
+    padding-left: 8px !important;
+}
+
+/* Fallback for browsers that don't support :has() */
+.modal .option-list li.selected {
+    background-color: #e3f2fd !important;
+    border-left: 4px solid #007bff !important;
+    padding-left: 8px !important;
+}
+
+/* Keep checkbox styling separate */
+.modal input[type="checkbox"] {
+    margin-right: 6px !important;
+    margin-bottom: 0 !important;
+    margin-top: 0 !important;
+}
+
+/* Reduce space between form elements */
+.modal ul {
+    margin-bottom: 5px !important;
+    padding-left: 20px !important;
+}
+
+/* Modal action button styling */
+.modal .btn-primary {
+    background-color: #5FA4E7 !important;
+    border-color: #5FA4E7 !important;
+}
+
+.modal .btn-primary:hover,
+.modal .btn-primary:focus {
+    background-color: #4a94d7 !important;
+    border-color: #4a94d7 !important;
+}
+
+.modal .btn-primary:active {
+    background-color: #3d84c7 !important;
+    border-color: #3d84c7 !important;
+}
+
+/* Folder configuration section layout fixes */
+.list-group-item.input {
+    display: block !important;
+    padding: 15px !important;
+}
+
+.list-group-item.input label {
+    display: block !important;
+    margin-bottom: 5px !important;
+    font-weight: bold !important;
+    float: none !important;
+}
+
+.list-group-item.input input[type="text"] {
+    display: block !important;
+    width: 100% !important;
+    max-width: 400px !important;
+    float: none !important;
+    position: static !important;
+    margin-bottom: 8px !important;
+}
+
+.list-group-item.input p {
+    margin: 0 !important;
+    font-size: 13px !important;
+    color: #666 !important;
+    clear: both !important;
+}
+
+/* Configuration sections styling - consistent borders */
+.list-group.col-12 {
+    border: 1px solid #ddd !important;
+    border-radius: 4px !important;
+    margin-bottom: 20px !important;
+    padding: 15px !important;
+    background-color: #fff !important;
+}
+
+.list-group.col-12 h3 {
+    margin-top: 0 !important;
+    margin-bottom: 15px !important;
+    padding-bottom: 10px !important;
+    border-bottom: 1px solid #eee !important;
+}
+
+/* Users, Incubators, Sensors section styling */
+.list-group.col-12 .input {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+.list-group.col-12 .input select {
+    flex: 1 !important;
+    max-width: 300px !important;
+}
+
+/* Time section styling */
+.time-info {
+    margin-top: 10px;
+}
+
+.time-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+    padding: 2px 0;
+}
+
+.time-label {
+    font-weight: normal;
+    text-align: left;
+}
+
+.time-value {
+    font-weight: bold;
+    text-align: right;
+    color: var(--warm-gray);
+}
+
+/* Table header styling - Override Bootstrap link colors */
+table thead th a,
+table thead th a:link,
+table thead th a:visited,
+table thead th a:active {
+    color: var(--warm-gray) !important;
+    font-weight: bold !important;
+    text-decoration: none !important;
+}
+
+table thead th a:hover,
+table thead th a:focus {
+    color: var(--deep-purple) !important;
+    text-decoration: none !important;
+}
+
+/* More specific override for Bootstrap table styles */
+.table thead th a {
+    color: var(--warm-gray) !important;
+    font-weight: bold !important;
+    text-decoration: none !important;
+}
+
+/* Backup status circles */
+.backup-status-circle {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+/* Backup status icons */
+.backup-status-icon {
+    display: inline-block;
+    margin-right: 6px;
+    vertical-align: middle;
+    font-size: 14px;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.backup-status-icon:hover {
+    opacity: 1.0;
+}
+
+.backup-status-success {
+    color: var(--deep-green);
+}
+
+.backup-status-error {
+    color: var(--deep-red);
+}
+
+.backup-status-processing {
+    color: var(--burnt-orange);
+    animation: apple-breathing 2s ease-in-out infinite;
+}
+
+.backup-status-partial {
+    color: var(--golden-honey);
+}
+
+.backup-status-unknown {
+    color: var(--medium-gray);
+}
+
+.backup-status-offline {
+    color: var(--warm-gray);
+}
+
+@keyframes apple-breathing {
+    0% {
+        opacity: 0.3;
+        transform: scale(0.8);
+        box-shadow: 0 0 0 0 rgba(196, 123, 47, 0.7);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.2);
+        box-shadow: 0 0 0 8px rgba(196, 123, 47, 0.1);
+    }
+    100% {
+        opacity: 0.3;
+        transform: scale(0.8);
+        box-shadow: 0 0 0 0 rgba(196, 123, 47, 0.7);
+    }
+}
+
+/* Poke button styling */
+.poke-ip-button {
+    display: inline-block;
+    padding: 2px 6px;
+    background-color: var(--light-blue);
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.2;
+    transition: background-color 0.2s ease;
+    border: none;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.poke-ip-button:hover {
+    background-color: var(--sky-blue);
+    color: white;
+    text-decoration: none;
+}
+
+.poke-ip-button .fa-refresh {
+    margin-right: 3px;
+    font-size: 10px;
+}
+

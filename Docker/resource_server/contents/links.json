@@ -1,0 +1,95 @@
+{
+    "images": [{
+            "title": "Ethoscope000, rPI2/3",
+            "filename": "20250629_ethoscope_PI3_000.img.zip",
+            "url": "https://imperialcollegelondon.box.com/shared/static/wxvadqrn87v3afgxftuivrndisjecodg.zip",
+            "date": "29 Jun 2025",
+            "md5sum": "8c15cde5dafbc4ff192d57a5ccd0ffa0",
+            "SDsize": "32Gb",
+            "tested_on": "SD"
+        },
+
+        {
+            "title": "Ethoscope000, rPI4",
+            "filename": "20250630_ethoscope_PI4_000.img.zip",
+            "url": "https://imperialcollegelondon.box.com/shared/static/717b5qg4ox3dhvilte7xa7ktr5ibqsw6.zip",
+            "date": "30 Jun 2025",
+            "md5sum": "ca91c431f9501ebdf0381d89860a39a1",
+            "SDsize": "32Gb",
+            "tested_on": "SD"
+        },
+
+        {
+            "title": "Ethoscope Node, LiveCD",
+            "filename": "manjaro-ethoscope-25.0.0-minimal-250214-linux54.iso",
+            "url": "https://imperialcollegelondon.box.com/shared/static/ha14uo1c634u5qpxvfvksh8d3y0vpnjt.iso",
+            "date": "14 Feb 2025",
+            "md5sum": "921c26353d5988a9771b11b2e293a921"
+        }
+    ],
+
+
+    "gcodes": [{
+            "filename": "CE3PRO_1_etho_v1.8_LIGHT_BOX_WITH_STRIP_2x.gcode",
+            "url": "https://github.com/gilestrolab/ethoscope/tree/dev/accessories/3D_printed_files",
+            "prints": "Light box with strip",
+            "material": "PLA - CE3PRO"
+        },
+        {
+            "filename": "CE3PRO_2_etho_v1.7_PI3_CASE_FULL_1x.gcode",
+            "url": "https://github.com/gilestrolab/ethoscope/tree/dev/accessories/3D_printed_files",
+            "prints": "Upper case with camera case and lid - PI3 version",
+            "material": "PLA - CE3PRO"
+        },
+        {
+            "filename": "CE3PRO_2_etho_v1.7_PI4_CASE_FULL_1x.gcode",
+            "url": "https://github.com/gilestrolab/ethoscope/tree/dev/accessories/3D_printed_files",
+            "prints": "Upper case with camera case and lid - PI4 version",
+            "material": "PLA - CE3PRO"
+        },
+        {
+            "filename": "CE3PRO_3.1_etho_v1.8_Wall_Stabiliser_2x.gcode",
+            "url": "https://github.com/gilestrolab/ethoscope/tree/dev/accessories/3D_printed_files",
+            "prints": "Wall stabilizers",
+            "material": "PLA - CE3PRO"
+        },
+        {
+            "filename": "CE3PRO_3.2_etho_v1.8_SSD_ADAPTER_2x.gcode",
+            "url": "https://github.com/gilestrolab/ethoscope/tree/dev/accessories/3D_printed_files",
+            "prints": "SSD adapter - mounts on wall stabilizers",
+            "material": "PLA - CE3PRO"
+        }
+
+    ],
+    "onshape": [{
+            "name": "Upper case and lid - RPI3",
+            "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/d228e2116a5933cf39312517"
+        },
+        {
+            "name": "Upper case and lid - RPI4",
+            "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/e2cd330298b182900c4a8bf9"
+        },
+        {
+            "name": "Light box and light strip",
+            "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/d5e7d416ecf9f99624a6734c"
+        },
+        {
+            "name": "Walls",
+            "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/72167f0b1de0d32cd5d66968"
+        },
+        {
+            "name": "Wall stabiliser with pins for SSD mounting",
+            "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/87a97f390fc8099029a703fa"
+        },
+        {
+            "name": "SSD mounting plate",
+            "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/7a6406ee502010e636557252"
+        }
+
+    ],
+    "gcodes_zip": {
+        "filename": "ethoscope_gcodes_v1.8.zip",
+        "url": "https://github.com/gilestrolab/ethoscope/blob/dev/accessories/3D_printed_files/",
+        "date": "2025-02-22"
+    }
+}

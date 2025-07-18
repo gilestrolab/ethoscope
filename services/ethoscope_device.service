@@ -1,0 +1,15 @@
+[Unit]
+Description=Ethoscope device WEB server
+Wants=ntpd.service ethoscope_listener.service
+After=ntpd.service network.target ethoscope_listener.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ethoscope/src/ethoscope/scripts/
+ExecStart=/usr/bin/python3 /opt/ethoscope/src/ethoscope/scripts/device_server.py
+RestartSec=5
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+

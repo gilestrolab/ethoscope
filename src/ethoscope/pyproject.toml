@@ -1,0 +1,120 @@
+[build-system]
+requires = ["setuptools>=64", "wheel", "numpy>=1.6.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ethoscope"
+version = "1.0.0"
+description = "The API of the Ethoscope device for automated behavioral monitoring."
+readme = {text = """
+The Ethoscope is a platform for high-throughput ethomics - the study of animal behavior.
+
+This package provides the core API and device components for the Ethoscope platform,
+enabling automated, long-term behavioral monitoring and analysis of small model organisms
+such as Drosophila melanogaster (fruit flies).
+
+The Ethoscope system allows researchers to:
+- Monitor animal behavior continuously over extended periods
+- Perform high-throughput behavioral experiments with automated tracking
+- Analyze behavioral patterns with computer vision algorithms
+- Control environmental conditions and deliver targeted perturbations
+- Process video data in real-time with minimal computational overhead
+
+This core ethoscope package provides the fundamental APIs, tracking algorithms,
+and device interfaces that power individual Ethoscope units.
+
+Key features:
+- Real-time video tracking and analysis
+- Modular stimulator and sensor interfaces
+- Data logging and experiment management
+- Integration with the broader Ethoscope ecosystem
+
+For more information, visit: http://lab.gilest.ro/ethoscope
+""", content-type = "text/plain"}
+authors = [
+    {name = "Giorgio Gilestro", email = "giorgio@gilest.ro"}
+]
+license = {text = "GPL-3.0"}
+keywords = ["behaviour", "video tracking", "ethomics", "drosophila", "behavioral analysis"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Topic :: Multimedia :: Video :: Capture",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.21.0,<1.26.0",
+    "scipy>=1.7.0",
+    "GitPython>=3.1.44",
+    "mysql-connector-python>=8.0.16",
+    "cherrypy>=18.10.0",
+    "pyserial>=3.5",
+    "bottle>=0.13.4",
+    "opencv-python>=4.8.0",
+    "zeroconf>=0.147.0",
+    "netifaces>=0.11.0",
+    "requests>=2.32.4",
+    "picamera2",
+]
+
+[project.urls]
+Homepage = "https://github.com/gilestrolab/ethoscope"
+Repository = "https://github.com/gilestrolab/ethoscope"
+Documentation = "http://lab.gilest.ro/ethoscope"
+
+[project.optional-dependencies]
+dev = [
+    "Sphinx>=1.4.4",
+    "sphinx_rtd_theme>=0.1.9",
+    "mock>=2.0.0",
+    "pytest>=6.0.0",
+    "pytest-cov>=2.10.0"
+]
+testing = [
+    "psutil>=5.8.0",
+    "requests>=2.32.4"
+]
+
+[project.scripts]
+device_server = "scripts.device_server:main"
+device_server_optimized = "scripts.device_server_optimized:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ethoscope*"]
+
+[tool.pytest.ini_options]
+testpaths = ["ethoscope/tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--verbose",
+    "--cov=ethoscope",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "hardware: marks tests that require hardware",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]

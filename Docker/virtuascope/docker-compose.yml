@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  ethoscope-virtual:
+    build: .
+    image: ethoscope-device
+    container_name: ethoscope-device
+    expose:
+      - 9000
+    restart: unless-stopped
+    volumes:
+      - /home/gg/Data/ethoscope_project/ethoscope:/opt/ethoscope:ro
+      - /mnt/ethoscope_data:/ethoscope_data
+      - mariadb_socket:/run/mysqld
+    devices:
+      - /dev/video0:/dev/video0
+    depends_on:
+      - ethoscope-mariadb
+    #network_mode: service:ethoscope-mariadb
+    network_mode: host
+
+  ethoscope-mariadb:
+    image: mariadb:latest
+    container_name: ethoscope-mariadb
+    restart: unless-stopped
+    expose:
+      - 3306
+    environment:
+      MYSQL_ROOT_PASSWORD: ethoscope
+      #MYSQL_USER: ethoscope
+      #MYSQL_PASSWORD: ethoscope
+    volumes:
+      - mariadb_socket:/run/mysqld
+      #- mariadb_data:/var/lib/mysql
+      - ./init_db_credentials.sql:/docker-entrypoint-initdb.d/init-db_credentials.sql
+    network_mode: host
+    # Uncomment the following line if you want to access your MariaDB instance from your host for development purposes
+    # ports:
+    #   - "3306:3306"
+
+volumes:
+  mariadb_socket:
+  mariadb_data:

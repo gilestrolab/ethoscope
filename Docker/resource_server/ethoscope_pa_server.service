@@ -1,0 +1,13 @@
+[Unit]
+Description=Ethoscope PA server
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/http/ethoscope/
+ExecStart=/usr/bin/python /srv/http/ethoscope/pa_server.py
+RestartSec=5
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+

@@ -1,0 +1,15 @@
+
+
+{"roi_builder":{"name":"SleepMonitorWithTargetROIBuilder",
+                      "arguments":{}},
+        "tracker": {"name":"AdaptiveBGModel",
+                      "arguments":{}},
+        "interactor": {"name":"FakeSleepDepInteractor",
+                       "arguments":{"velocity_threshold": 0.0060,
+                                    "min_inactive_time": 20,
+                                     "date_range":""}},
+        "drawer": {"name":"DefaultDrawer",
+                      "arguments":{"draw_frames":true}},
+        "camera": {"name":"MovieVirtualCamera",
+                      "arguments":{"path":"/data/ethoscope_ref_videos/2016-03-22_14-36-58_cs_long_validation/2016-03-22_14-36-58_cs_long_validation.mp4"}}
+}

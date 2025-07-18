@@ -1,0 +1,18 @@
+[Unit]
+Description=Ethoscope node server
+Wants=ntpd.service
+After=ntpd.service
+
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ethoscope/src/node/scripts
+Environment=NODE_PORT=80
+EnvironmentFile=-/etc/ethoscope/environment
+ExecStart=/usr/bin/python /opt/ethoscope/src/node/scripts/server.py --port=${NODE_PORT}
+RestartSec=5
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+

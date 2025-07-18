@@ -1,0 +1,25 @@
+[Unit]
+Description=Ethoscope Virtual Sensor
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=node
+Group=node
+ExecStart=/usr/bin/python3 /opt/ethoscope/accessories/etho_sensor/virtual_sensor.py --conf /etc/ethoscope/config_virtual_sensor.json
+WorkingDirectory=/opt/ethoscope/accessories/etho_sensor
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Environment variables
+Environment=PYTHONPATH=/opt/ethoscope/src:/opt/ethoscope/accessories
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Less restrictive security settings for development
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
