@@ -28,6 +28,14 @@ ACTION_RESTART_DAEMON = "restart_daemon"
 ACTION_CHANGE_BRANCH = "change_branch"
 
 
+def monitored_paths():
+    """Get the monitored paths based on device type"""
+    MONITORED_PATHS = {
+        'NODE': ["src/node", "services", "src/updater", "accessories"],
+        'ETHOSCOPE': ["src/ethoscope", "services", "src/updater", "accessories"] 
+    }
+    return MONITORED_PATHS['NODE'] if is_node else MONITORED_PATHS['ETHOSCOPE']
+
 def handle_node_update():
     """Handle local node update operation"""
     try:
@@ -196,10 +204,27 @@ def device(action, id):
     try:
         if action == ACTION_CHECK_UPDATE:
             local_commit, origin_commit = ethoscope_updater.get_local_and_origin_commits()
-            up_to_date = local_commit == origin_commit
-            # @pepelisu you can get
-            #data["local_commit"]["id"] -> a34fac...
-            #data["local_commit"]["date"] -> 2015-01-24 12:23:00
+            
+            # Check if update is needed based on directory constraints
+            if local_commit == origin_commit:
+                up_to_date = True
+            else:
+                
+                # Check if any monitored files changed
+                up_to_date = True
+                try:
+                    diff = local_commit.diff(origin_commit)
+                    for diff_item in diff:
+                        for path in [diff_item.a_path, diff_item.b_path]:
+                            if path and any(path.startswith(mp + "/") or path == mp for mp in monitored_paths()):
+                                up_to_date = False
+                                break
+                        if not up_to_date:
+                            break
+                except Exception as e:
+                    logging.warning(f"Error checking diff, defaulting to update needed: {e}")
+                    up_to_date = False
+            
             return {"up_to_date":up_to_date,
                     "local_commit":get_commit_version(local_commit),
                     "origin_commit":get_commit_version(origin_commit)
