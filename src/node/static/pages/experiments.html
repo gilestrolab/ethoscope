@@ -104,14 +104,14 @@
                 <td title="{{run.problems}}">{{run.problems.substring(0,6)}}</td>
                 <td>
                     <span ng-if="run.status == 'running'">
-                        <span ng-if="compare_time(run.last_backup) >= 0  && compare_time(run.last_backup) <= 20" class="fa fa-check-circle color-green" title="Last backup {{compare_time(run.last_backup)}} minutes ago in file {{run.experimental_data}}"></span>
-                        <span ng-if="compare_time(run.last_backup) > 20" class="fa fa-exclamation-triangle color-red" title="Last backup {{compare_time(run.last_backup)}} minutes ago in file {{run.experimental_data}}"></span>
-                        <span ng-if="!run.has_backup" class="fa fa-exclamation-triangle color-black" title="No backup yet!"></span>
+                        <span ng-if="compare_time(run.last_backup) >= 0  && compare_time(run.last_backup) <= 20" class="fa fa-check-circle color-green" title="Last {{run.backup_type || 'database'}} backup {{compare_time(run.last_backup)}} minutes ago in file {{run.experimental_data}}"></span>
+                        <span ng-if="compare_time(run.last_backup) > 20" class="fa fa-exclamation-triangle color-red" title="Last {{run.backup_type || 'database'}} backup {{compare_time(run.last_backup)}} minutes ago in file {{run.experimental_data}}"></span>
+                        <span ng-if="!run.has_backup" class="fa fa-exclamation-triangle color-black" title="No backup yet! (Backup type: {{run.backup_type || 'unknown'}})"></span>
                     </span>
                     <span ng-if="run.status == 'stopped'">
-                        <span ng-if="!run.has_backup" class="fa fa-exclamation-triangle color-black" title="A backup file for this run was not found on the node!"></span>
-                        <span ng-if="compare_time(run.last_backup, run.end_time) >= 0" class="fa fa-check-circle color-green" title="Run has had a full successful backup"></span>
-                        <span ng-if="compare_time(run.last_backup, run.end_time) < 0" class="fa fa-exclamation-triangle color-red" title="Last backup happened {{compare_time(run.last_backup, run.end_time)}} minutes before the end of the run! Some data may be missing."></span>
+                        <span ng-if="!run.has_backup" class="fa fa-exclamation-triangle color-black" title="A backup file for this run was not found on the node! (Backup type: {{run.backup_type || 'unknown'}})"></span>
+                        <span ng-if="compare_time(run.last_backup, run.end_time) >= 0" class="fa fa-check-circle color-green" title="Run has had a full successful {{run.backup_type || 'database'}} backup"></span>
+                        <span ng-if="compare_time(run.last_backup, run.end_time) < 0" class="fa fa-exclamation-triangle color-red" title="Last {{run.backup_type || 'database'}} backup happened {{compare_time(run.last_backup, run.end_time)}} minutes before the end of the run! Some data may be missing."></span>
                     </span>
 
 

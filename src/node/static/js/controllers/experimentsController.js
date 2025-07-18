@@ -5,8 +5,8 @@
         $scope.currentPage = 1;
         $scope.itemsPerPage = 20;
 
-        // We need to make this call syncronous because the server may take a while to generate these data
-        $scope.getBackupInfo = function () { return $http.get('/browse/null') };
+        // Get structured backup status with MySQL, SQLite, and Video backup information
+        $scope.getBackupInfo = function () { return $http.get('/backup/status') };
 
         $http.get('/devices').then(function(response) { var data = response.data;
             $scope.devices = data;
@@ -17,8 +17,15 @@
             $scope.totalRuns = 0;
 
             // we work syncronously so we get this data and then we process the rest
-            $scope.getBackupInfo().then(function(data) {
-                $scope.backup_files =  data.data.files;
+            $scope.getBackupInfo().then(function(response) {
+                var backupData;
+                try {
+                    backupData = JSON.parse(response.data);
+                    $scope.backup_devices = backupData.devices || {};
+                } catch (e) {
+                    console.error('Error parsing backup status data:', e);
+                    $scope.backup_devices = {};
+                }
 
                 for (var ix in $scope.runs) {
                     
@@ -28,14 +35,53 @@
                     if ( $scope.runs[ix].end_time != '' ) { $scope.runs[ix].end_time = $scope.runs[ix].end_time.split(".")[0].replace(/-/g,'/') };
                     $scope.runs[ix].start_time = $scope.runs[ix]['start_time'].split(".")[0].replace(/-/g,'/') ;
 
-                    // check the mtime of the associated db file and records whether a backup file is on the node
-                    var db_name = $scope.runs[ix].experimental_data.split('\\').pop().split('/').pop();
-                    if ( $scope.backup_files[db_name] != undefined ) 
-                        { $scope.runs[ix].last_backup = $scope.backup_files[db_name]['mtime'];
-                          $scope.runs[ix].has_backup = true;
+                    // Get backup information for this run's ethoscope from the new backup status
+                    var ethoscope_id = $scope.runs[ix].ethoscope_id;
+                    var backup_info = $scope.backup_devices[ethoscope_id];
+                    
+                    if (backup_info) {
+                        // Determine backup type based on experimental_data file extension or database type
+                        var db_name = $scope.runs[ix].experimental_data.split('\\').pop().split('/').pop();
+                        var backup_type = 'sqlite'; // default
+                        
+                        // Better backup type detection
+                        // Check MySQL first since it's the primary backup system
+                        if (backup_info.backup_types.mysql.available) {
+                            backup_type = 'mysql';
+                        } else if (backup_info.backup_types.sqlite.available) {
+                            backup_type = 'sqlite';
                         }
-                    else
-                        { $scope.runs[ix].has_backup = false };
+                        
+                        var relevant_backup = backup_info.backup_types[backup_type];
+                        
+                        if (relevant_backup.available && relevant_backup.last_backup) {
+                            $scope.runs[ix].last_backup = relevant_backup.last_backup;
+                            $scope.runs[ix].has_backup = true;
+                            $scope.runs[ix].backup_type = backup_type;
+                        } else {
+                            $scope.runs[ix].has_backup = false;
+                            $scope.runs[ix].backup_type = null;
+                        }
+                        
+                        // Store additional backup info for potential use in templates
+                        $scope.runs[ix].backup_info = {
+                            mysql: backup_info.backup_types.mysql,
+                            sqlite: backup_info.backup_types.sqlite,
+                            video: backup_info.backup_types.video
+                        };
+                    } else {
+                        $scope.runs[ix].has_backup = false;
+                        $scope.runs[ix].backup_type = null;
+                        $scope.runs[ix].backup_info = null;
+                    }
+                }
+            }).catch(function(error) {
+                console.error('Error fetching backup status:', error);
+                // If backup status fails, set default values for all runs
+                for (var ix in $scope.runs) {
+                    $scope.runs[ix].has_backup = false;
+                    $scope.runs[ix].backup_type = null;
+                    $scope.runs[ix].backup_info = null;
                 }
             });
         });
