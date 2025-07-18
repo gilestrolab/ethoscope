@@ -34,7 +34,20 @@ def monitored_paths():
         'NODE': ["src/node", "services", "src/updater", "accessories"],
         'ETHOSCOPE': ["src/ethoscope", "services", "src/updater", "accessories"] 
     }
-    return MONITORED_PATHS['NODE'] if is_node else MONITORED_PATHS['ETHOSCOPE']
+    
+    # Determine device type - use global variable if available, otherwise detect
+    try:
+        # Try to use the global variable if it's been set
+        return MONITORED_PATHS['NODE'] if is_node else MONITORED_PATHS['ETHOSCOPE']
+    except NameError:
+        # Fallback: detect based on whether ethoscope module is available
+        try:
+            from ethoscope.utils import pi
+            # If we can import ethoscope modules, we're on an ethoscope
+            return MONITORED_PATHS['ETHOSCOPE']
+        except ImportError:
+            # If we can't import ethoscope modules, we're probably on a node
+            return MONITORED_PATHS['NODE']
 
 def handle_node_update():
     """Handle local node update operation"""
