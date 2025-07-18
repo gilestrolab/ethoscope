@@ -1,9 +1,14 @@
 import os
 import json
+import urllib.request
+import urllib.parse
+import time
+import csv
+import datetime
 from threading import RLock
 from typing import Dict, Any
 
-from ethoscope_node.utils.device_scanner import BaseDevice, DeviceScanner
+from ethoscope_node.utils.device_scanner import BaseDevice, DeviceScanner, ScanException
 
 
 
@@ -13,15 +18,17 @@ class Sensor(BaseDevice):
     SENSOR_FIELDS = ["Time", "Temperature", "Humidity", "Pressure", "Light"]
     
     def __init__(self, ip: str, port: int = 80, refresh_period: float = 5, 
-                 results_dir: str = "", save_to_csv: bool = True):
+                 results_dir: str = "/ethoscope_data/sensors", save_to_csv: bool = True):
                      
         self.save_to_csv = save_to_csv
         self._csv_lock = RLock()
         
-        # Ensure CSV directory exists before calling parent
+        # Set CSV path for this sensor and ensure CSV directory exists before calling parent
+
+        self.CSV_PATH = results_dir
         if save_to_csv:
-            os.makedirs(results_dir, exist_ok=True)
-            
+            os.makedirs(self.CSV_PATH, exist_ok=True)
+
         super().__init__(ip, port, refresh_period, results_dir)
     
     def _setup_urls(self):
@@ -153,4 +160,4 @@ class SensorScanner(DeviceScanner):
     
     def __init__(self, results_dir: str = "/ethoscope_data", device_refresh_period: float = 300, device_class=Sensor):
         super().__init__(device_refresh_period, device_class)
-        self.results_dir = os.path.join(results_dir, "/sensors")
+        self.results_dir = os.path.join(results_dir, "sensors")
