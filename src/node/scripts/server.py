@@ -19,7 +19,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 from contextlib import contextmanager
 
-from ethoscope_node.utils.device_scanner import EthoscopeScanner, SensorScanner
+from ethoscope_node.utils.device_scanner import EthoscopeScanner
+from ethoscope_node.utils.sensor_scanner import SensorScanner
 from ethoscope_node.utils.configuration import EthoscopeConfiguration, ensure_ssh_keys
 from ethoscope_node.utils.backups_helpers import GenericBackupWrapper, BackupClass
 from ethoscope_node.utils.etho_db import ExperimentalDB
@@ -325,7 +326,7 @@ class EthoscopeNodeServer:
             
             # Initialize sensor scanner
             try:
-                self.sensor_scanner = SensorScanner()
+                self.sensor_scanner = SensorScanner(results_dir=self.results_dir)
                 self.sensor_scanner.start()
                 self.logger.info("Sensor scanner started")
             except Exception as e:
