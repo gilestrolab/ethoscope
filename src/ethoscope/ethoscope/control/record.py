@@ -4,6 +4,7 @@ import time
 from ethoscope.control.tracking import ControlThread, ExperimentalInformation
 from ethoscope.utils.description import DescribedObject
 from ethoscope.hardware.input.cameras import V4L2Camera, OurPiCameraAsync
+from ethoscope.utils.debug import EthoscopeException
 import tempfile
 import shutil
 import threading, queue
