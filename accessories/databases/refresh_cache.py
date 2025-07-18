@@ -51,47 +51,6 @@ MYSQL_CREDENTIALS = {
 }
 
 
-def get_mysql_experiment_start_time(db_name):
-    """
-    Get the actual experiment start time from MySQL START_EVENTS table.
-    
-    Args:
-        db_name (str): MySQL database name
-        
-    Returns:
-        int: Experiment start timestamp, or None if not found
-    """
-    try:
-        with mysql.connector.connect(
-            host='localhost',
-            user=MYSQL_CREDENTIALS["user"],
-            password=MYSQL_CREDENTIALS["password"],
-            database=db_name,
-            charset='latin1',
-            use_unicode=True,
-            connect_timeout=10
-        ) as conn:
-            cursor = conn.cursor()
-            
-            # Query START_EVENTS table for graceful_start events
-            cursor.execute("""
-                SELECT t FROM START_EVENTS 
-                WHERE event = 'graceful_start' 
-                ORDER BY t ASC 
-                LIMIT 1
-            """)
-            result = cursor.fetchone()
-            
-            if result:
-                return result[0]
-            else:
-                logger.warning(f"No graceful_start event found in {db_name}")
-                return None
-                
-    except mysql.connector.Error as e:
-        logger.error(f"Failed to get experiment start time from {db_name}: {e}")
-        return None
-
 
 def discover_sqlite_databases():
     """
@@ -124,23 +83,16 @@ def discover_sqlite_databases():
             date_time_dir = path_parts[-2]
             db_filename = path_parts[-1]
             
-            # Extract timestamp from directory name (YYYY-MM-DD_HH-MM-SS format)
-            try:
-                timestamp = time.mktime(time.strptime(date_time_dir, '%Y-%m-%d_%H-%M-%S'))
-            except ValueError:
-                logger.warning(f"Could not parse timestamp from directory {date_time_dir}")
-                continue
-            
             # Verify database file exists and is accessible
             if not os.path.exists(db_path):
                 logger.warning(f"Database file does not exist: {db_path}")
                 continue
                 
+            # No need to manually extract timestamp - cache system will handle it
             sqlite_databases.append({
                 'path': db_path,
                 'machine_id': machine_id,
                 'machine_name': machine_name,
-                'timestamp': timestamp,
                 'backup_filename': db_filename
             })
             
@@ -176,17 +128,11 @@ def discover_mysql_databases():
         ) as conn:
             logger.info(f"Found MySQL database: {db_name}")
             
-            # Get actual experiment start time
-            experiment_start_time = get_mysql_experiment_start_time(db_name)
-            
-            if experiment_start_time:
-                mysql_databases.append({
-                    'name': db_name,
-                    'machine_name': machine_name,
-                    'timestamp': experiment_start_time
-                })
-            else:
-                logger.warning(f"Could not determine experiment start time for {db_name}")
+            # No need to manually extract timestamp - cache system will handle it
+            mysql_databases.append({
+                'name': db_name,
+                'machine_name': machine_name
+            })
                 
     except mysql.connector.Error as e:
         logger.error(f"Failed to connect to MySQL database: {e}")
@@ -205,7 +151,6 @@ def refresh_sqlite_cache(sqlite_db_info, dry_run=False):
     try:
         db_path = sqlite_db_info['path']
         machine_name = sqlite_db_info['machine_name']
-        timestamp = sqlite_db_info['timestamp']
         
         logger.info(f"Processing SQLite database: {db_path}")
         
@@ -221,29 +166,11 @@ def refresh_sqlite_cache(sqlite_db_info, dry_run=False):
             database_type="SQLite3"
         )
         
-        # Get database metadata
-        db_metadata = cache.get_metadata(tracking_start_time=timestamp)
-        
-        # Extract experimental metadata from database
-        experimental_metadata = cache.get_experimental_metadata()
-        
-        # Prepare experiment info
-        experiment_info = {
-            "date_time": timestamp,
-            "backup_filename": sqlite_db_info['backup_filename'],
-            "user": experimental_metadata.get("user", "unknown"),
-            "location": experimental_metadata.get("location", "unknown"),
-            "result_writer_type": "SQLiteResultWriter",
-            "sqlite_source_path": db_path
-        }
-        
-        # Store experiment info in cache
-        cache.store_experiment_info(timestamp, experiment_info)
-        
-        # Generate cache filename
-        ts_str = time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(timestamp))
-        cache_filename = f"db_metadata_{ts_str}_{machine_name}_db.json"
-        cache_filepath = os.path.join(CACHE_DIR, cache_filename)
+        # Use cache system to refresh from database metadata (fully automated)
+        cache_filepath = cache.refresh_cache_from_database(
+            backup_filename=sqlite_db_info['backup_filename'],
+            sqlite_source_path=db_path
+        )
         
         logger.info(f"Created cache file: {cache_filepath}")
         
@@ -262,7 +189,6 @@ def refresh_mysql_cache(mysql_db_info, dry_run=False):
     try:
         db_name = mysql_db_info['name']
         machine_name = mysql_db_info['machine_name']
-        timestamp = mysql_db_info['timestamp']
         
         logger.info(f"Processing MySQL database: {db_name}")
         
@@ -281,31 +207,8 @@ def refresh_mysql_cache(mysql_db_info, dry_run=False):
             database_type="MySQL"
         )
         
-        # Get database metadata
-        db_metadata = cache.get_metadata(tracking_start_time=timestamp)
-        
-        # Extract experimental metadata from database
-        experimental_metadata = cache.get_experimental_metadata()
-        
-        # Generate backup filename from timestamp
-        ts_str = time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(timestamp))
-        backup_filename = f"{ts_str}_{pi.get_machine_id()}.db"
-        
-        # Prepare experiment info
-        experiment_info = {
-            "date_time": timestamp,
-            "backup_filename": backup_filename,
-            "user": experimental_metadata.get("user", "unknown"),
-            "location": experimental_metadata.get("location", "unknown"),
-            "result_writer_type": "MySQLResultWriter"
-        }
-        
-        # Store experiment info in cache
-        cache.store_experiment_info(timestamp, experiment_info)
-        
-        # Generate cache filename
-        cache_filename = f"db_metadata_{ts_str}_{machine_name}_db.json"
-        cache_filepath = os.path.join(CACHE_DIR, cache_filename)
+        # Use cache system to refresh from database metadata (fully automated)
+        cache_filepath = cache.refresh_cache_from_database()
         
         logger.info(f"Created cache file: {cache_filepath}")
         

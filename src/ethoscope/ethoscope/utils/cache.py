@@ -173,6 +173,121 @@ class BaseDatabaseMetadataCache:
             'files': files
         }
     
+    def create_experiment_info_from_metadata(self, timestamp, backup_filename, result_writer_type, sqlite_source_path=None):
+        """
+        Create experiment info dictionary from database metadata.
+        
+        Args:
+            timestamp: Experiment timestamp
+            backup_filename: Database backup filename
+            result_writer_type: Type of result writer (SQLiteResultWriter or MySQLResultWriter)
+            sqlite_source_path: Path to SQLite database (if applicable)
+            
+        Returns:
+            dict: Properly formatted experiment info dictionary
+        """
+        # Extract experimental metadata from database
+        experimental_metadata = self.get_experimental_metadata()
+        
+        # Create experiment info dictionary matching tracking.py format
+        experiment_info = {
+            "date_time": timestamp,
+            "backup_filename": backup_filename,
+            "user": experimental_metadata.get("user", "unknown"),
+            "location": experimental_metadata.get("location", "unknown"),
+            "result_writer_type": result_writer_type,
+            "run_id": experimental_metadata.get("run_id", "unknown")
+        }
+        
+        # Add SQLite source path if provided
+        if sqlite_source_path:
+            experiment_info["sqlite_source_path"] = sqlite_source_path
+            
+        return experiment_info
+
+    def get_database_timestamp(self):
+        """
+        Get the database timestamp from the METADATA table.
+        
+        Returns:
+            float: Database timestamp, or None if not found
+        """
+        try:
+            db_path = self.db_credentials["name"]
+            if not os.path.exists(db_path):
+                logging.warning(f"SQLite database path does not exist: {db_path}")
+                return None
+                
+            with sqlite3.connect(db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Get date_time from METADATA table
+                cursor.execute("SELECT value FROM METADATA WHERE field = 'date_time'")
+                result = cursor.fetchone()
+                
+                if result:
+                    return float(result[0])
+                else:
+                    logging.warning("No date_time found in metadata table")
+                    return None
+                    
+        except Exception as e:
+            logging.error(f"Failed to get database timestamp: {e}")
+            return None
+
+    def refresh_cache_from_database(self, timestamp=None, backup_filename=None, result_writer_type=None, sqlite_source_path=None):
+        """
+        Completely refresh the cache from database metadata.
+        
+        Args:
+            timestamp: Experiment timestamp (if None, will auto-detect from database)
+            backup_filename: Database backup filename (if None, will auto-generate)
+            result_writer_type: Type of result writer (if None, will auto-detect)
+            sqlite_source_path: Path to SQLite database (if applicable)
+            
+        Returns:
+            str: Path to the created cache file
+        """
+        # Auto-detect timestamp from database if not provided
+        if timestamp is None:
+            timestamp = self.get_database_timestamp()
+            if timestamp is None:
+                raise ValueError("Could not determine timestamp from database")
+        
+        # Auto-generate backup filename if not provided
+        if backup_filename is None:
+            ts_str = time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(timestamp))
+            if hasattr(self, 'db_credentials') and 'name' in self.db_credentials:
+                # For SQLite, use the database filename
+                if sqlite_source_path:
+                    backup_filename = os.path.basename(sqlite_source_path)
+                else:
+                    backup_filename = f"{ts_str}_{self.device_name}.db"
+            else:
+                # For MySQL, generate standard name
+                backup_filename = f"{ts_str}_{self.device_name}.db"
+        
+        # Auto-detect result writer type if not provided
+        if result_writer_type is None:
+            if hasattr(self, 'db_credentials') and 'name' in self.db_credentials:
+                if sqlite_source_path or self.db_credentials['name'].endswith('.db'):
+                    result_writer_type = "SQLiteResultWriter"
+                else:
+                    result_writer_type = "MySQLResultWriter"
+            else:
+                result_writer_type = "SQLiteResultWriter"
+        
+        # Create properly formatted experiment info from database metadata
+        experiment_info = self.create_experiment_info_from_metadata(
+            timestamp, backup_filename, result_writer_type, sqlite_source_path
+        )
+        
+        # Store the experiment info in cache
+        self.store_experiment_info(timestamp, experiment_info)
+        
+        # Return the cache file path
+        return self._get_cache_file_path(timestamp)
+
     def store_experiment_info(self, tracking_start_time, experiment_info):
         """
         Store experiment information in the cache file (replaces last_run_info functionality).
@@ -186,6 +301,7 @@ class BaseDatabaseMetadataCache:
                 - location: Device location
                 - result_writer_type: Type of result writer used
                 - sqlite_source_path: Path to SQLite database (if applicable)
+                - run_id: Unique run identifier
         """
         cache_file_path = self._get_cache_file_path(tracking_start_time)
         if cache_file_path:
@@ -201,6 +317,7 @@ class BaseDatabaseMetadataCache:
                     "location": experiment_info.get("location"),
                     "result_writer_type": experiment_info.get("result_writer_type"),
                     "sqlite_source_path": experiment_info.get("sqlite_source_path"),
+                    "run_id": experiment_info.get("run_id"),
                     "stored_timestamp": time.time()
                 }
                 
@@ -733,6 +850,42 @@ class MySQLDatabaseMetadataCache(BaseDatabaseMetadataCache):
         except Exception as e:
             logging.error(f"Unexpected error retrieving experimental metadata: {e}")
             return {}
+
+    def get_database_timestamp(self):
+        """
+        Get the database timestamp from the MySQL METADATA table.
+        
+        Returns:
+            float: Database timestamp, or None if not found
+        """
+        try:
+            with mysql.connector.connect(
+                host='localhost',
+                user=self.db_credentials["user"],
+                password=self.db_credentials["password"],
+                database=self.db_credentials["name"],
+                charset='latin1',
+                use_unicode=True,
+                connect_timeout=10
+            ) as conn:
+                cursor = conn.cursor()
+                
+                # Get date_time from METADATA table
+                cursor.execute("SELECT value FROM METADATA WHERE field = 'date_time'")
+                result = cursor.fetchone()
+                
+                if result:
+                    return float(result[0])
+                else:
+                    logging.warning("No date_time found in metadata table")
+                    return None
+                    
+        except mysql.connector.Error as e:
+            logging.error(f"Failed to get database timestamp from MySQL: {e}")
+            return None
+        except Exception as e:
+            logging.error(f"Unexpected error getting database timestamp: {e}")
+            return None
 
 
 class SQLiteDatabaseMetadataCache(BaseDatabaseMetadataCache):

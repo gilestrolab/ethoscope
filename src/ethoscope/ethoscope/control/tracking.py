@@ -758,7 +758,8 @@ class ControlThread(Thread):
             "user": self._info["experimental_info"]["name"],
             "location": self._info["experimental_info"]["location"],
             "result_writer_type": result_writer_type,
-            "sqlite_source_path": sqlite_source_path
+            "sqlite_source_path": sqlite_source_path,
+            "run_id": self._info["experimental_info"]["run_id"]
         }
         
         # hardware_interface is a running thread
