@@ -15,6 +15,9 @@ from pathlib import Path
 # Test data directory
 TEST_DATA_DIR = Path(__file__).parent / "fixtures" / "data"
 
+# Import notification fixtures
+from .fixtures.notification_fixtures import *
+
 
 @pytest.fixture
 def temp_dir():
