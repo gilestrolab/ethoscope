@@ -13,7 +13,6 @@ import socket
 import struct
 import subprocess
 from threading import Thread, RLock, Event
-import queue
 from functools import wraps
 from contextlib import contextmanager
 from typing import Dict, List, Optional, Any, Iterator, Union
@@ -718,13 +717,8 @@ class Ethoscope(BaseDevice):
         self._config = config or EthoscopeConfiguration()
         self._notification_service = EmailNotificationService(self._config, self._edb)
         
-        # Shared streaming connection attributes
-        self._shared_streaming_socket = None
-        self._streaming_clients = {}  # client_id -> queue
-        self._streaming_thread = None
-        self._streaming_lock = RLock()
-        self._streaming_running = False
-        self._next_client_id = 0
+        # Streaming manager
+        self._stream_manager = None
         
         # Call parent initialization
         super().__init__(ip, port, refresh_period, results_dir)
@@ -912,211 +906,24 @@ class Ethoscope(BaseDevice):
             self._logger.warning(f"Could not get debug image: {e}")
             return None
     
-    def _ensure_streaming_connection(self):
-        """Ensure shared streaming connection is active."""
-        with self._streaming_lock:
-            if self._shared_streaming_socket is None or not self._streaming_running:
-                self._start_shared_streaming()
-    
-    def _start_shared_streaming(self):
-        """Start the shared streaming connection and broadcasting thread."""
-        try:
-            # Clean up any existing connection
-            self._stop_shared_streaming()
-            
-            # Create new socket connection
-            self._shared_streaming_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self._shared_streaming_socket.connect((self._ip, STREAMING_PORT))
-            self._shared_streaming_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
-            self._shared_streaming_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, True)
-            
-            # Start broadcasting thread
-            self._streaming_running = True
-            self._streaming_thread = Thread(
-                target=self._streaming_broadcast_loop,
-                daemon=True,
-                name=f"StreamBroadcast_{self._id}"
-            )
-            self._streaming_thread.start()
-            
-            self._logger.info(f"Started shared streaming connection to {self._ip}:{STREAMING_PORT}")
-            
-        except Exception as e:
-            self._logger.error(f"Failed to start shared streaming: {e}")
-            self._stop_shared_streaming()
-            raise
-    
-    def _stop_shared_streaming(self):
-        """Stop the shared streaming connection."""
-        with self._streaming_lock:
-            self._streaming_running = False
-            
-            if self._shared_streaming_socket:
-                try:
-                    self._shared_streaming_socket.close()
-                except Exception:
-                    pass
-                self._shared_streaming_socket = None
-            
-            if self._streaming_thread and self._streaming_thread.is_alive():
-                self._streaming_thread.join(timeout=2)
-            self._streaming_thread = None
-            
-            # Clear all client queues
-            for client_queue in self._streaming_clients.values():
-                try:
-                    client_queue.put(None)  # Signal end to clients
-                except Exception:
-                    pass
-            self._streaming_clients.clear()
-    
-    def _streaming_broadcast_loop(self):
-        """Main loop for broadcasting frames to all clients."""
-        data = b""
-        payload_size = struct.calcsize("Q")
-        
-        while self._streaming_running and self._shared_streaming_socket:
-            try:
-                # Get message size
-                while len(data) < payload_size:
-                    packet = self._shared_streaming_socket.recv(4096)
-                    if not packet:
-                        break
-                    data += packet
-                
-                if len(data) < payload_size:
-                    break
-                
-                # Unpack message size
-                packed_msg_size = data[:payload_size]
-                data = data[payload_size:]
-                msg_size = struct.unpack("Q", packed_msg_size)[0]
-                
-                # Get frame data
-                while len(data) < msg_size:
-                    packet = self._shared_streaming_socket.recv(4096)
-                    if not packet:
-                        break
-                    data += packet
-                
-                if len(data) < msg_size:
-                    break
-                
-                # Extract frame
-                frame_data = data[:msg_size]
-                data = data[msg_size:]
-                
-                # Process and broadcast frame
-                try:
-                    frame = pickle.loads(frame_data)
-                    frame_bytes = (b'--frame\r\nContent-Type:image/jpeg\r\n\r\n' + 
-                                 frame.tobytes() + b'\r\n')
-                    
-                    # Broadcast to all connected clients
-                    self._broadcast_frame(frame_bytes)
-                    
-                except Exception as e:
-                    self._logger.warning(f"Error processing frame: {e}")
-                    continue
-                    
-            except Exception as e:
-                if self._streaming_running:
-                    self._logger.error(f"Streaming broadcast error: {e}")
-                break
-        
-        self._logger.info("Streaming broadcast loop ended")
-    
-    def _broadcast_frame(self, frame_bytes):
-        """Broadcast frame to all connected clients."""
-        with self._streaming_lock:
-            disconnected_clients = []
-            
-            for client_id, client_queue in self._streaming_clients.items():
-                try:
-                    client_queue.put_nowait(frame_bytes)
-                except queue.Full:
-                    # Client queue is full, skip this frame
-                    pass
-                except Exception:
-                    # Client is disconnected
-                    disconnected_clients.append(client_id)
-            
-            # Remove disconnected clients
-            for client_id in disconnected_clients:
-                self._streaming_clients.pop(client_id, None)
-    
-    def _add_streaming_client(self) -> tuple:
-        """Add a new streaming client and return client_id and queue."""
-        with self._streaming_lock:
-            client_id = self._next_client_id
-            self._next_client_id += 1
-            
-            client_queue = queue.Queue(maxsize=10)  # Limit queue size
-            self._streaming_clients[client_id] = client_queue
-            
-            return client_id, client_queue
-    
-    def _remove_streaming_client(self, client_id: int):
-        """Remove a streaming client."""
-        with self._streaming_lock:
-            self._streaming_clients.pop(client_id, None)
-            
-            # If no more clients, stop streaming after a delay
-            if not self._streaming_clients and self._streaming_running:
-                # Use a timer to stop streaming after 30 seconds of no clients
-                def delayed_stop():
-                    time.sleep(30)
-                    with self._streaming_lock:
-                        if not self._streaming_clients and self._streaming_running:
-                            self._logger.info("No streaming clients for 30s, stopping shared connection")
-                            self._stop_shared_streaming()
-                
-                Thread(target=delayed_stop, daemon=True).start()
-    
     def relay_stream(self) -> Iterator[bytes]:
         """Relay video stream from ethoscope using shared connection."""
-        client_id = None
-        client_queue = None
+        # Lazy import to avoid circular dependencies
+        from .streaming import EthoscopeStreamManager
         
-        try:
-            # Ensure shared streaming connection is active
-            self._ensure_streaming_connection()
-            
-            # Add this client to the streaming system
-            client_id, client_queue = self._add_streaming_client()
-            
-            self._logger.info(f"New streaming client {client_id} connected")
-            
-            while True:
-                try:
-                    # Get frame from queue (blocks until frame available)
-                    frame_data = client_queue.get(timeout=30)  # 30 second timeout
-                    
-                    # None signals end of stream
-                    if frame_data is None:
-                        break
-                    
-                    yield frame_data
-                    
-                except queue.Empty:
-                    # Timeout - check if streaming is still active
-                    if not self._streaming_running:
-                        break
-                    # Continue waiting for frames
-                    continue
-                    
-        except Exception as e:
-            self._logger.error(f"Error in relay_stream: {e}")
-        finally:
-            # Clean up this client
-            if client_id is not None:
-                self._remove_streaming_client(client_id)
-                self._logger.info(f"Streaming client {client_id} disconnected")
+        # Create stream manager if it doesn't exist
+        if self._stream_manager is None:
+            self._stream_manager = EthoscopeStreamManager(self._ip, self._id)
+        
+        # Delegate to stream manager
+        return self._stream_manager.get_stream_for_client()
     
     def stop(self):
         """Stop the ethoscope device and cleanup streaming connections."""
-        # Stop shared streaming first
-        self._stop_shared_streaming()
+        # Stop stream manager if it exists
+        if self._stream_manager is not None:
+            self._stream_manager.stop()
+            self._stream_manager = None
         
         # Call parent stop method
         super().stop()
