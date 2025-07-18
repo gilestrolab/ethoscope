@@ -28,6 +28,7 @@ from ethoscope_node.utils.etho_db import ExperimentalDB
 # Constants
 DEFAULT_PORT = 80
 STATIC_DIR = "../static"
+ETHOSCOPE_DATA_DIR = "/ethoscope_data"
 
 SYSTEM_DAEMONS = {
     "ethoscope_backup_mysql": {
@@ -149,7 +150,7 @@ class EthoscopeNodeServer:
     """Main server class for Ethoscope Node."""
     
     def __init__(self, port: int = DEFAULT_PORT, debug: bool = False, 
-                 results_dir: Optional[str] = None, config_dir: Optional[str] = None):
+                 ethoscope_data_dir: Optional[str] = None, config_dir: Optional[str] = None):
         self.port = port
         self.debug = debug
         self.app = bottle.Bottle()
@@ -163,7 +164,8 @@ class EthoscopeNodeServer:
         
         # Paths and directories
         self.tmp_imgs_dir: Optional[str] = None
-        self.results_dir: Optional[str] = results_dir
+        self.results_dir: Optional[str] = os.path.join (ethoscope_data_dir, "results")
+        self.sensors_dir: Optional[str] = os.path.join (ethoscope_data_dir, "sensors")
         self.config_dir: Optional[str] = config_dir
         
         # System configuration
@@ -326,7 +328,7 @@ class EthoscopeNodeServer:
             
             # Initialize sensor scanner
             try:
-                self.sensor_scanner = SensorScanner(results_dir=self.results_dir)
+                self.sensor_scanner = SensorScanner(results_dir=self.sensors_dir)
                 self.sensor_scanner.start()
                 self.logger.info("Sensor scanner started")
             except Exception as e:
@@ -1305,14 +1307,10 @@ def parse_command_line():
     import argparse
     
     parser = argparse.ArgumentParser(description='Ethoscope Node Server')
-    parser.add_argument('-D', '--debug', action='store_true',
-                       help='Enable debug mode')
-    parser.add_argument('-p', '--port', type=int, default=DEFAULT_PORT,
-                       help=f'Server port (default: {DEFAULT_PORT})')
-    parser.add_argument('-e', '--temporary-results-dir', dest='results_dir',
-                       help='Directory for temporary result files')
-    parser.add_argument('-c', '--configuration', dest='config_dir',
-                       help='Path to configuration directory (default: /etc/ethoscope)')
+    parser.add_argument('-D', '--debug', action='store_true', help='Enable debug mode')
+    parser.add_argument('-p', '--port', type=int, default=DEFAULT_PORT, help=f'Server port (default: {DEFAULT_PORT})')
+    parser.add_argument('-e', '--data-dir', dest='ethoscope_data_dir', default="/ethoscope_data", help=f'Root directory for all result files (default: "/ethoscope_data")')
+    parser.add_argument('-c', '--configuration', dest='config_dir', help='Path to configuration directory (default: /etc/ethoscope)')
     
     return parser.parse_args()
 
@@ -1342,7 +1340,7 @@ def main():
         server = EthoscopeNodeServer(
             port=args.port,
             debug=args.debug,
-            results_dir=args.results_dir,
+            ethoscope_data_dir=args.ethoscope_data_dir,
             config_dir=args.config_dir
         )
         

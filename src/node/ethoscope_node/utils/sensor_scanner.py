@@ -17,20 +17,18 @@ class Sensor(BaseDevice):
     
     SENSOR_FIELDS = ["Time", "Temperature", "Humidity", "Pressure", "Light"]
     
-    def __init__(self, ip: str, port: int = 80, refresh_period: float = 5, 
-                 results_dir: str = "/ethoscope_data/sensors", save_to_csv: bool = True):
+    def __init__(self, ip: str, port: int = 80, refresh_period: float = 5, results_dir: str = "/ethoscope_data/sensors", save_to_csv: bool = True):
                      
         self.save_to_csv = save_to_csv
         self._csv_lock = RLock()
         
-        # Set CSV path for this sensor and ensure CSV directory exists before calling parent
+        super().__init__(ip, port, refresh_period, results_dir)
 
+        # Set CSV path for this sensor and ensure CSV directory exists before calling parent
         self.CSV_PATH = results_dir
         if save_to_csv:
             os.makedirs(self.CSV_PATH, exist_ok=True)
 
-        super().__init__(ip, port, refresh_period, results_dir)
-    
     def _setup_urls(self):
         """Setup sensor-specific URLs."""
         self._data_url = f"http://{self._ip}:{self._port}/"
@@ -158,6 +156,6 @@ class SensorScanner(DeviceScanner):
     SERVICE_TYPE = "_sensor._tcp.local."
     DEVICE_TYPE = "sensor"
     
-    def __init__(self, results_dir: str = "/ethoscope_data", device_refresh_period: float = 300, device_class=Sensor):
+    def __init__(self, results_dir: str = "/ethoscope_data/sensors", device_refresh_period: float = 300, device_class=Sensor):
         super().__init__(device_refresh_period, device_class)
-        self.results_dir = os.path.join(results_dir, "sensors")
+        self.results_dir = results_dir
