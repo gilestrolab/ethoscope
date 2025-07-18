@@ -22,7 +22,7 @@ from zeroconf import ServiceBrowser, Zeroconf, IPVersion
 from ethoscope_node.utils.etho_db import ExperimentalDB
 from ethoscope_node.utils.configuration import ensure_ssh_keys, EthoscopeConfiguration
 from ethoscope_node.utils.backups_helpers import get_sqlite_table_counts, calculate_backup_percentage_from_table_counts
-from ethoscope_node.utils.notification import EmailNotificationService
+from ethoscope_node.notifications.email import EmailNotificationService
 
 # Constants
 STREAMING_PORT = 8887
