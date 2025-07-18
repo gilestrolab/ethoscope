@@ -87,6 +87,20 @@
         $scope.can_stream = false;
         $scope.isActive = false;
 
+        // Cache for static data to reduce repeated requests
+        var nodeConfigCache = {
+            data: null,
+            timestamp: 0,
+            maxAge: 5 * 60 * 1000 // Cache for 5 minutes
+        };
+
+        // Cache node server timestamp to avoid repeated requests
+        var nodeTimestampCache = {
+            timestamp: 0,
+            cachedAt: 0,
+            maxAge: 30 * 1000 // Cache for 30 seconds
+        };
+
         // Date range picker configuration for stimulator scheduling
         // Initialize with safe defaults, will be updated when moment.js is available
         $scope.dateRangeOptions = {
@@ -106,10 +120,10 @@
                 toLabel: 'To'
             }
         };
-        
+
         // Centralized moment.js locale configuration
         var momentLocaleConfigured = false;
-        
+
         function ensureMomentLocale() {
             if (typeof moment !== 'undefined' && moment.locale && !momentLocaleConfigured) {
                 moment.locale('en');
@@ -118,11 +132,11 @@
             }
             return momentLocaleConfigured;
         }
-        
+
         // Update dateRangeOptions when moment.js becomes available
         var momentCheckAttempts = 0;
         var maxMomentCheckAttempts = 50; // Max 5 seconds (50 * 100ms)
-        
+
         function updateDateRangeOptions() {
             if (typeof moment !== 'undefined' && moment.locale) {
                 // Ensure moment.js locale is configured
@@ -146,7 +160,7 @@
                 }
             }
         }
-        
+
         // Start the check
         updateDateRangeOptions();
 
@@ -155,9 +169,49 @@
         // ===========================
 
         /**
-         * Load node-level data (users, incubators, sensors)
+         * Load node-level data (users, incubators, sensors) - OPTIMIZED WITH CACHING
          */
         function loadNodeData() {
+            var now = new Date().getTime();
+
+            // Check if we have cached data that's still valid
+            if (nodeConfigCache.data && (now - nodeConfigCache.timestamp) < nodeConfigCache.maxAge) {
+                console.log('Using cached node configuration data');
+                $scope.node.users = nodeConfigCache.data.users;
+                $scope.node.incubators = nodeConfigCache.data.incubators;
+                $scope.node.sensors = nodeConfigCache.data.sensors;
+                $scope.node.timestamp = nodeConfigCache.data.timestamp;
+                return;
+            }
+
+            // Use batched endpoint to load all node config in one request
+            $http.get('/node/config')
+                .then(function(response) {
+                    // Update cache
+                    nodeConfigCache.data = response.data;
+                    nodeConfigCache.timestamp = now;
+
+                    // Update scope
+                    $scope.node.users = response.data.users;
+                    $scope.node.incubators = response.data.incubators;
+                    $scope.node.sensors = response.data.sensors;
+                    $scope.node.timestamp = response.data.timestamp;
+
+                    // Cache the node timestamp for time sync operations
+                    nodeTimestampCache.timestamp = response.data.timestamp;
+                    nodeTimestampCache.cachedAt = now;
+                })
+                .catch(function(error) {
+                    console.error('Failed to load node configuration:', error);
+                    // Fallback to individual requests if batch fails
+                    loadNodeDataFallback();
+                });
+        }
+
+        /**
+         * Fallback to individual requests if batched endpoint fails
+         */
+        function loadNodeDataFallback() {
             // Load users
             $http.get('/node/users')
                 .then(function(response) {
@@ -187,9 +241,79 @@
         }
 
         /**
-         * Load device-specific data
+         * Load device-specific data - OPTIMIZED FOR SPEED
          */
         function loadDeviceData() {
+            // First, load the critical data immediately (device info + timestamp)
+            $http.get('/device/' + device_id + '/batch-critical')
+                .then(function(response) {
+                    var data = response.data;
+
+                    // Set device data immediately
+                    if (data.data) {
+                        $scope.device = data.data;
+                        // Device is active if it doesn't end with "_000"
+                        $scope.isActive = ($scope.device.name.split("_").pop() !== "000");
+                        
+                        // CRITICAL: Display timestamp immediately on load
+                        updateTimestampDisplay(data.data);
+                    }
+
+                    // Now load the non-critical data in the background
+                    loadNonCriticalDeviceData();
+                })
+                .catch(function(error) {
+                    console.error('Failed to load critical device data:', error);
+                    // Fallback to individual requests if batch fails
+                    loadDeviceDataFallback();
+                });
+
+            // Load video files asynchronously (less critical)
+            loadVideoFilesAsync();
+        }
+
+        /**
+         * Load non-critical device data in background after critical data is loaded
+         */
+        function loadNonCriticalDeviceData() {
+            // Load machine info asynchronously
+            $http.get('/device/' + device_id + '/machineinfo')
+                .then(function(response) {
+                    $scope.machine_info = response.data;
+                })
+                .catch(function(error) {
+                    console.error('Failed to load machine info:', error);
+                });
+
+            // Load user options asynchronously
+            $http.get('/device/' + device_id + '/user_options')
+                .then(function(response) {
+                    var userOptions = response.data;
+
+                    // Check streaming capability
+                    $scope.can_stream = (typeof userOptions.streaming !== 'undefined');
+
+                    // Store raw options data (preserves server order)
+                    $scope.user_options = {
+                        tracking: userOptions.tracking || {},
+                        recording: userOptions.recording || {},
+                        update_machine: userOptions.update_machine || {}
+                    };
+
+                    // Initialize selected options with default values
+                    initializeSelectedOptions('tracking', userOptions.tracking || {});
+                    initializeSelectedOptions('recording', userOptions.recording || {});
+                    initializeSelectedOptions('update_machine', userOptions.update_machine || {});
+                })
+                .catch(function(error) {
+                    console.error('Failed to load user options:', error);
+                });
+        }
+
+        /**
+         * Fallback to individual requests if batched endpoint fails
+         */
+        function loadDeviceDataFallback() {
             // Load machine information
             $http.get('/device/' + device_id + '/machineinfo')
                 .then(function(response) {
@@ -209,14 +333,19 @@
                 .catch(function(error) {
                     console.error('Failed to load device data:', error);
                 });
+        }
 
-            // Load available video files
+        /**
+         * Load video files asynchronously (can be slow, so load separately)
+         */
+        function loadVideoFilesAsync() {
             $http.get('/device/' + device_id + '/videofiles')
                 .then(function(response) {
                     $scope.videofiles = response.data.filelist;
                 })
                 .catch(function(error) {
                     console.error('Failed to load video files:', error);
+                    $scope.videofiles = [];
                 });
         }
 
@@ -260,33 +389,6 @@
             }
         }
 
-        /**
-         * Load user options (tracking, recording, machine update options)
-         */
-        function loadUserOptions() {
-            $http.get('/device/' + device_id + '/user_options')
-                .then(function(response) {
-                    var data = response.data;
-
-                    // Check streaming capability
-                    $scope.can_stream = (typeof data.streaming !== 'undefined');
-
-                    // Store raw options data (preserves server order)
-                    $scope.user_options = {
-                        tracking: data.tracking || {},
-                        recording: data.recording || {},
-                        update_machine: data.update_machine || {}
-                    };
-
-                    // Initialize selected options with default values
-                    initializeSelectedOptions('tracking', data.tracking || {});
-                    initializeSelectedOptions('recording', data.recording || {});
-                    initializeSelectedOptions('update_machine', data.update_machine || {});
-                })
-                .catch(function(error) {
-                    console.error('Failed to load user options:', error);
-                });
-        }
 
         // ===========================
         // FORM MANAGEMENT FUNCTIONS
@@ -336,11 +438,11 @@
                                 if (typeof moment !== 'undefined') {
                                     // Ensure moment.js locale is configured
                                     ensureMomentLocale();
-                                    
+
                                     // Validate the default value before using it
                                     var defaultValue = argument.default;
                                     var momentObj = moment(defaultValue);
-                                    
+
                                     if (momentObj.isValid()) {
                                         $scope.selected_options[optionType][name].arguments[argument.name] = [
                                             momentObj.format('LLLL'),
@@ -779,18 +881,86 @@
         };
 
         // ===========================
-        // OBSOLETE/DEPRECATED FUNCTIONS
+        // TIMESTAMP DISPLAY FUNCTIONS
         // ===========================
 
         /**
-         * OBSOLETE: Download function - functionality unclear, may be unused
-         * @deprecated This function appears to be incomplete and potentially unused
+         * Update timestamp display immediately when device data is available
          */
-        $scope.ethoscope.download = function() {
-            // WARNING: This function may not work as expected
-            // The $scope.result_files variable is not defined anywhere
-            $http.get($scope.device.ip + ':9000/static' + $scope.result_files);
-        };
+        function updateTimestampDisplay(deviceData) {
+            // Initialize time display immediately - don't wait for node timestamp
+            if (deviceData.current_timestamp) {
+                $scope.device_timestamp = new Date(deviceData.current_timestamp * 1000);
+                $scope.device_datetime = $scope.device_timestamp.toUTCString();
+
+                // Show local node time immediately (no HTTP request needed)
+                var local_time = new Date();
+                $scope.node_datetime = local_time.toUTCString();
+                $scope.delta_t_min = Math.abs((local_time.getTime() / 1000 - deviceData.current_timestamp) / 60);
+            } else {
+                $scope.node_datetime = "Node Time";
+                $scope.device_datetime = "Device Time";
+            }
+
+            // Check time synchronization with node asynchronously (don't block UI)
+            if (deviceData.current_timestamp) {
+                var now = new Date().getTime();
+                var useCache = nodeTimestampCache.timestamp &&
+                    (now - nodeTimestampCache.cachedAt) < nodeTimestampCache.maxAge;
+
+                if (useCache) {
+                    // Use cached timestamp - no HTTP request needed
+                    var node_t = nodeTimestampCache.timestamp;
+                    var node_time = new Date(node_t * 1000);
+                    $scope.node_datetime = node_time.toUTCString();
+                    $scope.delta_t_min = Math.abs((node_t - deviceData.current_timestamp) / 60);
+
+                    // Auto-correct time if difference > 3 minutes (max 3 attempts)
+                    if ($scope.delta_t_min > 3 && $attempt < 3) {
+                        $scope.ethoscope.update_machine({
+                            machine_options: {
+                                arguments: {
+                                    datetime: new Date().getTime() / 1000
+                                },
+                                name: 'datetime'
+                            }
+                        });
+                        $attempt++;
+                        console.log("Auto-correcting device time. Attempt:", $attempt);
+                    }
+                } else {
+                    // Fetch fresh timestamp
+                    $http.get('/node/timestamp')
+                        .then(function(node_response) {
+                            var node_t = node_response.data.timestamp;
+                            var node_time = new Date(node_t * 1000);
+                            $scope.node_datetime = node_time.toUTCString();
+                            $scope.delta_t_min = Math.abs((node_t - deviceData.current_timestamp) / 60);
+
+                            // Update cache
+                            nodeTimestampCache.timestamp = node_t;
+                            nodeTimestampCache.cachedAt = now;
+
+                            // Auto-correct time if difference > 3 minutes (max 3 attempts)
+                            if ($scope.delta_t_min > 3 && $attempt < 3) {
+                                $scope.ethoscope.update_machine({
+                                    machine_options: {
+                                        arguments: {
+                                            datetime: new Date().getTime() / 1000
+                                        },
+                                        name: 'datetime'
+                                    }
+                                });
+                                $attempt++;
+                                console.log("Auto-correcting device time. Attempt:", $attempt);
+                            }
+                        })
+                        .catch(function(error) {
+                            console.error('Failed to get node timestamp:', error);
+                        });
+                }
+            }
+        }
 
         // ===========================
         // REAL-TIME UPDATE FUNCTIONS
@@ -824,43 +994,11 @@
                     var data = response.data;
                     $scope.device = data;
 
-                    // Initialize time display
-                    $scope.node_datetime = "Node Time";
-                    $scope.device_datetime = "Device Time";
+                    // Update timestamp display using the extracted function
+                    updateTimestampDisplay(data);
 
-                    if (data.current_timestamp) {
-                        $scope.device_timestamp = new Date(data.current_timestamp * 1000);
-                        $scope.device_datetime = $scope.device_timestamp.toUTCString();
-
-                        // Check time synchronization with node
-                        $http.get('/node/timestamp')
-                            .then(function(node_response) {
-                                var node_t = node_response.data.timestamp;
-                                var node_time = new Date(node_t * 1000);
-                                $scope.node_datetime = node_time.toUTCString();
-                                $scope.delta_t_min = Math.abs((node_t - data.current_timestamp) / 60);
-
-                                // Auto-correct time if difference > 3 minutes (max 3 attempts)
-                                if ($scope.delta_t_min > 3 && $attempt < 3) {
-                                    $scope.ethoscope.update_machine({
-                                        machine_options: {
-                                            arguments: {
-                                                datetime: new Date().getTime() / 1000
-                                            },
-                                            name: 'datetime'
-                                        }
-                                    });
-                                    $attempt++;
-                                    console.log("Auto-correcting device time. Attempt:", $attempt);
-                                }
-                            })
-                            .catch(function(error) {
-                                console.error('Failed to get node timestamp:', error);
-                            });
-                    }
-
-                    // Update device URLs with cache busting
-                    var timestamp = Math.floor(new Date().getTime() / 1000.0);
+                    // Update device URLs with reduced cache busting (every 30 seconds instead of every refresh)
+                    var timestamp = Math.floor(new Date().getTime() / 30000.0) * 30;
                     $scope.device.url_img = "/device/" + $scope.device.id + "/last_img?" + timestamp;
                     $scope.device.url_stream = '/device/' + device_id + '/stream';
 
@@ -884,13 +1022,14 @@
         // INITIALIZATION
         // ===========================
 
-        // Load all initial data
+        // Load all initial data - OPTIMIZED
         loadNodeData();
         loadDeviceData();
-        loadUserOptions();
+        // Note: loadUserOptions() is now called within loadDeviceData() via batch endpoint
 
-        // Start periodic refresh (every 6 seconds)
-        refresh_data = $interval(refresh, 6000);
+        // Start periodic refresh (every 10 seconds - reduced from 6 seconds)
+        // Only refresh when page is visible to reduce unnecessary load
+        refresh_data = $interval(refresh, 10000);
 
         // Cleanup interval when controller is destroyed
         $scope.$on("$destroy", function() {

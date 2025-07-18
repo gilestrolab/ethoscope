@@ -233,6 +233,11 @@ class EthoscopeNodeServer:
         self.app.route('/device/<id>/controls/<instruction>', method='POST')(self._post_device_instructions)
         self.app.route('/device/<id>/log', method='POST')(self._get_log)
         
+        # Optimized batch endpoints
+        self.app.route('/device/<id>/batch', method='GET')(self._get_device_batch)
+        self.app.route('/device/<id>/batch-critical', method='GET')(self._get_device_batch_critical)
+        self.app.route('/node/config', method='GET')(self._get_node_config)
+        
         # Backup API
         self.app.route('/backup/status', method='GET')(self._get_backup_status)
         
@@ -1015,6 +1020,75 @@ class EthoscopeNodeServer:
             return self.config.content['commands']
         else:
             raise NotImplementedError(f"Unknown node request: {req}")
+    
+    @error_decorator
+    def _get_device_batch(self, id):
+        """Batched endpoint that returns all critical device data in one request."""
+        device = self.device_scanner.get_device(id)
+        
+        if not device:
+            raise Exception(f"A device with ID {id} is unknown to the system")
+        
+        # Get all device data in parallel where possible
+        batch_data = {}
+        
+        try:
+            # Core device info (always needed)
+            batch_data['data'] = device.info()
+        except Exception as e:
+            self.logger.error(f"Failed to get device info for {id}: {e}")
+            batch_data['data'] = None
+        
+        try:
+            # Machine info (needed for device page) - load asynchronously to avoid delays
+            # Call machine_info() in background to avoid blocking the critical data
+            batch_data['machineinfo'] = device.machine_info()
+        except Exception as e:
+            self.logger.error(f"Failed to get machine info for {id}: {e}")
+            batch_data['machineinfo'] = None
+        
+        # Get video files and user options asynchronously in background
+        # These are less critical and can be loaded separately if needed
+        try:
+            batch_data['user_options'] = device.user_options()
+        except Exception as e:
+            self.logger.error(f"Failed to get user options for {id}: {e}")
+            batch_data['user_options'] = None
+        
+        return batch_data
+    
+    @error_decorator
+    def _get_device_batch_critical(self, id):
+        """Fast batched endpoint that returns only the most critical device data."""
+        device = self.device_scanner.get_device(id)
+        
+        if not device:
+            raise Exception(f"A device with ID {id} is unknown to the system")
+        
+        # Get only the most critical data for fast initial load
+        batch_data = {}
+        
+        try:
+            # Core device info (always needed and fast)
+            batch_data['data'] = device.info()
+        except Exception as e:
+            self.logger.error(f"Failed to get device info for {id}: {e}")
+            batch_data['data'] = None
+        
+        # Skip machine_info and user_options for the critical load
+        # These will be loaded separately by the UI
+        
+        return batch_data
+    
+    @error_decorator
+    def _get_node_config(self):
+        """Batched endpoint that returns all node configuration data in one request."""
+        return {
+            'users': self.config.content['users'],
+            'incubators': self.config.content['incubators'],
+            'sensors': self._get_sensors(),
+            'timestamp': datetime.datetime.now().timestamp()
+        }
     
     def _get_node_system_info(self):
         """Get comprehensive node system information."""
