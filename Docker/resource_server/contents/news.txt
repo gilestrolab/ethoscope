@@ -1,3 +1,4 @@
 #2020-06-25;We now have a notification service
 #2020-06-26;Please be aware that there are issues with the raspberry PI 3 and the PINoIR camera version 2. Follow the github issue #97 for updates.
 #2020-07-02;The new stable branch is now master. Starting from yesterday's image, all your ethoscopes and node will migrate from python3.7 to master for the future. Switch to dev if you want to experience the new features as we use them in the gilestro lab.
+2025-06-30;A new update in the ethoscope dev branch requires manual intervention because the project folder structure has changed. See https://github.com/gilestrolab/ethoscope/issues/205 for more info

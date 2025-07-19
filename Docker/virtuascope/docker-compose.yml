@@ -9,7 +9,7 @@ services:
       - 9000
     restart: unless-stopped
     volumes:
-      - /home/gg/Data/ethoscope_project/ethoscope:/opt/ethoscope-device:ro
+      - /home/gg/Data/ethoscope_project/ethoscope:/opt/ethoscope:ro
       - /mnt/ethoscope_data:/ethoscope_data
       - mariadb_socket:/run/mysqld
     devices:

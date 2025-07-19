@@ -1,0 +1,16 @@
+[Unit]
+Description=Updater Service for the Node
+After=network.target
+
+[Service]
+Type=simple
+#User=git
+#Group=git
+WorkingDirectory=/opt/ethoscope/src/updater/
+ExecStart=/usr/bin/python3 /opt/ethoscope/src/updater/update_server.py -g /opt/ethoscope -b /srv/git/ethoscope.git
+Restart=always
+RestartSec=5s
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

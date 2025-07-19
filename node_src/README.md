@@ -1,7 +1,0 @@
-To install, we run
-`sudo python setup.py develop`
-in the `node-src` directory.
-
-You do *not* need to reinstall the package every time you make a change.
-
-

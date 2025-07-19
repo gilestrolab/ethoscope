@@ -1,0 +1,16 @@
+[Unit]
+Description=Ethoscope listener server
+Wants=ntpd.service mariadb.service
+After=ntpd.service network.target
+
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ethoscope/src/ethoscope/scripts/
+ExecStart=/usr/bin/python3 /opt/ethoscope/src/ethoscope/scripts/device_listener.py
+RestartSec=5
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+

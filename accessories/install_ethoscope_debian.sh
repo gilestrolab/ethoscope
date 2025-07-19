@@ -1,185 +1,608 @@
 #!/bin/bash
 
-# Check if the script is running as root
-if [[ $EUID -ne 0 ]]; then
-   echo "This script must be run as root. Use sudo to run it." 1>&2
-   exit 1
-fi
+#===============================================================================
+# Ethoscope Device Installation Script for Debian/Raspbian
+#===============================================================================
+#
+# Purpose: Complete installation and configuration of ethoscope software on
+#          Raspberry Pi devices running Debian/Raspbian OS
+#
+# Target Platform: Raspberry Pi (tested on Pi 4) with Debian/Raspbian
+# Prerequisites: Fresh Debian/Raspbian installation with network connectivity
+#
+# What this script does:
+# 1. Installs required system packages and Python dependencies
+# 2. Creates ethoscope user account
+# 3. Clones ethoscope software from GitHub to /opt/ethoscope
+# 4. Configures systemd services for device operation
+# 5. Sets up MariaDB database with ethoscope user
+# 6. Configures network settings (ethernet + WiFi)
+# 7. Sets up NTP time synchronization with node
+# 8. Configures Raspberry Pi specific hardware (camera, I2C, etc.)
+#
+# Usage:
+#   sudo ./install_ethoscope_debian.sh           # Full installation
+#   sudo ./install_ethoscope_debian.sh --apt-install  # Package installation only
+#
+# Author: Giorgio Gilestro <giorgio@gilest.ro>
+# License: GPL3
+# Repository: https://github.com/gilestrolab/ethoscope
+#===============================================================================
 
+set -e  # Exit on any error
 
-# Function to perform update
+#===============================================================================
+# UTILITY FUNCTIONS
+#===============================================================================
+
+check_root() {
+    if [[ $EUID -ne 0 ]]; then
+       echo "This script must be run as root. Use sudo to run it." 1>&2
+       exit 1
+    fi
+}
+
+detect_pi_model() {
+    # Get the hardware model from /proc/cpuinfo
+    local model=$(grep 'Model' /proc/cpuinfo | awk -F': ' '{print $2}')
+    local revision=$(grep 'Revision' /proc/cpuinfo | awk '{print $3}')
+    
+    # Determine Pi model for filename
+    if [[ "$revision" == "a01041" || "$revision" == "a21041" || "$revision" == "a22042" ]]; then
+        PI_MODEL="pi2"
+    elif [[ "$revision" == "a02082" || "$revision" == "a22082" || "$revision" == "a32082" || "$revision" == "a020d3" ]]; then
+        PI_MODEL="pi3"
+    elif [[ "$revision" =~ ^[bc][0-9a-f]{5}$ ]]; then
+        PI_MODEL="pi4"
+    elif [[ "$revision" =~ ^d[0-9a-f]{5}$ ]]; then
+        PI_MODEL="pi5"
+    else
+        PI_MODEL="pi"
+    fi
+    
+    echo "Detected Raspberry Pi model: $PI_MODEL (revision: $revision)"
+}
+
+determine_config_paths() {
+    # Initialize configuration paths
+    MYCNF=""
+    BOOTCFG=""
+    
+    if [ -f "/etc/os-release" ]; then
+        . /etc/os-release
+        
+        if [[ "$ID" == "debian" ]]; then
+            MYCNF="/etc/mysql/mariadb.conf.d/ethoscope.cnf"
+            BOOTCFG="/boot/firmware/config.txt"
+        elif [[ "$ID" == "arch" ]]; then
+            MYCNF="/etc/my.cnf.d/ethoscope.cnf"
+            BOOTCFG="/boot/config.txt"
+        fi
+    fi
+}
+
+#===============================================================================
+# PACKAGE INSTALLATION
+#===============================================================================
+
 install_apt_packages() {
-    #Install all the necessary dependencies
-    apt-get update && apt-get upgrade -y
+    echo "Installing system packages and Python dependencies on $PI_MODEL..."
+    sudo apt-get update && apt-get upgrade -y
 
-    #mysql-connector is not available for raspbian so we take it from debian
-    wget http://ftp.uk.debian.org/debian/pool/main/m/mysql-connector-python/python3-mysql.connector_8.0.15-4_all.deb && dpkg -i python3-mysql.connector_8.0.15-4_all.deb
+    echo "Installing basic system packages..."
+    sudo apt-get install -y \
+        mariadb-server \
+        mariadb-client \
+        sqlite3 \
+        systemd-resolved \
+        build-essential \
+        python3-dev \
+        libcap-dev \
+        pkg-config \
+        ntp git
 
-    apt-get install -y python3-bottle python3-cheroot python3-cherrypy3 python3-opencv python3-pymysql\
-            python3-git python3-matplotlib python3-mock python3-netifaces python3-serial\
-            python3-usb python3-sklearn python3-setuptools python3-zeroconf python3-protobuf python3-picamera2 \
-            mariadb-server mariadb-client ntp systemd-resolved
+    echo "Restarting network services..."
+    sudo systemctl restart systemd-networkd systemd-resolved
+
+    echo "Installing Python system packages..."
+    sudo apt-get install -y \
+        python3-pip \
+        python3-venv \
+        python3-setuptools \
+        python3-picamera2 \
+        python3-usb \
+        python3-protobuf
+
+    #the rest will be installed via pip
+
     echo "All necessary packages were installed. Now reboot."        
 }
 
-# Check for "--apt-install" flag. If present, updates but leaves everything else.
+#===============================================================================
+# USER MANAGEMENT
+#===============================================================================
+
+setup_ethoscope_user() {
+    echo "Setting up ethoscope user account..."
+    if id "ethoscope" &>/dev/null; then
+        echo "User 'ethoscope' already exists, skipping user creation"
+    else
+        echo "Creating ethoscope user account..."
+        useradd -m ethoscope
+    fi
+    echo -e "ethoscope\nethoscope" | passwd ethoscope
+    usermod -a -G root ethoscope
+}
+
+#===============================================================================
+# SOFTWARE INSTALLATION
+#===============================================================================
+
+install_ethoscope_software() {
+
+    # Create system-wide pip config
+    cat > /etc/pip.conf << 'EOF'
+[global]
+break-system-packages = true
+EOF
+
+    echo "Cloning ethoscope software repository..."
+    if [[ -d "/opt/ethoscope" ]]; then
+        echo "Removing existing /opt/ethoscope directory for clean installation..."
+        rm -rf /opt/ethoscope
+    fi
+    git clone https://github.com/gilestrolab/ethoscope.git /opt/ethoscope
+
+    echo "Configuring git repository (dev branch, node remote)..."
+    cd /opt/ethoscope/
+    git checkout dev
+    git remote set-url origin git://node/ethoscope.git
+    git config --global --add safe.directory /opt/ethoscope
+
+    echo "Installing ethoscope Python package..."
+    cd /opt/ethoscope/src/ethoscope
+    pip3 install -e . --break-system-packages
+
+    #Make sure we use only picamera2 (if the PI is at least a PI3?)
+    pip3 uninstall -y picamera 2>/dev/null && pip3 install picamera2
+
+    echo "Installing systemd service files..."
+    rm -rf /usr/lib/systemd/system/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_update}.service >> /dev/null
+    ln -s /opt/ethoscope/services/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_update}.service /usr/lib/systemd/system/
+
+    echo "Creating ethoclient command line tool..."
+    echo $'#!/bin/env bash\npython /opt/ethoscope/src/ethoscope/scripts/ethoclient.py $@' > /usr/bin/ethoclient
+    chmod +x /usr/bin/ethoclient
+}
+
+#===============================================================================
+# SYSTEM CONFIGURATION
+#===============================================================================
+
+configure_system_identity() {
+    echo "Setting up default machine identity (ETHOSCOPE_000)..."
+    echo "ETHOSCOPE_000" > /etc/machine-name
+    echo "ETHOSCOPE_000" > /etc/hostname
+
+    echo "Configuring login prompt with network information..."
+    echo 'Ethoscope Linux \r  (\n) (\l)' > /etc/issue
+    echo 'Ethernet IP: \4{eth0}' >> /etc/issue
+    echo 'WIFI IP: \4{wlan0}' >> /etc/issue
+    echo 'Time on Device: \d \t' >> /etc/issue
+
+    echo "Limiting systemd journal log space to 250MB..."
+    echo 'SystemMaxUse=250MB' >> /etc/systemd/journald.conf
+
+    echo "Generating en_GB.UTF-8 locale..."
+    echo "en_GB.UTF-8 UTF-8" >> /etc/locale.gen
+    locale-gen
+
+    # Create a timestamp for this SD card image installation
+    echo $(date +%Y%m%d)_ethoscope_${PI_MODEL}.img > /etc/sdimagename
+}
+
+configure_time_sync() {
+    echo "Configuring NTP time synchronization with node..."
+    echo 'server node' > /etc/ntp.conf
+    echo 'server 127.127.1.0' >> /etc/ntp.conf
+    echo 'fudge 127.127.1.0 stratum 10' >> /etc/ntp.conf
+    echo 'restrict default kod limited nomodify nopeer noquery notrap' >> /etc/ntp.conf
+    echo 'restrict 127.0.0.1' >> /etc/ntp.conf
+    echo 'restrict ::1' >> /etc/ntp.conf
+    echo 'driftfile /var/lib/ntp/ntp.drift' >> /etc/ntp.conf
+}
+
+enable_system_services() {
+    echo "Enabling ethoscope device services..."
+    systemctl enable ethoscope_device.service ethoscope_listener.service ethoscope_update.service ethoscope_GPIO_listener.service
+    
+    # Enable system services with proper service names for Debian/Raspbian
+    echo "Enabling system services..."
+    
+    # NTP service - handle aliases and find the real service
+    echo "Configuring NTP service..."
+    
+    # First try to resolve the actual service behind ntp.service alias
+    local actual_ntp_service=""
+    
+    # Method 1: Check what ntp.service is aliased to
+    if [ -L "/lib/systemd/system/ntp.service" ]; then
+        actual_ntp_service=$(readlink -f "/lib/systemd/system/ntp.service" | xargs basename)
+        echo "Found ntp.service aliased to: $actual_ntp_service"
+    elif [ -L "/usr/lib/systemd/system/ntp.service" ]; then
+        actual_ntp_service=$(readlink -f "/usr/lib/systemd/system/ntp.service" | xargs basename)
+        echo "Found ntp.service aliased to: $actual_ntp_service"
+    fi
+    
+    # Method 2: Check if ntp.service is a real file (not alias)
+    if [ -z "$actual_ntp_service" ] && [ -f "/lib/systemd/system/ntp.service" ] && [ ! -L "/lib/systemd/system/ntp.service" ]; then
+        actual_ntp_service="ntp.service"
+        echo "Found actual ntp.service file"
+    fi
+    
+    # Method 3: Fall back to common alternatives
+    if [ -z "$actual_ntp_service" ]; then
+        for service in "systemd-timesyncd.service" "ntpd.service" "chronyd.service"; do
+            if systemctl list-unit-files | grep -q "^$service"; then
+                actual_ntp_service="$service"
+                echo "Using fallback NTP service: $service"
+                break
+            fi
+        done
+    fi
+    
+    # Enable the actual service
+    if [ -n "$actual_ntp_service" ]; then
+        if systemctl enable "$actual_ntp_service"; then
+            echo "Successfully enabled $actual_ntp_service"
+        else
+            echo "Warning: Failed to enable $actual_ntp_service, but NTP should still work"
+        fi
+    else
+        echo "Warning: No NTP service found - manual NTP configuration may be required"
+    fi
+    
+    # MariaDB/MySQL service (usually mariadb.service on Debian)
+    if systemctl list-unit-files | grep -q "^mariadb\.service"; then
+        systemctl enable mariadb.service
+        echo "Enabled mariadb.service"
+    elif systemctl list-unit-files | grep -q "^mysql\.service"; then
+        systemctl enable mysql.service
+        echo "Enabled mysql.service"
+    elif systemctl list-unit-files | grep -q "^mysqld\.service"; then
+        systemctl enable mysqld.service
+        echo "Enabled mysqld.service"
+    else
+        echo "Warning: No MySQL/MariaDB service found"
+    fi
+    
+    # SSH service (usually ssh.service on Debian)
+    if systemctl list-unit-files | grep -q "^ssh\.service"; then
+        systemctl enable ssh.service
+        echo "Enabled ssh.service"
+    elif systemctl list-unit-files | grep -q "^sshd\.service"; then
+        systemctl enable sshd.service
+        echo "Enabled sshd.service"
+    else
+        echo "Warning: No SSH service found"
+    fi
+    
+    # Avahi daemon (usually available)
+    if systemctl list-unit-files | grep -q "^avahi-daemon\.service"; then
+        systemctl enable avahi-daemon.service
+        echo "Enabled avahi-daemon.service"
+    else
+        echo "Warning: avahi-daemon.service not found"
+    fi
+}
+
+#===============================================================================
+# NETWORK CONFIGURATION
+#===============================================================================
+
+configure_network() {
+    echo "Configuring network interfaces (ethernet + WiFi)..."
+    
+    # Disable conflicting network managers first
+    systemctl disable NetworkManager ModemManager dhcpcd || true
+    systemctl stop NetworkManager ModemManager dhcpcd || true
+    
+    # Create wired network config for eth0
+    cat > /etc/systemd/network/20-wired.network << 'EOF'
+[Match]
+Name=eth0
+
+[Network]
+DHCP=yes
+LinkLocalAddressing=yes
+
+[DHCPv4]
+RouteMetric=10
+UseDNS=yes
+EOF
+
+    # WiFi configuration  
+    cat > /etc/systemd/network/25-wireless.network << 'EOF'
+[Match]
+Name=wlan0
+
+[Network]
+DHCP=yes
+LinkLocalAddressing=yes
+
+[DHCPv4]
+RouteMetric=20
+UseDNS=yes
+EOF
+
+    # Enable systemd-networkd and resolved
+    systemctl enable systemd-networkd systemd-resolved
+    systemctl disable systemd-networkd-wait-online  # Prevent boot hangs
+    
+    # Ensure interfaces are up
+    echo "Bringing up network interfaces..."
+    ip link set eth0 up || true
+    ip link set wlan0 up || true
+    
+    # Create resolved configuration
+    mkdir -p /etc/systemd/resolved.conf.d
+    cat > /etc/systemd/resolved.conf.d/ethoscope.conf << 'EOF'
+[Resolve]
+DNS=8.8.8.8 1.1.1.1
+FallbackDNS=8.8.4.4 1.0.0.1
+EOF
+}
+
+configure_wifi() {
+    echo "Configuring Wi-Fi country and unblocking rfkill..."
+    # Set Wi-Fi country to GB (adjust as needed)
+    if command -v raspi-config >/dev/null 2>&1; then
+        echo "Setting Wi-Fi country to GB using raspi-config..."
+        raspi-config nonint do_wifi_country GB
+    else
+        echo "raspi-config not available, setting Wi-Fi country manually..."
+        if [[ ! -f /etc/wpa_supplicant/wpa_supplicant.conf ]] || ! grep -q "country=" /etc/wpa_supplicant/wpa_supplicant.conf; then
+            echo "country=GB" >> /etc/wpa_supplicant/wpa_supplicant.conf
+        fi
+    fi
+
+    # Unblock Wi-Fi if rfkill is blocking it
+    if command -v rfkill >/dev/null 2>&1; then
+        echo "Unblocking Wi-Fi with rfkill..."
+        rfkill unblock wifi
+        rfkill unblock all
+    else
+        echo "rfkill not available, skipping Wi-Fi unblock"
+    fi
+
+    wpa_passphrase ETHOSCOPE_WIFI ETHOSCOPE_1234 > /etc/wpa_supplicant/wpa_supplicant-wlan0.conf
+    systemctl enable wpa_supplicant
+    systemctl enable wpa_supplicant@wlan0.service
+}
+
+#===============================================================================
+# DATABASE CONFIGURATION
+#===============================================================================
+
+setup_mariadb() {
+    echo "Setting up MariaDB database..."
+    # Initialize MariaDB data directory if not already done
+    if [ ! -d "/var/lib/mysql/mysql" ]; then
+        echo "Initializing MariaDB data directory..."
+        mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
+    fi
+
+    # Ensure proper ownership
+    chown -R mysql:mysql /var/lib/mysql
+
+    # Start MariaDB service
+    systemctl start mysqld.service
+
+    # Wait for MariaDB to be ready
+    echo "Waiting for MariaDB to start..."
+    for i in {1..30}; do
+        if mysqladmin ping >/dev/null 2>&1; then
+            echo "MariaDB is ready"
+            break
+        fi
+        if [ $i -eq 30 ]; then
+            echo "ERROR: MariaDB failed to start within 30 seconds"
+            exit 1
+        fi
+        sleep 1
+    done
+
+    # Set up ethoscope database user
+    echo "Creating ethoscope database user..."
+    mysql -u root <<EOF
+-- Create users for local and network connections
+CREATE USER IF NOT EXISTS 'ethoscope'@'localhost' IDENTIFIED BY 'ethoscope';
+CREATE USER IF NOT EXISTS 'node'@'%' IDENTIFIED BY 'node';
+
+-- Grant necessary permissions to ethoscope (full access)
+GRANT ALL PRIVILEGES ON *.* TO 'ethoscope'@'localhost' WITH GRANT OPTION;
+
+-- Grant ONLY reading privileges to node user
+GRANT SELECT ON *.* TO 'node'@'%';
+
+-- Flush privileges to ensure changes take effect
+FLUSH PRIVILEGES;
+EOF
+
+    if [ $? -eq 0 ]; then
+        echo "Database user created successfully"
+    else
+        echo "ERROR: Failed to create database user"
+        exit 1
+    fi
+}
+
+configure_mariadb() {
+    echo "Configuring MariaDB for ethoscope use on $PI_MODEL..."
+    
+    # Set memory limits based on Pi model
+    local buffer_pool_size="64M"
+    local log_file_size="16M"
+    local key_buffer_size="16M"
+    local max_connections="50"
+    
+    if [[ "$PI_MODEL" == "pi2" ]]; then
+        buffer_pool_size="32M"
+        log_file_size="8M"
+        key_buffer_size="8M"
+        max_connections="25"
+    elif [[ "$PI_MODEL" == "pi3" ]]; then
+        buffer_pool_size="64M"
+        log_file_size="16M"
+        key_buffer_size="16M"
+        max_connections="40"
+    elif [[ "$PI_MODEL" == "pi4" ]]; then
+        buffer_pool_size="128M"
+        log_file_size="32M"
+        key_buffer_size="32M"
+        max_connections="75"
+    elif [[ "$PI_MODEL" == "pi5" ]]; then
+        buffer_pool_size="256M"
+        log_file_size="64M"
+        key_buffer_size="64M"
+        max_connections="100"
+    fi
+    
+    # Ensure config directory exists
+    if [ -n "$MYCNF" ]; then
+        mkdir -p "$(dirname "$MYCNF")"
+        
+        echo "Creating MariaDB configuration at $MYCNF..."
+        cat > "$MYCNF" <<EOF
+[server]
+# Binary logging configuration for replication/backup
+log-bin          = mysql-bin
+binlog_format    = mixed
+expire_logs_days = 10
+max_binlog_size  = 100M
+
+# Network configuration - allow connections from ethoscope network
+bind-address     = 0.0.0.0
+
+# Performance optimizations for $PI_MODEL
+innodb_buffer_pool_size = $buffer_pool_size
+innodb_log_file_size = $log_file_size
+key_buffer_size = $key_buffer_size
+max_connections = $max_connections
+
+# Reduce disk I/O for SD card longevity
+innodb_flush_log_at_trx_commit = 2
+sync_binlog = 0
+EOF
+        
+        echo "MariaDB configuration written successfully for $PI_MODEL"
+    else
+        echo "WARNING: Could not determine MariaDB config location for this OS"
+    fi
+}
+
+#===============================================================================
+# HARDWARE CONFIGURATION
+#===============================================================================
+
+configure_raspberry_pi_hardware() {
+    local revision=$(grep 'Revision' /proc/cpuinfo | awk '{print $3}')
+    
+    echo "Configuring Raspberry Pi $PI_MODEL hardware..."
+    
+    # Common settings for all Pi versions
+    echo "Disabling Bluetooth (not needed for ethoscope)..."
+    echo 'dtoverlay=disable-bt' >> "$BOOTCFG"
+
+    echo "Enable default HDMI output"
+    echo 'hdmi_force_hotplug=1' >> "$BOOTCFG"
+
+    echo "Enabling I2C support for hardware interfaces..."
+    echo 'dtparam=i2c_arm=on' >> "$BOOTCFG"
+    echo 'i2c-dev' >> /etc/modules-load.d/raspberrypi.conf
+
+    # Camera configuration based on Pi model
+    echo "Configuring camera for $PI_MODEL..."
+    echo 'disable_camera_led=1' >> "$BOOTCFG"
+    
+    if [[ "$PI_MODEL" == "pi2" || "$PI_MODEL" == "pi3" ]]; then
+        echo "Configuring legacy camera (Pi 2/3)..."
+        echo 'start_file=start_x.elf' >> "$BOOTCFG"
+        echo 'fixup_file=fixup_x.dat' >> "$BOOTCFG"
+        echo 'gpu_mem=256' >> "$BOOTCFG"
+        echo 'cma_lwm=' >> "$BOOTCFG"
+        echo 'cma_hwm=' >> "$BOOTCFG"
+        echo 'cma_offline_start=' >> "$BOOTCFG"
+
+        # https://github.com/raspberrypi/firmware/issues/1167
+        echo 'awb_auto_is_greyworld=1' >> "$BOOTCFG"
+
+        echo 'Loading bcm2835 module for legacy camera'
+        echo 'bcm2835-v4l2' > /etc/modules-load.d/picamera.conf
+        
+    elif [[ "$PI_MODEL" == "pi4" ]]; then
+        echo "Configuring camera for Pi 4..."
+        echo 'dtoverlay=vc4-kms-v3d' >> "$BOOTCFG"
+        echo 'gpu_mem=256' >> "$BOOTCFG"
+        echo 'dtoverlay=imx219' >> "$BOOTCFG"
+        
+    elif [[ "$PI_MODEL" == "pi5" ]]; then
+        echo "Configuring camera for Pi 5..."
+        echo 'dtoverlay=vc4-kms-v3d' >> "$BOOTCFG"
+        echo 'gpu_mem=256' >> "$BOOTCFG"
+        echo 'dtoverlay=imx219' >> "$BOOTCFG"
+        
+    else
+        echo "Unknown Pi model, using basic camera configuration..."
+        echo 'gpu_mem=128' >> "$BOOTCFG"
+        echo 'dtoverlay=imx219' >> "$BOOTCFG"
+    fi
+    
+    # Enable camera interface for all models
+    echo 'camera_auto_detect=1' >> "$BOOTCFG"
+    echo 'dtparam=camera=on' >> "$BOOTCFG"
+}
+
+#===============================================================================
+# MAIN EXECUTION
+#===============================================================================
+
+main() {
+    check_root
+    detect_pi_model
+    determine_config_paths
+    
+    setup_ethoscope_user
+    install_ethoscope_software
+    configure_system_identity
+    configure_time_sync
+    enable_system_services
+    configure_network
+    configure_wifi
+    setup_mariadb
+    configure_mariadb
+    configure_raspberry_pi_hardware
+    
+    echo ""
+    echo "==============================================="
+    echo "Ethoscope installation completed successfully!"
+    echo "==============================================="
+    echo ""
+    echo "Next steps:"
+    echo "1. Reboot this Raspberry Pi: sudo reboot"
+    echo "2. After reboot, the device will be accessible as ETHOSCOPE_000"
+    echo "3. Change the device ID from 000 to a unique number"
+    echo "4. Connect to the ethoscope network node for full functionality"
+    echo ""
+    echo "Please reboot now: sudo reboot"
+}
+
+# Check for "--apt-install" flag
 if [ "$1" == "--apt-install" ]; then
+  check_root
   install_apt_packages
   exit 0
 fi
 
-echo "Create ethoscope user and change passwd"
-useradd -m ethoscope
-echo -e "ethoscope\nethoscope" | sudo passwd ethoscope
-gpasswd -a ethoscope root
-
-echo "clone and rename folders"
-git clone https://github.com/gilestrolab/ethoscope.git /opt/ethoscope-device
-ln -s /opt/ethoscope-device/scripts/ethoscope_updater /opt/
-
-echo "setting dev branch and changing remote git source to the node"
-cd /opt/ethoscope-device/
-git checkout dev
-git remote set-url origin git://node/ethoscope.git
-git config --global --add safe.directory /opt/ethoscope-device
-
-echo "make and install python wheel"
-cd /opt/ethoscope-device/src
-python setup.py develop
-
-echo "install systemd files"
-cp /opt/ethoscope-device/scripts/{ethoscope_device.service,ethoscope_listener.service,ethoscope_GPIO_listener.service} /usr/lib/systemd/system/
-cp /opt/ethoscope-device/scripts/ethoscope_updater/ethoscope_update.service /usr/lib/systemd/system/
-
-echo "create 000 machine files"
-echo "ETHOSCOPE_000" > /etc/machine-name
-echo "ETHOSCOPE_000" > /etc/hostname
-
-echo "create an ethoclient command"
-echo $'#!/bin/env bash\npython /opt/ethoscope-device/src/scripts/ethoclient.py $@' > /usr/bin/ethoclient
-chmod +x /usr/bin/ethoclient
-
-echo "create a verbose login prompt"
-echo 'Ethoscope Linux \r  (\n) (\l)' > /etc/issue
-echo 'Ethernet IP: \4{eth0}' >> /etc/issue
-echo 'WIFI IP: \4{wlan0}' >> /etc/issue
-echo 'Time on Device: \d \t' >> /etc/issue
-
-#echo "activates remote journal upload"
-#echo $'[Upload]\nURL=http://node:19532\n' > /etc/systemd/journal-upload.conf
-
-echo "configure the NTP file"
-echo 'server node' > /etc/ntp.conf
-echo 'server 127.127.1.0' >> /etc/ntp.conf
-echo 'fudge 127.127.1.0 stratum 10' >> /etc/ntp.conf
-echo 'restrict default kod limited nomodify nopeer noquery notrap' >> /etc/ntp.conf
-echo 'restrict 127.0.0.1' >> /etc/ntp.conf
-echo 'restrict ::1' >> /etc/ntp.conf
-echo 'driftfile /var/lib/ntp/ntp.drift' >> /etc/ntp.conf
-
-echo "enabling DEVICE specific systemd service files"
-systemctl enable ethoscope_device.service ethoscope_listener.service ethoscope_update.service ethoscope_GPIO_listener.service
-systemctl enable ntpd.service mysqld.service sshd.service mysqld.service avahi-daemon.service
-#systemctl enable fake-hwclock fake-hwclock-save.timer
-
-echo "create the default network configuration files"
-echo $'[Match]\nName=eth0\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\nRouteMetric=10\n' > /etc/systemd/network/20-wired.network
-echo $'[Match]\nName=wlan0\n\n\n[Network]\nDHCP=yes\n\n[DHCPv4]\nRouteMetric=20\n' > /etc/systemd/network/25-wireless.network
-
-systemctl enable systemd-networkd systemd-resolved
-systemctl disable systemd-networkd-wait-online #this needs to be disabled because it hangs at boot. investigate.
-systemctl disable NetworkManager ModemManager
-
-wpa_passphrase ETHOSCOPE_WIFI ETHOSCOPE_1234 > /etc/wpa_supplicant/wpa_supplicant-wlan0.conf
-systemctl enable wpa_supplicant
-systemctl enable wpa_supplicant@wlan0.service
-
-echo "Set up mysql database"
-mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
-systemctl start mysqld.service
-mysql -u root -e "CREATE USER 'ethoscope'@'localhost' IDENTIFIED BY 'ethoscope'"
-mysql -u root -e "CREATE USER 'ethoscope'@'%' IDENTIFIED BY 'ethoscope'"
-mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO 'ethoscope'@'localhost' WITH GRANT OPTION";
-mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO 'ethoscope'@'%' WITH GRANT OPTION";
-chown -R mysql:mysql /var/lib/mysql
-
-echo "setup mariadb/mysql configuration"
-
-# Initialize MYCNF variable
-MYCNF=""
-
-# Check for OS-specific configurations
-if [ -f "/etc/os-release" ]; then
-    # Source the os-release file to use its variables
-    . /etc/os-release
-    
-    # Check if running on Raspbian
-    if [[ "$ID" == "debian" ]]; then
-        MYCNF="/etc/mysql/mariadb.conf.d/ethoscope.cnf"
-        BOOTCFG="/boot/firmware/config.txt"
-    # Check if running on Arch Linux
-    elif [[ "$ID" == "arch" ]]; then
-        MYCNF="/etc/my.cnf.d/ethoscope.cnf"
-        BOOTCFG="/boot/config.txt"
-    fi
-fi
-
-echo '[server]' > "$MYCNF"
-echo 'log-bin          = mysql-bin' >> "$MYCNF"
-echo 'binlog_format    = mixed' >> "$MYCNF"
-echo 'expire_logs_days = 10' >> "$MYCNF"
-echo 'max_binlog_size  = 100M' >> "$MYCNF"
-echo 'bind-address     = 0.0.0.0' >> "$MYCNF"
-
-echo "limiting journal log space"
-echo 'SystemMaxUse=250MB' >> /etc/systemd/journald.conf
-
-# Get the hardware model from /proc/cpuinfo
-model=$(grep 'Model' /proc/cpuinfo | awk -F': ' '{print $2}')
-
-# Alternatively, use the Revision field for more specific control
-revision=$(grep 'Revision' /proc/cpuinfo | awk '{print $3}')
-
-# Only if running on Raspberry Pi 2 or 3
-# This checks the revision code; adjust as needed based on the specific models you're targeting
-# Reference: https://elinux.org/RPi_HardwareHistory
-# Note: Revision codes can vary, ensure to include all relevant codes for Pi 2 and 3
-if [[ "$revision" == "a01041" || "$revision" == "a21041" || "$revision" == "a22042" ||
-      "$revision" == "a02082" || "$revision" == "a22082" || "$revision" == "a32082" ||
-      "$revision" == "a020d3" ]]; then
-    echo "This script is running on a Raspberry Pi 2 or 3."
-    echo "install picamera settings into the boot/config.txt"
-    echo 'start_file=start_x.elf' > "$BOOTCFG"
-    echo 'fixup_file=fixup_x.dat' >> "$BOOTCFG"
-    echo 'disable_camera_led=1' >> "$BOOTCFG"
-    echo 'gpu_mem=256' >> "$BOOTCFG"
-    echo 'cma_lwm=' >> "$BOOTCFG"
-    echo 'cma_hwm=' >> "$BOOTCFG"
-    echo 'cma_offline_start=' >> "$BOOTCFG"
-
-    # https://github.com/raspberrypi/firmware/issues/1167
-    echo 'awb_auto_is_greyworld=1' >> /boot/config.txt
-
-    echo 'Loading bcm2835 module'
-    echo 'bcm2835-v4l2' > /etc/modules-load.d/picamera.conf
-fi
-
-
-echo "generating locale"
-echo "en_GB.UTF-8 UTF-8" >> /etc/locale.gen
-locale-gen
-
-echo "disable bluetooth"
-echo 'dtoverlay=disable-bt' >> "$BOOTCFG"
-
-echo 'hdmi_force_hotplug=1' >> "$BOOTCFG"
-
-#https://madflex.de/use-i2c-on-raspberry-pi-with-archlinux-arm/
-echo "adding support to I2C"
-echo 'dtparam=i2c_arm=on' >> "$BOOTCFG"
-echo 'i2c-dev' >> /etc/modules-load.d/raspberrypi.conf
-
-#give a unique name to this image/installation
-echo $(date +%Y%m%d)_ethoscope_pi4.img > /etc/sdimagename
-
-echo "Please reboot this PI now."
+# Run main installation
+main

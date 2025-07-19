@@ -1,0 +1,8 @@
+{
+  "name": "ethoscope-frontend",
+  "version": "1.0.0",
+  "description": "Ethoscope web interface - simplified without build step",
+  "scripts": {
+    "test": "echo \"No tests configured\" && exit 0"
+  }
+}

@@ -1,0 +1,170 @@
+.toggle-check-input {
+  width: 1px;
+  height: 1px;
+  position: absolute;
+}
+
+.toggle-check-text {
+  display: inline-block;
+  position: relative;
+  float: right;
+  text-transform: uppercase;
+  background: #CCC;
+  padding: 0.25em 0.5em 0.25em 2em;
+  border-radius: 1em;
+  min-width: 100px;
+  color: #FFF;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.toggle-check-text:after {
+  content: ' ';
+  display: block;
+  float: right;
+  background: #FFF;
+  width: 1.1em;
+  height: 1.1em;
+  border-radius: 1em;
+  position: absolute;
+  left: 0.3em;
+  top: 0.25em;
+  transition: left 0.15s, margin-left 0.15s;
+}
+
+.toggle-check-text:before {
+  content: 'Inactive';
+}
+
+.toggle-check-input:checked ~ .toggle-check-text {
+  background: #8ad869;
+  padding-right: 2em;
+}
+
+.toggle-check-input:checked ~ .toggle-check-text:before {
+  content: 'Active';
+}
+
+.toggle-check-input:checked ~ .toggle-check-text:after {
+  left: 100%;
+  margin-left: -1.4em;
+}
+
+
+/* https://codepen.io/Monredo/pen/QWQowZa */
+
+.switchlabel {
+  display:inline;
+  padding-right: 20px;
+}
+
+.switch {
+	position: relative;
+	display: inline;
+	float: right;
+	width:  30px;
+	height: 17px;
+	margin: 0px;
+  margin-left: auto;
+  order: 2;
+  }
+
+
+  .switch input { 
+	opacity: 0;
+	width: 0;
+	height: 0;
+	display: inline-block;
+	position: right;
+
+  }
+
+  .slider {
+	position: absolute;
+	float: right;
+	vertical-align: middle;
+	cursor: pointer;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background-color: #ccc;
+	-webkit-transition: .4s;
+	transition: .4s cubic-bezier(0,1,0.5,1);
+	border-radius: 2px;
+  }
+  
+  .slider:before {
+	position: absolute;
+	content: "";
+	height: 13px;
+	width: 13px;
+	left: 2px;
+	bottom: 2px;
+	background-color: white;
+	-webkit-transition: .4s;
+	transition: .4s cubic-bezier(0,1,0.5,1);
+	border-radius: 1px;
+  }
+  
+  input:checked + .slider {
+	background-color: #52c944;
+  }
+  
+  input:focus + .slider {
+	box-shadow: 0 0 2px #7efa70;
+  }
+  
+  input:checked + .slider:before {
+	-webkit-transform: translateX(13px);
+	-ms-transform: translateX(13px);
+	transform: translateX(13px);
+  }
+  
+  /* Rounded sliders */
+  .slider.round {
+	border-radius: 17px;
+  }
+  
+  .slider.round:before {
+	border-radius: 50%;
+  }
+  
+  input:checked + .slider.red {
+	background-color: crimson;
+  }
+  
+  input:focus + .slider.red {
+	box-shadow: 0 0 2px crimson;
+  }
+  
+  input:checked + .slider.red {
+	background-color: crimson;
+  }
+  
+  #round {
+	border-radius: 17px;
+  }
+  
+  #round:before {
+	border-radius: 50%;
+  }
+  
+  input:checked + .slider.red {
+	background-color: crimson;
+  }
+  
+  input:focus + .slider.blue {
+	box-shadow: 0 0 2px #424bf5;
+  }
+  
+  input:checked + .slider.blue {
+	background-color: #424bf5;
+  }
+
+
+  .not-available-icon {
+    color: grey; /* Set the color to grey */
+    float: right; /* Align the icon to the right */
+    margin-left: 10px; /* Add some space between the text and the icon */
+  }

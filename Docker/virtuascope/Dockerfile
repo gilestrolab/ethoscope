@@ -33,8 +33,8 @@ RUN sudo rm /etc/machine-name
 RUN sudo pacman -Scc --noconfirm
 
 # Set the working directory
-WORKDIR /opt/ethoscope-device/src/scripts
+WORKDIR /opt/ethoscope/src/ethoscope/scripts
 USER root
 
 # Command to run when the container starts
-CMD ["python3", "/opt/ethoscope-device/src/scripts/device_server.py", "-D"]
+CMD ["python3", "/opt/ethoscope/src/ethoscope/scripts/device_server.py", "-D"]
