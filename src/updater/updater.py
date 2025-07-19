@@ -260,6 +260,33 @@ class BareRepoUpdater:
             logging.error(f"Remote '{self._remote_name}' does not exist in the repository.")
             raise AttributeError(f"Remote '{self._remote_name}' not found in the repository.") from None
 
+        self._ensure_fetch_refspec()
+
+    def _ensure_fetch_refspec(self) -> None:
+        """
+        Ensures that the fetch refspec for the remote is set.
+        This is crucial for bare repositories to properly fetch all branches.
+        """
+        try:
+            # Check if the fetch refspec is already set
+            fetch_refspecs = self._working_repo.config_reader().get_value(
+                f'remote "{self._remote_name}"', 'fetch', default=None
+            )
+            if fetch_refspecs and "+refs/heads/*:refs/heads/*" in fetch_refspecs:
+                logging.info(f"Fetch refspec for remote '{self._remote_name}' is already set.")
+                return
+
+            # If not set, add it
+            logging.info(f"Adding fetch refspec for remote '{self._remote_name}'.")
+            self._working_repo.config_writer().set_value(
+                f'remote "{self._remote_name}"', 'fetch', "+refs/heads/*:refs/heads/*"
+            ).release()
+            logging.info(f"Successfully added fetch refspec for remote '{self._remote_name}'.")
+        except Exception as e:
+            logging.error(f"Failed to ensure fetch refspec for remote '{self._remote_name}': {e}")
+            logging.debug(traceback.format_exc())
+            raise BranchUpdateError(f"Failed to ensure fetch refspec for remote '{self._remote_name}'.") from e
+
     def add_safe_directory(self) -> None:
         """
         Adds the repository directory to Git's safe.directory configuration if it's not already present.
