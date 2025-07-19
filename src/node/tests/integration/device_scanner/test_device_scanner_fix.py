@@ -70,7 +70,7 @@ def test_mariadb_backup_filename():
     device = Ethoscope('192.168.1.10', 9000, '/tmp')
     device._info = create_test_device_new_format()
     
-    filename = device._get_mariadb_backup_filename()
+    filename = device._get_backup_filename_for_db_type("MariaDB")
     expected = '2024-01-01_12-00-00_test_device_001.db'
     
     if filename == expected:
@@ -81,7 +81,7 @@ def test_mariadb_backup_filename():
     
     # Test with old format
     device._info = create_test_device_old_format()
-    filename = device._get_mariadb_backup_filename()
+    filename = device._get_backup_filename_for_db_type("MariaDB")
     
     if filename == expected:
         print("✓ Old format fallback: MariaDB backup filename extracted correctly")
@@ -109,7 +109,7 @@ def test_sqlite_backup_filename():
     device = Ethoscope('192.168.1.10', 9000, '/tmp')
     device._info = device_info
     
-    filename = device._get_sqlite_backup_filename()
+    filename = device._get_backup_filename_for_db_type("SQLite")
     expected = '2024-01-01_12-00-00_test_device_001.db'
     
     if filename == expected:
