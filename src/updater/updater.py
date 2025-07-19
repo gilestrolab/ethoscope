@@ -278,14 +278,14 @@ class BareRepoUpdater:
                 # Handle cases where 'fetch' option might not exist at all
                 logging.debug(f"'fetch' option not found for remote '{self._remote_name}': {e}")
 
-            if fetch_refspecs and "+refs/heads/*:refs/heads/*" in fetch_refspecs:
+            if fetch_refspecs and "+refs/heads/*:refs/remotes/origin/*" in fetch_refspecs:
                 logging.info(f"Fetch refspec for remote '{self._remote_name}' is already set.")
                 return
 
             # If not set, add it
             logging.info(f"Adding fetch refspec for remote '{self._remote_name}'.")
             self._working_repo.config_writer().set_value(
-                f'remote "{self._remote_name}"', 'fetch', "+refs/heads/*:refs/heads/*"
+                f'remote "{self._remote_name}"', 'fetch', "+refs/heads/*:refs/remotes/origin/*"
             ).release()
             logging.info(f"Successfully added fetch refspec for remote '{self._remote_name}'.")
         except Exception as e:
