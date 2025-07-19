@@ -227,7 +227,6 @@ class EthoscopeNodeServer:
         self.app.route('/resources', method='GET')(self._redirection_to_resources)
         
         # Initialize and register API modules
-        self._setup_api_modules()
     
     def _setup_api_modules(self):
         """Initialize and register all API modules."""
@@ -319,6 +318,7 @@ class EthoscopeNodeServer:
                 self.logger.warning("Continuing without sensor scanner")
                 self.sensor_scanner = None
             
+            self._setup_api_modules()
             self.logger.info("Server initialization complete")
             
         except Exception as e:
