@@ -223,8 +223,13 @@ def generate_new_device_map():
                 data = f.result()
                 devices_map[id].update(data)
             except Exception as e:
-                logging.error("Could not get data from device %s :" % id)
-                logging.error(traceback.format_exc())
+                if isinstance(e.__cause__, (TimeoutError, urllib.error.URLError)):
+                    devices_map[id]["status"] = "Unreachable"
+                    logging.warning("Device %s is unreachable (timeout/network error)" % id)
+                else:
+                    devices_map[id]["status"] = "Software broken"
+                    logging.error("Could not get data from device %s :" % id)
+                    logging.error(traceback.format_exc())
 
     # Adds the active_branch to devices_,map
     with futures.ThreadPoolExecutor(max_workers=128) as executor:
@@ -238,8 +243,12 @@ def generate_new_device_map():
                 data = f.result()
                 devices_map[id].update(data)
             except Exception as e:
-                logging.error("Could not get data from device %s :" % id)
-                logging.error(traceback.format_exc())
+                if isinstance(e.__cause__, (TimeoutError, urllib.error.URLError)):
+                    devices_map[id]["status"] = "Unreachable"
+                    logging.warning("Device %s is unreachable (timeout/network error)" % id)
+                else:
+                    logging.error("Could not get data from device %s :" % id)
+                    logging.error(traceback.format_exc())
 
     # Adds the check_update to devices_,map
     with futures.ThreadPoolExecutor(max_workers=128) as executor:
@@ -253,8 +262,12 @@ def generate_new_device_map():
                 data = f.result()
                 devices_map[id].update(data)
             except Exception as e:
-                logging.error("Could not get data from device %s :" % id)
-                logging.error(traceback.format_exc())
+                if isinstance(e.__cause__, (TimeoutError, urllib.error.URLError)):
+                    devices_map[id]["status"] = "Unreachable"
+                    logging.warning("Device %s is unreachable (timeout/network error)" % id)
+                else:
+                    logging.error("Could not get data from device %s :" % id)
+                    logging.error(traceback.format_exc())
 
 
     return devices_map
