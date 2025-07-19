@@ -540,9 +540,6 @@ if __name__ == '__main__':
     if not options.local_repo:
         raise Exception("You must specify the location of the GIT repo to update using the -g or --git-local-repo flags.")
 
-
-    ethoscope_updater = updater.DeviceUpdater(options.local_repo)
-
     if options.bare_repo is not None:
         is_node = True
         bare_repo_updater = updater.BareRepoUpdater(options.bare_repo)
@@ -553,6 +550,8 @@ if __name__ == '__main__':
         from ethoscope.utils import pi
         bare_repo_updater = None
         device_id = pi.get_machine_id()
+
+    ethoscope_updater = updater.DeviceUpdater(options.local_repo)
 
     try:
         # Use cheroot server (modern replacement for cherrypy)
