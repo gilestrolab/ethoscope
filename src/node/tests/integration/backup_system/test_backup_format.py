@@ -12,7 +12,7 @@ import tempfile
 from pathlib import Path
 
 # Add the src directory to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
 
 from ethoscope_node.utils.backups_helpers import BackupClass
 
@@ -141,7 +141,7 @@ def test_device_info_creation():
     print("Testing device info creation...")
     
     try:
-        from node.scripts.backup_tool import create_device_info_from_backup
+        from scripts.backup_tool import create_device_info_from_backup
         
         ethoscope_name = "ETHOSCOPE_001"
         host = "192.168.1.10"

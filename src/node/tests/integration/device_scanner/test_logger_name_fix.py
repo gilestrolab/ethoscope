@@ -12,7 +12,7 @@ import logging
 from unittest.mock import patch
 
 # Add the src directory to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
 
 from ethoscope_node.utils.device_scanner import Ethoscope
 

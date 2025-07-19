@@ -1,0 +1,1 @@
+# Device scanner integration tests package
