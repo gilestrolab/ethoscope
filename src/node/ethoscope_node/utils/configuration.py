@@ -92,7 +92,7 @@ class EthoscopeConfiguration:
                 'email': '',
                 'telephone': '',
                 'group': '',
-                'active': False,
+                'active': True,
                 'isAdmin': True,
                 'created': datetime.datetime.now().timestamp()
             }

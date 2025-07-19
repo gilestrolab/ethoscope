@@ -18,8 +18,8 @@ import signal
 
 import trace
 from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera, V4L2Camera
-from ethoscope.roi_builders.target_roi_builder import OlfactionAssayROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder, ElectricShockAssayROIBuilder
-from ethoscope.roi_builders.roi_builders import  DefaultROIBuilder
+from ethoscope.roi_builders.target_roi_builder import TargetGridROIBuilder
+from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
 from ethoscope.core.monitor import Monitor
 from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
@@ -100,7 +100,7 @@ class ControlThread(Thread):
                                             ],
                     }),
         ("roi_builder", {
-                "possible_classes":[DefaultROIBuilder, SleepMonitorWithTargetROIBuilder, TargetGridROIBuilder, OlfactionAssayROIBuilder, ElectricShockAssayROIBuilder],
+                "possible_classes":[FileBasedROIBuilder, TargetGridROIBuilder],
             }),
         ("tracker", {
                 "possible_classes":[AdaptiveBGModel],
@@ -112,7 +112,7 @@ class ControlThread(Thread):
                         "possible_classes":[OurPiCameraAsync, MovieVirtualCamera, V4L2Camera],
                     }),
         ("result_writer", {
-                        "possible_classes":[MySQLResultWriter, SQLiteResultWriter],
+                        "possible_classes":[SQLiteResultWriter, MySQLResultWriter],
                 }),
      ])
     

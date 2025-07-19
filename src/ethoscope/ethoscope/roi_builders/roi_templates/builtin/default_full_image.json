@@ -1,0 +1,26 @@
+{
+  "template_info": {
+    "name": "Full Image ROI",
+    "version": "1.0",
+    "description": "Single ROI covering entire image",
+    "author": "Gilestro Lab",
+    "hardware_type": "generic"
+  },
+  "roi_definition": {
+    "type": "manual_polygons",
+    "manual_rois": [
+      {
+        "polygon": [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+          [0, 1]
+        ],
+        "value": 0
+      }
+    ]
+  },
+  "validation": {
+    "min_roi_area": 1000
+  }
+}

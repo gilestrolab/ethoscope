@@ -1,0 +1,40 @@
+{
+  "template_info": {
+    "name": "Sleep Monitor (30 tubes)",
+    "version": "1.0",
+    "description": "Extended 30-tube sleep monitoring setup (10x3 grid)",
+    "author": "Gilestro Lab",
+    "hardware_type": "sleep_monitor"
+  },
+  "roi_definition": {
+    "type": "grid_with_targets",
+    "grid": {
+      "n_rows": 10,
+      "n_cols": 3,
+      "orientation": "vertical"
+    },
+    "alignment": {
+      "target_detection": true,
+      "expected_targets": 3,
+      "adaptive_radius": 0.10,
+      "min_target_distance": 10
+    },
+    "positioning": {
+      "margins": {
+        "top": 0.0629,
+        "bottom": 0.0629,
+        "left": -0.033,
+        "right": -0.033
+      },
+      "fill_ratios": {
+        "horizontal": 0.975,
+        "vertical": 0.7
+      }
+    }
+  },
+  "validation": {
+    "min_roi_area": 100,
+    "max_roi_overlap": 0.05,
+    "required_targets": 3
+  }
+}

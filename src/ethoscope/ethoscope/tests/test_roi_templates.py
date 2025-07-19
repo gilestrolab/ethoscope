@@ -9,6 +9,7 @@ import unittest
 import tempfile
 import os
 import json
+import copy
 from unittest.mock import Mock, patch
 import numpy as np
 
@@ -103,16 +104,16 @@ class TestROITemplate(unittest.TestCase):
     def test_grid_template_validation(self):
         """Test validation of grid-based templates."""
         # Missing grid configuration
-        invalid_data = self.valid_template_data.copy()
-        del invalid_data["roi_definition"]["grid"]
+        invalid_data1 = copy.deepcopy(self.valid_template_data)
+        del invalid_data1["roi_definition"]["grid"]
         with self.assertRaises(ROITemplateValidationError):
-            ROITemplate(invalid_data)
+            ROITemplate(invalid_data1)
         
         # Invalid grid parameters
-        invalid_data = self.valid_template_data.copy()
-        invalid_data["roi_definition"]["grid"]["n_rows"] = 0
+        invalid_data2 = copy.deepcopy(self.valid_template_data)
+        invalid_data2["roi_definition"]["grid"]["n_rows"] = 0
         with self.assertRaises(ROITemplateValidationError):
-            ROITemplate(invalid_data)
+            ROITemplate(invalid_data2)
     
     def test_manual_template_validation(self):
         """Test validation of manual polygon templates."""
@@ -121,16 +122,16 @@ class TestROITemplate(unittest.TestCase):
         self.assertEqual(template.name, "Manual Test Template")
         
         # Invalid manual template - missing manual_rois
-        invalid_data = self.manual_template_data.copy()
-        del invalid_data["roi_definition"]["manual_rois"]
+        invalid_data1 = copy.deepcopy(self.manual_template_data)
+        del invalid_data1["roi_definition"]["manual_rois"]
         with self.assertRaises(ROITemplateValidationError):
-            ROITemplate(invalid_data)
+            ROITemplate(invalid_data1)
         
         # Invalid polygon - too few points
-        invalid_data = self.manual_template_data.copy()
-        invalid_data["roi_definition"]["manual_rois"][0]["polygon"] = [[0, 0], [100, 0]]
+        invalid_data2 = copy.deepcopy(self.manual_template_data)
+        invalid_data2["roi_definition"]["manual_rois"][0]["polygon"] = [[0, 0], [100, 0]]
         with self.assertRaises(ROITemplateValidationError):
-            ROITemplate(invalid_data)
+            ROITemplate(invalid_data2)
     
     def test_load_from_file(self):
         """Test loading template from JSON file."""

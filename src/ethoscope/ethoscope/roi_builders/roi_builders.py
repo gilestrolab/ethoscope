@@ -73,23 +73,3 @@ class BaseROIBuilder(DescribedObject):
         '''
         return sorted(rois, key=lambda x: x.value, reverse=False)
 
-
-class DefaultROIBuilder(BaseROIBuilder):
-
-
-    """
-    The default ROI builder. It simply defines the entire image as a unique ROI.
-    There are no reference points
-    """
-
-
-    def _rois_from_img(self,img):
-        h, w = img.shape[0],img.shape[1]
-        return _, [
-            ROI(np.array([
-                (   0,        0       ),
-                (   0,        h -1    ),
-                (   w - 1,    h - 1   ),
-                (   w - 1,    0       )])
-            , idx=1)]
-

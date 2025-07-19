@@ -100,13 +100,21 @@
 
     // create the controller and inject Angular's $scope
     app.controller('mainController', function($scope, $http, $interval, $timeout) {
+        
+        // ===========================
+        // SCOPE INITIALIZATION
+        // ===========================
+        
         $scope.sortType = 'name'; // set the default sort type
         $scope.sortReverse = false; // set the default sort order
         $scope.filterEthoscopes = ''; // set the default search/filter term
         $scope.notifications = {};
         $scope.showOnline = true; // show only online devices by default
-
         $scope.groupActions = {};
+
+        // ===========================
+        // HELPER FUNCTIONS
+        // ===========================
 
         var spin = function(action) {
             if (action == "start") {
@@ -119,11 +127,11 @@
             }
         }
 
-        $http.get('/devices').then(function(response) {
-            var data = response.data;
-            $scope.devices = data;
-        });
+        // ===========================
+        // DATA LOADING FUNCTIONS
+        // ===========================
 
+        // Initialize notifications from external source
         $http.get("https://ethoscope-resources.lab.gilest.ro/news").then(function(response) {
             var data = response.data;
             $scope.notifications = data.news;
@@ -154,7 +162,7 @@
                 $scope.rsync_backup_available = summary.services && summary.services.rsync_service_available || false;
                 $scope.backup_service_available = $scope.mysql_backup_available || $scope.rsync_backup_available;
 
-            }).catch(function(error) {
+            }).catch(function() {
                 $scope.backup_status = {};
                 $scope.backup_service_available = false;
                 $scope.mysql_backup_available = false;
@@ -213,6 +221,10 @@
             })
         };
 
+        // ===========================
+        // UTILITY FUNCTIONS
+        // ===========================
+
         $scope.secToDate = function(secs) {
             if (!secs) return 'No date';
             
@@ -232,6 +244,10 @@
             
             return formatConciseTime(d);
         };
+
+        // ===========================
+        // BACKUP STATUS FUNCTIONS
+        // ===========================
 
         $scope.getBackupStatusClass = function(device) {
             // Prioritize comprehensive backup status if available
@@ -637,7 +653,6 @@
             var video = backup_info.backup_types.video;
 
             var text = '';
-            var parts = [];
 
             // Check if any backup is processing
             if ((mysql && mysql.processing) || (sqlite && sqlite.processing) || (video && video.processing)) {
@@ -686,12 +701,6 @@
             return text;
         };
 
-        // Helper function for folder name extraction (used in video tooltip)
-        function getFolderName(directory) {
-            if (!directory) return null;
-            var parts = directory.split('/');
-            return parts[parts.length - 1] || parts[parts.length - 2];
-        }
 
         $scope.elapsedtime = function(t) {
             // Calculate the number of days left
@@ -746,6 +755,9 @@
             return bytes.toFixed(dp) + ' ' + units[u];
         };
 
+        // ===========================
+        // GROUP ACTIONS & FORM HANDLING
+        // ===========================
 
         $scope.groupActions.checkStart = function(selected_devices) {
             var softwareVersion = "";
@@ -774,8 +786,7 @@
                     var data = response.data;
                     $scope.device.status = data.status;
                 });
-            $http.get('/devices').then(function(response) {
-                var data = response.data;
+            $http.get('/devices').then(function() {
                 $http.get('/device/' + device_id + '/data').then(function(response) {
                     var data = response.data;
                     $scope.device = data;
@@ -783,17 +794,17 @@
                 });
 
                 $http.get('/device/' + device_id + '/ip').then(function(response) {
-                    var data = response.data;
-                    $scope.device.ip = data;
-                    var device_ip = data;
+                    $scope.device.ip = response.data;
                 });
                 $("#startModal").modal('hide');
             });
         };
 
-        $scope.$on('$viewContentLoaded', $scope.get_devices);
+        // ===========================
+        // MODAL & EVENT HANDLING
+        // ===========================
 
-        $('#editSensorModal').on('show.bs.modal', function(e) {
+        $('#editSensorModal').on('show.bs.modal', function() {
             // Clear previous sensor data to show loading state
             $scope.sensoredit = null;
             $scope.$apply();
@@ -805,7 +816,7 @@
             }, 100);
         });
 
-        $('#editSensorModal').on('hidden.bs.modal', function(e) {
+        $('#editSensorModal').on('hidden.bs.modal', function() {
             // Clear sensor data when modal is closed
             $scope.sensoredit = null;
             $scope.$apply();
@@ -814,7 +825,7 @@
         $scope.editSensor = function() {
             console.log($scope.sensoredit);
             $http.post('/sensor/set', data = $scope.sensoredit)
-                .then(function(response) {
+                .then(function() {
                     refresh_platform();
                 })
         };
@@ -836,31 +847,41 @@
                 })
         };
 
+        /**
+         * Refresh platform data (called periodically)
+         */
         var refresh_platform = function() {
+            // Only refresh when page is visible (performance optimization)
             if (document.visibilityState == "visible") {
                 get_devices();
                 update_local_times();
                 get_sensors();
                 get_backup_status();
-                //console.log("refresh platform", new Date());
 
-                // For some reason that I don't understand, angularjs templates cannot access scope from the header so 
-                // we need to use jquery to change the value of the notification badge. We do that only if news is newer than a week.
-                //console.log($scope.notifications.length); // 1
-                //console.log($scope.notifications[0]); // {content: "Latest news here", date: "2020-02-15"}
-
+                // Update notification badge in header
+                // Note: AngularJS templates cannot access scope from header, so we use jQuery
                 $('.notification-badge').html($scope.notifications.length);
-
             }
         };
 
-        // Initialize backup status on page load
-        get_backup_status();
+        // ===========================
+        // INITIALIZATION FUNCTION
+        // ===========================
+        
+        /**
+         * Initialize all platform data immediately on page load
+         */
+        var initialize_platform = function() {
+            console.log("Initializing platform data...");
+            get_devices();
+            update_local_times();
+            get_sensors();
+            get_backup_status();
+        };
 
-        // Note: showAll now only controls frontend filtering by device.status
-        // No longer triggers retirement - devices are fetched based on database active status
-
-        // Add poke device function
+        // ===========================
+        // DEVICE INTERACTION FUNCTIONS
+        // ===========================
         $scope.pokeDevice = function(device) {
             if (device.last_ip) {
                 $http.post('/device/add', device.last_ip)
@@ -880,13 +901,19 @@
             }
         };
 
-        // refresh every 5 seconds
+        // ===========================
+        // STARTUP SEQUENCE
+        // ===========================
+        
+        // Initialize platform data immediately (no delay)
+        initialize_platform();
+        
+        // Set up periodic refresh every 5 seconds
         var refresh_data = $interval(refresh_platform, 5 * 1000);
 
-        //clear interval when scope is destroyed
+        // Clean up interval when scope is destroyed
         $scope.$on("$destroy", function() {
             $interval.cancel(refresh_data);
-            //clearInterval(refresh_data);
         });
     });
 })()

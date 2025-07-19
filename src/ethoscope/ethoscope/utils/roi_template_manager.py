@@ -31,7 +31,7 @@ class ROITemplateManager:
         # Builtin templates - part of the codebase, available on both node and ethoscope
         if builtin_templates_dir is None:
             self.builtin_dir = os.path.abspath(os.path.join(
-                os.path.dirname(__file__), "..", "..", "..", "roi_templates", "builtin"
+                os.path.dirname(__file__), "..", "roi_builders", "roi_templates", "builtin"
             ))
         else:
             self.builtin_dir = builtin_templates_dir
@@ -328,4 +328,65 @@ class ROITemplateManager:
         
         os.remove(template_file)
         return True
+
+
+def convert_legacy_to_template(legacy_builder_class, **legacy_params) -> Dict[str, Any]:
+    """
+    Convert legacy ROI builder class and parameters to template format.
     
+    This function helps migrate from hardcoded builders to template-based ones.
+    
+    Args:
+        legacy_builder_class: Legacy ROI builder class
+        **legacy_params: Legacy builder parameters
+        
+    Returns:
+        Dictionary with template data
+    """
+    class_name = legacy_builder_class.__name__
+    
+    # Create base template structure
+    template_data = {
+        "template_info": {
+            "name": f"Legacy {class_name}",
+            "version": "1.0",
+            "description": f"Migrated from legacy {class_name}",
+            "migration_source": class_name
+        }
+    }
+    
+    # Convert based on known legacy builder types
+    if "TargetGrid" in class_name or "SleepMonitor" in class_name or "Olfaction" in class_name or "ElectricShock" in class_name:
+        # Grid-based templates
+        template_data["roi_definition"] = {
+            "type": "grid_with_targets",
+            "grid": {
+                "n_rows": legacy_params.get("n_rows", 1),
+                "n_cols": legacy_params.get("n_cols", 1),
+                "orientation": "vertical"
+            },
+            "positioning": {
+                "margins": {
+                    "top": legacy_params.get("top_margin", 0.063),
+                    "bottom": legacy_params.get("bottom_margin", 0.063),
+                    "left": legacy_params.get("left_margin", -0.033),
+                    "right": legacy_params.get("right_margin", -0.033)
+                },
+                "fill_ratios": {
+                    "horizontal": legacy_params.get("horizontal_fill", 0.975),
+                    "vertical": legacy_params.get("vertical_fill", 0.7)
+                }
+            },
+            "alignment": {
+                "target_detection": True,
+                "expected_targets": 3
+            }
+        }
+    else:
+        # Default to manual polygons for unknown builders
+        template_data["roi_definition"] = {
+            "type": "manual_polygons",
+            "manual_rois": []
+        }
+    
+    return template_data

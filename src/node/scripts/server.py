@@ -14,6 +14,7 @@ import shutil
 import netifaces
 import json
 import time
+import hashlib
 import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -150,7 +151,8 @@ class EthoscopeNodeServer:
     """Main server class for Ethoscope Node."""
     
     def __init__(self, port: int = DEFAULT_PORT, debug: bool = False, 
-                 ethoscope_data_dir: Optional[str] = None, config_dir: Optional[str] = None):
+                 ethoscope_data_dir: Optional[str] = None, 
+                 config_dir: Optional[str] = None ):
         self.port = port
         self.debug = debug
         self.app = bottle.Bottle()
@@ -166,6 +168,8 @@ class EthoscopeNodeServer:
         self.tmp_imgs_dir: Optional[str] = None
         self.results_dir: Optional[str] = os.path.join (ethoscope_data_dir, "results")
         self.sensors_dir: Optional[str] = os.path.join (ethoscope_data_dir, "sensors")
+        self.roi_templates_dir: Optional[str] = os.path.join(ethoscope_data_dir, "roi_templates")
+
         self.config_dir: Optional[str] = config_dir
         
         # System configuration
@@ -256,7 +260,11 @@ class EthoscopeNodeServer:
         self.app.route('/browse/<folder:path>', method='GET')(self._browse)
         self.app.route('/request_download/<what>', method='POST')(self._download)
         self.app.route('/remove_files', method='POST')(self._remove_files)
-        
+        # ROI template API
+        self.app.route('/roi_templates', method='GET')(self._list_roi_templates)
+        self.app.route('/roi_template/<template_name>', method='GET')(self._get_roi_template)
+        self.app.route('/upload_roi_template', method='POST')(self._upload_roi_template)
+        self.app.route('/device/<id>/upload_template', method='POST')(self._upload_template_to_device)        
         # Database API
         self.app.route('/runs_list', method='GET')(self._runs_list)
         self.app.route('/experiments_list', method='GET')(self._experiments_list)
@@ -983,6 +991,170 @@ class EthoscopeNodeServer:
                 data.append(line.strip().split(','))
         
         return {'headers': headers, 'data': data}
+    
+        # Route handlers - ROI Template API
+    @error_decorator
+    def _list_roi_templates(self):
+        """List available ROI templates, separating builtin and custom."""
+        templates = []
+        
+        # Builtin templates directory (part of codebase)
+        builtin_dir = os.path.join(os.path.dirname(__file__), "..", "..", "roi_templates", "builtin")
+        builtin_dir = os.path.abspath(builtin_dir)
+        
+        # Custom templates directory (in ethoscope_data)
+        custom_dir = self.roi_templates_dir
+        os.makedirs(custom_dir, exist_ok=True)
+        
+        try:
+            # Scan builtin templates first
+            if os.path.exists(builtin_dir):
+                for filename in os.listdir(builtin_dir):
+                    if filename.endswith('.json'):
+                        filepath = os.path.join(builtin_dir, filename)
+                        template_info = self._parse_template_file(filepath, "builtin")
+                        if template_info:
+                            templates.append(template_info)
+            
+            # Scan custom templates second
+            for filename in os.listdir(custom_dir):
+                if filename.endswith('.json'):
+                    filepath = os.path.join(custom_dir, filename)
+                    template_info = self._parse_template_file(filepath, "custom")
+                    if template_info:
+                        templates.append(template_info)
+                        
+            # Sort by display text
+            templates.sort(key=lambda x: x["text"])
+            
+        except Exception as e:
+            self.logger.error(f"Error listing ROI templates: {e}")
+        
+        return {"templates": templates}
+    
+    def _parse_template_file(self, filepath: str, template_type: str):
+        """Parse a template file and return template info."""
+        try:
+            with open(filepath, 'r') as f:
+                file_content = f.read()
+                template_data = json.loads(file_content)
+            
+            # Calculate MD5 hash of the file content
+            md5_hash = hashlib.md5(file_content.encode('utf-8')).hexdigest()
+            
+            template_info = template_data.get("template_info", {})
+            filename = os.path.basename(filepath)
+            
+            # Use existing template ID or generate from MD5
+            template_id = template_info.get("id", md5_hash)
+            
+            return {
+                "value": filename[:-5],  # Remove .json extension
+                "text": template_info.get("name", filename[:-5]),
+                "description": template_info.get("description", ""),
+                "filename": filename,
+                "id": template_id,
+                "md5": md5_hash,
+                "type": template_type  # "builtin" or "custom"
+            }
+        except Exception as e:
+            self.logger.warning(f"Could not load template {filepath}: {e}")
+            return None
+    
+    @error_decorator
+    def _get_roi_template(self, template_name):
+        """Get specific ROI template content from builtin or custom directories."""
+        # Try builtin templates first
+        builtin_dir = os.path.join(os.path.dirname(__file__), "..", "..", "roi_templates", "builtin")
+        builtin_dir = os.path.abspath(builtin_dir)
+        builtin_path = os.path.join(builtin_dir, f"{template_name}.json")
+        
+        if os.path.exists(builtin_path):
+            try:
+                with open(builtin_path, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                bottle.abort(500, f"Error loading builtin template: {e}")
+        
+        # Try custom templates second
+        custom_path = os.path.join(self.roi_templates_dir, f"{template_name}.json")
+        if os.path.exists(custom_path):
+            try:
+                with open(custom_path, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                bottle.abort(500, f"Error loading custom template: {e}")
+        
+        bottle.abort(404, f"Template '{template_name}' not found in builtin or custom directories")
+    
+    @error_decorator
+    def _upload_roi_template(self):
+        """Handle ROI template uploads from web interface."""
+        upload = bottle.request.files.get('template')
+        if not upload:
+            bottle.abort(400, "No template file uploaded")
+        
+        if not upload.filename.endswith('.json'):
+            bottle.abort(400, "Template must be a JSON file")
+        
+        # Ensure roi_templates directory exists 
+        os.makedirs(self.roi_templates_dir, exist_ok=True)
+        
+        # Save uploaded file
+        filepath = os.path.join(self.roi_templates_dir, upload.filename)
+        try:
+            upload.save(filepath)
+            
+            # Validate template
+            with open(filepath, 'r') as f:
+                template_data = json.load(f)
+            
+            # Basic validation
+            if "template_info" not in template_data or "roi_definition" not in template_data:
+                os.remove(filepath)
+                bottle.abort(400, "Invalid template format")
+            
+            return {"success": True, "filename": upload.filename}
+            
+        except Exception as e:
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            bottle.abort(500, f"Error saving template: {e}")
+    
+    @error_decorator  
+    def _upload_template_to_device(self, id):
+        """Upload custom template from node to device."""
+        template_name = bottle.request.json.get('template_name')
+        if not template_name:
+            bottle.abort(400, "Template name required")
+        
+        # Get template from node (should be a custom template)
+        template_data = self._get_roi_template(template_name)
+        
+        # Get device info
+        try:
+            device = self.device_scanner.get_device(id)
+            if not device:
+                bottle.abort(404, f"Device {id} not found")
+            
+            # Upload template to device using device API
+            device_url = f"http://{device.ip()}:{device._port}/upload_roi_template"
+            import requests
+            
+            # Send template data as JSON POST
+            payload = {
+                'template_data': template_data,
+                'template_name': template_name
+            }
+            
+            response = requests.post(device_url, json=payload, timeout=10)
+            if response.status_code == 200:
+                return {"success": True, "message": f"Custom template {template_name} uploaded to device {id}"}
+            else:
+                bottle.abort(500, f"Device upload failed: {response.text}")
+                
+        except Exception as e:
+            bottle.abort(500, f"Error uploading to device: {e}")
     
     # Route handlers - Database API
     @error_decorator
