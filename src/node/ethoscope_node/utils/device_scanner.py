@@ -760,6 +760,7 @@ class Ethoscope(BaseDevice):
             post_data: Optional data to send with instruction (can be Dict or bytes)
         """
         self._check_instruction_status(instruction)
+        current_status = self._device_status.status_name
         
         # Determine trigger source and type
         is_user_triggered = True
@@ -794,7 +795,7 @@ class Ethoscope(BaseDevice):
             if instruction in ["poweroff", "reboot", "restart"]:
                 pass  # Expected for power operations
             else:
-                raise DeviceError(f"Cannot send '{instruction}' to device in status '{current_status}'")
+                raise DeviceError(f"Cannot send '{{instruction}}' to device in status '{{current_status}}'")
        
         self._update_info()
     
