@@ -392,28 +392,17 @@ class BareRepoUpdater:
             logging.debug(traceback.format_exc())
             raise BranchUpdateError("Failed to fetch all remote branches during update.") from e
 
-        # Iterate through remote branches and update them
+        # After fetching, all remote-tracking branches are up-to-date in the bare repo's refs.
+        # We can now list them and report their status as updated.
         for remote_ref in self._remote.refs:
-            # We are interested in actual branches, not HEAD or other special refs
             if remote_ref.name.startswith(f"{self._remote_name}/") and remote_ref.name.count('/') == 1:
                 branch_name = remote_ref.name.split('/', 1)[1]
-                update_results[branch_name] = False  # Assume failure initially
-                try:
-                    # Checkout the branch and pull
-                    self._working_repo.git.checkout(branch_name)
-                    self._remote.pull()
-                    update_results[branch_name] = True
-                    any_success = True
-                    logging.info(f"Successfully updated branch '{branch_name}'.")
-                except GitCommandError as git_err:
-                    logging.error(f"Git command failed while updating branch '{branch_name}': {git_err}")
-                    logging.debug(traceback.format_exc())
-                except Exception as e:
-                    logging.error(f"Unexpected error while updating branch '{branch_name}': {e}")
-                    logging.debug(traceback.format_exc())
+                update_results[branch_name] = True  # Mark as updated since fetch was successful
+                any_success = True
+                logging.info(f"Remote branch '{branch_name}' refs updated in bare repository.")
 
         if not any_success:
-            error_message = "Could not update any branch. Please check your internet connection and repository permissions."
+            error_message = "No remote branches found or updated. Please check your remote configuration and network connection."
             logging.critical(error_message)
             raise BranchUpdateError(error_message)
 
