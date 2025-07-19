@@ -20,7 +20,8 @@
             $scope.getBackupInfo().then(function(response) {
                 var backupData;
                 try {
-                    backupData = JSON.parse(response.data);
+                    // response.data is already parsed by Angular, no need for JSON.parse
+                    backupData = response.data;
                     $scope.backup_devices = backupData.devices || {};
                 } catch (e) {
                     console.error('Error parsing backup status data:', e);
