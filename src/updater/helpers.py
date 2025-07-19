@@ -120,7 +120,7 @@ def update_dev_map_wrapped (devices_map, id, what="data", type=None, port=9000, 
     logging.info("requesting %s" % request_url)
 
     try:
-        f = urllib.request.urlopen(req)
+        f = urllib.request.urlopen(req, timeout=10)
         message = f.read()
 
         if message:
@@ -141,7 +141,7 @@ def update_dev_map_wrapped (devices_map, id, what="data", type=None, port=9000, 
         logging.error('BadlineSatus, most probably due to update device and auto-reset')
         raise e
 
-    except urllib.error.URLError as e:
+    except (urllib.error.URLError, TimeoutError) as e:
         if hasattr(e, 'reason'):
             logging.error('We failed to reach a server.')
             logging.error('Reason: '+ str(e.reason))
@@ -149,6 +149,9 @@ def update_dev_map_wrapped (devices_map, id, what="data", type=None, port=9000, 
         elif hasattr(e, 'code'):
             logging.error('The server couldn\'t fulfill the request.')
             logging.error('Error code: '+ str(e.code))
+            raise e
+        elif isinstance(e, TimeoutError):
+            logging.error('Request timed out.')
             raise e
 
     return devices_map
@@ -274,7 +277,7 @@ def updates_api_wrapper(ip, id, what="check_update", type=None, port=8888, data=
     logging.info("requesting %s" %request_url)
 
     try:
-        f = urllib.request.urlopen(req)
+        f = urllib.request.urlopen(req, timeout=10)
         message = f.read()
 
         if message:
@@ -284,7 +287,7 @@ def updates_api_wrapper(ip, id, what="check_update", type=None, port=8888, data=
         logging.error('BadlineSatus, most probably due to update device and auto-reset')
         raise e
 
-    except urllib.error.URLError as e:
+    except (urllib.error.URLError, TimeoutError) as e:
         if hasattr(e, 'reason'):
             logging.error('We failed to reach a server.')
             logging.error('Reason: '+ str(e.reason))
@@ -292,6 +295,9 @@ def updates_api_wrapper(ip, id, what="check_update", type=None, port=8888, data=
         elif hasattr(e, 'code'):
             logging.error('The server couldn\'t fulfill the request.')
             logging.error('Error code: '+ str(e.code))
+            raise e
+        elif isinstance(e, TimeoutError):
+            logging.error('Request timed out.')
             raise e
 
     return response
