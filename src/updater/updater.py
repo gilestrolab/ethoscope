@@ -269,9 +269,15 @@ class BareRepoUpdater:
         """
         try:
             # Check if the fetch refspec is already set
-            fetch_refspecs = self._working_repo.config_reader().get_value(
-                f'remote "{self._remote_name}"', 'fetch', default=None
-            )
+            fetch_refspecs = None
+            try:
+                fetch_refspecs = self._working_repo.config_reader().get_value(
+                    f'remote "{self._remote_name}"', 'fetch', default=None
+                )
+            except Exception as e:
+                # Handle cases where 'fetch' option might not exist at all
+                logging.debug(f"'fetch' option not found for remote '{self._remote_name}': {e}")
+
             if fetch_refspecs and "+refs/heads/*:refs/heads/*" in fetch_refspecs:
                 logging.info(f"Fetch refspec for remote '{self._remote_name}' is already set.")
                 return
@@ -383,18 +389,32 @@ class BareRepoUpdater:
         update_results: Dict[str, bool] = {}
         any_success = False
 
+        logging.info("Starting update_all_visible_branches for bare repository.")
+
+        # Log remote branches before fetch
+        logging.info("Remote branches BEFORE fetch:")
+        for ref in self._remote.refs:
+            logging.info(f"  - {ref.name}")
+
         try:
             # Fetch all remote branches to ensure we have the latest information
+            logging.info(f"Attempting to fetch from remote '{self._remote_name}' with prune=True.")
             self._remote.fetch(prune=True)
-            logging.info("Fetched all remote branches.")
+            logging.info("Fetch operation completed.")
         except GitCommandError as e:
             logging.error(f"Failed to fetch all remote branches: {e}")
             logging.debug(traceback.format_exc())
             raise BranchUpdateError("Failed to fetch all remote branches during update.") from e
 
+        # Log remote branches AFTER fetch
+        logging.info("Remote branches AFTER fetch:")
+        for ref in self._remote.refs:
+            logging.info(f"  - {ref.name}")
+
         # After fetching, all remote-tracking branches are up-to-date in the bare repo's refs.
         # We can now list them and report their status as updated.
         for remote_ref in self._remote.refs:
+            # We are interested in actual branches, not HEAD or other special refs
             if remote_ref.name.startswith(f"{self._remote_name}/") and remote_ref.name.count('/') == 1:
                 branch_name = remote_ref.name.split('/', 1)[1]
                 update_results[branch_name] = True  # Mark as updated since fetch was successful
