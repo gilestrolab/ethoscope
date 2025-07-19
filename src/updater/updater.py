@@ -353,28 +353,37 @@ class BareRepoUpdater:
         :return: A dictionary mapping branch names to their update status (True for success, False for failure).
         :raises BranchUpdateError: If none of the branches could be updated.
         """
-        branches = self._working_repo.branches
         update_results: Dict[str, bool] = {}
         any_success = False
 
-        if not branches:
-            logging.warning("No branches found in the repository to update.")
-            return update_results  # Return empty dict since there are no branches
+        try:
+            # Fetch all remote branches to ensure we have the latest information
+            self._remote.fetch(prune=True)
+            logging.info("Fetched all remote branches.")
+        except GitCommandError as e:
+            logging.error(f"Failed to fetch all remote branches: {e}")
+            logging.debug(traceback.format_exc())
+            raise BranchUpdateError("Failed to fetch all remote branches during update.") from e
 
-        for branch in branches:
-            branch_name = branch.name
-            update_results[branch_name] = False  # Assume failure initially
-            try:
-                self.update_branch(branch_name)
-                update_results[branch_name] = True
-                any_success = True
-                logging.info(f"Successfully updated branch '{branch_name}'.")
-            except GitCommandError as git_err:
-                logging.error(f"Git command failed while updating branch '{branch_name}': {git_err}")
-                logging.debug(traceback.format_exc())
-            except Exception as e:
-                logging.error(f"Unexpected error while updating branch '{branch_name}': {e}")
-                logging.debug(traceback.format_exc())
+        # Iterate through remote branches and update them
+        for remote_ref in self._remote.refs:
+            # We are interested in actual branches, not HEAD or other special refs
+            if remote_ref.name.startswith(f"{self._remote_name}/") and remote_ref.name.count('/') == 1:
+                branch_name = remote_ref.name.split('/', 1)[1]
+                update_results[branch_name] = False  # Assume failure initially
+                try:
+                    # Checkout the branch and pull
+                    self._working_repo.git.checkout(branch_name)
+                    self._remote.pull()
+                    update_results[branch_name] = True
+                    any_success = True
+                    logging.info(f"Successfully updated branch '{branch_name}'.")
+                except GitCommandError as git_err:
+                    logging.error(f"Git command failed while updating branch '{branch_name}': {git_err}")
+                    logging.debug(traceback.format_exc())
+                except Exception as e:
+                    logging.error(f"Unexpected error while updating branch '{branch_name}': {e}")
+                    logging.debug(traceback.format_exc())
 
         if not any_success:
             error_message = "Could not update any branch. Please check your internet connection and repository permissions."
@@ -383,31 +392,7 @@ class BareRepoUpdater:
 
         return update_results
 
-    def update_branch(self, branch_name: str) -> None:
-        """
-        Fetches updates for a specific branch from the configured remote.
-
-        :param branch_name: The name of the branch to update.
-        :raises GitCommandError: If the fetch operation fails.
-        :raises TypeError: If the branch name is not a string.
-        """
-        if not isinstance(branch_name, str):
-            logging.error(f"Invalid branch type: {type(branch_name)}. Expected 'str'.")
-            raise TypeError("Branch name must be a string.")
-
-        fetch_ref = f"{branch_name}:{branch_name}"
-        try:
-            logging.debug(f"Fetching '{fetch_ref}' from remote '{self._remote_name}'.")
-            self._working_repo.git.fetch(self._remote_name, fetch_ref)
-            logging.debug(f"Fetch command executed successfully for branch '{branch_name}'.")
-        except GitCommandError as e:
-            logging.error(f"Failed to fetch branch '{branch_name}': {e}")
-            logging.debug(traceback.format_exc())
-            raise
-        except Exception as e:
-            logging.error(f"An unexpected error occurred while fetching branch '{branch_name}': {e}")
-            logging.debug(traceback.format_exc())
-            raise
+    
 
     def update_all_branches(self):
         self._working_repo.git.fetch()
