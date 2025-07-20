@@ -1,6 +1,7 @@
 __author__ = 'quentin'
 
 import cv2
+import logging
 
 try:
     CV_VERSION = int(cv2.__version__.split(".")[0])
@@ -172,6 +173,9 @@ class TargetGridROIBuilder(BaseROIBuilder):
 
         # as soon as we have three objects, we stop
         contours = []
+        best_contours = []
+        best_threshold = -1
+        
         for t in range(0, 255,1):
             cv2.threshold(map, t, 255,cv2.THRESH_BINARY  ,bin)
             if CV_VERSION == 3:
@@ -179,11 +183,22 @@ class TargetGridROIBuilder(BaseROIBuilder):
             else:
                 contours, h = cv2.findContours(bin, cv2.RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)
 
-
-            if len(contours) <3:
-                raise EthoscopeException("There should be three targets. Only %i objects have been found" % (len(contours)), img)
+            # Keep track of the best attempt (highest number of contours found)
+            if len(contours) > len(best_contours):
+                best_contours = contours
+                best_threshold = t
+                
             if len(contours) == 3:
                 break
+                
+        # Use the best attempt if we couldn't find exactly 3 targets
+        if len(contours) != 3:
+            contours = best_contours
+            logging.warning(f"Could not find exactly 3 targets. Found {len(contours)} targets at threshold {best_threshold}")
+            
+        if len(contours) < 3:
+            logging.error("There should be three targets. Only %i objects have been found. Please check that your arena has 3 circular targets visible." % (len(contours)))
+            return None  # Return None instead of raising exception
 
         target_diams = [cv2.boundingRect(c)[2] for c in contours]
 
@@ -191,7 +206,8 @@ class TargetGridROIBuilder(BaseROIBuilder):
         mean_sd = np.std(target_diams)
 
         if mean_sd/mean_diam > 0.10:
-            raise EthoscopeException("Too much variation in the diameter of the targets. Something must be wrong since all target should have the same size", img)
+            logging.error("Too much variation in the diameter of the targets. Something must be wrong since all target should have the same size")
+            return None  # Return None instead of raising exception
 
         src_points = []
         for c in contours:
@@ -236,6 +252,11 @@ class TargetGridROIBuilder(BaseROIBuilder):
         '''
         
         reference_points = self._find_target_coordinates(img)
+        
+        # Handle graceful failure when target detection fails
+        if reference_points is None:
+            logging.warning("ROI building failed: could not detect required targets")
+            return None, None
         
         #point 1 is the reference point at coords A,B; point 0 will be A,y and point 2 x,B
         #we then transform the ROIS on the assumption that those points are aligned perpendicularly in this way

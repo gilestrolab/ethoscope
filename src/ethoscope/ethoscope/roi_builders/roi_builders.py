@@ -5,6 +5,7 @@ __author__ = 'quentin'
 import numpy as np
 
 from ethoscope.utils.description import DescribedObject
+from ethoscope.utils.debug import EthoscopeException
 import logging
 import traceback
 
@@ -41,7 +42,19 @@ class BaseROIBuilder(DescribedObject):
         try:
             reference_points, rois = self._rois_from_img(accum)
             
+            # Handle graceful failure when _rois_from_img returns None
+            if reference_points is None or rois is None:
+                logging.warning("ROI building failed gracefully, no targets detected")
+                # Clean up input if it's not an array (i.e., if it's a camera object)
+                if not isinstance(input, np.ndarray):
+                    del input
+                raise EthoscopeException("ROI building failed: insufficient targets detected")
+            
+        except EthoscopeException:
+            # Re-raise EthoscopeException without modification (input already cleaned up above)
+            raise
         except Exception as e:
+            # Handle other exceptions
             if not isinstance(input, np.ndarray):
                 del input
             logging.error(traceback.format_exc())

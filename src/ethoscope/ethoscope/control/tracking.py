@@ -632,9 +632,35 @@ class ControlThread(Thread):
         
         try:
             reference_points, rois = roi_builder.build(cam)
-        except EthoscopeException as e:
-            cam._close()
-            raise e
+            
+            # Handle graceful failure when ROI building returns None values
+            if reference_points is None or rois is None:
+                logging.warning("ROI building failed: insufficient targets detected.")
+                # Save debug image to help user understand the issue
+                self._save_roi_debug_image(cam, "Insufficient targets detected")
+                try:
+                    cam._close()
+                    # Add a delay to allow camera hardware to reset
+                    time.sleep(2.0)
+                    logging.info("Camera cleanup completed, hardware should be available for next attempt")
+                except Exception as cleanup_error:
+                    logging.error(f"Error during camera cleanup: {cleanup_error}")
+                # Return None to indicate failure instead of raising exception
+                return None
+                
+        except (EthoscopeException, Exception) as e:
+            logging.error(f"ROI building failed: {e}")
+            # Save debug image with exception details
+            self._save_roi_debug_image(cam, f"ROI building error: {str(e)}")
+            try:
+                cam._close()
+                # Add a delay to allow camera hardware to reset
+                time.sleep(2.0)
+                logging.info("Camera cleanup completed, hardware should be available for next attempt")
+            except Exception as cleanup_error:
+                logging.error(f"Error during camera cleanup: {cleanup_error}")
+            # Return None to indicate failure instead of raising exception
+            return None
 
 
         logging.info("Initialising monitor")
@@ -787,7 +813,49 @@ class ControlThread(Thread):
         return  (cam, rw, rois, reference_points, TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs)
 
-    
+    def _save_roi_debug_image(self, cam, error_message):
+        """
+        Save a debug image when ROI building fails to help user understand the issue.
+        """
+        try:
+            # Get a frame from the camera to show what was detected
+            _, frame = next(iter(cam))
+            
+            # Convert to color if it's grayscale for better annotation visibility
+            if len(frame.shape) == 2:
+                debug_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+            else:
+                debug_frame = frame.copy()
+            
+            # Add timestamp in bottom right corner in white text
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 2.0  # 4x larger than 0.5
+            color = (255, 255, 255)  # White color
+            thickness = 3  # Thicker for better visibility
+            
+            # Get current timestamp with timezone
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
+            # If no timezone info, add local timezone indicator
+            if not timestamp.endswith(' '):
+                import time
+                tz_name = time.tzname[time.daylight]
+                timestamp = f"{timestamp.rstrip()} {tz_name}"
+            
+            # Calculate text size to position it in bottom right
+            text_size = cv2.getTextSize(timestamp, font, font_scale, thickness)[0]
+            text_x = debug_frame.shape[1] - text_size[0] - 10  # 10 pixels from right edge
+            text_y = debug_frame.shape[0] - 10  # 10 pixels from bottom edge
+            
+            cv2.putText(debug_frame, timestamp, (text_x, text_y), font, font_scale, color, thickness)
+            
+            # Save the debug image
+            debug_path = self._info["dbg_img"]
+            cv2.imwrite(debug_path, debug_frame)
+            logging.info(f"Debug image saved to: {debug_path}")
+            
+        except Exception as e:
+            logging.error(f"Failed to save debug image: {e}")
+
     def run(self):
         cam = None
         hardware_connection = None
@@ -800,8 +868,17 @@ class ControlThread(Thread):
             self._last_info_frame_idx = 0
 
             # Always create a new tracking instance (pickle resume logic removed)
-            cam, rw, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
+            tracking_setup = self._set_tracking_from_scratch()
+            
+            # Handle graceful failure when tracking setup fails
+            if tracking_setup is None:
+                logging.warning("Tracking setup failed. Please check your arena setup and try again.")
+                self._info["status"] = "stopped"  # Keep device available for restart
+                self._info["error"] = "ROI building failed: insufficient targets detected. Please check your arena has 3 circular targets visible."
+                # Don't exit, just stop this tracking attempt - device remains available
+                return  # Exit gracefully without crashing
                 
+            cam, rw, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = tracking_setup
             
             with rw as result_writer:
                 # Start tracking directly (pickle saving removed)

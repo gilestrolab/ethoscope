@@ -1,9 +1,7 @@
-__author__ = 'quentin'
-
 import time, datetime
 import logging
 import os
-from ethoscope.utils.debug import EthoscopeException
+import gc
 import threading, queue
 import traceback
 
@@ -18,6 +16,8 @@ try:
 
 except ImportError:
     from cv2 import CAP_PROP_FRAME_WIDTH, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_COUNT, CAP_PROP_POS_MSEC, CAP_PROP_FPS
+
+from ethoscope.utils.debug import EthoscopeException
 
 try:
     import picamera2
@@ -636,6 +636,23 @@ class PiFrameGrabber2(PiFrameGrabber):
                 logging.warning(f"Some problem acquiring frames from the camera: {e}")
 
         finally:
+            # Ensure camera cleanup for PiFrameGrabber2
+            try:
+                # Force cleanup of any Picamera2 instances that might be lingering
+                gc.collect()
+                
+                # Try to explicitly close any remaining camera connections
+                try:
+                    from picamera2 import Picamera2
+                    # Clear any global camera instances if they exist
+                    if hasattr(Picamera2, '_instances'):
+                        Picamera2._instances.clear()
+                except Exception:
+                    pass
+                    
+            except Exception as cleanup_e:
+                logging.error(f"Error during frame grabber cleanup: {cleanup_e}")
+                
             self._queue.task_done()  # Indicates to the parent that the thread can be closed
             logging.warning("Camera Frame grabber stopped acquisition cleanly.")
 
@@ -682,15 +699,16 @@ class OurPiCameraAsync(BaseCamera):
             # Check if camera hardware is not available
             if first_frame is None:
                 logging.error("Camera hardware not available - no video capabilities")
-                self._p.join(5)
+                self._cleanup_frame_grabber()
+                # Add delay to allow hardware to reset between initialization attempts
+                time.sleep(1.0)
                 raise EthoscopeException("Camera hardware not available. Video tracking and recording are disabled.")
             
         except Exception as e:
             logging.error("Could not get any frame from the camera after the initialisation!")
-            # we force kill the frame grabber if it does not reply within 5s
-            self._p.join(5)
-            logging.warning("Framegrabber thread joined")
-
+            self._cleanup_frame_grabber()
+            # Add delay to allow hardware to reset between initialization attempts
+            time.sleep(1.0)
             raise e
             
         if len(first_frame.shape) < 2:
@@ -706,6 +724,56 @@ class OurPiCameraAsync(BaseCamera):
         super(OurPiCameraAsync, self).__init__(*args, **kwargs)
         self._start_time = time.time()
         logging.info("Camera initialised")
+    
+    def _cleanup_frame_grabber(self):
+        """
+        Clean up the frame grabber process properly.
+        """
+        try:
+            # Signal the frame grabber to stop
+            self._stop_queue.put(None)
+            
+            # Empty the frames queue to prevent blocking
+            while not self._queue.empty():
+                self._queue.get()
+            
+            # Wait for the process to finish with timeout
+            self._p.join(5)
+            logging.warning("Framegrabber thread joined")
+            
+        except Exception as cleanup_e:
+            logging.error(f"Error during frame grabber cleanup: {cleanup_e}")
+            # Force terminate if join fails
+            if self._p.is_alive():
+                self._p.terminate()
+                self._p.join(1)
+                if self._p.is_alive():
+                    logging.error("Could not terminate frame grabber process")
+        
+        finally:
+            # Additional cleanup for Picamera2 global state
+            try:
+                # Force garbage collection to clean up any lingering camera objects
+                gc.collect()
+                
+                # Try to reset Picamera2 global state
+                try:
+                    from picamera2 import Picamera2
+                    # Some versions of picamera2 maintain global state
+                    if hasattr(Picamera2, '_instances'):
+                        Picamera2._instances.clear()
+                    if hasattr(Picamera2, '_global_camera_info'):
+                        Picamera2._global_camera_info = None
+                        
+                    # Wait a bit for hardware to reset
+                    time.sleep(0.5)
+                        
+                except Exception:
+                    # If Picamera2 cleanup fails, that's okay
+                    pass
+                    
+            except Exception as global_cleanup_e:
+                logging.error(f"Error during global camera cleanup: {global_cleanup_e}")
 
     def restart(self):
         self._frame_idx = 0
@@ -741,18 +809,8 @@ class OurPiCameraAsync(BaseCamera):
         return self._start_time
 
     def _close(self):
-
         logging.info("Requesting grabbing process to stop!")
-        
-        #Insert a stop signal in the stopping queue
-        self._stop_queue.put(None)
-        
-        #empty the frames' queue
-        while not self._queue.empty():
-             self._queue.get()
-
-        self._p.join()
-        logging.info("Frame grabbing thread is joined")
+        self._cleanup_frame_grabber()
 
     def _next_image(self):
         self.fps = self._frame_idx/(time.time() - self._start_time)
