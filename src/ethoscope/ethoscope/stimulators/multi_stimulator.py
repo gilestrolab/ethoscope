@@ -22,12 +22,12 @@ class MultiStimulator(BaseStimulator):
     
     _description = {
         "overview": "A meta-stimulator that manages multiple stimulators with individual date/time ranges",
+        "hidden": True,
         "arguments": [
             {
                 "type": "stimulator_sequence", 
                 "name": "stimulator_sequence",
                 "description": "Sequence of stimulators with their configurations and date ranges",
-                "hidden": True,
                 "default": []
             }
         ]
