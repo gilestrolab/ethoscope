@@ -372,10 +372,10 @@ class DAMFileHelper(object):
         """
         dt = datetime.datetime.fromtimestamp(int(time.time()))
         date_time_fields = dt.strftime("%d %b %Y,%H:%M:%S").split(",")
-        values = [0] + date_time_fields
+        values = date_time_fields
         for i in range(1, self._n_rois +1):
             values.append(int(round(self._scale * vals[i])))
-        command = '''INSERT INTO CSV_DAM_ACTIVITY VALUES %s''' % str(tuple(values))
+        command = '''INSERT INTO CSV_DAM_ACTIVITY (date, time, ''' + ', '.join([f'ROI_{i}' for i in range(1, self._n_rois + 1)]) + ''') VALUES %s''' % str(tuple(values))
         return command
 
     def flush(self, t):
@@ -1132,7 +1132,8 @@ class BaseResultWriter(object):
         
         # now this is irrelevant when tracking multiple animals
         if self._dam_file_helper is not None:
-            self._dam_file_helper.input_roi_data(t, roi, data_rows)
+            for dr in data_rows:
+                self._dam_file_helper.input_roi_data(t, roi, dr)
     
     def _initialise_var_map(self, data_row):
         """Initialize variable mapping table with data types."""
@@ -1685,7 +1686,8 @@ class SQLiteResultWriter(BaseResultWriter):
         
         # now this is irrelevant when tracking multiple animals
         if self._dam_file_helper is not None:
-            self._dam_file_helper.input_roi_data(t, roi, data_rows)
+            for dr in data_rows:
+                self._dam_file_helper.input_roi_data(t, roi, dr)
 
     def _create_all_tables(self):
         """
