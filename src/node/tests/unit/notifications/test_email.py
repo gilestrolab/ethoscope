@@ -296,21 +296,24 @@ class TestEmailNotificationService:
         mock_get_logs.return_value = 'Log line 1\nLog line 2\nError occurred'
         mock_send.return_value = True
         
-        result = email_service.send_device_stopped_alert(device_id, device_name, run_id, last_seen)
-        
-        assert result == True
-        mock_get_users.assert_called_once_with(device_id)
-        mock_get_admin.assert_called_once()
-        mock_analyze.assert_called_once_with(device_id)
-        mock_get_logs.assert_called_once_with(device_id, max_lines=500)
-        mock_send.assert_called_once()
-        
-        # Check that email was created with correct content
-        call_args = mock_send.call_args[0][0]  # Get the message argument
-        assert 'Test Device' in call_args['Subject']
-        to_addresses = call_args['To']
-        assert 'user@example.com' in to_addresses
-        assert 'admin@example.com' in to_addresses
+        # Mock database methods
+        with patch.object(email_service.db, 'hasAlertBeenSent', return_value=False), \
+             patch.object(email_service.db, 'logAlert', return_value=1):
+            result = email_service.send_device_stopped_alert(device_id, device_name, run_id, last_seen)
+            
+            assert result == True
+            mock_get_users.assert_called_once_with(device_id)
+            mock_get_admin.assert_called_once()
+            mock_analyze.assert_called_once_with(device_id)
+            mock_get_logs.assert_called_once_with(device_id, max_lines=500)
+            mock_send.assert_called_once()
+            
+            # Check that email was created with correct content
+            call_args = mock_send.call_args[0][0]  # Get the message argument
+            assert 'Test Device' in call_args['Subject']
+            to_addresses = call_args['To']
+            assert 'user@example.com' in to_addresses
+            assert 'admin@example.com' in to_addresses
         
         # Check that email has attachments
         payload = call_args.get_payload()
@@ -324,7 +327,7 @@ class TestEmailNotificationService:
         result = email_service.send_device_stopped_alert('device_001', 'Test Device', 'run_123', datetime.datetime.now())
         
         assert result == False
-        mock_should_send.assert_called_once_with('device_001', 'device_stopped')
+        mock_should_send.assert_called_once_with('device_001', 'device_stopped', 'run_123')
     
     @patch.object(EmailNotificationService, 'get_device_users')
     @patch.object(EmailNotificationService, 'get_admin_emails')
@@ -458,7 +461,9 @@ class TestEmailNotificationService:
         # Mock other dependencies
         with patch.object(email_service, 'get_device_users', return_value=['user@example.com']), \
              patch.object(email_service, 'get_admin_emails', return_value=['admin@example.com']), \
-             patch.object(email_service, '_send_email', return_value=True) as mock_send:
+             patch.object(email_service, '_send_email', return_value=True) as mock_send, \
+             patch.object(email_service.db, 'hasAlertBeenSent', return_value=False), \
+             patch.object(email_service.db, 'logAlert', return_value=1):
             
             result = email_service.send_device_stopped_alert('device_001', 'Test Device', 'run_123', datetime.datetime.now())
             

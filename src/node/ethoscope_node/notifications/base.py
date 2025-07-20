@@ -69,13 +69,21 @@ class NotificationAnalyzer:
                     'error': 'No runs found for device'
                 }
             
-            # Find last run
-            last_run = max(device_runs, key=lambda x: x.get('start_time', 0))
+            # Find last run (need to parse timestamps for comparison)
+            def get_run_start_time(run):
+                start_time_raw = run.get('start_time', 0)
+                return self._parse_timestamp(start_time_raw)
+            
+            last_run = max(device_runs, key=get_run_start_time)
             
             # Determine failure type and duration
             current_time = time.time()
-            start_time = last_run.get('start_time', 0)
-            end_time = last_run.get('end_time')
+            start_time_raw = last_run.get('start_time', 0)
+            end_time_raw = last_run.get('end_time')
+            
+            # Convert datetime strings to timestamps
+            start_time = self._parse_timestamp(start_time_raw)
+            end_time = self._parse_timestamp(end_time_raw) if end_time_raw else None
             
             if end_time is None:
                 failure_type = "crashed_during_tracking"
@@ -128,6 +136,56 @@ class NotificationAnalyzer:
                 'error': str(e)
             }
     
+    def _parse_timestamp(self, timestamp_value):
+        """
+        Parse timestamp value which could be a string, float, or datetime object.
+        
+        Args:
+            timestamp_value: The timestamp value from database
+            
+        Returns:
+            float: Unix timestamp, or 0 if parsing fails
+        """
+        if timestamp_value is None:
+            return 0
+        
+        try:
+            # If it's already a number, return it
+            if isinstance(timestamp_value, (int, float)):
+                return float(timestamp_value)
+            
+            # If it's a string, try to parse it as datetime
+            if isinstance(timestamp_value, str):
+                # Try different datetime formats that might be stored in database
+                for fmt in [
+                    '%Y-%m-%d %H:%M:%S.%f',  # 2023-01-01 12:34:56.789123
+                    '%Y-%m-%d %H:%M:%S',     # 2023-01-01 12:34:56
+                    '%Y-%m-%d_%H-%M-%S',     # 2023-01-01_12-34-56
+                    '%Y%m%d_%H%M%S'          # 20230101_123456
+                ]:
+                    try:
+                        dt = datetime.datetime.strptime(timestamp_value, fmt)
+                        return dt.timestamp()
+                    except ValueError:
+                        continue
+                
+                # If no format worked, try parsing as float
+                try:
+                    return float(timestamp_value)
+                except ValueError:
+                    pass
+            
+            # If it's a datetime object
+            if hasattr(timestamp_value, 'timestamp'):
+                return timestamp_value.timestamp()
+            
+            self.logger.warning(f"Could not parse timestamp: {timestamp_value} (type: {type(timestamp_value)})")
+            return 0
+            
+        except Exception as e:
+            self.logger.error(f"Error parsing timestamp '{timestamp_value}': {e}")
+            return 0
+    
     def get_device_logs(self, device_id: str, max_lines: int = 1000) -> Optional[str]:
         """
         Get log content from a device.
@@ -145,8 +203,14 @@ class NotificationAnalyzer:
             if not device_info:
                 return None
                 
-            # Get device IP/hostname
-            ip = device_info.get('ip', device_info.get('ethoscope_name', device_id))
+            # Get device IP/hostname from database
+            # Extract the actual device data from the nested structure
+            device_data = device_info.get(device_id, {})
+            ip = device_data.get('last_ip') or device_data.get('ethoscope_name')
+            
+            if not ip or ip == device_id:
+                self.logger.warning(f"No valid IP found for device {device_id} - cannot fetch logs")
+                return None
             
             # Try to fetch logs from device
             log_url = f"http://{ip}:9000/data/log/{device_id}"
@@ -192,7 +256,22 @@ class NotificationAnalyzer:
                 return {'error': 'Device not found'}
             
             # Try to get real-time status from device
-            ip = device_info.get('ip', device_info.get('ethoscope_name', device_id))
+            # Extract the actual device data from the nested structure
+            device_data = device_info.get(device_id, {})
+            ip = device_data.get('last_ip') or device_data.get('ethoscope_name')
+            
+            # Only try to connect if we have a valid IP (not the device ID)
+            if not ip or ip == device_id:
+                # Device is offline, return database info
+                return {
+                    'device_id': device_id,
+                    'device_name': device_data.get('ethoscope_name'),
+                    'online': False,
+                    'last_seen': device_data.get('last_seen'),
+                    'active': device_data.get('active', False),
+                    'problems': device_data.get('problems', ''),
+                    'status': 'offline'
+                }
             
             try:
                 status_url = f"http://{ip}:9000/data/{device_id}"
@@ -218,11 +297,11 @@ class NotificationAnalyzer:
             # Device is offline, return database info
             return {
                 'device_id': device_id,
-                'device_name': device_info.get('ethoscope_name'),
+                'device_name': device_data.get('ethoscope_name'),
                 'online': False,
-                'last_seen': device_info.get('last_seen'),
-                'active': device_info.get('active', False),
-                'problems': device_info.get('problems', ''),
+                'last_seen': device_data.get('last_seen'),
+                'active': device_data.get('active', False),
+                'problems': device_data.get('problems', ''),
                 'status': 'offline'
             }
             

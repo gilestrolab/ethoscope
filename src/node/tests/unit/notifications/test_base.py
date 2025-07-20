@@ -205,10 +205,12 @@ class TestNotificationAnalyzer:
         device_id = "test_device_001"
         log_content = "Log line 1\nLog line 2\nLog line 3"
         
-        # Mock device info
+        # Mock device info - nested structure like getEthoscope returns
         device_info = {
-            'ethoscope_name': 'Test Ethoscope 001',
-            'ip': '192.168.1.100'
+            device_id: {
+                'ethoscope_name': 'Test Ethoscope 001',
+                'last_ip': '192.168.1.100'
+            }
         }
         
         # Mock successful HTTP response
@@ -233,8 +235,10 @@ class TestNotificationAnalyzer:
         device_id = "test_device_001"
         
         device_info = {
-            'ethoscope_name': 'Test Ethoscope 001',
-            'ip': '192.168.1.100'
+            device_id: {
+                'ethoscope_name': 'Test Ethoscope 001',
+                'last_ip': '192.168.1.100'
+            }
         }
         
         mock_get.side_effect = Exception("Connection timeout")
@@ -251,8 +255,10 @@ class TestNotificationAnalyzer:
         log_content = "\n".join([f"Line {i}" for i in range(100)])
         
         device_info = {
-            'ethoscope_name': 'Test Ethoscope 001',
-            'ip': '192.168.1.100'
+            device_id: {
+                'ethoscope_name': 'Test Ethoscope 001',
+                'last_ip': '192.168.1.100'
+            }
         }
         
         mock_response = Mock()
@@ -275,8 +281,10 @@ class TestNotificationAnalyzer:
         device_id = "test_device_001"
         
         device_info = {
-            'ethoscope_name': 'Test Ethoscope 001',
-            'ip': '192.168.1.100'
+            device_id: {
+                'ethoscope_name': 'Test Ethoscope 001',
+                'last_ip': '192.168.1.100'
+            }
         }
         
         status_data = {
@@ -300,7 +308,7 @@ class TestNotificationAnalyzer:
         result = analyzer.get_device_status_info(device_id)
         
         assert result['device_id'] == device_id
-        assert result['device_name'] == 'Test Ethoscope 001'
+        assert result['device_name'] == device_info.get('ethoscope_name')
         assert result['online'] == True
         assert result['status'] == 'running'
         assert result['fps'] == 30
@@ -312,21 +320,24 @@ class TestNotificationAnalyzer:
         device_id = "test_device_001"
         
         device_info = {
-            'ethoscope_name': 'Test Ethoscope 001',
-            'ip': '192.168.1.100',
-            'last_seen': time.time() - 3600,
-            'active': False,
-            'problems': 'Device offline'
+            device_id: {
+                'ethoscope_name': 'Test Ethoscope 001',
+                'last_ip': '192.168.1.100',
+                'last_seen': time.time() - 3600,
+                'active': False,
+                'problems': 'Device offline'
+            }
         }
         
-        mock_get.side_effect = Exception("Connection refused")
+        import requests
+        mock_get.side_effect = requests.RequestException("Connection refused")
         analyzer.db.getEthoscope.return_value = device_info
         
         result = analyzer.get_device_status_info(device_id)
         
         assert result['device_id'] == device_id
-        assert 'error' in result
-        assert result['error'] == 'Connection refused'
+        assert result['online'] == False
+        assert result['status'] == 'offline'
     
     def test_format_duration_seconds(self, analyzer):
         """Test duration formatting for seconds."""

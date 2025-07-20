@@ -50,21 +50,34 @@ class EmailNotificationService(NotificationAnalyzer):
         """Get alert configuration from settings."""
         return self.config.content.get('alerts', {})
     
-    def _should_send_alert(self, device_id: str, alert_type: str) -> bool:
+    def _should_send_alert(self, device_id: str, alert_type: str, run_id: str = None) -> bool:
         """
-        Check if we should send an alert based on rate limiting.
+        Check if we should send an alert based on rate limiting and database history.
         
         Args:
             device_id: Device identifier
             alert_type: Type of alert (device_stopped, storage_warning, etc.)
+            run_id: Run ID for device_stopped alerts (prevents duplicates for same run)
             
         Returns:
             True if alert should be sent
         """
+        # For device_stopped alerts, check database for duplicates based on run_id
+        if alert_type == 'device_stopped' and run_id:
+            if self.db.hasAlertBeenSent(device_id, alert_type, run_id):
+                self.logger.debug(f"Alert {device_id}:{alert_type}:{run_id} already sent - preventing duplicate")
+                return False
+        
+        # For other alerts or when no run_id, use traditional cooldown
         alert_config = self._get_alert_config()
         cooldown = alert_config.get('cooldown_seconds', self._default_cooldown)
         
-        key = f"{device_id}:{alert_type}"
+        # Use run_id in key for device_stopped alerts, otherwise use traditional key
+        if alert_type == 'device_stopped' and run_id:
+            key = f"{device_id}:{alert_type}:{run_id}"
+        else:
+            key = f"{device_id}:{alert_type}"
+        
         current_time = time.time()
         
         if key in self._last_alert_times:
@@ -190,7 +203,7 @@ class EmailNotificationService(NotificationAnalyzer):
         Returns:
             True if alert was sent
         """
-        if not self._should_send_alert(device_id, 'device_stopped'):
+        if not self._should_send_alert(device_id, 'device_stopped', run_id):
             return False
         
         # Get comprehensive device failure analysis
@@ -335,7 +348,14 @@ class EmailNotificationService(NotificationAnalyzer):
         """
         
         msg = self._create_email_message(all_emails, subject, html_body, text_body, attachments)
-        return self._send_email(msg)
+        success = self._send_email(msg)
+        
+        # Log the alert to database
+        if success:
+            recipients_str = ', '.join(all_emails)
+            self.db.logAlert(device_id, 'device_stopped', f"Device {device_name} stopped unexpectedly", recipients_str, run_id)
+        
+        return success
     
     def send_storage_warning_alert(self, device_id: str, device_name: str, 
                                   storage_percent: float, available_space: str) -> bool:
@@ -440,7 +460,14 @@ class EmailNotificationService(NotificationAnalyzer):
         """
         
         msg = self._create_email_message(all_emails, subject, html_body, text_body)
-        return self._send_email(msg)
+        success = self._send_email(msg)
+        
+        # Log the alert to database
+        if success:
+            recipients_str = ', '.join(all_emails)
+            self.db.logAlert(device_id, 'storage_warning', f"Storage warning: {storage_percent:.1f}% full", recipients_str)
+        
+        return success
     
     def send_device_unreachable_alert(self, device_id: str, device_name: str, 
                                      last_seen: datetime.datetime) -> bool:
@@ -536,7 +563,14 @@ class EmailNotificationService(NotificationAnalyzer):
         """
         
         msg = self._create_email_message(admin_emails, subject, html_body, text_body)
-        return self._send_email(msg)
+        success = self._send_email(msg)
+        
+        # Log the alert to database
+        if success:
+            recipients_str = ', '.join(admin_emails)
+            self.db.logAlert(device_id, 'device_unreachable', f"Device {device_name} is unreachable", recipients_str)
+        
+        return success
     
     def test_email_configuration(self) -> Dict[str, Any]:
         """

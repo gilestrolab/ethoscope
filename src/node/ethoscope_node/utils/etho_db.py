@@ -105,8 +105,7 @@ class ExperimentalDB(multiprocessing.Process):
         """
         
         sql_create_runs_table = """CREATE TABLE IF NOT EXISTS %s (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                run_id TEXT NOT NULL,
+                                run_id TEXT PRIMARY KEY,
                                 type TEXT NOT NULL,
                                 ethoscope_name TEXT NOT NULL,
                                 ethoscope_id TEXT NOT NULL,
@@ -163,6 +162,7 @@ class ExperimentalDB(multiprocessing.Process):
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 device_id TEXT NOT NULL,
                                 alert_type TEXT NOT NULL,
+                                run_id TEXT,
                                 message TEXT NOT NULL,
                                 recipients TEXT,
                                 created_at TIMESTAMP NOT NULL,
@@ -185,6 +185,10 @@ class ExperimentalDB(multiprocessing.Process):
         try:
             # Migration 1: Convert ethoscopes table to use ethoscope_id as primary key
             self._migrate_ethoscopes_primary_key()
+            # Migration 2: Convert runs table to use run_id as primary key
+            self._migrate_runs_primary_key()
+            # Migration 3: Add run_id column to alert_logs table
+            self._migrate_alert_logs_run_id()
         except Exception as e:
             logging.error(f"Error during database migration: {e}")
     
@@ -246,6 +250,101 @@ class ExperimentalDB(multiprocessing.Process):
                 
         except Exception as e:
             logging.error(f"Error migrating ethoscopes table: {e}")
+    
+    def _migrate_runs_primary_key(self):
+        """
+        Migrate runs table to use run_id as primary key instead of auto-incrementing id.
+        """
+        try:
+            # Check if the table has the old structure (id column exists)
+            check_old_structure = f"PRAGMA table_info({self._runs_table_name})"
+            table_info = self.executeSQL(check_old_structure)
+            
+            if not isinstance(table_info, list):
+                return
+            
+            # Check if 'id' column exists (old structure) and run_id is not primary key
+            has_id_column = any(col[1] == 'id' for col in table_info)
+            run_id_is_primary = any(col[1] == 'run_id' and col[5] == 1 for col in table_info)
+            
+            if has_id_column and not run_id_is_primary:
+                logging.info("Migrating runs table to use run_id as primary key")
+                
+                # Create new table with correct structure
+                sql_create_new_table = f"""CREATE TABLE {self._runs_table_name}_new (
+                    run_id TEXT PRIMARY KEY,
+                    type TEXT NOT NULL,
+                    ethoscope_name TEXT NOT NULL,
+                    ethoscope_id TEXT NOT NULL,
+                    user_name TEXT,
+                    user_id INTEGER NOT NULL,
+                    location TEXT,
+                    start_time TIMESTAMP NOT NULL,
+                    end_time TIMESTAMP,
+                    alert INTEGER,
+                    problems TEXT,
+                    experimental_data TEXT,
+                    comments TEXT,
+                    status TEXT
+                )"""
+                
+                # Copy data from old table to new table, handling duplicates by keeping the most recent
+                sql_copy_data = f"""INSERT INTO {self._runs_table_name}_new 
+                    (run_id, type, ethoscope_name, ethoscope_id, user_name, user_id, location, start_time, end_time, alert, problems, experimental_data, comments, status)
+                    SELECT run_id, type, ethoscope_name, ethoscope_id, user_name, user_id, location, start_time, end_time, alert, problems, experimental_data, comments, status
+                    FROM {self._runs_table_name}
+                    WHERE id IN (
+                        SELECT MAX(id) FROM {self._runs_table_name} GROUP BY run_id
+                    )"""
+                
+                # Drop old table
+                sql_drop_old = f"DROP TABLE {self._runs_table_name}"
+                
+                # Rename new table
+                sql_rename_new = f"ALTER TABLE {self._runs_table_name}_new RENAME TO {self._runs_table_name}"
+                
+                # Execute migration
+                self.executeSQL(sql_create_new_table)
+                self.executeSQL(sql_copy_data)
+                self.executeSQL(sql_drop_old)
+                self.executeSQL(sql_rename_new)
+                
+                logging.info("Successfully migrated runs table to use run_id as primary key")
+                
+        except Exception as e:
+            logging.error(f"Error migrating runs table: {e}")
+    
+    def _migrate_alert_logs_run_id(self):
+        """
+        Add run_id column to alert_logs table if it doesn't exist.
+        """
+        try:
+            # Check if run_id column already exists
+            check_columns = f"PRAGMA table_info(alert_logs)"
+            table_info = self.executeSQL(check_columns)
+            
+            if not isinstance(table_info, list):
+                # Table might not exist yet, let the regular creation handle it
+                return
+            
+            # Check if run_id column exists
+            has_run_id_column = any(col[1] == 'run_id' for col in table_info)
+            
+            if not has_run_id_column:
+                logging.info("Adding run_id column to alert_logs table")
+                
+                # Add the run_id column
+                sql_add_column = "ALTER TABLE alert_logs ADD COLUMN run_id TEXT"
+                self.executeSQL(sql_add_column)
+                
+                # Create index for better performance
+                sql_create_index = "CREATE INDEX IF NOT EXISTS idx_alert_logs_device_type_run ON alert_logs(device_id, alert_type, run_id)"
+                self.executeSQL(sql_create_index)
+                
+                logging.info("Successfully added run_id column to alert_logs table")
+                
+        except Exception as e:
+            logging.error(f"Error migrating alert_logs table: {e}")
 
     def getRun (self, run_id, asdict=False):
         """
@@ -299,7 +398,7 @@ class ExperimentalDB(multiprocessing.Process):
 
         problems = ""
         
-        sql_enter_new_experiment = "INSERT INTO %s VALUES( NULL, '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % ( self._runs_table_name, run_id, experiment_type, ethoscope_name, ethoscope_id, username, user_id, location, start_time, end_time, alert, problems, experimental_data, comments, status)
+        sql_enter_new_experiment = "INSERT INTO %s VALUES( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')" % ( self._runs_table_name, run_id, experiment_type, ethoscope_name, ethoscope_id, username, user_id, location, start_time, end_time, alert, problems, experimental_data, comments, status)
         return self.executeSQL ( sql_enter_new_experiment )
     
     
@@ -507,7 +606,7 @@ class ExperimentalDB(multiprocessing.Process):
         else:
             return rows
     
-    def logAlert(self, device_id: str, alert_type: str, message: str, recipients: str = ""):
+    def logAlert(self, device_id: str, alert_type: str, message: str, recipients: str = "", run_id: str = None):
         """
         Log an alert that was sent.
         
@@ -516,19 +615,65 @@ class ExperimentalDB(multiprocessing.Process):
             alert_type: Type of alert (device_stopped, storage_warning, etc.)
             message: Alert message content
             recipients: Comma-separated list of email recipients
+            run_id: Run ID associated with the alert (optional)
             
         Returns:
             ID of the inserted alert log entry
         """
         timestamp = datetime.datetime.now()
         
+        # Escape single quotes in message
+        escaped_message = message.replace("'", "''")
+        
+        # Handle run_id - use NULL if not provided
+        run_id_sql = f"'{run_id}'" if run_id else "NULL"
+        
         sql_log_alert = """
         INSERT INTO alert_logs VALUES(
-            NULL, '%s', '%s', '%s', '%s', '%s', '%s'
+            NULL, '%s', '%s', %s, '%s', '%s', '%s', '%s'
         )
-        """ % (device_id, alert_type, message.replace("'", "''"), recipients, timestamp, timestamp)
+        """ % (device_id, alert_type, run_id_sql, escaped_message, recipients, timestamp, timestamp)
         
         return self.executeSQL(sql_log_alert)
+    
+    def hasAlertBeenSent(self, device_id: str, alert_type: str, run_id: str = None) -> bool:
+        """
+        Check if an alert has already been sent for a specific device, alert type, and run_id.
+        
+        Args:
+            device_id: Device ID to check
+            alert_type: Type of alert to check
+            run_id: Run ID to check (optional)
+            
+        Returns:
+            True if alert has already been sent, False otherwise
+        """
+        try:
+            sql_conditions = ["device_id = '%s'" % device_id, "alert_type = '%s'" % alert_type]
+            
+            if run_id:
+                sql_conditions.append("run_id = '%s'" % run_id)
+            else:
+                sql_conditions.append("run_id IS NULL")
+            
+            where_clause = " AND ".join(sql_conditions)
+            
+            sql_check_alert = f"""
+            SELECT COUNT(*) as count FROM alert_logs 
+            WHERE {where_clause}
+            """
+            
+            result = self.executeSQL(sql_check_alert)
+            
+            if isinstance(result, list) and len(result) > 0:
+                count = result[0][0] if hasattr(result[0], '__getitem__') else result[0]['count']
+                return count > 0
+            
+            return False
+            
+        except Exception as e:
+            logging.error(f"Error checking alert history for {device_id}, {alert_type}, {run_id}: {e}")
+            return False
     
     def getAlertHistory(self, device_id: str = None, alert_type: str = None, 
                        limit: int = 100, asdict: bool = False):
