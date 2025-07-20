@@ -100,4 +100,5 @@ Both tracking and recording use `OrderedDict` for consistent form ordering:
 
 
 ## Local development
-- use `source /home/gg/Data/virtual_envs/python/ethoscope/bin/activate`
+- use `source /home/gg/Data/virtual_envs/python/ethoscope/bin/activate` to activate the appropriate virtual environment
+- run the server with `cd /home/gg/Data/ethoscope_project/ethoscope/src/node/scripts && python server.py -D --port 8080` and optionally specific flags about the location of configs and results
