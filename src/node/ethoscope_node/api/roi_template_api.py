@@ -27,8 +27,9 @@ class ROITemplateAPI(BaseAPI):
         """List available ROI templates, separating builtin and custom."""
         templates = []
         
-        # Builtin templates directory (part of codebase)
-        builtin_dir = os.path.join(os.path.dirname(__file__), "..", "..", "roi_templates", "builtin")
+        # Builtin templates directory (part of ethoscope package)
+        # Look for builtin templates in the ethoscope package roi_builders directory
+        builtin_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "ethoscope", "ethoscope", "roi_builders", "roi_templates", "builtin")
         builtin_dir = os.path.abspath(builtin_dir)
         
         # Custom templates directory (in ethoscope_data)
@@ -84,7 +85,8 @@ class ROITemplateAPI(BaseAPI):
                 "filename": filename,
                 "id": template_id,
                 "md5": md5_hash,
-                "type": template_type  # "builtin" or "custom"
+                "type": template_type,  # "builtin" or "custom"
+                "is_default": template_info.get("default", False)  # Check for default flag
             }
         except Exception as e:
             self.logger.warning(f"Could not load template {filepath}: {e}")
@@ -94,7 +96,7 @@ class ROITemplateAPI(BaseAPI):
     def _get_roi_template(self, template_name):
         """Get specific ROI template content from builtin or custom directories."""
         # Try builtin templates first
-        builtin_dir = os.path.join(os.path.dirname(__file__), "..", "..", "roi_templates", "builtin")
+        builtin_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "ethoscope", "ethoscope", "roi_builders", "roi_templates", "builtin")
         builtin_dir = os.path.abspath(builtin_dir)
         builtin_path = os.path.join(builtin_dir, f"{template_name}.json")
         

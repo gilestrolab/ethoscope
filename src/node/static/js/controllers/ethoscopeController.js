@@ -305,14 +305,13 @@
                         initializeSelectedOptions('tracking', userOptions.tracking || {});
                         initializeSelectedOptions('recording', userOptions.recording || {});
                         initializeSelectedOptions('update_machine', userOptions.update_machine || {});
+                        
+                        // Load ROI templates AFTER user options are initialized
+                        $scope.loadRoiTemplates();
                     })
                     .catch(function(error) {
                         console.error('Failed to load user options:', error);
                     });
-
-
-                // Load ROI templates from node and update dropdown options
-                $scope.loadRoiTemplates();
             }
 
             /**
@@ -1060,6 +1059,18 @@
                     // Store template information for later use
                     $scope.available_templates = data.templates;
 
+                    // Find default template if any
+                    var defaultTemplate = null;
+                    for (var k = 0; k < data.templates.length; k++) {
+                        if (data.templates[k].is_default === true) {
+                            defaultTemplate = data.templates[k].value;
+                            break;
+                        }
+                    }
+                    
+                    // Store default template for later use
+                    $scope.defaultTemplate = defaultTemplate;
+
                     // Update template dropdown options for FileBasedROIBuilder
                     if ($scope.user_options && $scope.user_options.tracking &&
                         $scope.user_options.tracking.roi_builder) {
@@ -1115,6 +1126,9 @@
                                         arg.groups = groups;
                                         // Remove old options if it exists
                                         delete arg.options;
+
+                                        // Apply default template selection
+                                        $scope.applyDefaultTemplate();
                                         break;
                                     }
                                 }
@@ -1124,6 +1138,47 @@
                 }, function(error) {
                     console.log("Could not load ROI templates from node server");
                 });
+            };
+            
+            // Helper function to apply default template selection
+            $scope.applyDefaultTemplate = function() {
+                if (!$scope.defaultTemplate) {
+                    console.log('No default template found');
+                    return;
+                }
+                
+                if (!$scope.selected_options || !$scope.selected_options.tracking || !$scope.selected_options.tracking.roi_builder) {
+                    console.log('ROI builder not initialized yet');
+                    return;
+                }
+                
+                // Check if FileBasedROIBuilder is selected
+                var roiBuilderName = $scope.selected_options.tracking.roi_builder.name;
+                if (!roiBuilderName || roiBuilderName.indexOf('FileBasedROIBuilder') === -1) {
+                    console.log('FileBasedROIBuilder not selected, current:', roiBuilderName);
+                    return;
+                }
+                
+                // Ensure arguments object exists
+                if (!$scope.selected_options.tracking.roi_builder.arguments) {
+                    $scope.selected_options.tracking.roi_builder.arguments = {};
+                }
+                
+                // Only set default if no template is currently selected or if it's empty
+                var currentTemplate = $scope.selected_options.tracking.roi_builder.arguments.template_name;
+                if (!currentTemplate || currentTemplate === '' || currentTemplate === 'null' || currentTemplate === 'undefined') {
+                    $scope.selected_options.tracking.roi_builder.arguments.template_name = $scope.defaultTemplate;
+                    console.log('Default ROI template applied:', $scope.defaultTemplate);
+                    
+                    // Force Angular digest cycle
+                    setTimeout(function() {
+                        if (!$scope.$$phase) {
+                            $scope.$apply();
+                        }
+                    }, 0);
+                } else {
+                    console.log('Template already selected:', currentTemplate);
+                }
             };
 
             // Upload template to device when needed
@@ -1553,6 +1608,13 @@
                     if ($radioButton.length) {
                         $radioButton.click();
                     }
+                });
+                
+                // Apply default template when tracking modal is shown
+                $('#startModal').on('show.bs.modal', function() {
+                    setTimeout(function() {
+                        $scope.applyDefaultTemplate();
+                    }, 200);
                 });
             }, 100);
 
