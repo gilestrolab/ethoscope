@@ -81,6 +81,7 @@
                 incubators: {},
                 sensors: {}
             };
+            $scope.stimulatorSequence = []; // Array for stimulator sequence
 
             // UI state variables
             $scope.showLog = false;
@@ -109,7 +110,7 @@
                 timePickerIncrement: 30,
                 drops: 'up',
                 autoApply: true,
-                autoUpdateInput: true,
+                autoUpdateInput: false, // Prevent auto-update to avoid setStartDate errors
                 minDate: new Date(), // Will be updated to moment() when available
                 locale: {
                     format: 'YYYY-MM-DD HH:mm:ss',
@@ -498,6 +499,23 @@
                         }
                     }
 
+                    // Special handling for MultiStimulator
+                    if (optionType === 'tracking' && name === 'interactor' && targetOptionName === 'MultiStimulator') {
+                        // Initialize MultiStimulator configuration
+                        if (!$scope.selected_options[optionType][name].arguments.stimulator_sequence) {
+                            $scope.selected_options[optionType][name].arguments.stimulator_sequence = [];
+                            // Add one default stimulator to start
+                            setTimeout(function() {
+                                $scope.addNewStimulator();
+                                try {
+                                    $scope.$apply();
+                                } catch (e) {
+                                    // Digest already in progress
+                                }
+                            }, 100);
+                        }
+                    }
+
                     // Force Angular to update the view
                     try {
                         $scope.$apply();
@@ -519,6 +537,220 @@
             $scope.ethoscope.update_user_options.update_machine = function(name, selectedOptionName) {
                 $scope.ethoscope.update_user_options('update_machine', name, selectedOptionName);
             };
+
+            // ===========================
+            // MULTI-STIMULATOR FUNCTIONS
+            // ===========================
+
+            /**
+             * Get the selected stimulator option object
+             * @param {string} name - The option category name (should be 'interactor')
+             * @returns {Object} The selected stimulator option object
+             */
+            $scope.getSelectedStimulatorOption = function(name) {
+                if (!$scope.user_options.tracking || !$scope.user_options.tracking[name] || !$scope.selected_options.tracking || !$scope.selected_options.tracking[name]) {
+                    return {};
+                }
+                
+                var selectedName = $scope.selected_options.tracking[name]['name'];
+                if (!selectedName) return {};
+                
+                var options = $scope.user_options.tracking[name];
+                for (var i = 0; i < options.length; i++) {
+                    if (options[i].name === selectedName) {
+                        return options[i];
+                    }
+                }
+                return {};
+            };
+
+            /**
+             * Get stimulator arguments for a specific stimulator class
+             * @param {string} className - The stimulator class name
+             * @returns {Array} Array of argument definitions
+             */
+            $scope.getStimulatorArguments = function(className) {
+                if (!$scope.user_options.tracking || !$scope.user_options.tracking.interactor) {
+                    return [];
+                }
+                
+                var options = $scope.user_options.tracking.interactor;
+                for (var i = 0; i < options.length; i++) {
+                    if (options[i].name === className) {
+                        return options[i].arguments || [];
+                    }
+                }
+                return [];
+            };
+
+            /**
+             * Add a new stimulator to the sequence
+             */
+            $scope.addNewStimulator = function() {
+                if (!$scope.selected_options.tracking) {
+                    $scope.selected_options.tracking = {};
+                }
+                if (!$scope.selected_options.tracking.interactor) {
+                    $scope.selected_options.tracking.interactor = {
+                        name: 'MultiStimulator',
+                        arguments: {}
+                    };
+                }
+                if (!$scope.selected_options.tracking.interactor.arguments.stimulator_sequence) {
+                    $scope.selected_options.tracking.interactor.arguments.stimulator_sequence = [];
+                }
+
+                var newStimulator = {
+                    class_name: '',
+                    arguments: {},
+                    date_range: ''
+                };
+
+                $scope.selected_options.tracking.interactor.arguments.stimulator_sequence.push(newStimulator);
+            };
+
+            /**
+             * Remove a stimulator from the sequence
+             * @param {number} index - Index of stimulator to remove
+             */
+            $scope.removeStimulator = function(index) {
+                if ($scope.selected_options.tracking && 
+                    $scope.selected_options.tracking.interactor && 
+                    $scope.selected_options.tracking.interactor.arguments &&
+                    $scope.selected_options.tracking.interactor.arguments.stimulator_sequence) {
+                    
+                    $scope.selected_options.tracking.interactor.arguments.stimulator_sequence.splice(index, 1);
+                }
+            };
+
+            /**
+             * Update stimulator arguments when stimulator type changes
+             * @param {number} index - Index of stimulator in sequence
+             */
+            $scope.updateStimulatorArguments = function(index) {
+                var sequence = $scope.selected_options.tracking.interactor.arguments.stimulator_sequence;
+                if (!sequence || !sequence[index]) return;
+
+                var stimulator = sequence[index];
+                var className = stimulator.class_name;
+                
+                if (!className) {
+                    stimulator.arguments = {};
+                    return;
+                }
+
+                // Get the argument definitions for this stimulator class
+                var argDefs = $scope.getStimulatorArguments(className);
+                var newArguments = {};
+
+                // Initialize arguments with default values
+                for (var i = 0; i < argDefs.length; i++) {
+                    var argDef = argDefs[i];
+                    if (argDef.type !== 'date_range') { // Skip date_range as it's handled separately
+                        newArguments[argDef.name] = argDef.default || '';
+                    }
+                }
+
+                stimulator.arguments = newArguments;
+            };
+
+            /**
+             * Initialize MultiStimulator configuration when selected
+             */
+            $scope.initializeMultiStimulator = function() {
+                if (!$scope.selected_options.tracking.interactor.arguments.stimulator_sequence) {
+                    $scope.selected_options.tracking.interactor.arguments.stimulator_sequence = [];
+                    // Add one default stimulator to start
+                    $scope.addNewStimulator();
+                }
+            };
+
+            // ===========================
+            // STIMULATOR SEQUENCE FUNCTIONS
+            // ===========================
+
+            /**
+             * Add a new stimulator to the sequence
+             */
+            $scope.addStimulatorToSequence = function() {
+                var newStimulator = {
+                    name: '',
+                    arguments: {}
+                };
+                
+                $scope.stimulatorSequence.push(newStimulator);
+                
+                // Set a default interactor selection to avoid validation issues
+                if (!$scope.selected_options.tracking) {
+                    $scope.selected_options.tracking = {};
+                }
+                if (!$scope.selected_options.tracking.interactor) {
+                    $scope.selected_options.tracking.interactor = {
+                        name: 'DefaultStimulator',
+                        arguments: {}
+                    };
+                }
+            };
+
+            /**
+             * Remove a stimulator from the sequence
+             * @param {number} index - Index of stimulator to remove
+             */
+            $scope.removeStimulatorFromSequence = function(index) {
+                $scope.stimulatorSequence.splice(index, 1);
+            };
+
+            /**
+             * Update stimulator options when selection changes
+             * @param {number} index - Index of stimulator in sequence
+             */
+            $scope.updateStimulatorInSequence = function(index) {
+                if (!$scope.stimulatorSequence[index]) return;
+
+                var stimulator = $scope.stimulatorSequence[index];
+                var stimulatorName = stimulator.name;
+                
+                if (!stimulatorName) {
+                    stimulator.arguments = {};
+                    return;
+                }
+
+                // Get the argument definitions for this stimulator
+                var argDefs = $scope.getStimulatorArguments(stimulatorName);
+                var newArguments = {};
+
+                // Initialize arguments with default values
+                for (var i = 0; i < argDefs.length; i++) {
+                    var argDef = argDefs[i];
+                    if (argDef.type === 'date_range' && (argDef.default === '' || !argDef.default)) {
+                        // Don't set date_range arguments with empty defaults - leave undefined to avoid daterangepicker errors
+                        continue;
+                    }
+                    newArguments[argDef.name] = argDef.default || '';
+                }
+
+                stimulator.arguments = newArguments;
+            };
+
+            /**
+             * Get interactor option by name
+             * @param {string} name - Interactor name
+             * @returns {Object} Interactor option object
+             */
+            $scope.getInteractorOptionByName = function(name) {
+                if (!$scope.user_options.tracking || !$scope.user_options.tracking.interactor) {
+                    return {};
+                }
+                
+                var options = $scope.user_options.tracking.interactor;
+                for (var i = 0; i < options.length; i++) {
+                    if (options[i].name === name) {
+                        return options[i];
+                    }
+                }
+                return {};
+            };
+
 
             // ===========================
             // UTILITY FUNCTIONS
@@ -644,6 +876,20 @@
                 return true;
             };
 
+            // Check if user is properly selected for tracking
+            $scope.isUserSelected = function() {
+                if (!$scope.selected_options || !$scope.selected_options.tracking || !$scope.selected_options.tracking.experimental_info) {
+                    return false;
+                }
+                
+                var experimentalInfo = $scope.selected_options.tracking.experimental_info;
+                var args = experimentalInfo.arguments || {};
+                var userName = args.name;
+                
+                // Valid if we have a non-empty user name
+                return userName && userName !== '' && userName !== 'None' && userName !== 'null' && userName !== undefined;
+            };
+
             // Watch for changes in template selection to update UI
             $scope.$watch('selected_options.tracking.roi_builder.arguments.template_name', function(newValue, oldValue) {
                 if (newValue !== oldValue) {
@@ -681,6 +927,70 @@
                 if (option.experimental_info && option.experimental_info.arguments && option.experimental_info.arguments.location) {
                     var selectedIncubatorName = option.experimental_info.arguments.location; // This field contains the incubator name
                     option.experimental_info.arguments.sensor = $scope.get_ip_of_sensor(selectedIncubatorName);
+                }
+
+                // Include stimulator sequence in the data sent to backend
+                if ($scope.stimulatorSequence && $scope.stimulatorSequence.length > 0) {
+                    // Process stimulator sequence date range pickers
+                    for (var i = 0; i < $scope.stimulatorSequence.length; i++) {
+                        var stimulator = $scope.stimulatorSequence[i];
+                        if (stimulator.arguments) {
+                            for (var argName in stimulator.arguments) {
+                                // Extract formatted field from date range picker objects
+                                if (stimulator.arguments[argName] &&
+                                    typeof stimulator.arguments[argName] === 'object' &&
+                                    stimulator.arguments[argName].hasOwnProperty('formatted')) {
+                                    stimulator.arguments[argName] = stimulator.arguments[argName].formatted;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Replace the interactor section with MultiStimulator configuration
+                    option.interactor = {
+                        name: 'MultiStimulator',
+                        arguments: {
+                            stimulator_sequence: $scope.stimulatorSequence.map(function(stim) {
+                                // Create a clean copy of arguments without the date_range
+                                var cleanArguments = {};
+                                if (stim.arguments) {
+                                    for (var key in stim.arguments) {
+                                        if (key !== 'date_range') {
+                                            cleanArguments[key] = stim.arguments[key];
+                                        }
+                                    }
+                                }
+                                
+                                return {
+                                    class_name: stim.name,
+                                    arguments: cleanArguments,
+                                    date_range: (stim.arguments && stim.arguments.date_range) ? 
+                                        (typeof stim.arguments.date_range === 'string' ? stim.arguments.date_range : '') : ''
+                                };
+                            })
+                        }
+                    };
+                    // Sanitize the data to prevent JSON errors
+                try {
+                    JSON.stringify(option.interactor.arguments.stimulator_sequence);
+                    console.log('Configured MultiStimulator with sequence:', option.interactor.arguments.stimulator_sequence);
+                } catch (jsonError) {
+                    console.error('JSON serialization error in stimulator sequence:', jsonError);
+                    console.log('Raw stimulator sequence:', $scope.stimulatorSequence);
+                    // Fallback to DefaultStimulator if JSON serialization fails
+                    option.interactor = {
+                        name: 'DefaultStimulator',
+                        arguments: {}
+                    };
+                }
+                } else {
+                    // If no stimulators in sequence, use DefaultStimulator
+                    if (!option.interactor || !option.interactor.name) {
+                        option.interactor = {
+                            name: 'DefaultStimulator',
+                            arguments: {}
+                        };
+                    }
                 }
 
                 // Check if we need to handle custom template transfer for FileBasedROIBuilder

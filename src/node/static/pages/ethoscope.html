@@ -385,85 +385,190 @@
                 <form name="trackingoptionsform" class="input">
                     <div id="user_options" ng-repeat="(name, option) in user_options.tracking">
                         <h4>{{name}}</h4>
-                        <ul class="option-list">
-                            <li ng-repeat="opt in option">
-                                <input type=radio name={{opt.name}} value={{opt.name}} ng-model="selected_options.tracking[name]['name']" ng-click="ethoscope.update_user_options.tracking(name, opt.name)">
-                                <strong data-toggle="tooltip" data-placement="top" title=" {{opt.overview}}" ng-init="description[opt.name] = false">{{opt.name}}</strong> <a href="" ng-click="description[opt.name] = true" ng-if="description[opt.name]==false">
-                                    <icon class="fa fa-plus-square-o"> </icon>
-                                </a>
-                                <a href="" ng-click="description[opt.name] = false" ng-if="description[opt.name]==true">
-                                    <icon class="fa fa-minus-square-o"> </icon>
-                                </a>
-                                <div ng-if="description[opt.name] == true">
-                                    {{opt.overview}}
+                        
+                        <!-- Special handling for interactor section - use dropdown instead of radio buttons -->
+                        <div ng-if="name == 'interactor'">
+                            <div class="form-group">
+                                <label>Configure Stimulators:</label>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <button type="button" class="btn btn-success" ng-click="addStimulatorToSequence()" style="flex: 1;">
+                                        <i class="fa fa-plus"></i> Add Stimulator
+                                    </button>
                                 </div>
-                                <ul ng-if="selected_options.tracking[name]['name']==opt.name">
-                                    <li ng-repeat="arg in opt.arguments">
-                                        <label ng-if="arg.type != 'boolean' && arg.type != 'date_range'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
-
-
-                                        <select ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
-                                            <option value="">Available Movies</option>
-                                            <option ng-repeat="entry in videofiles" value="{{entry.fullpath}}">{{entry.filename | limitTo: 40}}{{entry.filename.length < 40 ? '' : '...'}}</option>
+                                <small class="form-text text-muted" style="margin-top: 5px;">
+                                    Click "Add Stimulator" to add stimulators to your experiment sequence. Each stimulator can have its own schedule and parameters.
+                                </small>
+                            </div>
+                            
+                            <!-- All stimulators list (including the first one) -->
+                            <div ng-if="stimulatorSequence && stimulatorSequence.length > 0" class="stimulator-sequence-container">
+                                <div ng-repeat="stimulator in stimulatorSequence track by $index" class="form-group stimulator-item" style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid #28a745;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                        <label style="margin: 0; font-weight: 600; color: #495057;">
+                                            <i class="fa fa-robot"></i> Stimulator {{$index + 1}}
+                                        </label>
+                                        <button type="button" class="btn btn-danger btn-sm" ng-click="removeStimulatorFromSequence($index)" title="Remove this stimulator" style="margin-left: auto;">
+                                            <i class="fa fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Stimulator type selection -->
+                                    <div class="form-group" style="margin-bottom: 15px;">
+                                        <label style="font-size: 14px; margin-bottom: 5px;">Stimulator Type:</label>
+                                        <select class="form-control" ng-model="stimulator.name" ng-change="updateStimulatorInSequence($index)" style="font-size: 14px;">
+                                            <option value="">-- Choose a stimulator --</option>
+                                            <option ng-repeat="opt in option" value="{{opt.name}}" title="{{opt.overview}}">{{opt.name}}</option>
                                         </select>
-                                        <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
-                                        <input ng-if="(arg.type == 'str' && arg.asknode == undefined && arg.options == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
-                                        <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" ng-required="{{arg.required == 'required'}}">
-                                            <option value="">-- choose {{arg.name}}{{arg.required == 'required' ? ' *' : ''}} --</option>
-                                            <option ng-repeat="entry in node[arg.asknode] | toArray | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
-                                        </select>
-                                        <div ng-if="(arg.type == 'str' && arg.asknode != undefined && arg.required == 'required')" class="text-danger" ng-show="trackingoptionsform[arg.name].$invalid && trackingoptionsform[arg.name].$touched">
-                                            <small>{{arg.name}} is required</small>
+                                    </div>
+                                    
+                                    <!-- Show description for selected stimulator -->
+                                    <div ng-if="stimulator.name" class="alert alert-info" style="margin-bottom: 15px; font-size: 14px; padding: 8px 12px;">
+                                        <strong>{{getInteractorOptionByName(stimulator.name).name}}:</strong> {{getInteractorOptionByName(stimulator.name).overview}}
+                                    </div>
+                                    
+                                    <!-- Arguments for stimulator -->
+                                    <div ng-if="stimulator.name && stimulator.name != 'MultiStimulator'" class="stimulator-arguments-section" style="background-color: white; border-radius: 4px; padding: 15px; border: 1px solid #dee2e6;">
+                                        <h6 style="margin-bottom: 15px; color: #495057; font-size: 14px; font-weight: 600;">
+                                            <i class="fa fa-cog"></i> Configuration:
+                                        </h6>
+                                        <div ng-repeat="arg in getInteractorOptionByName(stimulator.name).arguments" class="form-group" style="margin-bottom: 15px;">
+                                            <label ng-if="arg.type != 'boolean' && arg.type != 'date_range'" style="font-size: 14px; margin-bottom: 5px; font-weight: 500;">{{arg.description}}</label>
+
+                                            <select ng-if="arg.type == 'filepath'" class="form-control" ng-model="stimulator.arguments[arg.name]">
+                                                <option value="">Available Movies</option>
+                                                <option ng-repeat="entry in videofiles" value="{{entry.fullpath}}">{{entry.filename | limitTo: 40}}{{entry.filename.length < 40 ? '' : '...'}}</option>
+                                            </select>
+                                            <input ng-if="arg.type == 'number'" type="number" class="form-control" ng-model="stimulator.arguments[arg.name]" min="{{arg.min}}" max="{{arg.max}}" step="{{arg.step}}" placeholder="{{arg.default}}">
+                                            <input ng-if="(arg.type == 'str' && arg.asknode == undefined && arg.options == undefined)" type="text" class="form-control" ng-model="stimulator.arguments[arg.name]" placeholder="{{arg.default}}">
+                                            <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" class="form-control" ng-model="stimulator.arguments[arg.name]" ng-required="{{arg.required == 'required'}}">
+                                                <option value="">-- choose {{arg.name}}{{arg.required == 'required' ? ' *' : ''}} --</option>
+                                                <option ng-repeat="entry in node[arg.asknode] | toArray | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
+                                            </select>
+                                            <select ng-if="(arg.type == 'str' && arg.options != undefined)" class="form-control" ng-model="stimulator.arguments[arg.name]">
+                                                <option value="">-- choose {{arg.name}} --</option>
+                                                <option ng-repeat="option in arg.options" value="{{option}}">{{option}}</option>
+                                            </select>
+                                            <select ng-if="arg.type == 'dropdown' && !arg.groups" class="form-control" ng-model="stimulator.arguments[arg.name]">
+                                                <option value="">-- choose {{arg.description}} --</option>
+                                                <option ng-repeat="opt in arg.options" value="{{opt.value}}">{{opt.text}}</option>
+                                            </select>
+                                            <select ng-if="arg.type == 'dropdown' && arg.groups" class="form-control" ng-model="stimulator.arguments[arg.name]">
+                                                <option value="">-- choose {{arg.description}} --</option>
+                                                <optgroup ng-repeat="group in arg.groups" label="{{group.label}}">
+                                                    <option ng-repeat="opt in group.options" value="{{opt.value}}">{{opt.text}}</option>
+                                                </optgroup>
+                                            </select>
+                                            <div ng-if="arg.type == 'boolean'" class="form-check" style="margin-top: 5px;">
+                                                <input type="checkbox" class="form-check-input" ng-model="stimulator.arguments[arg.name]" id="stim-{{$parent.$index}}-{{arg.name}}" style="transform: scale(1.2); margin-right: 8px;">
+                                                <label class="form-check-label" for="stim-{{$parent.$index}}-{{arg.name}}" style="font-size: 14px;">{{arg.description}}</label>
+                                            </div>
+
+                                            <div ng-if="arg.type == 'date_range' && stimulator.arguments" class="form-group" style="margin-bottom: 15px;">
+                                                <label style="font-size: 14px; margin-bottom: 5px; font-weight: 500;">{{arg.description}}</label>
+                                                <div class="input-group">
+                                                    <input date-range-picker class="form-control date-picker" type="text" ng-model="stimulator.arguments[arg.name]" placeholder="Click to select start and end date/time" style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;" options="dateRangeOptions">
+                                                    <div class="input-group-append">
+                                                        <span class="input-group-text" style="background-color: #337ab7; color: white; cursor: pointer;">
+                                                            <i class="fa fa-clock"></i>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <small class="form-text text-muted" style="margin-top: 3px; font-size: 12px;">
+                                                    Click to select start and end date/time when stimulator should be active
+                                                </small>
+                                            </div>
                                         </div>
-                                        <select ng-if="(arg.type == 'str' && arg.options != undefined)" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
-                                            <option value="">-- choose {{arg.name}} --</option>
-                                            <option ng-repeat="option in arg.options" value="{{option}}">{{option}}</option>
-                                        </select>
-                                        <select ng-if="arg.type == 'dropdown' && !arg.groups" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
-                                            <option value="">-- choose {{arg.description}} --</option>
-                                            <option ng-repeat="opt in arg.options" value="{{opt.value}}">{{opt.text}}</option>
-                                        </select>
-                                        <select ng-if="arg.type == 'dropdown' && arg.groups" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
-                                            <option value="">-- choose {{arg.description}} --</option>
-                                            <optgroup ng-repeat="group in arg.groups" label="{{group.label}}">
-                                                <option ng-repeat="opt in group.options" value="{{opt.value}}">{{opt.text}}</option>
-                                            </optgroup>
-                                        </select>
-                                        <div ng-if="arg.type == 'boolean'"><label for="input-{{arg.name}}"><input style="transform: scale(1.5); margin: 3px; margin-right: 10px;" id="input-{{arg.name}}" type="checkbox" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">{{arg.description}}</label></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Standard handling for non-interactor sections -->
+                        <div ng-if="name != 'interactor'">
+                            <ul class="option-list">
+                                <li ng-repeat="opt in option">
+                                    <input type=radio name={{opt.name}} value={{opt.name}} ng-model="selected_options.tracking[name]['name']" ng-click="ethoscope.update_user_options.tracking(name, opt.name)">
+                                    <strong data-toggle="tooltip" data-placement="top" title=" {{opt.overview}}" ng-init="description[opt.name] = false">{{opt.name}}</strong> <a href="" ng-click="description[opt.name] = true" ng-if="description[opt.name]==false">
+                                        <icon class="fa fa-plus-square-o"> </icon>
+                                    </a>
+                                    <a href="" ng-click="description[opt.name] = false" ng-if="description[opt.name]==true">
+                                        <icon class="fa fa-minus-square-o"> </icon>
+                                    </a>
+                                    <div ng-if="description[opt.name] == true">
+                                        {{opt.overview}}
+                                    </div>
+                                    <ul ng-if="selected_options.tracking[name]['name']==opt.name">
+                                        <li ng-repeat="arg in opt.arguments">
+                                            <label ng-if="arg.type != 'boolean' && arg.type != 'date_range'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
 
-                                        <div ng-if="arg.type == 'date_range'" class="form-group">
-                                            <label for="input-{{arg.name}}">{{arg.description}}</label>
-                                            <div class="input-group" style="margin-top: 5px;">
-                                                <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-drp-{{arg.name}}" type="text" ng-model="selected_options.tracking[name]['arguments'][arg.name]" placeholder="Click to select start and end date/time" style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;" options="dateRangeOptions">
+                                            <select ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
+                                                <option value="">Available Movies</option>
+                                                <option ng-repeat="entry in videofiles" value="{{entry.fullpath}}">{{entry.filename | limitTo: 40}}{{entry.filename.length < 40 ? '' : '...'}}</option>
+                                            </select>
+                                            <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
+                                            <input ng-if="(arg.type == 'str' && arg.asknode == undefined && arg.options == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
+                                            <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" ng-required="{{arg.required == 'required'}}">
+                                                <option value="">-- choose {{arg.name}}{{arg.required == 'required' ? ' *' : ''}} --</option>
+                                                <option ng-repeat="entry in node[arg.asknode] | toArray | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
+                                            </select>
+                                            <div ng-if="(arg.type == 'str' && arg.asknode != undefined && arg.required == 'required')" class="text-danger" ng-show="trackingoptionsform[arg.name].$invalid && trackingoptionsform[arg.name].$touched">
+                                                <small>{{arg.name}} is required</small>
+                                            </div>
+                                            <select ng-if="(arg.type == 'str' && arg.options != undefined)" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
+                                                <option value="">-- choose {{arg.name}} --</option>
+                                                <option ng-repeat="option in arg.options" value="{{option}}">{{option}}</option>
+                                            </select>
+                                            <select ng-if="arg.type == 'dropdown' && !arg.groups" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
+                                                <option value="">-- choose {{arg.description}} --</option>
+                                                <option ng-repeat="opt in arg.options" value="{{opt.value}}">{{opt.text}}</option>
+                                            </select>
+                                            <select ng-if="arg.type == 'dropdown' && arg.groups" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
+                                                <option value="">-- choose {{arg.description}} --</option>
+                                                <optgroup ng-repeat="group in arg.groups" label="{{group.label}}">
+                                                    <option ng-repeat="opt in group.options" value="{{opt.value}}">{{opt.text}}</option>
+                                                </optgroup>
+                                            </select>
+                                            <div ng-if="arg.type == 'boolean'"><label for="input-{{arg.name}}"><input style="transform: scale(1.5); margin: 3px; margin-right: 10px;" id="input-{{arg.name}}" type="checkbox" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">{{arg.description}}</label></div>
+
+                                            <div ng-if="arg.type == 'date_range'" class="form-group">
+                                                <label for="input-{{arg.name}}">{{arg.description}}</label>
+                                                <div class="input-group" style="margin-top: 5px;">
+                                                    <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-drp-{{arg.name}}" type="text" ng-model="selected_options.tracking[name]['arguments'][arg.name]" placeholder="Click to select start and end date/time" style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;" options="dateRangeOptions">
+                                                    <div class="input-group-append">
+                                                        <span class="input-group-text" style="background-color: #337ab7; color: white; cursor: pointer;">
+                                                            <i class="fa fa-clock"></i>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <small class="form-text text-muted" style="margin-top: 3px;">
+                                                    Click to select start and end date/time when stimulator should be active
+                                                </small>
+                                            </div>
+
+                                            <div ng-if="arg.type == 'datetime'" class="input-group">
+                                                <input ng-if="arg.type == 'datetime'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-{{arg.name}}" type=text ng-model="selected_options.tracking[name]['arguments'][arg.name]" options="{singleDatePicker: true, timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss' }}">
                                                 <div class="input-group-append">
-                                                    <span class="input-group-text" style="background-color: #337ab7; color: white; cursor: pointer;">
-                                                        <i class="fa fa-clock"></i>
-                                                    </span>
+                                                    <span class="input-group-text"><i class="fa fa-calendar"></i></span>
                                                 </div>
                                             </div>
-                                            <small class="form-text text-muted" style="margin-top: 3px;">
-                                                Click to select start and end date/time when stimulator should be active
-                                            </small>
-                                        </div>
-
-                                        <div ng-if="arg.type == 'datetime'" class="input-group">
-                                            <input ng-if="arg.type == 'datetime'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-{{arg.name}}" type=text ng-model="selected_options.tracking[name]['arguments'][arg.name]" options="{singleDatePicker: true, timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss' }}">
-                                            <div class="input-group-append">
-                                                <span class="input-group-text"><i class="fa fa-calendar"></i></span>
-                                            </div>
-                                        </div>
-                                    </li>
-                                </ul>
-                            </li>
-                        </ul>
+                                        </li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </div>
                         <hr>
                     </div>
-                    <div class="modal-footer">
-                        <div ng-if="!isRoiTemplateSelected()" class="alert alert-warning" style="margin-bottom: 10px;">
-                            <strong>Warning:</strong> Please select a ROI template/mask before starting tracking.
+                    <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                        <div ng-if="!isRoiTemplateSelected() || !isUserSelected()" class="alert alert-warning" style="margin-bottom: 0; margin-right: 15px; flex: 1; max-width: 60%;">
+                            {{ (!isRoiTemplateSelected() && !isUserSelected()) ? 'A ROI mask and user must be selected.' :
+                               (!isRoiTemplateSelected() && isUserSelected()) ? 'A ROI mask must be selected.' :
+                               (isRoiTemplateSelected() && !isUserSelected()) ? 'A user must be selected.' : '' }}
                         </div>
-                        <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
-                        <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_tracking(selected_options.tracking)" ng-disabled="!isRoiTemplateSelected()" data-toggle="modal">Start Tracking</button>
+                        <div ng-if="isRoiTemplateSelected() && isUserSelected()" style="flex: 1;"></div>
+                        <div style="display: flex; gap: 10px;">
+                            <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
+                            <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_tracking(selected_options.tracking)" ng-disabled="!isRoiTemplateSelected() || !isUserSelected()" data-toggle="modal">Start Tracking</button>
+                        </div>
                     </div>
 
                 </form>

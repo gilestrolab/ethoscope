@@ -1403,3 +1403,364 @@ table thead th a:focus {
     font-size: 10px;
 }
 
+/* ===========================
+   MULTI-STIMULATOR INTERFACE
+   =========================== */
+
+/* Multi-stimulator configuration container */
+.multi-stimulator-config {
+    background-color: var(--off-white);
+    border: 1px solid var(--light-gray);
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 15px;
+}
+
+.multi-stimulator-config h5 {
+    color: var(--deep-purple);
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+/* Individual stimulator item cards */
+.stimulator-item {
+    background-color: white;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.2s ease;
+}
+
+.stimulator-item:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.stimulator-item .card-header {
+    border-radius: 6px 6px 0 0;
+}
+
+.stimulator-item .card-header h6 {
+    color: var(--warm-gray);
+    font-weight: 600;
+}
+
+/* Stimulator arguments section */
+.stimulator-arguments {
+    background-color: var(--off-white);
+    border-radius: 4px;
+    padding: 15px;
+    margin-top: 15px;
+}
+
+.stimulator-arguments h6 {
+    color: var(--deep-purple);
+    margin-bottom: 10px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* Add stimulator button */
+.multi-stimulator-config .btn-success {
+    background-color: var(--deep-green);
+    border-color: var(--deep-green);
+    color: white;
+    font-weight: 500;
+    padding: 8px 15px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.multi-stimulator-config .btn-success:hover {
+    background-color: var(--forest-green);
+    border-color: var(--forest-green);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Remove stimulator button */
+.stimulator-item .btn-danger {
+    background-color: var(--deep-red);
+    border-color: var(--deep-red);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    transition: all 0.2s ease;
+}
+
+.stimulator-item .btn-danger:hover {
+    background-color: var(--coral-red);
+    border-color: var(--coral-red);
+    transform: scale(1.05);
+}
+
+/* Form styling within stimulator items */
+.stimulator-item .form-group {
+    margin-bottom: 15px;
+}
+
+.stimulator-item .form-group:last-child {
+    margin-bottom: 0;
+}
+
+.stimulator-item label {
+    font-weight: 500;
+    color: var(--warm-gray);
+    margin-bottom: 5px;
+}
+
+.stimulator-item .form-control {
+    border: 1px solid var(--light-gray);
+    border-radius: 4px;
+    padding: 8px 12px;
+    transition: border-color 0.2s ease;
+}
+
+.stimulator-item .form-control:focus {
+    border-color: var(--indigo);
+    box-shadow: 0 0 0 2px rgba(91, 70, 199, 0.2);
+}
+
+/* Date range picker styling */
+.stimulator-item .date-picker {
+    background-color: var(--off-white);
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.stimulator-item .input-group-append .input-group-text {
+    background-color: var(--indigo);
+    color: white;
+    border-color: var(--indigo);
+    cursor: pointer;
+}
+
+/* Interactor selection dropdown */
+#interactor-select {
+    font-size: 16px;
+    padding: 10px 15px;
+    border: 2px solid var(--light-gray);
+    border-radius: 6px;
+    background-color: white;
+    color: var(--warm-gray);
+    transition: all 0.2s ease;
+}
+
+#interactor-select:focus {
+    border-color: var(--indigo);
+    box-shadow: 0 0 0 3px rgba(91, 70, 199, 0.2);
+    outline: none;
+}
+
+/* Alert styling for stimulator description */
+.multi-stimulator-config .alert-info {
+    background-color: rgba(91, 70, 199, 0.1);
+    border: 1px solid var(--indigo);
+    color: var(--deep-purple);
+    border-radius: 6px;
+}
+
+.multi-stimulator-config .alert-warning {
+    background-color: rgba(196, 123, 47, 0.1);
+    border: 1px solid var(--burnt-orange);
+    color: var(--deep-gold);
+    border-radius: 6px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .multi-stimulator-config {
+        padding: 15px;
+    }
+    
+    .stimulator-item {
+        margin-bottom: 20px;
+    }
+    
+    .stimulator-item .card-header h6 {
+        font-size: 14px;
+    }
+}
+
+/* ===========================
+   MODAL FOOTER LAYOUT FIX
+   =========================== */
+
+/* Ensure modal footer warning doesn't push buttons to next row */
+.modal-footer .alert-warning {
+    font-size: 14px;
+    padding: 8px 12px;
+    line-height: 1.3;
+}
+
+/* Mobile responsive modal footer */
+@media (max-width: 576px) {
+    .modal-footer {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+    
+    .modal-footer .alert-warning {
+        max-width: 100% !important;
+        margin-bottom: 15px !important;
+        margin-right: 0 !important;
+    }
+    
+    .modal-footer > div:last-child {
+        justify-content: center;
+    }
+}
+
+/* ===========================
+   ADDITIONAL INTERACTORS STYLING
+   =========================== */
+
+/* Additional interactors container */
+.additional-interactors {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 2px solid var(--light-gray);
+}
+
+/* Individual additional interactor items */
+.additional-interactor-item {
+    background-color: #f8f9fa;
+    border: 1px solid var(--light-gray);
+    border-left: 4px solid var(--deep-green);
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 15px;
+    transition: all 0.2s ease;
+}
+
+.additional-interactor-item:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-left-color: var(--forest-green);
+}
+
+/* Additional interactor header */
+.additional-interactor-item label {
+    color: var(--warm-gray);
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+/* Additional interactor remove button */
+.additional-interactor-item .btn-danger {
+    background-color: var(--deep-red);
+    border-color: var(--deep-red);
+    padding: 4px 8px;
+    font-size: 12px;
+    transition: all 0.2s ease;
+}
+
+.additional-interactor-item .btn-danger:hover {
+    background-color: var(--coral-red);
+    border-color: var(--coral-red);
+    transform: scale(1.05);
+}
+
+/* Additional interactor arguments section */
+.additional-interactor-arguments {
+    background-color: white;
+    border-radius: 4px;
+    padding: 15px;
+    margin-top: 15px;
+    border: 1px solid var(--light-gray);
+}
+
+.additional-interactor-arguments h6 {
+    color: var(--deep-purple);
+    margin-bottom: 15px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* Form controls within additional interactors */
+.additional-interactor-item .form-control {
+    border: 1px solid var(--light-gray);
+    border-radius: 4px;
+    transition: border-color 0.2s ease;
+    font-size: 14px;
+}
+
+.additional-interactor-item .form-control:focus {
+    border-color: var(--indigo);
+    box-shadow: 0 0 0 2px rgba(91, 70, 199, 0.2);
+}
+
+/* Add Stimulator button */
+.btn-success {
+    background-color: var(--deep-green);
+    border-color: var(--deep-green);
+    padding: 12px 20px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    color: white;
+    font-weight: 600;
+    font-size: 16px;
+    width: 100%;
+    text-align: center;
+}
+
+.btn-success:hover {
+    background-color: var(--forest-green);
+    border-color: var(--forest-green);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    color: white;
+}
+
+.btn-success:focus {
+    background-color: var(--forest-green);
+    border-color: var(--forest-green);
+    color: white;
+    box-shadow: 0 0 0 3px rgba(60, 159, 60, 0.25);
+}
+
+/* Small success buttons (for remove actions, etc.) */
+.btn-success.btn-sm {
+    background-color: var(--deep-green);
+    border-color: var(--deep-green);
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    color: white;
+    font-weight: 500;
+    font-size: 14px;
+    width: auto;
+}
+
+.btn-success.btn-sm:hover {
+    background-color: var(--forest-green);
+    border-color: var(--forest-green);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Alert info for additional interactors */
+.additional-interactor-item .alert-info {
+    background-color: rgba(91, 70, 199, 0.1);
+    border: 1px solid var(--indigo);
+    color: var(--deep-purple);
+    border-radius: 4px;
+    font-size: 14px;
+    padding: 8px 12px;
+    margin-bottom: 0;
+}
+
+/* Responsive design for additional interactors */
+@media (max-width: 768px) {
+    .additional-interactor-item {
+        padding: 12px;
+    }
+    
+    .additional-interactor-arguments {
+        padding: 12px;
+        margin-top: 12px;
+    }
+    
+    .additional-interactor-item .form-control {
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+}
+

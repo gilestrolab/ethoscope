@@ -27,6 +27,7 @@ from ethoscope.stimulators.stimulators import DefaultStimulator
 from ethoscope.stimulators.sleep_depriver_stimulators import * #importing all stimulators - remember to add the allowed ones to line 84
 from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver, MiddleCrossingOdourStimulator, MiddleCrossingOdourStimulatorFlushed
 from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulator
+from ethoscope.stimulators.multi_stimulator import MultiStimulator
 
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.io import MySQLResultWriter, SQLiteResultWriter 
@@ -95,7 +96,8 @@ class ControlThread(Thread):
                                             MiddleCrossingOdourStimulator,
                                             MiddleCrossingOdourStimulatorFlushed,
                                             mAGO,
-                                            AGO
+                                            AGO,
+                                            MultiStimulator
                                             ],
                     }),
         ("roi_builder", {
