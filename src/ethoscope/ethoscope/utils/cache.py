@@ -75,11 +75,18 @@ class BaseDatabaseMetadataCache:
             # Fall back to cached data
             return self._read_cache(cache_file_path)
     
-    def finalize_cache(self, tracking_start_time):
-        """Mark cache file as finalized when experiment ends."""
+    def finalize_cache(self, tracking_start_time, graceful=True, stop_reason="user_stop"):
+        """
+        Mark cache file as finalized when experiment ends.
+        
+        Args:
+            tracking_start_time: Experiment start timestamp for cache naming
+            graceful (bool): True if experiment was stopped gracefully, False if crashed/interrupted
+            stop_reason (str): Reason for stopping ("user_stop", "timer_stop", "error")
+        """
         cache_file_path = self._get_cache_file_path(tracking_start_time)
         if cache_file_path:
-            self._write_cache(cache_file_path, finalise=True)
+            self._write_cache(cache_file_path, finalise=True, graceful=graceful, stop_reason=stop_reason)
         
         # Clear current cache file path when session ends
         self.current_cache_file_path = None
@@ -480,7 +487,7 @@ class BaseDatabaseMetadataCache:
         """
         raise NotImplementedError("Subclasses must implement _query_database()")
     
-    def _write_cache(self, cache_file_path, db_info=None, tracking_start_time=None, finalise=False, experiment_info=None):
+    def _write_cache(self, cache_file_path, db_info=None, tracking_start_time=None, finalise=False, experiment_info=None, graceful=True, stop_reason="user_stop"):
         """Write or update cache file."""
         try:
             # Read existing cache file or create new one
@@ -506,9 +513,16 @@ class BaseDatabaseMetadataCache:
                 }
             
             if finalise:
-                # Mark cache file as finalized
-                cache_data["db_status"] = "finalised"
-                cache_data["finalized_timestamp"] = time.time()
+                # Mark cache file as finalized with graceful stop information
+                stop_timestamp = time.time()
+                cache_data.update({
+                    "db_status": "finalised",
+                    "finalized_timestamp": stop_timestamp,
+                    "stopped_gracefully": graceful,
+                    "stop_reason": stop_reason,
+                    "stop_timestamp": stop_timestamp
+                })
+                logging.info(f"Finalizing cache with graceful={graceful}, reason={stop_reason}")
             elif db_info:
                 # Update with current database info
                 cache_data.update({
@@ -627,6 +641,9 @@ class BaseDatabaseMetadataCache:
             "creation_timestamp": cache_data.get("creation_timestamp"),
             "tracking_start_time": cache_data.get("tracking_start_time"),
             "finalized_timestamp": cache_data.get("finalized_timestamp"),
+            "stopped_gracefully": cache_data.get("stopped_gracefully", False),
+            "stop_reason": cache_data.get("stop_reason", "unknown"),
+            "stop_timestamp": cache_data.get("stop_timestamp"),
             "experiment_info": cache_data.get("experiment_info", {})
         }
     

@@ -8,7 +8,6 @@ import datetime
 import re
 import cv2
 from threading import Thread
-import pickle
 import secrets
 from collections import OrderedDict
 import json
@@ -250,18 +249,6 @@ class ControlThread(Thread):
                     "used_space": pi.get_partition_info(ethoscope_dir)['Use%'].replace("%","")
                 }
         
-        # Fallback: try the old pickle file if cache doesn't have info
-        if os.path.exists(self._last_run_info) and not self._info.get("previous_backup_filename"):
-            try:
-                with open(self._last_run_info, 'rb') as fn:
-                    pickle_data = pickle.load(fn)
-                    if isinstance(pickle_data, dict):
-                        self._info.update(pickle_data)
-                        logging.info("Loaded last experiment info from legacy pickle file")
-                    else:
-                        logging.warning(f"Pickle file contained non-dict data: {type(pickle_data)}")
-            except Exception as e:
-                logging.warning(f"Failed to load from pickle file: {e}")
         
         # Final safety check: ensure _info is always a dictionary
         if not isinstance(self._info, dict):
@@ -350,7 +337,28 @@ class ControlThread(Thread):
 
     @property
     def was_interrupted(self):
-        return os.path.exists(self._persistent_state_file)
+        """
+        Check if the last experiment was interrupted abruptly (not stopped gracefully).
+        Uses cache system to determine if experiment ended gracefully.
+        """
+        if self._metadata_cache:
+            try:
+                # Get the most recent cache files to check for graceful stop
+                cache_files = self._metadata_cache.list_cache_files()
+                if cache_files:
+                    recent_cache_path = cache_files[0]['path']
+                    if os.path.exists(recent_cache_path):
+                        with open(recent_cache_path, 'r') as f:
+                            cache_data = json.load(f)
+                        
+                        # Check if experiment was stopped gracefully
+                        stopped_gracefully = cache_data.get('stopped_gracefully', False)
+                        return not stopped_gracefully
+            except Exception as e:
+                logging.warning(f"Failed to check cache for graceful stop: {e}")
+        
+        # Default to not interrupted if no cache info available
+        return False
 
     @classmethod
     def user_options(self):
@@ -530,8 +538,6 @@ class ControlThread(Thread):
         kwargs = self._monit_kwargs.copy()
         kwargs.update(tracker_kwargs)
 
-        # todo: pickle hardware connection, camera, rois, tracker class, stimulator class,.
-        # then rerun stimulators and Monitor(......)
         self._monit = Monitor(camera, TrackerClass, rois,
                               reference_points = reference_points,
                               stimulators=stimulators,
@@ -588,33 +594,6 @@ class ControlThread(Thread):
 
         self._monit.run(result_writer, self._drawer)
 
-    def _has_pickle_file(self):
-        """
-        """
-        return os.path.exists(self._persistent_state_file)
-
-    def _set_tracking_from_pickled(self):
-        """
-        """
-        with open(self._persistent_state_file, "rb") as f:
-                time.sleep(15)
-                return pickle.load(f)
-
-    def _save_pickled_state(self, camera, result_writer, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, running_info):
-        """
-        note that cv2.videocapture is not a serializable object and cannot be pickled
-        """
-
-        tpl = (camera, result_writer, rois, reference_points, TrackerClass, tracker_kwargs,
-                        hardware_connection, StimulatorClass, stimulator_kwargs, running_info)
-
-
-        if not os.path.exists(os.path.dirname(self._persistent_state_file)):
-            logging.warning("No cache dir detected. making one")
-            os.makedirs(os.path.dirname(self._persistent_state_file))
-
-        with open(self._persistent_state_file, "wb") as f:
-            return pickle.dump(tpl, f)
 
     def _set_tracking_from_scratch(self):
         """
@@ -696,11 +675,6 @@ class ControlThread(Thread):
             # Use existing backup filename when appending to database
             self._info["backup_filename"] = existing_backup_filename
             logging.info(f"Using existing backup filename for append mode: {existing_backup_filename}")
-
-        elif self._has_pickle_file() and existing_backup_filename and not append_to_db:
-            # and when we are recovering from a crash
-            self._info["backup_filename"] = existing_backup_filename
-
         else:
             # No existing backup filename or first time - create new one
             self._info["backup_filename"] = self._create_backup_filename()
@@ -711,7 +685,6 @@ class ControlThread(Thread):
         self._info["interactor"].update ( self._option_dict['interactor']['kwargs'])
 
         # this will be saved in the metadata table
-        # and in the pickle file below
         # Extract original experiment start time from backup filename for consistency
         timestamp_str = '_'.join( self._info["backup_filename"].split('_')[:2] )
         experiment_time = time.mktime(time.strptime(timestamp_str, '%Y-%m-%d_%H-%M-%S'))
@@ -824,50 +797,12 @@ class ControlThread(Thread):
             self._last_info_t_stamp = 0
             self._last_info_frame_idx = 0
 
-            #check if a previous instance exist and if it does attempts to start from there
-            if self._has_pickle_file():
-                logging.warning("Attempting to resume a previously interrupted state")
-                
-                try:
-                    cam, rw, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, self._info = self._set_tracking_from_pickled()
-                    
-                    # IMPORTANT: Validate backup filename from pickle against metadata table
-                    # The pickle file might have an outdated backup filename if the ethoscope rebooted
-                    logging.info(f"Loaded backup filename from pickle: {self._info.get('backup_filename', 'None')}")
-                    
-                    # Get the correct backup filename from metadata cache
-                    metadata_backup_filename = None
-                    if self._metadata_cache is not None:
-                        try:
-                            metadata_backup_filename = self._metadata_cache.get_backup_filename()
-                        except Exception as e:
-                            logging.warning(f"Failed to get backup filename from metadata cache: {e}")
-                    
-                    if metadata_backup_filename and metadata_backup_filename != self._info.get('backup_filename'):
-                        logging.warning(f"Backup filename mismatch! Pickle: {self._info.get('backup_filename')} vs Metadata: {metadata_backup_filename}")
-                        logging.info(f"Using correct backup filename from metadata: {metadata_backup_filename}")
-                        self._info['backup_filename'] = metadata_backup_filename
-                    elif metadata_backup_filename:
-                        logging.info(f"Backup filename validated against metadata: {metadata_backup_filename}")
-                    else:
-                        logging.warning("No backup filename found in metadata cache, keeping pickle version")
-
-                except Exception as e:
-                    logging.error("Could not load previous state for unexpected reason:")
-                    raise e
-            
-            #a previous instance does not exist, hence we create a new one
-            else:
-                cam, rw, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
+            # Always create a new tracking instance (pickle resume logic removed)
+            cam, rw, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = self._set_tracking_from_scratch()
                 
             
             with rw as result_writer:
-                
-                # and we save it if we can
-                if cam.canbepickled:
-                    self._save_pickled_state(cam, rw, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, self._info)
-                
-                # then we start tracking
+                # Start tracking directly (pickle saving removed)
                 self._start_tracking(cam, result_writer, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
             
             #self.stop()
@@ -875,18 +810,14 @@ class ControlThread(Thread):
         except EthoscopeException as e:
             if e.img is not  None:
                 cv2.imwrite(self._info["dbg_img"], e.img)
+            # This is an exception-based stop, so it's not graceful
             self.stop(traceback.format_exc())
         
         except Exception as e:
+            # This is an exception-based stop, so it's not graceful
             self.stop(traceback.format_exc())
 
         finally:
-
-            if os.path.exists(self._persistent_state_file):
-                try:
-                    os.remove(self._persistent_state_file)
-                except:
-                    logging.warning("Failed to remove persistent file")
             try:
                 if cam is not None:
                     cam._close()
@@ -934,11 +865,15 @@ class ControlThread(Thread):
             self._info["error"] = error
             self._info["monitor_info"] = self._default_monitor_info
             
-            # Finalize database cache file when tracking stops (MySQL only)
+            # Finalize database cache file when tracking stops
             if self._tracking_start_time and self._metadata_cache is not None:
                 try:
-                    self._metadata_cache.finalize_cache(self._tracking_start_time)
-                    logging.info(f"Finalized database cache file for tracking session")
+                    # Determine if this was a graceful stop or an error
+                    is_graceful = error is None
+                    stop_reason = "error" if error else "user_stop"
+                    
+                    self._metadata_cache.finalize_cache(self._tracking_start_time, graceful=is_graceful, stop_reason=stop_reason)
+                    logging.info(f"Finalized database cache file for tracking session (graceful={is_graceful}, reason={stop_reason})")
                 except Exception as e:
                     logging.warning(f"Failed to finalize cache file: {e}")
             
@@ -981,4 +916,3 @@ class ControlThread(Thread):
 
         self.stop()
         shutil.rmtree(self._tmp_dir, ignore_errors=True)
-        shutil.rmtree(self._persistent_state_file, ignore_errors=True)
