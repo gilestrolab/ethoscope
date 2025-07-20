@@ -75,7 +75,20 @@ def send_command(action, data=None, host='127.0.0.1', port=5000, size=COMM_PACKE
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((host, port))
         s.sendall( json.dumps(message).encode('utf-8') )
-        response = s.recv(size)
+        
+        # Receive response in chunks until complete
+        response = b''
+        while True:
+            chunk = s.recv(size)
+            if not chunk:
+                break
+            response += chunk
+            # Check if we have a complete JSON response
+            try:
+                json.loads(response.decode('utf-8', errors='ignore'))
+                break  # Valid JSON received
+            except json.JSONDecodeError:
+                continue  # Keep receiving
         
         # Handle empty or invalid responses
         if not response:
