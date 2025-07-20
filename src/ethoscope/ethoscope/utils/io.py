@@ -50,7 +50,7 @@ import multiprocessing
 import time, datetime
 import traceback
 import logging
-from collections import OrderedDict
+from collections import OrderedDict, deque
 import tempfile
 import os
 import numpy as np
@@ -66,6 +66,12 @@ SQL_CHARSET = 'latin1'
 ASYNC_WRITER_TIMEOUT = 30  # Timeout in seconds for async writer initialization
 SENSOR_DEFAULT_PERIOD = 120.0  # Default sensor sampling period in seconds
 IMG_SNAPSHOT_DEFAULT_PERIOD = 300.0  # Default image snapshot period in seconds (5 minutes)
+
+# Database resilience constants
+MAX_DB_RETRIES = 3  # Maximum number of retry attempts for database operations
+RETRY_BASE_DELAY = 1.0  # Base delay in seconds for exponential backoff
+MAX_RETRY_DELAY = 30.0  # Maximum delay between retries
+MAX_BUFFERED_COMMANDS = 10000  # Maximum commands to buffer in memory during failures
 DAM_DEFAULT_PERIOD = 60.0  # Default DAM activity sampling period in seconds
 METADATA_MAX_VALUE_LENGTH = 60000  # Maximum length for metadata values before truncation
 QUEUE_CHECK_INTERVAL = 0.1  # Interval for checking queue status in seconds
@@ -897,6 +903,11 @@ class BaseResultWriter(object):
         self._make_dam_like_table = make_dam_like_table
         self._take_frame_shots = take_frame_shots
         
+        # Initialize resilience features
+        self._failed_commands_buffer = deque(maxlen=MAX_BUFFERED_COMMANDS)
+        self._writer_restart_count = 0
+        self._last_restart_time = 0
+        
         # Initialize helper classes
         if make_dam_like_table:
             self._dam_file_helper = DAMFileHelper(n_rois=len(rois))
@@ -1141,24 +1152,233 @@ class BaseResultWriter(object):
     
     def _write_async_command(self, command, args=None):
         """
-        Send SQL command to async writer process.
+        Send SQL command to async writer process with resilience features.
         
         Args:
             command (str): SQL command to execute
             args (tuple): Optional arguments for parameterized query
             
         Raises:
-            Exception: If async writer has died
+            Exception: If all retry attempts fail and fallback strategies are exhausted
         """
-        # Check if async writer is still alive (already waited for ready during init)
-        if not self._async_writer.is_alive():
-            raise Exception("Async database writer has stopped unexpectedly")
+        return self._write_async_command_resilient(command, args)
+    
+    def _write_async_command_resilient(self, command, args=None):
+        """
+        Send SQL command with retry logic and writer recovery.
         
-        # Send command to queue with error handling
+        Args:
+            command (str): SQL command to execute
+            args (tuple): Optional arguments for parameterized query
+            
+        Returns:
+            bool: True if command was sent successfully, False if buffered
+        """
+        for attempt in range(MAX_DB_RETRIES + 1):
+            try:
+                # Check if async writer is alive
+                if not self._async_writer.is_alive():
+                    if attempt < MAX_DB_RETRIES:
+                        self.log_io_diagnostics(f"Writer died during attempt {attempt + 1}/{MAX_DB_RETRIES}")
+                        logging.warning(f"Async writer died, attempting restart (attempt {attempt + 1}/{MAX_DB_RETRIES})")
+                        if self._restart_async_writer():
+                            # Writer restarted successfully, retry buffered commands first
+                            self._retry_buffered_commands()
+                        continue
+                    else:
+                        # Final attempt failed, buffer the command
+                        self.log_io_diagnostics("Writer permanently failed, entering degraded mode")
+                        logging.error("Async writer permanently failed, buffering command")
+                        return self._buffer_command(command, args)
+                
+                # Send command to queue
+                self._queue.put((command, args))
+                return True
+                
+            except Exception as e:
+                if attempt < MAX_DB_RETRIES:
+                    delay = min(RETRY_BASE_DELAY * (2 ** attempt), MAX_RETRY_DELAY)
+                    logging.warning(f"Database write failed (attempt {attempt + 1}/{MAX_DB_RETRIES}): {e}. Retrying in {delay:.1f}s")
+                    time.sleep(delay)
+                else:
+                    logging.error(f"All database write attempts failed: {e}. Buffering command.")
+                    return self._buffer_command(command, args)
+        
+        return False
+    
+    def _restart_async_writer(self):
+        """
+        Attempt to restart the async database writer process.
+        
+        Returns:
+            bool: True if restart was successful, False otherwise
+        """
         try:
-            self._queue.put((command, args))
+            current_time = time.time()
+            
+            # Prevent too frequent restarts (minimum 30 seconds between attempts)
+            if current_time - self._last_restart_time < 30:
+                logging.warning("Async writer restart attempted too recently, skipping")
+                return False
+            
+            # Clean up old writer
+            if hasattr(self, '_async_writer') and self._async_writer is not None:
+                try:
+                    if self._async_writer.is_alive():
+                        self._async_writer.terminate()
+                        self._async_writer.join(timeout=5)
+                except Exception as e:
+                    logging.warning(f"Error cleaning up old async writer: {e}")
+            
+            # Clean up old queue
+            if hasattr(self, '_queue') and self._queue is not None:
+                try:
+                    self._queue.close()
+                except Exception as e:
+                    logging.warning(f"Error closing old queue: {e}")
+            
+            # Create new queue and writer
+            self._queue = multiprocessing.JoinableQueue()
+            self._async_writer = self._create_async_writer(self._db_credentials, False)
+            self._async_writer.start()
+            
+            # Wait for initialization
+            if not self._async_writer._ready_event.wait(timeout=ASYNC_WRITER_TIMEOUT):
+                logging.error("Restarted async writer failed to initialize")
+                return False
+            
+            self._writer_restart_count += 1
+            self._last_restart_time = current_time
+            logging.info(f"Successfully restarted async writer (restart #{self._writer_restart_count})")
+            return True
+            
         except Exception as e:
-            raise Exception(f"Failed to send command to async writer: {e}")
+            logging.error(f"Failed to restart async writer: {e}")
+            return False
+    
+    def _buffer_command(self, command, args=None):
+        """
+        Buffer a failed database command for later retry.
+        
+        Args:
+            command (str): SQL command to buffer
+            args (tuple): Optional command arguments
+            
+        Returns:
+            bool: False (indicates command was buffered, not executed)
+        """
+        try:
+            self._failed_commands_buffer.append((command, args, time.time()))
+            if len(self._failed_commands_buffer) >= MAX_BUFFERED_COMMANDS:
+                logging.warning(f"Command buffer full ({MAX_BUFFERED_COMMANDS} commands), oldest commands will be dropped")
+            return False
+        except Exception as e:
+            logging.error(f"Failed to buffer command: {e}")
+            return False
+    
+    def _retry_buffered_commands(self):
+        """
+        Attempt to execute all buffered commands after writer recovery.
+        """
+        if not self._failed_commands_buffer:
+            return
+        
+        retry_count = len(self._failed_commands_buffer)
+        logging.info(f"Retrying {retry_count} buffered database commands")
+        
+        # Process buffered commands in FIFO order
+        failed_retries = 0
+        while self._failed_commands_buffer:
+            try:
+                command, args, timestamp = self._failed_commands_buffer.popleft()
+                age = time.time() - timestamp
+                
+                # Skip very old commands (older than 5 minutes)
+                if age > 300:
+                    logging.warning(f"Skipping old buffered command (age: {age:.1f}s)")
+                    continue
+                
+                # Try to execute the command directly (no retry logic here to avoid recursion)
+                if self._async_writer.is_alive():
+                    self._queue.put((command, args))
+                else:
+                    # Writer died again, put command back and stop
+                    self._failed_commands_buffer.appendleft((command, args, timestamp))
+                    logging.error("Async writer died again while retrying buffered commands")
+                    break
+                    
+            except Exception as e:
+                failed_retries += 1
+                logging.warning(f"Failed to retry buffered command: {e}")
+                if failed_retries > 10:  # Stop if too many consecutive failures
+                    logging.error("Too many failures retrying buffered commands, stopping retry")
+                    break
+        
+        remaining = len(self._failed_commands_buffer)
+        if remaining > 0:
+            logging.warning(f"{remaining} commands remain buffered after retry attempt")
+        else:
+            logging.info("All buffered commands successfully retried")
+    
+    def get_resilience_status(self):
+        """
+        Get current status of database resilience features.
+        
+        Returns:
+            dict: Status information including buffer size, restart count, etc.
+        """
+        return {
+            'writer_alive': self._async_writer.is_alive() if hasattr(self, '_async_writer') else False,
+            'buffered_commands': len(self._failed_commands_buffer),
+            'restart_count': self._writer_restart_count,
+            'last_restart_time': self._last_restart_time,
+            'time_since_last_restart': time.time() - self._last_restart_time if self._last_restart_time > 0 else None
+        }
+    
+    def log_io_diagnostics(self, error_context=""):
+        """
+        Log comprehensive I/O diagnostics to help identify SD card issues.
+        
+        Args:
+            error_context (str): Additional context about when the error occurred
+        """
+        try:
+            status = self.get_resilience_status()
+            db_path = getattr(self, '_db_credentials', {}).get('name', 'unknown')
+            
+            logging.error(f"Database I/O Issue - {error_context}")
+            logging.error(f"  Database path: {db_path}")
+            logging.error(f"  Writer alive: {status['writer_alive']}")
+            logging.error(f"  Buffered commands: {status['buffered_commands']}")
+            logging.error(f"  Writer restarts: {status['restart_count']}")
+            logging.error(f"  Time since last restart: {status['time_since_last_restart']:.1f}s" if status['time_since_last_restart'] else "Never restarted")
+            
+            # Check disk space and I/O stats if possible
+            if hasattr(os, 'statvfs') and db_path != 'unknown' and os.path.exists(os.path.dirname(db_path)):
+                try:
+                    statvfs = os.statvfs(os.path.dirname(db_path))
+                    # Handle different statvfs implementations
+                    if hasattr(statvfs, 'f_available'):
+                        free_space = statvfs.f_frsize * statvfs.f_available
+                        total_space = statvfs.f_frsize * statvfs.f_blocks
+                    else:
+                        free_space = statvfs.f_frsize * statvfs.f_bavail
+                        total_space = statvfs.f_frsize * statvfs.f_blocks
+                    free_percent = (free_space / total_space) * 100
+                    logging.error(f"  Disk space: {free_space / (1024**3):.2f}GB free ({free_percent:.1f}% of {total_space / (1024**3):.2f}GB)")
+                except Exception as e:
+                    logging.error(f"  Could not check disk space: {e}")
+            
+            # Log recent queue status
+            if hasattr(self, '_queue'):
+                try:
+                    queue_size = self._queue.qsize()
+                    logging.error(f"  Queue size: {queue_size}")
+                except Exception as e:
+                    logging.error(f"  Could not check queue size: {e}")
+            
+        except Exception as e:
+            logging.error(f"Failed to log I/O diagnostics: {e}")
 
     def _create_table(self, name, fields, engine="InnoDB"):
         """
@@ -1369,14 +1589,14 @@ class SQLiteResultWriter(BaseResultWriter):
 
     def _write_async_command(self, command, args=None):
         """
-        Send SQL command to async writer process with SQLite placeholder conversion.
+        Send SQL command to async writer process with SQLite placeholder conversion and resilience.
         
         Args:
             command (str): SQL command to execute (may contain MySQL placeholders)
             args (tuple): Optional arguments for parameterized query
             
-        Raises:
-            Exception: If async writer is not ready or has died
+        Returns:
+            bool: True if command was sent successfully, False if buffered
         """
         # Convert MySQL placeholders (%s) to SQLite placeholders (?)
         if '%s' in command:
@@ -1396,17 +1616,9 @@ class SQLiteResultWriter(BaseResultWriter):
             sqlite_args = tuple(sqlite_args)
         else:
             sqlite_args = None
-            
-        # Wait for the async writer to be ready before sending commands
-        if not self._async_writer._ready_event.wait(timeout=ASYNC_WRITER_TIMEOUT):
-            if self._async_writer.is_alive():
-                raise Exception(f"Async database writer failed to initialize within {ASYNC_WRITER_TIMEOUT} seconds - check SQLite connection")
-            else:
-                raise Exception("Async database writer process died during initialization - check SQLite configuration and logs")
         
-        if not self._async_writer.is_alive():
-            raise Exception("Async database writer has stopped unexpectedly")
-        self._queue.put((sqlite_command, sqlite_args))
+        # Use the resilient write method from parent class
+        return self._write_async_command_resilient(sqlite_command, sqlite_args)
 
     def _create_table(self, name, fields, engine=None):
         """
