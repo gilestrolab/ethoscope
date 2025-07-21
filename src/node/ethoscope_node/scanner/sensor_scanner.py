@@ -8,9 +8,7 @@ import datetime
 from threading import RLock
 from typing import Dict, Any
 
-from ethoscope_node.utils.device_scanner import BaseDevice, DeviceScanner, ScanException
-
-
+from ethoscope_node.scanner.base_scanner import BaseDevice, DeviceScanner, ScanException
 
 class Sensor(BaseDevice):
     """Enhanced sensor device class with improved CSV handling."""

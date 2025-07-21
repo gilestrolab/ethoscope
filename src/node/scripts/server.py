@@ -14,8 +14,8 @@ import json
 import time
 from typing import Dict, List, Optional, Any
 
-from ethoscope_node.utils.device_scanner import EthoscopeScanner
-from ethoscope_node.utils.sensor_scanner import SensorScanner
+from ethoscope_node.scanner.ethoscope_scanner import EthoscopeScanner
+from ethoscope_node.scanner.sensor_scanner import SensorScanner
 from ethoscope_node.utils.configuration import EthoscopeConfiguration, ensure_ssh_keys
 from ethoscope_node.utils.backups_helpers import GenericBackupWrapper
 from ethoscope_node.utils.etho_db import ExperimentalDB
