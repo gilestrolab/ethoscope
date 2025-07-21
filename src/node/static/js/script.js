@@ -5,6 +5,11 @@
         return function(obj) {
             var result = [];
             angular.forEach(obj, function(val, key) {
+                // Add the key as 'name' property if it doesn't exist
+                // This is needed for user dropdowns where the key is the username
+                if (typeof val === 'object' && val !== null && !val.hasOwnProperty('name')) {
+                    val.name = key;
+                }
                 result.push(val);
             });
             return result;
