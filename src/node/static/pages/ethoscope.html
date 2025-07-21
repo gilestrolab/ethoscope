@@ -385,7 +385,7 @@
                 <form name="trackingoptionsform" class="input">
                     <div id="user_options" ng-repeat="(name, option) in user_options.tracking">
                         <h4>{{name}}</h4>
-                        
+
                         <!-- Special handling for interactor section - use dropdown instead of radio buttons -->
                         <div ng-if="name == 'interactor'">
                             <div class="form-group">
@@ -399,7 +399,7 @@
                                     Click "Add Stimulator" to add stimulators to your experiment sequence. Each stimulator can have its own schedule and parameters.
                                 </small>
                             </div>
-                            
+
                             <!-- All stimulators list (including the first one) -->
                             <div ng-if="stimulatorSequence && stimulatorSequence.length > 0" class="stimulator-sequence-container">
                                 <div ng-repeat="stimulator in stimulatorSequence track by $index" class="form-group stimulator-item" style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid #28a745;">
@@ -411,7 +411,7 @@
                                             <i class="fa fa-trash"></i>
                                         </button>
                                     </div>
-                                    
+
                                     <!-- Stimulator type selection -->
                                     <div class="form-group" style="margin-bottom: 15px;">
                                         <label style="font-size: 14px; margin-bottom: 5px;">Stimulator Type:</label>
@@ -420,12 +420,12 @@
                                             <option ng-repeat="opt in option" value="{{opt.name}}" title="{{opt.overview}}">{{opt.name}}</option>
                                         </select>
                                     </div>
-                                    
+
                                     <!-- Show description for selected stimulator -->
                                     <div ng-if="stimulator.name" class="alert alert-info" style="margin-bottom: 15px; font-size: 14px; padding: 8px 12px;">
                                         <strong>{{getInteractorOptionByName(stimulator.name).name}}:</strong> {{getInteractorOptionByName(stimulator.name).overview}}
                                     </div>
-                                    
+
                                     <!-- Arguments for stimulator -->
                                     <div ng-if="stimulator.name && stimulator.name != 'MultiStimulator'" class="stimulator-arguments-section" style="background-color: white; border-radius: 4px; padding: 15px; border: 1px solid #dee2e6;">
                                         <h6 style="margin-bottom: 15px; color: #495057; font-size: 14px; font-weight: 600;">
@@ -482,7 +482,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- Standard handling for non-interactor sections -->
                         <div ng-if="name != 'interactor'">
                             <ul class="option-list">
@@ -602,7 +602,7 @@
                                     {{opt.overview}}
                                 </div>
                                 <ul ng-if="selected_options.update_machine[name]['name']==opt.name" class="option-items">
-                                    <li ng-repeat="arg in opt.arguments">
+                                    <li ng-repeat="arg in opt.arguments" style="background-color: {{$even ? '#f8f9fa' : 'transparent'}}; padding: 10px; margin: 5px 0; border-radius: 4px;">
 
 
                                         <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=file name={{arg.name}} ng-model="selected_options.update_machine[name]['arguments'][arg.name]">
@@ -614,32 +614,25 @@
                                         <input ng-if="arg.type == 'str'" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.update_machine[name]['arguments'][arg.name]">
 
 
-                                        <div ng-if="arg.type == 'boolean'">
-                                            <label for="input-{{arg.name}}" class="switchlabel">{{arg.description}}</label>
-                                            <label class="switch">
+                                        <div ng-if="arg.type == 'boolean' && arg.name != 'expand_rootfs'" style="display: flex; align-items: center; justify-content: space-between;">
+                                            <label for="input-{{arg.name}}" class="switchlabel" style="margin: 0; flex: 1;">{{arg.description}}</label>
+                                            <label class="switch" style="margin: 0;">
                                                 <input id="input-{{arg.name}}" type="checkbox" name={{arg.name}} ng-model="selected_options.update_machine[name]['arguments'][arg.name]"><span class="slider"></span>
                                             </label>
                                         </div>
 
-                                        <div ng-if="arg.type == 'date_range'" class="form-group">
-                                            <label for="input-{{arg.name}}">{{arg.description}}</label>
-                                            <div class="input-group" style="margin-top: 5px;">
-                                                <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-{{arg.name}}" type="text" ng-model="selected_options.update_machine[name]['arguments'][arg.name]" placeholder="Click to select start and end date/time" style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;" options="dateRangeOptions">
-                                                <div class="input-group-append">
-                                                    <span class="input-group-text" style="background-color: #337ab7; color: white; cursor: pointer;" onclick="$('#input-{{arg.name}}').focus();">
-                                                        <i class="fa fa-clock"></i>
-                                                    </span>
-                                                </div>
+                                        <!-- Special handling for expand_rootfs checkbox -->
+                                        <div ng-if="arg.name == 'expand_rootfs'">
+                                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                                <label for="input-{{arg.name}}" class="switchlabel" style="margin: 0; flex: 1;">{{arg.description}}</label>
+                                                <label class="switch" style="margin: 0;">
+                                                    <input id="input-{{arg.name}}" type="checkbox" name={{arg.name}} ng-model="selected_options.update_machine[name]['arguments'][arg.name]">
+                                                    <span class="slider"></span>
+                                                </label>
                                             </div>
-                                            <small class="form-text text-muted" style="margin-top: 3px;">
-                                                Click to select start and end date/time when stimulator should be active
-                                            </small>
-                                        </div>
-
-                                        <div ng-if="arg.type == 'datetime'" class="input-group">
-                                            <input ng-if="arg.type == 'datetime'" date-range-picker class="form-control date-picker" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.update_machine[name]['arguments'][arg.name]" options="{singleDatePicker: true, timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss' }}">
-                                            <div class="input-group-append">
-                                                <span class="input-group-text"><i class="fa fa-calendar"></i></span>
+                                            <div class="alert alert-warning" style="margin-top: 10px; font-size: 12px; padding: 8px;">
+                                                <i class="fa fa-exclamation-triangle"></i> 
+                                                <strong>Warning:</strong> Expands filesystem to use full SD card space. Reboot required.
                                             </div>
                                         </div>
                                     </li>
@@ -704,7 +697,7 @@
                                                 </div>
                                             </div>
                                             <small class="form-text text-muted" style="margin-top: 3px;">
-                                                Click to select start and end date/time when stimulator should be active
+                                                Click to select start and end date/time for recording schedule
                                             </small>
                                         </div>
 

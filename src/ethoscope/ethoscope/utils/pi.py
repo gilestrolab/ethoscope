@@ -865,3 +865,94 @@ def manage_disk_space(ethoscope_dir, threshold_percent=85, max_age_days=60):
         error_msg = f"Error in disk space management: {e}"
         logging.error(error_msg)
         return {'status': 'error', 'details': error_msg}
+
+
+def expand_rootfs():
+    """
+    Execute raspi-config --expand-rootfs if the system supports it and there is room for expansion.
+    
+    Returns:
+        dict: {'success': bool, 'message': str, 'expanded': bool}
+    """
+    result = {
+        'success': False,
+        'message': '',
+        'expanded': False
+    }
+    
+    try:
+        # Check if we're on a Raspberry Pi
+        if not isMachinePI():
+            result['message'] = 'Not running on Raspberry Pi - rootfs expansion not applicable'
+            result['success'] = True
+            return result
+        
+        # Check if raspi-config exists and is executable
+        raspi_config_locations = ['/usr/bin/raspi-config', '/bin/raspi-config']
+        raspi_config_path = None
+        
+        for path in raspi_config_locations:
+            if os.path.isfile(path) and os.access(path, os.X_OK):
+                raspi_config_path = path
+                break
+        
+        if not raspi_config_path:
+            result['message'] = 'raspi-config not found or not executable'
+            return result
+        
+        # Check current partition info to see if expansion is needed
+        partition_info = get_partition_info('/')
+        if not partition_info:
+            result['message'] = 'Cannot get root partition information'
+            return result
+        
+        # Get available space on root partition
+        available_str = partition_info.get('Avail', '0')
+        if available_str.endswith('G'):
+            available_gb = float(available_str[:-1])
+        elif available_str.endswith('M'):
+            available_gb = float(available_str[:-1]) / 1024
+        else:
+            available_gb = 0
+        
+        # Check if there's already plenty of space (>1GB available)
+        if available_gb > 1.0:
+            result['message'] = f'Root partition has {available_gb:.1f}GB available - expansion not needed'
+            result['success'] = True
+            return result
+        
+        # Check if we can detect an unexpanded partition
+        # This is a simple check - if the root filesystem doesn't fill the SD card
+        try:
+            with os.popen('lsblk -ln -o NAME,SIZE,MOUNTPOINT | grep "/$"') as cmd:
+                root_info = cmd.read().strip()
+            
+            if not root_info:
+                result['message'] = 'Cannot detect root partition layout'
+                return result
+            
+            # Execute raspi-config --expand-rootfs
+            expand_cmd = f'{raspi_config_path} --expand-rootfs'
+            
+            with os.popen(expand_cmd) as cmd:
+                output = cmd.read().strip()
+                exit_code = cmd.close()
+            
+            if exit_code is None or exit_code == 0:
+                result['success'] = True
+                result['expanded'] = True
+                result['message'] = 'Root filesystem expansion completed successfully - reboot required to take effect'
+                logging.info(f"Root filesystem expanded: {output}")
+            else:
+                result['message'] = f'raspi-config --expand-rootfs failed with exit code {exit_code}: {output}'
+                logging.error(result['message'])
+                
+        except Exception as e:
+            result['message'] = f'Error executing raspi-config: {str(e)}'
+            logging.error(result['message'])
+    
+    except Exception as e:
+        result['message'] = f'Error in expand_rootfs: {str(e)}'
+        logging.error(result['message'])
+    
+    return result

@@ -320,6 +320,12 @@ def update_machine_info(id):
     if 'remoteLogging' in update_machine_json_data and update_machine_json_data['remoteLogging'] != machine_info['remoteLogging']:
         pi.loggingStatus(update_machine_json_data['remoteLogging'])
         haschanged = True
+
+    if 'expand_rootfs' in update_machine_json_data and update_machine_json_data['expand_rootfs']:
+        expansion_result = pi.expand_rootfs()
+        logging.info(f"Root filesystem expansion requested: {expansion_result}")
+        if expansion_result['expanded']:
+            haschanged = True
     
     #Time comes as number of milliseconds from timestamp
     if 'datetime' in update_machine_json_data and update_machine_json_data['datetime']:
@@ -714,6 +720,7 @@ def user_options(id):
                                 {"type": "boolean", "name":"isexperimental", "description": "Specify if the ethoscope is to be treated as experimental", "default": machine_info['isExperimental']}, 
                                 {"type": "boolean", "name":"useSTATIC", "description": "Use a static IP address instead of obtaining one with DHCP. The last number in the IP address will be the current ethoscope number", "default" : machine_info['useSTATIC']},
                                 {"type": "boolean", "name":"remoteLogging", "description": "The ethoscope logs events directly on the node.", "default" : machine_info['remoteLogging']},
+                                {"type": "boolean", "name":"expand_rootfs", "description": "Expand root filesystem to use full SD card space", "default" : False},
                                 {"type": "str", "name":"node_ip", "description": "The IP address that you want to record as the node (do not change this value unless you know what you are doing!)","default": machine_info['node_ip']},
                                 {"type": "str", "name":"ESSID", "description": "The name of the WIFI SSID","default": machine_info['WIFI_SSID'] },
                                 {"type": "str", "name":"Key", "description": "The WPA password for the WIFI SSID","default": machine_info['WIFI_PASSWORD'] }],
