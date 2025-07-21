@@ -365,6 +365,11 @@ class BareRepoUpdater:
             if e.cmd[0] == "git" and "config" in e.cmd and "--get-all" in e.cmd and e.returncode == 1:
                 logging.debug("No existing safe.directory configuration found.")
                 return
+            # Handle permission denied errors gracefully - don't fail the entire update
+            if "permission denied" in e.stderr.lower() or "could not lock config file" in e.stderr.lower():
+                logging.warning(f"Permission denied adding safe.directory: {e.stderr.strip()}")
+                logging.warning("Safe directory not added - you may need to run: sudo git config --system --add safe.directory /srv/git/ethoscope.git")
+                return
             logging.error(f"Failed to add safe.directory: {e.stderr.strip()}")
             logging.debug(traceback.format_exc())
             raise BranchUpdateError(f"Failed to add safe.directory: {e.stderr.strip()}") from e
@@ -412,14 +417,32 @@ class BareRepoUpdater:
             logging.info(f"  - {ref.name}")
 
         # After fetching, all remote-tracking branches are up-to-date in the bare repo's refs.
-        # We can now list them and report their status as updated.
+        # For bare repositories, we also need to update the local branches to match remote ones.
         for remote_ref in self._remote.refs:
             # We are interested in actual branches, not HEAD or other special refs
             if remote_ref.name.startswith(f"{self._remote_name}/") and remote_ref.name.count('/') == 1:
                 branch_name = remote_ref.name.split('/', 1)[1]
-                update_results[branch_name] = True  # Mark as updated since fetch was successful
-                any_success = True
-                logging.info(f"Remote branch '{branch_name}' refs updated in bare repository.")
+                
+                try:
+                    # Update local branch to match remote branch in bare repository
+                    # This is equivalent to: git branch -f <branch_name> refs/remotes/origin/<branch_name>
+                    local_branch_ref = f"refs/heads/{branch_name}"
+                    remote_commit = remote_ref.commit
+                    
+                    # Create or update the local branch reference
+                    # Use git command to handle both creation and updates properly
+                    self._working_repo.git.branch('-f', branch_name, remote_ref.name)
+                    
+                    logging.info(f"Updated local branch '{branch_name}' to commit {remote_commit.hexsha[:8]} in bare repository.")
+                    update_results[branch_name] = True
+                    any_success = True
+                    
+                except Exception as e:
+                    logging.warning(f"Failed to update local branch '{branch_name}': {e}")
+                    # Still mark as successful if remote ref was updated
+                    update_results[branch_name] = True
+                    any_success = True
+                    logging.info(f"Remote branch '{branch_name}' refs updated in bare repository (local branch update failed).")
 
         if not any_success:
             error_message = "No remote branches found or updated. Please check your remote configuration and network connection."
