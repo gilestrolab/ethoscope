@@ -285,7 +285,6 @@ def create_device_info_from_backup(ethoscope_name, host, backup_filename):
                     'backup_filename': backup_filename,
                     'filesize': 0,  # Unknown for forced backups
                     'version': 'Unknown',
-                    'path': f"{device_id}/{ethoscope_name}",  # Approximate path
                     'date': time.time(),  # Current time as fallback
                     'db_status': 'forced_backup',
                     'table_counts': {},
