@@ -1255,6 +1255,10 @@
                 $http.post('/device/' + device_id + '/machineinfo', option)
                     .then(function(response) {
                         $scope.machine_info = response.data;
+                        
+                        // Immediately refresh device data to show updated time/settings
+                        refreshDeviceStatus();
+                        
                         if (response.data.haschanged) {
                             $scope.ethoscope.alert("Some settings have changed. Please REBOOT your ethoscope now.");
                         }
