@@ -3,6 +3,7 @@ __author__ = 'quentin'
 from .tracking_unit import TrackingUnit
 import logging
 import traceback
+import time
 
 import datetime
 
@@ -136,6 +137,7 @@ class Monitor(object):
                 if drawer is not None:
                     drawer.draw(frame, self._last_positions, self._unit_trackers, self._reference_points)
                 self._last_t = t
+                time.sleep(0.001)
 
         except Exception as e:
             logging.error("Monitor closing with an exception: '%s'" % traceback.format_exc())
