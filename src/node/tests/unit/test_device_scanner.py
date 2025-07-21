@@ -10,8 +10,8 @@ from unittest.mock import Mock, patch, MagicMock
 import time
 import threading
 
-# Note: Actual imports would need to be adjusted based on the real module structure
-# from ethoscope_node.utils.device_scanner import DeviceScanner
+# Import the updated scanner modules
+from ethoscope_node.scanner.base_scanner import DeviceScanner
 
 
 class TestDeviceScanner:

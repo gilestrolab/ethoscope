@@ -15,7 +15,7 @@ from unittest.mock import Mock, patch
 # Add the src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
 
-from ethoscope_node.utils.device_scanner import Ethoscope
+from ethoscope_node.scanner.ethoscope_scanner import Ethoscope
 
 def create_test_device_old_format():
     """Create a test device with old database_info format."""

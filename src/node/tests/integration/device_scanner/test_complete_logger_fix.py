@@ -15,7 +15,7 @@ import json
 # Add the src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
 
-from ethoscope_node.utils.device_scanner import Ethoscope
+from ethoscope_node.scanner.ethoscope_scanner import Ethoscope
 
 def test_complete_logger_name_workflow():
     """Test complete workflow of logger name updates."""

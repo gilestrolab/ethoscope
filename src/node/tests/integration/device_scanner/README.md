@@ -35,7 +35,7 @@ From the node package directory:
 python -m pytest tests/integration/device_scanner/ -v
 
 # Run with coverage
-python -m pytest tests/integration/device_scanner/ --cov=ethoscope_node.utils.device_scanner -v
+python -m pytest tests/integration/device_scanner/ --cov=ethoscope_node.scanner -v
 ```
 
 ## Requirements

@@ -14,7 +14,7 @@ from unittest.mock import patch
 # Add the src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
 
-from ethoscope_node.utils.device_scanner import Ethoscope
+from ethoscope_node.scanner.ethoscope_scanner import Ethoscope
 
 def test_logger_name_update():
     """Test that logger name is updated properly."""

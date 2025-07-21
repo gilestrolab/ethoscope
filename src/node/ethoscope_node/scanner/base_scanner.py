@@ -1,33 +1,19 @@
 import urllib.request
 import urllib.error
-import urllib.parse
 import os
-import csv
-import datetime
 import json
 import time
 import logging
-import traceback
-import pickle
 import socket
 import struct
-import subprocess
 from threading import Thread, RLock, Event
 from functools import wraps
-from contextlib import contextmanager
+
 from typing import Dict, List, Optional, Any, Iterator, Union
 from dataclasses import dataclass
 from zeroconf import ServiceBrowser, Zeroconf, IPVersion
+import traceback
 
-from ethoscope_node.utils.etho_db import ExperimentalDB
-from ethoscope_node.utils.configuration import ensure_ssh_keys, EthoscopeConfiguration
-from ethoscope_node.utils.backups_helpers import get_sqlite_table_counts, calculate_backup_percentage_from_table_counts
-from ethoscope_node.notifications.email import EmailNotificationService
-
-# Constants
-STREAMING_PORT = 8887
-ETHOSCOPE_PORT = 9000
-DB_UPDATE_INTERVAL = 30  # seconds
 DEFAULT_TIMEOUT = 5
 MAX_RETRIES = 2
 INITIAL_RETRY_DELAY = 1
@@ -341,6 +327,9 @@ class BaseDevice(Thread):
         
         # Logging
         self._logger = logging.getLogger(f"{self.__class__.__name__}_{ip}")
+        # Ensure device loggers inherit the root logger's level
+        if self._logger.level == logging.NOTSET:
+            self._logger.setLevel(logging.getLogger().level or logging.INFO)
         
         # URLs
         self._setup_urls()
@@ -682,6 +671,9 @@ class DeviceScanner:
         self._browser = None
         self._lock = RLock()
         self._logger = logging.getLogger(self.__class__.__name__)
+        # Ensure scanner loggers inherit the root logger's level
+        if self._logger.level == logging.NOTSET:
+            self._logger.setLevel(logging.getLogger().level or logging.INFO)
         self.results_dir = ""  # Default, override in subclasses
         self._is_running = False
     

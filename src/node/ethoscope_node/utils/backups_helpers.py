@@ -1326,7 +1326,7 @@ class GenericBackupWrapper(threading.Thread):
         
         try:
             # Import here to avoid circular dependency
-            from ethoscope_node.utils.device_scanner import EthoscopeScanner
+            from ethoscope_node.scanner.ethoscope_scanner import EthoscopeScanner
             
             self._logger.info("Creating EthoscopeScanner instance...")
             scanner = EthoscopeScanner()

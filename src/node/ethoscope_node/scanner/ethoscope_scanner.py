@@ -1,10 +1,21 @@
-from threading import Thread, Event
-import subprocess
-import datetime
+import urllib.request
+import urllib.error
 import urllib.parse
+import os
+import datetime
+import json
+import time
+import logging
+import struct
+import subprocess
+from threading import Thread, Event
 from typing import Dict, List, Optional, Any, Iterator, Union
+from dataclasses import dataclass
+from zeroconf import Zeroconf
 
-from ethoscope_node.scanner.base_scanner import BaseDevice, DeviceScanner, ScanException
+from ethoscope_node.scanner.base_scanner import BaseDevice, DeviceScanner, DeviceStatus, ScanException
+from ethoscope_node.scanner.ethoscope_streaming import EthoscopeStreamManager
+
 from ethoscope_node.utils.etho_db import ExperimentalDB
 from ethoscope_node.utils.configuration import ensure_ssh_keys, EthoscopeConfiguration
 from ethoscope_node.utils.backups_helpers import get_sqlite_table_counts, calculate_backup_percentage_from_table_counts
@@ -260,7 +271,7 @@ class Ethoscope(BaseDevice):
     def relay_stream(self) -> Iterator[bytes]:
         """Relay video stream from ethoscope using shared connection."""
         # Lazy import to avoid circular dependencies
-        from .streaming import EthoscopeStreamManager
+        #from .streaming import EthoscopeStreamManager
         
         # Create stream manager if it doesn't exist
         if self._stream_manager is None:
@@ -362,7 +373,7 @@ class Ethoscope(BaseDevice):
 
         except ScanException as e:
             try:
-                did = self._get_json(self._id_url)
+                did = self._get_json(self._id_url, timeout=5)
                 if did:
                     with self._lock:
                         self._info['last_seen'] = time.time()
@@ -371,9 +382,15 @@ class Ethoscope(BaseDevice):
                 self._logger.warning(f"The device is online and responding but cannot communicate its status. Flagged as busy. {e}")
                 return False
             
-            except ScanException as e:
-
-                self._logger.warning(f"Error fetching device info: {e}")
+            except ScanException as inner_e:
+                # Device doesn't respond to either /data/<id> or /id - mark for offline transition
+                current_status = self.get_device_status()
+                if current_status and current_status.status_name == 'busy':
+                    # If previously busy, transition to unreached to start timeout countdown
+                    self._logger.warning(f"Busy device {self._id} no longer responding to any endpoint. Starting offline transition. {inner_e}")
+                    self._handle_unreachable_state('busy')
+                else:
+                    self._logger.warning(f"Error fetching device info: {inner_e}")
                 return False
     
     def _update_logger_name(self):
@@ -388,6 +405,9 @@ class Ethoscope(BaseDevice):
             # Only update if the name has changed
             if new_logger_name != current_logger_name:
                 self._logger = logging.getLogger(new_logger_name)
+                # Ensure updated logger inherits proper level
+                if self._logger.level == logging.NOTSET:
+                    self._logger.setLevel(logging.getLogger().level or logging.INFO)
                 self._logger.debug(f"Updated logger name from {current_logger_name} to {new_logger_name}")
     
     def _handle_unreachable_state(self, previous_status: str):
@@ -400,7 +420,15 @@ class Ethoscope(BaseDevice):
         unreachable_timeout = alert_config.get('unreachable_timeout_minutes', 20)
         
         if current_status.status_name == 'busy':
-                self._logger.info(f"Device {self._id} has been busy for longer than timeout allowed ({unreachable_timeout}m), but it's still online.")
+            # Check if busy device has exceeded timeout - if so, transition to offline
+            busy_timeout = alert_config.get('busy_timeout_minutes', 10)  # Shorter timeout for busy devices
+            if current_status.is_timeout_exceeded(busy_timeout):
+                self._logger.info(f"Device {self._id} busy timeout exceeded ({busy_timeout}m), marking as offline")
+                self._update_device_status("offline", trigger_source="system", metadata={"reason": "busy_timeout"})
+                self._edb.updateEthoscopes(ethoscope_id=self._id, status="offline")
+                return
+            else:
+                self._logger.info(f"Device {self._id} has been busy for {current_status.get_age_minutes():.1f}m (timeout: {busy_timeout}m)")
                 self._update_device_status("busy", trigger_source="system", metadata={"reason": "unreachable_timeout"})
                 self._edb.updateEthoscopes(ethoscope_id=self._id, status="busy")
                 return
