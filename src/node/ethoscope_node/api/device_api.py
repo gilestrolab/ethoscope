@@ -22,6 +22,7 @@ class DeviceAPI(BaseAPI):
         self.app.route('/devices', method='GET')(self._get_devices)
         self.app.route('/devices_list', method='GET')(self._get_devices_list)
         self.app.route('/devices/retire-inactive', method='POST')(self._retire_inactive_devices)
+        self.app.route('/devices/cleanup-busy', method='POST')(self._cleanup_busy_devices)
         self.app.route('/device/add', method='POST')(self._manual_add_device)
         
         # Device information
@@ -75,18 +76,22 @@ class DeviceAPI(BaseAPI):
                     # If parsing fails, use default
                     pass
             
-            # First purge unnamed and invalid devices
+            # First cleanup stale busy devices
+            busy_cleaned_count = self.database.cleanup_stale_busy_devices(timeout_minutes=10)
+            
+            # Then purge unnamed and invalid devices
             purged_count = self.database.purge_unnamed_devices()
             
-            # Then retire inactive devices
+            # Finally retire inactive devices
             retired_count = self.database.retire_inactive_devices(threshold_days)
             
             return {
                 'success': True,
                 'retired_count': retired_count,
                 'purged_count': purged_count,
+                'busy_cleaned_count': busy_cleaned_count,
                 'threshold_days': threshold_days,
-                'message': f'Purged {purged_count} unnamed/invalid devices and retired {retired_count} devices that were offline for more than {threshold_days} days'
+                'message': f'Cleaned up {busy_cleaned_count} stale busy devices, purged {purged_count} unnamed/invalid devices, and retired {retired_count} devices that were offline for more than {threshold_days} days'
             }
             
         except Exception as e:
@@ -95,6 +100,40 @@ class DeviceAPI(BaseAPI):
                 'success': False,
                 'error': str(e),
                 'message': 'Failed to retire inactive devices'
+            }
+    
+    @error_decorator
+    def _cleanup_busy_devices(self):
+        """Clean up devices that are stuck in 'busy' status."""
+        try:
+            # Get threshold from request body or use default
+            request_data = self.get_request_data().decode("utf-8")
+            threshold_hours = 2  # Default value
+            
+            if request_data:
+                try:
+                    data = json.loads(request_data)
+                    threshold_hours = data.get('threshold_hours', 2)
+                except (json.JSONDecodeError, ValueError):
+                    # If parsing fails, use default
+                    pass
+            
+            # Clean up offline busy devices
+            cleaned_count = self.database.cleanup_offline_busy_devices(threshold_hours)
+            
+            return {
+                'success': True,
+                'cleaned_count': cleaned_count,
+                'threshold_hours': threshold_hours,
+                'message': f'Cleaned up {cleaned_count} devices that were stuck as busy for more than {threshold_hours} hours'
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error cleaning up busy devices: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'message': 'Failed to cleanup busy devices'
             }
 
     def _manual_add_device(self):

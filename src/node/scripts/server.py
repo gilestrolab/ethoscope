@@ -296,6 +296,20 @@ class EthoscopeNodeServer:
                 self.database = ExperimentalDB()
             self.logger.info("Database connection established")
             
+            # Retire inactive devices at startup
+            try:
+                retired_count = self.database.retire_inactive_devices()
+                self.logger.info(f"Retired {retired_count} inactive devices at startup")
+            except Exception as e:
+                self.logger.warning(f"Failed to retire inactive devices at startup: {e}")
+            
+            # Clean up offline busy devices at startup
+            try:
+                cleaned_count = self.database.cleanup_offline_busy_devices()
+                self.logger.info(f"Cleaned up {cleaned_count} offline busy devices at startup")
+            except Exception as e:
+                self.logger.warning(f"Failed to cleanup offline busy devices at startup: {e}")
+            
             # Initialize device scanner
             try:
                 if self.config_dir:
@@ -460,10 +474,14 @@ class EthoscopeNodeServer:
 
 def setup_logging(debug: bool = False):
     """Setup logging configuration."""
-    level = logging.DEBUG if debug else logging.INFO
+    level = logging.INFO if debug else logging.ERROR
     format_string = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     
-    logging.basicConfig(level=level, format=format_string)
+    # Force configure logging even if already initialized
+    logging.basicConfig(level=level, format=format_string, force=True)
+    
+    # Explicitly set root logger level to ensure it takes effect
+    logging.getLogger().setLevel(level)
     
     if debug:
         logging.info("Debug logging enabled")

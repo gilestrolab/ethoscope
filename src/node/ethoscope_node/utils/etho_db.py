@@ -873,6 +873,162 @@ class ExperimentalDB(multiprocessing.Process):
             logging.info(f"No unnamed/invalid devices found to purge")
         
         return purged_count
+    
+    def cleanup_stale_busy_devices(self, timeout_minutes: int = 10) -> int:
+        """
+        Clean up devices that are marked as 'busy' but haven't been seen recently.
+        
+        Args:
+            timeout_minutes: Minutes after which a busy device is considered stale
+            
+        Returns:
+            Number of devices that were cleaned up
+        """
+        cutoff_date = datetime.datetime.now() - datetime.timedelta(minutes=timeout_minutes)
+        cutoff_timestamp = cutoff_date.timestamp()
+        
+        # Get all devices with status 'busy'
+        sql_get_busy = "SELECT ethoscope_id, last_seen FROM %s WHERE status = 'busy'" % self._ethoscopes_table_name
+        
+        busy_devices = self.executeSQL(sql_get_busy)
+        if not isinstance(busy_devices, list):
+            return 0
+        
+        devices_to_cleanup = []
+        
+        for device in busy_devices:
+            ethoscope_id = device[0]
+            last_seen = device[1]
+            
+            try:
+                # Try to parse the last_seen timestamp
+                if isinstance(last_seen, str):
+                    # Try different datetime formats
+                    for fmt in ['%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S.%f %Z']:
+                        try:
+                            last_seen_dt = datetime.datetime.strptime(last_seen, fmt)
+                            break
+                        except ValueError:
+                            continue
+                    else:
+                        # If no format worked, try parsing as timestamp
+                        try:
+                            last_seen_dt = datetime.datetime.fromtimestamp(float(last_seen))
+                        except:
+                            # If all parsing fails, consider it for cleanup
+                            devices_to_cleanup.append(ethoscope_id)
+                            continue
+                else:
+                    # Try as numeric timestamp
+                    last_seen_dt = datetime.datetime.fromtimestamp(float(last_seen))
+                
+                # Check if device should be cleaned up
+                if last_seen_dt.timestamp() < cutoff_timestamp:
+                    devices_to_cleanup.append(ethoscope_id)
+                    
+            except Exception as e:
+                # If any parsing fails, consider device for cleanup
+                logging.warning(f"Failed to parse timestamp for busy device {ethoscope_id}: {e}")
+                devices_to_cleanup.append(ethoscope_id)
+        
+        # Clean up the devices by marking them as offline
+        cleaned_count = 0
+        for ethoscope_id in devices_to_cleanup:
+            sql_cleanup = "UPDATE %s SET status = 'offline' WHERE ethoscope_id = '%s'" % (
+                self._ethoscopes_table_name, ethoscope_id
+            )
+            
+            result = self.executeSQL(sql_cleanup)
+            if result != -1:
+                cleaned_count += 1
+            else:
+                logging.error(f"Failed to cleanup busy device {ethoscope_id}")
+        
+        if cleaned_count > 0:
+            logging.info(f"Cleaned up {cleaned_count} stale busy devices (busy for >{timeout_minutes} minutes)")
+        else:
+            logging.info(f"No stale busy devices found to cleanup (busy for >{timeout_minutes} minutes)")
+        
+        return cleaned_count
+    
+    def cleanup_offline_busy_devices(self, threshold_hours: int = 2) -> int:
+        """
+        Clean up devices that are marked as 'busy' but haven't been seen for hours (indicating they're actually offline).
+        
+        Args:
+            threshold_hours: Hours after which a busy device is considered offline
+            
+        Returns:
+            Number of devices that were cleaned up
+        """
+        cutoff_date = datetime.datetime.now() - datetime.timedelta(hours=threshold_hours)
+        cutoff_timestamp = cutoff_date.timestamp()
+        
+        # Get all devices with status 'busy'
+        sql_get_busy = "SELECT ethoscope_id, ethoscope_name, last_seen FROM %s WHERE status = 'busy'" % self._ethoscopes_table_name
+        
+        busy_devices = self.executeSQL(sql_get_busy)
+        if not isinstance(busy_devices, list):
+            return 0
+        
+        devices_to_cleanup = []
+        
+        for device in busy_devices:
+            ethoscope_id = device[0]
+            ethoscope_name = device[1]
+            last_seen = device[2]
+            
+            try:
+                # Try to parse the last_seen timestamp
+                if isinstance(last_seen, str):
+                    # Try different datetime formats
+                    for fmt in ['%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S.%f %Z']:
+                        try:
+                            last_seen_dt = datetime.datetime.strptime(last_seen, fmt)
+                            break
+                        except ValueError:
+                            continue
+                    else:
+                        # If no format worked, try parsing as timestamp
+                        try:
+                            last_seen_dt = datetime.datetime.fromtimestamp(float(last_seen))
+                        except:
+                            # If all parsing fails, consider it for cleanup
+                            devices_to_cleanup.append((ethoscope_id, ethoscope_name))
+                            continue
+                else:
+                    # Try as numeric timestamp
+                    last_seen_dt = datetime.datetime.fromtimestamp(float(last_seen))
+                
+                # Check if device should be cleaned up
+                if last_seen_dt.timestamp() < cutoff_timestamp:
+                    devices_to_cleanup.append((ethoscope_id, ethoscope_name))
+                    
+            except Exception as e:
+                # If any parsing fails, consider device for cleanup
+                logging.warning(f"Failed to parse timestamp for busy device {ethoscope_id}: {e}")
+                devices_to_cleanup.append((ethoscope_id, ethoscope_name))
+        
+        # Clean up the devices by marking them as offline
+        cleaned_count = 0
+        for ethoscope_id, ethoscope_name in devices_to_cleanup:
+            sql_cleanup = "UPDATE %s SET status = 'offline' WHERE ethoscope_id = '%s'" % (
+                self._ethoscopes_table_name, ethoscope_id
+            )
+            
+            result = self.executeSQL(sql_cleanup)
+            if result != -1:
+                cleaned_count += 1
+                logging.info(f"Cleaned up offline busy device: {ethoscope_name} ({ethoscope_id})")
+            else:
+                logging.error(f"Failed to cleanup offline busy device {ethoscope_id}")
+        
+        if cleaned_count > 0:
+            logging.info(f"Cleaned up {cleaned_count} offline busy devices (busy for >{threshold_hours} hours)")
+        else:
+            logging.info(f"No offline busy devices found to cleanup (busy for >{threshold_hours} hours)")
+        
+        return cleaned_count
         
 class simpleDB(object):
     '''
