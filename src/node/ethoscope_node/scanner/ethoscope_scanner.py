@@ -1073,14 +1073,28 @@ class EthoscopeScanner(DeviceScanner):
             devices_info = {}
             
             for device_id, device_data in db_devices.items():
+                # Skip devices with empty or invalid IDs
+                if not device_id or device_id.strip() == '':
+                    self._logger.debug(f"Skipping device with empty ID from database")
+                    continue
+                
+                # Skip devices with no name or empty names unless they have valid IPs
+                device_name = device_data.get('ethoscope_name', '').strip()
+                device_ip = device_data.get('last_ip', '').strip()
+                
+                # Skip devices that have no meaningful identifying information
+                if (not device_name or device_name.lower() in ['none', '']) and (not device_ip or device_ip.lower() in ['none', '']):
+                    self._logger.debug(f"Skipping device {device_id} with no name and no IP from database")
+                    continue
+                
                 # Include device if it's active, or if include_inactive is True
                 if device_data.get('active') == 1 or include_inactive:
                     devices_info[device_id] = {
-                        'name': device_data.get('ethoscope_name', ''),
+                        'name': device_name,
                         'id': device_id,
                         'status': device_data.get('status', 'offline'),  # Default to offline for database-only devices
-                        'ip': device_data.get('last_ip', ''),
-                        'last_ip': device_data.get('last_ip', ''),
+                        'ip': device_ip,
+                        'last_ip': device_ip,
                         'time': device_data.get('last_seen', 0),
                         'active': device_data.get('active', 1)
                     }
@@ -1094,6 +1108,11 @@ class EthoscopeScanner(DeviceScanner):
                 device_id = device.id()
                 device_name = getattr(device, 'name', 'N/A')
                 
+                # Skip devices with empty or invalid IDs from scanner
+                if not device_id or device_id.strip() == '':
+                    self._logger.debug(f"Skipping scanner device with empty ID")
+                    continue
+                
                 if device_name != "ETHOSCOPE_000":
                     info = device.info()
                     info.update({
@@ -1101,10 +1120,17 @@ class EthoscopeScanner(DeviceScanner):
                         "backup_size": self._get_backup_size(device)
                     })
                     
+                    # Skip devices with no meaningful identifying information
+                    scanner_name = info.get('name', '').strip()
+                    scanner_ip = info.get('ip', '').strip()
+                    
+                    if (not scanner_name or scanner_name.lower() in ['none', '', 'n/a', 'unknown_name']) and (not scanner_ip or scanner_ip.lower() in ['none', '']):
+                        self._logger.debug(f"Skipping scanner device {device_id} with no name and no IP")
+                        continue
+                    
                     # Preserve name from database if device doesn't have a proper name
                     if device_id in devices_info:
                         db_name = devices_info[device_id].get('name', '')
-                        scanner_name = info.get('name', '')
                         
                         # If scanner has no name or unknown name, preserve database name
                         if not scanner_name or scanner_name in ['', 'unknown_name', 'N/A']:
