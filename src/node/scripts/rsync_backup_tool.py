@@ -293,12 +293,27 @@ def main():
                 for device in gbw.find_devices():
                     if device['name'] == ("ETHOSCOPE_%03d" % ethoscope):
                         # Validate device has SQLite database before attempting backup
-                        database_info = device.get("database_info", {})
-                        active_type = database_info.get("active_type", "none")
-                        sqlite_exists = database_info.get("sqlite", {}).get("exists", False)
+                        # Check both old format (database_info) and new format (databases.SQLite)
+                        has_sqlite = False
                         
-                        if not sqlite_exists and active_type != "sqlite":
-                            print(f"Skipping ETHOSCOPE_%03d - no SQLite database found (active_type: {active_type})" % ethoscope)
+                        # Check new format first
+                        databases = device.get("databases", {})
+                        sqlite_databases = databases.get("SQLite", {})
+                        if sqlite_databases and len(sqlite_databases) > 0:
+                            has_sqlite = True
+                            print(f"SQLite databases found (new format): {list(sqlite_databases.keys())}")
+                        
+                        # Fallback to old format
+                        if not has_sqlite:
+                            database_info = device.get("database_info", {})
+                            active_type = database_info.get("active_type", "none")
+                            sqlite_exists = database_info.get("sqlite", {}).get("exists", False)
+                            if sqlite_exists or active_type == "sqlite":
+                                has_sqlite = True
+                                print(f"SQLite database found (old format): active_type={active_type}")
+                        
+                        if not has_sqlite:
+                            print(f"Skipping ETHOSCOPE_%03d - no SQLite database found" % ethoscope)
                             print(f"This device should be backed up by the MariaDB backup service instead")
                             exit("ETHOSCOPE_%03d has no SQLite database for rsync backup" % ethoscope)
                         

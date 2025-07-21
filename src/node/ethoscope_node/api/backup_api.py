@@ -128,9 +128,13 @@ class BackupAPI(BaseAPI):
             if not sqlite_info:
                 return self._get_empty_backup_info(backup_type)
             
+            # Calculate device-specific SQLite size and file count instead of using total directory stats
+            device_sqlite_size, device_sqlite_size_human, device_sqlite_files = self._calculate_device_backup_stats(device_data, device_id, "sqlite")
+            
             base_info.update({
-                "size": sqlite_info.get("disk_usage_bytes", 0),
-                "files": sqlite_info.get("local_files", 0),
+                "size": device_sqlite_size,
+                "size_human": device_sqlite_size_human,
+                "files": device_sqlite_files,
                 "directory": sqlite_info.get("directory", "")
             })
         
@@ -141,7 +145,7 @@ class BackupAPI(BaseAPI):
                 return self._get_empty_backup_info(backup_type)
             
             # Calculate device-specific video size and file count instead of using total directory stats
-            device_video_size, device_video_size_human, device_video_files = self._calculate_device_video_stats(device_data, device_id)
+            device_video_size, device_video_size_human, device_video_files = self._calculate_device_backup_stats(device_data, device_id, "video")
             
             base_info.update({
                 "size": device_video_size,
@@ -172,6 +176,11 @@ class BackupAPI(BaseAPI):
     
     def _find_sqlite_info(self, synced_data: dict):
         """Find SQLite database info in synced data."""
+        # SQLite databases are stored in the 'results' directory by the rsync backup tool
+        if 'results' in synced_data:
+            return synced_data['results']
+        
+        # Fallback: search for keys that might contain database info
         for key, value in synced_data.items():
             if (key.lower().endswith('.db') or 
                 'sqlite' in key.lower() or 
@@ -179,30 +188,34 @@ class BackupAPI(BaseAPI):
                 return value
         return {}
     
-    def _calculate_device_video_stats(self, device_data: dict, device_id: str = None):
-        """Calculate the actual video directory size and file count for a specific device."""
+    def _calculate_device_backup_stats(self, device_data: dict, device_id: str = None, backup_type: str = "video"):
+        """Calculate the actual directory size and file count for a specific device and backup type."""
         try:
             # Get device name from device data
             device_name = device_data.get("name", "") if device_data else ""
             
             if not device_id or not device_name:
-                self.logger.warning(f"Could not determine device ID ({device_id}) or name ({device_name}) for video stats calculation")
+                self.logger.warning(f"Could not determine device ID ({device_id}) or name ({device_name}) for {backup_type} stats calculation")
                 return 0, "0 B", 0
             
-            # Build the device-specific video path
-            # Path structure: /ethoscope_data/videos/{device_id}/{device_name}/
-            device_video_path = f"/ethoscope_data/videos/{device_id}/{device_name}"
+            # Build the device-specific path based on backup type
+            if backup_type == "sqlite":
+                # Path structure: /ethoscope_data/results/{device_id}/{device_name}/
+                device_path = f"/ethoscope_data/results/{device_id}/{device_name}"
+            else:  # video
+                # Path structure: /ethoscope_data/videos/{device_id}/{device_name}/
+                device_path = f"/ethoscope_data/videos/{device_id}/{device_name}"
             
-            if not os.path.exists(device_video_path):
+            if not os.path.exists(device_path):
                 # Commented out warning to reduce log noise
-                # self.logger.warning(f"Device video path does not exist: {device_video_path}")
+                # self.logger.warning(f"Device {backup_type} path does not exist: {device_path}")
                 return 0, "0 B", 0
             
-            self.logger.debug(f"Calculating video stats for device {device_name} ({device_id}) at path: {device_video_path}")
+            self.logger.debug(f"Calculating {backup_type} stats for device {device_name} ({device_id}) at path: {device_path}")
             
             # Calculate directory size using du command
             size_result = subprocess.run(
-                ['du', '-sb', device_video_path], 
+                ['du', '-sb', device_path], 
                 capture_output=True, 
                 text=True, 
                 timeout=10
@@ -210,7 +223,7 @@ class BackupAPI(BaseAPI):
             
             # Count files in directory using find command
             files_result = subprocess.run(
-                ['find', device_video_path, '-type', 'f'], 
+                ['find', device_path, '-type', 'f'], 
                 capture_output=True, 
                 text=True, 
                 timeout=10
@@ -224,18 +237,18 @@ class BackupAPI(BaseAPI):
                 size_bytes = int(size_result.stdout.split()[0])
                 size_human = self._human_readable_size(size_bytes)
             else:
-                self.logger.error(f"Failed to calculate size for {device_video_path}: {size_result.stderr}")
+                self.logger.error(f"Failed to calculate size for {device_path}: {size_result.stderr}")
             
             if files_result.returncode == 0:
                 # Count lines in output (each line is a file)
                 file_count = len([line for line in files_result.stdout.strip().split('\\n') if line.strip()])
             else:
-                self.logger.error(f"Failed to count files for {device_video_path}: {files_result.stderr}")
+                self.logger.error(f"Failed to count files for {device_path}: {files_result.stderr}")
             
             return size_bytes, size_human, file_count
                 
         except Exception as e:
-            self.logger.error(f"Error calculating device video stats: {e}")
+            self.logger.error(f"Error calculating device {backup_type} stats: {e}")
             return 0, "0 B", 0
     
     def _human_readable_size(self, size_bytes: int) -> str:
