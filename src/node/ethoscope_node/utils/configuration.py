@@ -83,20 +83,6 @@ class EthoscopeConfiguration:
                 'description': 'A temporary location for downloading data.'
             }
         },
-        'users': {
-            'admin': {
-                'id': 1,
-                'name': 'admin',
-                'fullname': '',
-                'PIN': 9999,
-                'email': '',
-                'telephone': '',
-                'group': '',
-                'active': True,
-                'isAdmin': True,
-                'created': datetime.datetime.now().timestamp()
-            }
-        },
         'incubators': {
             'incubator 1': {
                 'id': 1,
@@ -137,7 +123,7 @@ class EthoscopeConfiguration:
         }
     }
     
-    REQUIRED_SECTIONS = ['folders', 'users', 'incubators', 'sensors', 'commands', 'custom', 'smtp', 'alerts']
+    REQUIRED_SECTIONS = ['folders', 'incubators', 'sensors', 'commands', 'custom', 'smtp', 'alerts']
     REQUIRED_FOLDERS = ['results', 'video', 'temporary']
     
     def __init__(self, config_file: str = "/etc/ethoscope/ethoscope.conf"):
@@ -202,24 +188,7 @@ class EthoscopeConfiguration:
             if not isinstance(folder_config['path'], str):
                 raise ConfigurationValidationError(f"Folder '{folder_name}' path must be a string")
         
-        # Validate users section
-        users = config_data.get('users', {})
-        if not isinstance(users, dict):
-            raise ConfigurationValidationError("Users section must be a dictionary")
-        
-        # Validate user structure
-        for user_name, user_data in users.items():
-            if not isinstance(user_data, dict):
-                raise ConfigurationValidationError(f"User '{user_name}' must be a dictionary")
-            
-            # Check for missing required fields (only validate, don't warn since we fix them in merge)
-            missing_user_keys = set(USERS_KEYS) - set(user_data.keys())
-            if missing_user_keys:
-                # Only critical fields that can't have defaults should cause errors
-                critical_missing = {'name', 'email'} & missing_user_keys
-                if critical_missing:
-                    raise ConfigurationValidationError(f"User '{user_name}' missing critical fields: {critical_missing}")
-                # Non-critical missing fields are handled in merge step
+        # Users are now stored in database, no validation needed for config file
     
     def _merge_with_defaults(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -243,37 +212,11 @@ class EthoscopeConfiguration:
                     target[key] = value
             return target
         
-        # First, do the basic merge
+        # Merge configuration with defaults (users are handled by database)
         merged = deep_merge(merged, config_data)
-        
-        # Then, ensure all user fields have default values
-        self._merge_user_fields(merged)
         
         return merged
     
-    def _merge_user_fields(self, config_data: Dict[str, Any]) -> None:
-        """
-        Ensure all users have all required fields with default values.
-        
-        Args:
-            config_data: Configuration data to update in-place
-        """
-        users = config_data.get('users', {})
-        
-        # Default values for missing user fields
-        user_field_defaults = {
-            'telephone': '',
-            'group': '',
-            'isAdmin': False
-        }
-        
-        for user_name, user_data in users.items():
-            if isinstance(user_data, dict):
-                # Add any missing fields with default values
-                for field, default_value in user_field_defaults.items():
-                    if field not in user_data:
-                        user_data[field] = default_value
-                        self._logger.debug(f"Added default value for user '{user_name}' field '{field}': {default_value}")
     
     @property
     def content(self) -> Dict[str, Any]:
@@ -403,7 +346,7 @@ class EthoscopeConfiguration:
     
     def add_user(self, userdata: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Add a new user to configuration.
+        Add a new user using database storage.
         
         Args:
             userdata: User data dictionary
@@ -420,23 +363,40 @@ class EthoscopeConfiguration:
         name = userdata['name']
         
         try:
+            # Import here to avoid circular imports
+            from ethoscope_node.utils.etho_db import ExperimentalDB
+            
             # Validate user data
             for key in USERS_KEYS:
                 if key not in userdata and key not in ['created']:
                     self._logger.warning(f"User '{name}' missing field: {key}")
             
-            # Set creation timestamp
-            userdata['created'] = datetime.datetime.now().timestamp()
+            # Map configuration fields to database fields
+            db_user_data = {
+                'username': userdata['name'],
+                'fullname': userdata.get('fullname', ''),
+                'pin': str(userdata.get('PIN', '')),
+                'email': userdata.get('email', ''),
+                'telephone': userdata.get('telephone', ''),
+                'labname': userdata.get('group', ''),
+                'active': 1 if userdata.get('active', True) else 0,
+                'isadmin': 1 if userdata.get('isAdmin', False) else 0,
+                'created': userdata.get('created', datetime.datetime.now().timestamp())
+            }
             
-            # Add user
-            if 'users' not in self._settings:
-                self._settings['users'] = {}
+            # Add user to database
+            db = ExperimentalDB()
+            result = db.addUser(**db_user_data)
             
-            self._settings['users'][name] = userdata
-            self.save()
-            
-            self._logger.info(f"Added user: {name}")
-            return {'result': 'success', 'data': self._settings['users']}
+            if result > 0:
+                self._logger.info(f"Added user to database: {name}")
+                # Get all users from database to return consistent format
+                all_users = db.getAllUsers(asdict=True)
+                return {'result': 'success', 'data': all_users}
+            else:
+                error_msg = f"Failed to add user '{name}' to database"
+                self._logger.error(error_msg)
+                raise ValueError(error_msg)
             
         except Exception as e:
             error_msg = f"Failed to add user '{name}': {e}"
@@ -555,21 +515,32 @@ class EthoscopeConfiguration:
     
     def remove_user(self, username: str) -> bool:
         """
-        Remove a user from configuration.
+        Deactivate a user in the database (users are never actually deleted).
         
         Args:
-            username: Name of user to remove
+            username: Name of user to deactivate
             
         Returns:
-            True if user was removed, False if not found
+            True if user was deactivated, False if not found
         """
-        if 'users' not in self._settings or username not in self._settings['users']:
+        try:
+            # Import here to avoid circular imports
+            from ethoscope_node.utils.etho_db import ExperimentalDB
+            
+            # Deactivate user in database
+            db = ExperimentalDB()
+            result = db.deactivateUser(username=username)
+            
+            if result > 0:
+                self._logger.info(f"Deactivated user: {username}")
+                return True
+            else:
+                self._logger.warning(f"User '{username}' not found for deactivation")
+                return False
+                
+        except Exception as e:
+            self._logger.error(f"Error deactivating user '{username}': {e}")
             return False
-        
-        del self._settings['users'][username]
-        self.save()
-        self._logger.info(f"Removed user: {username}")
-        return True
     
     def get_folder_path(self, folder_name: str) -> Optional[str]:
         """

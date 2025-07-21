@@ -189,6 +189,10 @@ class ExperimentalDB(multiprocessing.Process):
             self._migrate_runs_primary_key()
             # Migration 3: Add run_id column to alert_logs table
             self._migrate_alert_logs_run_id()
+            # Migration 4: Add telephone column to users table
+            self._migrate_users_add_telephone()
+            # Migration 5: Migrate users from configuration file to database
+            self._migrate_users_from_config()
         except Exception as e:
             logging.error(f"Error during database migration: {e}")
     
@@ -345,6 +349,98 @@ class ExperimentalDB(multiprocessing.Process):
                 
         except Exception as e:
             logging.error(f"Error migrating alert_logs table: {e}")
+    
+    def _migrate_users_add_telephone(self):
+        """
+        Add telephone column to users table if it doesn't exist.
+        """
+        try:
+            # Check if telephone column already exists
+            check_columns = f"PRAGMA table_info({self._users_table_name})"
+            table_info = self.executeSQL(check_columns)
+            
+            if not isinstance(table_info, list):
+                # Table might not exist yet, let the regular creation handle it
+                return
+            
+            # Check if telephone column exists
+            has_telephone_column = any(col[1] == 'telephone' for col in table_info)
+            
+            if not has_telephone_column:
+                logging.info("Adding telephone column to users table")
+                
+                # Add the telephone column
+                sql_add_column = f"ALTER TABLE {self._users_table_name} ADD COLUMN telephone TEXT"
+                self.executeSQL(sql_add_column)
+                
+                logging.info("Successfully added telephone column to users table")
+                
+        except Exception as e:
+            logging.error(f"Error migrating users table (adding telephone): {e}")
+    
+    def _migrate_users_from_config(self):
+        """
+        Migrate users from configuration file to database if database is empty.
+        """
+        try:
+            # Check if we already have users in the database
+            existing_users = self.executeSQL(f"SELECT COUNT(*) as count FROM {self._users_table_name}")
+            
+            if isinstance(existing_users, list) and len(existing_users) > 0:
+                user_count = existing_users[0][0] if hasattr(existing_users[0], '__getitem__') else existing_users[0]['count']
+                if user_count > 0:
+                    logging.info(f"Users table already has {user_count} users, skipping migration from config")
+                    return
+            
+            # Try to import users from configuration
+            from ethoscope_node.utils.configuration import EthoscopeConfiguration
+            
+            try:
+                config = EthoscopeConfiguration()
+                config_users = config.content.get('users', {})
+                
+                if not config_users:
+                    logging.info("No users found in configuration file")
+                    return
+                
+                migrated_count = 0
+                for username, user_data in config_users.items():
+                    try:
+                        # Map configuration fields to database fields
+                        db_user_data = {
+                            'username': user_data.get('name', username),
+                            'fullname': user_data.get('fullname', ''),
+                            'pin': str(user_data.get('PIN', '')),
+                            'email': user_data.get('email', ''),
+                            'telephone': user_data.get('telephone', ''),
+                            'labname': user_data.get('group', ''),
+                            'active': 1 if user_data.get('active', True) else 0,
+                            'isadmin': 1 if user_data.get('isAdmin', False) else 0,
+                            'created': user_data.get('created', datetime.datetime.now().timestamp())
+                        }
+                        
+                        # Insert user into database
+                        result = self.addUser(**db_user_data)
+                        if result > 0:
+                            migrated_count += 1
+                            logging.info(f"Migrated user: {db_user_data['username']}")
+                        
+                    except Exception as e:
+                        logging.error(f"Error migrating user {username}: {e}")
+                        continue
+                
+                if migrated_count > 0:
+                    logging.info(f"Successfully migrated {migrated_count} users from configuration to database")
+                else:
+                    logging.info("No users were migrated from configuration")
+                    
+            except ImportError as e:
+                logging.warning(f"Could not import configuration module for user migration: {e}")
+            except Exception as e:
+                logging.error(f"Error reading configuration file for user migration: {e}")
+                
+        except Exception as e:
+            logging.error(f"Error during user migration from config: {e}")
 
     def getRun (self, run_id, asdict=False):
         """
@@ -603,6 +699,208 @@ class ExperimentalDB(multiprocessing.Process):
         
         if asdict:
             return [dict(row) for row in rows]
+        else:
+            return rows
+    
+    def addUser(self, username: str, fullname: str = "", pin: str = "", email: str = "", 
+                telephone: str = "", labname: str = "", active: int = 1, isadmin: int = 0, created: float = None):
+        """
+        Add a new user to the database.
+        
+        Args:
+            username: Username (required)
+            fullname: Full name of the user
+            pin: User's PIN code
+            email: Email address (required)
+            telephone: Phone number
+            labname: Laboratory/group name
+            active: Whether user is active (1) or not (0)
+            isadmin: Whether user is admin (1) or not (0)
+            created: Creation timestamp (uses current time if None)
+            
+        Returns:
+            ID of the inserted user or -1 if error
+        """
+        if not username:
+            logging.error("Username is required for adding user")
+            return -1
+            
+        if not email:
+            logging.error("Email is required for adding user")
+            return -1
+        
+        if created is None:
+            created = datetime.datetime.now().timestamp()
+        
+        try:
+            # Check if username already exists
+            existing = self.getUserByName(username)
+            if existing:
+                logging.error(f"User with username '{username}' already exists")
+                return -1
+            
+            # Check if email already exists
+            existing = self.getUserByEmail(email)
+            if existing:
+                logging.error(f"User with email '{email}' already exists")
+                return -1
+            
+            # Escape single quotes in text fields
+            escaped_username = username.replace("'", "''")
+            escaped_fullname = fullname.replace("'", "''")
+            escaped_pin = pin.replace("'", "''")
+            escaped_email = email.replace("'", "''")
+            escaped_telephone = telephone.replace("'", "''")
+            escaped_labname = labname.replace("'", "''")
+            
+            sql_add_user = f"""
+            INSERT INTO {self._users_table_name} 
+            (username, fullname, pin, email, telephone, labname, active, isadmin, created) 
+            VALUES ('{escaped_username}', '{escaped_fullname}', '{escaped_pin}', '{escaped_email}', 
+                    '{escaped_telephone}', '{escaped_labname}', {active}, {isadmin}, '{created}')
+            """
+            
+            result = self.executeSQL(sql_add_user)
+            
+            if result > 0:
+                logging.info(f"Added new user: {username}")
+            
+            return result
+            
+        except Exception as e:
+            logging.error(f"Error adding user {username}: {e}")
+            return -1
+    
+    def updateUser(self, user_id: int = None, username: str = None, **updates):
+        """
+        Update an existing user in the database.
+        
+        Args:
+            user_id: Database ID of user to update (either user_id or username required)
+            username: Username of user to update (either user_id or username required)
+            **updates: Fields to update (fullname, pin, email, telephone, labname, active, isadmin)
+            
+        Returns:
+            Number of rows affected or -1 if error
+        """
+        if not user_id and not username:
+            logging.error("Either user_id or username must be provided for updating user")
+            return -1
+        
+        if not updates:
+            logging.warning("No updates provided for user update")
+            return 0
+        
+        try:
+            # Build WHERE clause
+            if user_id:
+                where_clause = f"id = {user_id}"
+            else:
+                escaped_username = username.replace("'", "''")
+                where_clause = f"username = '{escaped_username}'"
+            
+            # Build SET clause
+            set_clauses = []
+            for field, value in updates.items():
+                if field in ['fullname', 'pin', 'email', 'telephone', 'labname']:
+                    escaped_value = str(value).replace("'", "''")
+                    set_clauses.append(f"{field} = '{escaped_value}'")
+                elif field in ['active', 'isadmin']:
+                    set_clauses.append(f"{field} = {int(value)}")
+                elif field == 'created':
+                    set_clauses.append(f"{field} = '{value}'")
+                else:
+                    logging.warning(f"Unknown field '{field}' in user update, skipping")
+            
+            if not set_clauses:
+                logging.warning("No valid updates provided for user update")
+                return 0
+            
+            sql_update_user = f"""
+            UPDATE {self._users_table_name} 
+            SET {', '.join(set_clauses)} 
+            WHERE {where_clause}
+            """
+            
+            result = self.executeSQL(sql_update_user)
+            
+            if result >= 0:
+                identifier = f"ID {user_id}" if user_id else f"username {username}"
+                logging.info(f"Updated user {identifier}")
+            
+            return result
+            
+        except Exception as e:
+            identifier = f"ID {user_id}" if user_id else f"username {username}"
+            logging.error(f"Error updating user {identifier}: {e}")
+            return -1
+    
+    def deactivateUser(self, user_id: int = None, username: str = None):
+        """
+        Deactivate a user (set active=0) instead of deleting.
+        
+        Args:
+            user_id: Database ID of user to deactivate (either user_id or username required)
+            username: Username of user to deactivate (either user_id or username required)
+            
+        Returns:
+            Number of rows affected or -1 if error
+        """
+        return self.updateUser(user_id=user_id, username=username, active=0)
+    
+    def getUserById(self, user_id: int, asdict: bool = False):
+        """
+        Get user information by database ID.
+        
+        Args:
+            user_id: Database ID to look up
+            asdict: Return as dictionary if True
+            
+        Returns:
+            User data from database or empty dict if not found
+        """
+        sql_get_user = f"SELECT * FROM {self._users_table_name} WHERE id = {user_id}"
+        
+        row = self.executeSQL(sql_get_user)
+        
+        if type(row) != list or len(row) == 0:
+            return {}
+        
+        if asdict:
+            return dict(row[0])
+        else:
+            return row[0]
+    
+    def getAllUsers(self, active_only: bool = False, asdict: bool = False):
+        """
+        Get all users from the database.
+        
+        Args:
+            active_only: If True, only return active users
+            asdict: Return as dictionary if True
+            
+        Returns:
+            List of user data or dictionary keyed by username
+        """
+        sql_get_users = f"SELECT * FROM {self._users_table_name}"
+        
+        if active_only:
+            sql_get_users += " WHERE active = 1"
+        
+        sql_get_users += " ORDER BY username"
+        
+        rows = self.executeSQL(sql_get_users)
+        
+        if type(rows) != list:
+            return {} if asdict else []
+        
+        if asdict:
+            # Return dictionary keyed by username like the configuration format
+            result = {}
+            for row in rows:
+                row_dict = dict(row)
+                result[row_dict['username']] = row_dict
+            return result
         else:
             return rows
     

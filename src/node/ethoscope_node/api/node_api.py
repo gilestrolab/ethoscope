@@ -84,7 +84,14 @@ class NodeAPI(BaseAPI):
         elif req == 'folders':
             return self.config.content['folders']
         elif req == 'users':
-            return self.config.content['users']
+            # Get users from database instead of configuration
+            try:
+                from ethoscope_node.utils.etho_db import ExperimentalDB
+                db = ExperimentalDB()
+                return db.getAllUsers(active_only=False, asdict=True)
+            except Exception as e:
+                self.logger.error(f"Error getting users from database: {e}")
+                return {}
         elif req == 'incubators':
             return self.config.content['incubators']
         elif req == 'sensors':
@@ -97,8 +104,17 @@ class NodeAPI(BaseAPI):
     @error_decorator
     def _get_node_config(self):
         """Batched endpoint that returns all node configuration data in one request."""
+        # Get users from database
+        try:
+            from ethoscope_node.utils.etho_db import ExperimentalDB
+            db = ExperimentalDB()
+            users_data = db.getAllUsers(active_only=False, asdict=True)
+        except Exception as e:
+            self.logger.error(f"Error getting users from database: {e}")
+            users_data = {}
+        
         return {
-            'users': self.config.content['users'],
+            'users': users_data,
             'incubators': self.config.content['incubators'],
             'sensors': self.sensor_scanner.get_all_devices_info() if self.sensor_scanner else {},
             'timestamp': datetime.datetime.now().timestamp()
