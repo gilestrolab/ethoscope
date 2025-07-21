@@ -1205,6 +1205,23 @@ class EthoscopeScanner(DeviceScanner):
                         existing_device.reset_error_state()
                         existing_device.skip_scanning(False)
                         
+                        # Force ID update to handle device renaming (ETHOSCOPE_000 -> new name)
+                        # This is critical when devices are renamed via webUI
+                        try:
+                            old_id = existing_device.id()
+                            existing_device._update_id()
+                            new_id = existing_device.id()
+                            
+                            if old_id != new_id:
+                                self._logger.info(f"Device at {ip} ID changed from '{old_id}' to '{new_id}' (device was renamed)")
+                                # Update database entry for the new device ID
+                                self._handle_device_id_change(existing_device, old_id, new_id)
+                            else:
+                                self._logger.debug(f"Device at {ip} ID unchanged: {new_id}")
+                                
+                        except Exception as e:
+                            self._logger.warning(f"Failed to update ID for device at {ip}: {e}")
+                        
                         # Explicitly reset status to allow device info to be updated
                         with existing_device._lock:
                             existing_device._update_device_status("offline", trigger_source="system")
@@ -1258,6 +1275,66 @@ class EthoscopeScanner(DeviceScanner):
                     
         except Exception as e:
             self._logger.error(f"Error in add method for {ip}:{port}: {e}")
+    
+    def _handle_device_id_change(self, device: 'Ethoscope', old_id: str, new_id: str):
+        """Handle database updates when a device ID changes (e.g., ETHOSCOPE_000 -> new name)."""
+        try:
+            device_name = device.info().get('name', '')
+            device_ip = device.ip()
+            
+            # Log the device renaming
+            self._logger.info(f"Handling device ID change: {old_id} -> {new_id} (name: {device_name}, IP: {device_ip})")
+            
+            # If old device was ETHOSCOPE_000, it might not be in database yet
+            if old_id == 'ETHOSCOPE_000' or not old_id:
+                self._logger.info(f"Device {new_id} was previously ETHOSCOPE_000 or had empty ID, creating new database entry")
+                # Just update/create entry for new ID
+                self._edb.updateEthoscopes(
+                    ethoscope_id=new_id,
+                    ethoscope_name=device_name,
+                    last_ip=device_ip,
+                    status="offline"  # Will be updated by normal scanning
+                )
+            else:
+                # Handle actual ID change from one real ID to another
+                try:
+                    # Check if old device exists in database
+                    old_device_data = self._edb.getEthoscope(old_id, asdict=True)
+                    if old_device_data and old_id in old_device_data:
+                        self._logger.info(f"Retiring old device entry {old_id} and creating new entry {new_id}")
+                        # Retire old device
+                        self._edb.updateEthoscopes(ethoscope_id=old_id, active=0)
+                        
+                        # Create new device entry, preserving relevant info from old entry
+                        old_info = old_device_data[old_id]
+                        self._edb.updateEthoscopes(
+                            ethoscope_id=new_id,
+                            ethoscope_name=device_name,
+                            last_ip=device_ip,
+                            status="offline",
+                            comments=f"Renamed from {old_id}"
+                        )
+                    else:
+                        # Old device not in database, just create new entry
+                        self._logger.info(f"Old device {old_id} not found in database, creating new entry for {new_id}")
+                        self._edb.updateEthoscopes(
+                            ethoscope_id=new_id,
+                            ethoscope_name=device_name,
+                            last_ip=device_ip,
+                            status="offline"
+                        )
+                except Exception as db_error:
+                    self._logger.warning(f"Error handling old device {old_id} in database: {db_error}")
+                    # Still create entry for new device
+                    self._edb.updateEthoscopes(
+                        ethoscope_id=new_id,
+                        ethoscope_name=device_name,
+                        last_ip=device_ip,
+                        status="offline"
+                    )
+            
+        except Exception as e:
+            self._logger.error(f"Error handling device ID change from {old_id} to {new_id}: {e}")
     
     def retire_device(self, device_id: str, active: int = 0) -> Dict[str, Any]:
         """Retire device by updating database status."""
