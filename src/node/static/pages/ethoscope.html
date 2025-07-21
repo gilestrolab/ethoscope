@@ -99,6 +99,18 @@
     </div>
 </div>
 
+<!-- Camera Hardware Warning - Prominently displayed above buttons -->
+<div class="alert alert-warning" ng-if="machine_info.camera && machine_info.camera.indexOf('No camera hardware detected') === 0" style="margin: 20px auto; max-width: 640px;">
+    <h4><span class="fa fa-exclamation-triangle"></span> No Camera Hardware Detected</h4>
+    <p><strong>Video capabilities are disabled.</strong> This ethoscope cannot perform video tracking, recording, or streaming without camera hardware.</p>
+    <p>To enable video features, please:</p>
+    <ul>
+        <li>Connect a compatible Raspberry Pi camera module</li>
+        <li>Enable the camera interface in raspi-config</li>
+        <li>Restart the ethoscope service</li>
+    </ul>
+</div>
+
 <div class="last_drawn_img">
     <img ng-if="device.status == 'running' || device.status == 'recording'" ng-src="{{device.url_img}}" alt="" width="640"></img>
     <img ng-if="device.status == 'streaming'" ng-src="{{device.url_stream}}" alt="" width=""></img>
