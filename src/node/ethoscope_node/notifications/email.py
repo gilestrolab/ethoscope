@@ -64,9 +64,13 @@ class EmailNotificationService(NotificationAnalyzer):
         """
         # For device_stopped alerts, check database for duplicates based on run_id
         if alert_type == 'device_stopped' and run_id:
-            if self.db.hasAlertBeenSent(device_id, alert_type, run_id):
+            has_been_sent = self.db.hasAlertBeenSent(device_id, alert_type, run_id)
+            if has_been_sent:
                 self.logger.debug(f"Alert {device_id}:{alert_type}:{run_id} already sent - preventing duplicate")
                 return False
+        elif alert_type == 'device_stopped' and not run_id:
+            # For alerts without run_id, use timestamp-based approach to prevent spam
+            self.logger.debug(f"No run_id provided for device_stopped alert - using cooldown only")
         
         # For other alerts or when no run_id, use traditional cooldown
         alert_config = self._get_alert_config()
@@ -203,6 +207,8 @@ class EmailNotificationService(NotificationAnalyzer):
         Returns:
             True if alert was sent
         """
+        self.logger.info(f"send_device_stopped_alert: device_id={device_id}, run_id={run_id}")
+        
         if not self._should_send_alert(device_id, 'device_stopped', run_id):
             return False
         
@@ -353,7 +359,9 @@ class EmailNotificationService(NotificationAnalyzer):
         # Log the alert to database
         if success:
             recipients_str = ', '.join(all_emails)
-            self.db.logAlert(device_id, 'device_stopped', f"Device {device_name} stopped unexpectedly", recipients_str, run_id)
+            # For alerts without run_id, generate a unique identifier based on timestamp
+            log_run_id = run_id if run_id else f"ALERT_{int(time.time())}"
+            self.db.logAlert(device_id, 'device_stopped', f"Device {device_name} stopped unexpectedly", recipients_str, log_run_id)
         
         return success
     

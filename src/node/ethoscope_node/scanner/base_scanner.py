@@ -67,6 +67,7 @@ class DeviceStatus:
         self._metadata = metadata or {}
         self._unreachable_start_time = None
         self._consecutive_errors = 0
+        self._is_initial_discovery = False  # Flag to track initial device discovery
         
         # Set unreachable start time if this is an unreached status
         if status_name == 'unreached':
@@ -118,6 +119,10 @@ class DeviceStatus:
         """Reset the consecutive error count."""
         self._consecutive_errors = 0
     
+    def mark_as_initial_discovery(self):
+        """Mark this status as an initial device discovery (server startup)."""
+        self._is_initial_discovery = True
+    
     def should_send_alert(self, unreachable_timeout_minutes: int = 20) -> bool:
         """
         Determine if an alert should be sent for this status.
@@ -136,12 +141,16 @@ class DeviceStatus:
         if self.is_graceful_operation():
             return False
         
-        # For unreachable/busy status, only alert after timeout
-        if self._status_name in ['unreached', 'busy']:
-            return self.is_timeout_exceeded(unreachable_timeout_minutes)
+        # Check for interrupted tracking session (reboot scenario)
+        if self._status_name in ['stopped', 'offline'] and self.is_interrupted_tracking_session():
+            return True
         
-        # Alert for autonomous stops and other system issues
+        # Alert for autonomous stops and other system issues (direct transitions)
+        # But exclude initial device discovery transitions during server startup
         if self._status_name in ['stopped', 'offline'] and self._trigger_source == 'system':
+            # Don't alert for initial device discovery
+            if self._is_initial_discovery:
+                return False
             return True
         
         return False
@@ -188,6 +197,65 @@ class DeviceStatus:
             Age in minutes
         """
         return self.get_age_seconds() / 60
+    
+    def is_interrupted_tracking_session(self) -> bool:
+        """
+        Detect if this represents an interrupted tracking session.
+        
+        Pattern: {tracking,recording,running} -> (intermediate_states)n -> {stopped,offline}
+        where intermediate_states are: unreached, busy, initialising, stopping
+        
+        This detects when an active tracking/recording session is permanently 
+        interrupted (e.g., by reboot, crash) rather than just temporarily unreachable.
+        
+        Returns:
+            True if this appears to be an interrupted tracking session
+        """
+        # Only relevant for final states that indicate permanent interruption
+        if self._status_name not in ['stopped', 'offline']:
+            return False
+        
+        # Check if we have a previous status chain
+        if not self._previous_status:
+            return False
+        
+        # Look for interrupted session patterns
+        current = self._previous_status
+        found_active_session = False
+        went_through_intermediates = False
+        status_chain = []
+        
+        # Active session states that we care about being interrupted
+        active_states = {'running', 'recording', 'tracking'}
+        
+        # Intermediate states that indicate interruption (not user-initiated)
+        intermediate_states = {'unreached', 'busy', 'initialising', 'stopping'}
+        
+        # Walk back through status chain (max 10 steps for complex sequences)
+        max_lookback = 10
+        steps = 0
+        
+        while current and steps < max_lookback:
+            status_chain.append(current.status_name)
+            
+            if current.status_name in active_states:
+                found_active_session = True
+                break
+            elif current.status_name in intermediate_states:
+                went_through_intermediates = True
+            
+            current = current._previous_status
+            steps += 1
+        
+        # Store debug info for external logging
+        self._debug_chain = ' -> '.join(reversed(status_chain)) + f' -> {self._status_name}'
+        self._debug_found_active_session = found_active_session
+        self._debug_went_through_intermediates = went_through_intermediates
+        
+        # We have an interrupted session if:
+        # 1. We found an active session state in the history
+        # 2. We went through intermediate states (indicating non-graceful transition)
+        return found_active_session and went_through_intermediates
     
     def update_metadata(self, key: str, value: Any):
         """
@@ -505,6 +573,13 @@ class BaseDevice(Thread):
             
             # Set previous status for transition tracking
             new_status.set_previous_status(previous_status)
+            
+            # Mark as initial discovery if transitioning from initial offline state
+            if (previous_status and 
+                previous_status.status_name == 'offline' and 
+                not hasattr(self, '_has_received_real_status')):
+                new_status.mark_as_initial_discovery()
+                self._has_received_real_status = True
             
             # Update consecutive errors from previous status
             if previous_status:

@@ -347,7 +347,9 @@ class Ethoscope(BaseDevice):
             # Track the backup_filename used for this backup_path
             self._last_backup_filename = current_backup_filename
         
-        self._handle_state_transition(previous_status, new_status)
+        # Only handle state transitions when status actually changes
+        if previous_status != new_status:
+            self._handle_state_transition(previous_status, new_status)
         self._update_backup_status_from_database_info()
         
         # Check for storage warnings
@@ -364,6 +366,12 @@ class Ethoscope(BaseDevice):
            
             with self._lock:
                 self._info.update(new_info)
+                
+                # Cache run_id for use during interruptions when experimental_info is lost
+                experimental_info = new_info.get('experimental_info', {})
+                if experimental_info and experimental_info.get('run_id'):
+                    self._info['cached_run_id'] = experimental_info['run_id']
+                    self._logger.debug(f"Cached run_id: {experimental_info['run_id']}")
                 self._info['last_seen'] = time.time()
                 
                 # Update logger name if we have a valid device name
@@ -507,30 +515,27 @@ class Ethoscope(BaseDevice):
     def _handle_state_transition(self, previous_status: str, new_status: str):
         """Handle state transitions for experiment tracking."""
         try:
+            self._logger.debug(f"Handling state transition: {previous_status} -> {new_status}")
+            
+            # Always check for alerts regardless of experimental info
             experimental_info = self._info.get('experimental_info', {})
-            if not experimental_info:
-                return
+            run_id = experimental_info.get('run_id') if experimental_info else None
             
-            user_name = experimental_info.get('name', '')
-            location = experimental_info.get('location', '')
-            run_id = experimental_info.get('run_id')
-            
+            # If no current run_id, try to get cached run_id from device info
             if not run_id:
-                return
+                run_id = self._info.get('cached_run_id')
             
-            # State transition handlers
-            transitions = {
-                ('initialising', 'running'): lambda: self._edb.addRun(
-                    run_id=run_id, experiment_type="tracking",
-                    ethoscope_name=self._info.get('name', ''), ethoscope_id=self._id,
-                    username=user_name, user_id="", location=location,
-                    alert=True, comments="", 
-                    experimental_data=self._info.get('backup_path', '')
-                ),
-                ('initialising', 'stopping'): lambda: self._edb.flagProblem(
-                    run_id=run_id, message="self-stopped"
-                ),
-                ('running', 'stopped'): lambda: self._edb.stopRun(run_id=run_id),
+            current_status = self.get_device_status()
+            is_interrupted = current_status.is_interrupted_tracking_session() if current_status else False
+            
+            self._logger.info(f"Alert info: run_id={run_id} (from {'experimental_info' if experimental_info and experimental_info.get('run_id') else 'cache' if run_id else 'none'}), "
+                            f"new_status={new_status}, is_interrupted={is_interrupted}")
+            
+            # Send alerts
+            self._send_state_transition_alerts(previous_status, new_status, run_id)
+            
+            # Handle device status transitions that don't require experimental info
+            device_transitions = {
                 ('running', 'unreached'): lambda: self._edb.updateEthoscopes(
                     ethoscope_id=self._id, status="unreached"
                 ),
@@ -540,14 +545,66 @@ class Ethoscope(BaseDevice):
             }
             
             transition_key = (previous_status, new_status)
-            if transition_key in transitions:
-                transitions[transition_key]()
+            if transition_key in device_transitions:
+                device_transitions[transition_key]()
+            
+            # Handle experiment-specific transitions only if we have experimental info
+            if experimental_info and run_id:
+                user_name = experimental_info.get('name', '')
+                location = experimental_info.get('location', '')
                 
-            # Send alerts for specific state transitions
-            self._send_state_transition_alerts(previous_status, new_status, run_id)
+                experiment_transitions = {
+                    ('initialising', 'running'): lambda: self._edb.addRun(
+                        run_id=run_id, experiment_type="tracking",
+                        ethoscope_name=self._info.get('name', ''), ethoscope_id=self._id,
+                        username=user_name, user_id="", location=location,
+                        alert=True, comments="", 
+                        experimental_data=self._info.get('backup_path', '')
+                    ),
+                    ('initialising', 'stopping'): lambda: self._edb.flagProblem(
+                        run_id=run_id, message="self-stopped"
+                    ),
+                    ('running', 'stopped'): lambda: self._edb.stopRun(run_id=run_id)
+                }
+                
+                if transition_key in experiment_transitions:
+                    experiment_transitions[transition_key]()
                 
         except Exception as e:
             self._logger.error(f"Error handling state transition: {e}")
+    
+    def _get_recent_run_id(self) -> Optional[str]:
+        """
+        Get the most recent run_id for this device from the database.
+        Used to recover run_id for interrupted tracking sessions.
+        
+        Returns:
+            The most recent run_id for this device, or None if not found
+        """
+        try:
+            # Query for the most recent run for this device
+            sql = """
+            SELECT run_id FROM runs 
+            WHERE ethoscope_id = ? 
+            ORDER BY start_time DESC 
+            LIMIT 1
+            """
+            
+            self._logger.info(f"Executing database query for device {self._id}: {sql}")
+            result = self._edb.exec(sql, (self._id,))
+            self._logger.info(f"Database query result: {result}")
+            
+            if result and len(result) > 0:
+                recent_run_id = result[0]['run_id']
+                self._logger.info(f"Recovered run_id for interrupted session: {recent_run_id}")
+                return recent_run_id
+            else:
+                self._logger.warning(f"Could not find recent run_id for device {self._id} - query returned empty")
+                return None
+                
+        except Exception as e:
+            self._logger.error(f"Error recovering run_id for device {self._id}: {e}")
+            return None
     
     def _send_state_transition_alerts(self, previous_status: str, new_status: str, run_id: str):
         """Send email alerts for state transitions using DeviceStatus logic."""
@@ -560,10 +617,32 @@ class Ethoscope(BaseDevice):
             unreachable_timeout = alert_config.get('unreachable_timeout_minutes', 20)
             
             # Use DeviceStatus logic to determine if alert should be sent
-            if not current_status.should_send_alert(unreachable_timeout):
-                self._logger.debug(f"Alert suppressed for status change {previous_status} -> {new_status} "
-                                 f"(user_triggered: {current_status.is_user_triggered}, "
-                                 f"graceful: {current_status.is_graceful_operation()})")
+            should_alert = current_status.should_send_alert(unreachable_timeout)
+            is_interrupted = current_status.is_interrupted_tracking_session() if hasattr(current_status, 'is_interrupted_tracking_session') else False
+            
+            # Get debug info if available
+            debug_chain = getattr(current_status, '_debug_chain', 'N/A')
+            debug_active_session = getattr(current_status, '_debug_found_active_session', 'N/A')
+            debug_intermediates = getattr(current_status, '_debug_went_through_intermediates', 'N/A')
+            
+            self._logger.info(f"Alert decision for {previous_status} -> {new_status}: "
+                            f"should_alert={should_alert}, is_interrupted={is_interrupted}, "
+                            f"user_triggered={current_status.is_user_triggered}, "
+                            f"graceful={current_status.is_graceful_operation()}, "
+                            f"trigger_source={current_status.trigger_source}")
+            
+            if is_interrupted:
+                # Get experimental_info within this function scope
+                experimental_info = self._info.get('experimental_info', {})
+                run_id_source = "recovered from database" if run_id and not experimental_info.get('run_id') else "from experiment info" if run_id else "not available"
+                self._logger.info(f"Interrupted tracking analysis: "
+                                f"chain='{debug_chain}', "
+                                f"found_active_session={debug_active_session}, "
+                                f"went_through_intermediates={debug_intermediates}, "
+                                f"run_id={run_id} ({run_id_source})")
+            
+            if not should_alert:
+                self._logger.debug(f"Alert suppressed for status change {previous_status} -> {new_status}")
                 return
             
             # Send appropriate alerts based on status transition
@@ -571,12 +650,17 @@ class Ethoscope(BaseDevice):
             
             if new_status == 'stopped':
                 # Send stopped alert (DeviceStatus already filtered out tracking->stopped transitions)
-                self._notification_service.send_device_stopped_alert(
-                    device_id=self._id,
-                    device_name=device_name,
-                    run_id=run_id,
-                    last_seen=last_seen
-                )
+                self._logger.info(f"Sending device stopped alert for {device_name} (run_id: {run_id})")
+                try:
+                    self._notification_service.send_device_stopped_alert(
+                        device_id=self._id,
+                        device_name=device_name,
+                        run_id=run_id,
+                        last_seen=last_seen
+                    )
+                    self._logger.info(f"Device stopped alert sent successfully for {device_name}")
+                except Exception as alert_error:
+                    self._logger.error(f"Failed to send device stopped alert for {device_name}: {alert_error}")
             elif new_status == 'unreached':
                 # Send unreachable alert (DeviceStatus already checked timeout)
                 self._notification_service.send_device_unreachable_alert(

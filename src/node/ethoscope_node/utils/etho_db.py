@@ -55,12 +55,13 @@ class ExperimentalDB(multiprocessing.Process):
         migrate_conf_file('/etc/ethoscope-node.db', config_dir)
         self.create_tables()
 
-    def executeSQL(self, command: str):
+    def executeSQL(self, command: str, params: tuple = None):
         """
         Execute an SQL command and return the results.
         
         Args:
             command (str): The SQL command to execute
+            params (tuple): Optional parameters for parameterized queries
             
         Returns:
             Union[int, list, int]: 
@@ -78,7 +79,10 @@ class ExperimentalDB(multiprocessing.Process):
                 db.row_factory = sqlite3.Row
                 
             cursor = db.cursor()
-            cursor.execute(command)
+            if params:
+                cursor.execute(command, params)
+            else:
+                cursor.execute(command)
             lid = cursor.lastrowid  # the last id inserted / 0 if not an INSERT command
             rows = cursor.fetchall()  # return the result of a SELECT query / [] if not a SELECT query
             
@@ -920,19 +924,15 @@ class ExperimentalDB(multiprocessing.Process):
         """
         timestamp = datetime.datetime.now()
         
-        # Escape single quotes in message
-        escaped_message = message.replace("'", "''")
-        
-        # Handle run_id - use NULL if not provided
-        run_id_sql = f"'{run_id}'" if run_id else "NULL"
-        
+        # Use proper parameter binding to avoid formatting issues
         sql_log_alert = """
-        INSERT INTO alert_logs VALUES(
-            NULL, '%s', '%s', %s, '%s', '%s', '%s', '%s'
-        )
-        """ % (device_id, alert_type, run_id_sql, escaped_message, recipients, timestamp, timestamp)
+        INSERT INTO alert_logs (device_id, alert_type, run_id, message, recipients, created_at, updated_at) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """
         
-        return self.executeSQL(sql_log_alert)
+        params = (device_id, alert_type, run_id, message, recipients, timestamp, timestamp)
+        
+        return self.executeSQL(sql_log_alert, params)
     
     def hasAlertBeenSent(self, device_id: str, alert_type: str, run_id: str = None) -> bool:
         """
@@ -947,21 +947,20 @@ class ExperimentalDB(multiprocessing.Process):
             True if alert has already been sent, False otherwise
         """
         try:
-            sql_conditions = ["device_id = '%s'" % device_id, "alert_type = '%s'" % alert_type]
-            
             if run_id:
-                sql_conditions.append("run_id = '%s'" % run_id)
+                sql_check_alert = """
+                SELECT COUNT(*) as count FROM alert_logs 
+                WHERE device_id = ? AND alert_type = ? AND run_id = ?
+                """
+                params = (device_id, alert_type, run_id)
             else:
-                sql_conditions.append("run_id IS NULL")
+                sql_check_alert = """
+                SELECT COUNT(*) as count FROM alert_logs 
+                WHERE device_id = ? AND alert_type = ? AND run_id IS NULL
+                """
+                params = (device_id, alert_type)
             
-            where_clause = " AND ".join(sql_conditions)
-            
-            sql_check_alert = f"""
-            SELECT COUNT(*) as count FROM alert_logs 
-            WHERE {where_clause}
-            """
-            
-            result = self.executeSQL(sql_check_alert)
+            result = self.executeSQL(sql_check_alert, params)
             
             if isinstance(result, list) and len(result) > 0:
                 count = result[0][0] if hasattr(result[0], '__getitem__') else result[0]['count']
