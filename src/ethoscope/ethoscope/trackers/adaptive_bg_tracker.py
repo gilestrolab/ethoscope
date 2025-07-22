@@ -103,6 +103,18 @@ class ObjectModel(object):
 
     def compute_features(self, img, contour):
         x,y,w,h = cv2.boundingRect(contour)
+        
+        # Ensure bounding rectangle stays within image bounds
+        img_height, img_width = img.shape[:2]
+        x = max(0, x)
+        y = max(0, y)
+        w = min(w, img_width - x)
+        h = min(h, img_height - y)
+        
+        # Validate that we have a valid region after boundary clipping
+        if w <= 0 or h <= 0:
+            # Return default features when no valid region exists
+            return np.array([0.0, 0.0, 0.0], dtype=np.float32)
 
         if self._roi_img_buff is None or np.any(self._roi_img_buff.shape < img.shape[0:2]) :
             # dynamically reallocate buffer if needed
@@ -118,7 +130,20 @@ class ObjectModel(object):
         sub_mask.fill(0)
 
         cv2.drawContours(sub_mask,[contour],-1, 255,-1,offset=(-x,-y))
-        mean_col = cv2.mean(sub_grey, sub_mask)[0]
+        
+        # Defensive check: ensure arrays have compatible shapes before cv2.mean()
+        if sub_grey.shape[:2] != sub_mask.shape[:2]:
+            # Fallback: use minimum dimensions to ensure compatibility
+            min_h = min(sub_grey.shape[0], sub_mask.shape[0])
+            min_w = min(sub_grey.shape[1], sub_mask.shape[1])
+            sub_grey = sub_grey[:min_h, :min_w]
+            sub_mask = sub_mask[:min_h, :min_w]
+        
+        try:
+            mean_col = cv2.mean(sub_grey, sub_mask)[0]
+        except cv2.error:
+            # Graceful fallback when cv2.mean fails
+            mean_col = 0.0
 
 
         (_,_) ,(width,height), angle  = cv2.minAreaRect(contour)
