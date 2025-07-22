@@ -1250,10 +1250,11 @@ class ExperimentalDB(multiprocessing.Process):
     
     def cleanup_offline_busy_devices(self, threshold_hours: int = 2) -> int:
         """
-        Clean up devices that are marked as 'busy' but haven't been seen for hours (indicating they're actually offline).
+        Clean up devices that are marked as 'busy' or 'unreached' but haven't been seen for hours 
+        (indicating they're actually offline or orphaned entries).
         
         Args:
-            threshold_hours: Hours after which a busy device is considered offline
+            threshold_hours: Hours after which a busy/unreached device is considered offline
             
         Returns:
             Number of devices that were cleaned up
@@ -1261,19 +1262,20 @@ class ExperimentalDB(multiprocessing.Process):
         cutoff_date = datetime.datetime.now() - datetime.timedelta(hours=threshold_hours)
         cutoff_timestamp = cutoff_date.timestamp()
         
-        # Get all devices with status 'busy'
-        sql_get_busy = "SELECT ethoscope_id, ethoscope_name, last_seen FROM %s WHERE status = 'busy'" % self._ethoscopes_table_name
+        # Get all devices with status 'busy' or 'unreached'
+        sql_get_devices = "SELECT ethoscope_id, ethoscope_name, last_seen, status FROM %s WHERE status IN ('busy', 'unreached')" % self._ethoscopes_table_name
         
-        busy_devices = self.executeSQL(sql_get_busy)
-        if not isinstance(busy_devices, list):
+        devices = self.executeSQL(sql_get_devices)
+        if not isinstance(devices, list):
             return 0
         
         devices_to_cleanup = []
         
-        for device in busy_devices:
+        for device in devices:
             ethoscope_id = device[0]
             ethoscope_name = device[1]
             last_seen = device[2]
+            status = device[3]
             
             try:
                 # Try to parse the last_seen timestamp
@@ -1291,7 +1293,7 @@ class ExperimentalDB(multiprocessing.Process):
                             last_seen_dt = datetime.datetime.fromtimestamp(float(last_seen))
                         except:
                             # If all parsing fails, consider it for cleanup
-                            devices_to_cleanup.append((ethoscope_id, ethoscope_name))
+                            devices_to_cleanup.append((ethoscope_id, ethoscope_name, status))
                             continue
                 else:
                     # Try as numeric timestamp
@@ -1299,16 +1301,19 @@ class ExperimentalDB(multiprocessing.Process):
                 
                 # Check if device should be cleaned up
                 if last_seen_dt.timestamp() < cutoff_timestamp:
-                    devices_to_cleanup.append((ethoscope_id, ethoscope_name))
+                    devices_to_cleanup.append((ethoscope_id, ethoscope_name, status))
                     
             except Exception as e:
                 # If any parsing fails, consider device for cleanup
-                logging.warning(f"Failed to parse timestamp for busy device {ethoscope_id}: {e}")
-                devices_to_cleanup.append((ethoscope_id, ethoscope_name))
+                logging.warning(f"Failed to parse timestamp for {status} device {ethoscope_id}: {e}")
+                devices_to_cleanup.append((ethoscope_id, ethoscope_name, status))
         
         # Clean up the devices by marking them as offline
         cleaned_count = 0
-        for ethoscope_id, ethoscope_name in devices_to_cleanup:
+        busy_count = 0
+        unreached_count = 0
+        
+        for ethoscope_id, ethoscope_name, status in devices_to_cleanup:
             sql_cleanup = "UPDATE %s SET status = 'offline' WHERE ethoscope_id = '%s'" % (
                 self._ethoscopes_table_name, ethoscope_id
             )
@@ -1316,14 +1321,24 @@ class ExperimentalDB(multiprocessing.Process):
             result = self.executeSQL(sql_cleanup)
             if result != -1:
                 cleaned_count += 1
-                logging.info(f"Cleaned up offline busy device: {ethoscope_name} ({ethoscope_id})")
+                if status == 'busy':
+                    busy_count += 1
+                elif status == 'unreached':
+                    unreached_count += 1
+                logging.info(f"Cleaned up {status} device: {ethoscope_name} ({ethoscope_id})")
             else:
-                logging.error(f"Failed to cleanup offline busy device {ethoscope_id}")
+                logging.error(f"Failed to cleanup {status} device {ethoscope_id}")
         
         if cleaned_count > 0:
-            logging.info(f"Cleaned up {cleaned_count} offline busy devices (busy for >{threshold_hours} hours)")
+            summary_parts = []
+            if busy_count > 0:
+                summary_parts.append(f"{busy_count} busy")
+            if unreached_count > 0:
+                summary_parts.append(f"{unreached_count} unreached")
+            summary = " and ".join(summary_parts)
+            logging.info(f"Cleaned up {cleaned_count} total devices ({summary}) not seen for >{threshold_hours} hours")
         else:
-            logging.info(f"No offline busy devices found to cleanup (busy for >{threshold_hours} hours)")
+            logging.info(f"No stale devices found to cleanup (not seen for >{threshold_hours} hours)")
         
         return cleaned_count
         
