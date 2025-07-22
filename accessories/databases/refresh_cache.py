@@ -9,7 +9,7 @@ databases and ensures cache filenames reflect actual database metadata timestamp
 Usage:
     python refresh_cache.py --all          # Refresh all database types
     python refresh_cache.py --sqlite       # Refresh only SQLite databases
-    python refresh_cache.py --mysql        # Refresh only MySQL databases
+    python refresh_cache.py --mysql --host ethoscope004.local # Refresh only MySQL databases
     python refresh_cache.py --dry-run      # Show what would be processed without changes
 """
 
@@ -103,43 +103,6 @@ def discover_sqlite_databases():
     return sqlite_databases
 
 
-def discover_mysql_databases():
-    """
-    Discover MySQL databases using machine name pattern.
-    
-    Returns:
-        list: List of dictionaries with database information
-    """
-    mysql_databases = []
-    
-    try:
-        machine_name = pi.get_machine_name()
-        db_name = f"{machine_name}_db"
-        
-        # Test connection to the database
-        with mysql.connector.connect(
-            host='localhost',
-            user=MYSQL_CREDENTIALS["user"],
-            password=MYSQL_CREDENTIALS["password"],
-            database=db_name,
-            charset='latin1',
-            use_unicode=True,
-            connect_timeout=10
-        ) as conn:
-            logger.info(f"Found MySQL database: {db_name}")
-            
-            # No need to manually extract timestamp - cache system will handle it
-            mysql_databases.append({
-                'name': db_name,
-                'machine_name': machine_name
-            })
-                
-    except mysql.connector.Error as e:
-        logger.error(f"Failed to connect to MySQL database: {e}")
-    
-    return mysql_databases
-
-
 def refresh_sqlite_cache(sqlite_db_info, dry_run=False):
     """
     Refresh cache for a single SQLite database.
@@ -151,6 +114,7 @@ def refresh_sqlite_cache(sqlite_db_info, dry_run=False):
     try:
         db_path = sqlite_db_info['path']
         machine_name = sqlite_db_info['machine_name']
+        machine_id = sqlite_db_info['machine_id']
         
         logger.info(f"Processing SQLite database: {db_path}")
         
@@ -166,9 +130,20 @@ def refresh_sqlite_cache(sqlite_db_info, dry_run=False):
             database_type="SQLite3"
         )
         
+        # Get timestamp from DB to construct correct filename
+        timestamp = cache.get_database_timestamp()
+        if timestamp:
+            ts_str = time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(timestamp))
+            correct_backup_filename = f"{ts_str}_{machine_id}.db"
+            logger.info(f"Constructed correct backup filename: {correct_backup_filename}")
+        else:
+            # Fallback to original filename if timestamp not found
+            correct_backup_filename = sqlite_db_info['backup_filename']
+            logger.warning(f"Could not get timestamp from {db_path}, using original filename: {correct_backup_filename}")
+
         # Use cache system to refresh from database metadata (fully automated)
         cache_filepath = cache.refresh_cache_from_database(
-            backup_filename=sqlite_db_info['backup_filename'],
+            backup_filename=correct_backup_filename,
             sqlite_source_path=db_path
         )
         
@@ -178,7 +153,7 @@ def refresh_sqlite_cache(sqlite_db_info, dry_run=False):
         logger.error(f"Failed to refresh SQLite cache for {sqlite_db_info['path']}: {e}")
 
 
-def refresh_mysql_cache(mysql_db_info, dry_run=False):
+def refresh_mysql_cache(dry_run=False):
     """
     Refresh cache for a single MySQL database.
     
@@ -187,33 +162,30 @@ def refresh_mysql_cache(mysql_db_info, dry_run=False):
         dry_run (bool): If True, only show what would be done
     """
     try:
-        db_name = mysql_db_info['name']
-        machine_name = mysql_db_info['machine_name']
-        
-        logger.info(f"Processing MySQL database: {db_name}")
-        
+        db_credentials = {  "name": "%s_db" % pi.get_machine_name(),
+                            "host" : "localhost",
+                            "user" : "ethoscope",
+                            "password" : "ethoscope"
+                            }
+
         if dry_run:
             logger.info(f"[DRY RUN] Would refresh cache for {db_name}")
             return
+
+        # Initiating the cache        
+        cache = create_metadata_cache(db_credentials, database_type="MySQL")
         
-        # Create MySQL metadata cache
-        mysql_credentials = MYSQL_CREDENTIALS.copy()
-        mysql_credentials["name"] = db_name
-        
-        cache = create_metadata_cache(
-            db_credentials=mysql_credentials,
-            device_name=machine_name,
-            cache_dir=CACHE_DIR,
-            database_type="MySQL"
-        )
-        
+        # Get backup filename from metadata to ensure consistency
+        backup_filename = cache.get_backup_filename()
+
         # Use cache system to refresh from database metadata (fully automated)
-        cache_filepath = cache.refresh_cache_from_database()
+        cache_filepath = cache.refresh_cache_from_database(backup_filename=backup_filename)
+        cache.get_database_info()
         
         logger.info(f"Created cache file: {cache_filepath}")
         
     except Exception as e:
-        logger.error(f"Failed to refresh MySQL cache for {mysql_db_info['name']}: {e}")
+        logger.error(f"Failed to refresh MySQL cache for: {e}")
 
 
 def main():
@@ -225,7 +197,7 @@ def main():
 Examples:
     python refresh_cache.py --all          # Refresh all database types
     python refresh_cache.py --sqlite       # Refresh only SQLite databases
-    python refresh_cache.py --mysql        # Refresh only MySQL databases
+    python refresh_cache.py --mysql --host ethoscope004.local # Refresh only MySQL databases
     python refresh_cache.py --dry-run      # Show what would be processed
         """
     )
@@ -260,12 +232,7 @@ Examples:
             refresh_sqlite_cache(sqlite_db, dry_run=args.dry_run)
     
     if args.mysql or args.all:
-        logger.info("Discovering MySQL databases...")
-        mysql_databases = discover_mysql_databases()
-        logger.info(f"Found {len(mysql_databases)} MySQL databases")
-        
-        for mysql_db in mysql_databases:
-            refresh_mysql_cache(mysql_db, dry_run=args.dry_run)
+        refresh_mysql_cache(dry_run=args.dry_run)
     
     logger.info("Database cache refresh completed")
 

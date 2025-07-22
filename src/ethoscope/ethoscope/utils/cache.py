@@ -4,6 +4,7 @@ import json
 import logging
 import sqlite3
 import mysql.connector
+import ast
 
 class BaseDatabaseMetadataCache:
     """
@@ -28,7 +29,7 @@ class BaseDatabaseMetadataCache:
     - has_last_experiment_info(): Check if last experiment info is available
     - get_experiment_history(): Get history of multiple experiments
     """
-    
+
     def __init__(self, db_credentials, device_name="", cache_dir="/ethoscope_data/cache"):
         """
         Initialize the database metadata cache.
@@ -39,9 +40,18 @@ class BaseDatabaseMetadataCache:
             cache_dir (str): Directory path for storing cache files
         """
         self.db_credentials = db_credentials
-        self.device_name = device_name
         self.cache_dir = cache_dir
         self.current_cache_file_path = None  # Track current active cache file
+
+        self.allowed_metadata_fields = ['backup_filename', 'experimental_info', 'date_time', 'machine_name', 'machine_id', 'stop_date_time']
+
+        #if device_name is not None:
+        #    self.device_name = device_name
+        #else:
+        self.device_name = self.get_device_name()
+        if self.device_name is None:
+            raise ValueError("Could not determine device_name from database")
+
         os.makedirs(cache_dir, exist_ok=True)
     
     def get_metadata(self, tracking_start_time=None):
@@ -212,37 +222,56 @@ class BaseDatabaseMetadataCache:
             
         return experiment_info
 
+    def get_experimental_metadata(self):
+        """
+        Extract experimental metadata from MySQL database METADATA table.
+        
+        Returns:
+            dict: Experimental metadata containing user, location, and other info
+        """
+        experimental_info_str = self._get_value_from_database('experimental_info')
+
+        try:
+            # Parse the experimental_info string - it's a string representation of a dict
+            experimental_info = ast.literal_eval(experimental_info_str)
+            
+            return {
+                "user": experimental_info.get("name", "unknown"),
+                "location": experimental_info.get("location", "unknown"),
+                "code": experimental_info.get("code", ""),
+                "run_id": experimental_info.get("run_id", "")
+            }
+        except (ValueError, SyntaxError) as e:
+            logging.warning(f"Could not parse experimental_info: {e}")
+            return {}                    
+
     def get_database_timestamp(self):
         """
         Get the database timestamp from the METADATA table.
-        
+
         Returns:
             float: Database timestamp, or None if not found
         """
+        timestamp_str = self._get_value_from_database('date_time')
+        if timestamp_str is None:
+            return None
         try:
-            db_path = self.db_credentials["name"]
-            if not os.path.exists(db_path):
-                logging.warning(f"SQLite database path does not exist: {db_path}")
-                return None
-                
-            with sqlite3.connect(db_path) as conn:
-                cursor = conn.cursor()
-                
-                # Get date_time from METADATA table
-                cursor.execute("SELECT value FROM METADATA WHERE field = 'date_time'")
-                result = cursor.fetchone()
-                
-                if result:
-                    return float(result[0])
-                else:
-                    logging.warning("No date_time found in metadata table")
-                    return None
-                    
-        except Exception as e:
-            logging.error(f"Failed to get database timestamp: {e}")
+            return float(timestamp_str)
+        except (ValueError, TypeError):
+            logging.warning(f"Could not convert timestamp '{timestamp_str}' to float.")
             return None
 
-    def refresh_cache_from_database(self, timestamp=None, backup_filename=None, result_writer_type=None, sqlite_source_path=None):
+    def get_device_name(self):
+        """
+        Get the device name from the MySQL METADATA table.
+        
+        Returns:
+            str: device name or None if not found
+        """
+        return self._get_value_from_database('machine_name')
+
+
+    def refresh_cache_from_database(self, device_name=None, timestamp=None, backup_filename=None, result_writer_type=None, sqlite_source_path=None):
         """
         Completely refresh the cache from database metadata.
         
@@ -486,10 +515,25 @@ class BaseDatabaseMetadataCache:
                 - last_db_update (float): Timestamp of query
         """
         raise NotImplementedError("Subclasses must implement _query_database()")
-    
+
+    def _get_value_from_database(self):
+        """
+        Abstract method for querying database metadata specific fields.
+        """
+        raise NotImplementedError("Subclasses must implement _get_value_from_database()")
+
     def _write_cache(self, cache_file_path, db_info=None, tracking_start_time=None, finalise=False, experiment_info=None, graceful=True, stop_reason="user_stop"):
         """Write or update cache file."""
         try:
+
+            # This is useful for post-hoc processing of databases
+            stopped = self._get_value_from_database('stop_date_time')
+            
+            if stopped: 
+                db_status = "finalised"
+            else:
+                db_status = "tracking"
+
             # Read existing cache file or create new one
             if os.path.exists(cache_file_path):
                 with open(cache_file_path, 'r') as f:
@@ -509,7 +553,7 @@ class BaseDatabaseMetadataCache:
                     "device_name": self.device_name,
                     "tracking_start_time": timestamp_str,
                     "creation_timestamp": tracking_start_time or time.time(),
-                    "db_status": "tracking"
+                    "db_status": db_status
                 }
             
             if finalise:
@@ -687,14 +731,12 @@ class BaseDatabaseMetadataCache:
     
     def get_backup_filename(self):
         """
-        Get the backup filename for the current database.
+        Get the backup filename for the MySQL database from the METADATA table.
         
         Returns:
             str or None: Backup filename if available, None otherwise
         """
-        # This is a default implementation that subclasses can override
-        # For now, return None as this is database-specific
-        return None
+        return self._get_value_from_database('backup_filename')
 
 
 class MySQLDatabaseMetadataCache(BaseDatabaseMetadataCache):
@@ -710,7 +752,7 @@ class MySQLDatabaseMetadataCache(BaseDatabaseMetadataCache):
     def _query_database(self):
         """Query MySQL database for metadata including size and table counts."""
         with mysql.connector.connect(
-            host='localhost',
+            host=self.db_credentials.get("host", "localhost"),
             user=self.db_credentials["user"],
             password=self.db_credentials["password"],
             database=self.db_credentials["name"],
@@ -779,17 +821,12 @@ class MySQLDatabaseMetadataCache(BaseDatabaseMetadataCache):
                 "table_counts": table_counts,
                 "last_db_update": time.time()
             }
-    
-    def get_backup_filename(self):
-        """
-        Get the backup filename for the MySQL database from the METADATA table.
-        
-        Returns:
-            str or None: Backup filename if available, None otherwise
-        """
+
+    def _get_value_from_database(self, field):
+
         try:
             with mysql.connector.connect(
-                host='localhost',
+                host=self.db_credentials.get("host", "localhost"),
                 user=self.db_credentials["user"],
                 password=self.db_credentials["password"],
                 database=self.db_credentials["name"],
@@ -800,110 +837,23 @@ class MySQLDatabaseMetadataCache(BaseDatabaseMetadataCache):
                 cursor = conn.cursor()
                 
                 # Query the metadata table for the backup filename
-                cursor.execute("SELECT DISTINCT value FROM METADATA WHERE field = 'backup_filename' AND value IS NOT NULL")
+                cursor.execute("SELECT DISTINCT value FROM METADATA WHERE field = '%s' AND value IS NOT NULL" % field)
                 result = cursor.fetchone()
                 
                 if result:
-                    backup_filename = result[0]
-                    logging.info(f"Found backup filename from metadata: {backup_filename}")
-                    return backup_filename
+                    value = result[0]
+                    logging.info(f"Found {field} from metadata: {value}")
+                    return value
                 else:
-                    logging.info("No backup filename found in metadata table")
+                    logging.info(f"No {field} found in metadata table")
                     return None
                     
         except mysql.connector.Error as e:
-            logging.warning(f"Could not retrieve backup filename from metadata table: {e}")
+            logging.warning(f"Could not retrieve {field} from metadata table: {e}")
             return None
         except Exception as e:
-            logging.error(f"Unexpected error retrieving backup filename: {e}")
+            logging.error(f"Unexpected error retrieving {field}: {e}")
             return None
-
-    def get_experimental_metadata(self):
-        """
-        Extract experimental metadata from MySQL database METADATA table.
-        
-        Returns:
-            dict: Experimental metadata containing user, location, and other info
-        """
-        try:
-            with mysql.connector.connect(
-                host='localhost',
-                user=self.db_credentials["user"],
-                password=self.db_credentials["password"],
-                database=self.db_credentials["name"],
-                charset='latin1',
-                use_unicode=True,
-                connect_timeout=10
-            ) as conn:
-                cursor = conn.cursor()
-                
-                # Query the metadata table for experimental_info
-                cursor.execute("SELECT value FROM METADATA WHERE field = 'experimental_info' AND value IS NOT NULL")
-                result = cursor.fetchone()
-                
-                if result:
-                    experimental_info_str = result[0]
-                    try:
-                        # Parse the experimental_info string - it's a string representation of a dict
-                        import ast
-                        experimental_info = ast.literal_eval(experimental_info_str)
-                        
-                        return {
-                            "user": experimental_info.get("name", "unknown"),
-                            "location": experimental_info.get("location", "unknown"),
-                            "code": experimental_info.get("code", ""),
-                            "run_id": experimental_info.get("run_id", "")
-                        }
-                    except (ValueError, SyntaxError) as e:
-                        logging.warning(f"Could not parse experimental_info: {e}")
-                        return {}
-                else:
-                    logging.info("No experimental_info found in metadata table")
-                    return {}
-                    
-        except mysql.connector.Error as e:
-            logging.warning(f"Could not retrieve experimental metadata from MySQL: {e}")
-            return {}
-        except Exception as e:
-            logging.error(f"Unexpected error retrieving experimental metadata: {e}")
-            return {}
-
-    def get_database_timestamp(self):
-        """
-        Get the database timestamp from the MySQL METADATA table.
-        
-        Returns:
-            float: Database timestamp, or None if not found
-        """
-        try:
-            with mysql.connector.connect(
-                host='localhost',
-                user=self.db_credentials["user"],
-                password=self.db_credentials["password"],
-                database=self.db_credentials["name"],
-                charset='latin1',
-                use_unicode=True,
-                connect_timeout=10
-            ) as conn:
-                cursor = conn.cursor()
-                
-                # Get date_time from METADATA table
-                cursor.execute("SELECT value FROM METADATA WHERE field = 'date_time'")
-                result = cursor.fetchone()
-                
-                if result:
-                    return float(result[0])
-                else:
-                    logging.warning("No date_time found in metadata table")
-                    return None
-                    
-        except mysql.connector.Error as e:
-            logging.error(f"Failed to get database timestamp from MySQL: {e}")
-            return None
-        except Exception as e:
-            logging.error(f"Unexpected error getting database timestamp: {e}")
-            return None
-
 
 class SQLiteDatabaseMetadataCache(BaseDatabaseMetadataCache):
     """
@@ -986,80 +936,30 @@ class SQLiteDatabaseMetadataCache(BaseDatabaseMetadataCache):
                 "db_status": "error",
                 "db_version": "SQLite 3.x"
             }
-    
-    def get_backup_filename(self):
-        """
-        Get the backup filename for the SQLite database.
-        
-        For SQLite databases, the backup filename is typically derived from the database path.
-        
-        Returns:
-            str or None: Backup filename if available, None otherwise
-        """
-        try:
-            db_path = self.db_credentials["name"]
-            if db_path and os.path.exists(db_path):
-                # Extract backup filename from the database path
-                # Expected path format: /ethoscope_data/results/{machine_id}/{machine_name}/{date_time}/{backup_filename}
-                backup_filename = os.path.basename(db_path)
-                if backup_filename.endswith('.db'):
-                    logging.info(f"Found SQLite backup filename: {backup_filename}")
-                    return backup_filename
-                else:
-                    logging.warning(f"SQLite database path does not end with .db: {db_path}")
-                    return None
-            else:
-                logging.warning(f"SQLite database path does not exist: {db_path}")
-                return None
-                
-        except Exception as e:
-            logging.error(f"Unexpected error retrieving SQLite backup filename: {e}")
-            return None
 
-    def get_experimental_metadata(self):
-        """
-        Extract experimental metadata from SQLite database METADATA table.
-        
-        Returns:
-            dict: Experimental metadata containing user, location, and other info
-        """
+    def _get_value_from_database(self, field):
         try:
             db_path = self.db_credentials["name"]
             if not os.path.exists(db_path):
                 logging.warning(f"SQLite database path does not exist: {db_path}")
-                return {}
-                
+                return None
+
             with sqlite3.connect(db_path) as conn:
                 cursor = conn.cursor()
-                
-                # Get experimental_info from METADATA table
-                cursor.execute("SELECT value FROM METADATA WHERE field = 'experimental_info'")
+
+                # Get date_time from METADATA table
+                cursor.execute("SELECT value FROM METADATA WHERE field = '%s'" % field)
                 result = cursor.fetchone()
-                
+
                 if result:
-                    experimental_info_str = result[0]
-                    try:
-                        # Parse the experimental_info string - it's a string representation of a dict
-                        # Remove the outer quotes and evaluate safely
-                        import ast
-                        experimental_info = ast.literal_eval(experimental_info_str)
-                        
-                        return {
-                            "user": experimental_info.get("name", "unknown"),
-                            "location": experimental_info.get("location", "unknown"),
-                            "code": experimental_info.get("code", ""),
-                            "run_id": experimental_info.get("run_id", "")
-                        }
-                    except (ValueError, SyntaxError) as e:
-                        logging.warning(f"Could not parse experimental_info: {e}")
-                        return {}
+                    return result[0]
                 else:
-                    logging.info("No experimental_info found in metadata table")
-                    return {}
-                    
+                    logging.warning(f"No {field} found in metadata table")
+                    return None
+
         except Exception as e:
-            logging.error(f"Unexpected error retrieving experimental metadata: {e}")
-            return {}
+            logging.error(f"Failed to get {field} from SQLite metadata: {e}")
+            return None
 
 
 def create_metadata_cache(db_credentials, device_name="", cache_dir="/ethoscope_data/cache", database_type=None):
