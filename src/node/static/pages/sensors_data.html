@@ -3,21 +3,57 @@
     <div class="header">
         <h2>Sensor Data Visualization</h2>
         <div class="form-group" id="fileSelector">
-            <div class="input-group">
-                <div class="input-group-prepend">
-                    <span class="input-group-text"><i class="fa fa-file"></i></span>
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fa fa-files-o"></i> Sensor Selection</h5>
+                    <small class="text-muted">Select multiple sensors to overlay their data on the same charts</small>
                 </div>
-                <select id="csvFiles" class="form-control" ng-model="selectedFile" ng-options="file for file in csvFiles" ng-change="fetchAndPlotData()">
-                    <option value="" disabled>Select a file</option>
-                </select>
+                <div class="card-body">
+                    <div class="sensor-checkboxes">
+                        <div class="row">
+                            <div ng-repeat="file in csvFiles" class="col-md-4 mb-2">
+                                <div class="form-check d-flex align-items-center">
+                                    <input class="form-check-input" type="checkbox" 
+                                           ng-model="selectedSensors[file].selected" 
+                                           ng-change="updatePlot()" 
+                                           id="sensor-{{$index}}"
+                                           style="margin-right: 6px;">
+                                    <span class="color-indicator" 
+                                          style="width: 16px; height: 16px; display: inline-block; margin-right: 6px; border: 1px solid #ccc; background-color: {{selectedSensors[file].color}};"></span>
+                                    <label class="form-check-label mb-0" for="sensor-{{$index}}">
+                                        {{file}}
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="sensor-controls mt-3 text-center">
+                        <button class="btn btn-sm btn-secondary mr-2" ng-click="clearAllSensors()">
+                            <i class="fa fa-square-o"></i> Clear All
+                        </button>
+                        <div class="form-check form-check-inline ml-3">
+                            <input class="form-check-input" type="checkbox" 
+                                   ng-model="showPressure" 
+                                   ng-change="updatePlot()" 
+                                   id="pressureToggle">
+                            <label class="form-check-label" for="pressureToggle">
+                                <i class="fa fa-tachometer"></i> Show Pressure
+                            </label>
+                        </div>
+                        <span class="text-info ml-3">
+                            <i class="fa fa-info-circle"></i> 
+                            Selected: {{getSelectedCount()}} sensors
+                        </span>
+                    </div>
+                </div>
             </div>
         </div>
         
         <!-- Information box about data range and navigation -->
         <div class="alert alert-info mt-3" role="alert">
             <i class="fa fa-info-circle"></i>
-            <strong>Data View:</strong> Charts are limited to the past 15 days by default for better performance. 
-            Use the time range buttons (1d, 7d, 15d, 30d, All) or the range slider below each chart to explore historical data. 
+            <strong>Data View:</strong> Charts are limited to the past 7 days by default for better performance. 
+            Use the time range buttons (1d, 7d, 15d, 30d, All) to explore historical data. 
             All charts are synchronized - zooming, panning, or using controls on one chart will update all others automatically.
         </div>
     </div>
