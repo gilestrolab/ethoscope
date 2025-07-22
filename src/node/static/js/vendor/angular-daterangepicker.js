@@ -99,28 +99,33 @@
             // Check if moment.js is available and date is valid
             if (typeof moment === 'undefined') {
               console.warn('Moment.js not available in daterangepicker formatter');
-              return '';
+              return null; // Return null instead of empty string to prevent NaN display
             }
             
             // Handle null/undefined dates
             if (date === null || date === undefined) {
-              return '';
+              return null;
             }
             
             var momentObj;
-            if (!moment.isMoment(date)) {
-              momentObj = moment(date);
-            } else {
-              momentObj = date;
+            try {
+              if (!moment.isMoment(date)) {
+                momentObj = moment(date);
+              } else {
+                momentObj = date;
+              }
+              
+              // Validate the moment object before formatting
+              if (!momentObj.isValid()) {
+                console.warn('Invalid date in daterangepicker formatter:', date);
+                return null;
+              }
+              
+              return momentObj.format(opts.locale.format);
+            } catch (e) {
+              console.warn('Error formatting date in daterangepicker:', date, e);
+              return null;
             }
-            
-            // Validate the moment object before formatting
-            if (!momentObj.isValid()) {
-              console.warn('Invalid date in daterangepicker formatter:', date);
-              return '';
-            }
-            
-            return momentObj.format(opts.locale.format);
           };
           
           if (opts.singleDatePicker && objValue) {
@@ -129,8 +134,8 @@
             var startFormatted = f(objValue.startDate);
             var endFormatted = f(objValue.endDate);
             
-            // Only format if both dates are valid
-            if (startFormatted && endFormatted) {
+            // Only format if both dates are valid and not null
+            if (startFormatted !== null && endFormatted !== null && startFormatted && endFormatted) {
               if (modelCtrl.$viewValue && modelCtrl.$viewValue.length > 0) { 
                   objValue.formatted = modelCtrl.$viewValue + ", " + [startFormatted, endFormatted].join(opts.locale.separator);
               } else {
@@ -139,7 +144,7 @@
               return objValue.formatted;
             }
           }
-          return '';
+          return null; // Return null instead of empty string to prevent NaN display
         });
 
         el.bind('blur', function() {
@@ -165,8 +170,13 @@
               console.warn('Moment.js not available in daterangepicker parser');
               return null;
             }
-            var momentObj = moment(value, opts.locale.format);
-            return momentObj.isValid() ? momentObj : null;
+            try {
+              var momentObj = moment(value, opts.locale.format);
+              return momentObj.isValid() ? momentObj : null;
+            } catch (e) {
+              console.warn('Error parsing date in daterangepicker:', value, e);
+              return null;
+            }
           };
           objValue = {
             startDate: null,
@@ -190,19 +200,38 @@
         modelCtrl.$isEmpty = function(val) {
           return !(angular.isString(val) && val.length > 0);
         };
+        // Initialize retry tracking
+        var retryCount = 0;
+        var maxRetries = 10;
+        
         _init = function() {
           // Check if required dependencies are available
           if (typeof moment === 'undefined') {
-            console.warn('Moment.js not available for daterangepicker initialization, retrying...');
-            $timeout(_init, 100);
+            retryCount++;
+            if (retryCount > maxRetries) {
+              console.error('Failed to load Moment.js after ' + maxRetries + ' retries. Daterangepicker will not function.');
+              return;
+            }
+            console.warn('Moment.js not available for daterangepicker initialization, retrying... (attempt ' + retryCount + '/' + maxRetries + ')');
+            var retryDelay = Math.min(250 * Math.pow(1.5, retryCount - 1), 2000); // Exponential backoff with cap
+            $timeout(_init, retryDelay);
             return;
           }
           
           if (typeof $.fn.daterangepicker === 'undefined') {
-            console.warn('Daterangepicker not available, retrying...');
-            $timeout(_init, 100);
+            retryCount++;
+            if (retryCount > maxRetries) {
+              console.error('Failed to load daterangepicker after ' + maxRetries + ' retries. Widget will not function.');
+              return;
+            }
+            console.warn('Daterangepicker not available, retrying... (attempt ' + retryCount + '/' + maxRetries + ')');
+            var retryDelay = Math.min(250 * Math.pow(1.5, retryCount - 1), 2000); // Exponential backoff with cap
+            $timeout(_init, retryDelay);
             return;
           }
+          
+          // Reset retry count on successful initialization
+          retryCount = 0;
           
           var eventType, results;
           el.daterangepicker(angular.extend(opts, {

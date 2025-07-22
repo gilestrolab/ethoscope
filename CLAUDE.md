@@ -29,7 +29,7 @@ Core tracking and monitoring functionality for individual Ethoscope devices.
 Central server for managing multiple Ethoscope devices and data collection.
 
 **Key components:**
-- `scripts/server.py` - Main node web server (runs on port 80)
+- `scripts/server.py` - Main node web server (runs on port 80 - APIs are in `src/node/ethoscope_node/api`)
 - `ethoscope_node.utils.device_scanner` - Device discovery and monitoring
 - `ethoscope_node.utils.backups_helpers` - Data synchronization and backup
 - `ethoscope_node.utils.etho_db` - Database management for experimental data
@@ -143,7 +143,7 @@ make test-functional   # Functional tests only
 ## Key System Services
 
 The system uses systemd services for deployment, all find in `/services`.
-These can be reinstalled using `accessories/
+These can be reinstalled using `accessories/upgrade_scripts/install_services.sh`
 
 On the ethoscope:
 - `ethoscope_device.service` - WEB facing API / interacts with listener through a socket
@@ -173,13 +173,13 @@ On the node:
 - SQLite databases store tracking data with timestamps
 - Each device maintains its own database
 - Node server aggregates data from multiple devices
-- Backup system syncs databases to central storage
+- Backup system rsyncs databases to central storage
 
 ## Hardware Integration
 
 - Camera interfaces support PiCamera and generic OpenCV cameras
 - GPIO interfaces for hardware control (stimulators, sensors)
-- Serial communication for external hardware (Lynx motion controllers)
+- Serial communication for external hardware (Lynx motion controllers, Arduinos)
 - Network discovery via Zeroconf for automatic device detection
 
 ## Important Notes
@@ -189,8 +189,3 @@ On the node:
 - CherryPy/Bottle used for web servers
 - Frontend uses Angular.js (legacy version, source-only)
 - System designed for Raspberry Pi deployment but works on other Linux systems
-
-## Development Environment Setup
-
-- **Virtual Environment Commands**:
-  - Run `source ~/Data/virtual_envs/python/ethoscope/bin/activate` to load the appropriate venv environment for the ethoscope and the node
