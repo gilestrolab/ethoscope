@@ -40,9 +40,9 @@ def monitored_paths():
 def handle_node_update():
     """Handle local node update operation"""
     try:
-        old_commit = ethoscope_updater.get_current_commit()
-        ethoscope_updater.update()
-        new_commit = ethoscope_updater.get_current_commit()
+        old_commit, _ = ethoscope_updater.get_local_and_origin_commits()
+        ethoscope_updater.update_active_branch()
+        new_commit, _ = ethoscope_updater.get_local_and_origin_commits()
         return {
             "status": "success",
             "device_id": "node",
