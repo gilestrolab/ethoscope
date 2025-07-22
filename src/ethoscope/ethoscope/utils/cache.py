@@ -797,12 +797,21 @@ class MySQLDatabaseMetadataCache(BaseDatabaseMetadataCache):
             table_counts = {}
             for table in tables:
                 try:
-                    # Use COUNT(*) for all tables to match backup percentage calculation expectations
-                    cursor.execute(f"SELECT COUNT(*) FROM `{table}`")
-                    
-                    result = cursor.fetchone()
-                    table_counts[table] = result[0] if result and result[0] is not None else 0
-                except mysql.connector.Error:
+                    # Check if the table has an auto-incrementing 'id' column
+                    cursor.execute(f"SHOW COLUMNS FROM `{table}` LIKE 'id'")
+                    id_column_info = cursor.fetchone()
+
+                    if id_column_info and 'auto_increment' in id_column_info[3].lower(): # Assuming 'Extra' column contains auto_increment
+                        cursor.execute(f"SELECT MAX(id) FROM `{table}`")
+                        result = cursor.fetchone()
+                        table_counts[table] = (result[0] if result and result[0] is not None else 0) + 1
+                    else:
+                        # Fallback to COUNT(*) if no auto-incrementing 'id' or other issues
+                        cursor.execute(f"SELECT COUNT(*) FROM `{table}`")
+                        result = cursor.fetchone()
+                        table_counts[table] = result[0] if result and result[0] is not None else 0
+                except mysql.connector.Error as e:
+                    logging.warning(f"Could not get count for table {table}: {e}")
                     table_counts[table] = 0
             
             # Get database version
@@ -890,10 +899,26 @@ class SQLiteDatabaseMetadataCache(BaseDatabaseMetadataCache):
             table_counts = {}
             for table in tables:
                 try:
-                    cursor.execute(f"SELECT COUNT(*) FROM `{table}`")
-                    result = cursor.fetchone()
-                    table_counts[table] = result[0] if result and result[0] is not None else 0
-                except sqlite3.Error:
+                    # Check if the table has an auto-incrementing 'id' column
+                    cursor.execute(f"PRAGMA table_info(`{table}`)")
+                    columns = cursor.fetchall()
+                    id_column_exists = False
+                    for col in columns:
+                        if col[1] == 'id' and col[5] == 1: # col[1] is name, col[5] is primary key
+                            id_column_exists = True
+                            break
+
+                    if id_column_exists:
+                        cursor.execute(f"SELECT MAX(id) FROM `{table}`")
+                        result = cursor.fetchone()
+                        table_counts[table] = (result[0] if result and result[0] is not None else 0) + 1
+                    else:
+                        # Fallback to COUNT(*) if no auto-incrementing 'id' or other issues
+                        cursor.execute(f"SELECT COUNT(*) FROM `{table}`")
+                        result = cursor.fetchone()
+                        table_counts[table] = result[0] if result and result[0] is not None else 0
+                except sqlite3.Error as e:
+                    logging.warning(f"Could not get count for table {table}: {e}")
                     table_counts[table] = 0
             
             # Get SQLite version
