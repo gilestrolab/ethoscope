@@ -19,7 +19,7 @@ from ethoscope_node.scanner.ethoscope_streaming import EthoscopeStreamManager
 from ethoscope_node.utils.etho_db import ExperimentalDB
 from ethoscope_node.utils.configuration import ensure_ssh_keys, EthoscopeConfiguration
 from ethoscope_node.utils.backups_helpers import get_sqlite_table_counts, calculate_backup_percentage_from_table_counts
-from ethoscope_node.notifications.email import EmailNotificationService
+from ethoscope_node.notifications.manager import NotificationManager
 
 # Constants
 STREAMING_PORT = 8887
@@ -76,7 +76,7 @@ class Ethoscope(BaseDevice):
         
         # Use provided configuration or create new one
         self._config = config or EthoscopeConfiguration()
-        self._notification_service = EmailNotificationService(self._config, self._edb)
+        self._notification_manager = NotificationManager(self._config, self._edb)
         
         # Streaming manager
         self._stream_manager = None
@@ -607,7 +607,7 @@ class Ethoscope(BaseDevice):
             return None
     
     def _send_state_transition_alerts(self, previous_status: str, new_status: str, run_id: str):
-        """Send email alerts for state transitions using DeviceStatus logic."""
+        """Send alerts for state transitions using DeviceStatus logic."""
         try:
             device_name = self._info.get('name', self._id)
             current_status = self.get_device_status()
@@ -651,23 +651,25 @@ class Ethoscope(BaseDevice):
             if new_status == 'stopped':
                 # Send stopped alert (DeviceStatus already filtered out tracking->stopped transitions)
                 self._logger.info(f"Sending device stopped alert for {device_name} (run_id: {run_id})")
-                try:
-                    self._notification_service.send_device_stopped_alert(
-                        device_id=self._id,
-                        device_name=device_name,
-                        run_id=run_id,
-                        last_seen=last_seen
-                    )
+                success = self._notification_manager.send_device_stopped_alert(
+                    device_id=self._id,
+                    device_name=device_name,
+                    run_id=run_id,
+                    last_seen=last_seen
+                )
+                if success:
                     self._logger.info(f"Device stopped alert sent successfully for {device_name}")
-                except Exception as alert_error:
-                    self._logger.error(f"Failed to send device stopped alert for {device_name}: {alert_error}")
+                else:
+                    self._logger.error(f"Failed to send device stopped alert for {device_name}")
             elif new_status == 'unreached':
                 # Send unreachable alert (DeviceStatus already checked timeout)
-                self._notification_service.send_device_unreachable_alert(
+                success = self._notification_manager.send_device_unreachable_alert(
                     device_id=self._id,
                     device_name=device_name,
                     last_seen=last_seen
                 )
+                if not success:
+                    self._logger.error(f"Failed to send device unreachable alert for {device_name}")
                 
         except Exception as e:
             self._logger.error(f"Error sending state transition alerts: {e}")
@@ -700,12 +702,15 @@ class Ethoscope(BaseDevice):
                         if isinstance(available_space, (int, float)):
                             available_space = f"{available_space / (1024**3):.1f} GB"
                         
-                        self._notification_service.send_storage_warning_alert(
+                        # Send storage warning alert
+                        success = self._notification_manager.send_storage_warning_alert(
                             device_id=self._id,
                             device_name=device_name,
                             storage_percent=used_percent,
                             available_space=str(available_space)
                         )
+                        if not success:
+                            self._logger.error(f"Failed to send storage warning alert for {device_name}")
                         
         except Exception as e:
             self._logger.error(f"Error checking storage warnings: {e}")

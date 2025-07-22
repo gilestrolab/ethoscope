@@ -112,6 +112,12 @@ class EthoscopeConfiguration:
             'password': '',
             'from_email': 'ethoscope@localhost'
         },
+        'mattermost': {
+            'enabled': False,
+            'server_url': '',
+            'bot_token': '',
+            'channel_id': ''
+        },
         'alerts': {
             'enabled': True,
             'cooldown_seconds': 3600,
@@ -123,7 +129,7 @@ class EthoscopeConfiguration:
         }
     }
     
-    REQUIRED_SECTIONS = ['folders', 'incubators', 'sensors', 'commands', 'custom', 'smtp', 'alerts']
+    REQUIRED_SECTIONS = ['folders', 'incubators', 'sensors', 'commands', 'custom', 'smtp', 'mattermost', 'alerts']
     REQUIRED_FOLDERS = ['results', 'video', 'temporary']
     
     def __init__(self, config_file: str = "/etc/ethoscope/ethoscope.conf"):
