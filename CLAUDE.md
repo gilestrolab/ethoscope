@@ -189,3 +189,8 @@ On the node:
 - CherryPy/Bottle used for web servers
 - Frontend uses Angular.js (legacy version, source-only)
 - System designed for Raspberry Pi deployment but works on other Linux systems
+
+## Development Environment Setup
+
+- **Virtual Environment Commands**:
+  - Run `source ~/Data/virtual_envs/python/ethoscope/bin/activate` to load the appropriate venv environment for the ethoscope and the node
