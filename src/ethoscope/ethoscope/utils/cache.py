@@ -799,9 +799,9 @@ class MySQLDatabaseMetadataCache(BaseDatabaseMetadataCache):
                 try:
                     # Check if the table has an auto-incrementing 'id' column
                     cursor.execute(f"SHOW COLUMNS FROM `{table}` LIKE 'id'")
-                    id_column_info = cursor.fetchone()
+                    id_column_exists = bool(cursor.fetchone())
 
-                    if id_column_info and 'auto_increment' in id_column_info[3].lower(): # Assuming 'Extra' column contains auto_increment
+                    if id_column_exists:
                         cursor.execute(f"SELECT MAX(id) FROM `{table}`")
                         result = cursor.fetchone()
                         table_counts[table] = (result[0] if result and result[0] is not None else 0) + 1
@@ -904,7 +904,7 @@ class SQLiteDatabaseMetadataCache(BaseDatabaseMetadataCache):
                     columns = cursor.fetchall()
                     id_column_exists = False
                     for col in columns:
-                        if col[1] == 'id' and col[5] == 1: # col[1] is name, col[5] is primary key
+                        if col[1] == 'id': # col[1] is name
                             id_column_exists = True
                             break
 
