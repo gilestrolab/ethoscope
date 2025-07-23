@@ -258,7 +258,7 @@ if __name__ == '__main__':
     }
 
     # Ensure proper directory structure and migrate from legacy if needed - July 2025 - We will remove this at some point
-    from ethoscope.utils.video_utils import ensure_video_directory_structure
+    from ethoscope.utils.video import ensure_video_directory_structure
     ensure_video_directory_structure(ethoscope_root, ethoscope_info['ETHOSCOPE_VIDEOS_DIR'])
 
 

@@ -15,7 +15,7 @@ import time
 from unittest.mock import Mock, patch, MagicMock
 
 # Import the classes we're testing
-from ethoscope.utils.cache import (
+from ethoscope.io import (
     get_all_databases_info,
     _fallback_database_discovery,
     SQLiteDatabaseMetadataCache,

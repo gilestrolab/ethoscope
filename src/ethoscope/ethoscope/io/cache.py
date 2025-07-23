@@ -530,11 +530,15 @@ class BaseDatabaseMetadataCache:
         try:
 
             # This is useful for post-hoc processing of databases
-            stopped = self._get_value_from_database('stop_date_time')
-            
-            if stopped: 
-                db_status = "finalised"
+            # Only check for stop_date_time when finalising, not when starting new tracking
+            if finalise:
+                stopped = self._get_value_from_database('stop_date_time')
+                if stopped: 
+                    db_status = "finalised"
+                else:
+                    db_status = "tracking"
             else:
+                # For new tracking sessions, always set status to tracking
                 db_status = "tracking"
 
             # Read existing cache file or create new one
@@ -1168,7 +1172,7 @@ def get_all_databases_info(device_name, cache_dir="/ethoscope_data/cache"):
                 logging.warning(f"Failed to read cache file {cache_file}: {e}")
                 continue
         
-        logging.info(f"Successfully processed {processed_files} cache files for {device_name}")
+        logging.debug(f"Successfully processed {processed_files} cache files for {device_name}")
         
         # Process SQLite databases (all historical databases)
         for experiment in sqlite_experiments:

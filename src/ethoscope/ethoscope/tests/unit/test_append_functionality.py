@@ -15,7 +15,7 @@ import logging
 from unittest.mock import Mock, patch, MagicMock
 
 # Import the classes we're testing
-from ethoscope.utils.io import MySQLResultWriter, SQLiteResultWriter
+from ethoscope.io import MySQLResultWriter, SQLiteResultWriter
 from ethoscope.core.monitor import Monitor
 from ethoscope.core.roi import ROI
 

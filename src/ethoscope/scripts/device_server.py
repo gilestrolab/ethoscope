@@ -20,7 +20,7 @@ from ethoscope.control.tracking import ControlThread
 from ethoscope.control.record import ControlThreadVideoRecording
 
 from ethoscope.utils import pi
-from ethoscope.utils.video_utils import list_local_video_files
+from ethoscope.utils.video import list_local_video_files
 from ethoscope.hardware.interfaces import interfaces
 
 try:

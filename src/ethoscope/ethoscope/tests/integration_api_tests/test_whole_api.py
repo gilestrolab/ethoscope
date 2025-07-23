@@ -8,7 +8,7 @@ import time
 import random
 from ethoscope.core.monitor import Monitor
 from ethoscope.hardware.input.cameras import MovieVirtualCamera
-from ethoscope.utils.io import SQLiteResultWriter
+from ethoscope.io import SQLiteResultWriter
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.drawers.drawers import DefaultDrawer
 from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder

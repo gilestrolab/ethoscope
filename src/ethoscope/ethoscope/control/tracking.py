@@ -30,8 +30,8 @@ from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulat
 from ethoscope.stimulators.multi_stimulator import MultiStimulator
 
 from ethoscope.utils.debug import EthoscopeException
-from ethoscope.utils.io import MySQLResultWriter, SQLiteResultWriter, dbAppender 
-from ethoscope.utils.cache import create_metadata_cache, get_all_databases_info
+from ethoscope.io import MySQLResultWriter, SQLiteResultWriter, dbAppender 
+from ethoscope.io import create_metadata_cache, get_all_databases_info
 from ethoscope.utils.description import DescribedObject
 from ethoscope.utils import pi
 

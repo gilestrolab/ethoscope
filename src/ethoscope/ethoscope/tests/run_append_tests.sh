@@ -59,7 +59,7 @@ import time
 sys.path.insert(0, os.getcwd())
 
 try:
-    from ethoscope.utils.io import SQLiteResultWriter
+    from ethoscope.io import SQLiteResultWriter
     from ethoscope.core.monitor import Monitor
     from ethoscope.core.roi import ROI
     from unittest.mock import Mock

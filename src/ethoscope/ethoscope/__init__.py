@@ -42,7 +42,7 @@ If you want to run this code yourself, you can download the `test video <http://
 >>> # We import all the bricks from ethoscope package
 >>> from ethoscope.core.monitor import Monitor
 >>> from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
->>> from ethoscope.utils.io import SQLiteResultWriter
+>>> from ethoscope.io import SQLiteResultWriter
 >>> from ethoscope.hardware.input.cameras import MovieVirtualCamera
 >>> from ethoscope.drawers.drawers import DefaultDrawer
 >>>

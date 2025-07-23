@@ -21,7 +21,7 @@ import sys
 sys.path.insert(0, '/home/gg/Data/ethoscope_project/ethoscope/src/ethoscope')
 
 # Import the actual classes we're testing
-from ethoscope.utils.io import dbAppender, MySQLResultWriter, SQLiteResultWriter
+from ethoscope.io import dbAppender, MySQLResultWriter, SQLiteResultWriter
 
 
 class TestDbAppender(unittest.TestCase):

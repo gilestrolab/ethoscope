@@ -57,7 +57,7 @@ backup_tool.py for the actual backup service implementation.
 
 from ethoscope_node.utils.mysql_backup import MySQLdbToSQLite, DBNotReadyError
 from ethoscope_node.utils.configuration import ensure_ssh_keys
-from ethoscope.utils.video_utils import list_local_video_files
+from ethoscope.utils.video import list_local_video_files
 import os
 import logging
 import time
