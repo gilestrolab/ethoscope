@@ -2232,7 +2232,7 @@ class dbAppender(object):
         """Create MySQL writer with append functionality."""
         # Update db_credentials to point to the existing database
         mysql_db_credentials = self.db_credentials.copy()
-        mysql_db_credentials["db_name"] = self.database_to_append
+        mysql_db_credentials["name"] = self.database_to_append
         
         # Create MySQL writer with erase_old_db=False for append functionality
         self.kwargs.update({'erase_old_db': False})
