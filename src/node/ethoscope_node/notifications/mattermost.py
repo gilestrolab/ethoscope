@@ -219,10 +219,13 @@ class MattermostNotificationService(NotificationAnalyzer):
             
             # Log alert in database if sent successfully
             if success:
-                try:
-                    self.db.logAlert(device_id, 'device_stopped', message, 'mattermost', run_id)
-                except Exception as e:
-                    self.logger.warning(f"Failed to log alert in database: {e}")
+                if message:  # Ensure message is not empty before logging
+                    try:
+                        self.db.logAlert(device_id, 'device_stopped', message, 'mattermost', run_id)
+                    except Exception as e:
+                        self.logger.warning(f"Failed to log alert in database: {e}")
+                else:
+                    self.logger.warning(f"Attempted to log an empty alert message for device {device_id}, type device_stopped. Skipping database log.")
             
             return success
             
