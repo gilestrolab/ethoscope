@@ -620,6 +620,12 @@ class Ethoscope(BaseDevice):
             should_alert = current_status.should_send_alert(unreachable_timeout)
             is_interrupted = current_status.is_interrupted_tracking_session() if hasattr(current_status, 'is_interrupted_tracking_session') else False
             
+            # Additional check: Don't alert for legacy devices without run_id
+            # All new runs have run_id, so missing run_id indicates legacy device
+            if should_alert and new_status in ['stopped', 'offline'] and not run_id:
+                self._logger.info(f"Suppressing alert for device {self._id} - legacy device without run_id")
+                should_alert = False
+            
             # Get debug info if available
             debug_chain = getattr(current_status, '_debug_chain', 'N/A')
             debug_active_session = getattr(current_status, '_debug_found_active_session', 'N/A')
