@@ -592,7 +592,7 @@ class ControlThread(Thread):
         # Set tracking start time for database metadata
         # Use the original experiment start time from metadata/backup filename, not current time
         if hasattr(self, '_metadata') and self._metadata is not None and 'date_time' in self._metadata:
-            # Use experiment start time from metadata
+            # Use experiment start time from metadata (already updated for dbAppender)
             self._tracking_start_time = self._metadata['date_time']
             logging.info(f"Using experiment start time from metadata: {self._tracking_start_time}")
 
@@ -753,12 +753,23 @@ class ControlThread(Thread):
         
         # Determine result writer type for backup metadata
         ResultWriterClass = self._option_dict["result_writer"]["class"]
-        result_writer_type = ResultWriterClass.__name__
+        
+        # For dbAppender, we need to get the underlying database type instead of the class name
+        if ResultWriterClass.__name__ == "dbAppender":
+            # dbAppender is a meta-class - we'll determine actual type after creation
+            result_writer_type = "dbAppender"  # Temporary, will be updated later
+        else:
+            # For direct writers, use the _database_type attribute if available
+            if hasattr(ResultWriterClass, '_database_type'):
+                result_writer_type = ResultWriterClass._database_type
+            else:
+                # Fallback to class name for backward compatibility
+                result_writer_type = ResultWriterClass.__name__
         
         # For SQLite, construct the source database file path using consistent directory structure
         # Path: /ethoscope_data/results/{machine_id}/{machine_name}/{date_time}/{backup_filename}
         sqlite_source_path = None
-        if result_writer_type == "SQLiteResultWriter":
+        if result_writer_type == "SQLite3" or result_writer_type == "SQLiteResultWriter":
             # Create new database with current timestamp
             # Parse backup filename format: YYYY-MM-DD_HH-MM-SS_machine_id.db
             filename_parts = self._info["backup_filename"].replace('.db', '').split("_")
@@ -841,9 +852,16 @@ class ControlThread(Thread):
             # The dbAppender will have created the appropriate writer internally
             if hasattr(rw, '_writer') and hasattr(rw._writer, '_database_type'):
                 db_type = rw._writer._database_type
+                
+                # Update result_writer_type to the actual database type instead of "dbAppender"
+                result_writer_type = db_type
+                logging.info(f"dbAppender: Updated result_writer_type from 'dbAppender' to '{db_type}'")
+                
                 if db_type == "SQLite3":
                     cache_credentials = {"name": rw._writer._db_credentials["name"]}
                     cache_db_type = "SQLite3"
+                    # Update sqlite_source_path for SQLite dbAppender
+                    sqlite_source_path = rw._writer._db_credentials["name"]
                 else:
                     cache_credentials = self._db_credentials
                     cache_db_type = "MySQL"
@@ -854,6 +872,33 @@ class ControlThread(Thread):
                     cache_dir=self._cache_dir,
                     database_type=cache_db_type
                 )
+                
+                # For dbAppender, get the original experiment timestamp from the database
+                # This ensures we reuse the existing cache file instead of creating a new one
+                try:
+                    original_timestamp = self._metadata_cache.get_database_timestamp()
+                    if original_timestamp:
+                        # Update the experiment time to use the original timestamp
+                        experiment_time = original_timestamp
+                        logging.info(f"dbAppender: Using original experiment timestamp {original_timestamp} from database")
+                        
+                        # Update metadata with original experiment time
+                        self._metadata['date_time'] = experiment_time
+                        
+                        # Update backup filename to match original experiment
+                        original_backup_filename = self._metadata_cache.get_backup_filename()
+                        if original_backup_filename:
+                            self._info["backup_filename"] = original_backup_filename
+                            logging.info(f"dbAppender: Using original backup filename {original_backup_filename}")
+                        else:
+                            # Generate backup filename from original timestamp
+                            ts_str = time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(original_timestamp))
+                            self._info["backup_filename"] = f"{ts_str}_{self._info['id']}.db"
+                            logging.info(f"dbAppender: Generated backup filename from original timestamp: {self._info['backup_filename']}")
+                    else:
+                        logging.warning("dbAppender: Could not retrieve original experiment timestamp, using new timestamp")
+                except Exception as e:
+                    logging.warning(f"dbAppender: Failed to get original experiment timestamp: {e}")
             else:
                 # Fallback to standard metadata cache
                 self._metadata_cache = create_metadata_cache(
@@ -862,6 +907,13 @@ class ControlThread(Thread):
                     cache_dir=self._cache_dir,
                     database_type="MySQL"
                 )
+            
+            # Update metadata and experiment_info_to_store with the correct result_writer_type
+            # (they were created before we knew the actual database type)
+            self._metadata["result_writer_type"] = result_writer_type
+            self._metadata["sqlite_source_path"] = sqlite_source_path
+            experiment_info_to_store["result_writer_type"] = result_writer_type
+            experiment_info_to_store["sqlite_source_path"] = sqlite_source_path
         else:
             # MySQL uses standard credentials and metadata cache
             rw = ResultWriterClass(self._db_credentials, rois, self._metadata, **result_writer_kwargs)
@@ -876,7 +928,8 @@ class ControlThread(Thread):
         
         # Store experiment information in cache (replaces last_run_info file)
         if self._metadata_cache:
-            tracking_start_time = time.time()
+            # Use the experiment timestamp (which may be original timestamp for dbAppender)
+            tracking_start_time = experiment_time
             self._metadata_cache.store_experiment_info(tracking_start_time, experiment_info_to_store)
 
         time_offset = 0

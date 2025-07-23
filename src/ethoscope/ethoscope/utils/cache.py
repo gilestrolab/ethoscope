@@ -492,8 +492,10 @@ class BaseDatabaseMetadataCache:
             return None
             
         if tracking_start_time:
-            # Use provided timestamp
-            ts_str = time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(tracking_start_time))
+            # Round down timestamp to nearest second to eliminate floating-point precision issues
+            # This ensures consistent cache file naming regardless of microsecond variations
+            rounded_timestamp = int(tracking_start_time)
+            ts_str = time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(rounded_timestamp))
             cache_filename = f"db_metadata_{ts_str}_{self.device_name}_db.json"
             return os.path.join(self.cache_dir, cache_filename)
         
@@ -1147,11 +1149,11 @@ def get_all_databases_info(device_name, cache_dir="/ethoscope_data/cache"):
                         "sqlite_source_path": experiment_info.get("sqlite_source_path", "")
                     }
                     
-                    # Categorize by result writer type
-                    if result_writer_type == "SQLiteResultWriter":
+                    # Categorize by result writer type (handle both old class names and new database types)
+                    if result_writer_type in ["SQLiteResultWriter", "SQLite3"]:
                         sqlite_experiments.append(experiment_data)
                         processed_files += 1
-                    elif result_writer_type == "MySQLResultWriter":
+                    elif result_writer_type in ["MySQLResultWriter", "MySQL"]:
                         mysql_experiments.append(experiment_data)
                         processed_files += 1
                     else:

@@ -12,7 +12,7 @@ from ethoscope.utils.io import SQLiteResultWriter
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.drawers.drawers import DefaultDrawer
 from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
-from ethoscope.hardware.interfaces.interfaces import BaseInterface
+from ethoscope.hardware.interfaces.interfaces import SimpleSerialInterface as BaseInterface
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection
 from _constants import VIDEO, DRAW_FRAMES
 from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVariable
