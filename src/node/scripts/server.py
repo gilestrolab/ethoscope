@@ -97,6 +97,8 @@ class CherootServer(bottle.ServerAdapter):
             pass
         finally:
             try:
+                import time
+                time.sleep(0.01) # Give a moment for connections to close
                 server.stop()
             except Exception as e:
                 logging.warning(f"Error stopping Cheroot server: {e}")
