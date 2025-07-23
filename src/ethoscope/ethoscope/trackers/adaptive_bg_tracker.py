@@ -367,6 +367,14 @@ class AdaptiveBGModel(BaseTracker):
         if darker_fg:
             cv2.subtract(255, buff_img, buff_img)
 
+        # Defensive check: ensure arrays have compatible shapes before cv2.mean()
+        if buff_img.shape[:2] != mask.shape[:2]:
+            # Fallback: use minimum dimensions to ensure compatibility
+            min_h = min(buff_img.shape[0], mask.shape[0])
+            min_w = min(buff_img.shape[1], mask.shape[1])
+            buff_img = buff_img[:min_h, :min_w]
+            mask = mask[:min_h, :min_w]
+
         mean = cv2.mean(buff_img, mask)
 
         try:
