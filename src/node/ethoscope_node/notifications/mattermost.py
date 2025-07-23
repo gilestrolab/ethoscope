@@ -220,8 +220,7 @@ class MattermostNotificationService(NotificationAnalyzer):
             # Log alert in database if sent successfully
             if success:
                 try:
-                    self.db.logAlert(device_id, 'device_stopped', run_id, 
-                                   datetime.datetime.now(), 'mattermost')
+                    self.db.logAlert(device_id, 'device_stopped', message, 'mattermost', run_id)
                 except Exception as e:
                     self.logger.warning(f"Failed to log alert in database: {e}")
             
