@@ -14,6 +14,7 @@ Modules:
 - node_api: Node system management
 - file_api: File operations and downloads
 - database_api: Database queries and experiments
+- setup_api: Installation wizard and first-time setup
 """
 
 from .base import BaseAPI
@@ -24,6 +25,7 @@ from .roi_template_api import ROITemplateAPI
 from .node_api import NodeAPI
 from .file_api import FileAPI
 from .database_api import DatabaseAPI
+from .setup_api import SetupAPI
 
 __all__ = [
     'BaseAPI',
@@ -33,5 +35,6 @@ __all__ = [
     'ROITemplateAPI',
     'NodeAPI',
     'FileAPI',
-    'DatabaseAPI'
+    'DatabaseAPI',
+    'SetupAPI'
 ]

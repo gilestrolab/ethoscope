@@ -4,7 +4,7 @@ function maxLengthCheck(object) {
 }
 
 (function(){
-    var moreController = function($scope, $http, $timeout, $routeParams, $window){
+    var moreController = function($scope, $http, $timeout, $routeParams, $window, $location){
 
         var spin = function(action){
             if (action=="start"){
@@ -61,6 +61,12 @@ function maxLengthCheck(object) {
                            style:"font-size:36px; padding:10px",
                            opt: "nodeCommands",
                           },
+                          {name:"Setup Wizard",
+                           icon:"fa fa-magic",
+                           color:"alert alert-warning",
+                           style:"font-size:36px; padding:10px",
+                           opt: "setupWizard",
+                          },
 
                          ];
 
@@ -84,6 +90,9 @@ function maxLengthCheck(object) {
                     break;
                 case "nodeCommands":
                     getNodeConfiguration();
+                    break;
+                case "setupWizard":
+                    $location.path('/installation-wizard').search('reconfigure', 'true');
                     break;
                 case "all":
                     break;
@@ -296,6 +305,7 @@ function maxLengthCheck(object) {
         
 }
 
- angular.module('flyApp').controller('moreController',moreController);
+ angular.module('flyApp').controller('moreController', 
+    ['$scope', '$http', '$timeout', '$routeParams', '$window', '$location', moreController]);
 
 })()

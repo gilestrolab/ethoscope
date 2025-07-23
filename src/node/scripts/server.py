@@ -21,7 +21,7 @@ from ethoscope_node.utils.backups_helpers import GenericBackupWrapper
 from ethoscope_node.utils.etho_db import ExperimentalDB
 from ethoscope_node.api import (
     DeviceAPI, BackupAPI, SensorAPI, ROITemplateAPI, 
-    NodeAPI, FileAPI, DatabaseAPI
+    NodeAPI, FileAPI, DatabaseAPI, SetupAPI
 )
 
 # Constants
@@ -216,6 +216,9 @@ class EthoscopeNodeServer:
         
         # Main pages
         self.app.route('/', method='GET')(self._index)
+        self.app.route('/installation-wizard', method='GET')(self._installation_wizard)
+        self.app.route('/setup', method='GET')(self._setup_redirect)
+        self.app.route('/reconfigure', method='GET')(self._reconfigure_redirect)
         self.app.route('/update', method='GET')(self._update_redirect)
         
         # Redirects (kept in main server for simplicity)
@@ -238,7 +241,8 @@ class EthoscopeNodeServer:
             ROITemplateAPI,
             NodeAPI,
             FileAPI,
-            DatabaseAPI
+            DatabaseAPI,
+            SetupAPI
         ]
         
         for api_class in api_classes:
@@ -420,7 +424,34 @@ class EthoscopeNodeServer:
         return self._serve_static('img/favicon.ico')
     
     def _index(self):
+        # Check for reconfigure parameter to bypass setup check
+        reconfigure = bottle.request.query.get('reconfigure', '').lower() == 'true'
+        
+        # Check if setup is required and redirect to installation wizard
+        # (but skip if reconfigure is explicitly requested)
+        if not reconfigure:
+            try:
+                if self.config and self.config.is_setup_required():
+                    self.logger.info("Setup required, redirecting to installation wizard")
+                    return bottle.redirect('/#!/installation-wizard')
+            except Exception as e:
+                self.logger.warning(f"Error checking setup status: {e}")
+                # Continue to serve index.html if there's an error checking setup
+        
         return bottle.static_file('index.html', root=STATIC_DIR)
+    
+    def _installation_wizard(self):
+        # Always serve the main index.html for the installation wizard
+        # Angular routing will handle showing the wizard component
+        return bottle.static_file('index.html', root=STATIC_DIR)
+    
+    def _setup_redirect(self):
+        """Direct access to setup wizard (respects setup completion status)"""
+        return bottle.redirect('/#!/installation-wizard')
+    
+    def _reconfigure_redirect(self):
+        """Direct access to setup wizard in reconfigure mode"""
+        return bottle.redirect('/#!/installation-wizard?reconfigure=true')
     
     def _update_redirect(self):
         return bottle.redirect(self.config.custom('UPDATE_SERVICE_URL'))

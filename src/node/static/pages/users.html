@@ -180,12 +180,13 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label class="form-label">PIN <span class="text-danger">*</span></label>
-                                <input type="number" 
+                                <input type="text" 
                                        class="form-control" 
                                        name="PIN" 
                                        ng-model="selectedUser.PIN" 
                                        maxlength="4" 
-                                       oninput="maxLengthCheck(this)" 
+                                       pattern="[0-9]{4}" 
+                                       title="4-digit PIN" 
                                        required>
                                 <div class="invalid-feedback" ng-show="userForm.PIN.$invalid && userForm.PIN.$touched">
                                     4-digit PIN is required.
@@ -210,7 +211,7 @@
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label class="form-label">Laboratory/Group</label>
+                                <label class="form-label">Team/Group</label>
                                 <input type="text" 
                                        class="form-control" 
                                        name="group" 

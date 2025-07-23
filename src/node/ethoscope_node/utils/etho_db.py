@@ -42,6 +42,7 @@ class ExperimentalDB(multiprocessing.Process):
     _users_table_name = "users"
     _experiments_table_name = "experiments"
     _ethoscopes_table_name = "ethoscopes"
+    _incubators_table_name = "incubators"
     
     def __init__(self, config_dir: str = "/etc/ethoscope"):
         super().__init__()
@@ -173,11 +174,22 @@ class ExperimentalDB(multiprocessing.Process):
                                 updated_at TIMESTAMP NOT NULL
                             );"""
 
+        sql_create_incubators_table = """CREATE TABLE IF NOT EXISTS %s (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                name TEXT NOT NULL UNIQUE,
+                                location TEXT,
+                                owner TEXT,
+                                description TEXT,
+                                created TIMESTAMP NOT NULL,
+                                active INTEGER DEFAULT 1
+                            );""" % self._incubators_table_name
+
         self.executeSQL ( sql_create_runs_table )
         self.executeSQL ( sql_create_experiments_table )
         self.executeSQL ( sql_create_users_table )
         self.executeSQL ( sql_create_ethoscopes_table )
         self.executeSQL ( sql_create_alert_logs_table )
+        self.executeSQL ( sql_create_incubators_table )
         
         # Run database migrations
         self._migrate_database()
@@ -197,6 +209,8 @@ class ExperimentalDB(multiprocessing.Process):
             self._migrate_users_add_telephone()
             # Migration 5: Migrate users from configuration file to database
             self._migrate_users_from_config()
+            # Migration 6: Migrate incubators from configuration file to database
+            self._migrate_incubators_from_config()
         except Exception as e:
             logging.error(f"Error during database migration: {e}")
     
@@ -445,6 +459,67 @@ class ExperimentalDB(multiprocessing.Process):
                 
         except Exception as e:
             logging.error(f"Error during user migration from config: {e}")
+    
+    def _migrate_incubators_from_config(self):
+        """
+        Migrate incubators from configuration file to database if database is empty.
+        """
+        try:
+            # Check if we already have incubators in the database
+            existing_incubators = self.executeSQL(f"SELECT COUNT(*) as count FROM {self._incubators_table_name}")
+            
+            if isinstance(existing_incubators, list) and len(existing_incubators) > 0:
+                incubator_count = existing_incubators[0][0] if hasattr(existing_incubators[0], '__getitem__') else existing_incubators[0]['count']
+                if incubator_count > 0:
+                    logging.info(f"Incubators table already has {incubator_count} incubators, skipping migration from config")
+                    return
+            
+            # Try to import incubators from configuration
+            from ethoscope_node.utils.configuration import EthoscopeConfiguration
+            
+            try:
+                config = EthoscopeConfiguration()
+                config_incubators = config.content.get('incubators', {})
+                
+                if not config_incubators:
+                    logging.info("No incubators found in configuration file")
+                    return
+                
+                migrated_count = 0
+                for incubator_key, incubator_data in config_incubators.items():
+                    try:
+                        # Map configuration fields to database fields
+                        db_incubator_data = {
+                            'name': incubator_data.get('name', incubator_key),
+                            'location': incubator_data.get('location', ''),
+                            'owner': incubator_data.get('owner', ''),
+                            'description': incubator_data.get('description', ''),
+                            'created': datetime.datetime.now().timestamp(),
+                            'active': 1
+                        }
+                        
+                        # Insert incubator into database
+                        result = self.addIncubator(**db_incubator_data)
+                        if result > 0:
+                            migrated_count += 1
+                            logging.info(f"Migrated incubator: {db_incubator_data['name']}")
+                        
+                    except Exception as e:
+                        logging.error(f"Error migrating incubator {incubator_key}: {e}")
+                        continue
+                
+                if migrated_count > 0:
+                    logging.info(f"Successfully migrated {migrated_count} incubators from configuration to database")
+                else:
+                    logging.info("No incubators were migrated from configuration")
+                    
+            except ImportError as e:
+                logging.warning(f"Could not import configuration module for incubator migration: {e}")
+            except Exception as e:
+                logging.error(f"Error reading configuration file for incubator migration: {e}")
+                
+        except Exception as e:
+            logging.error(f"Error during incubator migration from config: {e}")
 
     def getRun (self, run_id, asdict=False):
         """
@@ -904,6 +979,216 @@ class ExperimentalDB(multiprocessing.Process):
             for row in rows:
                 row_dict = dict(row)
                 result[row_dict['username']] = row_dict
+            return result
+        else:
+            return rows
+    
+    def addIncubator(self, name: str, location: str = "", owner: str = "", 
+                     description: str = "", created: float = None, active: int = 1):
+        """
+        Add a new incubator to the database.
+        
+        Args:
+            name: Incubator name (required, must be unique)
+            location: Physical location of the incubator
+            owner: Owner/responsible person for the incubator
+            description: Description of the incubator
+            created: Creation timestamp (uses current time if None)
+            active: Whether incubator is active (1) or not (0)
+            
+        Returns:
+            ID of the inserted incubator or -1 if error
+        """
+        if not name:
+            logging.error("Name is required for adding incubator")
+            return -1
+        
+        if created is None:
+            created = datetime.datetime.now().timestamp()
+        
+        try:
+            # Check if name already exists
+            existing = self.getIncubatorByName(name)
+            if existing:
+                logging.error(f"Incubator with name '{name}' already exists")
+                return -1
+            
+            # Escape single quotes in text fields
+            escaped_name = name.replace("'", "''")
+            escaped_location = location.replace("'", "''")
+            escaped_owner = owner.replace("'", "''")
+            escaped_description = description.replace("'", "''")
+            
+            sql_add_incubator = f"""
+            INSERT INTO {self._incubators_table_name} 
+            (name, location, owner, description, created, active) 
+            VALUES ('{escaped_name}', '{escaped_location}', '{escaped_owner}', 
+                    '{escaped_description}', '{created}', {active})
+            """
+            
+            result = self.executeSQL(sql_add_incubator)
+            
+            if result > 0:
+                logging.info(f"Added new incubator: {name}")
+            
+            return result
+            
+        except Exception as e:
+            logging.error(f"Error adding incubator {name}: {e}")
+            return -1
+    
+    def updateIncubator(self, incubator_id: int = None, name: str = None, **updates):
+        """
+        Update an existing incubator in the database.
+        
+        Args:
+            incubator_id: Database ID of incubator to update (either incubator_id or name required)
+            name: Name of incubator to update (either incubator_id or name required)
+            **updates: Fields to update (location, owner, description, active)
+            
+        Returns:
+            Number of rows affected or -1 if error
+        """
+        if not incubator_id and not name:
+            logging.error("Either incubator_id or name must be provided for updating incubator")
+            return -1
+        
+        if not updates:
+            logging.warning("No updates provided for incubator update")
+            return 0
+        
+        try:
+            # Build WHERE clause
+            if incubator_id:
+                where_clause = f"id = {incubator_id}"
+            else:
+                escaped_name = name.replace("'", "''")
+                where_clause = f"name = '{escaped_name}'"
+            
+            # Build SET clause
+            set_clauses = []
+            for field, value in updates.items():
+                if field in ['name', 'location', 'owner', 'description']:
+                    escaped_value = str(value).replace("'", "''")
+                    set_clauses.append(f"{field} = '{escaped_value}'")
+                elif field in ['active']:
+                    set_clauses.append(f"{field} = {int(value)}")
+                elif field == 'created':
+                    set_clauses.append(f"{field} = '{value}'")
+                else:
+                    logging.warning(f"Unknown field '{field}' in incubator update, skipping")
+            
+            if not set_clauses:
+                logging.warning("No valid updates provided for incubator update")
+                return 0
+            
+            sql_update_incubator = f"""
+            UPDATE {self._incubators_table_name} 
+            SET {', '.join(set_clauses)} 
+            WHERE {where_clause}
+            """
+            
+            result = self.executeSQL(sql_update_incubator)
+            
+            if result >= 0:
+                identifier = f"ID {incubator_id}" if incubator_id else f"name {name}"
+                logging.info(f"Updated incubator {identifier}")
+            
+            return result
+            
+        except Exception as e:
+            identifier = f"ID {incubator_id}" if incubator_id else f"name {name}"
+            logging.error(f"Error updating incubator {identifier}: {e}")
+            return -1
+    
+    def deactivateIncubator(self, incubator_id: int = None, name: str = None):
+        """
+        Deactivate an incubator (set active=0) instead of deleting.
+        
+        Args:
+            incubator_id: Database ID of incubator to deactivate (either incubator_id or name required)
+            name: Name of incubator to deactivate (either incubator_id or name required)
+            
+        Returns:
+            Number of rows affected or -1 if error
+        """
+        return self.updateIncubator(incubator_id=incubator_id, name=name, active=0)
+    
+    def getIncubatorById(self, incubator_id: int, asdict: bool = False):
+        """
+        Get incubator information by database ID.
+        
+        Args:
+            incubator_id: Database ID to look up
+            asdict: Return as dictionary if True
+            
+        Returns:
+            Incubator data from database or empty dict if not found
+        """
+        sql_get_incubator = f"SELECT * FROM {self._incubators_table_name} WHERE id = {incubator_id}"
+        
+        row = self.executeSQL(sql_get_incubator)
+        
+        if type(row) != list or len(row) == 0:
+            return {}
+        
+        if asdict:
+            return dict(row[0])
+        else:
+            return row[0]
+    
+    def getIncubatorByName(self, name: str, asdict: bool = False):
+        """
+        Get incubator information by name.
+        
+        Args:
+            name: Name to look up
+            asdict: Return as dictionary if True
+            
+        Returns:
+            Incubator data from database or empty dict if not found
+        """
+        sql_get_incubator = "SELECT * FROM %s WHERE name = '%s'" % (self._incubators_table_name, name)
+        
+        row = self.executeSQL(sql_get_incubator)
+        
+        if type(row) != list or len(row) == 0:
+            return {}
+        
+        if asdict:
+            return dict(row[0])
+        else:
+            return row[0]
+    
+    def getAllIncubators(self, active_only: bool = False, asdict: bool = False):
+        """
+        Get all incubators from the database.
+        
+        Args:
+            active_only: If True, only return active incubators
+            asdict: Return as dictionary if True
+            
+        Returns:
+            List of incubator data or dictionary keyed by name
+        """
+        sql_get_incubators = f"SELECT * FROM {self._incubators_table_name}"
+        
+        if active_only:
+            sql_get_incubators += " WHERE active = 1"
+        
+        sql_get_incubators += " ORDER BY name"
+        
+        rows = self.executeSQL(sql_get_incubators)
+        
+        if type(rows) != list:
+            return {} if asdict else []
+        
+        if asdict:
+            # Return dictionary keyed by name like the configuration format
+            result = {}
+            for row in rows:
+                row_dict = dict(row)
+                result[row_dict['name']] = row_dict
             return result
         else:
             return rows

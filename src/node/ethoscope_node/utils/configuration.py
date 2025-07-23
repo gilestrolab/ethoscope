@@ -126,10 +126,17 @@ class EthoscopeConfiguration:
             'unreachable_timeout_minutes': 20,
             'graceful_shutdown_grace_minutes': 5,
             'user_action_timeout_seconds': 30
+        },
+        'setup': {
+            'completed': False,
+            'steps_completed': [],
+            'setup_started': None,
+            'setup_completed': None,
+            'setup_version': '1.0'
         }
     }
     
-    REQUIRED_SECTIONS = ['folders', 'incubators', 'sensors', 'commands', 'custom', 'smtp', 'mattermost', 'alerts']
+    REQUIRED_SECTIONS = ['folders', 'incubators', 'sensors', 'commands', 'custom', 'smtp', 'mattermost', 'alerts', 'setup']
     REQUIRED_FOLDERS = ['results', 'video', 'temporary']
     
     def __init__(self, config_file: str = "/etc/ethoscope/ethoscope.conf"):
@@ -411,7 +418,7 @@ class EthoscopeConfiguration:
     
     def add_incubator(self, incubatordata: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Add a new incubator to configuration.
+        Add a new incubator using database storage.
         
         Args:
             incubatordata: Incubator data dictionary
@@ -428,20 +435,36 @@ class EthoscopeConfiguration:
         name = incubatordata['name']
         
         try:
+            # Import here to avoid circular imports
+            from ethoscope_node.utils.etho_db import ExperimentalDB
+            
             # Validate incubator data
             for key in INCUBATORS_KEYS:
-                if key not in incubatordata:
+                if key not in incubatordata and key not in ['id']:
                     self._logger.warning(f"Incubator '{name}' missing field: {key}")
             
-            # Add incubator
-            if 'incubators' not in self._settings:
-                self._settings['incubators'] = {}
+            # Map configuration fields to database fields
+            db_incubator_data = {
+                'name': incubatordata['name'],
+                'location': incubatordata.get('location', ''),
+                'owner': incubatordata.get('owner', ''),
+                'description': incubatordata.get('description', ''),
+                'active': 1
+            }
             
-            self._settings['incubators'][name] = incubatordata
-            self.save()
+            # Add incubator to database
+            db = ExperimentalDB()
+            result = db.addIncubator(**db_incubator_data)
             
-            self._logger.info(f"Added incubator: {name}")
-            return {'result': 'success', 'data': self._settings['incubators']}
+            if result > 0:
+                self._logger.info(f"Added incubator to database: {name}")
+                # Get all incubators from database to return consistent format
+                all_incubators = db.getAllIncubators(asdict=True)
+                return {'result': 'success', 'data': all_incubators}
+            else:
+                error_msg = f"Failed to add incubator '{name}' to database"
+                self._logger.error(error_msg)
+                raise ValueError(error_msg)
             
         except Exception as e:
             error_msg = f"Failed to add incubator '{name}': {e}"
@@ -571,6 +594,143 @@ class EthoscopeConfiguration:
         """
         self._logger.info("Reloading configuration from file")
         return self.load()
+    
+    def is_setup_completed(self) -> bool:
+        """
+        Check if first-time setup has been completed.
+        
+        Returns:
+            True if setup is completed, False otherwise
+        """
+        setup_section = self._settings.get('setup', {})
+        return setup_section.get('completed', False)
+    
+    def is_setup_required(self) -> bool:
+        """
+        Determine if setup is required based on various conditions.
+        
+        Returns:
+            True if setup is required, False otherwise
+        """
+        if self.is_setup_completed():
+            return False
+        
+        # Check if we have admin users in the database
+        try:
+            from ethoscope_node.utils.etho_db import ExperimentalDB
+            db = ExperimentalDB()
+            
+            # Get admin users from database
+            all_users = db.getAllUsers(active_only=True, asdict=True)
+            admin_users = [user for user in all_users.values() if user.get('isadmin', 0) == 1]
+            
+            # If no admin users exist, setup is required
+            if not admin_users:
+                return True
+            
+            # Check for default/test admin users that should be replaced
+            default_usernames = ['admin', 'test', 'default', 'ethoscope']
+            default_emails = ['admin@localhost', 'test@localhost', 'admin@example.com']
+            
+            for admin in admin_users:
+                username = admin.get('username', '').lower()
+                email = admin.get('email', '').lower()
+                
+                # If any admin has default credentials, setup is required
+                if username in default_usernames or email in default_emails:
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            self._logger.warning(f"Error checking setup requirements: {e}")
+            # If we can't determine, assume setup is required
+            return True
+    
+    def get_setup_status(self) -> Dict[str, Any]:
+        """
+        Get detailed setup status information.
+        
+        Returns:
+            Dictionary with setup status details
+        """
+        setup_section = self._settings.get('setup', {})
+        
+        status = {
+            'completed': self.is_setup_completed(),
+            'required': self.is_setup_required(),
+            'steps_completed': setup_section.get('steps_completed', []),
+            'setup_started': setup_section.get('setup_started'),
+            'setup_completed': setup_section.get('setup_completed'),
+            'setup_version': setup_section.get('setup_version', '1.0')
+        }
+        
+        # Add system information
+        try:
+            from ethoscope_node.utils.etho_db import ExperimentalDB
+            db = ExperimentalDB()
+            
+            user_count = len(db.getAllUsers(active_only=True))
+            admin_count = len([u for u in db.getAllUsers(active_only=True, asdict=True).values() 
+                             if u.get('isadmin', 0) == 1])
+            incubator_count = len(db.getAllIncubators(active_only=True))
+            
+            status['system_info'] = {
+                'users': user_count,
+                'admin_users': admin_count,
+                'incubators': incubator_count,
+                'smtp_configured': self._settings.get('smtp', {}).get('enabled', False),
+                'mattermost_configured': self._settings.get('mattermost', {}).get('enabled', False)
+            }
+            
+        except Exception as e:
+            self._logger.warning(f"Error getting system info for setup status: {e}")
+            status['system_info'] = {}
+        
+        return status
+    
+    def mark_setup_step_completed(self, step: str) -> None:
+        """
+        Mark a setup step as completed.
+        
+        Args:
+            step: Name of the completed step
+        """
+        if 'setup' not in self._settings:
+            self._settings['setup'] = self.DEFAULT_SETTINGS['setup'].copy()
+        
+        steps_completed = self._settings['setup'].get('steps_completed', [])
+        if step not in steps_completed:
+            steps_completed.append(step)
+            self._settings['setup']['steps_completed'] = steps_completed
+            
+        # Mark setup as started if this is the first step
+        if not self._settings['setup'].get('setup_started'):
+            self._settings['setup']['setup_started'] = datetime.datetime.now().isoformat()
+        
+        self.save()
+        self._logger.info(f"Setup step completed: {step}")
+    
+    def complete_setup(self) -> None:
+        """
+        Mark the entire setup process as completed.
+        """
+        if 'setup' not in self._settings:
+            self._settings['setup'] = self.DEFAULT_SETTINGS['setup'].copy()
+        
+        self._settings['setup']['completed'] = True
+        self._settings['setup']['setup_completed'] = datetime.datetime.now().isoformat()
+        
+        self.save()
+        self._logger.info("Setup process marked as completed")
+    
+    def reset_setup(self) -> None:
+        """
+        Reset setup status (for testing or re-setup).
+        """
+        self._settings['setup'] = self.DEFAULT_SETTINGS['setup'].copy()
+        self.save()
+        self._logger.info("Setup status reset")
 
 
 def ensure_ssh_keys(keys_dir: str = "/etc/ethoscope/keys") -> Tuple[str, str]:

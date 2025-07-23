@@ -91,6 +91,12 @@
                 controller: 'usersController',
             })
 
+            // route for the installation wizard
+            .when('/installation-wizard', {
+                templateUrl: '/static/pages/installation-wizard.html',
+                controller: 'installationWizardController',
+            })
+
 
         // route for the help page
         /*.when('/help', {
@@ -104,7 +110,27 @@
     });
 
     // create the controller and inject Angular's $scope
-    app.controller('mainController', function($scope, $http, $interval, $timeout) {
+    app.controller('mainController', function($scope, $http, $interval, $timeout, $location) {
+        
+        // ===========================
+        // SETUP CHECK
+        // ===========================
+        
+        // Check if setup is required and redirect to wizard
+        var checkSetupStatus = function() {
+            $http.get('/setup/status').then(function(response) {
+                if (response.data && response.data.required && !response.data.completed) {
+                    console.log('Setup required, redirecting to installation wizard');
+                    $location.path('/installation-wizard');
+                }
+            }).catch(function(error) {
+                // If setup API is not available or there's an error, continue normally
+                console.warn('Could not check setup status:', error);
+            });
+        };
+        
+        // Check setup status when controller loads
+        checkSetupStatus();
         
         // ===========================
         // SCOPE INITIALIZATION

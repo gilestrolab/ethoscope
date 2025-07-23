@@ -93,7 +93,14 @@ class NodeAPI(BaseAPI):
                 self.logger.error(f"Error getting users from database: {e}")
                 return {}
         elif req == 'incubators':
-            return self.config.content['incubators']
+            # Get incubators from database instead of configuration
+            try:
+                from ethoscope_node.utils.etho_db import ExperimentalDB
+                db = ExperimentalDB()
+                return db.getAllIncubators(active_only=False, asdict=True)
+            except Exception as e:
+                self.logger.error(f"Error getting incubators from database: {e}")
+                return {}
         elif req == 'sensors':
             return self.sensor_scanner.get_all_devices_info() if self.sensor_scanner else {}
         elif req == 'commands':
