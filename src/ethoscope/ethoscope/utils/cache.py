@@ -967,6 +967,9 @@ class SQLiteDatabaseMetadataCache(BaseDatabaseMetadataCache):
         try:
             db_path = self.db_credentials["name"]
             if not os.path.exists(db_path):
+                # Suppress warning for dummy 'temp' database when querying machine_name
+                if db_path == "temp" and field == "machine_name":
+                    return None
                 logging.warning(f"SQLite database path does not exist: {db_path}")
                 return None
 
@@ -1080,7 +1083,7 @@ def get_all_databases_info(device_name, cache_dir="/ethoscope_data/cache"):
         # Create one temporary cache instance to access existing methods
         # We'll use dummy credentials since we're only reading cache files
         temp_cache = SQLiteDatabaseMetadataCache(
-            {"name": "temp"}, device_name, cache_dir
+            {"name": "temp"}, device_name=device_name, cache_dir=cache_dir
         )
         
         # Get all cache files for this device
