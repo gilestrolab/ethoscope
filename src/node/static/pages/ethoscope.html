@@ -455,6 +455,7 @@
                                             <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" class="form-control" ng-model="stimulator.arguments[arg.name]" ng-required="{{arg.required == 'required'}}">
                                                 <option value="">-- choose {{arg.name}}{{arg.required == 'required' ? ' *' : ''}} --</option>
                                                 <option ng-repeat="entry in node[arg.asknode] | toArray | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
+                                                <option ng-if="!(node[arg.asknode] | toArray).length" value="" disabled>No {{arg.name}} available</option>
                                             </select>
                                             <select ng-if="(arg.type == 'str' && arg.options != undefined)" class="form-control" ng-model="stimulator.arguments[arg.name]">
                                                 <option value="">-- choose {{arg.name}} --</option>
@@ -522,9 +523,21 @@
                                             <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" ng-required="{{arg.required == 'required'}}">
                                                 <option value="">-- choose {{arg.name}}{{arg.required == 'required' ? ' *' : ''}} --</option>
                                                 <option ng-repeat="entry in node[arg.asknode] | toArray | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
+                                                <option ng-if="!(node[arg.asknode] | toArray).length" value="" disabled>No {{arg.name}} available</option>
                                             </select>
                                             <div ng-if="(arg.type == 'str' && arg.asknode != undefined && arg.required == 'required')" class="text-danger" ng-show="trackingoptionsform[arg.name].$invalid && trackingoptionsform[arg.name].$touched">
                                                 <small>{{arg.name}} is required</small>
+                                            </div>
+                                            <div ng-if="(arg.type == 'str' && arg.asknode != undefined && arg.name == 'database_to_append')" class="text-info" ng-show="!(node[arg.asknode] | toArray).length">
+                                                <small><i class="fa fa-info-circle"></i> No databases found for appending. Previous experiments may not be available or cached data may be loading.</small>
+                                                <br>
+                                                <small>
+                                                    <span ng-if="database_status.loading"><i class="fa fa-spinner fa-spin"></i> {{getDatabaseStatusMessage()}}</span>
+                                                    <span ng-if="!database_status.loading">{{getDatabaseStatusMessage()}}</span>
+                                                    <button ng-if="!database_status.loading" type="button" class="btn btn-xs btn-default" ng-click="refreshDatabaseStatus()" style="margin-left: 5px;">
+                                                        <i class="fa fa-refresh"></i> Refresh
+                                                    </button>
+                                                </small>
                                             </div>
                                             <select ng-if="(arg.type == 'str' && arg.options != undefined)" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
                                                 <option value="">-- choose {{arg.name}} --</option>
@@ -695,7 +708,9 @@
                                         <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}} ng-model="selected_options.recording[name]['arguments'][arg.name]">
                                         <input ng-if="(arg.type == 'str' && arg.asknode == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]">
                                         <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]">
+                                            <option value="">-- choose {{arg.name}} --</option>
                                             <option ng-repeat="entry in node[arg.asknode] | toArray | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
+                                            <option ng-if="!(node[arg.asknode] | toArray).length" value="" disabled>No {{arg.name}} available</option>
                                         </select>
 
                                         <div ng-if="arg.type == 'date_range'" class="form-group">

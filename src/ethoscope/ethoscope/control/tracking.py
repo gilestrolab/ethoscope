@@ -30,7 +30,7 @@ from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulat
 from ethoscope.stimulators.multi_stimulator import MultiStimulator
 
 from ethoscope.utils.debug import EthoscopeException
-from ethoscope.utils.io import MySQLResultWriter, SQLiteResultWriter 
+from ethoscope.utils.io import MySQLResultWriter, SQLiteResultWriter, dbAppender 
 from ethoscope.utils.cache import create_metadata_cache, get_all_databases_info
 from ethoscope.utils.description import DescribedObject
 from ethoscope.utils import pi
@@ -42,17 +42,15 @@ class ExperimentalInformation(DescribedObject):
                                     {"type": "str", "name": "name", "description": "Who are you?", "default" : "", "asknode" : "users", "required" : "required"},
                                     {"type": "str", "name": "location", "description": "Where is your device","default" : "", "asknode" : "incubators"},
                                     {"type": "str", "name": "code", "description": "Would you like to add any code to the resulting filename or metadata?", "default" : ""},
-                                #    {"type": "boolean", "name": "append", "description": "Append tracking data to the existing database", "default": False},
                                     {"type": "str", "name": "sensor", "description": "url to access the relevant ethoscope sensor", "default": "", "asknode" : "sensors", "hidden" : "true"}
                                    ]}
                                    
-        def __init__(self, name="", location="", code="", append=False, sensor=""):
+        def __init__(self, name="", location="", code="", sensor=""):
             self._check_code(code)
             self._info_dic = {"name":name,
                               "location":location,
                               "code":code,
-                              "sensor":sensor,
-                              "append":append}
+                              "sensor":sensor}
 
         def _check_code(self, code):
             r = re.compile(r"[^a-zA-Z0-9-]")
@@ -113,7 +111,7 @@ class ControlThread(Thread):
                         "possible_classes":[OurPiCameraAsync, MovieVirtualCamera, V4L2Camera],
                     }),
         ("result_writer", {
-                        "possible_classes":[SQLiteResultWriter, MySQLResultWriter],
+                        "possible_classes":[SQLiteResultWriter, MySQLResultWriter, dbAppender],
                 }),
      ])
     
@@ -413,6 +411,9 @@ class ControlThread(Thread):
         if data is None:
             return
 
+        # Debug: log the received data
+        logging.info(f"DEBUG: Received data in _parse_user_options: {data}")
+
         for key in list(self._option_dict.keys()):
 
             Class, kwargs = self._parse_one_user_option(key, data)
@@ -440,7 +441,43 @@ class ControlThread(Thread):
         
         # Add comprehensive databases information using existing cache files
         # This should be available regardless of monitor status
-        self._info["databases"] = self._get_databases_info()
+        databases_info = self._get_databases_info()
+        self._info["databases"] = databases_info
+
+        # Create database_list using dbAppender's method for consistent formatting
+        try:
+            db_list = dbAppender.get_available_databases(
+                db_credentials=self._db_credentials,
+                device_name=self._info["name"]
+            )
+            # Sort by name (newest first) 
+            db_list.sort(key=lambda x: x["name"], reverse=True)
+        except Exception as e:
+            logging.error(f"Error getting available databases via dbAppender: {e}")
+            # Fallback to old method if dbAppender fails
+            db_list = []
+            if databases_info and databases_info.get("SQLite"):
+                for db_name, db_info in databases_info["SQLite"].items():
+                    # Only include databases that actually exist and have data
+                    if db_info.get("file_exists", False) and db_info.get("filesize", 0) > 32768:  # > 32KB
+                        db_list.append({
+                            "name": db_name,
+                            "active": True,
+                            "size": db_info.get("filesize", 0),
+                            "status": db_info.get("db_status", "unknown")
+                        })
+            if databases_info and databases_info.get("MariaDB"):
+                for db_name, db_info in databases_info["MariaDB"].items():
+                    db_list.append({
+                        "name": db_name,
+                        "active": True,
+                        "size": db_info.get("db_size_bytes", 0),
+                        "status": db_info.get("db_status", "unknown")
+                    })
+            # Sort by name (newest first)
+            db_list.sort(key=lambda x: x["name"], reverse=True)
+        
+        self._info["database_list"] = db_list
         
         if self._monit is None:
             return
@@ -532,7 +569,7 @@ class ControlThread(Thread):
         self._databases_info_cache_time = 0
 
     def _start_tracking(self, camera, result_writer, rois, reference_points, TrackerClass, tracker_kwargs,
-                        hardware_connection, StimulatorClass, stimulator_kwargs):
+                        hardware_connection, StimulatorClass, stimulator_kwargs, time_offset=0):
 
         #Here the stimulator passes args. Hardware connection was previously open as thread.
         stimulators = [StimulatorClass(hardware_connection, **stimulator_kwargs) for _ in rois]
@@ -543,6 +580,7 @@ class ControlThread(Thread):
         self._monit = Monitor(camera, TrackerClass, rois,
                               reference_points = reference_points,
                               stimulators=stimulators,
+                              time_offset=time_offset,
                               *self._monit_args)
         
         self._info["status"] = "running"
@@ -668,7 +706,14 @@ class ControlThread(Thread):
 
         ExpInfoClass = self._option_dict["experimental_info"]["class"]
         exp_info_kwargs = self._option_dict["experimental_info"]["kwargs"]
+        
+        # Debug: log what's being passed to ExperimentalInformation
+        logging.info(f"DEBUG: Creating ExperimentalInformation with kwargs: {exp_info_kwargs}")
+        
         self._info["experimental_info"] = ExpInfoClass(**exp_info_kwargs).info_dic
+        
+        # Debug: log the final experimental_info
+        logging.info(f"DEBUG: Final experimental_info created: {self._info['experimental_info']}")
         self._info["time"] = cam.start_time # the camera start time is the reference 0
         
         #here the hardwareconnection call the interface class without passing any argument!
@@ -685,12 +730,6 @@ class ControlThread(Thread):
         else:
             sensor = None
 
-        if "append" in self._info["experimental_info"]:
-            append_to_db = self._info["experimental_info"]["append"]
-            logging.info(["Recreating a new database", "Appending tracking data to the existing database"][append_to_db])
-        else:
-            append_to_db = False
-
         # Try to get existing backup filename from metadata cache first
         existing_backup_filename = None
         if self._metadata_cache is not None:
@@ -699,14 +738,9 @@ class ControlThread(Thread):
             except Exception as e:
                 logging.warning(f"Failed to get backup filename from metadata cache: {e}")
         
-        if existing_backup_filename and append_to_db:
-            # Use existing backup filename when appending to database
-            self._info["backup_filename"] = existing_backup_filename
-            logging.info(f"Using existing backup filename for append mode: {existing_backup_filename}")
-        else:
-            # No existing backup filename or first time - create new one
-            self._info["backup_filename"] = self._create_backup_filename()
-            logging.info(f"Creating new backup filename: {self._info['backup_filename']}")
+        # Create new backup filename for the experiment
+        self._info["backup_filename"] = self._create_backup_filename()
+        logging.info(f"Creating new backup filename: {self._info['backup_filename']}")
         
         self._info["interactor"] = {}
         self._info["interactor"]["name"] = str(self._option_dict['interactor']['class'])
@@ -725,6 +759,7 @@ class ControlThread(Thread):
         # Path: /ethoscope_data/results/{machine_id}/{machine_name}/{date_time}/{backup_filename}
         sqlite_source_path = None
         if result_writer_type == "SQLiteResultWriter":
+            # Create new database with current timestamp
             # Parse backup filename format: YYYY-MM-DD_HH-MM-SS_machine_id.db
             filename_parts = self._info["backup_filename"].replace('.db', '').split("_")
             if len(filename_parts) >= 3:
@@ -767,7 +802,7 @@ class ControlThread(Thread):
         # Use the selected result writer class and pass appropriate arguments
         result_writer_kwargs.update({
             'take_frame_shots': True, 
-            'erase_old_db': (not append_to_db), 
+            'erase_old_db': True,  # Always create new database (dbAppender handles append internally)
             'sensor': sensor
         })
         
@@ -793,6 +828,40 @@ class ControlThread(Thread):
                 cache_dir=self._cache_dir,
                 database_type="SQLite3"
             )
+        elif result_writer_type == "dbAppender":
+            # dbAppender handles database discovery and append functionality internally
+            rw = ResultWriterClass(
+                db_credentials=self._db_credentials,
+                rois=rois,
+                metadata=self._metadata,
+                **result_writer_kwargs
+            )
+            
+            # Initialize metadata cache based on detected database type
+            # The dbAppender will have created the appropriate writer internally
+            if hasattr(rw, '_writer') and hasattr(rw._writer, '_database_type'):
+                db_type = rw._writer._database_type
+                if db_type == "SQLite3":
+                    cache_credentials = {"name": rw._writer._db_credentials["name"]}
+                    cache_db_type = "SQLite3"
+                else:
+                    cache_credentials = self._db_credentials
+                    cache_db_type = "MySQL"
+                    
+                self._metadata_cache = create_metadata_cache(
+                    db_credentials=cache_credentials,
+                    device_name=self._info["name"],
+                    cache_dir=self._cache_dir,
+                    database_type=cache_db_type
+                )
+            else:
+                # Fallback to standard metadata cache
+                self._metadata_cache = create_metadata_cache(
+                    db_credentials=self._db_credentials,
+                    device_name=self._info["name"],
+                    cache_dir=self._cache_dir,
+                    database_type="MySQL"
+                )
         else:
             # MySQL uses standard credentials and metadata cache
             rw = ResultWriterClass(self._db_credentials, rois, self._metadata, **result_writer_kwargs)
@@ -810,8 +879,13 @@ class ControlThread(Thread):
             tracking_start_time = time.time()
             self._metadata_cache.store_experiment_info(tracking_start_time, experiment_info_to_store)
 
+        time_offset = 0
+        # dbAppender handles append functionality and time offset internally
+        if hasattr(rw, 'append'):
+            time_offset = rw.append()
+
         return  (cam, rw, rois, reference_points, TrackerClass, tracker_kwargs,
-                        hardware_connection, StimulatorClass, stimulator_kwargs)
+                        hardware_connection, StimulatorClass, stimulator_kwargs, time_offset)
 
     def _save_roi_debug_image(self, cam, error_message):
         """
@@ -878,11 +952,11 @@ class ControlThread(Thread):
                 # Don't exit, just stop this tracking attempt - device remains available
                 return  # Exit gracefully without crashing
                 
-            cam, rw, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs = tracking_setup
+            cam, rw, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, time_offset = tracking_setup
             
             with rw as result_writer:
                 # Start tracking directly (pickle saving removed)
-                self._start_tracking(cam, result_writer, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs)
+                self._start_tracking(cam, result_writer, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, time_offset=time_offset)
             
             #self.stop()
 

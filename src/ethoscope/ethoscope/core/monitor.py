@@ -12,6 +12,7 @@ class Monitor(object):
 
     def __init__(self, camera, tracker_class,
                  rois = None, reference_points = None, stimulators=None,
+                 time_offset=0,
                  *args, **kwargs  # extra arguments for the tracker objects
                  ):
         r"""
@@ -35,6 +36,8 @@ class Monitor(object):
         :type reference_points: list
         :param stimulators: The class that will be used to analyse the position of the object and interact with the system/hardware.
         :type stimulators: list(:class:`~ethoscope.stimulators.stimulators.BaseInteractor`)
+        :param time_offset: The time offset in milliseconds to start the experiment from.
+        :type time_offset: int
         :param args: additional arguments passed to the tracking algorithm
         :param kwargs: additional keyword arguments passed to the tracking algorithm
         """
@@ -43,7 +46,8 @@ class Monitor(object):
         self._last_frame_idx =0
         self._force_stop = False
         self._last_positions = {}
-        self._last_time_stamp = 0
+        self._time_offset = time_offset
+        self._last_time_stamp = self._time_offset
         self._is_running = False
         self._reference_points = reference_points
 
@@ -114,9 +118,12 @@ class Monitor(object):
                     break
 
                 self._last_frame_idx = i
-                self._last_time_stamp = t
+                self._last_time_stamp = t + self._time_offset
                 self._frame_buffer = frame
 
+                # Adjust timestamp for database writes when appending
+                t_with_offset = t + self._time_offset
+                
                 for j,track_u in enumerate(self._unit_trackers):
                     data_rows = track_u.track(t, frame)
                     if len(data_rows) == 0:
@@ -129,10 +136,10 @@ class Monitor(object):
                     self._last_positions[track_u.roi.idx] = abs_pos
 
                     if result_writer is not None:
-                        result_writer.write(t, track_u.roi, data_rows)
+                        result_writer.write(t_with_offset, track_u.roi, data_rows)
 
                 if result_writer is not None:
-                    result_writer.flush(t, frame)
+                    result_writer.flush(t_with_offset, frame)
 
                 if drawer is not None:
                     drawer.draw(frame, self._last_positions, self._unit_trackers, self._reference_points)

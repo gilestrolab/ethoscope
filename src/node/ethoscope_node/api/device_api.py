@@ -287,6 +287,26 @@ class DeviceAPI(BaseAPI):
         post_data = self.get_request_data()
         device = self.validate_device_exists(id)
         
+        # Debug: log what data is being sent to device
+        if instruction == 'start':
+            import json
+            import logging
+            try:
+                data_dict = json.loads(post_data.decode('utf-8')) if isinstance(post_data, bytes) else post_data
+                logging.info(f"DEBUG: Node server sending start instruction to device {id}")
+                logging.info(f"DEBUG: Post data: {data_dict}")
+                
+                # Check for experimental_info and database_to_append
+                if 'experimental_info' in data_dict:
+                    exp_info = data_dict['experimental_info']
+                    logging.info(f"DEBUG: experimental_info section: {exp_info}")
+                    if 'arguments' in exp_info and 'database_to_append' in exp_info['arguments']:
+                        logging.info(f"DEBUG: Found database_to_append in node server: {exp_info['arguments']['database_to_append']}")
+                    else:
+                        logging.warning("DEBUG: database_to_append NOT found in node server data")
+            except Exception as e:
+                logging.error(f"DEBUG: Error parsing post data in node server: {e}")
+        
         # Don't try to JSON decode/encode - pass bytes directly
         device.send_instruction(instruction, post_data)
         return self._get_device_info(id)

@@ -306,6 +306,12 @@
                         initializeSelectedOptions('recording', userOptions.recording || {});
                         initializeSelectedOptions('update_machine', userOptions.update_machine || {});
                         
+                        // Check database availability for append functionality
+                        checkDatabaseAvailability();
+                        
+                        // Populate node.database_list for frontend dropdown
+                        updateNodeDatabaseList();
+                        
                         // Load ROI templates AFTER user options are initialized
                         $scope.loadRoiTemplates();
                     })
@@ -1021,6 +1027,13 @@
                         }
 
                         console.log('Starting tracking with options:', option);
+                        
+                        // Debug: log database_to_append specifically
+                        for (var opt in option) {
+                            if (option[opt].arguments && option[opt].arguments.database_to_append) {
+                                console.log('Found database_to_append:', option[opt].arguments.database_to_append);
+                            }
+                        }
 
                         // Send start command to ethoscope
                         $http.post('/device/' + device_id + '/controls/start', option)
@@ -1559,6 +1572,9 @@
                         var data = response.data;
                         $scope.device = data;
 
+                        // Update node.database_list for frontend dropdown
+                        updateNodeDatabaseList();
+
                         // Update timestamp display using the extracted function
                         updateTimestampDisplay(data);
 
@@ -1591,6 +1607,83 @@
             loadNodeData();
             loadDeviceData();
             // Note: loadUserOptions() is now called within loadDeviceData() via batch endpoint
+
+            /**
+             * Update node.database_list for frontend dropdown from device data
+             */
+            function updateNodeDatabaseList() {
+                // Populate node.database_list from device.database_list for dropdown
+                if ($scope.device && $scope.device.database_list) {
+                    $scope.node.database_list = $scope.device.database_list;
+                    console.log('Updated node.database_list with', $scope.device.database_list.length, 'databases');
+                } else {
+                    $scope.node.database_list = [];
+                    console.log('No database_list found on device, setting empty array');
+                }
+            }
+
+            /**
+             * Check database availability for append functionality and provide user feedback
+             */
+            function checkDatabaseAvailability() {
+                // Initialize database status tracking
+                $scope.database_status = {
+                    loading: false,
+                    available: false,
+                    error: null,
+                    last_check: null
+                };
+                
+                // Check if device has database_list in its data
+                if ($scope.device && $scope.device.database_list) {
+                    $scope.database_status.available = $scope.device.database_list.length > 0;
+                    $scope.database_status.last_check = new Date();
+                    
+                    if (!$scope.database_status.available) {
+                        $scope.database_status.error = "No previous experiments found for database appending";
+                    }
+                } else {
+                    // Database list not yet loaded, mark as loading
+                    $scope.database_status.loading = true;
+                    $scope.database_status.error = "Database information is still loading...";
+                }
+            }
+            
+            /**
+             * Refresh database availability status
+             */
+            $scope.refreshDatabaseStatus = function() {
+                $scope.database_status.loading = true;
+                $scope.database_status.error = null;
+                
+                // Reload device data to get fresh database list
+                $http.get('/device/' + device_id + '/data')
+                    .then(function(response) {
+                        $scope.device = response.data;
+                        updateNodeDatabaseList();
+                        checkDatabaseAvailability();
+                    })
+                    .catch(function(error) {
+                        $scope.database_status.loading = false;
+                        $scope.database_status.error = "Failed to refresh database information: " + error.data;
+                        console.error('Failed to refresh database status:', error);
+                    });
+            };
+            
+            /**
+             * Get user-friendly message for database availability status
+             */
+            $scope.getDatabaseStatusMessage = function() {
+                if ($scope.database_status.loading) {
+                    return "Loading database information...";
+                } else if ($scope.database_status.available) {
+                    return "Databases available for appending";
+                } else if ($scope.database_status.error) {
+                    return $scope.database_status.error;
+                } else {
+                    return "Database status unknown";
+                }
+            };
 
             // Start periodic refresh (every 10 seconds - reduced from 6 seconds)
             // Only refresh when page is visible to reduce unnecessary load

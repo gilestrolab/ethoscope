@@ -896,6 +896,7 @@ class BaseResultWriter(object):
         self._async_writer.start()
         
         # Initialize common attributes
+        self._erase_old_db = erase_old_db
         self._last_t, self._last_flush_t, self._last_dam_t = [0] * 3
         self._metadata = metadata
         self._rois = rois
@@ -929,22 +930,24 @@ class BaseResultWriter(object):
         self._var_map_initialised = False
         
         # Database initialization - wait for async writer to be ready first
-        if (self._database_type == "MySQL" and erase_old_db) or self._database_type == "SQLite3":
-            logging.warning("Waiting for async writer to initialize database...")
-            # Wait for async writer to complete database initialization
-            if not self._async_writer._ready_event.wait(timeout=ASYNC_WRITER_TIMEOUT):
-                if self._async_writer.is_alive():
-                    raise Exception(f"Async database writer failed to initialize within {ASYNC_WRITER_TIMEOUT} seconds - check database connection")
-                else:
-                    raise Exception("Async database writer process died during initialization - check database configuration and logs")
-            
-            logging.warning("Creating database tables...")
-            self._create_all_tables()
+#        if (self._database_type == "MySQL" and erase_old_db) or self._database_type == "SQLite3":
+        logging.warning("Waiting for async writer to initialize database...")
+        # Wait for async writer to complete database initialization
+        if not self._async_writer._ready_event.wait(timeout=ASYNC_WRITER_TIMEOUT):
+            if self._async_writer.is_alive():
+                raise Exception(f"Async database writer failed to initialize within {ASYNC_WRITER_TIMEOUT} seconds - check database connection")
+            else:
+                raise Exception("Async database writer process died during initialization - check database configuration and logs")
+        
+        logging.warning("Creating database tables...")
+    
+        #This will check if tables need to be created or not based on erase_old_db
+        self._create_all_tables()
 
-        elif self._database_type == "MySQL" and not erase_old_db:
-            event = "crash_recovery"
-            command = "INSERT INTO START_EVENTS VALUES (%s, %s, %s)"
-            self._write_async_command(command, (self._null, int(time.time()), event))
+#        elif self._database_type == "MySQL" and not erase_old_db:
+#            event = "crash_recovery"
+#            command = "INSERT INTO START_EVENTS VALUES (%s, %s, %s)"
+#            self._write_async_command(command, (self._null, int(time.time()), event))
 
         logging.info("Result writer initialised")
     
@@ -1000,6 +1003,14 @@ class BaseResultWriter(object):
                 logging.info("Joined OK")
             else:
                 logging.info("Process was not started, skipping join")
+
+    def append(self):
+        """
+        Gets the last timestamp from the database to allow appending.
+        Returns:
+            int: The last timestamp in milliseconds, or 0 if not found.
+        """
+        return self.get_last_timestamp()
             
     def close(self):
         """Placeholder close method."""
@@ -1474,6 +1485,35 @@ class MySQLResultWriter(BaseResultWriter):
         super(MySQLResultWriter, self).__init__(db_credentials, rois, metadata, make_dam_like_table, 
                                          take_frame_shots, erase_old_db, sensor, **kwargs)
     
+    def get_last_timestamp(self):
+        """
+        Connects to the database and retrieves the last timestamp
+        from all ROI tables.
+        Returns:
+            int: The last timestamp in milliseconds, or 0 if not found.
+        """
+        try:
+            db = mysql.connector.connect(
+                host=self._db_host,
+                user=self._db_credentials["user"],
+                passwd=self._db_credentials["password"],
+                db=self._db_credentials["name"],
+            )
+            cursor = db.cursor()
+            last_ts = 0
+            for roi in self._rois:
+                table_name = f"ROI_{roi.idx}"
+                cursor.execute(f"SELECT MAX(t) FROM {table_name}")
+                result = cursor.fetchone()
+                if result and result[0] is not None:
+                    last_ts = max(last_ts, result[0])
+            cursor.close()
+            db.close()
+            return last_ts
+        except mysql.connector.Error as err:
+            logging.error(f"Error getting last timestamp from MySQL: {err}")
+            return 0
+
     def _create_async_writer(self, db_credentials, erase_old_db, **kwargs):
         """Create MySQL-specific async writer."""
         return self._async_writing_class(db_credentials, self._queue, erase_old_db, self._db_host)
@@ -1498,39 +1538,48 @@ class MySQLResultWriter(BaseResultWriter):
         - METADATA: Experimental metadata
         - START_EVENTS: Experiment start/stop events
         """
-        logging.info("Creating master table 'ROI_MAP'")
-        self._create_table("ROI_MAP", "roi_idx SMALLINT, roi_value SMALLINT, x SMALLINT,y SMALLINT,w SMALLINT,h SMALLINT")
-        for r in self._rois:
-            fd = r.get_feature_dict()
-            command = "INSERT INTO ROI_MAP VALUES %s" % str((fd["idx"], fd["value"], fd["x"], fd["y"], fd["w"], fd["h"]))
-            self._write_async_command(command)
+        if self._erase_old_db:
+            logging.info("Creating master table 'ROI_MAP'")
+            self._create_table("ROI_MAP", "roi_idx SMALLINT, roi_value SMALLINT, x SMALLINT,y SMALLINT,w SMALLINT,h SMALLINT")
+            for r in self._rois:
+                fd = r.get_feature_dict()
+                command = "INSERT INTO ROI_MAP VALUES %s" % str((fd["idx"], fd["value"], fd["x"], fd["y"], fd["w"], fd["h"]))
+                self._write_async_command(command)
 
-        logging.info("Creating variable map table 'VAR_MAP'")
-        self._create_table("VAR_MAP", "var_name CHAR(100), sql_type CHAR(100), functional_type CHAR(100)")
-        if self._shot_saver is not None:
-            logging.info("Creating table for IMG_screenshots")
-            self._create_table(self._shot_saver.table_name, self._shot_saver.create_command)
-        if self._sensor_saver is not None:
-            logging.info("Creating table for SENSORS data")
-            self._create_table(self._sensor_saver.table_name, self._sensor_saver.create_command)
+            logging.info("Creating variable map table 'VAR_MAP'")
+            self._create_table("VAR_MAP", "var_name CHAR(100), sql_type CHAR(100), functional_type CHAR(100)")
+            if self._shot_saver is not None:
+                logging.info("Creating table for IMG_screenshots")
+                self._create_table(self._shot_saver.table_name, self._shot_saver.create_command)
+            if self._sensor_saver is not None:
+                logging.info("Creating table for SENSORS data")
+                self._create_table(self._sensor_saver.table_name, self._sensor_saver.create_command)
 
-        if self._dam_file_helper is not None:
-            logging.info("Creating 'CSV_DAM_ACTIVITY' table")
-            fields = self._dam_file_helper.make_dam_file_sql_fields()
-            self._create_table("CSV_DAM_ACTIVITY", fields)
+            if self._dam_file_helper is not None:
+                logging.info("Creating 'CSV_DAM_ACTIVITY' table")
+                fields = self._dam_file_helper.make_dam_file_sql_fields()
+                self._create_table("CSV_DAM_ACTIVITY", fields)
 
-        logging.info("Creating 'METADATA' table")
-        self._create_table("METADATA", "field CHAR(100), value TEXT")
-        logging.info("Creating 'START_EVENTS' table")
-        self._create_table("START_EVENTS", "id INT  NOT NULL AUTO_INCREMENT PRIMARY KEY, t INT, event CHAR(100)")
-        event = "graceful_start"
-        command = "INSERT INTO START_EVENTS VALUES (%s, %s, %s)"
-        self._write_async_command(command, (self._null, int(time.time()), event))
-
-        # Insert experimental metadata using shared method
-        self._insert_metadata()
+            logging.info("Creating 'METADATA' table")
+            self._create_table("METADATA", "field CHAR(100), value TEXT")
+            logging.info("Creating 'START_EVENTS' table")
+            self._create_table("START_EVENTS", "id INT  NOT NULL AUTO_INCREMENT PRIMARY KEY, t INT, event CHAR(100)")
         
-        self._wait_for_queue_empty()
+            event = "graceful_start"
+            command = "INSERT INTO START_EVENTS VALUES (%s, %s, %s)"
+            self._write_async_command(command, (self._null, int(time.time()), event))
+
+            # Insert experimental metadata using shared method
+            self._insert_metadata()
+            
+            self._wait_for_queue_empty()
+        
+        elif not self._erase_old_db and getattr(self, 'database_to_append', None):
+            event = "appending"
+            command = "INSERT INTO START_EVENTS VALUES (%s, %s, %s)"
+            self._write_async_command(command, (self._null, int(time.time()), event))
+            self._wait_for_queue_empty()
+
 
 class SQLiteResultWriter(BaseResultWriter):
     """
@@ -1555,13 +1604,12 @@ class SQLiteResultWriter(BaseResultWriter):
     _null = Null()
     
     def __init__(self, db_credentials, rois, metadata=None, make_dam_like_table=False, 
-                 take_frame_shots=False, db_host="localhost", sensor=None, *args, **kwargs):
+                 take_frame_shots=False, erase_old_db=True, sensor=None, *args, **kwargs):
         """
         Initialize SQLite result writer.
         
         Note: DAM-like tables are disabled by default for SQLite.
         Args:
-            db_host: Ignored for SQLite (file-based), kept for compatibility
             sensor: Optional sensor object for environmental data collection
         """
         # SQLite-specific parameter overrides
@@ -1569,12 +1617,107 @@ class SQLiteResultWriter(BaseResultWriter):
         kwargs.pop('erase_old_db', None)
         
         # SQLite databases are unique per experiment, don't erase them
-        erase_old_db = False
         
         # Call parent initialization with all common logic
         super(SQLiteResultWriter, self).__init__(db_credentials, rois, metadata, make_dam_like_table, 
                                                  take_frame_shots, erase_old_db, sensor, **kwargs)
     
+    def get_last_timestamp(self):
+        """
+        Connects to the database and retrieves the last timestamp
+        from all ROI tables with enhanced error handling and validation.
+        Returns:
+            int: The last timestamp in milliseconds, or 0 if not found.
+        """
+        db_path = self._db_credentials["name"]
+        
+        # Check if database file exists
+        if not os.path.exists(db_path):
+            logging.error(f"SQLite database file does not exist: {db_path}")
+            return 0
+        
+        # Check if database file is readable and not empty
+        try:
+            file_size = os.path.getsize(db_path)
+            if file_size == 0:
+                logging.error(f"SQLite database file is empty: {db_path}")
+                return 0
+        except OSError as e:
+            logging.error(f"Cannot access SQLite database file {db_path}: {e}")
+            return 0
+        
+        try:
+            # Use a timeout to prevent hanging on locked databases
+            db = sqlite3.connect(db_path, timeout=30.0)
+            cursor = db.cursor()
+            
+            # Check if database has the expected structure by looking for required tables
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'ROI_%'")
+            existing_roi_tables = {row[0] for row in cursor.fetchall()}
+            
+            if not existing_roi_tables:
+                logging.warning(f"No ROI tables found in SQLite database: {db_path}")
+                cursor.close()
+                db.close()
+                return 0
+            
+            last_ts = 0
+            successful_queries = 0
+            
+            for roi in self._rois:
+                table_name = f"ROI_{roi.idx}"
+                
+                # Check if this specific ROI table exists
+                if table_name not in existing_roi_tables:
+                    logging.warning(f"ROI table {table_name} not found in database, skipping")
+                    continue
+                
+                try:
+                    # Validate table structure by checking for required columns
+                    cursor.execute(f"PRAGMA table_info({table_name})")
+                    columns = [col[1] for col in cursor.fetchall()]  # col[1] is the column name
+                    
+                    if 't' not in columns:
+                        logging.error(f"Table {table_name} missing required 't' column")
+                        continue
+                    
+                    # Get the maximum timestamp from this table
+                    cursor.execute(f"SELECT MAX(t) FROM {table_name} WHERE t IS NOT NULL")
+                    result = cursor.fetchone()
+                    
+                    if result and result[0] is not None:
+                        table_max_ts = int(result[0])  # Ensure it's an integer
+                        last_ts = max(last_ts, table_max_ts)
+                        successful_queries += 1
+                        logging.debug(f"Table {table_name} max timestamp: {table_max_ts}")
+                    else:
+                        logging.info(f"Table {table_name} has no data or null timestamps")
+                        
+                except sqlite3.Error as table_err:
+                    logging.error(f"Error querying table {table_name}: {table_err}")
+                    continue
+            
+            cursor.close()
+            db.close()
+            
+            if successful_queries == 0:
+                logging.warning("No ROI tables could be successfully queried")
+                return 0
+            
+            logging.info(f"Successfully retrieved last timestamp {last_ts} from {successful_queries} ROI table(s)")
+            return last_ts
+            
+        except sqlite3.DatabaseError as db_err:
+            logging.error(f"SQLite database error accessing {db_path}: {db_err}")
+            return 0
+        except sqlite3.Error as err:
+            logging.error(f"SQLite error getting last timestamp from {db_path}: {err}")
+            return 0
+        except Exception as e:
+            logging.error(f"Unexpected error getting last timestamp from SQLite {db_path}: {e}")
+            logging.error(f"Traceback: {traceback.format_exc()}")
+            return 0
+
     def _create_async_writer(self, db_credentials, erase_old_db, **kwargs):
         """Create SQLite-specific async writer."""
         # SQLite uses the db path directly from db_credentials["name"]
@@ -1703,50 +1846,57 @@ class SQLiteResultWriter(BaseResultWriter):
         
         Note: SENSORS table is not created as SQLite doesn't support sensors yet
         """
-        logging.info("Creating master table 'ROI_MAP'")
-        self._create_table("ROI_MAP", "roi_idx INTEGER, roi_value INTEGER, x INTEGER, y INTEGER, w INTEGER, h INTEGER")
-        for r in self._rois:
-            fd = r.get_feature_dict()
-            command = "INSERT INTO ROI_MAP VALUES (?, ?, ?, ?, ?, ?)"
-            self._write_async_command(command, (fd["idx"], fd["value"], fd["x"], fd["y"], fd["w"], fd["h"]))
+        if self._erase_old_db:
+            logging.info("Creating master table 'ROI_MAP'")
+            self._create_table("ROI_MAP", "roi_idx INTEGER, roi_value INTEGER, x INTEGER, y INTEGER, w INTEGER, h INTEGER")
+            for r in self._rois:
+                fd = r.get_feature_dict()
+                command = "INSERT INTO ROI_MAP VALUES (?, ?, ?, ?, ?, ?)"
+                self._write_async_command(command, (fd["idx"], fd["value"], fd["x"], fd["y"], fd["w"], fd["h"]))
 
-        logging.info("Creating variable map table 'VAR_MAP'")
-        self._create_table("VAR_MAP", "var_name TEXT, sql_type TEXT, functional_type TEXT")
-        
-        if self._shot_saver is not None:
-            logging.info("Creating table for IMG_SNAPSHOTS")
-            # SQLite-compatible version of image snapshots table
-            self._create_table("IMG_SNAPSHOTS", "id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER, img BLOB")
+            logging.info("Creating variable map table 'VAR_MAP'")
+            self._create_table("VAR_MAP", "var_name TEXT, sql_type TEXT, functional_type TEXT")
+            
+            if self._shot_saver is not None:
+                logging.info("Creating table for IMG_SNAPSHOTS")
+                # SQLite-compatible version of image snapshots table
+                self._create_table("IMG_SNAPSHOTS", "id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER, img BLOB")
 
-        if self._sensor_saver is not None:
-            logging.info("Creating table for SENSORS data")
-            # SensorDataHelper handles SQLite-compatible field generation
-            self._create_table(self._sensor_saver.table_name, self._sensor_saver.create_command)
+            if self._sensor_saver is not None:
+                logging.info("Creating table for SENSORS data")
+                # SensorDataHelper handles SQLite-compatible field generation
+                self._create_table(self._sensor_saver.table_name, self._sensor_saver.create_command)
 
-        if self._dam_file_helper is not None:
-            logging.info("Creating 'CSV_DAM_ACTIVITY' table")
-            # Convert DAM table fields to SQLite-compatible format
-            mysql_fields = self._dam_file_helper.make_dam_file_sql_fields()
-            # Convert MySQL field definitions to SQLite equivalents
-            sqlite_fields = mysql_fields.replace("INT  NOT NULL AUTO_INCREMENT PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
-            sqlite_fields = sqlite_fields.replace("CHAR(100)", "TEXT")
-            sqlite_fields = sqlite_fields.replace("SMALLINT", "INTEGER")
-            self._create_table("CSV_DAM_ACTIVITY", sqlite_fields)
+            if self._dam_file_helper is not None:
+                logging.info("Creating 'CSV_DAM_ACTIVITY' table")
+                # Convert DAM table fields to SQLite-compatible format
+                mysql_fields = self._dam_file_helper.make_dam_file_sql_fields()
+                # Convert MySQL field definitions to SQLite equivalents
+                sqlite_fields = mysql_fields.replace("INT  NOT NULL AUTO_INCREMENT PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
+                sqlite_fields = sqlite_fields.replace("CHAR(100)", "TEXT")
+                sqlite_fields = sqlite_fields.replace("SMALLINT", "INTEGER")
+                self._create_table("CSV_DAM_ACTIVITY", sqlite_fields)
 
-        logging.info("Creating 'METADATA' table")
-        self._create_table("METADATA", "field TEXT, value TEXT")
-        
-        logging.info("Creating 'START_EVENTS' table")
-        self._create_table("START_EVENTS", "id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER, event TEXT")
-        event = "graceful_start"
-        command = "INSERT INTO START_EVENTS VALUES (?, ?, ?)"
-        self._write_async_command(command, (None, int(time.time()), event))
+            logging.info("Creating 'METADATA' table")
+            self._create_table("METADATA", "field TEXT, value TEXT")
+            
+            logging.info("Creating 'START_EVENTS' table")
+            self._create_table("START_EVENTS", "id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER, event TEXT")
+            event = "graceful_start"
+            command = "INSERT INTO START_EVENTS VALUES (?, ?, ?)"
+            self._write_async_command(command, (None, int(time.time()), event))
 
-        # Insert experimental metadata using shared method
-        self._insert_metadata()
-        
-        self._wait_for_queue_empty()
+            # Insert experimental metadata using shared method
+            self._insert_metadata()
+            
+            self._wait_for_queue_empty()
 
+        elif not self._erase_old_db and getattr(self, 'database_to_append', None):
+
+            event = "appending"
+            command = "INSERT INTO START_EVENTS VALUES (?, ?, ?)"
+            self._write_async_command(command, (None, int(time.time()), event))
+            self._wait_for_queue_empty()
 
 # =============================================================================================================#
 # VARIOUS OTHER CLASSES
@@ -1914,3 +2064,297 @@ class RawDataWriter():
         #The size of data_rows depends on how many contours were found. The array needs to have a fixed shape so we round it to self.entities as the max number of flies allowed
         arr.resize((self.entities, 6, 1), refcheck=False)
         self.data[roi.idx] = arr
+
+
+# =============================================================================================================#
+# DATABASE APPENDER META-CLASS
+# =============================================================================================================#
+
+class dbAppender(object):
+    """
+    Meta-class for appending to existing databases.
+    
+    This class provides a unified interface for appending to both SQLite and MySQL databases.
+    It automatically detects the database type, presents available databases to the user,
+    and wraps around the appropriate writer class with append functionality enabled.
+    
+    Features:
+    - Auto-detects database type (SQLite vs MySQL) from selected database
+    - Presents dropdown list of available databases from cache
+    - Wraps around MySQLResultWriter or SQLiteResultWriter with erase_old_db=False
+    - Maintains compatibility with existing frontend dropdown population
+    """
+    
+    _description = {
+        "overview": "Database appender - automatically detects database type and appends to existing databases. Supports both SQLite and MySQL/MariaDB databases with unified interface.",
+        "arguments": [
+            {"name": "database_to_append", "description": "Database to append to", "type": "str", "default": "", "asknode": "database_list"},
+            {"name": "take_frame_shots", "description": "Save periodic frame snapshots", "type": "boolean", "default": True},
+            {"name": "make_dam_like_table", "description": "Create DAM-compatible activity summary table", "type": "boolean", "default": False}
+        ]
+    }
+    
+    def __init__(self, db_credentials, rois, metadata=None, database_to_append="", 
+                 make_dam_like_table=False, take_frame_shots=False, sensor=None, 
+                 db_host="localhost", *args, **kwargs):
+        """
+        Initialize the database appender meta-class.
+        
+        Args:
+            db_credentials (dict): Database connection credentials
+            rois (list): List of ROI objects to track
+            metadata (dict): Experimental metadata to store
+            database_to_append (str): Name of database to append to
+            make_dam_like_table (bool): Whether to create DAM-compatible activity table
+            take_frame_shots (bool): Whether to periodically save image snapshots
+            sensor: Optional sensor object for environmental data collection
+            db_host (str): Database server hostname or IP address (for MySQL)
+        """
+        self.database_to_append = database_to_append
+        self.erase_old_db = False
+        self.db_credentials = db_credentials
+
+        self.rois = rois
+        self.metadata = metadata
+        self.make_dam_like_table = make_dam_like_table
+        self.take_frame_shots = take_frame_shots
+        self.sensor = sensor
+        self.db_host = db_host
+        self.args = args
+        self.kwargs = kwargs
+        
+        # Detect database type and create appropriate writer
+        self._detect_database_type_and_create_writer()
+
+        logging.info(f"We will be appending database: {database_to_append}")        
+    
+    def _detect_database_type_and_create_writer(self):
+        """
+        Auto-detect database type from the selected database and create appropriate writer.
+        """
+        if not self.database_to_append:
+            raise ValueError("database_to_append parameter is required")
+        
+        # Detect database type based on file extension and existence
+        db_type = self._detect_database_type(self.database_to_append)
+        
+        if db_type == "SQLite":
+            logging.info(f"Detected SQLite database: {self.database_to_append}")
+            self._create_sqlite_writer()
+        elif db_type == "MySQL":
+            logging.info(f"Detected MySQL database: {self.database_to_append}")
+            self._create_mysql_writer()
+        else:
+            raise ValueError(f"Could not detect database type for: {self.database_to_append}")
+    
+    def _detect_database_type(self, database_name):
+        """
+        Detect whether the selected database is SQLite or MySQL.
+        
+        Args:
+            database_name (str): Name/path of the database
+            
+        Returns:
+            str: "SQLite" or "MySQL" or None if cannot detect
+        """
+        # Method 1: Check if it's a file path with SQLite extension
+        if database_name.endswith('.db') or database_name.endswith('.sqlite') or database_name.endswith('.sqlite3'):
+            return "SQLite"
+        
+        # Method 2: Check if file exists in common SQLite locations
+        sqlite_paths = [
+            f"/ethoscope_data/results/{database_name}",
+            f"/ethoscope_data/results/{database_name}.db",
+            database_name  # If full path is provided
+        ]
+        
+        for path in sqlite_paths:
+            if os.path.exists(path):
+                return "SQLite"
+        
+        # Method 3: Check cache for database information
+        try:
+            from .cache import get_all_databases_info
+            device_name = self.db_credentials.get("name", "ETHOSCOPE_DEFAULT")
+            if isinstance(device_name, str) and not device_name.startswith("ETHOSCOPE_"):
+                # If device_name is a path (SQLite), extract device ID for cache lookup
+                import re
+                device_match = re.search(r'([a-f0-9]{32})', device_name)
+                if device_match:
+                    device_name = f"ETHOSCOPE_{device_match.group(1)[:8].upper()}"
+            
+            databases_info = get_all_databases_info(device_name)
+            
+            # Check SQLite databases
+            if databases_info.get("SQLite", {}).get(database_name):
+                return "SQLite"
+            
+            # Check MySQL databases  
+            if databases_info.get("MariaDB", {}).get(database_name):
+                return "MySQL"
+                
+        except Exception as e:
+            logging.warning(f"Could not check cache for database type detection: {e}")
+        
+        # Method 4: Default assumption based on database name patterns
+        # If no file extension and not found as file, assume MySQL
+        if '/' not in database_name and '\\' not in database_name and '.' not in database_name:
+            return "MySQL"
+        
+        return None
+    
+    def _create_sqlite_writer(self):
+        """Create SQLite writer with append functionality."""
+        # Update db_credentials to point to the existing database
+        sqlite_db_credentials = self.db_credentials.copy()
+        
+        # Find the actual path to the SQLite database
+        sqlite_path = self._find_sqlite_database_path(self.database_to_append)
+        if not sqlite_path:
+            raise FileNotFoundError(f"SQLite database not found: {self.database_to_append}")
+        
+        sqlite_db_credentials["name"] = sqlite_path
+
+        # Create SQlite writer with erase_old_db=False for append functionality
+        self.kwargs.update({'erase_old_db': False})
+        self._writer = SQLiteResultWriter(
+            db_credentials=sqlite_db_credentials,
+            rois=self.rois,
+            metadata=self.metadata,
+            make_dam_like_table=self.make_dam_like_table,
+            take_frame_shots=self.take_frame_shots,
+            sensor=self.sensor,
+            *self.args,
+            **self.kwargs
+        )
+    
+    def _create_mysql_writer(self):
+        """Create MySQL writer with append functionality."""
+        # Update db_credentials to point to the existing database
+        mysql_db_credentials = self.db_credentials.copy()
+        mysql_db_credentials["db_name"] = self.database_to_append
+        
+        # Create MySQL writer with erase_old_db=False for append functionality
+        self.kwargs.update({'erase_old_db': False})
+        self._writer = MySQLResultWriter(
+            db_credentials=mysql_db_credentials,
+            rois=self.rois,
+            metadata=self.metadata,
+            make_dam_like_table=self.make_dam_like_table,
+            take_frame_shots=self.take_frame_shots,
+            sensor=self.sensor,
+            db_host=self.db_host,
+            *self.args,
+            **self.kwargs
+        )
+    
+    def _find_sqlite_database_path(self, database_name):
+        """
+        Find the actual file path for a SQLite database.
+        
+        Args:
+            database_name (str): Name or partial path of database
+            
+        Returns:
+            str: Full path to database file, or None if not found
+        """
+        # If full path is provided and exists, use it
+        if os.path.exists(database_name):
+            logging.info(f"Found SQLite database at: {database_name}")
+            return database_name
+        
+        # Get the basename and ensure it has .db extension
+        db_basename = os.path.basename(database_name)
+        if not db_basename.endswith('.db'):
+            db_basename += '.db'
+        
+        # Walk the filesystem starting from common ethoscope data locations
+        search_roots = ["/ethoscope_data/results", "/data"]
+        
+        for search_root in search_roots:
+            if not os.path.exists(search_root):
+                continue
+                
+            try:
+                for root, dirs, files in os.walk(search_root):
+                    if db_basename in files:
+                        full_path = os.path.join(root, db_basename)
+                        logging.info(f"Found SQLite database at: {full_path}")
+                        return full_path
+            except Exception as e:
+                logging.warning(f"Error walking directory {search_root}: {e}")
+                continue
+        
+        logging.warning(f"Could not find SQLite database: {database_name}")
+        return None
+    
+    @classmethod
+    def get_available_databases(cls, db_credentials, device_name=""):
+        """
+        Get list of available databases for the dropdown interface.
+        
+        Args:
+            db_credentials (dict): Database connection credentials
+            device_name (str): Name of the device
+            
+        Returns:
+            list: List of database dictionaries for frontend dropdown
+        """
+        databases_list = []
+        
+        try:
+            from .cache import get_all_databases_info
+            
+            # Extract device name from credentials if not provided
+            if not device_name and "name" in db_credentials:
+                device_name = db_credentials["name"]
+                if isinstance(device_name, str) and not device_name.startswith("ETHOSCOPE_"):
+                    # Extract device ID from path for cache lookup
+                    import re
+                    device_match = re.search(r'([a-f0-9]{32})', device_name)
+                    if device_match:
+                        device_name = f"ETHOSCOPE_{device_match.group(1)[:8].upper()}"
+            
+            databases_info = get_all_databases_info(device_name)
+            
+            # Add SQLite databases
+            sqlite_dbs = databases_info.get("SQLite", {})
+            for db_name, db_info in sqlite_dbs.items():
+                if db_info.get("file_exists", False) and db_info.get("filesize", 0) > 32768:  # > 32KB
+                    databases_list.append({
+                        "name": db_name,
+                        "type": "SQLite",
+                        "active": True,
+                        "size": db_info.get("filesize", 0),
+                        "status": db_info.get("db_status", "unknown"),
+                        "path": db_info.get("path", "")
+                    })
+            
+            # Add MySQL databases
+            mysql_dbs = databases_info.get("MariaDB", {})
+            for db_name, db_info in mysql_dbs.items():
+                databases_list.append({
+                    "name": db_name,
+                    "type": "MySQL",
+                    "active": True,
+                    "size": db_info.get("db_size_bytes", 0),
+                    "status": db_info.get("db_status", "unknown")
+                })
+                
+        except Exception as e:
+            logging.error(f"Error getting available databases: {e}")
+        
+        return databases_list
+    
+    # Delegate all other methods to the wrapped writer
+    def __getattr__(self, name):
+        """Delegate all method calls to the wrapped writer instance."""
+        return getattr(self._writer, name)
+    
+    def __enter__(self):
+        """Context manager entry - delegate to wrapped writer."""
+        return self._writer.__enter__()
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - delegate to wrapped writer."""
+        return self._writer.__exit__(exc_type, exc_val, exc_tb)

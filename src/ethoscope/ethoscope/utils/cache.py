@@ -45,12 +45,13 @@ class BaseDatabaseMetadataCache:
 
         self.allowed_metadata_fields = ['backup_filename', 'experimental_info', 'date_time', 'machine_name', 'machine_id', 'stop_date_time']
 
-        #if device_name is not None:
-        #    self.device_name = device_name
-        #else:
-        self.device_name = self.get_device_name()
-        if self.device_name is None:
-            raise ValueError("Could not determine device_name from database")
+        if device_name:
+            self.device_name = device_name
+        else:
+            self.device_name = self.get_device_name()
+
+        if not self.device_name:
+            raise ValueError("Could not determine device_name from database or arguments")
 
         os.makedirs(cache_dir, exist_ok=True)
     
@@ -831,7 +832,7 @@ class MySQLDatabaseMetadataCache(BaseDatabaseMetadataCache):
                 "last_db_update": time.time()
             }
 
-    def _get_value_from_database(self, field):
+    def _get_value_from_database(self, field, warn=True):
 
         try:
             with mysql.connector.connect(
@@ -854,7 +855,7 @@ class MySQLDatabaseMetadataCache(BaseDatabaseMetadataCache):
                     logging.info(f"Found {field} from metadata: {value}")
                     return value
                 else:
-                    logging.info(f"No {field} found in metadata table")
+                    #logging.info(f"No {field} found in metadata table")
                     return None
                     
         except mysql.connector.Error as e:
@@ -979,7 +980,7 @@ class SQLiteDatabaseMetadataCache(BaseDatabaseMetadataCache):
                 if result:
                     return result[0]
                 else:
-                    logging.warning(f"No {field} found in metadata table")
+                    #logging.warning(f"No {field} found in metadata table")
                     return None
 
         except Exception as e:
@@ -1020,7 +1021,7 @@ DatabaseMetadataCache = MySQLDatabaseMetadataCache
 
 def get_all_databases_info(device_name, cache_dir="/ethoscope_data/cache"):
     """
-    Get comprehensive database information using existing cache methods.
+    Get comprehensive database information using existing cache methods with enhanced error handling.
     
     This function leverages existing cache infrastructure to provide a nested structure
     containing information about both SQLite and MariaDB databases:
@@ -1060,6 +1061,21 @@ def get_all_databases_info(device_name, cache_dir="/ethoscope_data/cache"):
     """
     databases = {"SQLite": {}, "MariaDB": {}}
     
+    # Validate inputs
+    if not device_name:
+        logging.warning("Empty device_name provided to get_all_databases_info")
+        return databases
+    
+    # Ensure cache directory exists
+    if not os.path.exists(cache_dir):
+        logging.warning(f"Cache directory does not exist: {cache_dir}")
+        try:
+            os.makedirs(cache_dir, exist_ok=True)
+            logging.info(f"Created cache directory: {cache_dir}")
+        except OSError as e:
+            logging.error(f"Failed to create cache directory {cache_dir}: {e}")
+            return databases
+    
     try:
         # Create one temporary cache instance to access existing methods
         # We'll use dummy credentials since we're only reading cache files
@@ -1074,19 +1090,52 @@ def get_all_databases_info(device_name, cache_dir="/ethoscope_data/cache"):
         sqlite_experiments = []
         mysql_experiments = []
         
+        processed_files = 0
+        
         for cache_file in cache_files:
             try:
-                with open(cache_file, 'r') as f:
+                # Check if cache file exists and is readable
+                if not os.path.exists(cache_file):
+                    logging.warning(f"Cache file no longer exists: {cache_file}")
+                    continue
+                
+                # Check file size to avoid reading empty or corrupted files
+                try:
+                    file_size = os.path.getsize(cache_file)
+                    if file_size == 0:
+                        logging.warning(f"Cache file is empty: {cache_file}")
+                        continue
+                    elif file_size > 10 * 1024 * 1024:  # 10MB limit
+                        logging.warning(f"Cache file too large ({file_size} bytes): {cache_file}")
+                        continue
+                except OSError as e:
+                    logging.warning(f"Cannot access cache file {cache_file}: {e}")
+                    continue
+                
+                with open(cache_file, 'r', encoding='utf-8') as f:
                     cache_data = json.load(f)
                 
+                # Validate cache data structure
+                if not isinstance(cache_data, dict):
+                    logging.warning(f"Invalid cache data format in {cache_file}")
+                    continue
+                
                 experiment_info = cache_data.get('experiment_info', {})
-                if experiment_info:
+                if experiment_info and isinstance(experiment_info, dict):
+                    # Validate required fields
+                    result_writer_type = experiment_info.get("result_writer_type")
+                    backup_filename = experiment_info.get("backup_filename")
+                    
+                    if not result_writer_type or not backup_filename:
+                        logging.debug(f"Cache file missing required fields: {cache_file}")
+                        continue
+                    
                     experiment_data = {
-                        "date_time": experiment_info.get("date_time"),
-                        "backup_filename": experiment_info.get("backup_filename"),
-                        "user": experiment_info.get("user"),
-                        "location": experiment_info.get("location"),
-                        "result_writer_type": experiment_info.get("result_writer_type"),
+                        "date_time": experiment_info.get("date_time", 0),
+                        "backup_filename": backup_filename,
+                        "user": experiment_info.get("user", "unknown"),
+                        "location": experiment_info.get("location", "unknown"),
+                        "result_writer_type": result_writer_type,
                         "db_size_bytes": cache_data.get("db_size_bytes", 0),
                         "table_counts": cache_data.get("table_counts", {}),
                         "db_status": cache_data.get("db_status", "unknown"),
@@ -1096,14 +1145,25 @@ def get_all_databases_info(device_name, cache_dir="/ethoscope_data/cache"):
                     }
                     
                     # Categorize by result writer type
-                    if experiment_info.get("result_writer_type") == "SQLiteResultWriter":
+                    if result_writer_type == "SQLiteResultWriter":
                         sqlite_experiments.append(experiment_data)
-                    elif experiment_info.get("result_writer_type") == "MySQLResultWriter":
+                        processed_files += 1
+                    elif result_writer_type == "MySQLResultWriter":
                         mysql_experiments.append(experiment_data)
+                        processed_files += 1
+                    else:
+                        logging.debug(f"Unknown result writer type '{result_writer_type}' in {cache_file}")
+                else:
+                    logging.debug(f"No experiment info found in cache file: {cache_file}")
                         
+            except json.JSONDecodeError as e:
+                logging.warning(f"Invalid JSON in cache file {cache_file}: {e}")
+                continue
             except Exception as e:
                 logging.warning(f"Failed to read cache file {cache_file}: {e}")
                 continue
+        
+        logging.info(f"Successfully processed {processed_files} cache files for {device_name}")
         
         # Process SQLite databases (all historical databases)
         for experiment in sqlite_experiments:
@@ -1146,5 +1206,78 @@ def get_all_databases_info(device_name, cache_dir="/ethoscope_data/cache"):
         
     except Exception as e:
         logging.warning(f"Failed to get databases info: {e}")
+    
+    # If no databases were found from cache files, try fallback discovery
+    if not databases["SQLite"] and not databases["MariaDB"]:
+        logging.info(f"No databases found in cache for {device_name}, attempting direct discovery")
+        databases = _fallback_database_discovery(device_name, cache_dir)
+    
+    return databases
+
+
+def _fallback_database_discovery(device_name, cache_dir):
+    """
+    Fallback method to discover databases when cache files are missing or corrupted.
+    
+    Args:
+        device_name (str): Name of the device
+        cache_dir (str): Cache directory path
+        
+    Returns:
+        dict: Database structure with discovered databases
+    """
+    databases = {"SQLite": {}, "MariaDB": {}}
+    
+    try:
+        # Look for SQLite databases in common locations
+        search_paths = [
+            "/ethoscope_data/results",
+            "/ethoscope_data",
+            cache_dir,
+            f"/ethoscope_data/results/{device_name}",
+            f"/ethoscope_data/{device_name}"
+        ]
+        
+        for search_path in search_paths:
+            if not os.path.exists(search_path):
+                continue
+                
+            try:
+                for root, dirs, files in os.walk(search_path):
+                    for file in files:
+                        if file.endswith('.db') and device_name.lower() in file.lower():
+                            db_path = os.path.join(root, file)
+                            try:
+                                # Quick check if this is a valid SQLite database
+                                with sqlite3.connect(db_path, timeout=5.0) as conn:
+                                    cursor = conn.cursor()
+                                    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' LIMIT 1")
+                                    if cursor.fetchone():
+                                        # This is a valid SQLite database
+                                        file_size = os.path.getsize(db_path)
+                                        mod_time = os.path.getmtime(db_path)
+                                        
+                                        databases["SQLite"][file] = {
+                                            "filesize": file_size,
+                                            "backup_filename": file,
+                                            "version": "SQLite 3.x",
+                                            "path": db_path,
+                                            "date": mod_time,
+                                            "db_status": "discovered",
+                                            "table_counts": {},
+                                            "file_exists": True
+                                        }
+                                        logging.info(f"Discovered SQLite database: {db_path}")
+                            except Exception as e:
+                                logging.debug(f"Skipping file {db_path}: {e}")
+                                continue
+            except Exception as e:
+                logging.debug(f"Error searching path {search_path}: {e}")
+                continue
+        
+        logging.info(f"Fallback discovery found {len(databases['SQLite'])} SQLite databases for {device_name}")
+        
+    except Exception as e:
+        logging.warning(f"Fallback database discovery failed: {e}")
     
     return databases
