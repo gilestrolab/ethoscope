@@ -131,13 +131,10 @@ class ObjectModel(object):
 
         cv2.drawContours(sub_mask,[contour],-1, 255,-1,offset=(-x,-y))
         
-        # Defensive check: ensure arrays have compatible shapes before cv2.mean()
+        # Ensure sub_grey and sub_mask have compatible shapes before cv2.mean()
         if sub_grey.shape[:2] != sub_mask.shape[:2]:
-            # Fallback: use minimum dimensions to ensure compatibility
-            min_h = min(sub_grey.shape[0], sub_mask.shape[0])
-            min_w = min(sub_grey.shape[1], sub_mask.shape[1])
-            sub_grey = sub_grey[:min_h, :min_w]
-            sub_mask = sub_mask[:min_h, :min_w]
+            # Resize sub_mask to match sub_grey dimensions
+            sub_mask = cv2.resize(sub_mask, (sub_grey.shape[1], sub_grey.shape[0]), interpolation=cv2.INTER_NEAREST)
         
         try:
             mean_col = cv2.mean(sub_grey, sub_mask)[0]
@@ -366,6 +363,10 @@ class AdaptiveBGModel(BaseTracker):
         
         if darker_fg:
             cv2.subtract(255, buff_img, buff_img)
+
+        # Ensure mask has the same dimensions as buff_img
+        if buff_img.shape != mask.shape:
+            mask = cv2.resize(mask, (buff_img.shape[1], buff_img.shape[0]), interpolation=cv2.INTER_NEAREST)
 
         mean = cv2.mean(buff_img, mask)
 
