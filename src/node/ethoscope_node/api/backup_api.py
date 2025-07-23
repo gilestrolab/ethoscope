@@ -73,7 +73,7 @@ class BackupAPI(BaseAPI):
             
             # Determine what types of data are being backed up
             mysql_backup_info = self._extract_backup_info("mysql", mysql_device)
-            sqlite_backup_info = self._extract_backup_info("sqlite", rsync_device, rsync_synced)
+            sqlite_backup_info = self._extract_backup_info("sqlite", rsync_device, rsync_synced, device_id)
             video_backup_info = self._extract_backup_info("video", rsync_device, rsync_synced, device_id)
             
             # Create structured device status
