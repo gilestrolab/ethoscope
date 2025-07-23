@@ -1,0 +1,25 @@
+[Unit]
+Description=Ethoscope Cloudflare Tunnel
+After=network-online.target
+Wants=network-online.target
+Requires=ethoscope_node.service
+After=ethoscope_node.service
+
+[Service]
+Type=notify
+TimeoutStartSec=0
+EnvironmentFile=-/etc/ethoscope/tunnel.env
+ExecStart=/usr/bin/cloudflared --no-autoupdate tunnel run --token ${TUNNEL_TOKEN}
+Restart=on-failure
+RestartSec=5s
+
+# Security settings
+User=root
+NoNewPrivileges=false
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/etc/ethoscope
+
+[Install]
+WantedBy=multi-user.target

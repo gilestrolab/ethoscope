@@ -119,6 +119,7 @@ case "$1" in
             "ethoscope_update_node.service"
             "ethoscope_virtuascope.service"
             "ethoscope_sensor_virtual.service"
+            "ethoscope_tunnel.service"
         )
         
         # Define node services to enable

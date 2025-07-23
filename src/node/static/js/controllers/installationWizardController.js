@@ -6,7 +6,7 @@
         // Initialize scope variables
         $scope.setupStatus = {};
         $scope.currentStep = 1;
-        $scope.totalSteps = 7;
+        $scope.totalSteps = 8;
         $scope.isLoading = false;
         $scope.errorMessage = '';
         $scope.successMessage = '';
@@ -34,6 +34,15 @@
         
         $scope.incubators = [];
         $scope.newIncubator = {};
+        
+        $scope.tunnel = {
+            enabled: false,
+            mode: 'custom',  // 'custom' (free) or 'ethoscope_net' (paid)
+            token: '',
+            node_id: 'auto',
+            domain: 'ethoscope.net',
+            custom_domain: ''
+        };
         
         $scope.notifications = {
             smtp: {
@@ -64,7 +73,8 @@
             { number: 3, title: 'Admin User', description: 'Create administrator account', icon: 'fa-user-shield' },
             { number: 4, title: 'Users', description: 'Add additional users (optional)', icon: 'fa-users' },
             { number: 5, title: 'Incubators', description: 'Configure incubators (optional)', icon: 'fa-thermometer-half' },
-            { number: 6, title: 'Notifications', description: 'Setup email and chat notifications (optional)', icon: 'fa-bell' }
+            { number: 6, title: 'Remote Access', description: 'Setup internet tunnel for remote access (optional)', icon: 'fa-globe' },
+            { number: 7, title: 'Notifications', description: 'Setup email and chat notifications (optional)', icon: 'fa-bell' }
         ];
         
         // Initialize the wizard
@@ -180,6 +190,16 @@
                             $scope.adminUser.labname = config.admin_user.labname || '';
                         }
                         
+                        // Load tunnel settings
+                        if (config.tunnel) {
+                            $scope.tunnel.enabled = config.tunnel.enabled || false;
+                            $scope.tunnel.mode = config.tunnel.mode || 'custom';
+                            $scope.tunnel.token = ''; // Don't populate token for security
+                            $scope.tunnel.node_id = config.tunnel.node_id || 'auto';
+                            $scope.tunnel.domain = config.tunnel.domain || 'ethoscope.net';
+                            $scope.tunnel.custom_domain = config.tunnel.custom_domain || '';
+                        }
+                        
                         // Load notification settings
                         if (config.notifications) {
                             // SMTP settings
@@ -248,6 +268,11 @@
                 case 5:
                     return true; // Incubators are optional
                 case 6:
+                    if (!$scope.tunnel.enabled) return true; // If disabled, always valid
+                    if (!$scope.tunnel.token) return false; // Token always required
+                    if ($scope.tunnel.mode === 'custom' && !$scope.tunnel.custom_domain) return false; // Custom domain required for free mode
+                    return true;
+                case 7:
                     return true; // Notifications are optional
                 default:
                     return false;
@@ -363,6 +388,27 @@
                 })
                 .catch(function(error) {
                     $scope.showMessage('Error adding incubator: ' + (error.data?.message || error.statusText), 'error');
+                })
+                .finally(function() {
+                    $scope.isLoading = false;
+                });
+        };
+        
+        // Tunnel configuration
+        $scope.processTunnel = function() {
+            $scope.isLoading = true;
+            
+            $http.post('/setup/tunnel', $scope.tunnel)
+                .then(function(response) {
+                    if (response.data.result === 'success') {
+                        // Move to next step
+                        $scope.nextStep();
+                    } else {
+                        $scope.showMessage('Error: ' + (response.data.message || 'Unknown error'), 'error');
+                    }
+                })
+                .catch(function(error) {
+                    $scope.showMessage('Error saving tunnel configuration: ' + (error.data?.message || error.statusText), 'error');
                 })
                 .finally(function() {
                     $scope.isLoading = false;
@@ -531,6 +577,28 @@
         
         $scope.getProgressPercentage = function() {
             return ($scope.currentStep / $scope.totalSteps) * 100;
+        };
+        
+        // Get computed node ID for tunnel preview
+        $scope.getComputedNodeId = function() {
+            if ($scope.tunnel.node_id === 'auto') {
+                var adminUsername = $scope.adminUser.username || 'admin';
+                return 'node-' + adminUsername.toLowerCase();
+            }
+            return $scope.tunnel.node_id || 'node-admin';
+        };
+        
+        // Get effective domain for tunnel preview
+        $scope.getEffectiveDomain = function() {
+            if ($scope.tunnel.mode === 'ethoscope_net') {
+                return 'ethoscope.net';
+            }
+            return $scope.tunnel.custom_domain || 'your-domain.com';
+        };
+        
+        // Get full tunnel URL preview
+        $scope.getTunnelPreview = function() {
+            return $scope.getComputedNodeId() + '.' + $scope.getEffectiveDomain();
         };
         
         // Generate username from full name

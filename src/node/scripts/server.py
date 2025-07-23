@@ -29,49 +29,6 @@ DEFAULT_PORT = 80
 STATIC_DIR = "../static"
 ETHOSCOPE_DATA_DIR = "/ethoscope_data"
 
-SYSTEM_DAEMONS = {
-    "ethoscope_backup_mysql": {
-        'description': 'The service that collects data from the ethoscope mariadb and syncs them with the node.',
-        'available_on_docker': True
-    },
-    "ethoscope_backup_video": {
-        'description': 'The service that collects videos in h264 chunks from the ethoscopes and syncs them with the node',
-        'available_on_docker': True
-    },
-    "ethoscope_backup_unified": {
-        'description': 'The service that collects videos and SQLite dbs from the ethoscopes and syncs them with the node',
-        'available_on_docker': True
-    },
-    "ethoscope_backup_sqlite": {
-        'description': 'The service that collects SQLite db from the ethoscopes and syncs them with the node',
-        'available_on_docker': True
-    },
-    "ethoscope_update_node": {
-        'description': 'The service used to update the nodes and the ethoscopes.',
-        'available_on_docker': True
-    },
-    "git-daemon.socket": {
-        'description': 'The GIT server that handles git updates for the node and ethoscopes.',
-        'available_on_docker': False
-    },
-    "ntpd": {
-        'description': 'The NTPd service is syncing time with the ethoscopes.',
-        'available_on_docker': False
-    },
-    "sshd": {
-        'description': 'The SSH daemon allows power users to access the node terminal from remote.',
-        'available_on_docker': False
-    },
-    "vsftpd": {
-        'description': 'The FTP server on the node, used to access the local ethoscope data',
-        'available_on_docker': False
-    },
-    "ethoscope_virtuascope": {
-        'description': 'A virtual ethoscope running on the node. Useful for offline tracking',
-        'available_on_docker': False
-    }
-}
-
 
 class ServerError(Exception):
     """Custom exception for server errors."""
@@ -336,6 +293,9 @@ class EthoscopeNodeServer:
                 self.logger.warning("Continuing without sensor scanner")
                 self.sensor_scanner = None
             
+            # Ensure tunnel environment file is up to date
+            self._update_tunnel_environment()
+            
             self._setup_api_modules()
             self.logger.info("Server initialization complete")
             
@@ -495,6 +455,35 @@ class EthoscopeNodeServer:
                 os.remove(tmp_file)
             return ""
 
+
+    def _update_tunnel_environment(self):
+        """Update tunnel environment file from configuration."""
+        try:
+            if not self.config:
+                return
+                
+            tunnel_config = self.config.get_tunnel_config()
+            tunnel_token = tunnel_config.get('token', '')
+            
+            if tunnel_token:
+                env_file_path = "/etc/ethoscope/tunnel.env"
+                
+                # Ensure directory exists
+                os.makedirs(os.path.dirname(env_file_path), exist_ok=True)
+                
+                # Write environment file
+                with open(env_file_path, 'w') as f:
+                    f.write(f"TUNNEL_TOKEN={tunnel_token}\n")
+                
+                # Set secure permissions (readable by root only)
+                os.chmod(env_file_path, 0o600)
+                
+                self.logger.info(f"Updated tunnel environment file from configuration")
+            else:
+                self.logger.debug("No tunnel token configured, skipping environment file update")
+                
+        except Exception as e:
+            self.logger.warning(f"Failed to update tunnel environment file: {e}")
 
     def _shutdown(self, exit_status=0):
         """Shutdown the server."""

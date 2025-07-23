@@ -369,8 +369,142 @@
         </div>
     </div>
 
-    <!-- Step 6: Notifications -->
+    <!-- Step 6: Remote Access Tunnel -->
     <div class="wizard-step" ng-if="currentStep === 6">
+        <div class="row">
+            <div class="col-lg-8 offset-lg-2">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>
+                            <i class="fa fa-globe"></i> 
+                            Remote Access Configuration (Optional)
+                        </h3>
+                        <p class="mb-0">Setup secure internet access to your ethoscope node</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <h6><i class="fa fa-info-circle"></i> About Remote Access</h6>
+                            <p class="mb-2">The tunnel allows secure external access to this ethoscope node via Cloudflare's network without opening firewall ports or port forwarding.</p>
+                            <p class="mb-0">Your node will be accessible at: <strong>{{getTunnelPreview()}}</strong></p>
+                        </div>
+                        
+                        <div class="form-group">
+                            <div class="custom-control custom-switch">
+                                <input type="checkbox" class="custom-control-input" id="enableTunnel" ng-model="tunnel.enabled">
+                                <label class="custom-control-label" for="enableTunnel">
+                                    <strong>Enable Remote Access Tunnel</strong>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div ng-if="tunnel.enabled">
+                            <div class="form-group">
+                                <label>Tunnel Mode</label>
+                                <div class="card-deck">
+                                    <div class="card" ng-class="{'border-primary': tunnel.mode === 'custom'}">
+                                        <div class="card-body text-center p-3">
+                                            <div class="custom-control custom-radio">
+                                                <input type="radio" class="custom-control-input" id="modeCustom" 
+                                                       ng-model="tunnel.mode" value="custom">
+                                                <label class="custom-control-label" for="modeCustom">
+                                                    <strong>Free - Custom Domain</strong>
+                                                </label>
+                                            </div>
+                                            <small class="text-muted">Use your own domain name</small>
+                                        </div>
+                                    </div>
+                                    <div class="card" ng-class="{'border-warning': tunnel.mode === 'ethoscope_net'}">
+                                        <div class="card-body text-center p-3">
+                                            <div class="custom-control custom-radio">
+                                                <input type="radio" class="custom-control-input" id="modeEthoscopeNet" 
+                                                       ng-model="tunnel.mode" value="ethoscope_net">
+                                                <label class="custom-control-label" for="modeEthoscopeNet">
+                                                    <strong>Paid - ethoscope.net</strong>
+                                                </label>
+                                            </div>
+                                            <small class="text-warning">Premium hosted service</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group" ng-if="tunnel.mode === 'custom'">
+                                <label for="customDomain">Your Domain *</label>
+                                <input type="text" class="form-control" id="customDomain" 
+                                       ng-model="tunnel.custom_domain" 
+                                       placeholder="example.com">
+                                <small class="form-text text-muted">
+                                    Enter your domain name (you'll need to configure Cloudflare tunnel for this domain)
+                                </small>
+                            </div>
+                            
+                            <div class="alert alert-warning" ng-if="tunnel.mode === 'ethoscope_net'">
+                                <h6><i class="fa fa-star"></i> Premium Service</h6>
+                                <p class="mb-0">The ethoscope.net tunnel service requires a subscription. Contact us for pricing and setup.</p>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="tunnelToken">Cloudflare Tunnel Token *</label>
+                                <input type="password" class="form-control" id="tunnelToken" 
+                                       ng-model="tunnel.token" 
+                                       placeholder="Enter your Cloudflare tunnel token">
+                                <small class="form-text text-muted">
+                                    Get your token from <a href="https://one.dash.cloudflare.com/" target="_blank">Cloudflare Zero Trust Dashboard</a>
+                                </small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="tunnelNodeId">Node ID</label>
+                                <input type="text" class="form-control" id="tunnelNodeId" 
+                                       ng-model="tunnel.node_id" 
+                                       placeholder="auto">
+                                <small class="form-text text-muted">
+                                    Use "auto" for node-&lt;admin_username&gt; or specify custom ID.
+                                    Preview: <strong>{{getTunnelPreview()}}</strong>
+                                </small>
+                            </div>
+                            
+                            <div class="alert alert-warning" ng-if="tunnel.mode === 'custom'">
+                                <h6><i class="fa fa-exclamation-triangle"></i> Setup Required</h6>
+                                <p class="mb-2">After configuring your token, you must also:</p>
+                                <ol class="mb-0">
+                                    <li>Add your domain ({{tunnel.custom_domain}}) to Cloudflare</li>
+                                    <li>Create a tunnel in Cloudflare Zero Trust Dashboard</li>
+                                    <li>Add a public hostname pointing to <code>http://localhost:80</code></li>
+                                    <li>Set subdomain to: <strong>{{getComputedNodeId()}}</strong></li>
+                                </ol>
+                            </div>
+                            
+                            <div class="alert alert-info" ng-if="tunnel.mode === 'ethoscope_net'">
+                                <h6><i class="fa fa-info-circle"></i> Managed Service</h6>
+                                <p class="mb-2">With the ethoscope.net service:</p>
+                                <ul class="mb-0">
+                                    <li>SSL certificates and domain management handled automatically</li>
+                                    <li>24/7 tunnel monitoring and uptime guarantees</li>
+                                    <li>Technical support included</li>
+                                    <li>Just provide your tunnel token - we handle the rest!</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="d-flex justify-content-between">
+                            <button type="button" class="btn btn-secondary" ng-click="goToPreviousStep()">
+                                <i class="fa fa-arrow-left"></i> Previous
+                            </button>
+                            <button type="button" class="btn btn-primary" ng-click="processTunnel()" 
+                                    ng-disabled="tunnel.enabled && !tunnel.token">
+                                Next <i class="fa fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 7: Notifications -->
+    <div class="wizard-step" ng-if="currentStep === 7">
         <div class="row">
             <div class="col-lg-10 offset-lg-1">
                 <div class="card">
@@ -495,7 +629,7 @@
     </div>
 
     <!-- Final Step: Completion -->
-    <div class="wizard-step" ng-if="currentStep === 7">
+    <div class="wizard-step" ng-if="currentStep === 8">
         <div class="row">
             <div class="col-lg-8 offset-lg-2">
                 <div class="card">

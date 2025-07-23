@@ -1,0 +1,36 @@
+# Cloudflare Tunnel Docker Compose - Host Network Mode
+# Use this version if you're having DNS issues with bridge networking
+# This bypasses Docker's internal networking and uses the host's network directly
+
+version: '3.8'
+
+services:
+  cloudflare-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: ethoscope-cloudflare-tunnel
+    restart: unless-stopped
+    
+    # Use host networking to bypass Docker DNS issues
+    network_mode: host
+    
+    # Use tunnel token from environment file
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+      - NODE_ID=${NODE_ID:-auto}
+    
+    # Health check to monitor tunnel status
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep '[c]loudflared' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

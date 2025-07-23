@@ -133,10 +133,22 @@ class EthoscopeConfiguration:
             'setup_started': None,
             'setup_completed': None,
             'setup_version': '1.0'
+        },
+        'tunnel': {
+            'enabled': False,
+            'provider': 'cloudflare',
+            'mode': 'custom',  # 'custom' (free) or 'ethoscope_net' (paid)
+            'token': '',
+            'node_id': 'auto',
+            'domain': 'ethoscope.net',
+            'custom_domain': '',  # For custom domain mode
+            'status': 'disconnected',
+            'last_connected': None,
+            'container_name': 'ethoscope-cloudflare-tunnel'
         }
     }
     
-    REQUIRED_SECTIONS = ['folders', 'incubators', 'sensors', 'commands', 'custom', 'smtp', 'mattermost', 'alerts', 'setup']
+    REQUIRED_SECTIONS = ['folders', 'incubators', 'sensors', 'commands', 'custom', 'smtp', 'mattermost', 'alerts', 'setup', 'tunnel']
     REQUIRED_FOLDERS = ['results', 'video', 'temporary']
     
     def __init__(self, config_file: str = "/etc/ethoscope/ethoscope.conf"):
@@ -731,6 +743,108 @@ class EthoscopeConfiguration:
         self._settings['setup'] = self.DEFAULT_SETTINGS['setup'].copy()
         self.save()
         self._logger.info("Setup status reset")
+    
+    def get_tunnel_node_id(self) -> str:
+        """
+        Get the tunnel node ID, generating it if set to 'auto'.
+        
+        Returns:
+            Node ID string for tunnel subdomain
+        """
+        tunnel_config = self._settings.get('tunnel', {})
+        node_id = tunnel_config.get('node_id', 'auto')
+        
+        if node_id == 'auto':
+            # Generate node ID as node-<admin_username>
+            try:
+                from ethoscope_node.utils.etho_db import ExperimentalDB
+                db = ExperimentalDB()
+                admin_users = db.getAllUsers(active_only=True, asdict=True)
+                
+                # Find first admin user
+                admin_username = None
+                for user_data in admin_users.values():
+                    if user_data.get('isAdmin', False):
+                        admin_username = user_data.get('name', '')
+                        break
+                
+                if admin_username:
+                    return f"node-{admin_username.lower()}"
+                else:
+                    # Fallback to hostname if no admin user found
+                    import socket
+                    hostname = socket.gethostname().lower()
+                    return f"node-{hostname}"
+                    
+            except Exception as e:
+                self._logger.warning(f"Failed to get admin username for node ID: {e}")
+                # Fallback to hostname
+                import socket
+                hostname = socket.gethostname().lower()
+                return f"node-{hostname}"
+        
+        return node_id.lower()
+    
+    def update_tunnel_config(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update tunnel configuration.
+        
+        Args:
+            config_data: Tunnel configuration data
+            
+        Returns:
+            Updated tunnel configuration
+            
+        Raises:
+            ValueError: If configuration data is invalid
+        """
+        if 'tunnel' not in self._settings:
+            self._settings['tunnel'] = self.DEFAULT_SETTINGS['tunnel'].copy()
+        
+        # Validate and update tunnel settings
+        allowed_keys = ['enabled', 'mode', 'token', 'node_id', 'domain', 'custom_domain', 'status', 'last_connected']
+        
+        for key, value in config_data.items():
+            if key in allowed_keys:
+                self._settings['tunnel'][key] = value
+            else:
+                self._logger.warning(f"Unknown tunnel configuration key: {key}")
+        
+        # Update last modified timestamp if status changed
+        if 'status' in config_data:
+            self._settings['tunnel']['last_connected'] = datetime.datetime.now().isoformat()
+        
+        self.save()
+        self._logger.info(f"Updated tunnel configuration: {list(config_data.keys())}")
+        
+        return self._settings['tunnel']
+    
+    def get_tunnel_config(self) -> Dict[str, Any]:
+        """
+        Get current tunnel configuration with computed node ID and domain.
+        
+        Returns:
+            Complete tunnel configuration dictionary
+        """
+        tunnel_config = self._settings.get('tunnel', self.DEFAULT_SETTINGS['tunnel']).copy()
+        
+        # Add computed node ID
+        tunnel_config['computed_node_id'] = self.get_tunnel_node_id()
+        
+        # Determine the full domain based on mode
+        if tunnel_config.get('mode', 'custom') == 'ethoscope_net':
+            # Paid mode: use ethoscope.net
+            tunnel_config['effective_domain'] = 'ethoscope.net'
+            tunnel_config['full_domain'] = f"{tunnel_config['computed_node_id']}.ethoscope.net"
+            tunnel_config['is_paid_mode'] = True
+        else:
+            # Free mode: use custom domain
+            custom_domain = tunnel_config.get('custom_domain', '')
+            tunnel_config['effective_domain'] = custom_domain
+            tunnel_config['full_domain'] = f"{tunnel_config['computed_node_id']}.{custom_domain}" if custom_domain else ''
+            tunnel_config['is_paid_mode'] = False
+        
+        return tunnel_config
 
 
 def ensure_ssh_keys(keys_dir: str = "/etc/ethoscope/keys") -> Tuple[str, str]:

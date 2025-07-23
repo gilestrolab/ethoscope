@@ -50,6 +50,8 @@ class SetupAPI(BaseAPI):
             return self._setup_notifications()
         elif action == 'test-notifications':
             return self._test_notifications()
+        elif action == 'tunnel':
+            return self._setup_tunnel()
         elif action == 'complete':
             return self._complete_setup()
         elif action == 'reset':
@@ -388,6 +390,45 @@ class SetupAPI(BaseAPI):
             self.logger.error(f"Error updating notification settings: {e}")
             return {'result': 'error', 'message': str(e)}
     
+    def _setup_tunnel(self):
+        """Configure tunnel settings."""
+        data = self.get_request_json()
+        
+        try:
+            # Update tunnel configuration with dual mode support
+            tunnel_config = {
+                'enabled': data.get('enabled', False),
+                'mode': data.get('mode', 'custom'),  # 'custom' (free) or 'ethoscope_net' (paid)
+                'token': data.get('token', ''),
+                'node_id': data.get('node_id', 'auto'),
+                'domain': data.get('domain', 'ethoscope.net'),
+                'custom_domain': data.get('custom_domain', '')  # For custom domain mode
+            }
+            
+            # Validate configuration based on mode
+            if tunnel_config['enabled']:
+                if not tunnel_config['token']:
+                    return {'result': 'error', 'message': 'Tunnel token is required when tunnel is enabled'}
+                
+                if tunnel_config['mode'] == 'custom' and not tunnel_config['custom_domain']:
+                    return {'result': 'error', 'message': 'Custom domain is required for free mode'}
+            
+            # Update configuration using the existing method
+            self.config.update_tunnel_config(tunnel_config)
+            
+            # Update the tunnel environment file if server is available
+            if hasattr(self, 'server') and self.server:
+                self.server._update_tunnel_environment()
+            
+            # Mark this setup step as completed
+            self.config.mark_setup_step_completed('tunnel')
+            
+            return {'result': 'success', 'message': 'Tunnel settings updated successfully'}
+            
+        except Exception as e:
+            self.logger.error(f"Error updating tunnel settings: {e}")
+            return {'result': 'error', 'message': str(e)}
+    
     def _test_notifications(self):
         """Test notification configuration."""
         data = self.get_request_json()
@@ -566,6 +607,14 @@ Ethoscope Node Setup Wizard
             config_data = {
                 'folders': {},
                 'admin_user': None,
+                'tunnel': {
+                    'enabled': False,
+                    'mode': 'custom',
+                    'token': '',  # Don't return token for security
+                    'node_id': 'auto',
+                    'domain': 'ethoscope.net',
+                    'custom_domain': ''
+                },
                 'notifications': {
                     'smtp': {
                         'enabled': False,
@@ -609,6 +658,21 @@ Ethoscope Node Setup Wizard
                         break  # Use first admin user found
             except Exception as e:
                 self.logger.warning(f"Could not load admin user info: {e}")
+            
+            # Get tunnel settings
+            try:
+                tunnel_config = self.config._settings.get('tunnel', {})
+                if tunnel_config:
+                    config_data['tunnel'].update({
+                        'enabled': tunnel_config.get('enabled', False),
+                        'mode': tunnel_config.get('mode', 'custom'),
+                        'token': '',  # Don't return token for security
+                        'node_id': tunnel_config.get('node_id', 'auto'),
+                        'domain': tunnel_config.get('domain', 'ethoscope.net'),
+                        'custom_domain': tunnel_config.get('custom_domain', '')
+                    })
+            except Exception as e:
+                self.logger.warning(f"Could not load tunnel settings: {e}")
             
             # Get notification settings
             try:
