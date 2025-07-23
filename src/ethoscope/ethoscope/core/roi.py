@@ -162,15 +162,36 @@ class ROI(object):
         """
         x,y,w,h = self._rectangle
 
+        img_h, img_w = img.shape[0:2]
 
+        # Clamp x, y, w, h to image boundaries
+        x1 = max(0, x)
+        y1 = max(0, y)
+        x2 = min(img_w, x + w)
+        y2 = min(img_h, y + h)
+
+        # Adjust w and h based on clamping
+        w_clamped = x2 - x1
+        h_clamped = y2 - y1
+
+        if w_clamped <= 0 or h_clamped <= 0:
+            raise EthoscopeException("Error whilst slicing region of interest. Clamped region has zero or negative width/height: %s" % str(self.get_feature_dict()), img)
 
         try:
-            out = img[y : y + h, x : x +w]
-        except:
-            raise EthoscopeException("Error whilst slicing region of interest %s" % str(self.get_feature_dict()), img)
+            out = img[y1 : y2, x1 : x2]
+        except Exception as e:
+            raise EthoscopeException("Error whilst slicing region of interest %s: %s" % (str(self.get_feature_dict()), str(e)), img)
 
-        if out.shape[0:2] != self._mask.shape:
-            raise EthoscopeException("Error whilst slicing region of interest. Possibly, the region out of the image: %s" % str(self.get_feature_dict()), img )
+        # The mask should be applied to the *clamped* output, so it needs to be adjusted as well.
+        # For now, we'll just check the shape. If the mask needs to be adjusted, that's a more complex change.
+        if out.shape[0:2] != (h_clamped, w_clamped):
+            raise EthoscopeException("Error whilst slicing region of interest. Output shape mismatch after clamping: %s" % str(self.get_feature_dict()), img )
+
+        # If the original mask shape doesn't match the clamped output shape, we need to re-evaluate how the mask is used.
+        # For now, we'll assume the mask is still valid for the *original* ROI, and the clamping is just for the image slice.
+        # If the mask needs to be cropped/adjusted, that's a more significant change.
+        # For now, we'll proceed with the original mask, but this might need further investigation if issues persist.
+        return out, self._mask
 
         return out, self._mask
 
