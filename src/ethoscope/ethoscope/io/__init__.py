@@ -77,8 +77,8 @@ from .cache import (
     BaseDatabaseMetadataCache,
     MySQLDatabaseMetadataCache,
     SQLiteDatabaseMetadataCache,
-    create_metadata_cache,
-    get_all_databases_info
+    DatabasesInfo,
+    create_metadata_cache
 )
 
 # Export all classes for proper module interface

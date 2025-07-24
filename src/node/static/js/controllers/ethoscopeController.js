@@ -1571,6 +1571,7 @@
                     .then(function(response) {
                         var data = response.data;
                         $scope.device = data;
+                        console.log('DEBUG: Data received in refresh function:', data);
 
                         // Update node.database_list for frontend dropdown
                         updateNodeDatabaseList();
@@ -1609,16 +1610,62 @@
             // Note: loadUserOptions() is now called within loadDeviceData() via batch endpoint
 
             /**
+             * Formats raw database information into a simplified list of dictionaries.
+             * @param {object} databasesData - A dictionary containing 'SQLite' and 'MariaDB' database information.
+             * @returns {object} A dictionary with a single key "database_list" containing a list
+             *                   of simplified database information dictionaries.
+             */
+            function formatDatabasesInfo(databasesData) {
+                var databaseList = [];
+
+                // Process MariaDB (MySQL) databases
+                if (databasesData && databasesData.MariaDB) {
+                    for (var dbName in databasesData.MariaDB) {
+                        if (databasesData.MariaDB.hasOwnProperty(dbName)) {
+                            var dbInfo = databasesData.MariaDB[dbName];
+                            databaseList.push({
+                                name: dbName,
+                                type: "MySQL",
+                                active: true,
+                                size: dbInfo.db_size_bytes || 0,
+                                status: dbInfo.db_status || "unknown"
+                            });
+                        }
+                    }
+                }
+
+                // Process SQLite databases
+                if (databasesData && databasesData.SQLite) {
+                    for (var dbName in databasesData.SQLite) {
+                        if (databasesData.SQLite.hasOwnProperty(dbName)) {
+                            var dbInfo = databasesData.SQLite[dbName];
+                            databaseList.push({
+                                name: dbName,
+                                type: "SQLite",
+                                active: true,
+                                size: dbInfo.filesize || 0,
+                                status: dbInfo.db_status || "unknown",
+                                path: dbInfo.path || ""
+                            });
+                        }
+                    }
+                }
+
+                return { "database_list": databaseList };
+            }
+
+            /**
              * Update node.database_list for frontend dropdown from device data
              */
             function updateNodeDatabaseList() {
-                // Populate node.database_list from device.database_list for dropdown
-                if ($scope.device && $scope.device.database_list) {
-                    $scope.node.database_list = $scope.device.database_list;
-                    console.log('Updated node.database_list with', $scope.device.database_list.length, 'databases');
+                // Populate node.database_list from device.databases for dropdown
+                console.log('DEBUG: $scope.device.databases before formatting:', $scope.device.databases);
+                if ($scope.device && $scope.device.databases) {
+                    $scope.node.database_list = formatDatabasesInfo($scope.device.databases).database_list;
+                    console.log('Updated node.database_list with', $scope.node.database_list.length, 'databases');
                 } else {
                     $scope.node.database_list = [];
-                    console.log('No database_list found on device, setting empty array');
+                    console.log('No databases found on device, setting empty array');
                 }
             }
 

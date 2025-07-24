@@ -22,6 +22,8 @@ from ethoscope.control.record import ControlThreadVideoRecording
 from ethoscope.utils import pi
 from ethoscope.utils.video import list_local_video_files
 from ethoscope.hardware.interfaces import interfaces
+from ethoscope.io.cache import DatabasesInfo
+
 
 try:
     from cheroot.wsgi import Server as WSGIServer
@@ -37,21 +39,28 @@ update_machine_json_data = {}
 
 """
 
-/upload/<id>                            POST    upload files to the ethoscope (masks, videos, etc)
-/data/listfiles/<category>/<id>         GET     provides a list of files in the ethoscope data folders, that were either uploaded or generated (masks, videos, etc).
-
-/<id>                                   GET     returns ID of the machine
-/make_index                             GET     create an index.html file with all the h264 files in the machine
-/list_video_files                       GET     returns a json with the full path and the md5sum information for each video chunk
 /rm_static_file/                        POST    remove file
 /dumpSQLdb/<id>                         POST    performs a SQL dump of the default database
 
 /update/<id>                            POST    update machine parameters (number, name, nodeIP, WIFI credentials, time)
 /controls/<id>/<action>                 POST    activate actions (tracking, recording, etc)
-/machine/<id>                           GET     information about the ethoscope that is not changing in time such as hardware specs and configuration parameters
+
+/upload_roi_template                    POST
+/upload/<id>                            POST    upload files to the ethoscope (masks, videos, etc)
+
+
+/<id>                                   GET     returns ID of the machine
+/make_index       [TO BE REMOVED]       GET     create an index.html file with all the h264 files in the machine
 /data/<id>                              GET     get information regarding the current status of the machine (e.g. FPS, temperature, etc)
-/user_options/<id>                      GET     Passing back options regarding what information can be changed on the the device. This populates the form on the node GUI
+/data/databases/<id>                    GET     get a comprehensive list of available databases on the machine and their statuses
+/data/listfiles/<category>/<id>         GET     provides a list of files in the ethoscope data folders, that were either uploaded or generated (masks, videos, etc).
+/list_video_files [TO BE REMOVED]       GET     returns a json with the full path and the md5sum information for each video chunk
 /data/log/<id>                          GET     fetch the journalctl log
+
+/machine/<id>                           GET     information about the ethoscope that is not changing in time such as hardware specs and configuration parameters
+/module/<id>                            GET
+
+/user_options/<id>                      GET     Passing back options regarding what information can be changed on the the device. This populates the form on the node GUI
 
 """
 
@@ -275,8 +284,6 @@ def db_dump(id):
         
         return { 'Status' : 'Finished', 'Started': gap }
 
-
-        
 
 @api.post('/update/<id>')
 def update_machine_info(id):
@@ -503,23 +510,44 @@ def info(id):
     This is information that is changing in time as the machine operates, such as FPS during tracking, CPU temperature etc
     
     {
-     "status": "stopped", 
-     "time": 1601748840.9973018, 
-     "error": null, 
-     "log_file": "/ethoscope_data/results/ethoscope.log", 
-     "dbg_img": "/ethoscope_data/results/dbg_img.png", 
-     "last_drawn_img": "/tmp/ethoscope_l99ys8nw/last_img.jpg", 
-     "db_name": "ETHOSCOPE_107_db", 
-     "monitor_info": {"last_positions": null, "last_time_stamp": 0, "fps": 0}, 
-     "experimental_info": {}, 
-     "CPU_temp": 46.2
-     }
+    "status": "stopped",
+    "time": 1753341761.4723725,
+    "error": null,
+    "log_file": "/tmp/ethoscope_ehe28adb/ethoscope.log",
+    "dbg_img": "/tmp/ethoscope_ehe28adb/dbg_img.png",
+    "last_drawn_img": "/tmp/ethoscope_ehe28adb/last_img.jpg",
+    "db_name": "ETHOSCOPE_004_db",
+    "monitor_info": {
+        "last_positions": null,
+        "last_time_stamp": 0,
+        "fps": 0
+    },
+    "experimental_info": {},
+    "database_info": {
+        "db_size_bytes": 0,
+        "table_counts": {},
+        "last_db_update": 0,
+        "db_status": "no_cache"
+    },
+    "id": "0043e1b367c544fb8adb6198eccf7805",
+    "name": "ETHOSCOPE_004",
+    "version": {
+        "id": "bb30d478235d506d5ba9187ef1e38026d67ef90d",
+        "date": "2025-06-30 19:41:34"
+    },
+    "used_space": "18",
+    "previous_date_time": 1753341201.925737,
+    "previous_backup_filename": "2025-07-24_07-13-21_0043e1b367c544fb8adb6198eccf7805.db",
+    "previous_user": "ggilestro",
+    "previous_location": "",
+    "result_writer_type": "SQLite3",
+    "sqlite_source_path": "/ethoscope_data/results/0043e1b367c544fb8adb6198eccf7805/ETHOSCOPE_004/2025-07-24_07-13-21/2025-07-24_07-13-21_0043e1b367c544fb8adb6198eccf7805.db",
+    "cache_file": "/ethoscope_data/cache/db_metadata_2025-07-24_07-13-21_ETHOSCOPE_004_db.json",
+    "CPU_temp": 55,
+    "underpowered": false,
+    "current_timestamp": 1753343540.3832064
+    }
 
-     "version": {"id": "4bdcc9c4a1ef06f7226856aaef5e078b1b164b1e", "date": "2020-11-23 18:50:31"}, 
-     "id": "10799c8f41b04562a60eab6dfd1745e1", 
-     "name": "ETHOSCOPE_107", 
-
-    
     """
     
     if id != _MACHINE_ID:
@@ -554,6 +582,15 @@ def info(id):
                        # }
     
     return runninginfo
+
+
+@api.get('/data/databases/<id>')
+@error_decorator
+def info(id):
+    if id != _MACHINE_ID:
+        raise WrongMachineID
+
+    return DB_INFO.get_databases_info()
 
 def _inject_roi_template_options(tracking_options):
     """
@@ -877,6 +914,8 @@ if __name__ == '__main__':
             zeroconf = Zeroconf()
             
         zeroconf.register_service(serviceInfo)
+
+        DB_INFO = DatabasesInfo(device_name=_MACHINE_NAME)
 
         #the webserver on the ethoscope side is quite basic so we can safely run the original bottle version based on WSGIRefServer()
         bottle.run(api, host='0.0.0.0', port=PORT, debug=DEBUG, quiet=True)

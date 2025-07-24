@@ -343,6 +343,20 @@ class BaseResultWriter(object):
         """
         raise NotImplementedError("Subclasses must implement _create_async_writer()")
     
+    def get_backup_filename(self):
+        """
+        Get the backup filename for this result writer.
+        
+        Base implementation returns the backup filename from metadata if available.
+        Subclasses can override this method to provide writer-specific logic.
+        
+        Returns:
+            str or None: Backup filename if available, None otherwise
+        """
+        if hasattr(self, '_metadata') and self._metadata:
+            return self._metadata.get('backup_filename')
+        return None
+    
     def __enter__(self):
         """Context manager entry."""
         return self

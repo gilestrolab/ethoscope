@@ -31,7 +31,7 @@ from ethoscope.stimulators.multi_stimulator import MultiStimulator
 
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.io import MySQLResultWriter, SQLiteResultWriter, dbAppender 
-from ethoscope.io import create_metadata_cache, get_all_databases_info
+from ethoscope.io import create_metadata_cache
 from ethoscope.utils.description import DescribedObject
 from ethoscope.utils import pi
 
@@ -193,10 +193,6 @@ class ControlThread(Thread):
         # DatabaseMetadataCache is only compatible with MySQL databases
         # For SQLite, we'll create it only when needed (see metadata cache initialization)
         self._metadata_cache = None
-        
-        # Cache for databases info to avoid repeated reads
-        self._databases_info_cache = None
-        self._databases_info_cache_time = 0
         
         #todo add 'data' -> how monitor was started to metadata
         self._info = {  "status": "stopped",
@@ -392,22 +388,18 @@ class ControlThread(Thread):
         return out_curated
 
 
-    def _parse_one_user_option(self,field, data):
+    def _parse_user_options(self, data):
+        """Parses user-defined options from a data dictionary and updates internal configuration.
 
-        try:
-            subdata = data[field]
-        except KeyError:
-            logging.warning("No field %s, using default" % field)
-            return None, {}
+        Dynamically loads classes and their arguments based on the provided data.
+        Defaults to a predefined class if an option is not found or parsing fails.
 
-        Class = eval(subdata["name"])
-        kwargs = subdata["arguments"]
-    
-        return Class, kwargs
+        Args:
+            data (dict): Dictionary of user-defined options.
 
-
-    def _parse_user_options(self,data):
-
+        Warning:
+            Uses `eval()` which can be a security risk if `data` is untrusted.
+        """
         if data is None:
             return
 
@@ -415,12 +407,25 @@ class ControlThread(Thread):
         logging.info(f"DEBUG: Received data in _parse_user_options: {data}")
 
         for key in list(self._option_dict.keys()):
+            Class = None
+            kwargs = {}
 
-            Class, kwargs = self._parse_one_user_option(key, data)
+            try:
+                subdata = data[key]
+                Class = eval(subdata["name"])
+                kwargs = subdata["arguments"]
+            except KeyError:
+                logging.warning("No field %s, using default" % key)
+                # Class and kwargs remain None and {} as initialized
+            except Exception as e:
+                logging.error(f"Error parsing option for field {key}: {e}")
+                # Handle other potential errors during eval or argument access
+                Class = None
+                kwargs = {}
+
+
             # when no field is present in the JSON config, we get the default class
-
             if Class is None:
-
                 self._option_dict[key]["class"] = self._option_dict[key]["possible_classes"][0]
                 self._option_dict[key]["kwargs"] = {}
                 continue
@@ -428,56 +433,12 @@ class ControlThread(Thread):
             self._option_dict[key]["class"] = Class
             self._option_dict[key]["kwargs"] = kwargs
 
-    
-    
-    
-    
 
     def _update_info(self):
         '''
         Updates a dictionary with information that relates to the current status of the machine, ie data linked for instance to data acquisition
         Information that is not related to control and it is not experiment-dependent will come from elsewhere
         '''
-        
-        # Add comprehensive databases information using existing cache files
-        # This should be available regardless of monitor status
-        databases_info = self._get_databases_info()
-        self._info["databases"] = databases_info
-
-        # Create database_list using dbAppender's method for consistent formatting
-        try:
-            db_list = dbAppender.get_available_databases(
-                db_credentials=self._db_credentials,
-                device_name=self._info["name"]
-            )
-            # Sort by name (newest first) 
-            db_list.sort(key=lambda x: x["name"], reverse=True)
-        except Exception as e:
-            logging.error(f"Error getting available databases via dbAppender: {e}")
-            # Fallback to old method if dbAppender fails
-            db_list = []
-            if databases_info and databases_info.get("SQLite"):
-                for db_name, db_info in databases_info["SQLite"].items():
-                    # Only include databases that actually exist and have data
-                    if db_info.get("file_exists", False) and db_info.get("filesize", 0) > 32768:  # > 32KB
-                        db_list.append({
-                            "name": db_name,
-                            "active": True,
-                            "size": db_info.get("filesize", 0),
-                            "status": db_info.get("db_status", "unknown")
-                        })
-            if databases_info and databases_info.get("MariaDB"):
-                for db_name, db_info in databases_info["MariaDB"].items():
-                    db_list.append({
-                        "name": db_name,
-                        "active": True,
-                        "size": db_info.get("db_size_bytes", 0),
-                        "status": db_info.get("db_status", "unknown")
-                    })
-            # Sort by name (newest first)
-            db_list.sort(key=lambda x: x["name"], reverse=True)
-        
-        self._info["database_list"] = db_list
         
         if self._monit is None:
             return
@@ -525,48 +486,17 @@ class ControlThread(Thread):
                 "db_status": "no_cache"
             }
         
-        # Update backup filename from metadata cache - always include regardless of status
-        if "backup_filename" not in self._info or not self._info["backup_filename"]:
-            if self._metadata_cache is not None:
-                try:
-                    backup_filename = self._metadata_cache.get_backup_filename()
-                    if backup_filename:
-                        self._info["backup_filename"] = backup_filename
-                except Exception as e:
-                    logging.warning(f"Failed to get backup filename from metadata cache: {e}")
+        # Update backup filename from result writer if available during tracking
+        if self._monit and hasattr(self._monit, '_result_writer'):
+            try:
+                backup_filename = self._monit._result_writer.get_backup_filename()
+                if backup_filename:
+                    self._info["backup_filename"] = backup_filename
+            except Exception as e:
+                logging.warning(f"Failed to get backup filename from result writer: {e}")
 
         self._last_info_t_stamp = wall_time
         self._last_info_frame_idx = frame_idx
-
-    def _get_databases_info(self):
-        """
-        Get comprehensive database information using existing cache files.
-        Uses caching to avoid repeated reads within a short time period.
-        
-        Returns:
-            dict: Nested structure with SQLite and MariaDB database information
-        """
-        current_time = time.time()
-        
-        # Cache results for 30 seconds to avoid repeated reads
-        if (self._databases_info_cache is not None and 
-            current_time - self._databases_info_cache_time < 30):
-            return self._databases_info_cache
-        
-        try:
-            databases_info = get_all_databases_info(self._info["name"], self._cache_dir)
-            # Update cache
-            self._databases_info_cache = databases_info
-            self._databases_info_cache_time = current_time
-            return databases_info
-        except Exception as e:
-            logging.warning(f"Failed to get databases info: {e}")
-            return {"SQLite": {}, "MariaDB": {}}
-
-    def _invalidate_databases_cache(self):
-        """Invalidate the databases info cache to force a fresh read."""
-        self._databases_info_cache = None
-        self._databases_info_cache_time = 0
 
     def _start_tracking(self, camera, result_writer, rois, reference_points, TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs, time_offset=0):
@@ -585,9 +515,6 @@ class ControlThread(Thread):
         
         self._info["status"] = "running"
         logging.info("Setting monitor status as running: '%s'" % self._info["status"])
-        
-        # Invalidate databases cache when tracking starts
-        self._invalidate_databases_cache()
         
         # Set tracking start time for database metadata
         # Use the original experiment start time from metadata/backup filename, not current time
@@ -714,7 +641,6 @@ class ControlThread(Thread):
         
         # Debug: log the final experimental_info
         logging.info(f"DEBUG: Final experimental_info created: {self._info['experimental_info']}")
-        self._info["time"] = cam.start_time # the camera start time is the reference 0
         
         #here the hardwareconnection call the interface class without passing any argument!
         hardware_connection = HardwareConnection(HardWareInterfaceClass)
@@ -730,41 +656,24 @@ class ControlThread(Thread):
         else:
             sensor = None
 
-        # Try to get existing backup filename from metadata cache first
-        existing_backup_filename = None
-        if self._metadata_cache is not None:
-            try:
-                existing_backup_filename = self._metadata_cache.get_backup_filename()
-            except Exception as e:
-                logging.warning(f"Failed to get backup filename from metadata cache: {e}")
+        # Use current camera start time for experiment timestamp
+        experiment_time = cam.start_time
+        self._info["time"] = experiment_time
         
-        # Create new backup filename for the experiment
+        # Create initial backup filename - result writer may override this later
         self._info["backup_filename"] = self._create_backup_filename()
-        logging.info(f"Creating new backup filename: {self._info['backup_filename']}")
+        logging.info(f"Creating initial backup filename: {self._info['backup_filename']}")
+        
+        # Determine result writer type
+        ResultWriterClass = self._option_dict["result_writer"]["class"]
+        if hasattr(ResultWriterClass, '_database_type'):
+            result_writer_type = ResultWriterClass._database_type
+        else:
+            result_writer_type = ResultWriterClass.__name__
         
         self._info["interactor"] = {}
         self._info["interactor"]["name"] = str(self._option_dict['interactor']['class'])
         self._info["interactor"].update ( self._option_dict['interactor']['kwargs'])
-
-        # this will be saved in the metadata table
-        # Extract original experiment start time from backup filename for consistency
-        timestamp_str = '_'.join( self._info["backup_filename"].split('_')[:2] )
-        experiment_time = time.mktime(time.strptime(timestamp_str, '%Y-%m-%d_%H-%M-%S'))
-        
-        # Determine result writer type for backup metadata
-        ResultWriterClass = self._option_dict["result_writer"]["class"]
-        
-        # For dbAppender, we need to get the underlying database type instead of the class name
-        if ResultWriterClass.__name__ == "dbAppender":
-            # dbAppender is a meta-class - we'll determine actual type after creation
-            result_writer_type = "dbAppender"  # Temporary, will be updated later
-        else:
-            # For direct writers, use the _database_type attribute if available
-            if hasattr(ResultWriterClass, '_database_type'):
-                result_writer_type = ResultWriterClass._database_type
-            else:
-                # Fallback to class name for backward compatibility
-                result_writer_type = ResultWriterClass.__name__
         
         # For SQLite, construct the source database file path using consistent directory structure
         # Path: /ethoscope_data/results/{machine_id}/{machine_name}/{date_time}/{backup_filename}
@@ -828,13 +737,21 @@ class ControlThread(Thread):
             os.makedirs(sqlite_dir, exist_ok=True)
             logging.info(f"Created SQLite directory structure: {sqlite_dir}")
             
-            sqlite_credentials = self._db_credentials.copy()
-            sqlite_credentials["name"] = sqlite_source_path
+            # Create clean SQLite credentials (only database path, no MySQL connection params)
+            sqlite_credentials = {"name": sqlite_source_path}
             rw = ResultWriterClass(sqlite_credentials, rois, self._metadata, **result_writer_kwargs)
             
+            # Get the backup filename from the result writer (may be different from initial one)
+            backup_filename_from_writer = rw.get_backup_filename()
+            if backup_filename_from_writer:
+                self._info["backup_filename"] = backup_filename_from_writer
+                logging.info(f"Updated backup filename from result writer: {backup_filename_from_writer}")
+            
             # Initialize SQLite metadata cache for JSON file generation
+            # Use clean SQLite credentials (only database path)
+            cache_credentials = {"name": sqlite_source_path}
             self._metadata_cache = create_metadata_cache(
-                db_credentials=sqlite_credentials,
+                db_credentials=cache_credentials,
                 device_name=self._info["name"],
                 cache_dir=self._cache_dir,
                 database_type="SQLite3"
@@ -847,6 +764,12 @@ class ControlThread(Thread):
                 metadata=self._metadata,
                 **result_writer_kwargs
             )
+            
+            # Get the backup filename from the result writer (may be different from initial one)
+            backup_filename_from_writer = rw.get_backup_filename()
+            if backup_filename_from_writer:
+                self._info["backup_filename"] = backup_filename_from_writer
+                logging.info(f"Updated backup filename from result writer: {backup_filename_from_writer}")
             
             # Initialize metadata cache based on detected database type
             # The dbAppender will have created the appropriate writer internally
@@ -917,6 +840,12 @@ class ControlThread(Thread):
         else:
             # MySQL uses standard credentials and metadata cache
             rw = ResultWriterClass(self._db_credentials, rois, self._metadata, **result_writer_kwargs)
+            
+            # Get the backup filename from the result writer (may be different from initial one)
+            backup_filename_from_writer = rw.get_backup_filename()
+            if backup_filename_from_writer:
+                self._info["backup_filename"] = backup_filename_from_writer
+                logging.info(f"Updated backup filename from result writer: {backup_filename_from_writer}")
             
             # Initialize MySQL metadata cache
             self._metadata_cache = create_metadata_cache(
@@ -1047,12 +976,8 @@ class ControlThread(Thread):
             self._info["status"] = "stopping"
             self._info["time"] = time.time()
             
-            # Invalidate databases cache when tracking stops
-            self._invalidate_databases_cache()
-
             # we reset all the user data of the latest experiment except the run_id
             # a new run_id will be created when we start another experiment
-            
             if "experimental_info" in self._info and "run_id" in self._info["experimental_info"]:
                 self._info["experimental_info"] = { "run_id" : self._info["experimental_info"]["run_id"] }
 

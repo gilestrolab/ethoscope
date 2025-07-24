@@ -33,6 +33,7 @@ class Ethoscope(BaseDevice):
     REMOTE_PAGES = {
         'id': "id",
         'data' : "data",
+        'databases_info' : "data/databases",
         'videofiles': "data/listfiles/video",
         'stream': "stream.mjpg",
         'user_options': "user_options",
@@ -187,6 +188,18 @@ class Ethoscope(BaseDevice):
         if current_status not in allowed_statuses:
             raise DeviceError(f"Cannot send '{instruction}' to device in status '{current_status}'")
     
+    def databases_info(self) -> Dict[str, Any]:
+        """Get information about all the databases on the ethoscope."""
+
+        if not self._id:
+            return {}
+        
+        try:
+            url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['databases_info']}/{self._id}"
+            return self._get_json(url)
+        except ScanException:
+            return {}
+
     def machine_info(self) -> Dict[str, Any]:
         """Get machine information from ethoscope."""
         if not self._id:
@@ -354,6 +367,9 @@ class Ethoscope(BaseDevice):
         
         # Check for storage warnings
         self._check_storage_warnings()
+
+        #update comprehensive list of databases - this should not be served here
+        self._info.update ({"databases" : self.databases_info()})
     
     def _fetch_device_info(self) -> bool:
         """Fetch latest device information."""
@@ -745,7 +761,7 @@ class Ethoscope(BaseDevice):
             
             # Fall back to legacy method for backward compatibility
             # Get database_info from the ethoscope's response
-            database_info = self._info.get("database_info", {})
+            database_info = self.databases_info()
             backup_path = self._info.get("backup_path")
             
             if not backup_path:
@@ -1040,7 +1056,7 @@ class Ethoscope(BaseDevice):
                     return backup_filename
             
             # Fallback to old structure for backward compatibility
-            database_info = self._info.get("database_info", {})
+            database_info = self.databases_info()
             db_type_key = db_type.lower()  # Convert to lowercase for old structure
             db_type_info = database_info.get(db_type_key, {})
             if db_type_info.get("exists", False):
@@ -1071,7 +1087,7 @@ class Ethoscope(BaseDevice):
                     return sqlite_filename
             
             # Fallback to old structure for backward compatibility
-            database_info = self._info.get("database_info", {})
+            database_info = self.databases_info()
             active_type = database_info.get("active_type", "none")
             
             if active_type == "mariadb":
