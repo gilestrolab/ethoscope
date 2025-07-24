@@ -209,7 +209,7 @@
                                 $scope.notifications.smtp.port = config.notifications.smtp.port || 587;
                                 $scope.notifications.smtp.use_tls = config.notifications.smtp.use_tls !== false;
                                 $scope.notifications.smtp.username = config.notifications.smtp.username || '';
-                                // Don't populate password for security
+                                $scope.notifications.smtp.password = config.notifications.smtp.password || ''; // Load masked password if configured
                                 $scope.notifications.smtp.from_email = config.notifications.smtp.from_email || 'ethoscope@localhost';
                             }
                             
@@ -217,9 +217,19 @@
                             if (config.notifications.mattermost) {
                                 $scope.notifications.mattermost.enabled = config.notifications.mattermost.enabled || false;
                                 $scope.notifications.mattermost.server_url = config.notifications.mattermost.server_url || '';
-                                // Don't populate bot_token for security
+                                $scope.notifications.mattermost.bot_token = config.notifications.mattermost.bot_token || ''; // Load masked token if configured
                                 $scope.notifications.mattermost.channel_id = config.notifications.mattermost.channel_id || '';
                             }
+                        }
+                        
+                        // Load existing users
+                        if (config.users && Array.isArray(config.users)) {
+                            $scope.users = config.users;
+                        }
+                        
+                        // Load existing incubators
+                        if (config.incubators && Array.isArray(config.incubators)) {
+                            $scope.incubators = config.incubators;
                         }
                         
                         console.log('Existing configuration loaded successfully');

@@ -353,32 +353,56 @@ class SetupAPI(BaseAPI):
         data = self.get_request_json()
         
         try:
-            # Update SMTP settings
+            # Update SMTP settings (stored directly under 'smtp' key)
             smtp_config = data.get('smtp', {})
             if smtp_config:
-                current_smtp = self.config.content.get('smtp', {})
-                current_smtp.update({
+                current_smtp = self.config._settings.get('smtp', {})
+                
+                # Handle masked password - preserve existing password if user didn't change it
+                submitted_password = smtp_config.get('password', '')
+                if submitted_password == '***CONFIGURED***' and current_smtp.get('password'):
+                    # User didn't change the masked password, preserve existing one
+                    actual_password = current_smtp.get('password')
+                else:
+                    # User provided a new password (or cleared it)
+                    actual_password = submitted_password
+                
+                smtp_settings = {
                     'enabled': smtp_config.get('enabled', False),
                     'host': smtp_config.get('host', 'localhost'),
                     'port': int(smtp_config.get('port', 587)),
                     'use_tls': smtp_config.get('use_tls', True),
                     'username': smtp_config.get('username', ''),
-                    'password': smtp_config.get('password', ''),
+                    'password': actual_password,
                     'from_email': smtp_config.get('from_email', 'ethoscope@localhost')
-                })
-                self.config._settings['smtp'] = current_smtp
+                }
+                
+                # Store directly under 'smtp' key (matching configuration.py structure)
+                self.config._settings['smtp'] = smtp_settings
             
-            # Update Mattermost settings
+            # Update Mattermost settings (stored directly under 'mattermost' key)
             mattermost_config = data.get('mattermost', {})
             if mattermost_config:
-                current_mattermost = self.config.content.get('mattermost', {})
-                current_mattermost.update({
+                current_mattermost = self.config._settings.get('mattermost', {})
+                
+                # Handle masked token - preserve existing token if user didn't change it
+                submitted_token = mattermost_config.get('bot_token', '')
+                if submitted_token == '***CONFIGURED***' and current_mattermost.get('bot_token'):
+                    # User didn't change the masked token, preserve existing one
+                    actual_token = current_mattermost.get('bot_token')
+                else:
+                    # User provided a new token (or cleared it)
+                    actual_token = submitted_token
+                
+                mattermost_settings = {
                     'enabled': mattermost_config.get('enabled', False),
                     'server_url': mattermost_config.get('server_url', ''),
-                    'bot_token': mattermost_config.get('bot_token', ''),
+                    'bot_token': actual_token,
                     'channel_id': mattermost_config.get('channel_id', '')
-                })
-                self.config._settings['mattermost'] = current_mattermost
+                }
+                
+                # Store directly under 'mattermost' key (matching configuration.py structure)
+                self.config._settings['mattermost'] = mattermost_settings
             
             # Save configuration
             self.config.save()
@@ -620,6 +644,8 @@ Ethoscope Node Setup Wizard
             config_data = {
                 'folders': {},
                 'admin_user': None,
+                'users': [],
+                'incubators': [],
                 'tunnel': {
                     'enabled': False,
                     'mode': 'custom',
@@ -691,34 +717,76 @@ Ethoscope Node Setup Wizard
             except Exception as e:
                 self.logger.warning(f"Could not load tunnel settings: {e}")
             
-            # Get notification settings
+            # Get notification settings (from correct configuration paths)
             try:
-                notifications_config = self.config._settings.get('notifications', {})
-                if notifications_config:
-                    # SMTP settings
-                    smtp_config = notifications_config.get('smtp', {})
-                    if smtp_config:
-                        config_data['notifications']['smtp'].update({
-                            'enabled': smtp_config.get('enabled', False),
-                            'host': smtp_config.get('host', 'localhost'),
-                            'port': smtp_config.get('port', 587),
-                            'use_tls': smtp_config.get('use_tls', True),
-                            'username': smtp_config.get('username', ''),
-                            'password': '',  # Don't return password for security
-                            'from_email': smtp_config.get('from_email', 'ethoscope@localhost')
-                        })
+                # SMTP settings - stored directly under 'smtp' key
+                smtp_config = self.config._settings.get('smtp', {})
+                if smtp_config:
+                    # Show masked password if one exists, empty if none configured
+                    existing_password = smtp_config.get('password', '')
+                    masked_password = '***CONFIGURED***' if existing_password else ''
                     
-                    # Mattermost settings
-                    mattermost_config = notifications_config.get('mattermost', {})
-                    if mattermost_config:
-                        config_data['notifications']['mattermost'].update({
-                            'enabled': mattermost_config.get('enabled', False),
-                            'server_url': mattermost_config.get('server_url', ''),
-                            'bot_token': '',  # Don't return token for security
-                            'channel_id': mattermost_config.get('channel_id', '')
-                        })
+                    config_data['notifications']['smtp'].update({
+                        'enabled': smtp_config.get('enabled', False),
+                        'host': smtp_config.get('host', 'localhost'),
+                        'port': smtp_config.get('port', 587),
+                        'use_tls': smtp_config.get('use_tls', True),
+                        'username': smtp_config.get('username', ''),
+                        'password': masked_password,  # Show masked password for UX, empty if none exists
+                        'from_email': smtp_config.get('from_email', 'ethoscope@localhost')
+                    })
+                
+                # Mattermost settings - stored directly under 'mattermost' key
+                mattermost_config = self.config._settings.get('mattermost', {})
+                if mattermost_config:
+                    # Show masked token if one exists, empty if none configured
+                    existing_token = mattermost_config.get('bot_token', '')
+                    masked_token = '***CONFIGURED***' if existing_token else ''
+                    
+                    config_data['notifications']['mattermost'].update({
+                        'enabled': mattermost_config.get('enabled', False),
+                        'server_url': mattermost_config.get('server_url', ''),
+                        'bot_token': masked_token,  # Show masked token for UX, empty if none exists
+                        'channel_id': mattermost_config.get('channel_id', '')
+                    })
             except Exception as e:
                 self.logger.warning(f"Could not load notification settings: {e}")
+            
+            # Get existing users (excluding admin user already loaded)
+            try:
+                db = ExperimentalDB()
+                all_users = db.getAllUsers(active_only=False, asdict=True)
+                for username, user_info in all_users.items():
+                    # Skip the admin user as it's already loaded separately
+                    if user_info.get('isadmin') != 1:
+                        config_data['users'].append({
+                            'username': username,
+                            'fullname': user_info.get('fullname', ''),
+                            'email': user_info.get('email', ''),
+                            'pin': user_info.get('pin', ''),
+                            'telephone': user_info.get('telephone', ''),
+                            'labname': user_info.get('labname', ''),
+                            'isadmin': bool(user_info.get('isadmin', 0))
+                        })
+            except Exception as e:
+                self.logger.warning(f"Could not load existing users: {e}")
+            
+            # Get existing incubators
+            try:
+                db = ExperimentalDB()
+                all_incubators = db.get_all_incubators()
+                for incubator in all_incubators:
+                    config_data['incubators'].append({
+                        'name': incubator.get('name', ''),
+                        'description': incubator.get('description', ''),
+                        'location': incubator.get('location', ''),
+                        'temperature_range_min': incubator.get('temperature_range_min', 20),
+                        'temperature_range_max': incubator.get('temperature_range_max', 30),
+                        'humidity_min': incubator.get('humidity_min', 40),
+                        'humidity_max': incubator.get('humidity_max', 70)
+                    })
+            except Exception as e:
+                self.logger.warning(f"Could not load existing incubators: {e}")
             
             return {
                 'result': 'success',
