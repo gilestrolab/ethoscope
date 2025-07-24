@@ -27,6 +27,7 @@
 from optparse import OptionParser
 import socket
 import json
+import time
 
 COMM_PACKET_SIZE = 1024*16 # in bytes. This should be large because it has to account for possible raise error messages coming backs
 
@@ -46,7 +47,7 @@ def listenerIsAlive():
     except:
         return False
 
-def send_command(action, data=None, host='127.0.0.1', port=5000, size=COMM_PACKET_SIZE):
+def send_command(action, data=None, host='127.0.0.1', port=5000, size=COMM_PACKET_SIZE, return_timing=False):
     '''
     Executes remote command execution via TCP socket communication with a JSON protocol.
     
@@ -59,9 +60,11 @@ def send_command(action, data=None, host='127.0.0.1', port=5000, size=COMM_PACKE
         host (str): IPv4 address of the target listener service
         port (int): TCP port number for service communication
         size (int): Maximum receive buffer size in bytes (must accommodate largest expected response)
+        return_timing (bool): If True, returns tuple of (response, response_time_ms)
 
     Returns:
         any: Deserialized response content from the service's JSON reply
+        tuple: (response, response_time_ms) if return_timing=True
         
     Raises:
         socket.error: On network communication failures
@@ -71,6 +74,7 @@ def send_command(action, data=None, host='127.0.0.1', port=5000, size=COMM_PACKE
     message = {'command' : action,
                'data' : data }
 
+    start_time = time.time()
               
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((host, port))
@@ -112,6 +116,11 @@ def send_command(action, data=None, host='127.0.0.1', port=5000, size=COMM_PACKE
     if not isinstance(r, dict) or 'response' not in r:
         raise ValueError(f"Invalid response structure: {r}")
     
+    end_time = time.time()
+    response_time_ms = (end_time - start_time) * 1000
+    
+    if return_timing:
+        return r['response'], response_time_ms
     return r['response']
 
 if __name__ == '__main__':
@@ -120,6 +129,7 @@ if __name__ == '__main__':
     parser.add_option("-s", "--server", dest="host", default='127.0.0.1', help="The IP of the ethoscope to be interrogated")
     parser.add_option("-c", "--command", dest="command", default='status', help="The command to be sent. Send help to receive a list of available commands.")
     parser.add_option("-d", "--data", dest="data", default='', help="dictionary with data to be sent")
+    parser.add_option("-t", "--timing", dest="timing", action="store_true", default=False, help="Include response time in output")
 
 
     (options, args) = parser.parse_args()
@@ -136,7 +146,12 @@ if __name__ == '__main__':
         data_dict = None
 
     try:
-        r = send_command(action=option_dict['command'], data=data_dict, host=option_dict['host'])
-        print(r)
+        if option_dict['timing']:
+            r, response_time = send_command(action=option_dict['command'], data=data_dict, host=option_dict['host'], return_timing=True)
+            print(f"Response: {r}")
+            print(f"Response time: {response_time:.2f} ms")
+        else:
+            r = send_command(action=option_dict['command'], data=data_dict, host=option_dict['host'])
+            print(r)
     except Exception as e:
         print(f"An error occurred: {e}")
