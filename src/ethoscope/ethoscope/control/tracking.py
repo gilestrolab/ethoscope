@@ -25,6 +25,7 @@ from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection, EthoscopeSensor
 from ethoscope.stimulators.stimulators import DefaultStimulator
 from ethoscope.stimulators.sleep_depriver_stimulators import * #importing all stimulators - remember to add the allowed ones to line 84
+from ethoscope.stimulators.sleep_restriction_stimulators import mAGOSleepRestriction, SimpleTimeRestrictedStimulator
 from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver, MiddleCrossingOdourStimulator, MiddleCrossingOdourStimulatorFlushed
 from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulator
 from ethoscope.stimulators.multi_stimulator import MultiStimulator
@@ -95,6 +96,8 @@ class ControlThread(Thread):
                                             MiddleCrossingOdourStimulatorFlushed,
                                             mAGO,
                                             AGO,
+                                            mAGOSleepRestriction,
+                                            SimpleTimeRestrictedStimulator,
                                             MultiStimulator
                                             ],
                     }),
@@ -391,44 +394,32 @@ class ControlThread(Thread):
         return out_curated
 
 
-    def _parse_user_options(self, data):
-        """Parses user-defined options from a data dictionary and updates internal configuration.
+    def _parse_one_user_option(self,field, data):
+    
+        try:
+            subdata = data[field]
+        except KeyError:
+            logging.warning("No field %s, using default" % field)
+            return None, {}
 
-        Dynamically loads classes and their arguments based on the provided data.
-        Defaults to a predefined class if an option is not found or parsing fails.
+        Class = eval(subdata["name"])
+        kwargs = subdata["arguments"]
+    
+        return Class, kwargs
 
-        Args:
-            data (dict): Dictionary of user-defined options.
 
-        Warning:
-            Uses `eval()` which can be a security risk if `data` is untrusted.
-        """
+    def _parse_user_options(self,data):
+
         if data is None:
             return
 
-        # Debug: log the received data
-        logging.info(f"DEBUG: Received data in _parse_user_options: {data}")
-
         for key in list(self._option_dict.keys()):
-            Class = None
-            kwargs = {}
 
-            try:
-                subdata = data[key]
-                Class = eval(subdata["name"])
-                kwargs = subdata["arguments"]
-            except KeyError:
-                logging.warning("No field %s, using default" % key)
-                # Class and kwargs remain None and {} as initialized
-            except Exception as e:
-                logging.error(f"Error parsing option for field {key}: {e}")
-                # Handle other potential errors during eval or argument access
-                Class = None
-                kwargs = {}
-
-
+            Class, kwargs = self._parse_one_user_option(key, data)
             # when no field is present in the JSON config, we get the default class
+
             if Class is None:
+
                 self._option_dict[key]["class"] = self._option_dict[key]["possible_classes"][0]
                 self._option_dict[key]["kwargs"] = {}
                 continue
