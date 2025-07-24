@@ -266,7 +266,7 @@ class Ethoscope(BaseDevice):
         try:
             img_path = self._info["last_drawn_img"]
             img_url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['static']}/{img_path}"
-            return urllib.request.urlopen(img_url, timeout=10)
+            return urllib.request.urlopen(img_url, timeout=3)
         except (KeyError, urllib.error.HTTPError) as e:
             self._logger.error(f"Could not get image for {self._id}: {e}")
             raise
@@ -276,7 +276,7 @@ class Ethoscope(BaseDevice):
         try:
             img_path = self._info["dbg_img"]
             img_url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['static']}/{img_path}"
-            return urllib.request.urlopen(img_url, timeout=10)
+            return urllib.request.urlopen(img_url, timeout=3)
         except Exception as e:
             self._logger.warning(f"Could not get debug image: {e}")
             return None

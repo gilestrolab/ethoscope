@@ -155,6 +155,9 @@ class ControlThread(Thread):
         # for FPS computation
         self._last_info_t_stamp = 0
         self._last_info_frame_idx = 0
+        
+        # for image write rate limiting (max 1 image per second)
+        self._last_img_write_time = 0
 
 
         # We wipe off previous logs and debug images
@@ -463,8 +466,9 @@ class ControlThread(Thread):
 
         if self._drawer:
             frame = self._drawer.last_drawn_frame
-            if frame is not None:
+            if frame is not None and (wall_time - self._last_img_write_time) >= 1.0:
                 cv2.imwrite(self._info["last_drawn_img"], frame, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
+                self._last_img_write_time = wall_time
 
         # Update database info using MetadataCache
         if self._metadata_cache is not None:
