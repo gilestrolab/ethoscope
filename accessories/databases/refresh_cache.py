@@ -25,7 +25,7 @@ from pathlib import Path
 # Add the src directory to Python path to import ethoscope modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
-from ethoscope.utils.cache import (
+from ethoscope.io.cache import (
     create_metadata_cache, 
     MySQLDatabaseMetadataCache, 
     SQLiteDatabaseMetadataCache
