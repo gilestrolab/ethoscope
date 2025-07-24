@@ -403,7 +403,7 @@ class SQLiteResultWriter(BaseResultWriter):
             command = "INSERT INTO START_EVENTS VALUES (?, ?, ?)"
             self._write_async_command(command, (None, int(time.time()), event))
 
-            # Insert experimental metadata using shared method
+            # Insert experimental metadata using SQLite-specific method
             self._insert_metadata()
             
             self._wait_for_queue_empty()
@@ -414,3 +414,22 @@ class SQLiteResultWriter(BaseResultWriter):
             command = "INSERT INTO START_EVENTS VALUES (?, ?, ?)"
             self._write_async_command(command, (None, int(time.time()), event))
             self._wait_for_queue_empty()
+
+    def _insert_metadata(self):
+        """Insert experimental metadata into METADATA table with SQLite duplicate prevention."""
+        import json
+        from .base import METADATA_MAX_VALUE_LENGTH
+        
+        for k, v in list(self.metadata.items()):
+            # Properly serialize complex metadata values to avoid SQL injection and formatting issues
+            v_serialized = json.dumps(str(v)) if not isinstance(v, (str, int, float, bool, type(None))) else v
+            
+            # Truncate extremely large values as a safety measure
+            max_value_length = METADATA_MAX_VALUE_LENGTH
+            if isinstance(v_serialized, str) and len(v_serialized) > max_value_length:
+                v_serialized = v_serialized[:max_value_length] + "... [TRUNCATED]"
+                logging.warning(f"Metadata value for key '{k}' was truncated due to size limit")
+            
+            # Use SQLite INSERT OR IGNORE to prevent duplicate key errors
+            command = "INSERT OR IGNORE INTO METADATA VALUES (?, ?)"
+            self._write_async_command(command, (k, v_serialized))
