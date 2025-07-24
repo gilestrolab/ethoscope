@@ -352,12 +352,32 @@ class Ethoscope(BaseDevice):
         current_backup_filename = self._info.get("backup_filename")
         previous_backup_filename = getattr(self, '_last_backup_filename', None)
         backup_filename_changed = (current_backup_filename != previous_backup_filename and current_backup_filename is not None)
+        
+        # Additional check: if backup_path contains a different timestamp than current backup_filename
+        # This handles cases where the scanner missed the initial change
+        current_backup_path = self._info.get("backup_path")
+        backup_path_mismatch = False
+        if current_backup_filename and current_backup_path:
+            try:
+                # Extract timestamp from backup_filename: "2025-07-24_10-32-01_..."
+                backup_filename_timestamp = "_".join(current_backup_filename.split("_")[:2])
+                # Check if backup_path contains the same timestamp
+                backup_path_mismatch = backup_filename_timestamp not in current_backup_path
+                if backup_path_mismatch:
+                    self._logger.debug(f"Device {self._ip}: Backup path timestamp mismatch detected. "
+                                     f"Filename: {backup_filename_timestamp}, Path: {current_backup_path}")
+            except (IndexError, AttributeError):
+                pass
 
-        # Update backup path if status changed, backup_path is None, or backup_filename changed
-        if (previous_status != new_status or self._info.get("backup_path") is None or backup_filename_changed):
-            # Force recalculation if backup filename changed
-            self._make_backup_path(force_recalculate=backup_filename_changed)
-            # Track the backup_filename used for this backup_path
+        # Update backup path if status changed, backup_path is None, backup_filename changed, or path mismatch
+        if (previous_status != new_status or self._info.get("backup_path") is None or 
+            backup_filename_changed or backup_path_mismatch):
+            # Force recalculation if backup filename changed or path doesn't match
+            force_recalc = backup_filename_changed or backup_path_mismatch
+            if backup_path_mismatch:
+                self._logger.info(f"Device {self._ip}: Forcing backup path recalculation due to timestamp mismatch")
+            self._make_backup_path(force_recalculate=force_recalc)
+            # Track the backup_filename used for this backup_path  
             self._last_backup_filename = current_backup_filename
         
         # Only handle state transitions when status actually changes
@@ -1071,38 +1091,79 @@ class Ethoscope(BaseDevice):
     def _get_appropriate_backup_filename(self) -> str:
         """Get the appropriate backup filename based on the active database type."""
         try:
-            # Check new nested databases structure first
-            databases = self._info.get("databases", {})
+            # FIRST PRIORITY: Use the top-level backup_filename from the ethoscope API response
+            # This field contains the current experiment's backup filename
+            if "backup_filename" in self._info and self._info["backup_filename"]:
+                backup_filename = self._info["backup_filename"]
+                self._logger.debug(f"Device {self._ip}: Using current backup_filename from API: {backup_filename}")
+                return backup_filename
             
-            # Try MariaDB first
-            if databases.get("MariaDB"):
-                mariadb_filename = self._get_backup_filename_for_db_type("MariaDB")
-                if mariadb_filename:
-                    return mariadb_filename
+            # SECOND PRIORITY: Try to determine the active database type from experimental_info
+            experimental_info = self._info.get("experimental_info", {})
+            if "selected_options" in experimental_info:
+                try:
+                    selected_options_str = experimental_info["selected_options"]
+                    if "SQLiteResultWriter" in selected_options_str:
+                        self._logger.debug(f"Device {self._ip}: Determined active database type: SQLite from experimental_info")
+                        sqlite_filename = self._get_backup_filename_for_db_type("SQLite")
+                        if sqlite_filename:
+                            return sqlite_filename
+                    elif "ResultWriter" in selected_options_str:
+                        self._logger.debug(f"Device {self._ip}: Determined active database type: MariaDB from experimental_info")
+                        mariadb_filename = self._get_backup_filename_for_db_type("MariaDB")
+                        if mariadb_filename:
+                            return mariadb_filename
+                except (KeyError, TypeError) as e:
+                    self._logger.debug(f"Device {self._ip}: Could not parse selected_options from experimental_info: {e}")
             
-            # Try SQLite next
-            if databases.get("SQLite"):
-                sqlite_filename = self._get_backup_filename_for_db_type("SQLite")
-                if sqlite_filename:
-                    return sqlite_filename
-            
-            # Fallback to old structure for backward compatibility
+            # THIRD PRIORITY: Fallback to old structure for backward compatibility
             database_info = self.databases_info()
             active_type = database_info.get("active_type", "none")
             
             if active_type == "mariadb":
+                self._logger.debug(f"Device {self._ip}: Using active_type MariaDB from database_info")
                 return self._get_backup_filename_for_db_type("MariaDB")
             elif active_type == "sqlite":
+                self._logger.debug(f"Device {self._ip}: Using active_type SQLite from database_info")
                 return self._get_backup_filename_for_db_type("SQLite")
-            else:
-                # Fallback to legacy behavior
-                if "backup_filename" in self._info and self._info["backup_filename"]:
-                    return self._info["backup_filename"]
-                elif (self._device_status.status_name == 'stopped' and 
-                      "previous_backup_filename" in self._info and 
-                      self._info["previous_backup_filename"]):
-                    return self._info["previous_backup_filename"]
-                return None
+            
+            # FOURTH PRIORITY: Check databases structure for active database
+            databases = self._info.get("databases", {})
+            
+            # Look for active databases by checking db_status = "tracking" 
+            for db_type in ["SQLite", "MariaDB"]:
+                db_type_databases = databases.get(db_type, {})
+                for db_name, db_info in db_type_databases.items():
+                    if db_info.get("db_status") == "tracking":
+                        backup_filename = db_info.get("backup_filename")
+                        if backup_filename:
+                            self._logger.debug(f"Device {self._ip}: Found active {db_type} database: {backup_filename}")
+                            return backup_filename
+            
+            # FIFTH PRIORITY: Try SQLite first in the existence check (reverse previous priority)
+            # This is because SQLite is more commonly used for new experiments
+            if databases.get("SQLite"):
+                self._logger.debug(f"Device {self._ip}: Found SQLite database, using as fallback")
+                sqlite_filename = self._get_backup_filename_for_db_type("SQLite")
+                if sqlite_filename:
+                    return sqlite_filename
+            
+            # Try MariaDB as last resort
+            if databases.get("MariaDB"):
+                self._logger.debug(f"Device {self._ip}: Found MariaDB database, using as fallback")
+                mariadb_filename = self._get_backup_filename_for_db_type("MariaDB")
+                if mariadb_filename:
+                    return mariadb_filename
+            
+            # FINAL FALLBACK: Use previous_backup_filename for stopped devices
+            if (self._device_status.status_name == 'stopped' and 
+                  "previous_backup_filename" in self._info and 
+                  self._info["previous_backup_filename"]):
+                self._logger.debug(f"Device {self._ip}: Using previous_backup_filename for stopped device")
+                return self._info["previous_backup_filename"]
+            
+            self._logger.warning(f"Device {self._ip}: No backup filename could be determined")
+            return None
         except Exception as e:
             self._logger.error(f"Error getting appropriate backup filename: {e}")
             return None
