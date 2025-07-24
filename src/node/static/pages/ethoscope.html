@@ -2,6 +2,10 @@
 <div class="jumbotron text-center" ng-cloak>
 
     <div class="header" style="position: relative;">
+        <!-- Robot Icon for Module Connected -->
+        <span ng-if="machine_info.Module.Connected" class="fa fa-robot fa-3x" title="Hardware module connected" style="position: absolute; top: -2px; right: 120px; color: var(--medium-gray); transform: scale(0.9);">
+        </span>
+
         <!-- Underpowered Icon -->
         <span ng-if="device.underpowered == true" class="fa fa-bolt fa-3x" title="The PI is underpowered!" style="position: absolute; top: 0px; right: 60px; color: #ff9966;">
         </span>
@@ -656,7 +660,7 @@
                                                 </label>
                                             </div>
                                             <div class="alert alert-warning" style="margin-top: 10px; font-size: 12px; padding: 8px;">
-                                                <i class="fa fa-exclamation-triangle"></i> 
+                                                <i class="fa fa-exclamation-triangle"></i>
                                                 <strong>Warning:</strong> Expands filesystem to use full SD card space. Reboot required.
                                             </div>
                                         </div>
