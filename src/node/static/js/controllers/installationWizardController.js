@@ -194,7 +194,7 @@
                         if (config.tunnel) {
                             $scope.tunnel.enabled = config.tunnel.enabled || false;
                             $scope.tunnel.mode = config.tunnel.mode || 'custom';
-                            $scope.tunnel.token = ''; // Don't populate token for security
+                            $scope.tunnel.token = config.tunnel.token || ''; // Load masked token if configured
                             $scope.tunnel.node_id = config.tunnel.node_id || 'auto';
                             $scope.tunnel.domain = config.tunnel.domain || 'ethoscope.net';
                             $scope.tunnel.custom_domain = config.tunnel.custom_domain || '';

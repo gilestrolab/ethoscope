@@ -395,11 +395,24 @@ class SetupAPI(BaseAPI):
         data = self.get_request_json()
         
         try:
+            # Get current token to preserve it if masked value is sent
+            current_tunnel_config = self.config._settings.get('tunnel', {})
+            current_token = current_tunnel_config.get('token', '')
+            
+            # Handle masked token - preserve existing token if user didn't change it
+            submitted_token = data.get('token', '')
+            if submitted_token == '***CONFIGURED***' and current_token:
+                # User didn't change the masked token, preserve existing one
+                actual_token = current_token
+            else:
+                # User provided a new token (or cleared it)
+                actual_token = submitted_token
+            
             # Update tunnel configuration with dual mode support
             tunnel_config = {
                 'enabled': data.get('enabled', False),
                 'mode': data.get('mode', 'custom'),  # 'custom' (free) or 'ethoscope_net' (paid)
-                'token': data.get('token', ''),
+                'token': actual_token,
                 'node_id': data.get('node_id', 'auto'),
                 'domain': data.get('domain', 'ethoscope.net'),
                 'custom_domain': data.get('custom_domain', '')  # For custom domain mode
@@ -610,7 +623,7 @@ Ethoscope Node Setup Wizard
                 'tunnel': {
                     'enabled': False,
                     'mode': 'custom',
-                    'token': '',  # Don't return token for security
+                    'token': '',  # Will be populated with masked value if configured
                     'node_id': 'auto',
                     'domain': 'ethoscope.net',
                     'custom_domain': ''
@@ -663,10 +676,14 @@ Ethoscope Node Setup Wizard
             try:
                 tunnel_config = self.config._settings.get('tunnel', {})
                 if tunnel_config:
+                    # Show masked token if one exists, empty if none configured
+                    existing_token = tunnel_config.get('token', '')
+                    masked_token = '***CONFIGURED***' if existing_token else ''
+                    
                     config_data['tunnel'].update({
                         'enabled': tunnel_config.get('enabled', False),
                         'mode': tunnel_config.get('mode', 'custom'),
-                        'token': '',  # Don't return token for security
+                        'token': masked_token,  # Show masked token for UX, empty if none exists
                         'node_id': tunnel_config.get('node_id', 'auto'),
                         'domain': tunnel_config.get('domain', 'ethoscope.net'),
                         'custom_domain': tunnel_config.get('custom_domain', '')
