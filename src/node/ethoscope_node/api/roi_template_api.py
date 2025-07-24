@@ -166,17 +166,18 @@ class ROITemplateAPI(BaseAPI):
         try:
             device = self.validate_device_exists(id)
             
-            # Upload template to device using device API
-            device_url = f"http://{device.ip()}:{device._port}/upload_roi_template"
+            # Upload template to device using unified upload API
+            device_url = f"http://{device.ip()}:{device._port}/upload/{id}"
             import requests
             
-            # Send template data as JSON POST
+            # Send template data as JSON POST with explicit Content-Type
             payload = {
                 'template_data': template_data,
                 'template_name': template_name
             }
             
-            response = requests.post(device_url, json=payload, timeout=10)
+            headers = {'Content-Type': 'application/json'}
+            response = requests.post(device_url, json=payload, headers=headers, timeout=10)
             if response.status_code == 200:
                 return {"success": True, "message": f"Custom template {template_name} uploaded to device {id}"}
             else:

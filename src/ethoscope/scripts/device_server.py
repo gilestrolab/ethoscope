@@ -38,23 +38,15 @@ recording_json_data = {}
 update_machine_json_data = {}
 
 """
-
-/rm_static_file/                        POST    remove file
-/dumpSQLdb/<id>                         POST    performs a SQL dump of the default database
-
 /update/<id>                            POST    update machine parameters (number, name, nodeIP, WIFI credentials, time)
 /controls/<id>/<action>                 POST    activate actions (tracking, recording, etc)
 
-/upload_roi_template                    POST
-/upload/<id>                            POST    upload files to the ethoscope (masks, videos, etc)
-
+/upload/<id>                            POST    upload files to the ethoscope (masks, videos, etc) or JSON template data
 
 /<id>                                   GET     returns ID of the machine
-/make_index       [TO BE REMOVED]       GET     create an index.html file with all the h264 files in the machine
 /data/<id>                              GET     get information regarding the current status of the machine (e.g. FPS, temperature, etc)
 /data/databases/<id>                    GET     get a comprehensive list of available databases on the machine and their statuses
 /data/listfiles/<category>/<id>         GET     provides a list of files in the ethoscope data folders, that were either uploaded or generated (masks, videos, etc).
-/list_video_files [TO BE REMOVED]       GET     returns a json with the full path and the md5sum information for each video chunk
 /data/log/<id>                          GET     fetch the journalctl log
 
 /machine/<id>                           GET     information about the ethoscope that is not changing in time such as hardware specs and configuration parameters
@@ -80,10 +72,55 @@ def error_decorator(func):
             return {'error': traceback.format_exc()}
     return func_wrapper
 
-@api.route('/upload_roi_template', method='POST')
-def upload_roi_template():
-    """Upload custom ROI template from node to device."""
+def _save_roi_template(template_data, template_name, validate=True):
+    """Save ROI template data to the templates directory.
+    
+    Args:
+        template_data: Dictionary containing template data
+        template_name: Name for the template file (without extension)
+        validate: Whether to validate template structure
+        
+    Returns:
+        dict: Result dictionary with success/failure status
+    """
     try:
+        # Ensure custom templates directory exists
+        custom_templates_dir = '/ethoscope_data/roi_templates'
+        os.makedirs(custom_templates_dir, exist_ok=True)
+        
+        # Validate template structure if requested
+        if validate:
+            if not isinstance(template_data, dict):
+                return {'result': 'fail', 'comment': 'Template data must be a JSON object'}
+            
+            if "template_info" not in template_data or "roi_definition" not in template_data:
+                return {'result': 'fail', 'comment': 'Invalid ROI template format - missing required fields'}
+        
+        # Save template with name-based filename
+        filename = f"{template_name}.json"
+        filepath = os.path.join(custom_templates_dir, filename)
+        
+        with open(filepath, 'w') as f:
+            json.dump(template_data, f, indent=2)
+        
+        return {
+            'result': 'success',
+            'path': filepath,
+            'message': f'Template {template_name} saved successfully'
+        }
+        
+    except Exception as e:
+        return {'result': 'fail', 'comment': f'Error saving template: {str(e)}'}
+
+
+@api.route('/upload/<id>', method='POST')
+def do_upload(id):
+    
+    if id != _MACHINE_ID:
+        raise WrongMachineID
+    
+    # Check if this is a JSON template upload (direct data, not file)
+    if bottle.request.content_type and 'application/json' in bottle.request.content_type:
         data = bottle.request.json
         if not data:
             return {'result': 'fail', 'comment': 'No JSON data provided'}
@@ -94,34 +131,13 @@ def upload_roi_template():
         if not template_data:
             return {'result': 'fail', 'comment': 'No template data provided'}
         
-        # Ensure custom templates directory exists
-        custom_templates_dir = '/ethoscope_data/roi_templates'
-        os.makedirs(custom_templates_dir, exist_ok=True)
-        
-        # Save template with simple name-based filename
-        filename = f"{template_name}.json"
-        filepath = os.path.join(custom_templates_dir, filename)
-        
-        # Save template
-        with open(filepath, 'w') as f:
-            json.dump(template_data, f, indent=2)
-        
-        return {
-            'result': 'success', 
-            'path': filepath,
-            'message': f'Custom template {template_name} saved to device'
-        }
-        
-    except Exception as e:
-        return {'result': 'fail', 'comment': f'Error saving template: {str(e)}'}
-
-@api.route('/upload/<id>', method='POST')
-def do_upload(id):
+        return _save_roi_template(template_data, template_name, validate=True)
     
-    if id != _MACHINE_ID:
-        raise WrongMachineID
-    
+    # Handle file upload
     upload = bottle.request.files.get('upload')
+    if not upload:
+        return {'result': 'fail', 'comment': 'No file uploaded'}
+        
     name, ext = os.path.splitext(upload.filename)
 
     if ext in ('.mp4', '.avi'):
@@ -142,30 +158,29 @@ def do_upload(id):
     file_path = "{path}/{file}".format(path=save_path, file=upload.filename)
     upload.save(file_path)
     
-    # Special handling for ROI templates - also copy to local roi_templates directory
+    # Special handling for ROI templates - save to roi_templates directory
     if ext == '.json' and category == 'templates':
-        roi_templates_dir = '/ethoscope_data/roi_templates'
-        os.makedirs(roi_templates_dir, exist_ok=True)
-        template_copy_path = os.path.join(roi_templates_dir, upload.filename)
-        
-        # Validate JSON template before copying
         try:
-            import json
             with open(file_path, 'r') as f:
                 template_data = json.load(f)
             
-            # Basic validation - ensure required fields exist
-            if "template_info" in template_data and "roi_definition" in template_data:
-                # Copy validated template to roi_templates directory
-                import shutil
-                shutil.copy2(file_path, template_copy_path)
-                return { 'result' : 'success', 'path' : file_path, 'template_path': template_copy_path }
+            # Use filename without extension as template name
+            template_name = name
+            template_result = _save_roi_template(template_data, template_name, validate=True)
+            
+            if template_result['result'] == 'success':
+                return {
+                    'result': 'success',
+                    'path': file_path,
+                    'template_path': template_result['path']
+                }
             else:
-                return {'result': 'fail', 'comment': 'Invalid ROI template format - missing required fields'}
+                return template_result
+                
         except json.JSONDecodeError:
             return {'result': 'fail', 'comment': 'Invalid JSON format in template file'}
         except Exception as e:
-            return {'result': 'fail', 'comment': f'Error validating template: {str(e)}'}
+            return {'result': 'fail', 'comment': f'Error processing template: {str(e)}'}
     
     return { 'result' : 'success', 'path' : file_path }
 
@@ -184,106 +199,6 @@ def server_static(filepath):
 @error_decorator
 def name():
     return {"id": _MACHINE_ID}
-
-@api.get('/list_video_files')
-@error_decorator
-def list_video_files():
-    import subprocess
-    
-    # Get basic video file list (no hashing needed with rsync)
-    video_files = list_local_video_files(_ETHOSCOPE_VIDEOS_DIR, createMD5=False)
-    
-    # Get disk usage for videos directory
-    try:
-        du_result = subprocess.run(['du', '-sb', _ETHOSCOPE_VIDEOS_DIR], 
-                                 capture_output=True, text=True, check=True)
-        disk_usage_bytes = int(du_result.stdout.split()[0])
-    except (subprocess.CalledProcessError, ValueError, IndexError):
-        disk_usage_bytes = 0
-    
-    # Get device IP address
-    device_ip = get_ip_address()
-    
-    # Return enhanced JSON with metadata
-    return {
-        'video_files': video_files,
-        'metadata': {
-            'videos_directory': _ETHOSCOPE_VIDEOS_DIR,
-            'total_files': len(video_files),
-            'disk_usage_bytes': disk_usage_bytes,
-            'device_ip': device_ip,
-            'machine_id': _MACHINE_ID,
-            'machine_name': _MACHINE_NAME
-        }
-    }
-
-@api.get('/make_index')
-@error_decorator
-def make_index():
-    """ 
-    Creates an index of all the video files in the provided formats
-    """
-    video_formats = ['h264', 'avi', 'mp4']
-    index_file = os.path.join(_ETHOSCOPE_VIDEOS_DIR, "index.html")
-    all_video_files = [y for x in os.walk(_ETHOSCOPE_VIDEOS_DIR) for y in glob.glob(os.path.join(x[0], '*.*')) if y.endswith(tuple(video_formats))]
-    with open(index_file, "w") as index:
-        for f in all_video_files:
-            index.write(f + "\n")
-    return {}
-
-@api.post('/rm_static_file/<id>')
-@error_decorator
-def rm_static_file(id):
-    data = bottle.request.body.read()
-    data = json.loads(data)
-    file_to_del = data["file"]
-    if id != _MACHINE_ID:
-        raise WrongMachineID
-
-    if pi.file_in_dir_r( file_to_del, _ETHOSCOPE_DIR ):
-        os.remove(file_to_del)
-    else:
-        msg = "Could not delete file %s. It is not allowed to remove files outside of %s" % ( file_to_del, _ETHOSCOPE_DIR )
-        logging.error(msg)
-        raise Exception(msg)
-    return data
-
-
-dumping_thread = {'thread': Thread() , 'time' : 0}
-
-@api.get('/dumpSQLdb/<id>')
-@error_decorator
-def db_dump(id):
-    '''
-    Asks the helper to perform a SQL dump of the database
-    If a dump was done recently under this session we do not attempt a new one
-    '''
-    gap_in_minutes = 30 #do not attempt a dump if last one was done these many minutes ago
-    
-    global dumping_thread
-    
-    if id != _MACHINE_ID:
-        raise WrongMachineID
-    
-    now = int ( time.time() / 60 ) 
-    gap = now - dumping_thread['time']
-    
-    if not dumping_thread['thread'].is_alive() and gap > gap_in_minutes:
-
-        dumping_thread['time'] = now
-        dumping_thread['thread'] = Thread( target = SQL_dump )
-        dumping_thread['thread'].start()
-       
-        return { 'Status' : 'Started', 'Started': gap }
-    
-    elif dumping_thread['thread'].is_alive():
-    
-        return { 'Status' : 'Dumping', 'Started': gap }
-
-    elif not dumping_thread['thread'].is_alive() and gap < gap_in_minutes:
-        
-        return { 'Status' : 'Finished', 'Started': gap }
-
 
 @api.post('/update/<id>')
 def update_machine_info(id):
