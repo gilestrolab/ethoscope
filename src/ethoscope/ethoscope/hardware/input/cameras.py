@@ -354,7 +354,7 @@ class V4L2Camera(BaseCamera):
 
 class PiFrameGrabber(threading.Thread):
 
-    def __init__(self, target_fps, target_resolution, queue, stop_queue, video_prefix=None, quality=20, *args, **kwargs):
+    def __init__(self, target_fps, target_resolution, queue, stop_queue, video_prefix=None, record_video=False, quality=20, *args, **kwargs):
         """
         Class to grab frames from pi camera. Designed to be used within :class:`~ethoscope.hardware.camreras.camreras.OurPiCameraAsync`
         This allows to get frames asynchronously as acquisition is a bottleneck.
@@ -379,7 +379,7 @@ class PiFrameGrabber(threading.Thread):
         
         # This stuff should not be here in principle but the video recording
         # must be done from the camera class or else it will be to slow
-        self._record_video = video_prefix is not None
+        self._record_video = video_prefix is not None and record_video
         self._video_prefix = video_prefix
         self._VIDEO_CHUNCK_DURATION = 300
         self._PREVIEW_REFRESH_TIME = 5

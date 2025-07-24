@@ -37,7 +37,7 @@ class cameraCaptureThread(threading.Thread):
     '''
         
     _VIDEO_CHUNCK_DURATION = 30 * 10
-    def __init__(self, cameraClass, camera_kwargs, img_path, video_prefix, width, height, fps, bitrate, quality, stream=False):
+    def __init__(self, cameraClass, camera_kwargs, img_path, video_prefix, width, height, fps, bitrate, quality, stream=False, record_video=False):
 
         self._img_path = img_path
         self._stream = stream
@@ -48,16 +48,21 @@ class cameraCaptureThread(threading.Thread):
         self.stop_camera_activity = False
 
         self._video_prefix = video_prefix
-        self._record_video = video_prefix is not None
+        self._record_video = video_prefix is not None and record_video
         if self._record_video: self._create_recording_folder()
+        logging.info(f"video_prefix_basethread: {video_prefix}")
+
 
         try:
-            self.camera = cameraClass ( target_fps = fps , target_resolution = (width, height), video_prefix = video_prefix, quality = quality, **camera_kwargs )
+            self.camera = cameraClass ( target_fps = fps , target_resolution = (width, height), video_prefix = video_prefix, record_video=self._record_video, quality = quality, **camera_kwargs )
         except EthoscopeException as e:
             if "Camera hardware not available" in str(e):
                 raise EthoscopeException("Recording disabled: No camera hardware available.")
             else:
                 raise e
+
+        # piCamera will record video autonomously without help from this class. 
+        # However if the user wants to record video with a non-pi camera, we need to fall back to recording here.
         self._local_recording = self._record_video is True and self.camera.isPiCamera is False
 
         self.video_file_index = 0
@@ -116,10 +121,6 @@ class cameraCaptureThread(threading.Thread):
             server_socket.bind(('', STREAMING_PORT))
             server_socket.listen(5)
             logging.info("Socket stream initiliased.")
-
-        if self._local_recording:
-            logging.info("Prepare to recording using cv2")
-            self._create_recording_folder()
 
         while not self.stop_camera_activity:
 
@@ -187,7 +188,7 @@ class GeneralVideoRecorder(DescribedObject):
                                ]}
     status = "recording" #this is the default status. The alternative is streaming
 
-    def __init__(self, cameraClass, camera_kwargs, img_path, video_prefix, width=1280, height=960, fps=25, bitrate=200000, quality=20, stream = False):
+    def __init__(self, cameraClass, camera_kwargs, img_path, video_prefix, width=1280, height=960, fps=25, bitrate=200000, quality=20, stream = False, record_video=True):
 
         self._stream = stream
 
@@ -243,7 +244,8 @@ class Streamer(GeneralVideoRecorder):
     status = "streaming"
     
     def __init__(self, cameraClass, camera_kwargs, video_prefix, img_path):
-        super(Streamer, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix=None, width=960, height=720, fps=25, bitrate=500000, stream=True)
+        logging.info(f"video_prefix_streamer: {video_prefix}")
+        super(Streamer, self).__init__(cameraClass, camera_kwargs, img_path="", video_prefix="", width=960, height=720, fps=25, bitrate=500000, stream=True, record_video=False)
         
 
 class timedStop(DescribedObject):
@@ -291,8 +293,6 @@ class timedStop(DescribedObject):
 
         except ValueError:
             raise ValueError("Error in countdown format. Use DD:HH:MM (days, hours, minutes)")
-
-
 
 class ControlThreadVideoRecording(ControlThread):
 
@@ -414,7 +414,6 @@ class ControlThreadVideoRecording(ControlThread):
                 logging.warning("No code field in experimental info")
 
             file_prefix = "%s_%s_%s" % (formatted_time, self._machine_id, code)
-
             self._output_video_full_prefix = os.path.join ( self._video_root_dir, self._machine_id, self._device_name, formatted_time, file_prefix )
 
             RecorderClass = self._option_dict["recorder"]["class"]
