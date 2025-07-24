@@ -1257,7 +1257,7 @@ class DatabasesInfo():
                     logging.warning(f"Failed to read cache file {cache_file}: {e}")
                     continue
             
-            logging.debug(f"Successfully processed {processed_files} cache files for {self.device_name}")
+            #logging.debug(f"Successfully processed {processed_files} cache files for {self.device_name}")
             
             # Process SQLite databases (all historical databases)
             for experiment in sqlite_experiments:

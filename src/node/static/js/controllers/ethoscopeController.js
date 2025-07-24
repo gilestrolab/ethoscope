@@ -1746,7 +1746,7 @@
 
         // Start periodic refresh (every 10 seconds - reduced from 6 seconds)
         // Only refresh when page is visible to reduce unnecessary load
-        refresh_data = $interval(refresh, 1000);
+        refresh_data = $interval(refresh, 10000);
 
         // Cleanup interval when controller is destroyed
         $scope.$on("$destroy", function() {

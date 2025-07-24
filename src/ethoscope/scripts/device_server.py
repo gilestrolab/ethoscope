@@ -299,11 +299,6 @@ def controls(id, action):
         send_command(action, recording_json_data)
         return info(id)
         
-    elif action == 'convertvideos':
-        logging.info("Converting h264 chunks to mp4")
-        subprocess.call(['/opt/ethoscope-device/scripts/tools/process_all_h264.py','-p','/ethoscope_data'])
-        return info(id)
-
     elif action == 'test_module':
         logging.info("Sending a test command to the connected module.")
         module_info = interfaces.getModuleCapabilities(test=True)
