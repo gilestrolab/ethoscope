@@ -100,15 +100,14 @@ function maxLengthCheck(object) {
         // Create username from full name
         $scope.createUsername = function() {
             if ($scope.selectedUser.fullname && $scope.selectedUser.fullname !== '') {
-                var nameParts = $scope.selectedUser.fullname.split(' ');
-                if (nameParts.length >= 2) {
-                    var username = nameParts[0].substr(0, 1) + nameParts[1].substr(0, 49);
-                    username = username.replace(/\s+/g, '');
-                    username = username.replace(/\'+/g, '');
-                    username = username.replace(/-+/g, '');
-                    username = username.toLowerCase();
-                    $scope.selectedUser.name = username;
-                }
+                // Create username from full name (lowercase, replace spaces with dots)
+                var username = $scope.selectedUser.fullname.toLowerCase()
+                    .replace(/[^a-z\s]/g, '') // Remove non-alphabetic characters except spaces
+                    .replace(/\s+/g, '.') // Replace spaces with dots
+                    .replace(/\.+/g, '.') // Replace multiple dots with single dot
+                    .replace(/^\.|\.$/g, ''); // Remove leading/trailing dots
+                
+                $scope.selectedUser.name = username;
             }
         };
 
