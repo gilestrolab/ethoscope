@@ -15,6 +15,7 @@ Modules:
 - file_api: File operations and downloads
 - database_api: Database queries and experiments
 - setup_api: Installation wizard and first-time setup
+- tunnel_utils: Tunnel configuration and URL management utilities
 """
 
 from .base import BaseAPI
@@ -26,6 +27,7 @@ from .node_api import NodeAPI
 from .file_api import FileAPI
 from .database_api import DatabaseAPI
 from .setup_api import SetupAPI
+from .tunnel_utils import TunnelUtils
 
 __all__ = [
     'BaseAPI',
@@ -36,5 +38,6 @@ __all__ = [
     'NodeAPI',
     'FileAPI',
     'DatabaseAPI',
-    'SetupAPI'
+    'SetupAPI',
+    'TunnelUtils'
 ]

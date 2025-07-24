@@ -21,7 +21,7 @@ from ethoscope_node.utils.backups_helpers import GenericBackupWrapper
 from ethoscope_node.utils.etho_db import ExperimentalDB
 from ethoscope_node.api import (
     DeviceAPI, BackupAPI, SensorAPI, ROITemplateAPI, 
-    NodeAPI, FileAPI, DatabaseAPI, SetupAPI
+    NodeAPI, FileAPI, DatabaseAPI, SetupAPI, TunnelUtils
 )
 
 # Constants
@@ -120,6 +120,7 @@ class EthoscopeNodeServer:
         self.device_scanner: Optional[EthoscopeScanner] = None
         self.sensor_scanner: Optional[SensorScanner] = None
         self.database: Optional[ExperimentalDB] = None
+        self.tunnel_utils: Optional[TunnelUtils] = None
         
         # Paths and directories
         self.tmp_imgs_dir: Optional[str] = None
@@ -201,13 +202,18 @@ class EthoscopeNodeServer:
             NodeAPI,
             FileAPI,
             DatabaseAPI,
-            SetupAPI
+            SetupAPI,
+            TunnelUtils
         ]
         
         for api_class in api_classes:
             api_module = api_class(self)
             api_module.register_routes()
             self.api_modules.append(api_module)
+            
+            # Create special reference to tunnel utils for easier access
+            if isinstance(api_module, TunnelUtils):
+                self.tunnel_utils = api_module
 
     def _setup_hooks(self):
         """Setup application hooks."""
@@ -295,10 +301,11 @@ class EthoscopeNodeServer:
                 self.logger.warning("Continuing without sensor scanner")
                 self.sensor_scanner = None
             
-            # Ensure tunnel environment file is up to date
+            self._setup_api_modules()
+            
+            # Ensure tunnel environment file is up to date (after API modules are setup)
             self._update_tunnel_environment()
             
-            self._setup_api_modules()
             self.logger.info("Server initialization complete")
             
         except Exception as e:
@@ -416,7 +423,24 @@ class EthoscopeNodeServer:
         return bottle.redirect('/#!/installation-wizard?reconfigure=true')
     
     def _update_redirect(self):
-        return bottle.redirect(self.config.custom('UPDATE_SERVICE_URL'))
+        """Redirect to update service URL with hostname-aware logic."""
+        try:
+            if not self.tunnel_utils:
+                # Fallback to configured URL if tunnel utils not available
+                return bottle.redirect(self.config.custom('UPDATE_SERVICE_URL'))
+            
+            # Get the current request hostname
+            current_host = bottle.request.environ.get('HTTP_HOST', '').lower()
+            fallback_url = self.config.custom('UPDATE_SERVICE_URL')
+            
+            # Use tunnel utils to determine appropriate redirect URL
+            redirect_url = self.tunnel_utils.get_hostname_aware_redirect_url(current_host, fallback_url)
+            return bottle.redirect(redirect_url)
+                
+        except Exception as e:
+            self.logger.warning(f"Error in update redirect: {e}")
+            # Fallback to configured URL
+            return bottle.redirect(self.config.custom('UPDATE_SERVICE_URL'))
     
     # Route handlers - Redirects
     def _redirection_to_list(self, type):
@@ -459,30 +483,13 @@ class EthoscopeNodeServer:
 
 
     def _update_tunnel_environment(self):
-        """Update tunnel environment file from configuration."""
+        """Update tunnel environment file from configuration using tunnel utils."""
         try:
-            if not self.config:
-                return
-                
-            tunnel_config = self.config.get_tunnel_config()
-            tunnel_token = tunnel_config.get('token', '')
-            
-            if tunnel_token:
-                env_file_path = "/etc/ethoscope/tunnel.env"
-                
-                # Ensure directory exists
-                os.makedirs(os.path.dirname(env_file_path), exist_ok=True)
-                
-                # Write environment file
-                with open(env_file_path, 'w') as f:
-                    f.write(f"TUNNEL_TOKEN={tunnel_token}\n")
-                
-                # Set secure permissions (readable by root only)
-                os.chmod(env_file_path, 0o600)
-                
-                self.logger.info(f"Updated tunnel environment file from configuration")
+            if self.tunnel_utils:
+                # Use tunnel utils to handle the environment update
+                self.tunnel_utils.update_tunnel_environment()
             else:
-                self.logger.debug("No tunnel token configured, skipping environment file update")
+                self.logger.warning("Tunnel utils not available, skipping tunnel environment update")
                 
         except Exception as e:
             self.logger.warning(f"Failed to update tunnel environment file: {e}")
