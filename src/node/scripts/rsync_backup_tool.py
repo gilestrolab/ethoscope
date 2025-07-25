@@ -252,7 +252,7 @@ def main():
         
         # Ensure at least one backup type is selected
         if not (BACKUP_RESULTS or BACKUP_VIDEOS):
-            print("Error: Cannot disable both results and videos backup")
+            print("Error: At least one backup type must be selected")
             sys.exit(1)
 
         if DEBUG:

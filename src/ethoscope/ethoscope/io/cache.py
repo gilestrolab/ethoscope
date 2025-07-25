@@ -530,19 +530,6 @@ class BaseDatabaseMetadataCache:
     def _write_cache(self, cache_file_path, db_info=None, tracking_start_time=None, finalise=False, experiment_info=None, graceful=True, stop_reason="user_stop"):
         """Write or update cache file."""
         try:
-
-            # This is useful for post-hoc processing of databases
-            # Only check for stop_date_time when finalising, not when starting new tracking
-            if finalise:
-                stopped = self._get_value_from_database('stop_date_time')
-                if stopped: 
-                    db_status = "finalised"
-                else:
-                    db_status = "tracking"
-            else:
-                # For new tracking sessions, always set status to tracking
-                db_status = "tracking"
-
             # Read existing cache file or create new one
             if os.path.exists(cache_file_path):
                 with open(cache_file_path, 'r') as f:
@@ -561,21 +548,22 @@ class BaseDatabaseMetadataCache:
                     "db_name": self.db_credentials["name"],
                     "device_name": self.device_name,
                     "tracking_start_time": timestamp_str,
-                    "creation_timestamp": tracking_start_time or time.time(),
-                    "db_status": db_status
+                    "creation_timestamp": tracking_start_time or time.time()
                 }
-            
-            if finalise:
-                # Mark cache file as finalized with graceful stop information
-                stop_timestamp = time.time()
+
+            stop_timestamp = self._get_value_from_database('stop_date_time')
+            finalise_timestamp = time.time()
+
+            if finalise or stop_timestamp:
                 cache_data.update({
-                    "db_status": "finalised",
-                    "finalized_timestamp": stop_timestamp,
-                    "stopped_gracefully": graceful,
-                    "stop_reason": stop_reason,
-                    "stop_timestamp": stop_timestamp
+                    "db_status": "finalised" if finalise else "terminated",
+                    "finalized_timestamp": finalise_timestamp if finalise else "unknown",
+                    "stopped_gracefully": graceful or finalise or "unknown",
+                    "stop_reason": stop_reason or "unknown",
+                    "stop_timestamp": stop_timestamp or "unknown"
                 })
                 logging.info(f"Finalizing cache with graceful={graceful}, reason={stop_reason}")
+
             elif db_info:
                 # Update with current database info
                 cache_data.update({
@@ -583,7 +571,8 @@ class BaseDatabaseMetadataCache:
                     "db_size_bytes": db_info["db_size_bytes"],
                     "table_counts": db_info["table_counts"],
                     "last_db_update": db_info["last_db_update"],
-                    "db_version": db_info["db_version"]
+                    "db_version": db_info["db_version"],
+                    "db_status": "tracking"
                 })
             
             # Add experiment information if provided (replaces last_run_info functionality)
@@ -841,7 +830,16 @@ class MySQLDatabaseMetadataCache(BaseDatabaseMetadataCache):
             }
 
     def _get_value_from_database(self, field, warn=True):
-
+        """
+        Retrieve a specific field value from the MySQL database METADATA table.
+        
+        Args:
+            field (str): The metadata field name to retrieve (e.g., 'backup_filename', 'date_time', 'machine_name')
+            warn (bool): Whether to log warnings for database connection errors (default: True)
+            
+        Returns:
+            str or None: The field value if found, None if field doesn't exist or query fails
+        """
         try:
             with mysql.connector.connect(
                 host=self.db_credentials.get("host", "localhost"),
@@ -972,6 +970,16 @@ class SQLiteDatabaseMetadataCache(BaseDatabaseMetadataCache):
             }
 
     def _get_value_from_database(self, field):
+        """
+        Retrieve a specific field value from the SQlite database METADATA table.
+        
+        Args:
+            field (str): The metadata field name to retrieve (e.g., 'backup_filename', 'date_time', 'machine_name')
+            warn (bool): Whether to log warnings for database connection errors (default: True)
+            
+        Returns:
+            str or None: The field value if found, None if field doesn't exist or query fails
+        """
         try:
             db_path = self.db_credentials["name"]
             if not os.path.exists(db_path):

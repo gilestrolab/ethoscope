@@ -82,3 +82,4 @@ node_src/node_modules
 sync_from_node.sh
 CLAUDE.local.md
 start_dev_node.sh
+.venv

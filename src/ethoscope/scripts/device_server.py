@@ -766,7 +766,7 @@ if __name__ == '__main__':
     _ETHOSCOPE_DIR = '/ethoscope_data'
     _ETHOSCOPE_UPLOAD = os.path.join(_ETHOSCOPE_DIR, 'upload')
     _ETHOSCOPE_VIDEOS_DIR = os.path.join(_ETHOSCOPE_DIR, 'videos')
-    _ETHOSCOPE_TRACKING_DIR = os.path.join(_ETHOSCOPE_DIR, 'tracking')
+    _ETHOSCOPE_TRACKING_DIR = os.path.join(_ETHOSCOPE_DIR, 'results')
     _ETHOSCOPE_CACHE_DIR = os.path.join(_ETHOSCOPE_DIR, 'cache')
 
     if not listenerIsAlive():
@@ -807,7 +807,7 @@ if __name__ == '__main__':
                 pass
 
             ip_attempts += 1
-            time.sleep(1)
+            time.sleep(0.1)
             
         logging.info("Registering device on zeroconf with IP: %s" % ip_address)
             
