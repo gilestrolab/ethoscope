@@ -1769,10 +1769,10 @@ table thead th a:focus {
         transparent 100%);
 }
 
-/* MySQL/MariaDB database styling - blue-green (same thing, different names) */
+/* MySQL/MariaDB database styling - green to match SQLite (same thing, different names) */
 .backup-progress-bar.mysql-db .backup-progress-fill.backed-up,
 .backup-progress-bar.mariadb-db .backup-progress-fill.backed-up {
-    background-color: #007bff;
+    background-color: var(--deep-green);
 }
 
 .backup-progress-bar.mysql-db .backup-progress-fill.backed-up::after,
