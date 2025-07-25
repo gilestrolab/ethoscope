@@ -177,8 +177,8 @@
         };
 
         var get_backup_status = function() {
-            // Get unified backup status from both MySQL and rsync backup daemons
-            $http.get('/backup/status').then(function(response) {
+            // Get lightweight backup summary for dashboard - no individual files data
+            $http.get('/backup/summary').then(function(response) {
                 var data = response.data;
 
                 // Store the full response for debugging/advanced use

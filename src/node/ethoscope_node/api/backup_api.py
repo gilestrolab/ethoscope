@@ -30,6 +30,7 @@ class BackupAPI(BaseAPI):
         """Register backup-related routes."""
         self.app.route('/backup/status', method='GET')(self._get_backup_status)
         self.app.route('/backup/status/<device_id>', method='GET')(self._get_device_backup_status)
+        self.app.route('/backup/summary', method='GET')(self._get_backup_summary)
     
     @error_decorator
     def _get_backup_status(self):
@@ -161,6 +162,118 @@ class BackupAPI(BaseAPI):
                 device_status['backup_types']['video'] = rsync_backup_types['video']
         
         return device_status
+    
+    @error_decorator
+    def _get_backup_summary(self):
+        """Get lightweight backup summary for dashboard - no individual files data."""
+        self.set_json_response()
+        
+        # Use summary-specific cache key
+        current_time = time.time()
+        
+        # Check summary-specific cache first
+        if (hasattr(self, '_summary_backup_cache') and 
+            current_time - self._summary_backup_cache.get('timestamp', 0) < 30):
+            return self._summary_backup_cache['data']
+        
+        # Fetch status from both backup services but request lightweight data
+        mysql_status = self._fetch_backup_service_status(8090, "MySQL")
+        # For rsync, we'll get summary data only - not individual files
+        rsync_status = self._fetch_rsync_summary_status(8093, "Rsync")
+        
+        # Create lightweight structured status
+        structured_status = self._create_summary_backup_status(mysql_status, rsync_status)
+        
+        result = json.dumps(structured_status, indent=2)
+        
+        # Cache the result with summary-specific cache
+        if not hasattr(self, '_summary_backup_cache'):
+            self._summary_backup_cache = {}
+            
+        self._summary_backup_cache = {
+            'data': result,
+            'timestamp': current_time
+        }
+        
+        return result
+    
+    def _fetch_rsync_summary_status(self, port: int, service_name: str):
+        """Fetch rsync status without expensive individual file enumeration."""
+        try:
+            # Use the base /status endpoint but indicate this is for summary use
+            backup_url = f'http://localhost:{port}/status'
+            with urllib.request.urlopen(backup_url, timeout=5) as response:
+                data = response.read().decode('utf-8')
+                parsed_data = json.loads(data)
+                
+                # Strip out individual_files data to reduce payload size
+                if 'devices' in parsed_data:
+                    for device_id, device_data in parsed_data['devices'].items():
+                        if 'individual_files' in device_data:
+                            del device_data['individual_files']
+                        # Also remove large individual_files arrays from backup_types
+                        if 'backup_types' in device_data:
+                            for backup_type, backup_info in device_data['backup_types'].items():
+                                if 'individual_files' in backup_info:
+                                    del backup_info['individual_files']
+                
+                return parsed_data
+        except Exception as e:
+            self.logger.debug(f"Summary rsync status failed for {service_name} on port {port}: {e}")
+            return {"error": f"{service_name} backup service unavailable", "service": service_name.lower().replace(" ", "_")}
+    
+    def _create_summary_backup_status(self, mysql_status, rsync_status):
+        """Create lightweight backup status summary for dashboard use."""
+        # Use the same structured format but without individual files data
+        structured_devices = {}
+        
+        mysql_devices, rsync_devices, all_device_ids = self._extract_devices_from_status(mysql_status, rsync_status)
+        
+        for device_id in all_device_ids:
+            mysql_device = mysql_devices.get(device_id, {})
+            rsync_device = rsync_devices.get(device_id, {})
+            
+            # Extract synced information to determine backup types
+            mysql_synced = mysql_device.get("synced", {})
+            rsync_synced = rsync_device.get("synced", {})
+            
+            # Determine what types of data are being backed up (summary only)
+            mysql_backup_info = self._extract_backup_info("mysql", mysql_device)
+            sqlite_backup_info = self._extract_backup_info("sqlite", rsync_device, rsync_synced, device_id)
+            video_backup_info = self._extract_backup_info("video", rsync_device, rsync_synced, device_id)
+            
+            # Create lightweight device status - no individual files
+            device_status = {
+                "name": mysql_device.get("name") or rsync_device.get("name", f"DEVICE_{device_id[:8]}"),
+                "device_status": mysql_device.get("status") or rsync_device.get("status", "unknown"),
+                "last_seen": max(
+                    mysql_device.get("ended", 0) or 0,
+                    rsync_device.get("ended", 0) or 0
+                ),
+                "backup_types": {
+                    "mysql": mysql_backup_info,
+                    "sqlite": sqlite_backup_info, 
+                    "video": video_backup_info
+                },
+                "overall_status": self._determine_overall_backup_status(
+                    mysql_backup_info, sqlite_backup_info, video_backup_info
+                )
+            }
+            
+            structured_devices[device_id] = device_status
+        
+        # Create summary with service availability info (needed by dashboard)
+        summary = {
+            "services": {
+                "mysql_service_available": "error" not in mysql_status,
+                "rsync_service_available": "error" not in rsync_status
+            }
+        }
+        
+        return {
+            "devices": structured_devices,
+            "summary": summary
+        }
     
     def _fetch_backup_service_status(self, port: int, service_name: str):
         """Fetch backup status from a backup daemon running on specified port."""

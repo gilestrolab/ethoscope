@@ -5,8 +5,8 @@
         $scope.currentPage = 1;
         $scope.itemsPerPage = 20;
 
-        // Get structured backup status with MySQL, SQLite, and Video backup information
-        $scope.getBackupInfo = function () { return $http.get('/backup/status') };
+        // Get lightweight backup summary for experiments page - no individual files data  
+        $scope.getBackupInfo = function () { return $http.get('/backup/summary') };
 
         $http.get('/devices').then(function(response) { var data = response.data;
             $scope.devices = data;
