@@ -847,6 +847,70 @@ class EthoscopeConfiguration:
         return tunnel_config
 
 
+def _setup_system_ssh_config(private_key_path: str) -> None:
+    """
+    Set up system-wide SSH configuration for ethoscope connections.
+    
+    Creates or updates /etc/ssh/ssh_config with ethoscope-specific settings
+    that apply to all users on the system.
+    
+    Args:
+        private_key_path: Path to the private key file
+    """
+    logger = logging.getLogger(__name__)
+    ssh_config_path = "/etc/ssh/ssh_config"
+    
+    # Import here to avoid circular imports
+    from .network import get_private_ip_pattern
+    
+    # Get the actual IP pattern for this network
+    ip_pattern = get_private_ip_pattern()
+    
+    # Configuration block to add
+    config_block = f"""
+# Ethoscope SSH configuration
+Host {ip_pattern} ethoscope*
+     User ethoscope
+     StrictHostKeyChecking no
+     UserKnownHostsFile=/dev/null
+     IdentityFile {private_key_path}
+     ConnectTimeout 10
+     ServerAliveInterval 30
+     ServerAliveCountMax 3
+"""
+    
+    try:
+        # Check if configuration already exists
+        if os.path.exists(ssh_config_path):
+            with open(ssh_config_path, 'r') as f:
+                content = f.read()
+                
+            # If ethoscope config already exists, skip
+            if "# Ethoscope SSH configuration" in content:
+                logger.info("System SSH config for ethoscopes already exists")
+                return
+                
+            # Append to existing config
+            with open(ssh_config_path, 'a') as f:
+                f.write(config_block)
+            logger.info(f"Appended ethoscope SSH config to {ssh_config_path}")
+        else:
+            # Create new config file
+            with open(ssh_config_path, 'w') as f:
+                f.write(config_block.lstrip())
+            logger.info(f"Created new SSH config at {ssh_config_path}")
+            
+        # Set proper permissions (readable by all users)
+        os.chmod(ssh_config_path, 0o644)
+        logger.info(f"Set permissions on {ssh_config_path}")
+        
+    except PermissionError as e:
+        logger.warning(f"Permission denied updating system SSH config: {e}")
+        logger.info("System SSH config requires root privileges to modify")
+    except Exception as e:
+        logger.error(f"Failed to setup system SSH config: {e}")
+
+
 def ensure_ssh_keys(keys_dir: str = "/etc/ethoscope/keys") -> Tuple[str, str]:
     """
     Ensure SSH keys exist for ethoscope node authentication.
@@ -924,6 +988,9 @@ def ensure_ssh_keys(keys_dir: str = "/etc/ethoscope/keys") -> Tuple[str, str]:
         logger.info(f"Set proper permissions on SSH keys")
         logger.info(f"Private key: {private_key_path} (600)")
         logger.info(f"Public key: {public_key_path} (644)")
+        
+        # Set up system-wide SSH configuration for ethoscopes
+        _setup_system_ssh_config(str(private_key_path))
         
         return str(private_key_path), str(public_key_path)
         
