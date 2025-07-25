@@ -64,6 +64,13 @@ class AsyncSQLiteWriter(BaseAsyncSQLWriter):
                 os.remove(self._db_name)
             except:
                 pass
+            
+            # Ensure directory exists before creating database connection
+            db_dir = os.path.dirname(self._db_name)
+            if db_dir:  # Only create directory if path contains a directory component
+                os.makedirs(db_dir, exist_ok=True)
+                logging.info(f"Created SQLite directory: {db_dir}")
+            
             conn = self._get_connection()
             c = conn.cursor()
             logging.info("Setting DB parameters")

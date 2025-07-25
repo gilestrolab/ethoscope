@@ -722,7 +722,7 @@ class ControlThread(Thread):
         })
         
         # Configure database credentials and metadata cache based on result writer type
-        if result_writer_type == "SQLiteResultWriter":
+        if result_writer_type == "SQLite3" or result_writer_type == "SQLiteResultWriter":
             # SQLite uses the consistent directory structure for database file path
             if sqlite_source_path is None:
                 raise ValueError("SQLite source path is None - backup filename parsing failed")
