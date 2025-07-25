@@ -85,6 +85,7 @@
         
         // Backup status cache
         $scope.backupSummary = null; // Cached backup summary to prevent digest loops
+        var lastBackupStatusLoad = 0; // Timestamp of last backup status load
 
         // UI state variables
         $scope.showLog = false;
@@ -832,6 +833,13 @@
          * Load backup status from the /backup/status endpoint
          */
         function loadBackupStatus() {
+            // Throttle backup status requests to maximum once every 60 seconds
+            var now = Date.now();
+            if (now - lastBackupStatusLoad < 60000) {
+                return;
+            }
+            lastBackupStatusLoad = now;
+            
             $http.get('/backup/status')
                 .then(function(response) {
                     var backupData = response.data;
@@ -1978,7 +1986,16 @@
                     return $http.get('/device/' + device_id + '/data');
                 })
                 .then(function(response) {
+                    // Preserve backup_status_detailed during device refresh
+                    var existingBackupStatus = $scope.device ? $scope.device.backup_status_detailed : null;
+                    
                     $scope.device = response.data;
+                    
+                    // Restore preserved backup status
+                    if (existingBackupStatus) {
+                        $scope.device.backup_status_detailed = existingBackupStatus;
+                    }
+                    
                     // Update backup summary cache when device data changes
                     updateBackupSummary();
                 })
@@ -1997,7 +2014,17 @@
             $http.get('/device/' + device_id + '/data')
                 .then(function(response) {
                     var data = response.data;
+                    
+                    // Preserve backup_status_detailed during device refresh
+                    var existingBackupStatus = $scope.device ? $scope.device.backup_status_detailed : null;
+                    
                     $scope.device = data;
+                    
+                    // Restore preserved backup status
+                    if (existingBackupStatus) {
+                        $scope.device.backup_status_detailed = existingBackupStatus;
+                    }
+                    
                     console.log('DEBUG: Data received in refresh function:', data);
 
                     // Update backup summary cache when device data changes
@@ -2029,8 +2056,8 @@
                     console.error('Failed to refresh device data:', error);
                 });
 
-            // Also refresh backup status periodically (less frequently)
-            if (Math.random() < 0.3) { // 30% chance to refresh backup status
+            // Also refresh backup status periodically (very infrequently due to caching)
+            if (Math.random() < 0.05) { // 5% chance to refresh backup status (throttled to 60s anyway)
                 loadBackupStatus();
             }
         }

@@ -9,12 +9,22 @@ import json
 import urllib.request
 import subprocess
 import os
+import time
 from typing import Dict, Any
 from .base import BaseAPI, error_decorator
 
 
 class BackupAPI(BaseAPI):
     """API endpoints for backup system management."""
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Cache for backup status to improve performance
+        self._backup_cache = {
+            'data': None,
+            'timestamp': 0,
+            'ttl': 30  # Cache for 30 seconds
+        }
     
     def register_routes(self):
         """Register backup-related routes."""
@@ -24,6 +34,12 @@ class BackupAPI(BaseAPI):
     def _get_backup_status(self):
         """Get structured backup status for MySQL, SQLite, and Video backups."""
         self.set_json_response()
+        
+        # Check cache first
+        current_time = time.time()
+        if (self._backup_cache['data'] is not None and 
+            current_time - self._backup_cache['timestamp'] < self._backup_cache['ttl']):
+            return self._backup_cache['data']
         
         # Fetch status from both backup services
         mysql_status = self._fetch_backup_service_status(8090, "MySQL")
@@ -35,7 +51,15 @@ class BackupAPI(BaseAPI):
             "summary": self._create_backup_summary(mysql_status, rsync_status)
         }
         
-        return json.dumps(structured_status, indent=2)
+        # Cache the result
+        result = json.dumps(structured_status, indent=2)
+        self._backup_cache = {
+            'data': result,
+            'timestamp': current_time,
+            'ttl': 30
+        }
+        
+        return result
     
     def _fetch_backup_service_status(self, port: int, service_name: str):
         """Fetch backup status from a backup daemon running on specified port."""
@@ -93,6 +117,19 @@ class BackupAPI(BaseAPI):
                     mysql_backup_info, sqlite_backup_info, video_backup_info
                 )
             }
+            
+            # Pass through enhanced individual_files data from rsync service
+            if rsync_device and 'individual_files' in rsync_device:
+                device_status['individual_files'] = rsync_device['individual_files']
+            
+            # Pass through enhanced backup_types from rsync service if available
+            if rsync_device and 'backup_types' in rsync_device:
+                # Merge the enhanced backup_types data from rsync service
+                rsync_backup_types = rsync_device['backup_types']
+                if 'sqlite' in rsync_backup_types and rsync_backup_types['sqlite'].get('available'):
+                    device_status['backup_types']['sqlite'] = rsync_backup_types['sqlite']
+                if 'video' in rsync_backup_types and rsync_backup_types['video'].get('available'):
+                    device_status['backup_types']['video'] = rsync_backup_types['video']
             
             structured_devices[device_id] = device_status
         
