@@ -56,10 +56,15 @@ SYSTEM_DAEMONS = {
         'available_on_docker': False
     },
     "ethoscope_tunnel": {
-        'description': 'Cloudflare tunnel service for remote access to this node via the internet',
+        'description': 'Cloudflare tunnel service for remote access to this node via the internet. Requires token.',
+        'available_on_docker': False
+    },
+    "ethoscope_sensor_virtual": {
+        'description': 'A virtual sensor collecting real world data about. Requires token.',
         'available_on_docker': False
     }
 }
+    
 
 
 class NodeAPI(BaseAPI):
