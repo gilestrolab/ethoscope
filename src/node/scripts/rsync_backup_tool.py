@@ -6,6 +6,7 @@ import sys
 import signal
 import time
 import os
+import threading
 from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from ethoscope_node.utils.backups_helpers import GenericBackupWrapper, UnifiedRsyncBackupClass
@@ -13,12 +14,14 @@ from ethoscope_node.utils.configuration import EthoscopeConfiguration
 
 gbw = None  # This will be initialized later
 
-# Global cache for file enumeration to prevent expensive filesystem operations
+# Global cache for file enumeration with background refresh
 file_enumeration_cache = {
     'sqlite': {},  # device_id -> cached data
     'videos': {},  # device_id -> cached data
     'cache_ttl': 300,  # 5 minutes cache TTL
-    'last_cleanup': time.time()
+    'last_refresh': {},  # device_id -> last refresh timestamp
+    'refresh_lock': threading.Lock(),
+    'background_refresh_active': {}  # device_id -> boolean to prevent multiple refreshes
 }
 
 class RequestHandler(BaseHTTPRequestHandler):
@@ -187,61 +190,127 @@ class RequestHandler(BaseHTTPRequestHandler):
         
         return status_dict
     
-    def _cleanup_file_cache(self):
-        """Clean up old cache entries to prevent memory buildup"""
-        current_time = time.time()
-        cache_ttl = file_enumeration_cache['cache_ttl']
-        
-        # Only cleanup every 60 seconds to avoid frequent operations
-        if current_time - file_enumeration_cache['last_cleanup'] < 60:
-            return
-            
-        for cache_type in ['sqlite', 'videos']:
-            expired_keys = []
-            for device_id, cache_entry in file_enumeration_cache[cache_type].items():
-                if current_time - cache_entry['timestamp'] > cache_ttl:
-                    expired_keys.append(device_id)
-            
-            for key in expired_keys:
-                del file_enumeration_cache[cache_type][key]
-        
-        file_enumeration_cache['last_cleanup'] = current_time
-    
     def _get_cached_file_enumeration(self, cache_type, device_id, directory_path):
-        """Get cached file enumeration if valid, otherwise return None"""
-        self._cleanup_file_cache()
-        
-        cache = file_enumeration_cache[cache_type].get(device_id)
-        if not cache:
-            return None
+        """Get cached file enumeration, always return existing cache or empty result"""
+        with file_enumeration_cache['refresh_lock']:
+            cache = file_enumeration_cache[cache_type].get(device_id)
+            current_time = time.time()
             
-        current_time = time.time()
-        cache_ttl = file_enumeration_cache['cache_ttl']
-        
-        # Check if cache is still valid
-        if current_time - cache['timestamp'] > cache_ttl:
-            # Cache expired
-            del file_enumeration_cache[cache_type][device_id]
-            return None
-        
-        # Check if directory path matches (in case device path changed)
-        if cache['directory_path'] != directory_path:
-            # Directory changed, invalidate cache
-            del file_enumeration_cache[cache_type][device_id]
-            return None
+            # If no cache exists, return empty result and trigger background refresh
+            if not cache:
+                self._trigger_background_refresh(cache_type, device_id, directory_path)
+                return {
+                    'count': 0,
+                    'total_size': 0,
+                    'total_size_human': '0 B',
+                    'files': []
+                }
             
-        return cache['data']
+            # Check if cache needs refresh (but don't block - serve existing cache)
+            cache_age = current_time - cache['timestamp']
+            if cache_age > file_enumeration_cache['cache_ttl']:
+                # Cache is stale, trigger background refresh but serve existing data
+                self._trigger_background_refresh(cache_type, device_id, directory_path)
+            
+            # Always return cached data (even if stale)
+            return cache['data']
     
-    def _set_cached_file_enumeration(self, cache_type, device_id, directory_path, data):
-        """Cache file enumeration data"""
-        file_enumeration_cache[cache_type][device_id] = {
-            'timestamp': time.time(),
-            'directory_path': directory_path,
-            'data': data
+    def _trigger_background_refresh(self, cache_type, device_id, directory_path):
+        """Trigger background refresh if not already running"""
+        refresh_key = f"{cache_type}_{device_id}"
+        
+        # Check if refresh is already running for this device/type
+        if file_enumeration_cache['background_refresh_active'].get(refresh_key, False):
+            return
+        
+        # Mark refresh as active
+        file_enumeration_cache['background_refresh_active'][refresh_key] = True
+        
+        # Start background thread
+        refresh_thread = threading.Thread(
+            target=self._background_refresh_worker,
+            args=(cache_type, device_id, directory_path, refresh_key),
+            daemon=True
+        )
+        refresh_thread.start()
+    
+    def _background_refresh_worker(self, cache_type, device_id, directory_path, refresh_key):
+        """Background worker to refresh file enumeration cache"""
+        try:
+            logging.info(f"Background refresh started for {cache_type} files on device {device_id}")
+            
+            # Perform the expensive filesystem operation
+            if cache_type == 'sqlite':
+                data = self._enumerate_files_from_filesystem(directory_path, '.db')
+            else:  # videos
+                video_extensions = ('.mp4', '.avi', '.h264', '.mkv', '.mov', '.webm')
+                data = self._enumerate_files_from_filesystem(directory_path, video_extensions)
+            
+            # Update cache with new data
+            with file_enumeration_cache['refresh_lock']:
+                file_enumeration_cache[cache_type][device_id] = {
+                    'timestamp': time.time(),
+                    'directory_path': directory_path,
+                    'data': data
+                }
+                file_enumeration_cache['last_refresh'][device_id] = time.time()
+            
+            logging.info(f"Background refresh completed for {cache_type} files on device {device_id}: {data['count']} files, {data['total_size_human']}")
+            
+        except Exception as e:
+            logging.error(f"Background refresh failed for {cache_type} files on device {device_id}: {e}")
+        finally:
+            # Mark refresh as completed
+            with file_enumeration_cache['refresh_lock']:
+                file_enumeration_cache['background_refresh_active'][refresh_key] = False
+    
+    def _enumerate_files_from_filesystem(self, directory_path, extensions):
+        """Perform actual filesystem enumeration (expensive operation)"""
+        files = []
+        
+        if not directory_path or not os.path.exists(directory_path):
+            return {
+                'count': 0,
+                'total_size': 0,
+                'total_size_human': '0 B',
+                'files': []
+            }
+        
+        try:
+            # Normalize extensions to tuple for endswith check
+            if isinstance(extensions, str):
+                extensions = (extensions,)
+            
+            for root, dirs, filenames in os.walk(directory_path):
+                for filename in filenames:
+                    if filename.lower().endswith(extensions):
+                        file_path = os.path.join(root, filename)
+                        try:
+                            file_stat = os.stat(file_path)
+                            files.append({
+                                'name': filename,
+                                'path': file_path,
+                                'relative_path': os.path.relpath(file_path, directory_path),
+                                'size': file_stat.st_size,
+                                'size_human': self._format_bytes(file_stat.st_size),
+                                'modified': file_stat.st_mtime,
+                                'status': 'backed_up'
+                            })
+                        except OSError as e:
+                            logging.warning(f"Could not stat file {file_path}: {e}")
+                            continue
+        except OSError as e:
+            logging.error(f"Could not scan directory {directory_path}: {e}")
+        
+        return {
+            'count': len(files),
+            'total_size': sum(f['size'] for f in files),
+            'total_size_human': self._format_bytes(sum(f['size'] for f in files)),
+            'files': sorted(files, key=lambda x: x['modified'], reverse=True)
         }
     
     def _enumerate_sqlite_files(self, device_id, results_info):
-        """Enumerate individual SQLite database files with aggressive caching"""
+        """Enumerate individual SQLite database files with background refresh caching"""
         # Use directory from results_info, or construct path from device_id
         results_path = results_info.get('local_path', '')
         if not results_path:
@@ -251,50 +320,11 @@ class RequestHandler(BaseHTTPRequestHandler):
         if not results_path and device_id:
             results_path = f"/ethoscope_data/results/{device_id}"
         
-        # Check cache first
-        cached_result = self._get_cached_file_enumeration('sqlite', device_id, results_path)
-        if cached_result is not None:
-            return cached_result
-        
-        # Cache miss - perform expensive filesystem operation
-        files = []
-        if results_path and os.path.exists(results_path):
-            try:
-                for root, dirs, filenames in os.walk(results_path):
-                    for filename in filenames:
-                        if filename.endswith('.db'):
-                            file_path = os.path.join(root, filename)
-                            try:
-                                file_stat = os.stat(file_path)
-                                files.append({
-                                    'name': filename,
-                                    'path': file_path,
-                                    'relative_path': os.path.relpath(file_path, results_path),
-                                    'size': file_stat.st_size,
-                                    'size_human': self._format_bytes(file_stat.st_size),
-                                    'modified': file_stat.st_mtime,
-                                    'status': 'backed_up'  # Since it exists in backup location
-                                })
-                            except OSError as e:
-                                # File might have been deleted while we were scanning
-                                logging.warning(f"Could not stat file {file_path}: {e}")
-                                continue
-            except OSError as e:
-                logging.error(f"Could not scan directory {results_path}: {e}")
-        
-        result = {
-            'count': len(files),
-            'total_size': sum(f['size'] for f in files),
-            'total_size_human': self._format_bytes(sum(f['size'] for f in files)),
-            'files': sorted(files, key=lambda x: x['modified'], reverse=True)  # Sort by newest first
-        }
-        
-        # Cache the result
-        self._set_cached_file_enumeration('sqlite', device_id, results_path, result)
-        return result
+        # Always get from cache (triggers background refresh if needed)
+        return self._get_cached_file_enumeration('sqlite', device_id, results_path)
     
     def _enumerate_video_files(self, device_id, videos_info):
-        """Enumerate individual video files with aggressive caching"""
+        """Enumerate individual video files with background refresh caching"""
         # Use directory from videos_info, or construct path from device_id
         videos_path = videos_info.get('local_path', '')
         if not videos_path:
@@ -304,50 +334,8 @@ class RequestHandler(BaseHTTPRequestHandler):
         if not videos_path and device_id:
             videos_path = f"/ethoscope_data/videos/{device_id}"
         
-        # Check cache first
-        cached_result = self._get_cached_file_enumeration('videos', device_id, videos_path)
-        if cached_result is not None:
-            return cached_result
-        
-        # Cache miss - perform expensive filesystem operation
-        files = []
-        if videos_path and os.path.exists(videos_path):
-            try:
-                # Common video extensions
-                video_extensions = ('.mp4', '.avi', '.h264', '.mkv', '.mov', '.webm')
-                
-                for root, dirs, filenames in os.walk(videos_path):
-                    for filename in filenames:
-                        if filename.lower().endswith(video_extensions):
-                            file_path = os.path.join(root, filename)
-                            try:
-                                file_stat = os.stat(file_path)
-                                files.append({
-                                    'name': filename,
-                                    'path': file_path,
-                                    'relative_path': os.path.relpath(file_path, videos_path),
-                                    'size': file_stat.st_size,
-                                    'size_human': self._format_bytes(file_stat.st_size),
-                                    'modified': file_stat.st_mtime,
-                                    'status': 'backed_up'  # Since it exists in backup location
-                                })
-                            except OSError as e:
-                                # File might have been deleted while we were scanning
-                                logging.warning(f"Could not stat file {file_path}: {e}")
-                                continue
-            except OSError as e:
-                logging.error(f"Could not scan directory {videos_path}: {e}")
-        
-        result = {
-            'count': len(files),
-            'total_size': sum(f['size'] for f in files),
-            'total_size_human': self._format_bytes(sum(f['size'] for f in files)),
-            'files': sorted(files, key=lambda x: x['modified'], reverse=True)  # Sort by newest first
-        }
-        
-        # Cache the result
-        self._set_cached_file_enumeration('videos', device_id, videos_path, result)
-        return result
+        # Always get from cache (triggers background refresh if needed)
+        return self._get_cached_file_enumeration('videos', device_id, videos_path)
     
     def _format_bytes(self, bytes_value):
         """Format bytes in human readable format"""
