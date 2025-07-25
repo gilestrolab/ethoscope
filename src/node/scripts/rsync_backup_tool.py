@@ -13,6 +13,14 @@ from ethoscope_node.utils.configuration import EthoscopeConfiguration
 
 gbw = None  # This will be initialized later
 
+# Global cache for file enumeration to prevent expensive filesystem operations
+file_enumeration_cache = {
+    'sqlite': {},  # device_id -> cached data
+    'videos': {},  # device_id -> cached data
+    'cache_ttl': 300,  # 5 minutes cache TTL
+    'last_cleanup': time.time()
+}
+
 class RequestHandler(BaseHTTPRequestHandler):
     def _send_response(self, content):
         """Helper function to send a JSON response"""
@@ -179,9 +187,61 @@ class RequestHandler(BaseHTTPRequestHandler):
         
         return status_dict
     
+    def _cleanup_file_cache(self):
+        """Clean up old cache entries to prevent memory buildup"""
+        current_time = time.time()
+        cache_ttl = file_enumeration_cache['cache_ttl']
+        
+        # Only cleanup every 60 seconds to avoid frequent operations
+        if current_time - file_enumeration_cache['last_cleanup'] < 60:
+            return
+            
+        for cache_type in ['sqlite', 'videos']:
+            expired_keys = []
+            for device_id, cache_entry in file_enumeration_cache[cache_type].items():
+                if current_time - cache_entry['timestamp'] > cache_ttl:
+                    expired_keys.append(device_id)
+            
+            for key in expired_keys:
+                del file_enumeration_cache[cache_type][key]
+        
+        file_enumeration_cache['last_cleanup'] = current_time
+    
+    def _get_cached_file_enumeration(self, cache_type, device_id, directory_path):
+        """Get cached file enumeration if valid, otherwise return None"""
+        self._cleanup_file_cache()
+        
+        cache = file_enumeration_cache[cache_type].get(device_id)
+        if not cache:
+            return None
+            
+        current_time = time.time()
+        cache_ttl = file_enumeration_cache['cache_ttl']
+        
+        # Check if cache is still valid
+        if current_time - cache['timestamp'] > cache_ttl:
+            # Cache expired
+            del file_enumeration_cache[cache_type][device_id]
+            return None
+        
+        # Check if directory path matches (in case device path changed)
+        if cache['directory_path'] != directory_path:
+            # Directory changed, invalidate cache
+            del file_enumeration_cache[cache_type][device_id]
+            return None
+            
+        return cache['data']
+    
+    def _set_cached_file_enumeration(self, cache_type, device_id, directory_path, data):
+        """Cache file enumeration data"""
+        file_enumeration_cache[cache_type][device_id] = {
+            'timestamp': time.time(),
+            'directory_path': directory_path,
+            'data': data
+        }
+    
     def _enumerate_sqlite_files(self, device_id, results_info):
-        """Enumerate individual SQLite database files"""
-        files = []
+        """Enumerate individual SQLite database files with aggressive caching"""
         # Use directory from results_info, or construct path from device_id
         results_path = results_info.get('local_path', '')
         if not results_path:
@@ -191,6 +251,13 @@ class RequestHandler(BaseHTTPRequestHandler):
         if not results_path and device_id:
             results_path = f"/ethoscope_data/results/{device_id}"
         
+        # Check cache first
+        cached_result = self._get_cached_file_enumeration('sqlite', device_id, results_path)
+        if cached_result is not None:
+            return cached_result
+        
+        # Cache miss - perform expensive filesystem operation
+        files = []
         if results_path and os.path.exists(results_path):
             try:
                 for root, dirs, filenames in os.walk(results_path):
@@ -215,16 +282,19 @@ class RequestHandler(BaseHTTPRequestHandler):
             except OSError as e:
                 logging.error(f"Could not scan directory {results_path}: {e}")
         
-        return {
+        result = {
             'count': len(files),
             'total_size': sum(f['size'] for f in files),
             'total_size_human': self._format_bytes(sum(f['size'] for f in files)),
             'files': sorted(files, key=lambda x: x['modified'], reverse=True)  # Sort by newest first
         }
+        
+        # Cache the result
+        self._set_cached_file_enumeration('sqlite', device_id, results_path, result)
+        return result
     
     def _enumerate_video_files(self, device_id, videos_info):
-        """Enumerate individual video files"""
-        files = []
+        """Enumerate individual video files with aggressive caching"""
         # Use directory from videos_info, or construct path from device_id
         videos_path = videos_info.get('local_path', '')
         if not videos_path:
@@ -234,6 +304,13 @@ class RequestHandler(BaseHTTPRequestHandler):
         if not videos_path and device_id:
             videos_path = f"/ethoscope_data/videos/{device_id}"
         
+        # Check cache first
+        cached_result = self._get_cached_file_enumeration('videos', device_id, videos_path)
+        if cached_result is not None:
+            return cached_result
+        
+        # Cache miss - perform expensive filesystem operation
+        files = []
         if videos_path and os.path.exists(videos_path):
             try:
                 # Common video extensions
@@ -261,12 +338,16 @@ class RequestHandler(BaseHTTPRequestHandler):
             except OSError as e:
                 logging.error(f"Could not scan directory {videos_path}: {e}")
         
-        return {
+        result = {
             'count': len(files),
             'total_size': sum(f['size'] for f in files),
             'total_size_human': self._format_bytes(sum(f['size'] for f in files)),
             'files': sorted(files, key=lambda x: x['modified'], reverse=True)  # Sort by newest first
         }
+        
+        # Cache the result
+        self._set_cached_file_enumeration('videos', device_id, videos_path, result)
+        return result
     
     def _format_bytes(self, bytes_value):
         """Format bytes in human readable format"""
