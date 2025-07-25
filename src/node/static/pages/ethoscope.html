@@ -135,9 +135,6 @@
 
             <!-- Enhanced backup status using /backup/status endpoint data -->
             <div ng-if="backupSummary && backupSummary.useDetailedStatus && device.backup_status_detailed">
-                <div style="background-color: #d4edda; padding: 5px; margin-bottom: 10px; border-radius: 3px; color: #155724; font-size: 12px;">
-                    ✅ Using enhanced backup status from /backup/status endpoint
-                </div>
 
                 <!-- MySQL/MariaDB Backup -->
                 <div ng-if="device.backup_status_detailed.backup_types.mysql && device.backup_status_detailed.backup_types.mysql.available" class="database-type-section">
@@ -245,9 +242,6 @@
 
             <!-- Fallback: Legacy backup status display -->
             <div ng-if="!backupSummary || !backupSummary.useDetailedStatus">
-                <div style="background-color: #f8d7da; padding: 5px; margin-bottom: 10px; border-radius: 3px; color: #721c24; font-size: 12px;">
-                    ⚠️ Using legacy backup status from device.databases (fallback)
-                </div>
                 <!-- SQLite Databases -->
                 <div ng-if="device.databases.SQLite && getObjectKeys(device.databases.SQLite).length > 0" class="database-type-section">
                     <h5><span class="fa fa-file-database-o"></span> SQLite Databases</h5>
