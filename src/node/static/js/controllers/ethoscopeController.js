@@ -82,6 +82,9 @@
             sensors: {}
         };
         $scope.stimulatorSequence = []; // Array for stimulator sequence
+        
+        // Backup status cache
+        $scope.backupSummary = null; // Cached backup summary to prevent digest loops
 
         // UI state variables
         $scope.showLog = false;
@@ -256,6 +259,9 @@
                         // Device is active if it doesn't end with "_000"
                         $scope.isActive = ($scope.device.name.split("_").pop() !== "000");
 
+                        // Update backup summary cache
+                        updateBackupSummary();
+
                         // CRITICAL: Display timestamp immediately on load
                         updateTimestampDisplay(data.data);
 
@@ -344,6 +350,9 @@
                     $scope.device = response.data;
                     // Device is active if it doesn't end with "_000"
                     $scope.isActive = ($scope.device.name.split("_").pop() !== "000");
+
+                    // Update backup summary cache
+                    updateBackupSummary();
 
                     // Initialize image URLs immediately for fast loading
                     var timestamp = Math.floor(new Date().getTime() / 30000.0) * 30;
@@ -813,6 +822,224 @@
                 device.hasOwnProperty('interactor') &&
                 device.interactor.name !== "<class 'ethoscope.stimulators.stimulators.DefaultStimulator'>"
             );
+        };
+
+        // ===========================
+        // BACKUP STATUS FUNCTIONS
+        // ===========================
+
+        /**
+         * Get the keys of an object (helper for ng-repeat)
+         * @param {Object} obj - Object to get keys from
+         * @returns {Array} Array of object keys
+         */
+        $scope.getObjectKeys = function(obj) {
+            return obj ? Object.keys(obj) : [];
+        };
+
+        /**
+         * Format file size in human readable format
+         * @param {number} bytes - File size in bytes
+         * @returns {string} Formatted file size
+         */
+        $scope.formatFileSize = function(bytes) {
+            if (!bytes || bytes === 0) return '0 B';
+            
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        };
+
+        /**
+         * Format date from Unix timestamp
+         * @param {number} timestamp - Unix timestamp
+         * @returns {string} Formatted date string
+         */
+        $scope.formatDate = function(timestamp) {
+            if (!timestamp) return 'Unknown';
+            
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        };
+
+        /**
+         * Get backup status class for progress bar
+         * @param {Object} dbInfo - Database information object
+         * @returns {string} CSS class name
+         */
+        $scope.getBackupBarClass = function(dbInfo) {
+            if (!dbInfo) return 'unknown';
+            
+            if (dbInfo.file_exists === true) {
+                return 'backed-up';
+            } else if (dbInfo.file_exists === false) {
+                return 'missing-backup';
+            } else if (dbInfo.db_status === 'tracking') {
+                return 'processing';
+            } else {
+                return 'unknown';
+            }
+        };
+
+        /**
+         * Get backup progress style for the progress bar fill
+         * @param {Object} dbInfo - Database information object
+         * @param {string} dbType - Database type ('sqlite' or 'mariadb') - for future use
+         * @returns {Object} Style object for ng-style
+         */
+        $scope.getBackupProgressStyle = function(dbInfo, dbType) {
+            if (!dbInfo) return { width: '0%' };
+            
+            let width = '0%';
+            
+            if (dbInfo.file_exists === true) {
+                width = '100%';
+            } else if (dbInfo.file_exists === false) {
+                width = '100%';
+            } else if (dbInfo.db_status === 'tracking') {
+                width = '75%';
+            } else {
+                width = '25%';
+            }
+            
+            return { width: width };
+        };
+
+        /**
+         * Get backup status text
+         * @param {Object} dbInfo - Database information object
+         * @returns {string} Status text
+         */
+        $scope.getBackupStatusText = function(dbInfo) {
+            if (!dbInfo) return 'Unknown';
+            
+            if (dbInfo.file_exists === true) {
+                return 'Backed Up';
+            } else if (dbInfo.file_exists === false) {
+                return 'Missing';
+            } else if (dbInfo.db_status === 'tracking') {
+                return 'In Progress';
+            } else {
+                return 'Unknown';
+            }
+        };
+
+        /**
+         * Get overall backup status class for the toggle icon
+         * @returns {string} CSS class name
+         */
+        $scope.getBackupStatusClass = function() {
+            if (!$scope.backupSummary) {
+                return 'backup-status-unknown';
+            }
+            
+            if ($scope.backupSummary.backedUp === $scope.backupSummary.total && $scope.backupSummary.total > 0) {
+                return 'backup-status-success';
+            } else if ($scope.backupSummary.backedUp === 0 && $scope.backupSummary.total > 0) {
+                return 'backup-status-error';
+            } else if ($scope.backupSummary.backedUp > 0) {
+                return 'backup-status-warning';
+            } else {
+                return 'backup-status-unknown';
+            }
+        };
+
+        /**
+         * Update backup summary cache - called when device data changes
+         */
+        function updateBackupSummary() {
+            if (!$scope.device || !$scope.device.databases) {
+                $scope.backupSummary = null;
+                return;
+            }
+            
+            let total = 0;
+            let backedUp = 0;
+            let missing = 0;
+            let processing = 0;
+            
+            // Count SQLite databases
+            if ($scope.device.databases.SQLite) {
+                for (let dbName in $scope.device.databases.SQLite) {
+                    if ($scope.device.databases.SQLite.hasOwnProperty(dbName)) {
+                        total++;
+                        const dbInfo = $scope.device.databases.SQLite[dbName];
+                        
+                        if (dbInfo.file_exists === true) {
+                            backedUp++;
+                        } else if (dbInfo.file_exists === false) {
+                            missing++;
+                        } else if (dbInfo.db_status === 'tracking') {
+                            processing++;
+                        }
+                    }
+                }
+            }
+            
+            // Count MariaDB databases
+            if ($scope.device.databases.MariaDB) {
+                for (let dbName in $scope.device.databases.MariaDB) {
+                    if ($scope.device.databases.MariaDB.hasOwnProperty(dbName)) {
+                        total++;
+                        const dbInfo = $scope.device.databases.MariaDB[dbName];
+                        
+                        if (dbInfo.file_exists === true) {
+                            backedUp++;
+                        } else if (dbInfo.file_exists === false) {
+                            missing++;
+                        } else if (dbInfo.db_status === 'tracking') {
+                            processing++;
+                        }
+                    }
+                }
+            }
+            
+            let overallStatus = 'Unknown';
+            if (total === 0) {
+                overallStatus = 'No Databases';
+            } else if (backedUp === total) {
+                overallStatus = 'All Backed Up';
+            } else if (backedUp === 0) {
+                overallStatus = 'None Backed Up';
+            } else {
+                overallStatus = 'Partial Backup';
+            }
+            
+            $scope.backupSummary = {
+                total: total,
+                backedUp: backedUp,
+                missing: missing,
+                processing: processing,
+                overallStatus: overallStatus
+            };
+        }
+
+        /**
+         * Get backup summary statistics (cached)
+         * @returns {Object} Summary object with totals and status
+         */
+        $scope.getBackupSummary = function() {
+            return $scope.backupSummary;
+        };
+
+        /**
+         * Get overall status CSS class
+         * @returns {string} CSS class name
+         */
+        $scope.getOverallStatusClass = function() {
+            if (!$scope.backupSummary) return 'overall-status-unknown';
+            
+            if ($scope.backupSummary.backedUp === $scope.backupSummary.total && $scope.backupSummary.total > 0) {
+                return 'overall-status-success';
+            } else if ($scope.backupSummary.backedUp === 0 && $scope.backupSummary.total > 0) {
+                return 'overall-status-error';
+            } else if ($scope.backupSummary.backedUp > 0) {
+                return 'overall-status-warning';
+            } else {
+                return 'overall-status-unknown';
+            }
         };
 
         /**
@@ -1564,6 +1791,8 @@
                 })
                 .then(function(response) {
                     $scope.device = response.data;
+                    // Update backup summary cache when device data changes
+                    updateBackupSummary();
                 })
                 .catch(function(error) {
                     console.error('Failed to refresh device status:', error);
@@ -1582,6 +1811,9 @@
                     var data = response.data;
                     $scope.device = data;
                     console.log('DEBUG: Data received in refresh function:', data);
+
+                    // Update backup summary cache when device data changes
+                    updateBackupSummary();
 
                     // Update node.database_list for frontend dropdown
                     updateNodeDatabaseList();
@@ -1719,6 +1951,8 @@
             $http.get('/device/' + device_id + '/data')
                 .then(function(response) {
                     $scope.device = response.data;
+                    // Update backup summary cache when device data changes
+                    updateBackupSummary();
                     updateNodeDatabaseList();
                     checkDatabaseAvailability();
                 })

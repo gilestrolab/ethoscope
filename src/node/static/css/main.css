@@ -1614,6 +1614,293 @@ table thead th a:focus {
 }
 
 /* ===========================
+   DATABASE BACKUP STATUS STYLING
+   =========================== */
+
+/* Backup status container */
+.backup-status-container {
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+/* Toggle button for backup status */
+.backup-toggle-btn {
+    background: none;
+    border: none;
+    padding: 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.backup-toggle-btn:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Backup status icon colors */
+.backup-status-icon.backup-status-success {
+    color: var(--deep-green);
+}
+
+.backup-status-icon.backup-status-warning {
+    color: var(--burnt-orange);
+}
+
+.backup-status-icon.backup-status-error {
+    color: var(--deep-red);
+}
+
+.backup-status-icon.backup-status-unknown {
+    color: var(--medium-gray);
+}
+
+/* Backup status content */
+.backup-status-content {
+    padding: 20px;
+    background-color: var(--off-white);
+    border-radius: 8px;
+    margin-top: 10px;
+}
+
+.backup-status-content h4 {
+    margin-bottom: 20px;
+    color: var(--warm-gray);
+    font-weight: 600;
+}
+
+/* Database type sections */
+.database-type-section {
+    margin-bottom: 25px;
+}
+
+.database-type-section h5 {
+    margin-bottom: 15px;
+    color: var(--deep-purple);
+    font-weight: 600;
+    font-size: 16px;
+}
+
+/* Individual database backup items */
+.database-backup-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    background-color: white;
+    border-radius: 4px;
+    border-left: 3px solid var(--light-gray);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.2s ease;
+}
+
+.database-backup-item:hover {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* Database info section */
+.database-info {
+    flex: 0 0 auto;
+    margin-right: 15px;
+    min-width: 140px;
+}
+
+.database-name {
+    display: block;
+    font-weight: 600;
+    color: var(--warm-gray);
+    font-size: 13px;
+    margin-bottom: 2px;
+}
+
+/* Backup progress container */
+.backup-progress-container {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    margin-right: 15px;
+}
+
+/* Database file size section */
+.database-file-size {
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: var(--medium-gray);
+    font-weight: 500;
+    text-align: right;
+    min-width: 60px;
+}
+
+/* Progress bar styling */
+.backup-progress-bar {
+    width: 100%;
+    height: 16px;
+    background-color: var(--light-gray);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+    cursor: help;
+}
+
+.backup-progress-fill {
+    height: 100%;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+/* SQLite database styling - deeper green */
+.backup-progress-bar.sqlite-db .backup-progress-fill.backed-up {
+    background-color: var(--deep-green);
+}
+
+.backup-progress-bar.sqlite-db .backup-progress-fill.backed-up::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(255, 255, 255, 0.2) 50%, 
+        transparent 100%);
+}
+
+/* MariaDB database styling - lighter green */
+.backup-progress-bar.mariadb-db .backup-progress-fill.backed-up {
+    background-color: var(--forest-green);
+}
+
+.backup-progress-bar.mariadb-db .backup-progress-fill.backed-up::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(255, 255, 255, 0.2) 50%, 
+        transparent 100%);
+}
+
+/* Missing backup styling */
+.backup-progress-fill.missing-backup {
+    background-color: var(--coral-red);
+}
+
+/* Processing backup styling */
+.backup-progress-fill.processing {
+    background-color: var(--burnt-orange);
+    background-image: linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.2) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.2) 50%,
+        rgba(255, 255, 255, 0.2) 75%,
+        transparent 75%,
+        transparent
+    );
+    background-size: 20px 20px;
+    animation: backup-processing 1s linear infinite;
+}
+
+@keyframes backup-processing {
+    0% {
+        background-position: 0 0;
+    }
+    100% {
+        background-position: 20px 0;
+    }
+}
+
+/* Unknown status styling */
+.backup-progress-fill.unknown {
+    background-color: var(--medium-gray);
+}
+
+
+/* Backup summary section */
+.backup-summary {
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 2px solid var(--light-gray);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.summary-item {
+    font-size: 14px;
+    color: var(--warm-gray);
+}
+
+.summary-item strong {
+    color: var(--deep-purple);
+}
+
+/* Overall status classes */
+.overall-status-success {
+    color: var(--deep-green);
+    font-weight: 600;
+}
+
+.overall-status-warning {
+    color: var(--burnt-orange);
+    font-weight: 600;
+}
+
+.overall-status-error {
+    color: var(--deep-red);
+    font-weight: 600;
+}
+
+.overall-status-unknown {
+    color: var(--medium-gray);
+    font-weight: 600;
+}
+
+/* Responsive design for backup status */
+@media (max-width: 768px) {
+    .database-backup-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .database-info {
+        margin-right: 0;
+        margin-bottom: 8px;
+        width: 100%;
+        min-width: auto;
+    }
+    
+    .backup-progress-container {
+        width: 100%;
+        margin-right: 0;
+        margin-bottom: 8px;
+    }
+    
+    .database-file-size {
+        width: 100%;
+        text-align: left;
+        min-width: auto;
+    }
+    
+    .backup-summary {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .summary-item {
+        margin-bottom: 8px;
+    }
+}
+
+/* ===========================
    ADDITIONAL INTERACTORS STYLING
    =========================== */
 

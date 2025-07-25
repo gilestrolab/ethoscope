@@ -23,7 +23,7 @@
         </span>
 
         <!-- Response Time Icon -->
-        <span ng-if="device.response_time !== undefined && device.response_time !== null" ng-class="{'fa fa-smile': device.response_time < 10.0, 'fa fa-face-anxious-sweat': device.response_time >= 10.0}" class="fa-3x" title="Response time: {{device.response_time}} ms" style="position: absolute; top: 0px; right: 0px; color: var(--medium-gray); transform: scale(0.9);">
+        <span ng-if="device.response_time !== undefined && device.response_time !== null" ng-class="{'fa fa-smile': device.response_time < 10.0, 'fa fa-face-dizzy': device.response_time >= 10.0}" class="fa-3x" title="Response time: {{device.response_time}} ms" style="position: absolute; top: 0px; right: 0px; color: var(--medium-gray); transform: scale(0.9);">
         </span>
 
         <h1>{{device.name}}</h1>
@@ -122,6 +122,65 @@
 <div class="last_drawn_img">
     <img ng-if="device.status == 'running' || device.status == 'recording'" ng-src="{{device.url_img}}" alt="" width="640"></img>
     <img ng-if="device.status == 'streaming'" ng-src="{{device.url_stream}}" alt="" width=""></img>
+</div>
+
+<!-- Database Backup Status Section -->
+<div class="jumbotron-fluid backup-status-container" ng-if="device.databases">
+    <button data-toggle="collapse" data-target="#backupStatus" class="backup-toggle-btn" style="float:right;">
+        <span class="fa fa-database fa-2x backup-status-icon" ng-class="getBackupStatusClass()"></span>
+    </button>
+    <div class="collapse" id="backupStatus">
+        <div class="backup-status-content">
+            <h4><span class="fa fa-database"></span> Database Backup Status</h4>
+
+            <!-- SQLite Databases -->
+            <div ng-if="device.databases.SQLite && getObjectKeys(device.databases.SQLite).length > 0" class="database-type-section">
+                <h5><span class="fa fa-file-database-o"></span> SQLite Databases</h5>
+                <div ng-repeat="(dbName, dbInfo) in device.databases.SQLite" class="database-backup-item">
+                    <div class="database-info">
+                        <span class="database-name">{{formatDate(dbInfo.date)}}</span>
+                    </div>
+                    <div class="backup-progress-container">
+                        <div class="backup-progress-bar sqlite-db" title="{{getBackupStatusText(dbInfo)}}">
+                            <div class="backup-progress-fill" ng-class="getBackupBarClass(dbInfo)" ng-style="getBackupProgressStyle(dbInfo, 'sqlite')"></div>
+                        </div>
+                    </div>
+                    <div class="database-file-size">
+                        {{formatFileSize(dbInfo.filesize)}}
+                    </div>
+                </div>
+            </div>
+
+            <!-- MariaDB Databases -->
+            <div ng-if="device.databases.MariaDB && getObjectKeys(device.databases.MariaDB).length > 0" class="database-type-section">
+                <h5><span class="fa fa-server"></span> MariaDB Databases</h5>
+                <div ng-repeat="(dbName, dbInfo) in device.databases.MariaDB" class="database-backup-item">
+                    <div class="database-info">
+                        <span class="database-name">{{formatDate(dbInfo.date)}}</span>
+                    </div>
+                    <div class="backup-progress-container">
+                        <div class="backup-progress-bar mariadb-db" title="{{getBackupStatusText(dbInfo)}}">
+                            <div class="backup-progress-fill" ng-class="getBackupBarClass(dbInfo)" ng-style="getBackupProgressStyle(dbInfo, 'mariadb')"></div>
+                        </div>
+                    </div>
+                    <div class="database-file-size">
+                        {{formatFileSize(dbInfo.db_size_bytes)}}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Overall Status Summary -->
+            <div class="backup-summary" ng-if="backupSummary">
+                <div class="summary-item">
+                    <strong>Overall Status:</strong>
+                    <span ng-class="getOverallStatusClass()">{{backupSummary.overallStatus}}</span>
+                </div>
+                <div class="summary-item">
+                    <strong>Backed Up:</strong> {{backupSummary.backedUp}} / {{backupSummary.total}}
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="jumbotron text-center">
