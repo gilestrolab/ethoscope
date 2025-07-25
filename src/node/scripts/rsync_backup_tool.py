@@ -31,10 +31,13 @@ class RequestHandler(BaseHTTPRequestHandler):
             # Convert BackupStatus objects to dictionaries for JSON serialization
             status_dict = {key: asdict(value) for key, value in status_copy.items()}
             
+            # Enhance with individual file information  
+            enhanced_status = self._enhance_backup_status_with_files(status_dict)
+            
             # Add disk usage summary
-            disk_usage_summary = self._calculate_disk_usage_summary(status_dict)
+            disk_usage_summary = self._calculate_disk_usage_summary(enhanced_status)
             response = {
-                'devices': status_dict,
+                'devices': enhanced_status,
                 'disk_usage_summary': disk_usage_summary
             }
             self._send_response(response)
@@ -95,6 +98,190 @@ class RequestHandler(BaseHTTPRequestHandler):
                 'total_size_human': format_bytes(total_results_bytes + total_videos_bytes)
             }
         }
+    
+    def _enhance_backup_status_with_files(self, status_dict):
+        """Enhance backup status with individual file information"""
+        for device_id, device_status in status_dict.items():
+            synced_info = device_status.get('synced', {})
+            
+            # Add individual file information
+            device_status['individual_files'] = {
+                'sqlite': self._enumerate_sqlite_files(device_id, synced_info.get('results', {})),
+                'videos': self._enumerate_video_files(device_id, synced_info.get('videos', {}))
+            }
+            
+            # Update the backup_types structure to include individual file counts
+            if 'backup_types' not in device_status:
+                device_status['backup_types'] = {}
+            
+            # Update SQLite information with individual files
+            sqlite_files = device_status['individual_files']['sqlite']
+            if sqlite_files['count'] > 0:
+                device_status['backup_types']['sqlite'] = {
+                    'available': True,
+                    'status': 'completed',
+                    'last_backup': synced_info.get('results', {}).get('last_sync_time', None),
+                    'processing': False,
+                    'message': 'Backup completed successfully',
+                    'size': sqlite_files['total_size'],
+                    'size_human': self._format_bytes(sqlite_files['total_size']),
+                    'files': sqlite_files['count'],
+                    'directory': synced_info.get('results', {}).get('local_path', ''),
+                    'individual_files': sqlite_files['files']
+                }
+            else:
+                device_status['backup_types']['sqlite'] = {
+                    'available': False,
+                    'status': 'not_available',
+                    'last_backup': None,
+                    'size': 0,
+                    'files': 0
+                }
+            
+            # Update Video information with individual files
+            video_files = device_status['individual_files']['videos']
+            if video_files['count'] > 0:
+                device_status['backup_types']['video'] = {
+                    'available': True,
+                    'status': 'completed',
+                    'last_backup': synced_info.get('videos', {}).get('last_sync_time', None),
+                    'processing': False,
+                    'message': 'Backup completed successfully',
+                    'size': video_files['total_size'],
+                    'size_human': self._format_bytes(video_files['total_size']),
+                    'files': video_files['count'],
+                    'directory': synced_info.get('videos', {}).get('local_path', ''),
+                    'individual_files': video_files['files']
+                }
+            else:
+                device_status['backup_types']['video'] = {
+                    'available': False,
+                    'status': 'not_available',
+                    'last_backup': None,
+                    'size': 0,
+                    'files': 0,
+                    'size_human': '0 B'
+                }
+            
+            # Add MySQL backup information if available
+            # MySQL backups are handled by backup_tool.py service, so we inherit existing status
+            if 'mysql' not in device_status.get('backup_types', {}):
+                device_status['backup_types']['mysql'] = {
+                    'available': False,
+                    'status': 'handled_by_mysql_service',
+                    'last_backup': None,
+                    'processing': False,
+                    'message': 'MySQL backups handled by separate backup_tool.py service',
+                    'size': 0,
+                    'files': 0,
+                    'size_human': '0 B'
+                }
+        
+        return status_dict
+    
+    def _enumerate_sqlite_files(self, device_id, results_info):
+        """Enumerate individual SQLite database files"""
+        files = []
+        # Use directory from results_info, or construct path from device_id
+        results_path = results_info.get('local_path', '')
+        if not results_path:
+            results_path = results_info.get('directory', '')
+        
+        # If still no path, construct from device_id and known structure
+        if not results_path and device_id:
+            results_path = f"/ethoscope_data/results/{device_id}"
+        
+        if results_path and os.path.exists(results_path):
+            try:
+                for root, dirs, filenames in os.walk(results_path):
+                    for filename in filenames:
+                        if filename.endswith('.db'):
+                            file_path = os.path.join(root, filename)
+                            try:
+                                file_stat = os.stat(file_path)
+                                files.append({
+                                    'name': filename,
+                                    'path': file_path,
+                                    'relative_path': os.path.relpath(file_path, results_path),
+                                    'size': file_stat.st_size,
+                                    'size_human': self._format_bytes(file_stat.st_size),
+                                    'modified': file_stat.st_mtime,
+                                    'status': 'backed_up'  # Since it exists in backup location
+                                })
+                            except OSError as e:
+                                # File might have been deleted while we were scanning
+                                logging.warning(f"Could not stat file {file_path}: {e}")
+                                continue
+            except OSError as e:
+                logging.error(f"Could not scan directory {results_path}: {e}")
+        
+        return {
+            'count': len(files),
+            'total_size': sum(f['size'] for f in files),
+            'total_size_human': self._format_bytes(sum(f['size'] for f in files)),
+            'files': sorted(files, key=lambda x: x['modified'], reverse=True)  # Sort by newest first
+        }
+    
+    def _enumerate_video_files(self, device_id, videos_info):
+        """Enumerate individual video files"""
+        files = []
+        # Use directory from videos_info, or construct path from device_id
+        videos_path = videos_info.get('local_path', '')
+        if not videos_path:
+            videos_path = videos_info.get('directory', '')
+        
+        # If still no path, construct from device_id and known structure
+        if not videos_path and device_id:
+            videos_path = f"/ethoscope_data/videos/{device_id}"
+        
+        if videos_path and os.path.exists(videos_path):
+            try:
+                # Common video extensions
+                video_extensions = ('.mp4', '.avi', '.h264', '.mkv', '.mov', '.webm')
+                
+                for root, dirs, filenames in os.walk(videos_path):
+                    for filename in filenames:
+                        if filename.lower().endswith(video_extensions):
+                            file_path = os.path.join(root, filename)
+                            try:
+                                file_stat = os.stat(file_path)
+                                files.append({
+                                    'name': filename,
+                                    'path': file_path,
+                                    'relative_path': os.path.relpath(file_path, videos_path),
+                                    'size': file_stat.st_size,
+                                    'size_human': self._format_bytes(file_stat.st_size),
+                                    'modified': file_stat.st_mtime,
+                                    'status': 'backed_up'  # Since it exists in backup location
+                                })
+                            except OSError as e:
+                                # File might have been deleted while we were scanning
+                                logging.warning(f"Could not stat file {file_path}: {e}")
+                                continue
+            except OSError as e:
+                logging.error(f"Could not scan directory {videos_path}: {e}")
+        
+        return {
+            'count': len(files),
+            'total_size': sum(f['size'] for f in files),
+            'total_size_human': self._format_bytes(sum(f['size'] for f in files)),
+            'files': sorted(files, key=lambda x: x['modified'], reverse=True)  # Sort by newest first
+        }
+    
+    def _format_bytes(self, bytes_value):
+        """Format bytes in human readable format"""
+        if bytes_value == 0:
+            return "0 B"
+        units = ['B', 'KB', 'MB', 'GB', 'TB']
+        unit_index = 0
+        size = float(bytes_value)
+        while size >= 1024 and unit_index < len(units) - 1:
+            size /= 1024
+            unit_index += 1
+        if unit_index == 0:
+            return f"{int(size)} {units[unit_index]}"
+        else:
+            return f"{size:.1f} {units[unit_index]}"
 
 def signal_handler(sig, frame):
     logging.info("Received shutdown signal. Stopping backup thread...")

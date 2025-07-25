@@ -23,7 +23,7 @@
         </span>
 
         <!-- Response Time Icon -->
-        <span ng-if="device.response_time !== undefined && device.response_time !== null" ng-class="{'fa fa-smile': device.response_time < 10.0, 'fa fa-face-dizzy': device.response_time >= 10.0}" class="fa-3x" title="Response time: {{device.response_time}} ms" style="position: absolute; top: 0px; right: 0px; color: var(--medium-gray); transform: scale(0.9);">
+        <span ng-if="device.response_time !== undefined && device.response_time !== null" ng-class="{'fa fa-smile': device.response_time < 500.0, 'fa fa-face-dizzy': device.response_time >= 500.0}" class="fa-3x" title="Response time: {{device.response_time}} ms" style="position: absolute; top: 0px; right: 0px; color: var(--medium-gray); transform: scale(0.9);">
         </span>
 
         <h1>{{device.name}}</h1>
@@ -113,9 +113,9 @@
     <p><strong>Video capabilities are disabled.</strong> This ethoscope cannot perform video tracking, recording, or streaming without camera hardware.</p>
     <p>To enable video features, please:</p>
     <ul>
-        <li>Connect a compatible Raspberry Pi camera module</li>
-        <li>Enable the camera interface in raspi-config</li>
-        <li>Restart the ethoscope service</li>
+        <li>Safely power off the machine</li>
+        <li>Make sure a rPi camera module is properly connected</li>
+        <li>Restart the ethoscope</li>
     </ul>
 </div>
 
@@ -125,7 +125,7 @@
 </div>
 
 <!-- Database Backup Status Section -->
-<div class="jumbotron-fluid backup-status-container" ng-if="device.databases">
+<div class="jumbotron-fluid backup-status-container" ng-if="device.databases || (device.backup_status_detailed && device.backup_status_detailed.backup_types)">
     <button data-toggle="collapse" data-target="#backupStatus" class="backup-toggle-btn" style="float:right;">
         <span class="fa fa-database fa-2x backup-status-icon" ng-class="getBackupStatusClass()"></span>
     </button>
@@ -133,38 +133,154 @@
         <div class="backup-status-content">
             <h4><span class="fa fa-database"></span> Database Backup Status</h4>
 
-            <!-- SQLite Databases -->
-            <div ng-if="device.databases.SQLite && getObjectKeys(device.databases.SQLite).length > 0" class="database-type-section">
-                <h5><span class="fa fa-file-database-o"></span> SQLite Databases</h5>
-                <div ng-repeat="(dbName, dbInfo) in device.databases.SQLite" class="database-backup-item">
-                    <div class="database-info">
-                        <span class="database-name">{{formatDate(dbInfo.date)}}</span>
-                    </div>
-                    <div class="backup-progress-container">
-                        <div class="backup-progress-bar sqlite-db" title="{{getBackupStatusText(dbInfo)}}">
-                            <div class="backup-progress-fill" ng-class="getBackupBarClass(dbInfo)" ng-style="getBackupProgressStyle(dbInfo, 'sqlite')"></div>
+            <!-- Enhanced backup status using /backup/status endpoint data -->
+            <div ng-if="backupSummary && backupSummary.useDetailedStatus && device.backup_status_detailed">
+                <div style="background-color: #d4edda; padding: 5px; margin-bottom: 10px; border-radius: 3px; color: #155724; font-size: 12px;">
+                    ✅ Using enhanced backup status from /backup/status endpoint
+                </div>
+
+                <!-- MySQL/MariaDB Backup -->
+                <div ng-if="device.backup_status_detailed.backup_types.mysql && device.backup_status_detailed.backup_types.mysql.available" class="database-type-section">
+                    <h5><span class="fa fa-server"></span> MySQL Database</h5>
+                    <div class="database-backup-item">
+                        <div class="database-info">
+                            <span class="database-name">MySQL Backup</span>
+                            <div class="backup-details">
+                                <small ng-if="device.backup_status_detailed.backup_types.mysql.last_backup">
+                                    Last backup: {{getTimeSinceBackup(device.backup_status_detailed.backup_types.mysql.last_backup)}}
+                                </small>
+                                <small ng-if="device.backup_status_detailed.backup_types.mysql.records">
+                                    ({{device.backup_status_detailed.backup_types.mysql.records}} records)
+                                </small>
+                            </div>
                         </div>
-                    </div>
-                    <div class="database-file-size">
-                        {{formatFileSize(dbInfo.filesize)}}
+                        <div class="backup-progress-container">
+                            <div class="backup-progress-bar mysql-db" title="{{getBackupStatusText(device.backup_status_detailed.backup_types.mysql, 'mysql')}}">
+                                <div class="backup-progress-fill" ng-class="getBackupBarClass(device.backup_status_detailed.backup_types.mysql, 'mysql')" ng-style="getBackupProgressStyle(device.backup_status_detailed.backup_types.mysql, 'mysql')"></div>
+                            </div>
+                        </div>
+                        <div class="database-file-size">
+                            {{formatFileSize(device.backup_status_detailed.backup_types.mysql.size)}}
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- MariaDB Databases -->
-            <div ng-if="device.databases.MariaDB && getObjectKeys(device.databases.MariaDB).length > 0" class="database-type-section">
-                <h5><span class="fa fa-server"></span> MariaDB Databases</h5>
-                <div ng-repeat="(dbName, dbInfo) in device.databases.MariaDB" class="database-backup-item">
-                    <div class="database-info">
-                        <span class="database-name">{{formatDate(dbInfo.date)}}</span>
-                    </div>
-                    <div class="backup-progress-container">
-                        <div class="backup-progress-bar mariadb-db" title="{{getBackupStatusText(dbInfo)}}">
-                            <div class="backup-progress-fill" ng-class="getBackupBarClass(dbInfo)" ng-style="getBackupProgressStyle(dbInfo, 'mariadb')"></div>
+                <!-- SQLite Database Files -->
+                <div ng-if="device.backup_status_detailed.backup_types.sqlite && device.backup_status_detailed.backup_types.sqlite.available" class="database-type-section">
+                    <h5><span class="fa fa-file-database-o"></span> SQLite Databases ({{device.backup_status_detailed.backup_types.sqlite.files}} files)</h5>
+                    
+                    <!-- Display individual SQLite files if available -->
+                    <div ng-if="device.backup_status_detailed.individual_files && device.backup_status_detailed.individual_files.sqlite && device.backup_status_detailed.individual_files.sqlite.files.length > 0">
+                        <div ng-repeat="sqliteFile in device.backup_status_detailed.individual_files.sqlite.files" class="database-backup-item">
+                            <div class="database-info">
+                                <span class="database-name">{{sqliteFile.name}}</span>
+                                <div class="backup-details">
+                                    <small>Modified: {{formatDate(sqliteFile.modified * 1000)}}</small>
+                                </div>
+                            </div>
+                            <div class="backup-progress-container">
+                                <div class="backup-progress-bar sqlite-db" title="{{sqliteFile.status}}">
+                                    <div class="backup-progress-fill backed-up" style="width: 100%"></div>
+                                </div>
+                            </div>
+                            <div class="database-file-size">
+                                {{sqliteFile.size_human}}
+                            </div>
                         </div>
                     </div>
-                    <div class="database-file-size">
-                        {{formatFileSize(dbInfo.db_size_bytes)}}
+                    
+                    <!-- Fallback: Show aggregate SQLite backup info if individual files not available -->
+                    <div ng-if="!device.backup_status_detailed.individual_files || !device.backup_status_detailed.individual_files.sqlite || device.backup_status_detailed.individual_files.sqlite.files.length === 0">
+                        <div class="database-backup-item">
+                            <div class="database-info">
+                                <span class="database-name">SQLite Backup</span>
+                                <div class="backup-details">
+                                    <small ng-if="device.backup_status_detailed.backup_types.sqlite.last_backup">
+                                        Last backup: {{getTimeSinceBackup(device.backup_status_detailed.backup_types.sqlite.last_backup)}}
+                                    </small>
+                                    <small ng-if="device.backup_status_detailed.backup_types.sqlite.files">
+                                        ({{device.backup_status_detailed.backup_types.sqlite.files}} files)
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="backup-progress-container">
+                                <div class="backup-progress-bar sqlite-db" title="{{getBackupStatusText(device.backup_status_detailed.backup_types.sqlite, 'sqlite')}}">
+                                    <div class="backup-progress-fill" ng-class="getBackupBarClass(device.backup_status_detailed.backup_types.sqlite, 'sqlite')" ng-style="getBackupProgressStyle(device.backup_status_detailed.backup_types.sqlite, 'sqlite')"></div>
+                                </div>
+                            </div>
+                            <div class="database-file-size">
+                                {{device.backup_status_detailed.backup_types.sqlite.size_human || formatFileSize(device.backup_status_detailed.backup_types.sqlite.size)}}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Video Backup -->
+                <div ng-if="device.backup_status_detailed.backup_types.video && device.backup_status_detailed.backup_types.video.available" class="database-type-section">
+                    <h5><span class="fa fa-video-camera"></span> Video Backup</h5>
+                    <div class="database-backup-item">
+                        <div class="database-info">
+                            <span class="database-name">Video Backup</span>
+                            <div class="backup-details">
+                                <small ng-if="device.backup_status_detailed.backup_types.video.last_backup">
+                                    Last backup: {{getTimeSinceBackup(device.backup_status_detailed.backup_types.video.last_backup)}}
+                                </small>
+                                <small ng-if="device.backup_status_detailed.backup_types.video.files">
+                                    ({{device.backup_status_detailed.backup_types.video.files}} files)
+                                </small>
+                            </div>
+                        </div>
+                        <div class="backup-progress-container">
+                            <div class="backup-progress-bar video-backup" title="{{getBackupStatusText(device.backup_status_detailed.backup_types.video, 'video')}}">
+                                <div class="backup-progress-fill" ng-class="getBackupBarClass(device.backup_status_detailed.backup_types.video, 'video')" ng-style="getBackupProgressStyle(device.backup_status_detailed.backup_types.video, 'video')"></div>
+                            </div>
+                        </div>
+                        <div class="database-file-size">
+                            {{device.backup_status_detailed.backup_types.video.size_human || formatFileSize(device.backup_status_detailed.backup_types.video.size)}}
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Fallback: Legacy backup status display -->
+            <div ng-if="!backupSummary || !backupSummary.useDetailedStatus">
+                <div style="background-color: #f8d7da; padding: 5px; margin-bottom: 10px; border-radius: 3px; color: #721c24; font-size: 12px;">
+                    ⚠️ Using legacy backup status from device.databases (fallback)
+                </div>
+                <!-- SQLite Databases -->
+                <div ng-if="device.databases.SQLite && getObjectKeys(device.databases.SQLite).length > 0" class="database-type-section">
+                    <h5><span class="fa fa-file-database-o"></span> SQLite Databases</h5>
+                    <div ng-repeat="(dbName, dbInfo) in device.databases.SQLite" class="database-backup-item">
+                        <div class="database-info">
+                            <span class="database-name">{{formatDate(dbInfo.date)}}</span>
+                        </div>
+                        <div class="backup-progress-container">
+                            <div class="backup-progress-bar sqlite-db" title="{{getBackupStatusText(dbInfo)}}">
+                                <div class="backup-progress-fill" ng-class="getBackupBarClass(dbInfo)" ng-style="getBackupProgressStyle(dbInfo, 'sqlite')"></div>
+                            </div>
+                        </div>
+                        <div class="database-file-size">
+                            {{formatFileSize(dbInfo.filesize)}}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MariaDB Databases -->
+                <div ng-if="device.databases.MariaDB && getObjectKeys(device.databases.MariaDB).length > 0" class="database-type-section">
+                    <h5><span class="fa fa-server"></span> MariaDB Databases</h5>
+                    <div ng-repeat="(dbName, dbInfo) in device.databases.MariaDB" class="database-backup-item">
+                        <div class="database-info">
+                            <span class="database-name">{{formatDate(dbInfo.date)}}</span>
+                        </div>
+                        <div class="backup-progress-container">
+                            <div class="backup-progress-bar mariadb-db" title="{{getBackupStatusText(dbInfo)}}">
+                                <div class="backup-progress-fill" ng-class="getBackupBarClass(dbInfo)" ng-style="getBackupProgressStyle(dbInfo, 'mariadb')"></div>
+                            </div>
+                        </div>
+                        <div class="database-file-size">
+                            {{formatFileSize(dbInfo.db_size_bytes)}}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -177,6 +293,9 @@
                 </div>
                 <div class="summary-item">
                     <strong>Backed Up:</strong> {{backupSummary.backedUp}} / {{backupSummary.total}}
+                </div>
+                <div class="summary-item" ng-if="backupSummary.totalSize && backupSummary.useDetailedStatus">
+                    <strong>Total Size:</strong> {{formatFileSize(backupSummary.totalSize)}}
                 </div>
             </div>
         </div>
@@ -548,7 +667,7 @@
                                                 <div class="input-group">
                                                     <input date-range-picker class="form-control date-picker" type="text" ng-model="stimulator.arguments[arg.name]" placeholder="Click to select start and end date/time" style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;" options="dateRangeOptions">
                                                     <div class="input-group-append">
-                                                        <span class="input-group-text" style="background-color: #337ab7; color: white; cursor: pointer;">
+                                                        <span class="input-group-text" style="background-color: #337ab7; color: white; cursor: pointer;" ng-click="initDateRangePicker(arg.name)">
                                                             <i class="fa fa-clock"></i>
                                                         </span>
                                                     </div>

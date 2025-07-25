@@ -1769,12 +1769,32 @@ table thead th a:focus {
         transparent 100%);
 }
 
-/* MariaDB database styling - lighter green */
+/* MySQL/MariaDB database styling - blue-green (same thing, different names) */
+.backup-progress-bar.mysql-db .backup-progress-fill.backed-up,
 .backup-progress-bar.mariadb-db .backup-progress-fill.backed-up {
-    background-color: var(--forest-green);
+    background-color: #007bff;
 }
 
+.backup-progress-bar.mysql-db .backup-progress-fill.backed-up::after,
 .backup-progress-bar.mariadb-db .backup-progress-fill.backed-up::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(255, 255, 255, 0.2) 50%, 
+        transparent 100%);
+}
+
+/* Video backup styling - purple */
+.backup-progress-bar.video-backup .backup-progress-fill.backed-up {
+    background-color: #6f42c1;
+}
+
+.backup-progress-bar.video-backup .backup-progress-fill.backed-up::after {
     content: '';
     position: absolute;
     top: 0;
@@ -1790,6 +1810,34 @@ table thead th a:focus {
 /* Missing backup styling */
 .backup-progress-fill.missing-backup {
     background-color: var(--coral-red);
+}
+
+/* Not available styling */
+.backup-progress-fill.not-available {
+    background-color: var(--medium-gray);
+    opacity: 0.6;
+}
+
+/* Ensure all backup types get the same treatment for different statuses */
+.backup-progress-bar.mysql-db .backup-progress-fill.missing-backup,
+.backup-progress-bar.mariadb-db .backup-progress-fill.missing-backup,
+.backup-progress-bar.sqlite-db .backup-progress-fill.missing-backup,
+.backup-progress-bar.video-backup .backup-progress-fill.missing-backup {
+    background-color: var(--coral-red);
+}
+
+.backup-progress-bar.mysql-db .backup-progress-fill.processing,
+.backup-progress-bar.mariadb-db .backup-progress-fill.processing,
+.backup-progress-bar.sqlite-db .backup-progress-fill.processing,
+.backup-progress-bar.video-backup .backup-progress-fill.processing {
+    background-color: var(--burnt-orange);
+}
+
+.backup-progress-bar.mysql-db .backup-progress-fill.unknown,
+.backup-progress-bar.mariadb-db .backup-progress-fill.unknown,
+.backup-progress-bar.sqlite-db .backup-progress-fill.unknown,
+.backup-progress-bar.video-backup .backup-progress-fill.unknown {
+    background-color: var(--medium-gray);
 }
 
 /* Processing backup styling */
