@@ -1684,7 +1684,6 @@ table thead th a:focus {
 .database-backup-item {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     padding: 8px 12px;
     margin-bottom: 6px;
     background-color: white;
@@ -1713,10 +1712,11 @@ table thead th a:focus {
     margin-bottom: 2px;
 }
 
-/* Backup progress container */
+/* Backup progress container - positioned on the right */
 .backup-progress-container {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     flex: 1;
     margin-right: 15px;
 }
