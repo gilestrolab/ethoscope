@@ -23,7 +23,8 @@ import json
 from pathlib import Path
 
 # Add the src directory to Python path to import ethoscope modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+ethoscope_src = os.path.join(os.path.dirname(__file__), '..', '..', 'src', 'ethoscope')
+sys.path.insert(0, ethoscope_src)
 
 from ethoscope.io.cache import (
     create_metadata_cache, 
@@ -153,39 +154,52 @@ def refresh_sqlite_cache(sqlite_db_info, dry_run=False):
         logger.error(f"Failed to refresh SQLite cache for {sqlite_db_info['path']}: {e}")
 
 
-def refresh_mysql_cache(dry_run=False):
+def refresh_mysql_cache(dry_run=False, host=None, db_name=None, user=None, password=None):
     """
     Refresh cache for a single MySQL database.
     
     Args:
-        mysql_db_info (dict): MySQL database information
         dry_run (bool): If True, only show what would be done
+        host (str): MySQL host (default: localhost)
+        db_name (str): Database name (default: auto-detect from machine)
+        user (str): MySQL username (default: ethoscope)
+        password (str): MySQL password (default: ethoscope)
     """
     try:
-        db_credentials = {  "name": "%s_db" % pi.get_machine_name(),
-                            "host" : "localhost",
-                            "user" : "ethoscope",
-                            "password" : "ethoscope"
-                            }
+        # Use provided credentials or defaults
+        db_credentials = {
+            "name": db_name or f"{pi.get_machine_name()}_db",
+            "host": host or "localhost",
+            "user": user or "ethoscope",
+            "password": password or "ethoscope"
+        }
 
         if dry_run:
-            logger.info(f"[DRY RUN] Would refresh cache for {db_name}")
+            logger.info(f"[DRY RUN] Would refresh cache for {db_credentials['name']} on {db_credentials['host']}")
             return
 
+        logger.info(f"Connecting to MySQL database: {db_credentials['name']} on {db_credentials['host']}")
+        
         # Initiating the cache        
         cache = create_metadata_cache(db_credentials, database_type="MySQL")
         
         # Get backup filename from metadata to ensure consistency
         backup_filename = cache.get_backup_filename()
+        logger.info(f"Found backup filename in metadata: {backup_filename}")
 
         # Use cache system to refresh from database metadata (fully automated)
         cache_filepath = cache.refresh_cache_from_database(backup_filename=backup_filename)
-        cache.get_database_info()
+        
+        # Test the get_database_info method we just fixed
+        db_info = cache.get_database_info()
+        logger.info(f"Database info - Size: {db_info.get('db_size_bytes', 0)} bytes, Tables: {len(db_info.get('table_counts', {}))}")
         
         logger.info(f"Created cache file: {cache_filepath}")
         
     except Exception as e:
-        logger.error(f"Failed to refresh MySQL cache for: {e}")
+        logger.error(f"Failed to refresh MySQL cache: {e}")
+        import traceback
+        logger.debug(traceback.format_exc())
 
 
 def main():
@@ -211,6 +225,12 @@ Examples:
     parser.add_argument('--dry-run', action='store_true', help='Show what would be processed without making changes')
     parser.add_argument('--verbose', '-v', action='store_true', help='Enable verbose logging')
     
+    # MySQL connection arguments
+    parser.add_argument('--host', help='MySQL host (default: localhost)')
+    parser.add_argument('--db-name', help='Database name (default: auto-detect from machine)')
+    parser.add_argument('--user', help='MySQL username (default: ethoscope)')
+    parser.add_argument('--password', help='MySQL password (default: ethoscope)')
+    
     args = parser.parse_args()
     
     # Configure logging level
@@ -232,7 +252,13 @@ Examples:
             refresh_sqlite_cache(sqlite_db, dry_run=args.dry_run)
     
     if args.mysql or args.all:
-        refresh_mysql_cache(dry_run=args.dry_run)
+        refresh_mysql_cache(
+            dry_run=args.dry_run,
+            host=args.host,
+            db_name=args.db_name,
+            user=args.user,
+            password=args.password
+        )
     
     logger.info("Database cache refresh completed")
 

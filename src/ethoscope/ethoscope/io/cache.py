@@ -324,6 +324,18 @@ class BaseDatabaseMetadataCache:
         # Store the experiment info in cache
         self.store_experiment_info(timestamp, experiment_info)
         
+        # Also update the cache with current database metadata (size, table counts, etc.)
+        try:
+            cache_file_path = self._get_cache_file_path(timestamp)
+            if cache_file_path:
+                # Query database for current metadata
+                db_info = self._query_database()
+                # Update cache with fresh database data
+                self._write_cache(cache_file_path, db_info, timestamp)
+                logging.info(f"Updated cache with database metadata: {db_info.get('db_size_bytes', 0)} bytes, {len(db_info.get('table_counts', {}))} tables")
+        except Exception as e:
+            logging.warning(f"Failed to update cache with database metadata: {e}")
+        
         # Return the cache file path
         return self._get_cache_file_path(timestamp)
 
@@ -551,21 +563,8 @@ class BaseDatabaseMetadataCache:
                     "creation_timestamp": tracking_start_time or time.time()
                 }
 
-            stop_timestamp = self._get_value_from_database('stop_date_time')
-            finalise_timestamp = time.time()
-
-            if finalise or stop_timestamp:
-                cache_data.update({
-                    "db_status": "finalised" if finalise else "terminated",
-                    "finalized_timestamp": finalise_timestamp if finalise else "unknown",
-                    "stopped_gracefully": graceful or finalise or "unknown",
-                    "stop_reason": stop_reason or "unknown",
-                    "stop_timestamp": stop_timestamp or "unknown"
-                })
-                logging.info(f"Finalizing cache with graceful={graceful}, reason={stop_reason}")
-
-            elif db_info:
-                # Update with current database info
+            # Update with current database info if provided
+            if db_info:
                 cache_data.update({
                     "last_updated": time.time(),
                     "db_size_bytes": db_info["db_size_bytes"],
@@ -574,6 +573,21 @@ class BaseDatabaseMetadataCache:
                     "db_version": db_info["db_version"],
                     "db_status": "tracking"
                 })
+
+            # Handle finalization status separately (after updating db_info)
+            stop_timestamp = self._get_value_from_database('stop_date_time')
+            finalise_timestamp = time.time()
+
+            if finalise or stop_timestamp:
+                # Update status fields but preserve database info
+                cache_data.update({
+                    "db_status": "finalised" if finalise else "terminated",
+                    "finalized_timestamp": finalise_timestamp if finalise else "unknown",
+                    "stopped_gracefully": graceful or finalise or "unknown",
+                    "stop_reason": stop_reason or "unknown",
+                    "stop_timestamp": stop_timestamp or "unknown"
+                })
+                logging.info(f"Finalizing cache with graceful={graceful}, reason={stop_reason}")
             
             # Add experiment information if provided (replaces last_run_info functionality)
             if experiment_info:
@@ -693,8 +707,8 @@ class BaseDatabaseMetadataCache:
         """
         Get structured database information for the current database.
         
-        This is a convenience method that calls get_metadata() and adds
-        additional status information.
+        This method tries to get fresh data from the database first, then falls back
+        to the most recent cached data if the database query fails.
         
         Returns:
             dict: Database information including:
@@ -706,18 +720,41 @@ class BaseDatabaseMetadataCache:
                 - db_version (str): Database version
         """
         try:
-            # Use existing get_metadata() method to avoid code duplication
-            db_info = self.get_metadata()
+            # First try to get fresh database metadata
+            db_info = self._query_database()
             
-            # Add additional fields not provided by get_metadata()
+            # Add additional fields
             if "db_name" not in db_info:
                 db_info["db_name"] = self.db_credentials.get("name", "unknown")
             if "db_status" not in db_info:
                 db_info["db_status"] = "active"
             
             return db_info
+            
         except Exception as e:
-            logging.warning(f"Failed to get database info: {e}")
+            logging.warning(f"Failed to query database directly: {e}")
+            
+            # Fallback to most recent cached data
+            try:
+                cached_data = self.get_cached_metadata(cache_index=0)
+                
+                # Check if we got meaningful data from cache
+                if cached_data.get("db_size_bytes", 0) > 0 or cached_data.get("table_counts"):
+                    # Add additional fields not in cached data
+                    if "db_name" not in cached_data:
+                        cached_data["db_name"] = self.db_credentials.get("name", "unknown")
+                    if "db_status" not in cached_data:
+                        cached_data["db_status"] = "cached"
+                    
+                    logging.info(f"Using cached database info for {self.device_name}")
+                    return cached_data
+                else:
+                    logging.warning(f"Cached data is empty for {self.device_name}")
+                    
+            except Exception as cache_e:
+                logging.warning(f"Failed to read cached database info: {cache_e}")
+            
+            # Final fallback - return error state
             return {
                 "db_name": self.db_credentials.get("name", "unknown"),
                 "db_size_bytes": 0,
