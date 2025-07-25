@@ -381,7 +381,7 @@ class RequestHandler(BaseHTTPRequestHandler):
                 file_enumeration_cache['background_refresh_active'][refresh_key] = False
     
     def _enumerate_files_from_filesystem(self, directory_path, extensions):
-        """Perform actual filesystem enumeration (expensive operation)"""
+        """Perform actual filesystem enumeration (expensive operation) with video optimization"""
         files = []
         
         if not directory_path or not os.path.exists(directory_path):
@@ -397,24 +397,33 @@ class RequestHandler(BaseHTTPRequestHandler):
             if isinstance(extensions, str):
                 extensions = (extensions,)
             
-            for root, dirs, filenames in os.walk(directory_path):
-                for filename in filenames:
-                    if filename.lower().endswith(extensions):
-                        file_path = os.path.join(root, filename)
-                        try:
-                            file_stat = os.stat(file_path)
-                            files.append({
-                                'name': filename,
-                                'path': file_path,
-                                'relative_path': os.path.relpath(file_path, directory_path),
-                                'size': file_stat.st_size,
-                                'size_human': self._format_bytes(file_stat.st_size),
-                                'modified': file_stat.st_mtime,
-                                'status': 'backed_up'
-                            })
-                        except OSError as e:
-                            logging.warning(f"Could not stat file {file_path}: {e}")
-                            continue
+            # Optimize for video files - they can be massive in number
+            is_video_scan = any(ext in ('.mp4', '.avi', '.h264', '.mkv', '.mov', '.webm') for ext in extensions)
+            
+            if is_video_scan:
+                # For videos: limit to recent files and use faster scanning
+                files = self._enumerate_video_files_optimized(directory_path, extensions)
+            else:
+                # For SQLite: full scan as they are fewer in number
+                for root, dirs, filenames in os.walk(directory_path):
+                    for filename in filenames:
+                        if filename.lower().endswith(extensions):
+                            file_path = os.path.join(root, filename)
+                            try:
+                                file_stat = os.stat(file_path)
+                                files.append({
+                                    'name': filename,
+                                    'path': file_path,
+                                    'relative_path': os.path.relpath(file_path, directory_path),
+                                    'size': file_stat.st_size,
+                                    'size_human': self._format_bytes(file_stat.st_size),
+                                    'modified': file_stat.st_mtime,
+                                    'status': 'backed_up'
+                                })
+                            except OSError as e:
+                                logging.warning(f"Could not stat file {file_path}: {e}")
+                                continue
+                                
         except OSError as e:
             logging.error(f"Could not scan directory {directory_path}: {e}")
         
@@ -424,6 +433,63 @@ class RequestHandler(BaseHTTPRequestHandler):
             'total_size_human': self._format_bytes(sum(f['size'] for f in files)),
             'files': sorted(files, key=lambda x: x['modified'], reverse=True)
         }
+    
+    def _enumerate_video_files_optimized(self, directory_path, extensions):
+        """Optimized video file enumeration - scan only recent directories and limit files"""
+        files = []
+        total_files_found = 0
+        max_files_to_detail = 100  # Only get detailed info for recent 100 files
+        max_dirs_to_scan = 20  # Only scan recent 20 directories
+        
+        try:
+            # Get directory list and sort by modification time (newest first)
+            dir_entries = []
+            for entry in os.scandir(directory_path):
+                if entry.is_dir():
+                    try:
+                        dir_entries.append((entry.path, entry.stat().st_mtime))
+                    except OSError:
+                        continue
+            
+            # Sort by modification time, newest first
+            dir_entries.sort(key=lambda x: x[1], reverse=True)
+            
+            # Scan only recent directories
+            for dir_path, _ in dir_entries[:max_dirs_to_scan]:
+                try:
+                    for filename in os.listdir(dir_path):
+                        if filename.lower().endswith(extensions):
+                            total_files_found += 1
+                            
+                            # Only get detailed file info for recent files
+                            if len(files) < max_files_to_detail:
+                                file_path = os.path.join(dir_path, filename)
+                                try:
+                                    file_stat = os.stat(file_path)
+                                    files.append({
+                                        'name': filename,
+                                        'path': file_path,
+                                        'relative_path': os.path.relpath(file_path, directory_path),
+                                        'size': file_stat.st_size,
+                                        'size_human': self._format_bytes(file_stat.st_size),
+                                        'modified': file_stat.st_mtime,
+                                        'status': 'backed_up'
+                                    })
+                                except OSError as e:
+                                    logging.warning(f"Could not stat video file {file_path}: {e}")
+                                    continue
+                except OSError as e:
+                    logging.warning(f"Could not scan video directory {dir_path}: {e}")
+                    continue
+            
+            # If we found more files than we detailed, log it
+            if total_files_found > len(files):
+                logging.info(f"Video scan found {total_files_found} total files, showing details for {len(files)} most recent")
+                
+        except OSError as e:
+            logging.error(f"Could not enumerate video directories in {directory_path}: {e}")
+            
+        return files
     
     def _enumerate_sqlite_files(self, device_id, results_info):
         """Enumerate individual SQLite database files with background refresh caching"""

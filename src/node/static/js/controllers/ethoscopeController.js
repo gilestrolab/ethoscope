@@ -832,16 +832,16 @@
         /**
          * Load backup status from the /backup/status endpoint
          */
-        function loadBackupStatus() {
-            // Throttle backup status requests to maximum once every 60 seconds
+        function loadBackupStatus(forceLoad) {
+            // Throttle backup status requests to maximum once every 30 seconds (unless forced)
             var now = Date.now();
-            if (now - lastBackupStatusLoad < 60000) {
+            if (!forceLoad && now - lastBackupStatusLoad < 30000) {
                 return;
             }
             lastBackupStatusLoad = now;
             
-            // Use device-specific endpoint for much better performance
-            $http.get('/backup/status/' + device_id)
+            // Use device-specific endpoint for much better performance with timeout
+            $http.get('/backup/status/' + device_id, { timeout: 5000 })
                 .then(function(response) {
                     var backupData = response.data;
                     if (backupData.device) {
@@ -849,10 +849,20 @@
                         updateBackupSummary();
                     } else if (backupData.error) {
                         console.warn('Device not found in backup services:', backupData.error);
+                        // Set empty backup status to avoid legacy fallback
+                        $scope.device.backup_status_detailed = {
+                            backup_types: { mysql: { available: false }, sqlite: { available: false }, video: { available: false } }
+                        };
+                        updateBackupSummary();
                     }
                 })
                 .catch(function(error) {
-                    console.error('Failed to load backup status:', error);
+                    console.error('Failed to load backup status (timeout or error):', error);
+                    // Set empty backup status to prevent falling back to legacy mode
+                    $scope.device.backup_status_detailed = {
+                        backup_types: { mysql: { available: false }, sqlite: { available: false }, video: { available: false } }
+                    };
+                    updateBackupSummary();
                 });
         }
 
@@ -2107,7 +2117,7 @@
         // Load all initial data - OPTIMIZED
         loadNodeData();
         loadDeviceData();
-        loadBackupStatus(); // Load detailed backup status
+        loadBackupStatus(true); // Load detailed backup status (force on initial load)
         // Note: loadUserOptions() is now called within loadDeviceData() via batch endpoint
 
         /**
