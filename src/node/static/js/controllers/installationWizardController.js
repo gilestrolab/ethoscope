@@ -6,7 +6,7 @@
         // Initialize scope variables
         $scope.setupStatus = {};
         $scope.currentStep = 1;
-        $scope.totalSteps = 8;
+        $scope.totalSteps = 9;
         $scope.isLoading = false;
         $scope.errorMessage = '';
         $scope.successMessage = '';
@@ -31,9 +31,13 @@
         
         $scope.additionalUsers = [];
         $scope.newUser = {};
+        $scope.editingUser = {};
+        $scope.editingUserIndex = -1;
         
         $scope.incubators = [];
         $scope.newIncubator = {};
+        $scope.editingIncubator = {};
+        $scope.editingIncubatorIndex = -1;
         
         $scope.tunnel = {
             enabled: false,
@@ -63,6 +67,14 @@
             }
         };
         
+        $scope.virtualSensor = {
+            enabled: false,
+            sensor_name: 'virtual-sensor',
+            location: 'Lab',
+            weather_location: '',
+            api_key: ''
+        };
+        
         $scope.systemInfo = {};
         $scope.existingUsers = {};
         
@@ -73,8 +85,9 @@
             { number: 3, title: 'Admin User', description: 'Create administrator account', icon: 'fa-user-shield' },
             { number: 4, title: 'Users', description: 'Add additional users (optional)', icon: 'fa-users' },
             { number: 5, title: 'Incubators', description: 'Configure incubators (optional)', icon: 'fa-thermometer-half' },
-            { number: 6, title: 'Remote Access', description: 'Setup internet tunnel for remote access (optional)', icon: 'fa-globe' },
-            { number: 7, title: 'Notifications', description: 'Setup email and chat notifications (optional)', icon: 'fa-bell' }
+            { number: 6, title: 'Virtual Sensor', description: 'Configure virtual sensor (optional)', icon: 'fa-cloud-sun' },
+            { number: 7, title: 'Remote Access', description: 'Setup internet tunnel for remote access (optional)', icon: 'fa-globe' },
+            { number: 8, title: 'Notifications', description: 'Setup email and chat notifications (optional)', icon: 'fa-bell' }
         ];
         
         // Initialize the wizard
@@ -224,12 +237,21 @@
                         
                         // Load existing users
                         if (config.users && Array.isArray(config.users)) {
-                            $scope.users = config.users;
+                            $scope.additionalUsers = config.users;
                         }
                         
                         // Load existing incubators
                         if (config.incubators && Array.isArray(config.incubators)) {
                             $scope.incubators = config.incubators;
+                        }
+                        
+                        // Load virtual sensor settings
+                        if (config.virtual_sensor) {
+                            $scope.virtualSensor.enabled = config.virtual_sensor.enabled || false;
+                            $scope.virtualSensor.sensor_name = config.virtual_sensor.sensor_name || 'virtual-sensor';
+                            $scope.virtualSensor.location = config.virtual_sensor.location || 'Lab';
+                            $scope.virtualSensor.weather_location = config.virtual_sensor.weather_location || '';
+                            $scope.virtualSensor.api_key = config.virtual_sensor.api_key || '';
                         }
                         
                         console.log('Existing configuration loaded successfully');
@@ -278,11 +300,14 @@
                 case 5:
                     return true; // Incubators are optional
                 case 6:
+                    if (!$scope.virtualSensor.enabled) return true; // If disabled, always valid
+                    return $scope.virtualSensor.sensor_name && $scope.virtualSensor.location; // Name and location required when enabled
+                case 7:
                     if (!$scope.tunnel.enabled) return true; // If disabled, always valid
                     if (!$scope.tunnel.token) return false; // Token always required
                     if ($scope.tunnel.mode === 'custom' && !$scope.tunnel.custom_domain) return false; // Custom domain required for free mode
                     return true;
-                case 7:
+                case 8:
                     return true; // Notifications are optional
                 default:
                     return false;
@@ -376,6 +401,44 @@
                 });
         };
         
+        // Edit user - populate the edit modal with existing data
+        $scope.editUser = function(index) {
+            $scope.editingUser = angular.copy($scope.additionalUsers[index]);
+            $scope.editingUserIndex = index;
+        };
+        
+        // Update user
+        $scope.updateUser = function() {
+            if (!$scope.editingUser.username || !$scope.editingUser.email) {
+                $scope.showMessage('Username and email are required.', 'error');
+                return;
+            }
+            
+            $scope.isLoading = true;
+            
+            var updateData = angular.copy($scope.editingUser);
+            updateData.original_username = $scope.additionalUsers[$scope.editingUserIndex].username;
+            
+            $http.post('/setup/update-user', updateData)
+                .then(function(response) {
+                    if (response.data.result === 'success') {
+                        $scope.additionalUsers[$scope.editingUserIndex] = angular.copy($scope.editingUser);
+                        $scope.editingUser = {};
+                        $scope.editingUserIndex = -1;
+                        $scope.showMessage('User updated successfully.', 'success');
+                        $('#editUserModal').modal('hide');
+                    } else {
+                        $scope.showMessage('Error: ' + (response.data.message || 'Unknown error'), 'error');
+                    }
+                })
+                .catch(function(error) {
+                    $scope.showMessage('Error updating user: ' + (error.data?.message || error.statusText), 'error');
+                })
+                .finally(function() {
+                    $scope.isLoading = false;
+                });
+        };
+        
         // Incubator management
         $scope.addIncubator = function() {
             if (!$scope.newIncubator.name) {
@@ -398,6 +461,53 @@
                 })
                 .catch(function(error) {
                     $scope.showMessage('Error adding incubator: ' + (error.data?.message || error.statusText), 'error');
+                })
+                .finally(function() {
+                    $scope.isLoading = false;
+                });
+        };
+        
+        // Edit incubator - populate the edit modal with existing data
+        $scope.editIncubator = function(index) {
+            $scope.editingIncubator = angular.copy($scope.incubators[index]);
+            $scope.editingIncubatorIndex = index;
+            console.log('Editing incubator:', $scope.editingIncubator);
+        };
+        
+        // Update incubator
+        $scope.updateIncubator = function() {
+            console.log('updateIncubator called');
+            console.log('editingIncubator:', $scope.editingIncubator);
+            
+            if (!$scope.editingIncubator.name) {
+                $scope.showMessage('Incubator name is required.', 'error');
+                return;
+            }
+            
+            $scope.isLoading = true;
+            
+            var updateData = angular.copy($scope.editingIncubator);
+            updateData.original_name = $scope.incubators[$scope.editingIncubatorIndex].name;
+            
+            console.log('Sending update data:', updateData);
+            console.log('Making request to /setup/update-incubator');
+            
+            $http.post('/setup/update-incubator', updateData)
+                .then(function(response) {
+                    console.log('Update response:', response.data);
+                    if (response.data.result === 'success') {
+                        $scope.incubators[$scope.editingIncubatorIndex] = angular.copy($scope.editingIncubator);
+                        $scope.editingIncubator = {};
+                        $scope.editingIncubatorIndex = -1;
+                        $scope.showMessage('Incubator updated successfully.', 'success');
+                        $('#editIncubatorModal').modal('hide');
+                    } else {
+                        $scope.showMessage('Error: ' + (response.data.message || 'Unknown error'), 'error');
+                    }
+                })
+                .catch(function(error) {
+                    console.log('Update error:', error);
+                    $scope.showMessage('Error updating incubator: ' + (error.data?.message || error.statusText), 'error');
                 })
                 .finally(function() {
                     $scope.isLoading = false;
@@ -440,6 +550,63 @@
                 })
                 .catch(function(error) {
                     $scope.showMessage('Error saving notifications: ' + (error.data?.message || error.statusText), 'error');
+                })
+                .finally(function() {
+                    $scope.isLoading = false;
+                });
+        };
+        
+        // Process virtual sensor configuration
+        $scope.processVirtualSensor = function() {
+            if (!$scope.isStepValid(6)) {
+                $scope.showMessage('Please fill in required fields.', 'error');
+                return;
+            }
+            
+            $scope.isLoading = true;
+            $scope.clearMessages();
+            
+            $http.post('/setup/virtual-sensor', $scope.virtualSensor)
+                .then(function(response) {
+                    $scope.showMessage('Virtual sensor configuration saved!', 'success');
+                    $scope.nextStep();
+                })
+                .catch(function(error) {
+                    $scope.showMessage('Error saving virtual sensor: ' + (error.data?.message || error.statusText), 'error');
+                })
+                .finally(function() {
+                    $scope.isLoading = false;
+                });
+        };
+        
+        // Test virtual sensor weather API
+        $scope.testVirtualSensor = function() {
+            if (!$scope.virtualSensor.weather_location || !$scope.virtualSensor.api_key) {
+                $scope.showMessage('Weather location and API key are required for testing.', 'error');
+                return;
+            }
+            
+            $scope.isLoading = true;
+            $scope.clearMessages();
+            
+            var testData = {
+                weather_location: $scope.virtualSensor.weather_location,
+                api_key: $scope.virtualSensor.api_key
+            };
+            
+            $http.post('/setup/test-weather-api', testData)
+                .then(function(response) {
+                    var data = response.data;
+                    if (data.success) {
+                        $scope.showMessage('Weather API test successful! Temperature: ' + 
+                            data.temperature.toFixed(1) + '°C, Humidity: ' + 
+                            data.humidity.toFixed(0) + '%', 'success');
+                    } else {
+                        $scope.showMessage('Weather API test failed: ' + data.message, 'error');
+                    }
+                })
+                .catch(function(error) {
+                    $scope.showMessage('Weather API test failed: ' + (error.data?.message || error.statusText), 'error');
                 })
                 .finally(function() {
                     $scope.isLoading = false;

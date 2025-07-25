@@ -281,6 +281,7 @@
                                         <th>Username</th>
                                         <th>Email</th>
                                         <th>Admin</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -291,6 +292,12 @@
                                         <td><span class="badge" ng-class="user.isadmin ? 'badge-warning' : 'badge-secondary'">
                                             {{user.isadmin ? 'Yes' : 'No'}}
                                         </span></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary" ng-click="editUser($index)" 
+                                                    data-toggle="modal" data-target="#editUserModal">
+                                                <i class="fa fa-edit"></i> Edit
+                                            </button>
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -339,6 +346,7 @@
                                         <th>Location</th>
                                         <th>Owner</th>
                                         <th>Description</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -347,13 +355,22 @@
                                         <td>{{incubator.location}}</td>
                                         <td>{{incubator.owner}}</td>
                                         <td>{{incubator.description}}</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary" ng-click="editIncubator($index)" 
+                                                    data-toggle="modal" data-target="#editIncubatorModal">
+                                                <i class="fa fa-edit"></i> Edit
+                                            </button>
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
                         </div>
 
-                        <div class="alert alert-info" ng-if="incubators.length === 0">
+                        <div class="alert alert-info" ng-if="incubators.length === 0 && !isReconfigureMode">
                             <i class="fa fa-info-circle"></i> No incubators have been added. You can skip this step and add incubators later.
+                        </div>
+                        <div class="alert alert-info" ng-if="incubators.length === 0 && isReconfigureMode">
+                            <i class="fa fa-info-circle"></i> No incubators are currently configured. You can add some now or skip this step.
                         </div>
                     </div>
                     <div class="card-footer">
@@ -369,8 +386,124 @@
         </div>
     </div>
 
-    <!-- Step 6: Remote Access Tunnel -->
+    <!-- Step 6: Virtual Sensor -->
     <div class="wizard-step" ng-if="currentStep === 6">
+        <div class="row">
+            <div class="col-lg-8 offset-lg-2">
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fa fa-cloud-sun"></i> Virtual Sensor <small class="text-muted">(Optional)</small></h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="lead">Configure a virtual sensor to provide environmental data (temperature, humidity, pressure, light) for your experiments.</p>
+                        
+                        <div class="form-group">
+                            <div class="custom-control custom-switch">
+                                <input type="checkbox" class="custom-control-input" id="enableVirtualSensor" ng-model="virtualSensor.enabled">
+                                <label class="custom-control-label" for="enableVirtualSensor">
+                                    <strong>Enable Virtual Sensor</strong>
+                                </label>
+                            </div>
+                            <small class="form-text text-muted">
+                                The virtual sensor provides environmental readings that can be used in experiments and monitoring.
+                            </small>
+                        </div>
+                        
+                        <div ng-if="virtualSensor.enabled">
+                            <div class="alert alert-info">
+                                <h6><i class="fa fa-info-circle"></i> About Virtual Sensor</h6>
+                                <p class="mb-2">The virtual sensor can provide either simulated data or real weather data from an external API.</p>
+                                <p class="mb-0">For real weather data, you'll need a free API key from OpenWeatherMap.</p>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="sensorName">Sensor Name *</label>
+                                        <input type="text" class="form-control" id="sensorName" 
+                                               ng-model="virtualSensor.sensor_name" 
+                                               placeholder="virtual-sensor" required>
+                                        <small class="form-text text-muted">Unique name for this sensor</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="sensorLocation">Location *</label>
+                                        <input type="text" class="form-control" id="sensorLocation" 
+                                               ng-model="virtualSensor.location" 
+                                               placeholder="Lab" required>
+                                        <small class="form-text text-muted">Physical location of the sensor</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Real Weather Data (Optional)</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert alert-light">
+                                        <p class="mb-2"><strong>To use real weather data:</strong></p>
+                                        <ol class="mb-2">
+                                            <li>Sign up for free at <a href="https://openweathermap.org/api" target="_blank">OpenWeatherMap</a></li>
+                                            <li>Get your API key from the dashboard</li>
+                                            <li>Enter your location and API key below</li>
+                                        </ol>
+                                        <p class="mb-0"><small>Leave blank to use simulated random data.</small></p>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="weatherLocation">Weather Location</label>
+                                                <input type="text" class="form-control" id="weatherLocation" 
+                                                       ng-model="virtualSensor.weather_location" 
+                                                       placeholder="London,GB or 51.5074,-0.1278 or 2643743">
+                                                <small class="form-text text-muted">
+                                                    City name (London,GB), coordinates (lat,lon), or city ID
+                                                </small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="weatherApiKey">OpenWeatherMap API Key</label>
+                                                <input type="password" class="form-control" id="weatherApiKey" 
+                                                       ng-model="virtualSensor.api_key" 
+                                                       placeholder="Enter your API key">
+                                                <small class="form-text text-muted">
+                                                    Optional - required for real weather data
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <button class="btn btn-outline-primary" ng-click="testVirtualSensor()" 
+                                            ng-disabled="!virtualSensor.weather_location || !virtualSensor.api_key || isLoading">
+                                        <i class="fa fa-thermometer-half"></i> Test Weather API
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info" ng-if="!virtualSensor.enabled">
+                            <i class="fa fa-info-circle"></i> Virtual sensor is disabled. You can enable it later in the system settings.
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn btn-secondary" ng-click="previousStep()">
+                            <i class="fa fa-arrow-left"></i> Back
+                        </button>
+                        <button class="btn btn-primary float-right" ng-click="processVirtualSensor()">
+                            Next <i class="fa fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 7: Remote Access Tunnel -->
+    <div class="wizard-step" ng-if="currentStep === 7">
         <div class="row">
             <div class="col-lg-8 offset-lg-2">
                 <div class="card">
@@ -503,8 +636,8 @@
         </div>
     </div>
 
-    <!-- Step 7: Notifications -->
-    <div class="wizard-step" ng-if="currentStep === 7">
+    <!-- Step 8: Notifications -->
+    <div class="wizard-step" ng-if="currentStep === 8">
         <div class="row">
             <div class="col-lg-10 offset-lg-1">
                 <div class="card">
@@ -629,7 +762,7 @@
     </div>
 
     <!-- Final Step: Completion -->
-    <div class="wizard-step" ng-if="currentStep === 8">
+    <div class="wizard-step" ng-if="currentStep === 9">
         <div class="row">
             <div class="col-lg-8 offset-lg-2">
                 <div class="card">
@@ -647,6 +780,7 @@
                                 <li><i class="fa fa-check" style="color: var(--warm-gray)"></i> Administrator account ready</li>
                                 <li ng-if="additionalUsers.length > 0"><i class="fa fa-check" style="color: var(--warm-gray)"></i> {{additionalUsers.length}} additional users added</li>
                                 <li ng-if="incubators.length > 0"><i class="fa fa-check" style="color: var(--warm-gray)"></i> {{incubators.length}} incubators configured</li>
+                                <li ng-if="virtualSensor.enabled"><i class="fa fa-check" style="color: var(--warm-gray)"></i> Virtual sensor configured</li>
                                 <li ng-if="notifications.smtp.enabled"><i class="fa fa-check" style="color: var(--warm-gray)"></i> Email notifications enabled</li>
                                 <li ng-if="notifications.mattermost.enabled"><i class="fa fa-check" style="color: var(--warm-gray)"></i> Mattermost notifications enabled</li>
                             </ul>
@@ -745,6 +879,85 @@
     </div>
 </div>
 
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">
+                    <i class="fa fa-edit"></i> Edit User
+                </h4>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form name="editUserForm" novalidate>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Full Name *</label>
+                                <input type="text" class="form-control" ng-model="editingUser.fullname" 
+                                       placeholder="Jane Doe" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Username *</label>
+                                <input type="text" class="form-control" ng-model="editingUser.username" 
+                                       placeholder="jane.doe" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Email *</label>
+                                <input type="email" class="form-control" ng-model="editingUser.email" 
+                                       placeholder="jane.doe@university.edu" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Phone</label>
+                                <input type="tel" class="form-control" ng-model="editingUser.telephone" 
+                                       placeholder="+1234567890">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>PIN Code</label>
+                                <input type="text" class="form-control" ng-model="editingUser.pin" 
+                                       placeholder="1234" maxlength="4">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Team</label>
+                                <input type="text" class="form-control" ng-model="editingUser.labname" 
+                                       placeholder="Research Team">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" ng-model="editingUser.isadmin" id="editUserIsAdmin">
+                            <label class="form-check-label" for="editUserIsAdmin">Administrator privileges</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" ng-click="updateUser()" 
+                        ng-disabled="!editingUser.username || !editingUser.email">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Add Incubator Modal -->
 <div class="modal fade" id="addIncubatorModal" tabindex="-1" role="dialog">
     <div class="modal-dialog" role="document">
@@ -785,6 +998,51 @@
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" ng-click="addIncubator()" 
                         ng-disabled="!newIncubator.name">Add Incubator</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Incubator Modal -->
+<div class="modal fade" id="editIncubatorModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">
+                    <i class="fa fa-edit"></i> Edit Incubator
+                </h4>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form name="editIncubatorForm" novalidate>
+                    <div class="form-group">
+                        <label>Name *</label>
+                        <input type="text" class="form-control" ng-model="editingIncubator.name" 
+                               placeholder="Incubator 1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Location</label>
+                        <input type="text" class="form-control" ng-model="editingIncubator.location" 
+                               placeholder="Room 101">
+                    </div>
+                    <div class="form-group">
+                        <label>Owner</label>
+                        <input type="text" class="form-control" ng-model="editingIncubator.owner" 
+                               placeholder="Dr. Smith">
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea class="form-control" ng-model="editingIncubator.description" 
+                                  placeholder="25°C constant temperature incubator" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" ng-click="updateIncubator()" 
+                        ng-disabled="!editingIncubator.name">Save Changes</button>
             </div>
         </div>
     </div>
@@ -872,6 +1130,7 @@
 
 .wizard-step {
     animation: fadeIn 0.3s ease;
+    margin-top: 50px;
 }
 
 @keyframes fadeIn {
@@ -935,6 +1194,7 @@
 /* Modal shadow enhancement */
 .modal-dialog {
     box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1), 0 5px 15px rgba(0, 0, 0, 0.08);
+    margin-top: 50px;
 }
 
 .modal-content {

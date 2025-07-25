@@ -27,6 +27,7 @@ from optparse import OptionParser
 MAC_ADDRESS = ':'.join('%02x'%random.randint(0,255) for x in range(6))
 PORT = 8001
 DEFAULT_JSONFILE = "config_sensor.json"
+DEFAULT_ETHOSCOPE_CONF = "/etc/ethoscope/ethoscope.conf"
 
 # Global config variable - will be loaded after parsing command line arguments
 config = None
@@ -354,9 +355,26 @@ class SensorHTTPHandler(BaseHTTPRequestHandler):
             
             print("Updated config:", config)
             
-            # Save to config file (using the global config file path)
-            with open(DEFAULT_JSONFILE, 'w') as f:
-                json.dump(config, f, indent=2)
+            # Save to ethoscope.conf file (preserving other sections)
+            try:
+                with open(DEFAULT_ETHOSCOPE_CONF, 'r') as f:
+                    ethoscope_config = json.load(f)
+                
+                if 'virtual_sensor' not in ethoscope_config:
+                    ethoscope_config['virtual_sensor'] = {}
+                
+                # Update only the virtual_sensor section
+                for key, value in config.items():
+                    ethoscope_config['virtual_sensor'][key] = value
+                
+                with open(DEFAULT_ETHOSCOPE_CONF, 'w') as f:
+                    json.dump(ethoscope_config, f, indent=4)
+                    
+            except Exception as save_error:
+                print(f"Error saving to ethoscope.conf: {save_error}")
+                # Fallback to old JSON file method
+                with open(DEFAULT_JSONFILE, 'w') as f:
+                    json.dump(config, f, indent=2)
             
             self.send_json_response({"DATA": "OK"})
             
@@ -414,12 +432,30 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
     option_dict = vars(options)
 
-    # Load configuration file
+    # Load configuration - try ethoscope.conf first, then fallback to JSON file
+    config = None
+    
+    # Try loading from ethoscope.conf virtual_sensor section
     try:
-        config = json.load(open(option_dict["config_file"]))
-    except:
-        config = { 'sensor_name' : 'virtual-test-sensor',
-                   'location' : 'Home_Office' }
+        with open(DEFAULT_ETHOSCOPE_CONF, 'r') as f:
+            ethoscope_config = json.load(f)
+            if 'virtual_sensor' in ethoscope_config:
+                config = ethoscope_config['virtual_sensor']
+                print(f"Loaded configuration from {DEFAULT_ETHOSCOPE_CONF}")
+    except Exception as e:
+        print(f"Could not load from ethoscope.conf: {e}")
+    
+    # Fallback to separate JSON config file if specified or if ethoscope.conf failed
+    if config is None:
+        try:
+            config = json.load(open(option_dict["config_file"]))
+            print(f"Loaded configuration from {option_dict['config_file']}")
+        except Exception as e:
+            print(f"Could not load from config file: {e}")
+            # Default configuration
+            config = { 'sensor_name' : 'virtual-test-sensor',
+                       'location' : 'Home_Office' }
+            print("Using default configuration")
 
     # Override config with command line arguments if provided
     if option_dict["sensor_name"]:

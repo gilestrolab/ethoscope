@@ -38,18 +38,27 @@ class SetupAPI(BaseAPI):
     @error_decorator
     def _setup_post(self, action):
         """Handle POST requests for setup actions."""
+        print(f"DEBUG: Received POST action: '{action}'")
         if action == 'basic-info':
             return self._setup_basic_info()
         elif action == 'admin-user':
             return self._setup_admin_user()
         elif action == 'add-user':
             return self._setup_add_user()
+        elif action == 'update-user':
+            return self._setup_update_user()
         elif action == 'add-incubator':
             return self._setup_add_incubator()
+        elif action == 'update-incubator':
+            return self._setup_update_incubator()
         elif action == 'notifications':
             return self._setup_notifications()
         elif action == 'test-notifications':
             return self._test_notifications()
+        elif action == 'virtual-sensor':
+            return self._setup_virtual_sensor()
+        elif action == 'test-weather-api':
+            return self._test_weather_api()
         elif action == 'tunnel':
             return self._setup_tunnel()
         elif action == 'complete':
@@ -312,6 +321,59 @@ class SetupAPI(BaseAPI):
             self.logger.error(f"Error creating user: {e}")
             return {'result': 'error', 'message': str(e)}
     
+    def _setup_update_user(self):
+        """Update user."""
+        data = self.get_request_json()
+        
+        try:
+            db = ExperimentalDB()
+            
+            # Get the original username to identify the user
+            original_username = data.get('original_username', '').strip()
+            if not original_username:
+                return {'result': 'error', 'message': 'Original username is required for update'}
+            
+            # Get updated user data
+            update_data = {}
+            new_username = None
+            if 'username' in data and data['username'].strip():
+                new_username = data['username'].strip()
+                if new_username != original_username:
+                    update_data['username'] = new_username
+            if 'fullname' in data:
+                update_data['fullname'] = data['fullname'].strip()
+            if 'email' in data:
+                update_data['email'] = data['email'].strip()
+            if 'pin' in data:
+                update_data['pin'] = data['pin'].strip()
+            if 'telephone' in data:
+                update_data['telephone'] = data['telephone'].strip()
+            if 'labname' in data:
+                update_data['labname'] = data['labname'].strip()
+            if 'isadmin' in data:
+                update_data['isadmin'] = 1 if data.get('isadmin', False) else 0
+            
+            # Validate required fields
+            if new_username and not new_username:
+                return {'result': 'error', 'message': 'Username cannot be empty'}
+            if 'email' in update_data and not update_data['email']:
+                return {'result': 'error', 'message': 'Email cannot be empty'}
+            
+            # Update user by username
+            result = db.updateUser(username=original_username, **update_data)
+            
+            if result >= 0:  # 0 means no changes needed, >= 1 means rows updated, -1 means error
+                return {
+                    'result': 'success', 
+                    'message': f'User updated successfully'
+                }
+            else:
+                return {'result': 'error', 'message': 'Failed to update user'}
+                
+        except Exception as e:
+            self.logger.error(f"Error updating user: {e}")
+            return {'result': 'error', 'message': str(e)}
+    
     def _setup_add_incubator(self):
         """Add incubator."""
         data = self.get_request_json()
@@ -346,6 +408,51 @@ class SetupAPI(BaseAPI):
                 
         except Exception as e:
             self.logger.error(f"Error creating incubator: {e}")
+            return {'result': 'error', 'message': str(e)}
+    
+    def _setup_update_incubator(self):
+        """Update incubator."""
+        data = self.get_request_json()
+        
+        try:
+            db = ExperimentalDB()
+            
+            # Get the original name to identify the incubator
+            original_name = data.get('original_name', '').strip()
+            if not original_name:
+                return {'result': 'error', 'message': 'Original incubator name is required for update'}
+            
+            # Get updated incubator data
+            update_data = {}
+            new_name = None
+            if 'name' in data and data['name'].strip():
+                new_name = data['name'].strip()
+                if new_name != original_name:
+                    update_data['name'] = new_name
+            if 'location' in data:
+                update_data['location'] = data['location'].strip()
+            if 'owner' in data:
+                update_data['owner'] = data['owner'].strip()
+            if 'description' in data:
+                update_data['description'] = data['description'].strip()
+            
+            # Validate required fields
+            if new_name and not new_name:
+                return {'result': 'error', 'message': 'Incubator name cannot be empty'}
+            
+            # Update incubator by name
+            result = db.updateIncubator(name=original_name, **update_data)
+            
+            if result >= 0:  # 0 means no changes needed, >= 1 means rows updated, -1 means error
+                return {
+                    'result': 'success', 
+                    'message': f'Incubator updated successfully'
+                }
+            else:
+                return {'result': 'error', 'message': 'Failed to update incubator'}
+                
+        except Exception as e:
+            self.logger.error(f"Error updating incubator: {e}")
             return {'result': 'error', 'message': str(e)}
     
     def _setup_notifications(self):
@@ -604,6 +711,146 @@ Ethoscope Node Setup Wizard
                 'message': f'Mattermost test failed: {str(e)}'
             }
     
+    def _setup_virtual_sensor(self):
+        """Configure virtual sensor settings."""
+        try:
+            data = bottle.request.json
+            if not data:
+                return {
+                    'result': 'error',
+                    'message': 'No data provided'
+                }
+            
+            # Validate required fields if enabled
+            if data.get('enabled', False):
+                required_fields = ['sensor_name', 'location']
+                for field in required_fields:
+                    if not data.get(field):
+                        return {
+                            'result': 'error',
+                            'message': f'Missing required field: {field}'
+                        }
+            
+            # Update virtual sensor configuration
+            config_data = self.config.config
+            if 'virtual_sensor' not in config_data:
+                config_data['virtual_sensor'] = {}
+            
+            config_data['virtual_sensor'].update({
+                'enabled': data.get('enabled', False),
+                'sensor_name': data.get('sensor_name', 'virtual-sensor'),
+                'location': data.get('location', 'Lab'),
+                'weather_location': data.get('weather_location', ''),
+                'api_key': data.get('api_key', '')
+            })
+            
+            # Save configuration
+            self.config.save_config()
+            
+            return {
+                'result': 'success',
+                'message': 'Virtual sensor configured successfully'
+            }
+            
+        except Exception as e:
+            return {
+                'result': 'error',
+                'message': f'Failed to configure virtual sensor: {str(e)}'
+            }
+    
+    def _test_weather_api(self):
+        """Test weather API connection."""
+        try:
+            data = bottle.request.json
+            if not data:
+                return {
+                    'result': 'error',
+                    'message': 'No data provided'
+                }
+            
+            weather_location = data.get('weather_location')
+            api_key = data.get('api_key')
+            
+            if not weather_location or not api_key:
+                return {
+                    'result': 'error',
+                    'message': 'Weather location and API key are required'
+                }
+            
+            # Test the weather API
+            import urllib.request
+            import urllib.error
+            import json
+            
+            # Determine URL format based on location
+            if ',' in weather_location and len(weather_location.split(',')) == 2:
+                # Check if it's lat,lon coordinates
+                try:
+                    lat, lon = weather_location.split(',')
+                    float(lat)  # Test if it's numeric
+                    float(lon)
+                    url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}&units=metric"
+                except ValueError:
+                    # It's city,country format
+                    url = f"https://api.openweathermap.org/data/2.5/weather?q={weather_location}&appid={api_key}&units=metric"
+            elif weather_location.isdigit():
+                # City ID format
+                url = f"https://api.openweathermap.org/data/2.5/weather?id={weather_location}&appid={api_key}&units=metric"
+            else:
+                # City name or other query format
+                url = f"https://api.openweathermap.org/data/2.5/weather?q={weather_location}&appid={api_key}&units=metric"
+            
+            try:
+                with urllib.request.urlopen(url, timeout=10) as response:
+                    weather_data = json.loads(response.read().decode())
+                
+                return {
+                    'success': True,
+                    'temperature': weather_data['main']['temp'],
+                    'humidity': weather_data['main']['humidity'],
+                    'pressure': weather_data['main']['pressure'],
+                    'location': weather_data['name'],
+                    'country': weather_data['sys']['country']
+                }
+                
+            except urllib.error.HTTPError as e:
+                if e.code == 401:
+                    return {
+                        'success': False,
+                        'message': 'Invalid API key. Please check your OpenWeatherMap API key.'
+                    }
+                elif e.code == 404:
+                    return {
+                        'success': False,
+                        'message': 'Location not found. Please check your location format.'
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'message': f'Weather API error: HTTP {e.code}'
+                    }
+            except urllib.error.URLError as e:
+                return {
+                    'success': False,
+                    'message': f'Network error: {str(e)}'
+                }
+            except json.JSONDecodeError:
+                return {
+                    'success': False,
+                    'message': 'Invalid response from weather API'
+                }
+            except KeyError as e:
+                return {
+                    'success': False,
+                    'message': f'Unexpected response format: missing {str(e)}'
+                }
+                
+        except Exception as e:
+            return {
+                'success': False,
+                'message': f'Weather API test failed: {str(e)}'
+            }
+    
     def _complete_setup(self):
         """Complete the setup process."""
         try:
@@ -670,6 +917,13 @@ Ethoscope Node Setup Wizard
                         'bot_token': '',
                         'channel_id': ''
                     }
+                },
+                'virtual_sensor': {
+                    'enabled': False,
+                    'sensor_name': 'virtual-sensor',
+                    'location': 'Lab',
+                    'weather_location': '',
+                    'api_key': ''
                 }
             }
             
@@ -752,6 +1006,24 @@ Ethoscope Node Setup Wizard
             except Exception as e:
                 self.logger.warning(f"Could not load notification settings: {e}")
             
+            # Get virtual sensor settings
+            try:
+                virtual_sensor_config = self.config._settings.get('virtual_sensor', {})
+                if virtual_sensor_config:
+                    # Show masked API key if one exists, empty if none configured
+                    existing_api_key = virtual_sensor_config.get('api_key', '')
+                    masked_api_key = '***CONFIGURED***' if existing_api_key else ''
+                    
+                    config_data['virtual_sensor'].update({
+                        'enabled': virtual_sensor_config.get('enabled', False),
+                        'sensor_name': virtual_sensor_config.get('sensor_name', 'virtual-sensor'),
+                        'location': virtual_sensor_config.get('location', 'Lab'),
+                        'weather_location': virtual_sensor_config.get('weather_location', ''),
+                        'api_key': masked_api_key  # Show masked API key for UX, empty if none exists
+                    })
+            except Exception as e:
+                self.logger.warning(f"Could not load virtual sensor settings: {e}")
+            
             # Get existing users (excluding admin user already loaded)
             try:
                 db = ExperimentalDB()
@@ -774,17 +1046,27 @@ Ethoscope Node Setup Wizard
             # Get existing incubators
             try:
                 db = ExperimentalDB()
-                all_incubators = db.get_all_incubators()
-                for incubator in all_incubators:
-                    config_data['incubators'].append({
-                        'name': incubator.get('name', ''),
-                        'description': incubator.get('description', ''),
-                        'location': incubator.get('location', ''),
-                        'temperature_range_min': incubator.get('temperature_range_min', 20),
-                        'temperature_range_max': incubator.get('temperature_range_max', 30),
-                        'humidity_min': incubator.get('humidity_min', 40),
-                        'humidity_max': incubator.get('humidity_max', 70)
-                    })
+                all_incubators = db.getAllIncubators(asdict=True)
+                if isinstance(all_incubators, dict):
+                    # When asdict=True, it returns a dictionary keyed by name
+                    for incubator_name, incubator_data in all_incubators.items():
+                        config_data['incubators'].append({
+                            'name': incubator_data.get('name', incubator_name),
+                            'description': incubator_data.get('description', ''),
+                            'location': incubator_data.get('location', ''),
+                            'owner': incubator_data.get('owner', ''),
+                            'active': incubator_data.get('active', True)
+                        })
+                elif isinstance(all_incubators, list):
+                    # When asdict=False, it returns a list of tuples/objects
+                    for incubator in all_incubators:
+                        config_data['incubators'].append({
+                            'name': incubator.get('name', ''),
+                            'description': incubator.get('description', ''),
+                            'location': incubator.get('location', ''),
+                            'owner': incubator.get('owner', ''),
+                            'active': incubator.get('active', True)
+                        })
             except Exception as e:
                 self.logger.warning(f"Could not load existing incubators: {e}")
             
