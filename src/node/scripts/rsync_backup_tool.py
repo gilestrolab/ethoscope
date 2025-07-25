@@ -404,25 +404,8 @@ class RequestHandler(BaseHTTPRequestHandler):
                 # For videos: limit to recent files and use faster scanning
                 files = self._enumerate_video_files_optimized(directory_path, extensions)
             else:
-                # For SQLite: full scan as they are fewer in number
-                for root, dirs, filenames in os.walk(directory_path):
-                    for filename in filenames:
-                        if filename.lower().endswith(extensions):
-                            file_path = os.path.join(root, filename)
-                            try:
-                                file_stat = os.stat(file_path)
-                                files.append({
-                                    'name': filename,
-                                    'path': file_path,
-                                    'relative_path': os.path.relpath(file_path, directory_path),
-                                    'size': file_stat.st_size,
-                                    'size_human': self._format_bytes(file_stat.st_size),
-                                    'modified': file_stat.st_mtime,
-                                    'status': 'backed_up'
-                                })
-                            except OSError as e:
-                                logging.warning(f"Could not stat file {file_path}: {e}")
-                                continue
+                # For SQLite: limit to recent files from this device only
+                files = self._enumerate_sqlite_files_optimized(directory_path, extensions)
                                 
         except OSError as e:
             logging.error(f"Could not scan directory {directory_path}: {e}")
@@ -491,6 +474,43 @@ class RequestHandler(BaseHTTPRequestHandler):
             
         return files
     
+    def _enumerate_sqlite_files_optimized(self, directory_path, extensions):
+        """Optimized SQLite file enumeration - scan only device-specific directory"""
+        files = []
+        
+        try:
+            # For SQLite, scan only the specific device directory
+            # The directory_path should already be device-specific: /ethoscope_data/results/{device_id}
+            if os.path.exists(directory_path):
+                # Use os.walk but limit depth to avoid scanning other devices
+                for root, dirs, filenames in os.walk(directory_path):
+                    for filename in filenames:
+                        if filename.lower().endswith(extensions):
+                            file_path = os.path.join(root, filename)
+                            try:
+                                file_stat = os.stat(file_path)
+                                files.append({
+                                    'name': filename,
+                                    'path': file_path,
+                                    'relative_path': os.path.relpath(file_path, directory_path),
+                                    'size': file_stat.st_size,
+                                    'size_human': self._format_bytes(file_stat.st_size),
+                                    'modified': file_stat.st_mtime,
+                                    'status': 'backed_up'
+                                })
+                            except OSError as e:
+                                logging.warning(f"Could not stat SQLite file {file_path}: {e}")
+                                continue
+                                
+                logging.info(f"SQLite scan found {len(files)} files in device directory {directory_path}")
+            else:
+                logging.warning(f"SQLite device directory does not exist: {directory_path}")
+                                
+        except OSError as e:
+            logging.error(f"Could not enumerate SQLite files in {directory_path}: {e}")
+            
+        return files
+    
     def _enumerate_sqlite_files(self, device_id, results_info):
         """Enumerate individual SQLite database files with background refresh caching"""
         # Use directory from results_info, or construct path from device_id
@@ -501,6 +521,9 @@ class RequestHandler(BaseHTTPRequestHandler):
         # If still no path, construct from device_id and known structure
         if not results_path and device_id:
             results_path = f"/ethoscope_data/results/{device_id}"
+        
+        # Debug logging to check path
+        logging.info(f"SQLite enumeration for device {device_id}: using path '{results_path}', results_info: {results_info}")
         
         # Always get from cache (triggers background refresh if needed)
         return self._get_cached_file_enumeration('sqlite', device_id, results_path)
