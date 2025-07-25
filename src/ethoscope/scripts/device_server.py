@@ -478,9 +478,12 @@ def info(id):
             "time": bottle.time.time()
         }
     
+    _, response_time = send_command(action='status', return_timing=True)
+
     runninginfo.update ( { "CPU_temp" : pi.get_core_temperature(), 
                            "underpowered" : pi.underPowered(),
-                           "current_timestamp" : bottle.time.time() } )
+                           "current_timestamp" : bottle.time.time(),
+                           "response_time" : "%.2f" % response_time } )
         
     # except:
         # runninginfo = {
