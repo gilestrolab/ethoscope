@@ -1733,7 +1733,7 @@ table thead th a:focus {
 
 /* Progress bar styling */
 .backup-progress-bar {
-    width: 100%;
+    width: 450px;
     height: 16px;
     background-color: var(--light-gray);
     border-radius: 8px;

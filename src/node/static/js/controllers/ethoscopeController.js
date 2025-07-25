@@ -893,6 +893,41 @@
         };
 
         /**
+         * Extract datetime from database filename
+         * @param {string} filename - Database filename like "device_YYYY-MM-DD_HH-MM-SS.db"
+         * @returns {string} Formatted datetime or original filename if no pattern match
+         */
+        $scope.extractDateTimeFromFilename = function(filename) {
+            if (!filename) return 'Unknown';
+            
+            // Pattern to match database files like "device_2024-01-15_14-30-45.db"
+            // or "ethoscope_YYYY-MM-DD_HH-MM-SS.db" or similar patterns
+            var dateTimePattern = /(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})/;
+            var match = filename.match(dateTimePattern);
+            
+            if (match) {
+                var dateTimeStr = match[1];
+                // Convert format from YYYY-MM-DD_HH-MM-SS to readable format
+                var parts = dateTimeStr.split('_');
+                if (parts.length === 2) {
+                    var datePart = parts[0]; // YYYY-MM-DD
+                    var timePart = parts[1].replace(/-/g, ':'); // HH:MM:SS
+                    
+                    try {
+                        var date = new Date(datePart + 'T' + timePart);
+                        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+                    } catch (e) {
+                        // If parsing fails, return the extracted datetime string
+                        return datePart + ' ' + timePart;
+                    }
+                }
+            }
+            
+            // If no datetime pattern found, return just the base filename without extension
+            return filename.replace(/\.[^/.]+$/, "");
+        };
+
+        /**
          * Get time since backup in human readable format
          * @param {number} timestamp - Unix timestamp of backup
          * @returns {string} Formatted time since backup

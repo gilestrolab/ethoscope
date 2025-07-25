@@ -141,7 +141,8 @@
                     <h5><span class="fa fa-server"></span> MySQL Database</h5>
                     <div class="database-backup-item">
                         <div class="database-info">
-                            <span class="database-name">MySQL Backup</span>
+                            <span class="database-name" ng-if="device.backup_status_detailed.backup_types.mysql.last_backup">{{formatDate(device.backup_status_detailed.backup_types.mysql.last_backup)}}</span>
+                            <span class="database-name" ng-if="!device.backup_status_detailed.backup_types.mysql.last_backup">MySQL Backup</span>
                             <div class="backup-details">
                                 <small ng-if="device.backup_status_detailed.backup_types.mysql.last_backup">
                                     Last backup: {{getTimeSinceBackup(device.backup_status_detailed.backup_types.mysql.last_backup)}}
@@ -170,7 +171,7 @@
                     <div ng-if="device.backup_status_detailed.individual_files && device.backup_status_detailed.individual_files.sqlite && device.backup_status_detailed.individual_files.sqlite.files.length > 0">
                         <div ng-repeat="sqliteFile in device.backup_status_detailed.individual_files.sqlite.files" class="database-backup-item">
                             <div class="database-info">
-                                <span class="database-name">{{sqliteFile.name}}</span>
+                                <span class="database-name">{{extractDateTimeFromFilename(sqliteFile.name)}}</span>
                                 <div class="backup-details">
                                     <small>Modified: {{formatDate(sqliteFile.modified * 1000)}}</small>
                                 </div>
@@ -247,7 +248,7 @@
                     <h5><span class="fa fa-file-database-o"></span> SQLite Databases</h5>
                     <div ng-repeat="(dbName, dbInfo) in device.databases.SQLite" class="database-backup-item">
                         <div class="database-info">
-                            <span class="database-name">{{formatDate(dbInfo.date)}}</span>
+                            <span class="database-name">{{extractDateTimeFromFilename(dbName)}}</span>
                         </div>
                         <div class="backup-progress-container">
                             <div class="backup-progress-bar sqlite-db" title="{{getBackupStatusText(dbInfo)}}">
@@ -265,7 +266,7 @@
                     <h5><span class="fa fa-server"></span> MariaDB Databases</h5>
                     <div ng-repeat="(dbName, dbInfo) in device.databases.MariaDB" class="database-backup-item">
                         <div class="database-info">
-                            <span class="database-name">{{formatDate(dbInfo.date)}}</span>
+                            <span class="database-name">{{extractDateTimeFromFilename(dbName)}}</span>
                         </div>
                         <div class="backup-progress-container">
                             <div class="backup-progress-bar mariadb-db" title="{{getBackupStatusText(dbInfo)}}">
