@@ -52,8 +52,124 @@ class RequestHandler(BaseHTTPRequestHandler):
                 'disk_usage_summary': disk_usage_summary
             }
             self._send_response(response)
+        elif self.path.startswith('/status/'):
+            # Handle device-specific status requests
+            device_id = self.path.split('/')[-1]
+            self._handle_device_status(device_id)
         else:
             self.send_error(404, "File not found")
+    
+    def _handle_device_status(self, device_id):
+        """Handle device-specific status requests - much more efficient than full status"""
+        try:
+            with gbw._lock:
+                status_copy = gbw.backup_status.copy()
+            
+            # Check if the device exists
+            if device_id not in status_copy:
+                self._send_response({
+                    'error': f'Device {device_id} not found',
+                    'device_id': device_id
+                })
+                return
+            
+            # Convert only the specific device's BackupStatus to dictionary
+            device_status = asdict(status_copy[device_id])
+            
+            # Enhance with individual file information for this device only
+            enhanced_device_status = self._enhance_device_backup_status_with_files(device_id, device_status)
+            
+            response = {
+                'device': enhanced_device_status,
+                'device_id': device_id
+            }
+            self._send_response(response)
+            
+        except Exception as e:
+            logging.error(f"Error handling device status for {device_id}: {e}")
+            self._send_response({
+                'error': f'Internal error processing device {device_id}',
+                'device_id': device_id
+            })
+    
+    def _enhance_device_backup_status_with_files(self, device_id, device_status):
+        """Enhance backup status with individual file information for a single device"""
+        synced_info = device_status.get('synced', {})
+        
+        # Add individual file information for this device only
+        device_status['individual_files'] = {
+            'sqlite': self._enumerate_sqlite_files(device_id, synced_info.get('results', {})),
+            'videos': self._enumerate_video_files(device_id, synced_info.get('videos', {}))
+        }
+        
+        # Update the backup_types structure to include individual file counts
+        if 'backup_types' not in device_status:
+            device_status['backup_types'] = {}
+        
+        # Update SQLite information with individual files
+        sqlite_files = device_status['individual_files']['sqlite']
+        if sqlite_files['count'] > 0:
+            device_status['backup_types']['sqlite'] = {
+                'available': True,
+                'status': 'completed',
+                'last_backup': synced_info.get('results', {}).get('last_sync_time', None),
+                'processing': False,
+                'message': 'Backup completed successfully',
+                'size': sqlite_files['total_size'],
+                'size_human': self._format_bytes(sqlite_files['total_size']),
+                'files': sqlite_files['count'],
+                'directory': synced_info.get('results', {}).get('local_path', ''),
+                'individual_files': sqlite_files['files']
+            }
+        else:
+            device_status['backup_types']['sqlite'] = {
+                'available': False,
+                'status': 'not_available',
+                'last_backup': None,
+                'size': 0,
+                'files': 0
+            }
+        
+        # Update Video information with individual files
+        video_files = device_status['individual_files']['videos']
+        if video_files['count'] > 0:
+            device_status['backup_types']['video'] = {
+                'available': True,
+                'status': 'completed',
+                'last_backup': synced_info.get('videos', {}).get('last_sync_time', None),
+                'processing': False,
+                'message': 'Backup completed successfully',
+                'size': video_files['total_size'],
+                'size_human': self._format_bytes(video_files['total_size']),
+                'files': video_files['count'],
+                'directory': synced_info.get('videos', {}).get('local_path', ''),
+                'individual_files': video_files['files']
+            }
+        else:
+            device_status['backup_types']['video'] = {
+                'available': False,
+                'status': 'not_available',
+                'last_backup': None,
+                'size': 0,
+                'files': 0,
+                'size_human': '0 B'
+            }
+        
+        # Add MySQL backup information if available
+        # MySQL backups are handled by backup_tool.py service, so we inherit existing status
+        if 'mysql' not in device_status.get('backup_types', {}):
+            device_status['backup_types']['mysql'] = {
+                'available': False,
+                'status': 'handled_by_mysql_service',
+                'last_backup': None,
+                'processing': False,
+                'message': 'MySQL backups handled by separate backup_tool.py service',
+                'size': 0,
+                'files': 0,
+                'size_human': '0 B'
+            }
+        
+        return device_status
     
     def _calculate_disk_usage_summary(self, status_dict):
         """Calculate overall disk usage summary from device statuses"""

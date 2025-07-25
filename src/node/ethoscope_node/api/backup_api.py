@@ -29,6 +29,7 @@ class BackupAPI(BaseAPI):
     def register_routes(self):
         """Register backup-related routes."""
         self.app.route('/backup/status', method='GET')(self._get_backup_status)
+        self.app.route('/backup/status/<device_id>', method='GET')(self._get_device_backup_status)
     
     @error_decorator
     def _get_backup_status(self):
@@ -61,6 +62,106 @@ class BackupAPI(BaseAPI):
         
         return result
     
+    @error_decorator
+    def _get_device_backup_status(self, device_id):
+        """Get structured backup status for a specific device only."""
+        self.set_json_response()
+        
+        # Use device-specific cache key
+        cache_key = f"device_{device_id}"
+        current_time = time.time()
+        
+        # Check device-specific cache first
+        if (hasattr(self, '_device_backup_cache') and 
+            cache_key in self._device_backup_cache and
+            current_time - self._device_backup_cache[cache_key]['timestamp'] < 30):
+            return self._device_backup_cache[cache_key]['data']
+        
+        # Fetch status from both backup services using device-specific endpoints
+        mysql_status = self._fetch_backup_service_status(8090, "MySQL")
+        rsync_status = self._fetch_device_backup_service_status(8093, "Rsync", device_id)
+        
+        # Extract device data - rsync returns device-specific format, mysql returns all devices
+        mysql_devices = mysql_status.get("devices", mysql_status) if "error" not in mysql_status else {}
+        mysql_device = mysql_devices.get(device_id, {})
+        
+        # Handle rsync device-specific response format
+        if "error" not in rsync_status and rsync_status.get("device"):
+            rsync_device = rsync_status["device"]
+        else:
+            rsync_device = {}
+        
+        if not mysql_device and not rsync_device:
+            # Device not found in either service
+            return json.dumps({
+                "error": f"Device {device_id} not found in backup services",
+                "device_id": device_id
+            })
+        
+        # Create device-specific structured response
+        device_backup_info = self._create_device_backup_info(device_id, mysql_device, rsync_device)
+        
+        structured_status = {
+            "device": device_backup_info,
+            "device_id": device_id
+        }
+        
+        # Cache the result with device-specific cache
+        if not hasattr(self, '_device_backup_cache'):
+            self._device_backup_cache = {}
+            
+        result = json.dumps(structured_status, indent=2)
+        self._device_backup_cache[cache_key] = {
+            'data': result,
+            'timestamp': current_time
+        }
+        
+        return result
+    
+    def _create_device_backup_info(self, device_id, mysql_device, rsync_device):
+        """Create structured backup info for a single device."""
+        # Extract synced information to determine backup types
+        mysql_synced = mysql_device.get("synced", {})
+        rsync_synced = rsync_device.get("synced", {})
+        
+        # Determine what types of data are being backed up
+        mysql_backup_info = self._extract_backup_info("mysql", mysql_device)
+        sqlite_backup_info = self._extract_backup_info("sqlite", rsync_device, rsync_synced, device_id)
+        video_backup_info = self._extract_backup_info("video", rsync_device, rsync_synced, device_id)
+        
+        # Create structured device status
+        device_status = {
+            "name": mysql_device.get("name") or rsync_device.get("name", f"DEVICE_{device_id[:8]}"),
+            "device_status": mysql_device.get("status") or rsync_device.get("status", "unknown"),
+            "last_seen": max(
+                mysql_device.get("ended", 0) or 0,
+                rsync_device.get("ended", 0) or 0
+            ),
+            "backup_types": {
+                "mysql": mysql_backup_info,
+                "sqlite": sqlite_backup_info, 
+                "video": video_backup_info
+            },
+            "overall_status": self._determine_overall_backup_status(
+                mysql_backup_info, sqlite_backup_info, video_backup_info
+            )
+        }
+        
+        # Pass through enhanced individual_files data from rsync service
+        if rsync_device and 'individual_files' in rsync_device:
+            device_status['individual_files'] = rsync_device['individual_files']
+        
+        # Pass through enhanced backup_types from rsync service if available
+        if rsync_device and 'backup_types' in rsync_device:
+            # Merge the enhanced backup_types data from rsync service
+            rsync_backup_types = rsync_device['backup_types']
+            if 'sqlite' in rsync_backup_types and rsync_backup_types['sqlite'].get('available'):
+                device_status['backup_types']['sqlite'] = rsync_backup_types['sqlite']
+            if 'video' in rsync_backup_types and rsync_backup_types['video'].get('available'):
+                device_status['backup_types']['video'] = rsync_backup_types['video']
+        
+        return device_status
+    
     def _fetch_backup_service_status(self, port: int, service_name: str):
         """Fetch backup status from a backup daemon running on specified port."""
         try:
@@ -72,6 +173,23 @@ class BackupAPI(BaseAPI):
             # Commented out warning to reduce log noise
             # self.logger.warning(f"Failed to get {service_name} backup status from port {port}: {e}")
             return {"error": f"{service_name} backup service unavailable", "service": service_name.lower().replace(" ", "_")}
+    
+    def _fetch_device_backup_service_status(self, port: int, service_name: str, device_id: str):
+        """Fetch device-specific backup status from a backup daemon."""
+        try:
+            backup_url = f'http://localhost:{port}/status/{device_id}'
+            with urllib.request.urlopen(backup_url, timeout=5) as response:
+                data = response.read().decode('utf-8')
+                return json.loads(data)
+        except Exception as e:
+            # Fall back to full status endpoint if device-specific endpoint not available
+            self.logger.debug(f"Device-specific endpoint failed for {service_name} on port {port}, falling back to full status: {e}")
+            full_status = self._fetch_backup_service_status(port, service_name)
+            if "error" not in full_status:
+                devices = full_status.get("devices", full_status)
+                if device_id in devices:
+                    return {"device": devices[device_id], "device_id": device_id}
+            return {"error": f"{service_name} backup service unavailable or device {device_id} not found", "service": service_name.lower().replace(" ", "_")}
     
     def _extract_devices_from_status(self, mysql_status, rsync_status):
         """Extract device information from both backup services."""

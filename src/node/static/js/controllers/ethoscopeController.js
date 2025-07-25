@@ -840,12 +840,15 @@
             }
             lastBackupStatusLoad = now;
             
-            $http.get('/backup/status')
+            // Use device-specific endpoint for much better performance
+            $http.get('/backup/status/' + device_id)
                 .then(function(response) {
                     var backupData = response.data;
-                    if (backupData.devices && backupData.devices[device_id]) {
-                        $scope.device.backup_status_detailed = backupData.devices[device_id];
+                    if (backupData.device) {
+                        $scope.device.backup_status_detailed = backupData.device;
                         updateBackupSummary();
+                    } else if (backupData.error) {
+                        console.warn('Device not found in backup services:', backupData.error);
                     }
                 })
                 .catch(function(error) {
