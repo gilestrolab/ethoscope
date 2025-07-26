@@ -17,7 +17,7 @@ from typing import Dict, List, Optional, Any
 from ethoscope_node.scanner.ethoscope_scanner import EthoscopeScanner
 from ethoscope_node.scanner.sensor_scanner import SensorScanner
 from ethoscope_node.utils.configuration import EthoscopeConfiguration, ensure_ssh_keys
-from ethoscope_node.utils.backups_helpers import GenericBackupWrapper
+from ethoscope_node.backup.helpers import GenericBackupWrapper
 from ethoscope_node.utils.etho_db import ExperimentalDB
 from ethoscope_node.api import (
     DeviceAPI, BackupAPI, SensorAPI, ROITemplateAPI, 

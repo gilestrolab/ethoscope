@@ -1,6 +1,6 @@
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
-from ethoscope_node.utils.backups_helpers import GenericBackupWrapper
-from ethoscope_node.utils.mysql_backup import get_backup_path_from_database
+from ethoscope_node.backup.helpers import GenericBackupWrapper
+from ethoscope_node.backup.mysql import get_backup_path_from_database
 import logging
 import optparse
 import signal

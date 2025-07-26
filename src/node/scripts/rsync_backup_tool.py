@@ -8,7 +8,7 @@ import time
 import os
 from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from ethoscope_node.utils.backups_helpers import GenericBackupWrapper, UnifiedRsyncBackupClass
+from ethoscope_node.backup.helpers import GenericBackupWrapper, UnifiedRsyncBackupClass
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
 
 gbw = None  # This will be initialized later
@@ -31,15 +31,50 @@ class RequestHandler(BaseHTTPRequestHandler):
             # Convert BackupStatus objects to dictionaries for JSON serialization
             status_dict = {key: asdict(value) for key, value in status_copy.items()}
             
+            # Enhance with detailed file transfer information
+            enhanced_status = self._enhance_with_transfer_details(status_dict)
+            
             # Add disk usage summary
-            disk_usage_summary = self._calculate_disk_usage_summary(status_dict)
+            disk_usage_summary = self._calculate_disk_usage_summary(enhanced_status)
             response = {
-                'devices': status_dict,
+                'devices': enhanced_status,
                 'disk_usage_summary': disk_usage_summary
             }
             self._send_response(response)
         else:
             self.send_error(404, "File not found")
+    
+    def _enhance_with_transfer_details(self, status_dict):
+        """Enhance status with detailed file transfer information from backup instances."""
+        enhanced_status = status_dict.copy()
+        
+        # Access the backup instances through the global backup wrapper
+        if gbw and hasattr(gbw, '_backup_instances'):
+            for device_id, backup_instance in gbw._backup_instances.items():
+                if device_id in enhanced_status:
+                    # Get transfer details if available
+                    if hasattr(backup_instance, '_transfer_details'):
+                        transfer_details = backup_instance._transfer_details
+                        
+                        # Add transfer details to the status
+                        enhanced_status[device_id]['transfer_details'] = transfer_details
+                        
+                        # Enhance individual file information in synced data
+                        synced_info = enhanced_status[device_id].get('synced', {})
+                        
+                        # Add file details to results section
+                        if 'results' in transfer_details and 'results' in synced_info:
+                            results_files = transfer_details['results'].get('files', {})
+                            if results_files:
+                                synced_info['results']['detailed_files'] = results_files
+                        
+                        # Add file details to videos section  
+                        if 'videos' in transfer_details and 'videos' in synced_info:
+                            videos_files = transfer_details['videos'].get('files', {})
+                            if videos_files:
+                                synced_info['videos']['detailed_files'] = videos_files
+        
+        return enhanced_status
     
     def _calculate_disk_usage_summary(self, status_dict):
         """Calculate overall disk usage summary from device statuses"""
@@ -163,6 +198,9 @@ class UnifiedBackupWrapper(GenericBackupWrapper):
                 backup_results=self._backup_results,
                 backup_videos=self._backup_videos
             )
+            
+            # Store backup instance for detailed status retrieval
+            self._backup_instances[device_id] = backup_job
             
             self._logger.info(f"Unified backup job object created successfully for device {device_id}")
             
