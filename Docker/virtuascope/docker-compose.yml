@@ -28,13 +28,15 @@ services:
       context: .
       dockerfile: video-streamer.dockerfile
     container_name: ethoscope-video-streamer
-    privileged: true  # Required for v4l2loopback
+    # privileged: true  # No longer needed - device created on host
     environment:
-      - VIDEO_URL=https://www.youtube.com/watch?v=uGsWPLsU6ws # 10 minute ethoscope raw video sample from youtube
+      - VIDEO_URL=/video/raw-ethoscope-video.mkv # 10 minute ethoscope raw video sample from youtube
       - VIRTUAL_DEVICE=/dev/video10
       - LOOP=true  # Set to false for single playback
     devices:
       - /dev/video10:/dev/video10
+    volumes:
+      - /tmp/video:/video
     restart: unless-stopped
 
   ethoscope-mariadb:

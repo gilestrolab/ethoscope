@@ -8,10 +8,17 @@ LOOP=${LOOP:-"true"}
 echo "Setting up virtual video device: $DEVICE"
 echo "Streaming from: $VIDEO_URL"
 
-# Load v4l2loopback module (requires privileged mode)
-modprobe v4l2loopback video_nr=10 card_label="Virtual Ethoscope Camera"
+# Check if virtual device exists (should be created by host)
+if [ ! -e "$DEVICE" ]; then
+    echo "ERROR: Virtual device $DEVICE not found!"
+    echo "Please create it on the host system first:"
+    echo "  sudo modprobe v4l2loopback video_nr=10 card_label=\"Virtual Ethoscope Camera\""
+    echo "Or if v4l2loopback needs rebuilding:"
+    echo "  sudo dkms install v4l2loopback/0.13.2 -k \$(uname -r)"
+    exit 1
+fi
 
-# Wait for device to be created
+echo "Virtual device $DEVICE found, proceeding with stream..."
 sleep 2
 
 # Determine loop parameters

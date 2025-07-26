@@ -12,18 +12,27 @@ The virtuascope provides:
 
 ## Quick Start
 
-1. Ensure the ethoscope network exists (start node services first):
+1. **Setup v4l2loopback on host** (required for virtual video):
+   ```bash
+   # If module needs rebuilding for current kernel:
+   sudo dkms install v4l2loopback/0.13.2 -k $(uname -r)
+   
+   # Load the module to create virtual video device:
+   sudo modprobe v4l2loopback video_nr=10 card_label="Virtual Ethoscope Camera"
+   ```
+
+2. Ensure the ethoscope network exists (start node services first):
    ```bash
    cd ../node
    docker compose up -d
    ```
 
-2. Start the virtuascope:
+3. Start the virtuascope:
    ```bash
    docker compose up -d
    ```
 
-3. Access the virtual device at: http://localhost:9000
+4. Access the virtual device at: http://localhost:9000
 
 ## Services
 
@@ -36,8 +45,8 @@ The virtuascope provides:
 ### video-streamer
 - **Image**: Built from `video-streamer.dockerfile` (Ubuntu + ffmpeg)
 - **Function**: Streams remote video (YouTube, etc.) to virtual camera device
-- **Device**: Creates `/dev/video10` using v4l2loopback kernel module
-- **Privileged**: Requires privileged mode to load kernel modules
+- **Device**: Uses `/dev/video10` created by host v4l2loopback module
+- **Host Dependency**: Requires v4l2loopback module loaded on host system
 
 ### ethoscope-mariadb
 - **Image**: mariadb:latest
@@ -148,11 +157,35 @@ cd ../node && docker compose up -d
 Large packages (scipy) may timeout during build. The dockerfile includes extended timeout settings (300s) to handle this.
 
 ### Kernel Module Issues
-If v4l2loopback fails to load:
+
+**On Arch/Manjaro systems:**
 ```bash
-# Install on host system
-sudo apt install v4l2loopback-dkms
-sudo modprobe v4l2loopback
+# Install v4l2loopback if not already installed
+yay -S v4l2loopback-dkms
+
+# Rebuild for current kernel if needed
+sudo dkms install v4l2loopback/0.13.2 -k $(uname -r)
+
+# Load the module
+sudo modprobe v4l2loopback video_nr=10 card_label="Virtual Ethoscope Camera"
+
+# Verify device was created
+ls -la /dev/video*
+```
+
+**On Debian/Ubuntu systems:**
+```bash
+# Install v4l2loopback
+sudo apt install v4l2loopback-dkms v4l2loopback-utils
+
+# Load the module
+sudo modprobe v4l2loopback video_nr=10 card_label="Virtual Ethoscope Camera"
+```
+
+**Make module load persistent:**
+```bash
+# Add to modules load configuration
+echo 'v4l2loopback video_nr=10 card_label="Virtual Ethoscope Camera"' | sudo tee /etc/modules-load.d/v4l2loopback.conf
 ```
 
 ## Integration
