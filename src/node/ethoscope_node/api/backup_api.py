@@ -17,11 +17,11 @@ class BackupAPI(BaseAPI):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Simple cache for backup status with 60 second TTL
+        # Simple cache for backup status with longer TTL for production
         self._backup_cache = {
             'data': None,
             'timestamp': 0,
-            'ttl': 60  # Cache for 60 seconds
+            'ttl': 300  # Cache for 5 minutes (was 60 seconds)
         }
     
     def register_routes(self):
@@ -43,20 +43,36 @@ class BackupAPI(BaseAPI):
         mysql_status = self._fetch_backup_service_status(8090, "MySQL")
         rsync_status = self._fetch_backup_service_status(8093, "Rsync")
         
-        # Create simple aggregated response
+        # Get device-level backup information for home page icons
+        devices_backup_info = self._get_devices_backup_summary()
+        
+        # Determine service availability
+        mysql_available = "error" not in mysql_status
+        rsync_available = "error" not in rsync_status
+        
+        # Create aggregated response with device-level data and summary
         aggregated_status = {
             "services": {
                 "mysql_backup": {
-                    "available": "error" not in mysql_status,
+                    "available": mysql_available,
                     "current_device": self._extract_current_device(mysql_status),
                     "current_file": self._extract_current_file(mysql_status)
                 },
                 "rsync_backup": {
-                    "available": "error" not in rsync_status,
+                    "available": rsync_available,
                     "current_device": self._extract_current_device(rsync_status),
                     "current_file": self._extract_current_file(rsync_status)
                 }
             },
+            "summary": {
+                "mysql_backup_available": mysql_available,
+                "rsync_backup_available": rsync_available,
+                "services": {
+                    "mysql_service_available": mysql_available,
+                    "rsync_service_available": rsync_available
+                }
+            },
+            "devices": devices_backup_info,
             "processing_devices": self._get_processing_devices(mysql_status, rsync_status),
             "timestamp": current_time
         }
@@ -154,3 +170,166 @@ class BackupAPI(BaseAPI):
             })
         
         return processing
+    
+    def _get_devices_backup_summary(self):
+        """Get backup summary for all devices for home page display."""
+        devices_backup = {}
+        
+        try:
+            # Get list of all devices from the device scanner
+            if not self.device_scanner:
+                return devices_backup
+            
+            devices = self.device_scanner.get_all_devices_info()
+            
+            # For each device, get basic backup information
+            for device_id, device_info in devices.items():
+                try:
+                    # For summary endpoint, use a more efficient approach
+                    # Check if device is online and has database information
+                    device_status = device_info.get('status', 'offline')
+                    has_databases = 'databases' in device_info and device_info['databases']
+                    
+                    if device_status != 'offline' and has_databases:
+                        # Get backup info for online devices with database info
+                        from ethoscope_node.backup.helpers import get_device_backup_info
+                        
+                        device_databases = device_info.get('databases', {})
+                        backup_info = get_device_backup_info(device_id, device_databases)
+                        backup_status = backup_info.get('backup_status', {})
+                        
+                        # Extract detailed backup information for home page display
+                        mysql_info = backup_status.get('mysql', {})
+                        sqlite_info = backup_status.get('sqlite', {})
+                        video_info = backup_status.get('video', {})
+                        
+                        # Calculate overall status
+                        available_count = sum([
+                            mysql_info.get('available', False),
+                            sqlite_info.get('available', False), 
+                            video_info.get('available', False)
+                        ])
+                        
+                        if available_count == 3:
+                            overall_status = 'success'
+                        elif available_count > 0:
+                            overall_status = 'partial'
+                        else:
+                            overall_status = 'no_backups'
+                        
+                        # Create structure for home page with required fields
+                        device_backup_data = {
+                            'backup_types': {
+                                'mysql': {
+                                    'available': mysql_info.get('available', False),
+                                    'status': 'success' if mysql_info.get('available', False) else 'not_available',
+                                    'processing': False,
+                                    'size': mysql_info.get('total_size_bytes', 0),
+                                    'last_backup': mysql_info.get('last_backup', 0),
+                                    'records': mysql_info.get('database_count', 0),
+                                    'directory': mysql_info.get('directory', ''),
+                                    'message': mysql_info.get('message', '')
+                                },
+                                'sqlite': {
+                                    'available': sqlite_info.get('available', False),
+                                    'status': 'success' if sqlite_info.get('available', False) else 'not_available',
+                                    'processing': False,
+                                    'size': sqlite_info.get('total_size_bytes', 0),
+                                    'last_backup': sqlite_info.get('last_backup', 0),
+                                    'files': sqlite_info.get('database_count', 0),
+                                    'directory': sqlite_info.get('directory', '')
+                                },
+                                'video': {
+                                    'available': video_info.get('available', False),
+                                    'status': 'success' if video_info.get('available', False) else 'not_available',
+                                    'processing': False,
+                                    'size': video_info.get('total_size_bytes', 0),
+                                    'last_backup': video_info.get('last_backup', 0),
+                                    'files': video_info.get('file_count', 0),
+                                    'directory': video_info.get('directory', ''),
+                                    'size_human': video_info.get('size_human', '')
+                                }
+                            },
+                            'overall_status': overall_status
+                        }
+                    else:
+                        # For offline devices or devices without database info, show as not available
+                        device_backup_data = {
+                            'backup_types': {
+                                'mysql': {
+                                    'available': False, 
+                                    'status': 'offline', 
+                                    'processing': False,
+                                    'size': 0,
+                                    'last_backup': 0,
+                                    'records': 0,
+                                    'directory': '',
+                                    'message': ''
+                                },
+                                'sqlite': {
+                                    'available': False, 
+                                    'status': 'offline', 
+                                    'processing': False,
+                                    'size': 0,
+                                    'last_backup': 0,
+                                    'files': 0,
+                                    'directory': ''
+                                },
+                                'video': {
+                                    'available': False, 
+                                    'status': 'offline', 
+                                    'processing': False,
+                                    'size': 0,
+                                    'last_backup': 0,
+                                    'files': 0,
+                                    'directory': '',
+                                    'size_human': ''
+                                }
+                            },
+                            'overall_status': 'no_backups'
+                        }
+                    
+                    devices_backup[device_id] = device_backup_data
+                    
+                except Exception as e:
+                    # If we can't get backup info for this device, mark as unknown
+                    devices_backup[device_id] = {
+                        'backup_types': {
+                            'mysql': {
+                                'available': False, 
+                                'status': 'unknown', 
+                                'processing': False,
+                                'size': 0,
+                                'last_backup': 0,
+                                'records': 0,
+                                'directory': '',
+                                'message': ''
+                            },
+                            'sqlite': {
+                                'available': False, 
+                                'status': 'unknown', 
+                                'processing': False,
+                                'size': 0,
+                                'last_backup': 0,
+                                'files': 0,
+                                'directory': ''
+                            },
+                            'video': {
+                                'available': False, 
+                                'status': 'unknown', 
+                                'processing': False,
+                                'size': 0,
+                                'last_backup': 0,
+                                'files': 0,
+                                'directory': '',
+                                'size_human': ''
+                            }
+                        },
+                        'overall_status': 'unknown'
+                    }
+                    
+        except Exception as e:
+            # If we can't get device list, return empty dict
+            pass
+        
+        return devices_backup

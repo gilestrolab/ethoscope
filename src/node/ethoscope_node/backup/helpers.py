@@ -2263,9 +2263,69 @@ def _format_bytes_simple(bytes_size: int) -> str:
     return f"{bytes_size:.1f} TB"
 
 
+def _get_video_cache_path(device_id: str, video_directory: str = "/ethoscope_data/videos") -> str:
+    """Get the file path for video cache for a specific device in the video directory root."""
+    import os
+    cache_dir = os.path.join(video_directory, ".cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    return os.path.join(cache_dir, f"video_cache_{device_id}.pkl")
+
+
+def _load_video_cache(device_id: str, video_directory: str = "/ethoscope_data/videos") -> dict:
+    """Load video file cache from disk."""
+    import os
+    import pickle
+    import logging
+    
+    cache_path = _get_video_cache_path(device_id, video_directory)
+    try:
+        if os.path.exists(cache_path):
+            with open(cache_path, 'rb') as f:
+                cache_data = pickle.load(f)
+                # Validate cache structure
+                if isinstance(cache_data, dict) and 'files' in cache_data and 'timestamp' in cache_data:
+                    return cache_data
+    except Exception as e:
+        logging.warning(f"Failed to load video cache for {device_id}: {e}")
+    return {'files': {}, 'timestamp': 0}
+
+
+def _save_video_cache(device_id: str, video_files: dict, video_directory: str = "/ethoscope_data/videos") -> None:
+    """Save video file cache to disk."""
+    import pickle
+    import time
+    import logging
+    
+    cache_path = _get_video_cache_path(device_id, video_directory)
+    try:
+        cache_data = {
+            'files': video_files,
+            'timestamp': time.time()
+        }
+        with open(cache_path, 'wb') as f:
+            pickle.dump(cache_data, f)
+        logging.info(f"Saved video cache for {device_id}: {len(video_files)} files to {cache_path}")
+    except Exception as e:
+        logging.warning(f"Failed to save video cache for {device_id}: {e}")
+
+
+def _is_file_older_than_week(file_path: str) -> bool:
+    """Check if a file is older than a week."""
+    import os
+    import time
+    
+    try:
+        file_mtime = os.path.getmtime(file_path)
+        one_week_ago = time.time() - (7 * 24 * 60 * 60)  # 7 days in seconds
+        return file_mtime < one_week_ago
+    except OSError:
+        return False
+
+
 def _enhance_databases_with_rsync_info(device_id: str, databases: dict) -> dict:
     """
     Enhance database information with file sizes from rsync backup service.
+    Uses file-based caching for video files older than a week to reduce filesystem scanning.
     
     Args:
         device_id: The ethoscope device ID
@@ -2281,6 +2341,8 @@ def _enhance_databases_with_rsync_info(device_id: str, databases: dict) -> dict:
         import logging
         import os
         import glob
+        import time
+        import pickle
         
         # Try to get enhanced file info from rsync backup service
         rsync_url = "http://localhost:8093/status"
@@ -2363,10 +2425,15 @@ def _enhance_databases_with_rsync_info(device_id: str, databases: dict) -> dict:
                             'transfer_speed': file_info.get('transfer_speed', '')
                         }
             
-            # If no individual files found from rsync but we have summary data, try filesystem fallback
+            # If no individual files found from rsync but we have summary data, try cache-aware filesystem fallback
             if not video_files and video_data.get('local_files', 0) > 0:
-                # Try to enumerate video files from filesystem
+                # Try to enumerate video files from filesystem using cache optimization
                 video_directory = video_data.get('directory', '/ethoscope_data/videos')
+                
+                # Load cached video file information
+                cache_data = _load_video_cache(device_id, video_directory)
+                cached_files = cache_data.get('files', {})
+                
                 device_video_path = f"{video_directory}/{device_id}"
                 
                 try:
@@ -2375,23 +2442,40 @@ def _enhance_databases_with_rsync_info(device_id: str, databases: dict) -> dict:
                         h264_pattern = f"{device_video_path}/**/*.h264"
                         h264_files = glob.glob(h264_pattern, recursive=True)
                         
+                        new_files_found = 0
+                        cache_hits = 0
+                        
                         for h264_file in h264_files:
                             if os.path.exists(h264_file):
                                 filename = os.path.basename(h264_file)
-                                file_size = os.path.getsize(h264_file)
                                 relative_path = os.path.relpath(h264_file, video_directory)
                                 
-                                video_files[filename] = {
-                                    'size_bytes': file_size,
-                                    'size_human': _format_bytes_simple(file_size),
-                                    'path': relative_path,
-                                    'status': 'backed-up',
-                                    'filesystem_enhanced': True
-                                }
+                                # Check if file is in cache and older than a week
+                                if filename in cached_files and _is_file_older_than_week(h264_file):
+                                    # Use cached information for old files
+                                    video_files[filename] = cached_files[filename]
+                                    video_files[filename]['cache_hit'] = True
+                                    cache_hits += 1
+                                else:
+                                    # Fresh scan for new/recent files
+                                    file_size = os.path.getsize(h264_file)
+                                    video_files[filename] = {
+                                        'size_bytes': file_size,
+                                        'size_human': _format_bytes_simple(file_size),
+                                        'path': relative_path,
+                                        'status': 'backed-up',
+                                        'filesystem_enhanced': True,
+                                        'cache_hit': False
+                                    }
+                                    new_files_found += 1
                         
-                        logging.info(f"[ENHANCE] Found {len(video_files)} video files via filesystem fallback")
+                        # Save updated cache with all current files
+                        _save_video_cache(device_id, video_files, video_directory)
+                        
+                        logging.info(f"[ENHANCE] Found {len(video_files)} video files via cache-aware filesystem fallback "
+                                   f"(cache hits: {cache_hits}, fresh scans: {new_files_found})")
                 except Exception as e:
-                    logging.warning(f"[ENHANCE] Filesystem video enumeration failed: {e}")
+                    logging.warning(f"[ENHANCE] Cache-aware filesystem video enumeration failed: {e}")
             
             # Get summary information from video_data
             total_video_size = video_data.get('disk_usage_bytes', 0)
