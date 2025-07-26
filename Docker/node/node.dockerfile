@@ -17,8 +17,8 @@ RUN pacman -Sy --needed --noconfirm python-setuptools python-pip python-ifaddr p
                                     python-zeroconf python-cheroot python-opencv python-gitpython 
 
 
-RUN git clone https://github.com/gilestrolab/ethoscope.git /opt/ethoscope
-RUN cd /opt/ethoscope/ && git checkout ${ETHOSCOPE_BRANCH}
+RUN cd /opt && git clone https://github.com/gilestrolab/ethoscope.git
+RUN cd /opt/ethoscope/ && git checkout ${ETHOSCOPE_BRANCH:-dev}
 RUN cd /opt/ethoscope/src/node && pip install -e . --break-system-packages
 RUN cd /opt/ethoscope/src/ethoscope && pip install -e . --break-system-packages
 

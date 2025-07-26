@@ -3,7 +3,6 @@
 # You can add them manually by knowing in advance their IP address, although that is not idea.
 # Linux still remains the best way to run this software
 
-
 services:
   node-base: &node-base
     build:
@@ -15,15 +14,15 @@ services:
     restart: unless-stopped
     volumes:
       - ../../:/opt/ethoscope:ro  # Uncomment if needed - will mount the host ethoscope folder, useful only for development
-      - /tmp/ethoscope_docker_volumes/ethoscope_data:/ethoscope_data
-      - /tmp/ethoscope_docker_volumes/etc_ethoscope:/etc/ethoscope
+      - ethoscope_data:/ethoscope_data
+      - ethoscope_config:/etc/ethoscope
 
 
   ethoscope-node:
     <<: *node-base
     container_name: ethoscope-node
     command: "/usr/bin/python /opt/ethoscope/src/node/scripts/server.py"
-    network_mode: host                   # Comment out when running in Windows
+    #network_mode: host                   # Comment out when running in Windows
     ports:
       - "80:80/tcp"
       - "5353:5353/udp"
@@ -88,17 +87,14 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: /mnt/ethoscope_data #example for linux/MacOS
-      #device: C:\ethoscope_data #example for windows
+      device: ${ETHOSCOPE_DATA:-/ethoscope_data}
 
-  etc_ethoscope:
+  ethoscope_config:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: ${PWD}/.volumes/conf #for linux/MacOS
-      #device: .\.volumes\conf #for windows
-
+      device: ${ETHOSCOPE_CONFIG:-/etc/ethoscope}
 
 networks:
   default:

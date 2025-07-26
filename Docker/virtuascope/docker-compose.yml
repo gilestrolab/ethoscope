@@ -1,23 +1,41 @@
-version: '3.8'
-
 services:
   ethoscope-virtual:
-    build: .
+    build:
+      context: .
+      dockerfile: virtuascope.dockerfile
+      args:
+        - ETHOSCOPE_BRANCH=dev
     image: ethoscope-device
     container_name: ethoscope-device
-    expose:
-      - 9000
+    ports:
+      - "9000:9000"
     restart: unless-stopped
     volumes:
-      - /home/gg/Data/ethoscope_project/ethoscope:/opt/ethoscope:ro
-      - /mnt/ethoscope_data:/ethoscope_data
+      - ../../:/opt/ethoscope:ro  # Uncomment if needed - will mount the host ethoscope folder, useful only for development
+      - ethoscope_data:/ethoscope_data
       - mariadb_socket:/run/mysqld
     devices:
-      - /dev/video0:/dev/video0
+      #- /dev/video0:/dev/video0   # Use video hardware on the computer
+      - /dev/video10:/dev/video0  # Use virtual video device
     depends_on:
       - ethoscope-mariadb
+      - video-streamer
     #network_mode: service:ethoscope-mariadb
-    network_mode: host
+    #network_mode: host
+
+  video-streamer:
+    build:
+      context: .
+      dockerfile: video-streamer.dockerfile
+    container_name: ethoscope-video-streamer
+    privileged: true  # Required for v4l2loopback
+    environment:
+      - VIDEO_URL=https://www.youtube.com/watch?v=uGsWPLsU6ws # 10 minute ethoscope raw video sample from youtube
+      - VIRTUAL_DEVICE=/dev/video10
+      - LOOP=true  # Set to false for single playback
+    devices:
+      - /dev/video10:/dev/video10
+    restart: unless-stopped
 
   ethoscope-mariadb:
     image: mariadb:latest
@@ -27,17 +45,21 @@ services:
       - 3306
     environment:
       MYSQL_ROOT_PASSWORD: ethoscope
-      #MYSQL_USER: ethoscope
-      #MYSQL_PASSWORD: ethoscope
     volumes:
       - mariadb_socket:/run/mysqld
-      #- mariadb_data:/var/lib/mysql
+      - mariadb_data:/var/lib/mysql
       - ./init_db_credentials.sql:/docker-entrypoint-initdb.d/init-db_credentials.sql
-    network_mode: host
+    #network_mode: host
     # Uncomment the following line if you want to access your MariaDB instance from your host for development purposes
     # ports:
     #   - "3306:3306"
 
 volumes:
+  ethoscope_data:
   mariadb_socket:
   mariadb_data:
+
+networks:
+  default:
+    name: ethoscope_network
+    external: true
