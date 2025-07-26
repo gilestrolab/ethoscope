@@ -36,7 +36,7 @@ services:
     devices:
       - /dev/video10:/dev/video10
     volumes:
-      - /tmp/video:/video
+      - ./video:/video #yt-dlp "https://www.youtube.com/watch?v=uGsWPLsU6ws" -o ./video/raw-ethoscope-video.mkv
     restart: unless-stopped
 
   ethoscope-mariadb:
