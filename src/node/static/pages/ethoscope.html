@@ -125,7 +125,7 @@
 </div>
 
 <!-- Database Backup Status Section -->
-<div class="jumbotron-fluid backup-status-container" ng-if="device.databases || (device.backup_status_detailed && device.backup_status_detailed.backup_types)">
+<div class="jumbotron-fluid backup-status-container" ng-if="device.databases || (device.backup_status_detailed && device.backup_status_detailed.backup_types) || device.backup_info">
     <button data-toggle="collapse" data-target="#backupStatus" class="backup-toggle-btn" style="float:right;">
         <span class="fa fa-database fa-2x backup-status-icon" ng-class="getBackupStatusClass()"></span>
     </button>
@@ -174,15 +174,26 @@
                                 <span class="database-name">{{extractDateTimeFromFilename(sqliteFile.name)}}</span>
                                 <div class="backup-details">
                                     <small>Modified: {{formatDate(sqliteFile.modified * 1000)}}</small>
+                                    <!-- Enhanced data source indicator -->
+                                    <small ng-if="sqliteFile.is_enhanced" class="enhancement-badge" 
+                                           title="File size from {{sqliteFile.enhancement_source === 'rsync' ? 'recent backup transfer' : 'filesystem scan'}}">
+                                        <span class="fa fa-check-circle" ng-class="{'text-success': sqliteFile.enhancement_source === 'rsync', 'text-info': sqliteFile.enhancement_source === 'filesystem'}"></span>
+                                        {{sqliteFile.enhancement_source === 'rsync' ? 'Live data' : 'Verified'}}
+                                    </small>
                                 </div>
                             </div>
                             <div class="backup-progress-container">
-                                <div class="backup-progress-bar sqlite-db" title="{{sqliteFile.status}}">
-                                    <div class="backup-progress-fill backed-up" style="width: 100%"></div>
+                                <div class="backup-progress-bar sqlite-db" title="{{sqliteFile.path || sqliteFile.name}}">
+                                    <div class="backup-progress-fill" 
+                                         ng-class="{'backed-up': sqliteFile.size_bytes > 0, 'backing-up': sqliteFile.size_bytes === 0}" 
+                                         style="width: 100%"></div>
                                 </div>
                             </div>
-                            <div class="database-file-size">
+                            <div class="database-file-size" ng-class="{'text-muted': sqliteFile.size_bytes === 0, 'text-success': sqliteFile.is_enhanced}">
                                 {{sqliteFile.size_human}}
+                                <small ng-if="sqliteFile.size_bytes === 0" class="text-warning" title="File size will be updated on next backup">
+                                    <span class="fa fa-clock"></span> Pending
+                                </small>
                             </div>
                         </div>
                     </div>
@@ -229,12 +240,30 @@
                             </div>
                         </div>
                         <div class="backup-progress-container">
-                            <div class="backup-progress-bar video-backup" title="{{getBackupStatusText(device.backup_status_detailed.backup_types.video, 'video')}}">
-                                <div class="backup-progress-fill" ng-class="getBackupBarClass(device.backup_status_detailed.backup_types.video, 'video')" ng-style="getBackupProgressStyle(device.backup_status_detailed.backup_types.video, 'video')"></div>
+                            <!-- Enhanced segmented progress bar for video files -->
+                            <div class="backup-progress-bar video-backup segmented" title="{{getVideoBackupTooltip()}}">
+                                <!-- Show segments if detailed video files are available -->
+                                <div ng-if="device.backup_status_detailed.individual_files && device.backup_status_detailed.individual_files.videos && device.backup_status_detailed.individual_files.videos.files.length > 0" class="video-segments-container">
+                                    <div ng-repeat="videoFile in device.backup_status_detailed.individual_files.videos.files | filter:filterH264Files" 
+                                         class="video-segment" 
+                                         ng-class="{'completed': videoFile.size_bytes > 0, 'pending': videoFile.size_bytes === 0}"
+                                         ng-style="getVideoSegmentStyle(videoFile, device.backup_status_detailed.individual_files.videos.files)"
+                                         title="{{videoFile.name}}: {{videoFile.size_human || formatBytes(videoFile.size_bytes || 0)}}">
+                                    </div>
+                                </div>
+                                <!-- Fallback single progress bar if no detailed files -->
+                                <div ng-if="!device.backup_status_detailed.individual_files || !device.backup_status_detailed.individual_files.videos || device.backup_status_detailed.individual_files.videos.files.length === 0" 
+                                     class="backup-progress-fill" 
+                                     ng-class="getBackupBarClass(device.backup_status_detailed.backup_types.video, 'video')" 
+                                     ng-style="getBackupProgressStyle(device.backup_status_detailed.backup_types.video, 'video')">
+                                </div>
                             </div>
                         </div>
                         <div class="database-file-size">
                             {{device.backup_status_detailed.backup_types.video.size_human || formatFileSize(device.backup_status_detailed.backup_types.video.size)}}
+                            <small ng-if="device.backup_status_detailed.individual_files && device.backup_status_detailed.individual_files.videos">
+                                ({{(device.backup_status_detailed.individual_files.videos.files | filter:filterH264Files).length}} h264 files)
+                            </small>
                         </div>
                     </div>
                 </div>

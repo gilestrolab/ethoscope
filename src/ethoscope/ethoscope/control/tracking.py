@@ -1024,10 +1024,21 @@ class ControlThread(Thread):
                 }
             
             if "backup_filename" in self._info:
-                self._info["previous_date_time"] = self._info["time"]
-                self._info["previous_backup_filename"] = self._info["backup_filename"]
-                self._info["previous_user"] = self._info["experimental_info"].get("name", "")
-                self._info["previous_location"] = self._info["experimental_info"].get("location", "")
+                # Initialize experimental_info structure if not exists
+                if "experimental_info" not in self._info:
+                    self._info["experimental_info"] = {"current": {}, "previous": {}}
+                elif not isinstance(self._info["experimental_info"], dict) or "previous" not in self._info["experimental_info"]:
+                    # Handle legacy format - preserve existing experimental_info as current
+                    existing_info = self._info["experimental_info"] if isinstance(self._info["experimental_info"], dict) else {}
+                    self._info["experimental_info"] = {"current": existing_info, "previous": {}}
+                
+                # Store previous experiment information in nested structure
+                self._info["experimental_info"]["previous"].update({
+                    "date_time": self._info["time"],
+                    "backup_filename": self._info["backup_filename"],
+                    "user": self._info["experimental_info"].get("current", {}).get("name", "") or self._info["experimental_info"].get("name", ""),
+                    "location": self._info["experimental_info"].get("current", {}).get("location", "") or self._info["experimental_info"].get("location", "")
+                })
 
 
             if error is not None:

@@ -408,12 +408,17 @@ class BaseDatabaseMetadataCache:
                     
                     experiment_info = cache_data.get('experiment_info', {})
                     if experiment_info:
-                        # Return in the format expected by tracking.py (with "previous_" prefix)
+                        # Return in the new nested experimental_info format
                         return {
-                            "previous_date_time": experiment_info.get("date_time"),
-                            "previous_backup_filename": experiment_info.get("backup_filename"),
-                            "previous_user": experiment_info.get("user"),
-                            "previous_location": experiment_info.get("location"),
+                            "experimental_info": {
+                                "current": {},
+                                "previous": {
+                                    "date_time": experiment_info.get("date_time"),
+                                    "backup_filename": experiment_info.get("backup_filename"),
+                                    "user": experiment_info.get("user"),
+                                    "location": experiment_info.get("location")
+                                }
+                            },
                             "result_writer_type": experiment_info.get("result_writer_type"),
                             "sqlite_source_path": experiment_info.get("sqlite_source_path"),
                             "cache_file": cache_file_path
@@ -431,10 +436,15 @@ class BaseDatabaseMetadataCache:
                         experiment_info = cache_data.get('experiment_info', {})
                         if experiment_info:
                             return {
-                                "previous_date_time": experiment_info.get("date_time"),
-                                "previous_backup_filename": experiment_info.get("backup_filename"),
-                                "previous_user": experiment_info.get("user"),
-                                "previous_location": experiment_info.get("location"),
+                                "experimental_info": {
+                                    "current": {},
+                                    "previous": {
+                                        "date_time": experiment_info.get("date_time"),
+                                        "backup_filename": experiment_info.get("backup_filename"),
+                                        "user": experiment_info.get("user"),
+                                        "location": experiment_info.get("location")
+                                    }
+                                },
                                 "result_writer_type": experiment_info.get("result_writer_type"),
                                 "sqlite_source_path": experiment_info.get("sqlite_source_path"),
                                 "cache_file": cache_file_path

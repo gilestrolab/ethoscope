@@ -189,3 +189,6 @@ On the node:
 - CherryPy/Bottle used for web servers
 - Frontend uses Angular.js (legacy version, source-only)
 - System designed for Raspberry Pi deployment but works on other Linux systems
+
+## See also
+@CLAUDE.local.md

@@ -111,11 +111,11 @@
 
     // create the controller and inject Angular's $scope
     app.controller('mainController', function($scope, $http, $interval, $timeout, $location) {
-        
+
         // ===========================
         // SETUP CHECK
         // ===========================
-        
+
         // Check if setup is required and redirect to wizard
         var checkSetupStatus = function() {
             $http.get('/setup/status').then(function(response) {
@@ -128,14 +128,14 @@
                 console.warn('Could not check setup status:', error);
             });
         };
-        
+
         // Check setup status when controller loads
         checkSetupStatus();
-        
+
         // ===========================
         // SCOPE INITIALIZATION
         // ===========================
-        
+
         $scope.sortType = 'name'; // set the default sort type
         $scope.sortReverse = false; // set the default sort order
         $scope.filterEthoscopes = ''; // set the default search/filter term
@@ -178,7 +178,7 @@
 
         var get_backup_status = function() {
             // Get lightweight backup summary for dashboard - no individual files data
-            $http.get('/backup/summary').then(function(response) {
+            $http.get('/backup/status').then(function(response) {
                 var data = response.data;
 
                 // Store the full response for debugging/advanced use
@@ -258,7 +258,7 @@
 
         $scope.secToDate = function(secs) {
             if (!secs) return 'No date';
-            
+
             var d;
             if (isNaN(secs)) {
                 // Handle string dates
@@ -267,12 +267,12 @@
                 // Handle timestamp (seconds)
                 d = new Date(secs * 1000);
             }
-            
+
             // Check if date is valid
             if (isNaN(d.getTime())) {
                 return 'Invalid date';
             }
-            
+
             return formatConciseTime(d);
         };
 
@@ -898,7 +898,7 @@
         // ===========================
         // INITIALIZATION FUNCTION
         // ===========================
-        
+
         /**
          * Initialize all platform data immediately on page load
          */
@@ -935,10 +935,10 @@
         // ===========================
         // STARTUP SEQUENCE
         // ===========================
-        
+
         // Initialize platform data immediately (no delay)
         initialize_platform();
-        
+
         // Set up periodic refresh every 5 seconds
         var refresh_data = $interval(refresh_platform, 5 * 1000);
 

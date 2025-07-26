@@ -1871,6 +1871,115 @@ table thead th a:focus {
     background-color: var(--medium-gray);
 }
 
+/* Enhancement indicators for improved file size data */
+.enhancement-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background-color: rgba(0, 0, 0, 0.05);
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.enhancement-badge .fa-check-circle {
+    margin-right: 3px;
+}
+
+/* Enhanced file size display */
+.database-file-size.text-success {
+    font-weight: 600;
+}
+
+.database-file-size .text-warning {
+    font-size: 10px;
+    margin-left: 5px;
+}
+
+/* Progress bar styling for pending files */
+.backup-progress-fill.backing-up {
+    background: repeating-linear-gradient(
+        45deg,
+        var(--light-gray),
+        var(--light-gray) 10px,
+        rgba(0, 0, 0, 0.1) 10px,
+        rgba(0, 0, 0, 0.1) 20px
+    );
+    animation: progress-pending 2s linear infinite;
+}
+
+@keyframes progress-pending {
+    0% { background-position: 0 0; }
+    100% { background-position: 20px 0; }
+}
+
+/* Remove question mark cursor from tooltips - use pointer or default cursor */
+[title]:not(.help-tooltip) {
+    cursor: default !important;
+}
+
+.backup-progress-bar[title] {
+    cursor: pointer !important;
+}
+
+.enhancement-badge[title] {
+    cursor: default !important;
+}
+
+/* Segmented video progress bar */
+.backup-progress-bar.segmented {
+    padding: 0;
+    overflow: hidden;
+}
+
+.video-segments-container {
+    display: flex;
+    width: 100%;
+    height: 100%;
+}
+
+.video-segment {
+    height: 100%;
+    border-right: 1px solid rgba(255, 255, 255, 0.3);
+    transition: background-color 0.3s ease;
+    cursor: pointer;
+}
+
+.video-segment:last-child {
+    border-right: none;
+}
+
+.video-segment.completed {
+    background-color: #6f42c1; /* Video purple color */
+    background: linear-gradient(135deg, #6f42c1 0%, #8e5cc7 100%);
+}
+
+.video-segment.pending {
+    background: repeating-linear-gradient(
+        45deg,
+        rgba(111, 66, 193, 0.3),
+        rgba(111, 66, 193, 0.3) 5px,
+        rgba(255, 255, 255, 0.2) 5px,
+        rgba(255, 255, 255, 0.2) 10px
+    );
+    animation: video-pending 2s linear infinite;
+}
+
+@keyframes video-pending {
+    0% { background-position: 0 0; }
+    100% { background-position: 10px 0; }
+}
+
+.video-segment:hover {
+    filter: brightness(1.1);
+}
+
+/* Ensure minimum segment visibility */
+.video-segment {
+    min-width: 2px;
+    flex-shrink: 0;
+}
+
 
 /* Backup summary section */
 .backup-summary {

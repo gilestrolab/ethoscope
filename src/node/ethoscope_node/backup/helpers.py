@@ -55,7 +55,7 @@ This module uses mysql_backup.py for low-level database operations and is used b
 backup_tool.py for the actual backup service implementation.
 """
 
-from ethoscope_node.utils.mysql_backup import MySQLdbToSQLite, DBNotReadyError
+from ethoscope_node.backup.mysql import MySQLdbToSQLite, DBNotReadyError
 from ethoscope_node.utils.configuration import ensure_ssh_keys
 from ethoscope.utils.video import list_local_video_files
 import os
@@ -887,6 +887,14 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
         if not (self._backup_results or self._backup_videos):
             raise ValueError("At least one of backup_results or backup_videos must be True")
     
+    def _format_bytes(self, bytes_size: int) -> str:
+        """Format bytes into human readable format."""
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if bytes_size < 1024.0:
+                return f"{bytes_size:.1f} {unit}"
+            bytes_size /= 1024.0
+        return f"{bytes_size:.1f} PB"
+    
     def backup(self) -> Iterator[str]:
         """
         Performs unified rsync backup for SQLite results and videos.
@@ -994,13 +1002,18 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
             # Ensure destination directory exists
             os.makedirs(destination_dir, exist_ok=True)
             
-            # Construct rsync command
+            # Construct rsync command with enhanced verbosity for file size capture
             rsync_source = f"ethoscope@{self._ip}:{source_dir}"
             rsync_command = [
                 'rsync', 
                 '-avz',           # archive, verbose, compress
                 '--progress',     # show progress
                 '--partial',      # keep partial files
+                '--stats',        # show detailed transfer statistics
+                '--itemize-changes',  # show per-file change details
+                '--exclude=*.db-shm',     # exclude SQLite shared memory files (temporary)
+                '--exclude=*.db-wal',     # exclude SQLite write-ahead log files (temporary)
+                '--exclude=*.db-journal', # exclude SQLite rollback journal files (temporary)
                 '--timeout=300',  # 5 minute timeout
                 '-e', f'ssh -i {private_key_path} -o StrictHostKeyChecking=no',  # SSH key authentication
                 rsync_source, 
@@ -1021,6 +1034,8 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
             
             files_transferred = 0
             current_file = ""
+            file_details = {}  # Store detailed file information
+            total_bytes_transferred = 0
             
             for line in iter(process.stdout.readline, ''):
                 line = line.strip()
@@ -1029,36 +1044,119 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
                     
                 self._logger.debug(f"[{self._device_id}] {operation_name} rsync: {line}")
                 
-                # Parse progress information
-                if line.endswith('bytes/sec'):
-                    # Progress line format: "1,234,567  67%   123.45kB/s    0:00:12"
-                    match = re.search(r'(\d{1,3}(?:,\d{3})*)\s+(\d+)%\s+(.+?/s)', line)
+                # Parse itemize-changes output format: >f+++++++++ path/to/file
+                if re.match(r'^[<>ch.*]f[.+cstpoguax]{9}\s+', line):
+                    # This is a file (not directory) itemize-changes line
+                    parts = line.split(None, 1)  # Split on first whitespace only
+                    if len(parts) >= 2:
+                        file_path = parts[1]  # Full path after the flags
+                        filename = os.path.basename(file_path)
+                        
+                        # Skip empty filenames
+                        if filename:
+                            # Initialize file details if not exists
+                            if filename not in file_details:
+                                file_details[filename] = {
+                                    'path': file_path,
+                                    'relative_path': file_path,  # Store relative path for size lookup
+                                    'size_bytes': 0,
+                                    'transfer_start': time.time(),
+                                    'status': 'transferring'
+                                }
+                                files_transferred += 1
+                                current_file = filename
+                                yield self._yield_status(
+                                    "info", 
+                                    f"{operation_name.title()}: Processing {filename} (file #{files_transferred})"
+                                )
+                
+                # Parse progress information: "12,664,832 100% 11.06MB/s 0:00:01 (xfr#12, to-chk=3/27)"
+                elif re.search(r'\d+\s+100%.*\(xfr#\d+', line):
+                    # This is a final transfer line showing completed file size
+                    match = re.search(r'(\d{1,3}(?:,\d{3})*)\s+100%\s+(.+?/s).*\(xfr#(\d+)', line)
                     if match:
-                        bytes_so_far = int(match.group(1).replace(',', ''))
-                        percentage = int(match.group(2))
-                        speed = match.group(3)
+                        final_bytes = int(match.group(1).replace(',', ''))
+                        speed = match.group(2)
+                        transfer_number = int(match.group(3))
+                        
+                        # Update the most recently processed file with final size
+                        if current_file and current_file in file_details:
+                            file_details[current_file]['size_bytes'] = final_bytes
+                            file_details[current_file]['size_human'] = self._format_bytes(final_bytes)
+                            file_details[current_file]['transfer_speed'] = speed
+                            
+                            self._logger.info(f"[{self._device_id}] File {current_file}: {final_bytes} bytes ({speed})")
+                        
+                        total_bytes_transferred += final_bytes
                         
                         yield self._yield_status(
                             "info", 
-                            f"{operation_name.title()}: {current_file} - {percentage}% complete ({speed})"
+                            f"{operation_name.title()}: {current_file} completed - {self._format_bytes(final_bytes)} ({speed})"
                         )
-                        
-                elif line.startswith('./') or '/' in line:
-                    # File being transferred
-                    if not line.startswith('rsync:') and not line.startswith('total size'):
-                        current_file = os.path.basename(line)
-                        files_transferred += 1
-                        yield self._yield_status(
-                            "info", 
-                            f"{operation_name.title()}: Transferring {current_file} (file #{files_transferred})"
-                        )
+                
+                # Parse rsync statistics for final file sizes
+                elif line.startswith('Total file size:'):
+                    # Extract total size: "Total file size: 123,456,789 bytes"
+                    match = re.search(r'Total file size:\s*(\d{1,3}(?:,\d{3})*)', line)
+                    if match:
+                        total_size = int(match.group(1).replace(',', ''))
+                        self._logger.info(f"[{self._device_id}] {operation_name} total size: {total_size} bytes")
+                
+                # Skip progress lines and rsync status messages
+                elif (line.endswith('%') and ('kB/s' in line or 'MB/s' in line)) or \
+                     line.startswith('rsync:') or \
+                     line.startswith('total size') or \
+                     'xfr#' in line or \
+                     'to-chk=' in line:
+                    # These are progress/status lines, not file names
+                    continue
                         
             # Wait for rsync to complete
             return_code = process.wait()
             
+            # Mark all files as completed and get final sizes from filesystem
+            for filename, details in file_details.items():
+                details['status'] = 'completed'
+                details['transfer_end'] = time.time()
+                
+                # Get actual file size from destination using relative path
+                relative_path = details.get('relative_path', details['path'])
+                dest_file_path = os.path.join(destination_dir, relative_path.lstrip('./'))
+                
+                # Try multiple path combinations to find the file
+                possible_paths = [
+                    dest_file_path,
+                    os.path.join(destination_dir, filename),
+                    os.path.join(destination_dir, details['path']),
+                ]
+                
+                for path_attempt in possible_paths:
+                    if os.path.exists(path_attempt):
+                        try:
+                            actual_size = os.path.getsize(path_attempt)
+                            details['size_bytes'] = actual_size
+                            details['size_human'] = self._format_bytes(actual_size)
+                            self._logger.debug(f"[{self._device_id}] Found file {filename}: {actual_size} bytes at {path_attempt}")
+                            break
+                        except OSError:
+                            continue
+                else:
+                    # File not found, log for debugging
+                    self._logger.warning(f"[{self._device_id}] Could not find transferred file {filename} in any of: {possible_paths}")
+            
+            # Store file details for status endpoint retrieval
+            if not hasattr(self, '_transfer_details'):
+                self._transfer_details = {}
+            self._transfer_details[operation_name] = {
+                'files': file_details,
+                'total_files': files_transferred,
+                'total_bytes': total_bytes_transferred,
+                'completion_time': time.time()
+            }
+            
             if return_code == 0:
-                self._logger.info(f"[{self._device_id}] {operation_name.title()} rsync completed successfully")
-                yield self._yield_status("info", f"{operation_name.title()} rsync completed successfully")
+                self._logger.info(f"[{self._device_id}] {operation_name.title()} rsync completed successfully - {files_transferred} files")
+                yield self._yield_status("info", f"{operation_name.title()} rsync completed successfully - {files_transferred} files")
                 return True
             else:
                 error_msg = f"{operation_name.title()} rsync failed with return code {return_code}"
@@ -1078,7 +1176,7 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
         Check sync status for both results and videos directories.
         
         Returns:
-            dict: Sync status for both backup types
+            dict: Sync status for both backup types including detailed file information
         """
         try:
             status = {}
@@ -1092,6 +1190,10 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
                 status['videos'] = self._check_directory_sync_status(
                     self._videos_dir, "videos"
                 )
+            
+            # Add detailed transfer information if available
+            if hasattr(self, '_transfer_details'):
+                status['transfer_details'] = self._transfer_details
             
             return status
             
@@ -1219,6 +1321,9 @@ class GenericBackupWrapper(threading.Thread):
         # Status tracking
         self.backup_status: Dict[str, BackupStatus] = {}
         self.last_backup = ""
+        
+        # Backup instances for detailed status retrieval
+        self._backup_instances: Dict[str, UnifiedRsyncBackupClass] = {}
         
         # Device discovery tracking
         self._last_device_count = 0
@@ -2095,3 +2200,302 @@ class GenericBackupWrapper(threading.Thread):
                 'is_video_backup': self._is_video_backup,
                 'max_threads': self._max_threads
             }
+
+
+def _fallback_database_discovery(device_id: str) -> dict:
+    """
+    Fallback method to discover databases by scanning local filesystem.
+    Used when device is offline and cannot provide database information.
+    
+    Args:
+        device_id: The ethoscope device ID
+        
+    Returns:
+        dict: Databases dictionary with SQLite and MariaDB information
+    """
+    databases = {'SQLite': {}, 'MariaDB': {}}
+    
+    # Scan for SQLite files in results directory
+    data_dir = "/ethoscope_data"
+    results_dir = os.path.join(data_dir, "results", device_id)
+    
+    if os.path.exists(results_dir):
+        for root, dirs, files in os.walk(results_dir):
+            for file in files:
+                if file.endswith('.db'):
+                    file_path = os.path.join(root, file)
+                    try:
+                        file_size = os.path.getsize(file_path)
+                        file_stat = os.path.stat(file_path)
+                        
+                        databases['SQLite'][file] = {
+                            'filesize': file_size,
+                            'backup_filename': file,
+                            'version': 'Unknown',
+                            'path': file_path,
+                            'date': file_stat.st_mtime,
+                            'db_status': 'unknown',
+                            'table_counts': {},
+                            'file_exists': True
+                        }
+                    except (OSError, IOError) as e:
+                        # File might be inaccessible, include with 0 size
+                        databases['SQLite'][file] = {
+                            'filesize': 0,
+                            'backup_filename': file,
+                            'version': 'Unknown',
+                            'path': file_path,
+                            'date': 0,
+                            'db_status': 'error',
+                            'table_counts': {},
+                            'file_exists': False
+                        }
+    
+    return databases
+
+
+def _format_bytes_simple(bytes_size: int) -> str:
+    """Simple bytes formatting helper."""
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if bytes_size < 1024.0:
+            return f"{bytes_size:.1f} {unit}"
+        bytes_size /= 1024.0
+    return f"{bytes_size:.1f} TB"
+
+
+def _enhance_databases_with_rsync_info(device_id: str, databases: dict) -> dict:
+    """
+    Enhance database information with file sizes from rsync backup service.
+    
+    Args:
+        device_id: The ethoscope device ID
+        databases: The databases dictionary to enhance
+        
+    Returns:
+        dict: Enhanced databases with actual file sizes from rsync service
+    """
+    try:
+        import urllib.request
+        import urllib.error
+        import json
+        import logging
+        import os
+        import glob
+        
+        # Try to get enhanced file info from rsync backup service
+        rsync_url = "http://localhost:8093/status"
+        
+        with urllib.request.urlopen(rsync_url, timeout=5) as response:
+            rsync_data = json.loads(response.read().decode())
+            
+        # Extract file details for this device
+        device_data = rsync_data.get('devices', {}).get(device_id, {})
+        
+        if device_data:
+            logging.info(f"[ENHANCE] Found device data for {device_id} in rsync service")
+        else:
+            logging.warning(f"[ENHANCE] No device data found for {device_id} in rsync service")
+        synced_data = device_data.get('synced', {})
+        
+        # Enhance SQLite database entries with rsync file sizes
+        detailed_files = synced_data.get('results', {}).get('detailed_files', {})
+        if 'SQLite' in databases:
+            for db_name, db_info in databases['SQLite'].items():
+                if detailed_files and db_name in detailed_files:
+                    # Update with actual file size from rsync if available
+                    rsync_file_info = detailed_files[db_name]
+                    db_info['filesize'] = rsync_file_info.get('size_bytes', db_info.get('filesize', 0))
+                    db_info['size_human'] = rsync_file_info.get('size_human', '')
+                    db_info['rsync_enhanced'] = True
+                elif db_info.get('filesize', 0) == 0 and db_info.get('path'):
+                    # File not in rsync cache and has 0 size, try filesystem fallback
+                    try:
+                        file_path = db_info['path']
+                        if os.path.exists(file_path):
+                            actual_size = os.path.getsize(file_path)
+                            db_info['filesize'] = actual_size
+                            db_info['size_human'] = _format_bytes_simple(actual_size)
+                            db_info['filesystem_enhanced'] = True
+                    except (OSError, KeyError):
+                        pass  # Keep original filesize
+        
+        # Add video backup information from rsync data
+        video_data = synced_data.get('videos', {})
+        transfer_details = device_data.get('transfer_details', {})
+        
+        logging.info(f"[ENHANCE] Video data available: {bool(video_data)}")
+        logging.info(f"[ENHANCE] Transfer details available: {bool(transfer_details.get('videos'))}")
+        
+        if video_data or transfer_details.get('videos'):
+            logging.info(f"[ENHANCE] Processing video backup data...")
+            # Add video backup to databases structure
+            if 'Video' not in databases:
+                databases['Video'] = {}
+            
+            # Extract video files information - prefer detailed_files, fall back to transfer_details
+            video_files = {}
+            
+            # First try to get from synced.videos.detailed_files (comprehensive data)
+            detailed_video_files = video_data.get('detailed_files', {})
+            if detailed_video_files:
+                for filename, file_info in detailed_video_files.items():
+                    # Only include .h264 files (exclude .md5 checksum files)
+                    if filename.endswith('.h264'):
+                        video_files[filename] = {
+                            'size_bytes': file_info.get('size_bytes', 0),
+                            'size_human': file_info.get('size_human', '0B'),
+                            'path': file_info.get('path', ''),
+                            'status': file_info.get('status', 'unknown'),
+                            'transfer_speed': file_info.get('transfer_speed', '')
+                        }
+            
+            # If no detailed files, try transfer_details as fallback
+            elif transfer_details.get('videos', {}).get('files'):
+                transfer_video_files = transfer_details['videos']['files']
+                for filename, file_info in transfer_video_files.items():
+                    # Only include .h264 files (exclude .md5 checksum files)
+                    if filename.endswith('.h264'):
+                        video_files[filename] = {
+                            'size_bytes': file_info.get('size_bytes', 0),
+                            'size_human': file_info.get('size_human', '0B'),
+                            'path': file_info.get('path', ''),
+                            'status': file_info.get('status', 'unknown'),
+                            'transfer_speed': file_info.get('transfer_speed', '')
+                        }
+            
+            # If no individual files found from rsync but we have summary data, try filesystem fallback
+            if not video_files and video_data.get('local_files', 0) > 0:
+                # Try to enumerate video files from filesystem
+                video_directory = video_data.get('directory', '/ethoscope_data/videos')
+                device_video_path = f"{video_directory}/{device_id}"
+                
+                try:
+                    if os.path.exists(device_video_path):
+                        # Find all .h264 files for this device
+                        h264_pattern = f"{device_video_path}/**/*.h264"
+                        h264_files = glob.glob(h264_pattern, recursive=True)
+                        
+                        for h264_file in h264_files:
+                            if os.path.exists(h264_file):
+                                filename = os.path.basename(h264_file)
+                                file_size = os.path.getsize(h264_file)
+                                relative_path = os.path.relpath(h264_file, video_directory)
+                                
+                                video_files[filename] = {
+                                    'size_bytes': file_size,
+                                    'size_human': _format_bytes_simple(file_size),
+                                    'path': relative_path,
+                                    'status': 'backed-up',
+                                    'filesystem_enhanced': True
+                                }
+                        
+                        logging.info(f"[ENHANCE] Found {len(video_files)} video files via filesystem fallback")
+                except Exception as e:
+                    logging.warning(f"[ENHANCE] Filesystem video enumeration failed: {e}")
+            
+            # Get summary information from video_data
+            total_video_size = video_data.get('disk_usage_bytes', 0)
+            total_video_files = video_data.get('local_files', 0)
+            
+            # If no summary data from video_data, calculate from file details
+            if total_video_size == 0 and video_files:
+                total_video_size = sum(f.get('size_bytes', 0) for f in video_files.values())
+            if total_video_files == 0 and video_files:
+                total_video_files = len(video_files)
+            
+            databases['Video']['video_backup'] = {
+                'total_files': total_video_files,
+                'total_size_bytes': total_video_size,
+                'size_human': video_data.get('disk_usage_human') or _format_bytes_simple(total_video_size),
+                'files': video_files,
+                'directory': video_data.get('directory', '/ethoscope_data/videos'),
+                'rsync_enhanced': len(video_files) > 0
+            }
+                    
+        return databases
+        
+    except Exception as e:
+        # If rsync service is unavailable, return databases unchanged
+        logging.warning(f"[ENHANCE] Failed to enhance databases with rsync info: {e}")
+        return databases
+
+
+def get_device_backup_info(device_id: str, databases: dict) -> dict:
+    """
+    Get backup information for a specific device based on its databases.
+    
+    Args:
+        device_id: The ethoscope device ID
+        databases: The databases dictionary from device.info()["databases"]
+        
+    Returns:
+        dict: Backup information including database types and backup status
+    """
+    # If databases dict is empty (device offline), use fallback discovery
+    if not databases or not any(databases.values()):
+        databases = _fallback_database_discovery(device_id)
+    
+    # Enhance with rsync backup service file sizes if available
+    databases = _enhance_databases_with_rsync_info(device_id, databases)
+    
+    backup_info = {
+        'device_id': device_id,
+        'databases': databases,
+        'backup_status': {
+            'mysql': {'available': False, 'database_count': 0, 'databases': []},
+            'sqlite': {'available': False, 'database_count': 0, 'databases': []},
+            'video': {'available': False, 'file_count': 0, 'total_size_bytes': 0, 'size_human': '0B'},
+            'total_databases': 0
+        },
+        'recommended_backup_type': None
+    }
+    
+    # Count total databases
+    total_db_count = 0
+    mysql_databases = []
+    sqlite_databases = []
+    
+    # Check for MySQL/MariaDB databases
+    if 'MariaDB' in databases:
+        mariadb_dbs = databases['MariaDB']
+        if mariadb_dbs and isinstance(mariadb_dbs, dict):
+            mysql_databases = list(mariadb_dbs.keys())
+            backup_info['backup_status']['mysql']['available'] = True
+            backup_info['backup_status']['mysql']['database_count'] = len(mysql_databases)
+            backup_info['backup_status']['mysql']['databases'] = mysql_databases
+            total_db_count += len(mysql_databases)
+    
+    # Check for SQLite databases
+    if 'SQLite' in databases:
+        sqlite_dbs = databases['SQLite']
+        if sqlite_dbs and isinstance(sqlite_dbs, dict):
+            sqlite_databases = list(sqlite_dbs.keys())
+            backup_info['backup_status']['sqlite']['available'] = True
+            backup_info['backup_status']['sqlite']['database_count'] = len(sqlite_databases)
+            backup_info['backup_status']['sqlite']['databases'] = sqlite_databases
+            total_db_count += len(sqlite_databases)
+    
+    # Check for Video backup
+    if 'Video' in databases:
+        video_data = databases['Video']
+        if video_data and isinstance(video_data, dict):
+            # Get video backup information
+            video_backup = video_data.get('video_backup', {})
+            if video_backup:
+                backup_info['backup_status']['video']['available'] = True
+                backup_info['backup_status']['video']['file_count'] = video_backup.get('total_files', 0)
+                backup_info['backup_status']['video']['total_size_bytes'] = video_backup.get('total_size_bytes', 0)
+                backup_info['backup_status']['video']['size_human'] = video_backup.get('size_human', '0B')
+                backup_info['backup_status']['video']['directory'] = video_backup.get('directory', '/ethoscope_data/videos')
+    
+    backup_info['backup_status']['total_databases'] = total_db_count
+    
+    # Determine recommended backup type
+    if backup_info['backup_status']['mysql']['available']:
+        backup_info['recommended_backup_type'] = 'mysql'
+    elif backup_info['backup_status']['sqlite']['available']:
+        backup_info['recommended_backup_type'] = 'rsync'
+    else:
+        backup_info['recommended_backup_type'] = 'none'
+    
+    return backup_info

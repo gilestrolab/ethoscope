@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Backup Status Integration</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+</head>
+<body>
+    <h1>Backup Status Integration Test</h1>
+    
+    <div id="device-info">
+        <h2>Device Information</h2>
+        <pre id="device-data"></pre>
+    </div>
+    
+    <div id="backup-status">
+        <h2>Backup Status from /backup/status</h2>
+        <pre id="backup-data"></pre>
+    </div>
+    
+    <div id="integration-test">
+        <h2>Integration Test</h2>
+        <div id="test-results"></div>
+    </div>
+
+    <script>
+        const deviceId = '0043e1b367c544fb8adb6198eccf7805';
+        
+        // Test fetching device data
+        $.get('http://localhost:8080/device/' + deviceId + '/data')
+            .done(function(deviceData) {
+                $('#device-data').text(JSON.stringify(deviceData, null, 2));
+                
+                // Test fetching backup status
+                $.get('http://localhost:8080/backup/status')
+                    .done(function(backupData) {
+                        $('#backup-data').text(JSON.stringify(backupData, null, 2));
+                        
+                        // Test integration
+                        testIntegration(deviceData, backupData);
+                    })
+                    .fail(function() {
+                        $('#backup-data').text('Failed to fetch backup status');
+                    });
+            })
+            .fail(function() {
+                $('#device-data').text('Failed to fetch device data');
+            });
+        
+        function testIntegration(deviceData, backupData) {
+            const results = [];
+            
+            // Check if device exists in backup data
+            if (backupData.devices && backupData.devices[deviceId]) {
+                results.push('✅ Device found in backup status data');
+                
+                const deviceBackupData = backupData.devices[deviceId];
+                
+                // Check backup types
+                if (deviceBackupData.backup_types) {
+                    results.push('✅ Backup types available');
+                    
+                    const backupTypes = deviceBackupData.backup_types;
+                    
+                    // Check MySQL backup
+                    if (backupTypes.mysql && backupTypes.mysql.available) {
+                        results.push('✅ MySQL backup available');
+                        results.push('  - Status: ' + backupTypes.mysql.status);
+                        results.push('  - Records: ' + backupTypes.mysql.records);
+                        results.push('  - Size: ' + backupTypes.mysql.size + ' bytes');
+                    } else {
+                        results.push('❌ MySQL backup not available');
+                    }
+                    
+                    // Check SQLite backup
+                    if (backupTypes.sqlite && backupTypes.sqlite.available) {
+                        results.push('✅ SQLite backup available');
+                        results.push('  - Status: ' + backupTypes.sqlite.status);
+                        results.push('  - Files: ' + backupTypes.sqlite.files);
+                    } else {
+                        results.push('⚠️ SQLite backup not available');
+                    }
+                    
+                    // Check Video backup
+                    if (backupTypes.video && backupTypes.video.available) {
+                        results.push('✅ Video backup available');
+                        results.push('  - Status: ' + backupTypes.video.status);
+                        results.push('  - Files: ' + backupTypes.video.files);
+                    } else {
+                        results.push('⚠️ Video backup not available');
+                    }
+                }
+                
+                // Overall status
+                results.push('📊 Overall Status: ' + deviceBackupData.overall_status);
+                
+            } else {
+                results.push('❌ Device not found in backup status data');
+            }
+            
+            // Compare with legacy device.databases structure
+            if (deviceData.databases) {
+                results.push('');
+                results.push('📋 Legacy databases structure comparison:');
+                
+                if (deviceData.databases.SQLite) {
+                    const sqliteCount = Object.keys(deviceData.databases.SQLite).length;
+                    results.push('  - SQLite databases in legacy: ' + sqliteCount);
+                }
+                
+                if (deviceData.databases.MariaDB) {
+                    const mariadbCount = Object.keys(deviceData.databases.MariaDB).length;
+                    results.push('  - MariaDB databases in legacy: ' + mariadbCount);
+                }
+            }
+            
+            $('#test-results').html('<pre>' + results.join('\n') + '</pre>');
+        }
+    </script>
+</body>
+</html>

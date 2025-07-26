@@ -18,7 +18,6 @@ from ethoscope_node.scanner.ethoscope_streaming import EthoscopeStreamManager
 
 from ethoscope_node.utils.etho_db import ExperimentalDB
 from ethoscope_node.utils.configuration import ensure_ssh_keys, EthoscopeConfiguration
-from ethoscope_node.utils.backups_helpers import get_sqlite_table_counts, calculate_backup_percentage_from_table_counts
 from ethoscope_node.notifications.manager import NotificationManager
 
 # Constants
@@ -383,13 +382,149 @@ class Ethoscope(BaseDevice):
         # Only handle state transitions when status actually changes
         if previous_status != new_status:
             self._handle_state_transition(previous_status, new_status)
-        self._update_backup_status_from_database_info()
         
         # Check for storage warnings
         self._check_storage_warnings()
 
         #update comprehensive list of databases - this should not be served here
         self._info.update ({"databases" : self.databases_info()})
+    
+    def _reorganize_experimental_info(self, new_info: dict):
+        """
+        Reorganize experimental_info into nested structure with current and previous.
+        
+        Structure:
+        experimental_info: {
+            current: {}, // Current experiment info (when running/recording)
+            previous: {} // Previous experiment info (when stopped)
+        }
+        """
+        # Get incoming experimental_info from device
+        incoming_experimental_info = new_info.get('experimental_info', {})
+        
+        # Handle legacy previous_* fields - migrate them to nested structure
+        legacy_previous_fields = {}
+        for field_name in ['previous_date_time', 'previous_backup_filename', 'previous_user', 'previous_location']:
+            if field_name in new_info:
+                # Map legacy field names to new structure
+                field_key = field_name.replace('previous_', '')
+                # Map 'date_time' instead of 'time'
+                if field_key == 'date_time':
+                    field_key = 'date_time'
+                legacy_previous_fields[field_key] = new_info[field_name]
+                # Remove legacy field from new_info
+                del new_info[field_name]
+        
+        # Handle interactor field - move to experimental_info.current (it's part of experimental setup)
+        interactor_data = {}
+        if 'interactor' in new_info:
+            interactor_data['interactor'] = new_info['interactor']
+            # Remove from top-level new_info - will be added to current experimental_info
+            del new_info['interactor']
+        
+        # Handle cache-derived fields - move them to latest_cache section for better organization
+        cache_fields = ['result_writer_type', 'sqlite_source_path', 'cache_file', 'cached_run_id', 'backup_filename']
+        cache_field_data = {}
+        for field_name in cache_fields:
+            if field_name in new_info:
+                cache_field_data[field_name] = new_info[field_name]
+                # Remove from top-level new_info - will be added to latest_cache section
+                del new_info[field_name]
+        
+        # Get current device status 
+        current_status = new_info.get('status', 'offline')
+        previous_status = self._info.get('status', 'offline')
+        
+        # Get existing nested structure or initialize
+        existing_nested = self._info.get('experimental_info', {})
+        if not isinstance(existing_nested, dict) or 'current' not in existing_nested:
+            # Initialize nested structure
+            nested_experimental_info = {
+                'current': {},
+                'previous': {}
+            }
+        else:
+            # Use existing nested structure
+            nested_experimental_info = {
+                'current': existing_nested.get('current', {}),
+                'previous': existing_nested.get('previous', {})
+            }
+        
+        # Handle incoming experimental_info format - check if it's already nested
+        if incoming_experimental_info and isinstance(incoming_experimental_info, dict):
+            if 'current' in incoming_experimental_info and 'previous' in incoming_experimental_info:
+                # Already in nested format - merge with existing
+                nested_experimental_info['current'] = incoming_experimental_info.get('current', {})
+                if incoming_experimental_info.get('previous'):
+                    nested_experimental_info['previous'].update(incoming_experimental_info['previous'])
+                # Add any legacy fields to previous
+                if legacy_previous_fields:
+                    nested_experimental_info['previous'].update(legacy_previous_fields)
+                # Update the new_info with nested structure and return early
+                new_info['experimental_info'] = nested_experimental_info
+                return
+            else:
+                # Legacy flat format - treat as current experimental_info
+                pass  # Continue with existing logic below
+        
+        # Add any legacy previous fields to the previous structure
+        if legacy_previous_fields:
+            nested_experimental_info['previous'].update(legacy_previous_fields)
+            self._logger.debug(f"Device {self._ip}: Migrated legacy previous_* fields to nested structure")
+        
+        # Determine what to do with the incoming experimental_info
+        if incoming_experimental_info and not ('current' in incoming_experimental_info and 'previous' in incoming_experimental_info):
+            # Device has experimental info
+            if current_status in ['running', 'recording', 'streaming', 'initialising']:
+                # Device is active - incoming info becomes current
+                nested_experimental_info['current'] = incoming_experimental_info
+                # Add interactor data to current experimental_info if present
+                if interactor_data:
+                    nested_experimental_info['current'].update(interactor_data)
+                self._logger.debug(f"Device {self._ip}: Updated current experimental_info for active session")
+                
+            elif current_status == 'stopped' and previous_status in ['running', 'recording', 'streaming']:
+                # Device just stopped - move current to previous, clear current
+                if nested_experimental_info['current']:
+                    nested_experimental_info['previous'] = nested_experimental_info['current'].copy()
+                    self._logger.debug(f"Device {self._ip}: Moved experimental_info to previous after stopping")
+                nested_experimental_info['current'] = {}
+                
+            else:
+                # Device is in other state - keep as current for now
+                nested_experimental_info['current'] = incoming_experimental_info
+                # Add interactor data to current experimental_info if present
+                if interactor_data:
+                    nested_experimental_info['current'].update(interactor_data)
+                
+        else:
+            # No incoming experimental_info 
+            if current_status == 'stopped' and previous_status in ['running', 'recording', 'streaming']:
+                # Device stopped and lost experimental_info - move current to previous
+                if nested_experimental_info['current']:
+                    nested_experimental_info['previous'] = nested_experimental_info['current'].copy()
+                    self._logger.debug(f"Device {self._ip}: Moved experimental_info to previous after session ended")
+                nested_experimental_info['current'] = {}
+                
+            elif current_status in ['running', 'recording', 'streaming'] and nested_experimental_info['current']:
+                # Device is active but no experimental_info - keep existing current
+                # Add interactor data to current experimental_info if present
+                if interactor_data:
+                    nested_experimental_info['current'].update(interactor_data)
+                self._logger.debug(f"Device {self._ip}: Keeping existing current experimental_info for active session")
+                pass
+                
+            else:
+                # Clear current if device is not active
+                nested_experimental_info['current'] = {}
+        
+        # Update the new_info with nested structure
+        new_info['experimental_info'] = nested_experimental_info
+        
+        # Add cache-derived fields to latest_cache section
+        if cache_field_data:
+            new_info['latest_cache'] = cache_field_data
+            self._logger.debug(f"Device {self._ip}: Organized cache-derived fields in latest_cache section")
     
     def _fetch_device_info(self) -> bool:
         """Fetch latest device information."""
@@ -401,13 +536,17 @@ class Ethoscope(BaseDevice):
             new_info = self._get_json(_data_url)
            
             with self._lock:
+                # Reorganize experimental_info before updating
+                self._reorganize_experimental_info(new_info)
+                
+                # Update device info with reorganized data
                 self._info.update(new_info)
                 
                 # Cache run_id for use during interruptions when experimental_info is lost
-                experimental_info = new_info.get('experimental_info', {})
-                if experimental_info and experimental_info.get('run_id'):
-                    self._info['cached_run_id'] = experimental_info['run_id']
-                    self._logger.debug(f"Cached run_id: {experimental_info['run_id']}")
+                current_experimental_info = new_info.get('experimental_info', {}).get('current', {})
+                if current_experimental_info and current_experimental_info.get('run_id'):
+                    self._info['cached_run_id'] = current_experimental_info['run_id']
+                    self._logger.debug(f"Cached run_id: {current_experimental_info['run_id']}")
                 self._info['last_seen'] = time.time()
                 
                 # Update logger name if we have a valid device name
@@ -490,8 +629,10 @@ class Ethoscope(BaseDevice):
             self._update_device_status("unreached", trigger_source="network", metadata={"previous_status": previous_status})
         
         # Handle running experiments
-        if 'experimental_info' in self._info and 'run_id' in self._info['experimental_info']:
-            run_id = self._info['experimental_info']['run_id']
+        experimental_info_nested = self._info.get('experimental_info', {})
+        current_experimental_info = experimental_info_nested.get('current', {})
+        if current_experimental_info and 'run_id' in current_experimental_info:
+            run_id = current_experimental_info['run_id']
             self._edb.flagProblem(run_id=run_id, message="unreached")
             
             if previous_status == 'running':
@@ -554,8 +695,9 @@ class Ethoscope(BaseDevice):
             self._logger.debug(f"Handling state transition: {previous_status} -> {new_status}")
             
             # Always check for alerts regardless of experimental info
-            experimental_info = self._info.get('experimental_info', {})
-            run_id = experimental_info.get('run_id') if experimental_info else None
+            experimental_info_nested = self._info.get('experimental_info', {})
+            current_experimental_info = experimental_info_nested.get('current', {})
+            run_id = current_experimental_info.get('run_id') if current_experimental_info else None
             
             # If no current run_id, try to get cached run_id from device info
             if not run_id:
@@ -564,7 +706,7 @@ class Ethoscope(BaseDevice):
             current_status = self.get_device_status()
             is_interrupted = current_status.is_interrupted_tracking_session() if current_status else False
             
-            self._logger.info(f"Alert info: run_id={run_id} (from {'experimental_info' if experimental_info and experimental_info.get('run_id') else 'cache' if run_id else 'none'}), "
+            self._logger.info(f"Alert info: run_id={run_id} (from {'experimental_info' if current_experimental_info and current_experimental_info.get('run_id') else 'cache' if run_id else 'none'}), "
                             f"new_status={new_status}, is_interrupted={is_interrupted}")
             
             # Send alerts
@@ -585,9 +727,9 @@ class Ethoscope(BaseDevice):
                 device_transitions[transition_key]()
             
             # Handle experiment-specific transitions only if we have experimental info
-            if experimental_info and run_id:
-                user_name = experimental_info.get('name', '')
-                location = experimental_info.get('location', '')
+            if current_experimental_info and run_id:
+                user_name = current_experimental_info.get('name', '')
+                location = current_experimental_info.get('location', '')
                 
                 experiment_transitions = {
                     ('initialising', 'running'): lambda: self._edb.addRun(
@@ -675,8 +817,9 @@ class Ethoscope(BaseDevice):
             
             if is_interrupted:
                 # Get experimental_info within this function scope
-                experimental_info = self._info.get('experimental_info', {})
-                run_id_source = "recovered from database" if run_id and not experimental_info.get('run_id') else "from experiment info" if run_id else "not available"
+                experimental_info_nested = self._info.get('experimental_info', {})
+                current_experimental_info = experimental_info_nested.get('current', {})
+                run_id_source = "recovered from database" if run_id and not current_experimental_info.get('run_id') else "from experiment info" if run_id else "not available"
                 self._logger.info(f"Interrupted tracking analysis: "
                                 f"chain='{debug_chain}', "
                                 f"found_active_session={debug_active_session}, "
@@ -758,239 +901,9 @@ class Ethoscope(BaseDevice):
             self._logger.error(f"Error checking storage warnings: {e}")
     
 
-    def _update_backup_status_from_database_info(self):
-        """Update backup status using new comprehensive device data format."""
-        if time.time() - self._last_db_info < DB_UPDATE_INTERVAL:
-            return
-        
-        try:
-            # Check if device provides backup status directly (new format)
-            if 'backup_status' in self._info:
-                # Use the backup status provided directly by the device
-                backup_status = self._info['backup_status']
-                backup_size = self._info.get('backup_size', 0)
-                time_since_backup = self._info.get('time_since_backup', 0)
-                
-                # Store additional backup info
-                self._info['backup_size'] = backup_size
-                self._info['time_since_backup'] = time_since_backup
-                
-                self._logger.debug(f"Device {self._ip}: Using device-provided backup status: {backup_status}")
-                self._last_db_info = time.time()
-                return
-            
-            # Fall back to legacy method for backward compatibility
-            # Get database_info from the ethoscope's response
-            database_info = self.databases_info()
-            backup_path = self._info.get("backup_path")
-            
-            if not backup_path:
-                self._logger.debug(f"Device {self._ip}: No backup_path available, attempting to create one")
-                self._make_backup_path(force_recalculate=True)
-                backup_path = self._info.get("backup_path")
-                if not backup_path:
-                    self._logger.debug(f"Device {self._ip}: Still no backup_path after creation attempt")
-                    self._info['backup_status'] = "No Backup"
-                    return
-                else:
-                    self._logger.debug(f"Device {self._ip}: Created backup_path: {backup_path}")
-                
-            # Check if backup file exists
-            if not os.path.exists(backup_path):
-                self._logger.debug(f"Device {self._ip}: Backup file does not exist: {backup_path}")
-                self._info['backup_status'] = "File Missing"
-                return
-            
-            # Check if we have new nested databases structure
-            databases = self._info.get("databases", {})
-            if databases:
-                # Use new database structure to determine backup status
-                self._update_backup_status_from_databases(databases, backup_path)
-                return
-            
-            # Check database_info status (old structure)
-            db_status = database_info.get("db_status", "unknown")
-            if db_status == "error":
-                self._logger.debug(f"Device {self._ip}: Database info shows error status")
-                self._info['backup_status'] = "DB Error"
-                return
-            
-            # Determine database type from metadata or experimental_info
-            result_writer_type = None
-            
-            # Try to get result writer type from experimental_info (which contains selected_options)
-            experimental_info = self._info.get("experimental_info", {})
-            if "selected_options" in experimental_info:
-                try:
-                    # selected_options is stored as a string representation, parse it carefully
-                    selected_options_str = experimental_info["selected_options"]
-                    if "SQLiteResultWriter" in selected_options_str:
-                        result_writer_type = "SQLiteResultWriter"
-                    elif "ResultWriter" in selected_options_str:
-                        result_writer_type = "ResultWriter"
-                except (KeyError, TypeError):
-                    pass
-            
-            # Fallback: check backup path extension if metadata not available
-            if not result_writer_type:
-                result_writer_type = "SQLiteResultWriter" if backup_path.endswith('.db') else "ResultWriter"
-                self._logger.debug(f"Device {self._ip}: Using fallback database type detection: {result_writer_type}")
-            
-            # Store result writer type for backup system reference
-            self._info['result_writer_type'] = result_writer_type
-            
-            if result_writer_type == "SQLiteResultWriter":
-                # Use file-based backup status for SQLite (rsync-compatible)
-                self._update_sqlite_backup_status(database_info, backup_path)
-            else:
-                # Use table count-based backup status for MySQL
-                self._update_mysql_backup_status(database_info, backup_path)
-        except Exception as e:
-            self._logger.warning(f"Device {self._ip}: Failed to update backup status from database_info: {e}")
-            self._info['backup_status'] = "Error"
-        
-        self._last_db_info = time.time()
     
-    def _update_backup_status_from_databases(self, databases: dict, backup_path: str):
-        """Update backup status using new nested databases structure."""
-        try:
-            # Check MariaDB databases first
-            mariadb_databases = databases.get("MariaDB", {})
-            if mariadb_databases:
-                # Use the first MariaDB database (typically there's only one)
-                db_name = list(mariadb_databases.keys())[0]
-                db_info = mariadb_databases[db_name]
-                
-                # Check if we have table counts for backup percentage calculation
-                if 'table_counts' in db_info:
-                    from ethoscope_node.utils.backups_helpers import get_sqlite_table_counts, calculate_backup_percentage_from_table_counts
-                    
-                    remote_table_counts = db_info['table_counts']
-                    backup_table_counts = get_sqlite_table_counts(backup_path)
-                    
-                    backup_percentage = calculate_backup_percentage_from_table_counts(
-                        remote_table_counts, backup_table_counts)
-                    
-                    # Store backup status info
-                    self._info['backup_status'] = backup_percentage
-                    self._info['backup_size'] = db_info.get('filesize', 0)
-                    self._info['time_since_backup'] = time.time() - db_info.get('date', time.time())
-                    
-                    self._logger.debug(f"Device {self._ip}: MariaDB backup status: {backup_percentage}%")
-                    return
-            
-            # Check SQLite databases
-            sqlite_databases = databases.get("SQLite", {})
-            if sqlite_databases:
-                # Use the first SQLite database (typically there's only one) 
-                db_name = list(sqlite_databases.keys())[0]
-                db_info = sqlite_databases[db_name]
-                
-                # For SQLite, use file size comparison
-                local_backup_size = os.path.getsize(backup_path)
-                remote_db_size = db_info.get("filesize", 0)
-                
-                if remote_db_size > 0:
-                    backup_percentage = min(100.0, (local_backup_size / remote_db_size) * 100)
-                else:
-                    backup_percentage = 0.0
-                
-                # Store backup status info
-                self._info['backup_status'] = backup_percentage
-                self._info['backup_size'] = local_backup_size
-                self._info['time_since_backup'] = time.time() - db_info.get('date', time.time())
-                
-                self._logger.debug(f"Device {self._ip}: SQLite backup status: {backup_percentage}%")
-                return
-            
-            # No databases found
-            self._logger.debug(f"Device {self._ip}: No databases found in nested structure")
-            self._info['backup_status'] = "No Database"
-            
-        except Exception as e:
-            self._logger.error(f"Device {self._ip}: Failed to update backup status from databases: {e}")
-            self._info['backup_status'] = "Error"
     
-    def _update_sqlite_backup_status(self, database_info, backup_path):
-        """Update backup status for SQLite databases using file-based comparison."""
-        try:
-            # Get file sizes
-            local_backup_size = os.path.getsize(backup_path)
-            remote_db_size = database_info.get("db_size_bytes", 0)
-            
-            # Calculate backup percentage based on file size
-            if remote_db_size > 0:
-                backup_percentage = min(100.0, (local_backup_size / remote_db_size) * 100)
-            else:
-                # If no remote size info, assume 100% if file exists
-                backup_percentage = 100.0 if local_backup_size > 0 else 0.0
-            
-            # Calculate time since last backup update
-            backup_mtime = os.path.getmtime(backup_path)
-            time_since_backup = time.time() - backup_mtime
-            
-            self._info['backup_status'] = backup_percentage
-            self._info['backup_size'] = local_backup_size
-            self._info['time_since_backup'] = time_since_backup
-            self._info['backup_type'] = 'sqlite_file'
-            self._info['backup_method'] = 'rsync'  # Indicate rsync-based backup
-            
-            self._logger.debug(f"Device {self._ip}: SQLite backup status {backup_percentage:.1f}% "
-                             f"(size: {local_backup_size}/{remote_db_size} bytes, "
-                             f"age: {time_since_backup/3600:.1f}h)")
-                             
-        except Exception as e:
-            self._logger.warning(f"Device {self._ip}: Failed to update SQLite backup status: {e}")
-            self._info['backup_status'] = "SQLite Error"
     
-    def _update_mysql_backup_status(self, database_info, backup_path):
-        """Update backup status for MySQL databases using table count comparison."""
-        try:
-            # Get table counts from ethoscope
-            remote_table_counts = database_info.get("table_counts", {})
-            if not remote_table_counts:
-                self._logger.debug(f"Device {self._ip}: No table counts available from ethoscope")
-                self._info['backup_status'] = "No Table Data"
-                return
-            
-            # Get table counts from backup database
-            backup_table_counts = get_sqlite_table_counts(backup_path)
-            if not backup_table_counts:
-                self._logger.debug(f"Device {self._ip}: Could not read backup database")
-                self._info['backup_status'] = "Backup Read Error"
-                return
-            
-            # Calculate backup percentage based on table counts
-            backup_percentage = calculate_backup_percentage_from_table_counts(
-                remote_table_counts, backup_table_counts)
-            
-            # Get file sizes for additional info
-            local_backup_size = os.path.getsize(backup_path)
-            remote_db_size = database_info.get("db_size_bytes", 0)
-            
-            # Calculate time since last backup update
-            backup_mtime = os.path.getmtime(backup_path)
-            time_since_backup = time.time() - backup_mtime
-            
-            self._info['backup_status'] = backup_percentage
-            self._info['backup_size'] = local_backup_size
-            self._info['remote_table_counts'] = remote_table_counts
-            self._info['backup_table_counts'] = backup_table_counts
-            self._info['time_since_backup'] = time_since_backup
-            self._info['backup_type'] = 'mysql_table'
-            self._info['backup_method'] = 'incremental'  # Indicate table-based incremental backup
-            
-            # Create detailed logging with table comparison
-            total_remote = sum(remote_table_counts.values())
-            total_backup = sum(backup_table_counts.values())
-            
-            self._logger.debug(f"Device {self._ip}: MySQL backup status {backup_percentage:.1f}% "
-                             f"(rows: {total_backup}/{total_remote}, "
-                             f"size: {local_backup_size}/{remote_db_size} bytes)")
-                             
-        except Exception as e:
-            self._logger.warning(f"Device {self._ip}: Failed to update MySQL backup status: {e}")
-            self._info['backup_status'] = "MySQL Error"
     
     def _make_backup_path(self, force_recalculate: bool = False, service_type: str = "auto"):
         """
@@ -1099,10 +1012,11 @@ class Ethoscope(BaseDevice):
                 return backup_filename
             
             # SECOND PRIORITY: Try to determine the active database type from experimental_info
-            experimental_info = self._info.get("experimental_info", {})
-            if "selected_options" in experimental_info:
+            experimental_info_nested = self._info.get("experimental_info", {})
+            current_experimental_info = experimental_info_nested.get("current", {})
+            if "selected_options" in current_experimental_info:
                 try:
-                    selected_options_str = experimental_info["selected_options"]
+                    selected_options_str = current_experimental_info["selected_options"]
                     if "SQLiteResultWriter" in selected_options_str:
                         self._logger.debug(f"Device {self._ip}: Determined active database type: SQLite from experimental_info")
                         sqlite_filename = self._get_backup_filename_for_db_type("SQLite")
@@ -1287,10 +1201,6 @@ class EthoscopeScanner(DeviceScanner):
                 
                 if device_name != "ETHOSCOPE_000":
                     info = device.info()
-                    info.update({
-                        "time_since_backup": self._get_last_backup_time(device),
-                        "backup_size": self._get_backup_size(device)
-                    })
                     
                     # Skip devices with no meaningful identifying information
                     scanner_name = info.get('name', '').strip()
@@ -1319,25 +1229,6 @@ class EthoscopeScanner(DeviceScanner):
         
         return devices_info
     
-    def _get_backup_size(self, device: Ethoscope) -> int:
-        """Get backup file size."""
-        try:
-            backup_path = device.info().get("backup_path")
-            if backup_path and os.path.exists(backup_path):
-                return os.path.getsize(backup_path)
-        except Exception:
-            pass
-        return 0
-    
-    def _get_last_backup_time(self, device: Ethoscope) -> Optional[float]:
-        """Get time since last backup."""
-        try:
-            backup_path = device.info().get("backup_path")
-            if backup_path and os.path.exists(backup_path):
-                return time.time() - os.path.getmtime(backup_path)
-        except Exception:
-            pass
-        return None
     
     def add(self, ip: str, port: int = ETHOSCOPE_PORT, name: Optional[str] = None,
            device_id: Optional[str] = None, zcinfo: Optional[Dict] = None):

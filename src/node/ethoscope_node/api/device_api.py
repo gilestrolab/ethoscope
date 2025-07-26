@@ -39,6 +39,7 @@ class DeviceAPI(BaseAPI):
         self.app.route('/device/<id>/stream', method='GET')(self._get_device_stream)
         
         # Device operations
+        self.app.route('/device/<id>/backup', method='GET')(self._get_device_backup_info)
         self.app.route('/device/<id>/backup', method='POST')(self._force_device_backup)
         self.app.route('/device/<id>/dumpSQLdb', method='GET')(self._device_local_dump)
         self.app.route('/device/<id>/retire', method='GET')(self._retire_device)
@@ -156,7 +157,15 @@ class DeviceAPI(BaseAPI):
     def _get_device_info(self, id):
         """Get device information."""
         device = self.validate_device_exists(id)
-        return device.info()
+        device_info = device.info()
+        
+        # Remove databases from response to avoid redundancy
+        # This information is now available via /device/<id>/backup endpoint
+        if 'databases' in device_info:
+            device_info = device_info.copy()
+            del device_info['databases']
+        
+        return device_info
     
     @error_decorator
     def _get_device_machine_info(self, id):
@@ -238,11 +247,27 @@ class DeviceAPI(BaseAPI):
         return device.relay_stream()
 
     @error_decorator
+    def _get_device_backup_info(self, id):
+        """Get device backup information from device databases."""
+        from ethoscope_node.backup.helpers import get_device_backup_info
+        
+        device = self.validate_device_exists(id)
+        device_info = device.info()
+        
+        # Extract databases information
+        databases = device_info.get('databases', {})
+        
+        # Use backup helpers to analyze the databases and provide backup status
+        backup_info = get_device_backup_info(id, databases)
+        
+        return backup_info
+    
+    @error_decorator
     def _force_device_backup(self, id):
         """Force backup on device with specified id."""
-        from ethoscope_node.utils.backups_helpers import BackupClass
+        from ethoscope_node.backup.helpers import BackupClass
         
-        device_info = self._get_device_info(id)
+        device_info = device.info().copy()
         
         try:
             self.logger.info(f"Initiating backup for device {device_info['id']}")
