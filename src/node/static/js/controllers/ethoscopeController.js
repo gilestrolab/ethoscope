@@ -820,8 +820,10 @@
         $scope.hasValidInteractor = function(device) {
             return (
                 device.status === 'running' &&
-                device.hasOwnProperty('interactor') &&
-                device.interactor.name !== "<class 'ethoscope.stimulators.stimulators.DefaultStimulator'>"
+                device.experimental_info &&
+                device.experimental_info.current &&
+                device.experimental_info.current.interactor &&
+                device.experimental_info.current.interactor.name !== "<class 'ethoscope.stimulators.stimulators.DefaultStimulator'>"
             );
         };
 

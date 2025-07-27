@@ -136,11 +136,7 @@
             
             // Only format if both dates are valid and not null
             if (startFormatted !== null && endFormatted !== null && startFormatted && endFormatted) {
-              if (modelCtrl.$viewValue && modelCtrl.$viewValue.length > 0) { 
-                  objValue.formatted = modelCtrl.$viewValue + ", " + [startFormatted, endFormatted].join(opts.locale.separator);
-              } else {
-                  objValue.formatted = [startFormatted, endFormatted].join(opts.locale.separator);
-              }
+              objValue.formatted = [startFormatted, endFormatted].join(opts.locale.separator);
               return objValue.formatted;
             }
           }
