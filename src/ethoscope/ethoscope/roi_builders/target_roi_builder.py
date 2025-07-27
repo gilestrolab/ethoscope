@@ -54,7 +54,8 @@ class TargetGridROIBuilder(BaseROIBuilder):
                                    
     def __init__(self, n_rows=1, n_cols=1, top_margin=0, bottom_margin=0,
                  left_margin=0, right_margin=0, horizontal_fill=.9, vertical_fill=.9,
-                 enable_diagnostics=False, device_id="unknown", save_success_images=False):
+                 enable_diagnostics=False, device_id="unknown", save_success_images=False,
+                 max_detection_attempts=5, enable_frame_averaging=True):
         """
         This roi builder uses three black circles drawn on the arena (targets) to align a grid layout:
 
@@ -82,6 +83,10 @@ class TargetGridROIBuilder(BaseROIBuilder):
         :type device_id: str
         :param save_success_images: Whether to save images of successful detections for analysis.
         :type save_success_images: bool
+        :param max_detection_attempts: Maximum number of detection attempts with different strategies.
+        :type max_detection_attempts: int
+        :param enable_frame_averaging: Whether to use frame averaging for noise reduction.
+        :type enable_frame_averaging: bool
         """
 
         self._n_rows = n_rows
@@ -97,6 +102,11 @@ class TargetGridROIBuilder(BaseROIBuilder):
         self._enable_diagnostics = enable_diagnostics
         self._save_success_images = save_success_images
         self._diagnostics = None
+        
+        # Multi-frame detection configuration
+        self._max_detection_attempts = max_detection_attempts
+        self._enable_frame_averaging = enable_frame_averaging
+        self._frame_buffer = []  # Buffer for frame averaging
         
         if self._enable_diagnostics:
             self._diagnostics = TargetDetectionDiagnostics(device_id=device_id)
@@ -186,10 +196,92 @@ class TargetGridROIBuilder(BaseROIBuilder):
 
     def _find_target_coordinates(self, img):
         '''
-        Finds the coordinates of the three blobs on the given img
+        Finds the coordinates of the three blobs on the given img with multi-attempt robust detection
         '''
         start_time = time.time() if self._enable_diagnostics else None
         
+        # Try multiple attempts with different strategies
+        for attempt in range(self._max_detection_attempts):
+            logging.debug(f"Target detection attempt {attempt + 1}/{self._max_detection_attempts}")
+            
+            # Use frame averaging for noise reduction if enabled and we have buffered frames
+            processed_img = self._prepare_image_for_detection(img, attempt)
+            
+            # Attempt detection on processed image
+            result = self._single_detection_attempt(processed_img, attempt)
+            
+            if result is not None:
+                # Success - log and return
+                if self._enable_diagnostics:
+                    processing_time = time.time() - start_time if start_time else None
+                    self._log_successful_detection(processed_img, result, attempt, processing_time)
+                return result
+            
+            # Failed attempt - add current image to buffer for potential averaging
+            if self._enable_frame_averaging:
+                self._update_frame_buffer(img)
+        
+        # All attempts failed
+        if self._enable_diagnostics:
+            processing_time = time.time() - start_time if start_time else None
+            self._log_failed_detection(img, processing_time)
+        
+        logging.error(f"Target detection failed after {self._max_detection_attempts} attempts")
+        return None
+    
+    def _prepare_image_for_detection(self, img, attempt):
+        '''
+        Prepare image for detection based on attempt number and available strategies
+        '''
+        if attempt == 0 or not self._enable_frame_averaging or len(self._frame_buffer) == 0:
+            # First attempt or no averaging - use original image
+            return img
+        
+        # Use frame averaging for noise reduction
+        return self._create_averaged_frame(img)
+    
+    def _update_frame_buffer(self, img):
+        '''
+        Update the frame buffer for averaging, keeping only recent frames
+        '''
+        max_buffer_size = 3  # Keep last 3 frames for averaging
+        
+        # Convert to float for averaging if needed
+        if img.dtype != np.float32:
+            img_float = img.astype(np.float32)
+        else:
+            img_float = img.copy()
+            
+        self._frame_buffer.append(img_float)
+        
+        # Keep buffer size manageable
+        if len(self._frame_buffer) > max_buffer_size:
+            self._frame_buffer.pop(0)
+    
+    def _create_averaged_frame(self, current_img):
+        '''
+        Create an averaged frame from buffer + current image for noise reduction
+        '''
+        if len(self._frame_buffer) == 0:
+            return current_img
+        
+        # Convert current image to float
+        if current_img.dtype != np.float32:
+            current_float = current_img.astype(np.float32)
+        else:
+            current_float = current_img.copy()
+        
+        # Average with buffered frames
+        all_frames = self._frame_buffer + [current_float]
+        averaged = np.mean(all_frames, axis=0)
+        
+        # Convert back to uint8
+        return averaged.astype(np.uint8)
+    
+    def _single_detection_attempt(self, img, attempt):
+        '''
+        Perform a single detection attempt with progressive tolerance relaxation
+        '''
         map = self._find_blobs(img, self._score_targets)
         bin = np.zeros_like(map)
 
@@ -236,70 +328,36 @@ class TargetGridROIBuilder(BaseROIBuilder):
             # Found exactly 3 targets at optimal threshold
             contours = best_contours
             threshold_used = optimal_threshold
-            logging.info(f"Found exactly 3 targets at optimal threshold {optimal_threshold}")
+            logging.debug(f"Found exactly 3 targets at optimal threshold {optimal_threshold} (attempt {attempt + 1})")
         elif len(best_contours) >= 3:
             # Use best quality targets as fallback
             contours = best_contours
             threshold_used = best_threshold
-            logging.warning(f"Using 3 best quality targets from threshold {best_threshold} (quality score: {best_quality_score:.2f})")
+            logging.debug(f"Using 3 best quality targets from threshold {best_threshold} (attempt {attempt + 1}, quality score: {best_quality_score:.2f})")
         else:
             # No good targets found
-            threshold_used = best_threshold
-            logging.warning(f"Could not find 3 quality targets. Found {len(best_contours)} targets at threshold {best_threshold}")
+            logging.debug(f"Could not find 3 quality targets on attempt {attempt + 1}. Found {len(best_contours)} targets at threshold {best_threshold}")
+            return None  # Early return for this attempt
         
-        # Calculate circularity scores for found targets
-        circularity_scores = []
-        target_coordinates = []
-        
-        if len(contours) >= 1:
-            for c in contours:
-                score = self._score_targets(c, img)
-                circularity_scores.append(score)
-                
-                # Get center coordinates
-                moms = cv2.moments(c)
-                if moms["m00"] != 0:  # Avoid division by zero
-                    x, y = moms["m10"]/moms["m00"], moms["m01"]/moms["m00"]
-                    target_coordinates.append((float(x), float(y)))
-        
-        # Enhanced diagnostics logging
-        if self._enable_diagnostics and self._diagnostics:
-            processing_time = time.time() - start_time if start_time else None
-            
-            metadata = self._diagnostics.log_detection_attempt(
-                image=img,
-                targets_found=target_coordinates,
-                expected_targets=3,
-                threshold_used=threshold_used,
-                circularity_scores=circularity_scores,
-                processing_time=processing_time
-            )
-            
-            # Save image if detection failed or if success saving is enabled
-            detection_success = len(contours) == 3
-            save_image = not detection_success or self._save_success_images
-            
-            if save_image:
-                self._diagnostics.save_detection_image(
-                    image=img,
-                    metadata=metadata,
-                    save_success=self._save_success_images,
-                    save_failed=True
-                )
-            
         if len(contours) < 3:
-            logging.error("There should be three targets. Only %i objects have been found. Please check that your arena has 3 circular targets visible." % (len(contours)))
-            return None  # Return None instead of raising exception
+            logging.debug(f"Only found {len(contours)} targets on attempt {attempt + 1}")
+            return None  # Early return for this attempt
 
+        # Progressive diameter tolerance relaxation
+        base_tolerance = 0.10
+        tolerance_multiplier = 1.0 + (attempt * 0.5)  # Increase tolerance by 50% per attempt
+        current_tolerance = min(base_tolerance * tolerance_multiplier, 0.30)  # Cap at 30%
+        
         target_diams = [cv2.boundingRect(c)[2] for c in contours]
-
         mean_diam = np.mean(target_diams)
         mean_sd = np.std(target_diams)
+        diameter_variation = mean_sd/mean_diam if mean_diam > 0 else 1.0
 
-        if mean_sd/mean_diam > 0.10:
-            logging.error("Too much variation in the diameter of the targets. Something must be wrong since all target should have the same size")
-            return None  # Return None instead of raising exception
+        if diameter_variation > current_tolerance:
+            logging.debug(f"Diameter variation {diameter_variation:.3f} exceeds tolerance {current_tolerance:.3f} on attempt {attempt + 1}")
+            return None  # Early return for this attempt
 
+        # Success! Process the target coordinates
         src_points = []
         for c in contours:
             moms = cv2.moments(c)
@@ -336,6 +394,66 @@ class TargetGridROIBuilder(BaseROIBuilder):
         #[[1193.1302, 125.34195 ], [1209.0566, 857.9937  ], [  46.788918, 859.4524  ]]
 
         return sorted_src_pts
+    
+    def _log_successful_detection(self, img, result, attempt, processing_time):
+        '''
+        Log successful detection with multi-attempt context
+        '''
+        if not self._enable_diagnostics or not self._diagnostics:
+            return
+            
+        target_coordinates = [(float(pt[0]), float(pt[1])) for pt in result]
+        
+        metadata = self._diagnostics.log_detection_attempt(
+            image=img,
+            targets_found=target_coordinates,
+            expected_targets=3,
+            threshold_used=None,  # Not available in success case
+            circularity_scores=[],
+            processing_time=processing_time
+        )
+        
+        # Add multi-attempt specific metadata
+        metadata['detection_attempts'] = attempt + 1
+        metadata['used_frame_averaging'] = self._enable_frame_averaging and len(self._frame_buffer) > 0
+        
+        logging.info(f"Target detection SUCCESS on attempt {attempt + 1}: Found 3/3 targets")
+        
+        if self._save_success_images:
+            self._diagnostics.save_detection_image(
+                image=img,
+                metadata=metadata,
+                save_success=True,
+                save_failed=False
+            )
+    
+    def _log_failed_detection(self, img, processing_time):
+        '''
+        Log failed detection after all attempts
+        '''
+        if not self._enable_diagnostics or not self._diagnostics:
+            return
+            
+        metadata = self._diagnostics.log_detection_attempt(
+            image=img,
+            targets_found=[],
+            expected_targets=3,
+            threshold_used=None,
+            circularity_scores=[],
+            processing_time=processing_time
+        )
+        
+        # Add multi-attempt specific metadata
+        metadata['detection_attempts'] = self._max_detection_attempts
+        metadata['used_frame_averaging'] = self._enable_frame_averaging
+        metadata['frame_buffer_size'] = len(self._frame_buffer)
+        
+        self._diagnostics.save_detection_image(
+            image=img,
+            metadata=metadata,
+            save_success=False,
+            save_failed=True
+        )
 
     def _rois_from_img(self,img):
         '''
