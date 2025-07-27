@@ -57,11 +57,11 @@
     <div ng-if="device.status == 'running'">
         <div id="node-info" class="intro">
             <p><span class="fa fa-clock"></span> Running since {{ethoscope.start_date_time(device.time)}}
-                (i.e. {{ethoscope.elapsedtime(device.time)}} ago) - Run ID: {{device.experimental_info.run_id}}
+                (i.e. {{ethoscope.elapsedtime(device.time)}} ago) - Run ID: {{device.experimental_info.current.run_id}}
                 <br>
-                <span class="fa fa-user"></span> User: {{device.experimental_info.name}}
+                <span class="fa fa-user"></span> User: {{device.experimental_info.current.name}}
                 <br>
-                <span class="fa fa-map-marker"></span> Location: {{device.experimental_info.location}}
+                <span class="fa fa-map-marker"></span> Location: {{device.experimental_info.current.location}}
                 <br>
                 <span ng-if="device.status == 'running'" class="fas fa-camera"></span> {{device.monitor_info.fps}} FPS
                 <br>
@@ -85,9 +85,9 @@
                     {{device.autostop.split(':')[2]}} minutes
                     <br>
                 </span>
-                <span class="fa fa-user"></span> User: {{device.experimental_info.name || 'not specified'}}
+                <span class="fa fa-user"></span> User: {{device.experimental_info.current.name || 'not specified'}}
                 <br>
-                <span class="fa fa-map-marker"></span> Location: {{device.experimental_info.location || 'not specified'}}
+                <span class="fa fa-map-marker"></span> Location: {{device.experimental_info.current.location || 'not specified'}}
                 <br>
                 <span ng-if="device.CPU_temp > 70" class="fas fa-temperature-high"></span>
                 <span ng-if="device.CPU_temp <= 70" class="fas fa-temperature-low"></span> CPU temperature: {{device.CPU_temp}} &#8451

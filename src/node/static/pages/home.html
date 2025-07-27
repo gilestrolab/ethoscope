@@ -209,16 +209,16 @@
                 <span ng-show="sortType == 'time_since_backup' && sortReverse" class="fa fa-caret-up"></span>
         </th>
         <th>
-            <a href="#" ng-click="sortType = 'experimental_info.name'; sortReverse = !sortReverse">
+            <a href="#" ng-click="sortType = 'experimental_info.current.name'; sortReverse = !sortReverse">
                 User
-                <span ng-show="sortType == 'experimental_info.name' && !sortReverse" class="fa fa-caret-down"></span>
-                <span ng-show="sortType == 'experimental_info.name' && sortReverse" class="fa fa-caret-up"></span>
+                <span ng-show="sortType == 'experimental_info.current.name' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'experimental_info.current.name' && sortReverse" class="fa fa-caret-up"></span>
         </th>
         <th>
-            <a href="#" ng-click="sortType = 'experimental_info.location'; sortReverse = !sortReverse">
+            <a href="#" ng-click="sortType = 'experimental_info.current.location'; sortReverse = !sortReverse">
                 Location
-                <span ng-show="sortType == 'experimental_info.location' && !sortReverse" class="fa fa-caret-down"></span>
-                <span ng-show="sortType == 'experimental_info.location' && sortReverse" class="fa fa-caret-up"></span>
+                <span ng-show="sortType == 'experimental_info.current.location' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'experimental_info.current.location' && sortReverse" class="fa fa-caret-up"></span>
         </th>
         <th>
             <a href="#" ng-click="sortType = 'ip'; sortReverse = !sortReverse">
@@ -262,11 +262,11 @@
                 <span>{{getBackupStatusText(device)}}</span>
             </td>
             <td>
-                <span ng-if="device.experimental_info.name != ''">{{device.experimental_info.name}}</span>
+                <span ng-if="device.experimental_info.current.name != ''">{{device.experimental_info.current.name}}</span>
                 <span ng-if="device.previous_user != '' && device.status == 'stopped'" style="color:grey;">{{device.previous_user}}</span>
             </td>
             <td>
-                <span ng-if="device.experimental_info.location != ''">{{device.experimental_info.location}}</span>
+                <span ng-if="device.experimental_info.current.location != ''">{{device.experimental_info.current.location}}</span>
                 <span ng-if="device.previous_location != '' && device.status == 'stopped'" style="color:grey;">{{device.previous_location}}</span>
             <td>
                 <span ng-if="device.status == 'offline' && device.last_ip" ng-click="pokeDevice(device)" class="poke-ip-button" title="Click to attempt re-adding this device ({{device.last_ip}})">
