@@ -2,6 +2,8 @@ __author__ = 'quentin'
 
 import cv2
 import logging
+import time
+from typing import Optional, Tuple, List
 
 try:
     CV_VERSION = int(cv2.__version__.split(".")[0])
@@ -20,6 +22,7 @@ import logging
 from ethoscope.roi_builders.roi_builders import BaseROIBuilder
 from ethoscope.core.roi import ROI
 from ethoscope.utils.debug import EthoscopeException
+from ethoscope.roi_builders.target_detection_diagnostics import TargetDetectionDiagnostics
 import itertools
 
 
@@ -50,7 +53,8 @@ class TargetGridROIBuilder(BaseROIBuilder):
                                    ]}
                                    
     def __init__(self, n_rows=1, n_cols=1, top_margin=0, bottom_margin=0,
-                 left_margin=0, right_margin=0, horizontal_fill=.9, vertical_fill=.9):
+                 left_margin=0, right_margin=0, horizontal_fill=.9, vertical_fill=.9,
+                 enable_diagnostics=False, device_id="unknown", save_success_images=False):
         """
         This roi builder uses three black circles drawn on the arena (targets) to align a grid layout:
 
@@ -72,6 +76,12 @@ class TargetGridROIBuilder(BaseROIBuilder):
         :type horizontal_fill: float
         :param vertical_fill: same as vertical_fill, but horizontally.
         :type vertical_fill: float
+        :param enable_diagnostics: Enable detailed diagnostic logging and image collection.
+        :type enable_diagnostics: bool
+        :param device_id: Identifier for the ethoscope device (used in diagnostic filenames).
+        :type device_id: str
+        :param save_success_images: Whether to save images of successful detections for analysis.
+        :type save_success_images: bool
         """
 
         self._n_rows = n_rows
@@ -82,6 +92,16 @@ class TargetGridROIBuilder(BaseROIBuilder):
         self._right_margin = right_margin
         self._horizontal_fill = horizontal_fill
         self._vertical_fill = vertical_fill
+        
+        # Diagnostics configuration
+        self._enable_diagnostics = enable_diagnostics
+        self._save_success_images = save_success_images
+        self._diagnostics = None
+        
+        if self._enable_diagnostics:
+            self._diagnostics = TargetDetectionDiagnostics(device_id=device_id)
+            logging.info(f"Target detection diagnostics enabled for device {device_id}")
+        
         # if self._vertical_fill is None:
         #     self._vertical_fill = self._horizontal_fill
         # if self._right_margin is None:
@@ -168,33 +188,104 @@ class TargetGridROIBuilder(BaseROIBuilder):
         '''
         Finds the coordinates of the three blobs on the given img
         '''
+        start_time = time.time() if self._enable_diagnostics else None
+        
         map = self._find_blobs(img, self._score_targets)
         bin = np.zeros_like(map)
 
-        # as soon as we have three objects, we stop
+        # Smart threshold selection: prioritize finding exactly 3 high-quality targets
         contours = []
         best_contours = []
         best_threshold = -1
+        best_quality_score = -1
+        optimal_threshold = -1
         
-        for t in range(0, 255,1):
-            cv2.threshold(map, t, 255,cv2.THRESH_BINARY  ,bin)
+        for t in range(0, 255, 1):
+            cv2.threshold(map, t, 255, cv2.THRESH_BINARY, bin)
             if CV_VERSION == 3:
-                _, contours, h = cv2.findContours(bin,cv2.RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)
+                _, contours, h = cv2.findContours(bin, cv2.RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)
             else:
                 contours, h = cv2.findContours(bin, cv2.RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)
 
-            # Keep track of the best attempt (highest number of contours found)
-            if len(contours) > len(best_contours):
-                best_contours = contours
-                best_threshold = t
+            # Primary goal: find the first (lowest) threshold that gives exactly 3 targets
+            if len(contours) == 3 and optimal_threshold == -1:
+                # Verify these are high-quality circular targets
+                quality_scores = [self._score_targets(c, img) for c in contours]
+                if all(score > 0 for score in quality_scores):  # All targets are circular enough
+                    optimal_threshold = t
+                    best_contours = contours
+                    best_threshold = t
+                    break  # Use first good threshold, not maximum contours
+            
+            # Fallback: track the threshold with best quality targets (not just most contours)
+            if len(contours) >= 3:
+                # Score the quality of the top 3 contours by area (likely to be real targets)
+                sorted_contours = sorted(contours, key=lambda c: cv2.contourArea(c), reverse=True)
+                top_3_contours = sorted_contours[:3]
+                quality_scores = [self._score_targets(c, img) for c in top_3_contours]
+                avg_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 0
                 
-            if len(contours) == 3:
-                break
-                
-        # Use the best attempt if we couldn't find exactly 3 targets
-        if len(contours) != 3:
+                # Prefer higher quality over more contours
+                if avg_quality > best_quality_score:
+                    best_quality_score = avg_quality
+                    best_contours = top_3_contours
+                    best_threshold = t
+        
+        # Use results from optimal threshold or best quality fallback
+        if optimal_threshold != -1:
+            # Found exactly 3 targets at optimal threshold
             contours = best_contours
-            logging.warning(f"Could not find exactly 3 targets. Found {len(contours)} targets at threshold {best_threshold}")
+            threshold_used = optimal_threshold
+            logging.info(f"Found exactly 3 targets at optimal threshold {optimal_threshold}")
+        elif len(best_contours) >= 3:
+            # Use best quality targets as fallback
+            contours = best_contours
+            threshold_used = best_threshold
+            logging.warning(f"Using 3 best quality targets from threshold {best_threshold} (quality score: {best_quality_score:.2f})")
+        else:
+            # No good targets found
+            threshold_used = best_threshold
+            logging.warning(f"Could not find 3 quality targets. Found {len(best_contours)} targets at threshold {best_threshold}")
+        
+        # Calculate circularity scores for found targets
+        circularity_scores = []
+        target_coordinates = []
+        
+        if len(contours) >= 1:
+            for c in contours:
+                score = self._score_targets(c, img)
+                circularity_scores.append(score)
+                
+                # Get center coordinates
+                moms = cv2.moments(c)
+                if moms["m00"] != 0:  # Avoid division by zero
+                    x, y = moms["m10"]/moms["m00"], moms["m01"]/moms["m00"]
+                    target_coordinates.append((float(x), float(y)))
+        
+        # Enhanced diagnostics logging
+        if self._enable_diagnostics and self._diagnostics:
+            processing_time = time.time() - start_time if start_time else None
+            
+            metadata = self._diagnostics.log_detection_attempt(
+                image=img,
+                targets_found=target_coordinates,
+                expected_targets=3,
+                threshold_used=threshold_used,
+                circularity_scores=circularity_scores,
+                processing_time=processing_time
+            )
+            
+            # Save image if detection failed or if success saving is enabled
+            detection_success = len(contours) == 3
+            save_image = not detection_success or self._save_success_images
+            
+            if save_image:
+                self._diagnostics.save_detection_image(
+                    image=img,
+                    metadata=metadata,
+                    save_success=self._save_success_images,
+                    save_failed=True
+                )
             
         if len(contours) < 3:
             logging.error("There should be three targets. Only %i objects have been found. Please check that your arena has 3 circular targets visible." % (len(contours)))
