@@ -178,10 +178,18 @@ class NodeAPI(BaseAPI):
             with os.popen('git rev-parse --abbrev-ref HEAD') as df:
                 git_branch = df.read().strip() or "Not detected"
             
+            with os.popen('git rev-parse --short HEAD') as df:
+                git_commit = df.read().strip() or "Not detected"
+            
+            with os.popen('git show -s --format=%ci HEAD') as df:
+                git_date = df.read().strip() or "Not detected"
+            
             with os.popen('git status -s -uno') as df:
                 needs_update = df.read() != ""
         except Exception:
             git_branch = "Not detected"
+            git_commit = "Not detected"
+            git_date = "Not detected"
             needs_update = False
         
         # Service status
@@ -199,6 +207,8 @@ class NodeAPI(BaseAPI):
             'IPs': ips,
             'CARDS': cards,
             'GIT_BRANCH': git_branch,
+            'GIT_COMMIT': git_commit,
+            'GIT_DATE': git_date,
             'NEEDS_UPDATE': needs_update
         }
     

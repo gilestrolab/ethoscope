@@ -2211,3 +2211,27 @@ table thead th a:focus {
     }
 }
 
+/* Footer styles */
+#footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: var(--off-white);
+    border-top: 1px solid var(--light-gray);
+    padding: 8px 0;
+    font-size: 12px;
+    z-index: 1000;
+    box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.1);
+}
+
+#footer small {
+    color: var(--medium-gray);
+    font-weight: 500;
+}
+
+/* Add bottom margin to main content to prevent footer overlap */
+body {
+    margin-bottom: 40px;
+}
+

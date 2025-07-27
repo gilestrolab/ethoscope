@@ -42,6 +42,7 @@
     <script src="static/js/controllers/sensorsController.js"></script>
     <script src="static/js/controllers/usersController.js"></script>
     <script src="static/js/controllers/installationWizardController.js"></script>
+    <script src="static/js/controllers/footerController.js"></script>
 
     <script src="static/js/vendor/daterangepicker.js"></script>
     <script src="static/js/vendor/angular-daterangepicker.js"></script>
@@ -78,7 +79,9 @@
 
     </div>
 
-    <div id="footer"></div>
+    <div id="footer" ng-controller="FooterController" class="text-center text-muted">
+        <small>Git: {{gitInfo.branch}} ({{gitInfo.commit}}) - {{gitInfo.date}}</small>
+    </div>
 
 </body>
 
