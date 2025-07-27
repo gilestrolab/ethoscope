@@ -3,62 +3,11 @@
 
     var app = angular.module('flyApp');
 
-    // Custom tooltip directive for ethoscope interface
-    app.directive('tooltip', function($compile) {
-        return {
-            restrict: 'A',
-            link: function(scope, element, attrs) {
-                // Create tooltip element
-                const tooltipElement = angular.element('<div class="custom-tooltip">{{tooltipText}}</div>');
-                tooltipElement.addClass('tooltip-hidden');
-                element.after(tooltipElement);
-
-                // Set tooltip text from the `tooltip` attribute
-                let tooltipText = attrs.tooltip || '';
-                scope.tooltipText = tooltipText;
-
-                // Compile the tooltip element to enable Angular binding
-                $compile(tooltipElement)(scope);
-
-                // Tooltip visibility logic
-                const showTooltip = () => {
-                    tooltipElement.removeClass('tooltip-hidden');
-                    tooltipElement.addClass('tooltip-visible');
-                };
-
-                const hideTooltip = () => {
-                    tooltipElement.removeClass('tooltip-visible');
-                    tooltipElement.addClass('tooltip-hidden');
-                };
-
-                // Attach mouseover and mouseleave events for tooltip visibility
-                element.on('mouseenter', () => {
-                    scope.$apply(showTooltip);
-                });
-
-                element.on('mouseleave', () => {
-                    scope.$apply(hideTooltip);
-                });
-
-                // Clean up event listeners on destroy
-                scope.$on('$destroy', () => {
-                    element.off('mouseenter');
-                    element.off('mouseleave');
-                });
-            }
-        };
-    });
-
-    // URL sanitization configuration
-    app.config(['$compileProvider', function($compileProvider) {
-        $compileProvider.aHrefSanitizationWhitelist(/^\s*(https?|ftp|mailto|file|sms|tel|ssh):/);
-    }]);
-
     /**
      * Ethoscope Controller - Controls individual ethoscope device interface
      * Manages tracking, recording, machine settings, and real-time updates
      */
-    app.controller('ethoscopeController', function($scope, $http, $routeParams, $interval) {
+    app.controller('ethoscopeController', function($scope, $http, $routeParams, $interval, ethoscopeBackupService, ethoscopeFormService) {
 
         // ===========================
         // INITIALIZATION & VARIABLES
@@ -85,7 +34,7 @@
 
         // Backup status cache
         $scope.backupSummary = null; // Cached backup summary to prevent digest loops
-        var lastBackupStatusLoad = 0; // Timestamp of last backup status load
+        $scope.lastBackupStatusLoad = 0; // Timestamp of last backup status load
 
         // UI state variables
         $scope.showLog = false;
@@ -261,7 +210,7 @@
                         $scope.isActive = ($scope.device.name.split("_").pop() !== "000");
 
                         // Update backup summary cache
-                        updateBackupSummary();
+                        ethoscopeBackupService.updateBackupSummary($scope);
 
                         // CRITICAL: Display timestamp immediately on load
                         updateTimestampDisplay(data.data);
@@ -313,10 +262,10 @@
                         update_machine: userOptions.update_machine || {}
                     };
 
-                    // Initialize selected options with default values
-                    initializeSelectedOptions('tracking', userOptions.tracking || {});
-                    initializeSelectedOptions('recording', userOptions.recording || {});
-                    initializeSelectedOptions('update_machine', userOptions.update_machine || {});
+                    // Initialize selected options with default values using service
+                    ethoscopeFormService.initializeSelectedOptions('tracking', userOptions.tracking || {}, $scope);
+                    ethoscopeFormService.initializeSelectedOptions('recording', userOptions.recording || {}, $scope);
+                    ethoscopeFormService.initializeSelectedOptions('update_machine', userOptions.update_machine || {}, $scope);
 
                     // Check database availability for append functionality
                     checkDatabaseAvailability();
@@ -353,7 +302,7 @@
                     $scope.isActive = ($scope.device.name.split("_").pop() !== "000");
 
                     // Update backup summary cache
-                    updateBackupSummary();
+                    ethoscopeBackupService.updateBackupSummary($scope);
 
                     // Initialize image URLs immediately for fast loading
                     var timestamp = Math.floor(new Date().getTime() / 30000.0) * 30;
@@ -379,666 +328,89 @@
                 });
         }
 
-        /**
-         * Initialize form options with default values
-         * @param {string} optionType - Type of options (tracking, recording, update_machine)
-         * @param {Object} data - Raw options data from server
-         */
-        function initializeSelectedOptions(optionType, data) {
-            $scope.selected_options[optionType] = {};
-
-            // Get keys in server-provided order
-            var keys = Object.keys(data);
-
-            for (var i = 0; i < keys.length; i++) {
-                var key = keys[i];
-                if (!data[key] || !data[key][0]) continue;
-
-                $scope.selected_options[optionType][key] = {
-                    name: data[key][0].name,
-                    arguments: {}
-                };
-
-                // Initialize arguments with default values
-                var args = data[key][0].arguments || [];
-                for (var j = 0; j < args.length; j++) {
-                    var arg = args[j];
-
-                    if (arg.type === 'date_range') {
-                        let startDate = null;
-                        let endDate = null;
-                        let formatted = arg.default || '';
-
-                        if (formatted) {
-                            const dates = formatted.split(' > ');
-                            if (dates.length === 2) {
-                                const m1 = moment(dates[0], 'YYYY-MM-DD HH:mm:ss');
-                                const m2 = moment(dates[1], 'YYYY-MM-DD HH:mm:ss');
-                                if (m1.isValid() && m2.isValid()) {
-                                    startDate = m1;
-                                    endDate = m2;
-                                }
-                            }
-                        }
-
-                        // To prevent the error, if startDate is still null, initialize it.
-                        if (startDate === null) {
-                            startDate = moment();
-                            endDate = moment();
-                            // Also clear formatted string if we are using a default moment object
-                            // because there was no valid default.
-                            formatted = '';
-                        }
-
-                        $scope.selected_options[optionType][key].arguments[arg.name] = {
-                            startDate: startDate,
-                            endDate: endDate,
-                            formatted: formatted
-                        };
-                    } else {
-                        // Standard default value assignment
-                        $scope.selected_options[optionType][key].arguments[arg.name] = arg.default;
-                    }
-                }
-            }
-        }
-
-
         // ===========================
-        // FORM MANAGEMENT FUNCTIONS
+        // FORM MANAGEMENT FUNCTIONS (Using Service)
         // ===========================
 
         /**
          * Update user option arguments when selection changes
-         * @param {string} optionType - Type of option (tracking, recording, update_machine)
-         * @param {string} name - Option category name
-         * @param {string} selectedOptionName - The specific option name that was selected (optional)
          */
         $scope.ethoscope.update_user_options = function(optionType, name, selectedOptionName) {
-            const data = $scope.user_options[optionType];
-            if (!data || !data[name]) return;
-
-            // Use $timeout to ensure proper timing and digest cycle
-            setTimeout(function() {
-                // Ensure the selected_options structure exists
-                if (!$scope.selected_options[optionType]) {
-                    $scope.selected_options[optionType] = {};
-                }
-                if (!$scope.selected_options[optionType][name]) {
-                    $scope.selected_options[optionType][name] = {
-                        name: '',
-                        arguments: {}
-                    };
-                }
-
-                // If selectedOptionName is provided, use it; otherwise use current selection
-                const targetOptionName = selectedOptionName || $scope.selected_options[optionType][name].name;
-
-                // Update the selected option name (to sync with ng-model)
-                $scope.selected_options[optionType][name].name = targetOptionName;
-
-                // Find the selected option
-                for (let i = 0; i < data[name].length; i++) {
-                    if (data[name][i].name === targetOptionName) {
-                        // Reset and populate arguments for the selected option
-                        $scope.selected_options[optionType][name].arguments = {};
-
-                        const args = data[name][i].arguments || [];
-                        for (let j = 0; j < args.length; j++) {
-                            const argument = args[j];
-
-                            if (argument.type === 'datetime') {
-                                // Handle datetime arguments with moment.js formatting
-                                if (typeof moment !== 'undefined') {
-                                    // Ensure moment.js locale is configured
-                                    ensureMomentLocale();
-
-                                    // Validate the default value before using it
-                                    var defaultValue = argument.default;
-                                    var momentObj = moment(defaultValue);
-
-                                    if (momentObj.isValid()) {
-                                        $scope.selected_options[optionType][name].arguments[argument.name] = [
-                                            momentObj.format('LLLL'),
-                                            defaultValue
-                                        ];
-                                    } else {
-                                        // Use current time if default is invalid
-                                        var fallbackMoment = moment();
-                                        $scope.selected_options[optionType][name].arguments[argument.name] = [
-                                            fallbackMoment.format('LLLL'),
-                                            fallbackMoment.unix()
-                                        ];
-                                        console.warn('Invalid datetime default value for ' + argument.name + ':', defaultValue, 'Using current time instead.');
-                                    }
-                                } else {
-                                    // Fallback if moment isn't available
-                                    $scope.selected_options[optionType][name].arguments[argument.name] = argument.default;
-                                }
-                            } else {
-                                // Set default for other argument types
-                                $scope.selected_options[optionType][name].arguments[argument.name] = argument.default;
-                            }
-                        }
-                        break;
-                    }
-                }
-
-                // Special handling for MultiStimulator
-                if (optionType === 'tracking' && name === 'interactor' && targetOptionName === 'MultiStimulator') {
-                    // Initialize MultiStimulator configuration
-                    if (!$scope.selected_options[optionType][name].arguments.stimulator_sequence) {
-                        $scope.selected_options[optionType][name].arguments.stimulator_sequence = [];
-                        // Add one default stimulator to start
-                        setTimeout(function() {
-                            $scope.addNewStimulator();
-                            try {
-                                $scope.$apply();
-                            } catch (e) {
-                                // Digest already in progress
-                            }
-                        }, 100);
-                    }
-                }
-
-                // Force Angular to update the view
-                try {
-                    $scope.$apply();
-                } catch (e) {
-                    // Digest already in progress, no need to apply
-                }
-            }, 0);
+            ethoscopeFormService.updateUserOptions(optionType, name, selectedOptionName, $scope);
         };
 
         // Convenience methods for different option types
         $scope.ethoscope.update_user_options.tracking = function(name, selectedOptionName) {
-            $scope.ethoscope.update_user_options('tracking', name, selectedOptionName);
+            ethoscopeFormService.updateUserOptions('tracking', name, selectedOptionName, $scope);
         };
 
         $scope.ethoscope.update_user_options.recording = function(name, selectedOptionName) {
-            $scope.ethoscope.update_user_options('recording', name, selectedOptionName);
+            ethoscopeFormService.updateUserOptions('recording', name, selectedOptionName, $scope);
         };
 
         $scope.ethoscope.update_user_options.update_machine = function(name, selectedOptionName) {
-            $scope.ethoscope.update_user_options('update_machine', name, selectedOptionName);
+            ethoscopeFormService.updateUserOptions('update_machine', name, selectedOptionName, $scope);
         };
 
-        // ===========================
-        // MULTI-STIMULATOR FUNCTIONS
-        // ===========================
-
-        /**
-         * Get the selected stimulator option object
-         * @param {string} name - The option category name (should be 'interactor')
-         * @returns {Object} The selected stimulator option object
-         */
+        // Multi-stimulator functions (delegated to service)
         $scope.getSelectedStimulatorOption = function(name) {
-            if (!$scope.user_options.tracking || !$scope.user_options.tracking[name] || !$scope.selected_options.tracking || !$scope.selected_options.tracking[name]) {
-                return {};
-            }
-
-            var selectedName = $scope.selected_options.tracking[name]['name'];
-            if (!selectedName) return {};
-
-            var options = $scope.user_options.tracking[name];
-            for (var i = 0; i < options.length; i++) {
-                if (options[i].name === selectedName) {
-                    return options[i];
-                }
-            }
-            return {};
+            return ethoscopeFormService.getSelectedStimulatorOption(name, $scope);
         };
 
-        /**
-         * Get stimulator arguments for a specific stimulator class
-         * @param {string} className - The stimulator class name
-         * @returns {Array} Array of argument definitions
-         */
         $scope.getStimulatorArguments = function(className) {
-            if (!$scope.user_options.tracking || !$scope.user_options.tracking.interactor) {
-                return [];
-            }
-
-            var options = $scope.user_options.tracking.interactor;
-            for (var i = 0; i < options.length; i++) {
-                if (options[i].name === className) {
-                    return options[i].arguments || [];
-                }
-            }
-            return [];
+            return ethoscopeFormService.getStimulatorArguments(className, $scope);
         };
 
-        /**
-         * Add a new stimulator to the sequence
-         */
         $scope.addNewStimulator = function() {
-            if (!$scope.selected_options.tracking) {
-                $scope.selected_options.tracking = {};
-            }
-            if (!$scope.selected_options.tracking.interactor) {
-                $scope.selected_options.tracking.interactor = {
-                    name: 'MultiStimulator',
-                    arguments: {}
-                };
-            }
-            if (!$scope.selected_options.tracking.interactor.arguments.stimulator_sequence) {
-                $scope.selected_options.tracking.interactor.arguments.stimulator_sequence = [];
-            }
-
-            var newStimulator = {
-                class_name: '',
-                arguments: {},
-                date_range: ''
-            };
-
-            $scope.selected_options.tracking.interactor.arguments.stimulator_sequence.push(newStimulator);
+            ethoscopeFormService.addNewStimulator($scope);
         };
 
-        /**
-         * Remove a stimulator from the sequence
-         * @param {number} index - Index of stimulator to remove
-         */
         $scope.removeStimulator = function(index) {
-            if ($scope.selected_options.tracking &&
-                $scope.selected_options.tracking.interactor &&
-                $scope.selected_options.tracking.interactor.arguments &&
-                $scope.selected_options.tracking.interactor.arguments.stimulator_sequence) {
-
-                $scope.selected_options.tracking.interactor.arguments.stimulator_sequence.splice(index, 1);
-            }
+            ethoscopeFormService.removeStimulator(index, $scope);
         };
 
-        /**
-         * Update stimulator arguments when stimulator type changes
-         * @param {number} index - Index of stimulator in sequence
-         */
         $scope.updateStimulatorArguments = function(index) {
-            var sequence = $scope.selected_options.tracking.interactor.arguments.stimulator_sequence;
-            if (!sequence || !sequence[index]) return;
-
-            var stimulator = sequence[index];
-            var className = stimulator.class_name;
-
-            if (!className) {
-                stimulator.arguments = {};
-                return;
-            }
-
-            // Get the argument definitions for this stimulator class
-            var argDefs = $scope.getStimulatorArguments(className);
-            var newArguments = {};
-
-            // Initialize arguments with default values
-            for (var i = 0; i < argDefs.length; i++) {
-                var argDef = argDefs[i];
-                if (argDef.type !== 'date_range') { // Skip date_range as it's handled separately
-                    newArguments[argDef.name] = argDef.default || '';
-                }
-            }
-
-            stimulator.arguments = newArguments;
+            ethoscopeFormService.updateStimulatorArguments(index, $scope);
         };
 
-        /**
-         * Initialize MultiStimulator configuration when selected
-         */
-        $scope.initializeMultiStimulator = function() {
-            if (!$scope.selected_options.tracking.interactor.arguments.stimulator_sequence) {
-                $scope.selected_options.tracking.interactor.arguments.stimulator_sequence = [];
-                // Add one default stimulator to start
-                $scope.addNewStimulator();
-            }
-        };
-
-        // ===========================
-        // STIMULATOR SEQUENCE FUNCTIONS
-        // ===========================
-
-        /**
-         * Add a new stimulator to the sequence
-         */
         $scope.addStimulatorToSequence = function() {
-            var newStimulator = {
-                name: '',
-                arguments: {}
-            };
-
-            $scope.stimulatorSequence.push(newStimulator);
-
-            // Set a default interactor selection to avoid validation issues
-            if (!$scope.selected_options.tracking) {
-                $scope.selected_options.tracking = {};
-            }
-            if (!$scope.selected_options.tracking.interactor) {
-                $scope.selected_options.tracking.interactor = {
-                    name: 'DefaultStimulator',
-                    arguments: {}
-                };
-            }
+            ethoscopeFormService.addStimulatorToSequence($scope);
         };
 
-        /**
-         * Remove a stimulator from the sequence
-         * @param {number} index - Index of stimulator to remove
-         */
         $scope.removeStimulatorFromSequence = function(index) {
-            $scope.stimulatorSequence.splice(index, 1);
+            ethoscopeFormService.removeStimulatorFromSequence(index, $scope);
         };
 
-        /**
-         * Update stimulator options when selection changes
-         * @param {number} index - Index of stimulator in sequence
-         */
         $scope.updateStimulatorInSequence = function(index) {
-            if (!$scope.stimulatorSequence[index]) return;
-
-            var stimulator = $scope.stimulatorSequence[index];
-            var stimulatorName = stimulator.name;
-
-            if (!stimulatorName) {
-                stimulator.arguments = {};
-                return;
-            }
-
-            // Get the argument definitions for this stimulator
-            var argDefs = $scope.getStimulatorArguments(stimulatorName);
-            var newArguments = {};
-
-            // Initialize arguments with default values
-            for (var i = 0; i < argDefs.length; i++) {
-                var argDef = argDefs[i];
-                if (argDef.type === 'date_range' && (argDef.default === '' || !argDef.default)) {
-                    // Don't set date_range arguments with empty defaults - leave undefined to avoid daterangepicker errors
-                    continue;
-                }
-                newArguments[argDef.name] = argDef.default || '';
-            }
-
-            stimulator.arguments = newArguments;
+            ethoscopeFormService.updateStimulatorInSequence(index, $scope);
         };
 
-        /**
-         * Get interactor option by name
-         * @param {string} name - Interactor name
-         * @returns {Object} Interactor option object
-         */
         $scope.getInteractorOptionByName = function(name) {
-            if (!$scope.user_options.tracking || !$scope.user_options.tracking.interactor) {
-                return {};
-            }
-
-            var options = $scope.user_options.tracking.interactor;
-            for (var i = 0; i < options.length; i++) {
-                if (options[i].name === name) {
-                    return options[i];
-                }
-            }
-            return {};
+            return ethoscopeFormService.getInteractorOptionByName(name, $scope);
         };
 
+        $scope.isRoiTemplateSelected = function() {
+            return ethoscopeFormService.isRoiTemplateSelected($scope);
+        };
+
+        $scope.isUserSelected = function() {
+            return ethoscopeFormService.isUserSelected($scope);
+        };
 
         // ===========================
-        // UTILITY FUNCTIONS
+        // BACKUP STATUS FUNCTIONS (Using Service)
         // ===========================
 
-        /**
-         * Manage loading spinner display
-         * @param {string} action - 'start' or 'stop'
-         */
-        function manageSpinner(action) {
-            if (action === 'start' && starting_tracking) {
-                spStart = new Spinner(opts).spin();
-                starting_tracking.appendChild(spStart.el);
-            } else if (action === 'stop' && spStart) {
-                spStart.stop();
-                spStart = null;
-            }
+        function loadBackupInfo(forceLoad) {
+            ethoscopeBackupService.loadBackupInfo(device_id, $scope, forceLoad);
         }
 
-        /**
-         * Get sensor IP address by location
-         * @param {string} location - Sensor location name
-         * @returns {string} Sensor IP address
-         */
-        $scope.get_ip_of_sensor = function(location) {
-            if (!location || !$scope.node.sensors) return null;
-
-            location = location.replace(/\s+/g, '_');
-            for (var sensor in $scope.node.sensors) {
-                if ($scope.node.sensors[sensor].location === location) {
-                    return $scope.node.sensors[sensor].ip;
-                }
-            }
-            return null;
-        };
-
-        /**
-         * Check if device has a valid (non-default) interactor
-         * @param {Object} device - Device object
-         * @returns {boolean} True if device has valid interactor
-         */
-        $scope.hasValidInteractor = function(device) {
-            return (
-                device.status === 'running' &&
-                device.experimental_info &&
-                device.experimental_info.current &&
-                device.experimental_info.current.interactor &&
-                device.experimental_info.current.interactor.name !== "<class 'ethoscope.stimulators.stimulators.DefaultStimulator'>"
-            );
-        };
-
-        // ===========================
-        // BACKUP STATUS FUNCTIONS
-        // ===========================
-
-        /**
-         * Load backup information from the device-specific endpoint
-         */
-        function loadBackupInfo(forceLoad) {
-            // Throttle backup info requests to maximum once every 10 seconds (unless forced)
-            var now = Date.now();
-            if (!forceLoad && now - lastBackupStatusLoad < 10000) {
-                return;
-            }
-            lastBackupStatusLoad = now;
-
-            // Use device-specific backup endpoint (GET request)
-            $http.get('/device/' + device_id + '/backup', {
-                    timeout: 5000
-                })
-                .then(function(response) {
-                    var backupData = response.data;
-                    console.log('DEBUG: Received backup data from endpoint:', backupData);
-                    
-                    // Store backup info directly - the endpoint returns the complete backup status
-                    $scope.device.backup_info = backupData;
-                    
-                    // Transform the data to match the expected frontend structure
-                    if (backupData.backup_status) {
-                        // Deep copy the backup_status to avoid modifying the original
-                        var backupTypes = JSON.parse(JSON.stringify(backupData.backup_status));
-                        
-                        // Enhance MySQL backup status with last_backup date from MariaDB data
-                        if (backupTypes.mysql && backupTypes.mysql.available && 
-                            backupData.databases && backupData.databases.MariaDB) {
-                            
-                            // Find the most recent MariaDB database date
-                            var latestDate = 0;
-                            for (var dbName in backupData.databases.MariaDB) {
-                                if (backupData.databases.MariaDB.hasOwnProperty(dbName)) {
-                                    var dbInfo = backupData.databases.MariaDB[dbName];
-                                    if (dbInfo.date && dbInfo.date > latestDate) {
-                                        latestDate = dbInfo.date;
-                                    }
-                                }
-                            }
-                            
-                            if (latestDate > 0) {
-                                backupTypes.mysql.last_backup = latestDate;
-                                
-                                // Also add size information from MariaDB data
-                                var totalSize = 0;
-                                for (var dbName in backupData.databases.MariaDB) {
-                                    if (backupData.databases.MariaDB.hasOwnProperty(dbName)) {
-                                        var dbInfo = backupData.databases.MariaDB[dbName];
-                                        if (dbInfo.db_size_bytes) {
-                                            totalSize += dbInfo.db_size_bytes;
-                                        }
-                                    }
-                                }
-                                backupTypes.mysql.size = totalSize;
-                                
-                                console.log('DEBUG: Enhanced MySQL backup status - last_backup:', latestDate, 'size:', totalSize);
-                            }
-                        }
-                        
-                        $scope.device.backup_status_detailed = {
-                            backup_types: backupTypes,
-                            individual_files: {}
-                        };
-                        
-                        // Transform SQLite individual files data
-                        if (backupData.databases && backupData.databases.SQLite) {
-                            var sqliteFiles = [];
-                            
-                            // Local utility function for file size formatting
-                            function formatBytes(bytes) {
-                                if (!bytes || bytes === 0) return '0 B';
-                                const k = 1024;
-                                const sizes = ['B', 'KB', 'MB', 'GB'];
-                                const i = Math.floor(Math.log(bytes) / Math.log(k));
-                                return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-                            }
-                            
-                            for (var fileName in backupData.databases.SQLite) {
-                                if (backupData.databases.SQLite.hasOwnProperty(fileName)) {
-                                    var fileInfo = backupData.databases.SQLite[fileName];
-                                    
-                                    // Check for enhanced data sources
-                                    var isRsyncEnhanced = fileInfo.rsync_enhanced || false;
-                                    var isFilesystemEnhanced = fileInfo.filesystem_enhanced || false;
-                                    var enhancementSource = '';
-                                    
-                                    if (isRsyncEnhanced) {
-                                        enhancementSource = 'rsync';
-                                    } else if (isFilesystemEnhanced) {
-                                        enhancementSource = 'filesystem';
-                                    }
-                                    
-                                    // Use enhanced size_human if available, otherwise format filesize
-                                    var sizeHuman = fileInfo.size_human || formatBytes(fileInfo.filesize || 0);
-                                    
-                                    sqliteFiles.push({
-                                        name: fileName,
-                                        modified: fileInfo.date || 0,
-                                        size_human: sizeHuman,
-                                        size_bytes: fileInfo.filesize || 0,
-                                        status: fileInfo.file_exists ? 'backed-up' : 'missing',
-                                        path: fileInfo.path || '',
-                                        db_status: fileInfo.db_status || 'unknown',
-                                        enhancement_source: enhancementSource,
-                                        is_enhanced: isRsyncEnhanced || isFilesystemEnhanced
-                                    });
-                                }
-                            }
-                            
-                            $scope.device.backup_status_detailed.individual_files.sqlite = {
-                                files: sqliteFiles
-                            };
-                            
-                            console.log('DEBUG: Created individual SQLite files structure:', sqliteFiles.length, 'files');
-                        }
-                        
-                        // Process video files if available from enhanced rsync data
-                        if (backupData.video_files || (backupData.backup_status && backupData.backup_status.video) || 
-                            (backupData.databases && backupData.databases.Video)) {
-                            
-                            var videoFileArray = [];
-                            
-                            // Process video data from databases.Video structure (preferred method)
-                            if (backupData.databases && backupData.databases.Video && backupData.databases.Video.video_backup) {
-                                var videoBackup = backupData.databases.Video.video_backup;
-                                var videoFiles = videoBackup.files || {};
-                                
-                                for (var filename in videoFiles) {
-                                    if (videoFiles.hasOwnProperty(filename)) {
-                                        var fileInfo = videoFiles[filename];
-                                        
-                                        // Check enhancement source
-                                        var isRsyncEnhanced = fileInfo.rsync_enhanced || false;
-                                        var isFilesystemEnhanced = fileInfo.filesystem_enhanced || false;
-                                        var enhancementSource = '';
-                                        
-                                        if (isRsyncEnhanced) {
-                                            enhancementSource = 'rsync';
-                                        } else if (isFilesystemEnhanced) {
-                                            enhancementSource = 'filesystem';
-                                        }
-                                        
-                                        videoFileArray.push({
-                                            name: filename,
-                                            size_bytes: fileInfo.size_bytes || 0,
-                                            size_human: fileInfo.size_human || formatBytes(fileInfo.size_bytes || 0),
-                                            is_h264: filename.endsWith('.h264'),
-                                            path: fileInfo.path || '',
-                                            enhancement_source: enhancementSource,
-                                            is_enhanced: isRsyncEnhanced || isFilesystemEnhanced
-                                        });
-                                    }
-                                }
-                                
-                                console.log('DEBUG: Processed video data from databases.Video:', videoFileArray.length, 'files');
-                            }
-                            
-                            $scope.device.backup_status_detailed.individual_files.videos = {
-                                files: videoFileArray
-                            };
-                            
-                            // If no video data in databases.Video, fall back to enhanced rsync status
-                            if (videoFileArray.length === 0) {
-                                loadEnhancedVideoInfo();
-                            }
-                        }
-                        
-                        // Also preserve the legacy databases structure for MariaDB (since it's not in individual_files yet)
-                        if (backupData.databases) {
-                            $scope.device.databases = backupData.databases;
-                        }
-                    }
-                    
-                    updateBackupSummary();
-                })
-                .catch(function(error) {
-                    console.error('Failed to load backup info:', error);
-                    // Don't overwrite existing backup info on error - just log the error
-                    // This prevents backup visualization from disappearing if there's a temporary network issue
-                    if (!$scope.device.backup_info && !$scope.device.backup_status_detailed) {
-                        // Only set empty backup info if we have no backup data at all
-                        $scope.device.backup_info = {
-                            backup_status: {
-                                mysql: {
-                                    available: false,
-                                    database_count: 0,
-                                    databases: []
-                                },
-                                sqlite: {
-                                    available: false,
-                                    database_count: 0,
-                                    databases: []
-                                },
-                                total_databases: 0
-                            },
-                            recommended_backup_type: null
-                        };
-                        updateBackupSummary();
-                    }
-                });
+        function updateBackupSummary() {
+            ethoscopeBackupService.updateBackupSummary($scope);
         }
 
         /**
          * Get the keys of an object (helper for ng-repeat)
-         * @param {Object} obj - Object to get keys from
-         * @returns {Array} Array of object keys
          */
         $scope.getObjectKeys = function(obj) {
             return obj ? Object.keys(obj) : [];
@@ -1046,8 +418,6 @@
 
         /**
          * Format file size in human readable format
-         * @param {number} bytes - File size in bytes
-         * @returns {string} Formatted file size
          */
         $scope.formatFileSize = function(bytes) {
             if (!bytes || bytes === 0) return '0 B';
@@ -1061,8 +431,6 @@
 
         /**
          * Format date from Unix timestamp
-         * @param {number} timestamp - Unix timestamp
-         * @returns {string} Formatted date string
          */
         $scope.formatDate = function(timestamp) {
             if (!timestamp) return 'Unknown';
@@ -1073,14 +441,11 @@
 
         /**
          * Extract datetime from database filename
-         * @param {string} filename - Database filename like "device_YYYY-MM-DD_HH-MM-SS.db"
-         * @returns {string} Formatted datetime or original filename if no pattern match
          */
         $scope.extractDateTimeFromFilename = function(filename) {
             if (!filename) return 'Unknown';
 
             // Pattern to match database files like "device_2024-01-15_14-30-45.db"
-            // or "ethoscope_YYYY-MM-DD_HH-MM-SS.db" or similar patterns
             var dateTimePattern = /(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})/;
             var match = filename.match(dateTimePattern);
 
@@ -1108,8 +473,6 @@
 
         /**
          * Get time since backup in human readable format
-         * @param {number} timestamp - Unix timestamp of backup
-         * @returns {string} Formatted time since backup
          */
         $scope.getTimeSinceBackup = function(timestamp) {
             if (!timestamp) return 'Never';
@@ -1133,9 +496,6 @@
 
         /**
          * Get backup status class for progress bar
-         * @param {Object} dbInfo - Database information object or backup type data
-         * @param {string} backupType - Type of backup (mysql, sqlite, video) for backup info
-         * @returns {string} CSS class name
          */
         $scope.getBackupBarClass = function(dbInfo, backupType) {
             if (!dbInfo) return 'unknown';
@@ -1166,9 +526,6 @@
 
         /**
          * Get backup progress style for the progress bar fill
-         * @param {Object} dbInfo - Database information object
-         * @param {string} dbType - Database type ('sqlite', 'mariadb', 'mysql', 'video')
-         * @returns {Object} Style object for ng-style
          */
         $scope.getBackupProgressStyle = function(dbInfo, dbType) {
             if (!dbInfo) return {
@@ -1213,10 +570,7 @@
         };
 
         /**
-         * Get backup status text for tooltip - shows file path/name when available
-         * @param {Object} dbInfo - Database information object
-         * @param {string} backupType - Type of backup (mysql, sqlite, video) for backup info
-         * @returns {string} Status text with file path/name
+         * Get backup status text for tooltip
          */
         $scope.getBackupStatusText = function(dbInfo, backupType) {
             if (!dbInfo) return 'Unknown';
@@ -1268,7 +622,6 @@
 
         /**
          * Get overall backup status class for the toggle icon
-         * @returns {string} CSS class name
          */
         $scope.getBackupStatusClass = function() {
             if (!$scope.backupSummary) {
@@ -1298,149 +651,7 @@
         };
 
         /**
-         * Update backup summary cache - called when device data changes
-         */
-        function updateBackupSummary() {
-            // Use device backup info if available, otherwise fall back to legacy device.databases
-            if ($scope.device && $scope.device.backup_info) {
-                updateBackupSummaryFromBackupInfo();
-            } else if ($scope.device && $scope.device.databases) {
-                updateBackupSummaryFromLegacyData();
-            } else {
-                $scope.backupSummary = null;
-            }
-        }
-
-        /**
-         * Update backup summary from device backup info endpoint
-         */
-        function updateBackupSummaryFromBackupInfo() {
-            const backupStatus = $scope.device.backup_info.backup_status;
-            if (!backupStatus) {
-                console.log('DEBUG: No backup_status found in backup_info');
-                $scope.backupSummary = null;
-                return;
-            }
-
-            let total = backupStatus.total_databases || 0;
-            let backedUp = 0;
-            let missing = 0;
-            let processing = 0;
-
-            // Count available backup types
-            if (backupStatus.mysql && backupStatus.mysql.available) {
-                backedUp += backupStatus.mysql.database_count || 0;
-            }
-            if (backupStatus.sqlite && backupStatus.sqlite.available) {
-                backedUp += backupStatus.sqlite.database_count || 0;
-            }
-
-            // Calculate missing
-            missing = total - backedUp;
-
-            let overallStatus = 'Unknown';
-            if (total === 0) {
-                overallStatus = 'No Databases';
-            } else if (backedUp === total) {
-                overallStatus = 'All Backed Up';
-            } else if (backedUp === 0) {
-                overallStatus = 'None Backed Up';
-            } else {
-                overallStatus = 'Partial Backup';
-            }
-
-            console.log('DEBUG: Updated backup summary from backup info:', {
-                total: total,
-                backedUp: backedUp,
-                missing: missing,
-                overallStatus: overallStatus,
-                useDetailedStatus: true,
-                hasIndividualFiles: $scope.device.backup_status_detailed && 
-                                   $scope.device.backup_status_detailed.individual_files && 
-                                   $scope.device.backup_status_detailed.individual_files.sqlite
-            });
-
-            $scope.backupSummary = {
-                total: total,
-                backedUp: backedUp,
-                missing: missing,
-                processing: processing,
-                overallStatus: overallStatus,
-                useBackupInfo: true,
-                useDetailedStatus: true,
-                totalSize: 0 // Will be calculated if needed
-            };
-        }
-
-        /**
-         * Update backup summary from legacy device databases data (fallback)
-         */
-        function updateBackupSummaryFromLegacyData() {
-            let total = 0;
-            let backedUp = 0;
-            let missing = 0;
-            let processing = 0;
-
-            // Count SQLite databases
-            if ($scope.device.databases.SQLite) {
-                for (let dbName in $scope.device.databases.SQLite) {
-                    if ($scope.device.databases.SQLite.hasOwnProperty(dbName)) {
-                        total++;
-                        const dbInfo = $scope.device.databases.SQLite[dbName];
-
-                        if (dbInfo.file_exists === true) {
-                            backedUp++;
-                        } else if (dbInfo.file_exists === false) {
-                            missing++;
-                        } else if (dbInfo.db_status === 'tracking') {
-                            processing++;
-                        }
-                    }
-                }
-            }
-
-            // Count MariaDB databases
-            if ($scope.device.databases.MariaDB) {
-                for (let dbName in $scope.device.databases.MariaDB) {
-                    if ($scope.device.databases.MariaDB.hasOwnProperty(dbName)) {
-                        total++;
-                        const dbInfo = $scope.device.databases.MariaDB[dbName];
-
-                        if (dbInfo.file_exists === true) {
-                            backedUp++;
-                        } else if (dbInfo.file_exists === false) {
-                            missing++;
-                        } else if (dbInfo.db_status === 'tracking') {
-                            processing++;
-                        }
-                    }
-                }
-            }
-
-            let overallStatus = 'Unknown';
-            if (total === 0) {
-                overallStatus = 'No Databases';
-            } else if (backedUp === total) {
-                overallStatus = 'All Backed Up';
-            } else if (backedUp === 0) {
-                overallStatus = 'None Backed Up';
-            } else {
-                overallStatus = 'Partial Backup';
-            }
-
-            $scope.backupSummary = {
-                total: total,
-                backedUp: backedUp,
-                missing: missing,
-                processing: processing,
-                overallStatus: overallStatus,
-                useDetailedStatus: false
-            };
-        }
-
-        /**
          * Get backup summary statistics (cached)
-         * @returns {Object} Summary object with totals and status
          */
         $scope.getBackupSummary = function() {
             return $scope.backupSummary;
@@ -1448,7 +659,6 @@
 
         /**
          * Get overall status CSS class
-         * @returns {string} CSS class name
          */
         $scope.getOverallStatusClass = function() {
             if (!$scope.backupSummary) return 'overall-status-unknown';
@@ -1475,10 +685,53 @@
             }
         };
 
+        // ===========================
+        // UTILITY FUNCTIONS
+        // ===========================
+
+        /**
+         * Manage loading spinner display
+         */
+        function manageSpinner(action) {
+            if (action === 'start' && starting_tracking) {
+                spStart = new Spinner(opts).spin();
+                starting_tracking.appendChild(spStart.el);
+            } else if (action === 'stop' && spStart) {
+                spStart.stop();
+                spStart = null;
+            }
+        }
+
+        /**
+         * Get sensor IP address by location
+         */
+        $scope.get_ip_of_sensor = function(location) {
+            if (!location || !$scope.node.sensors) return null;
+
+            location = location.replace(/\s+/g, '_');
+            for (var sensor in $scope.node.sensors) {
+                if ($scope.node.sensors[sensor].location === location) {
+                    return $scope.node.sensors[sensor].ip;
+                }
+            }
+            return null;
+        };
+
+        /**
+         * Check if device has a valid (non-default) interactor
+         */
+        $scope.hasValidInteractor = function(device) {
+            return (
+                device.status === 'running' &&
+                device.experimental_info &&
+                device.experimental_info.current &&
+                device.experimental_info.current.interactor &&
+                device.experimental_info.current.interactor.name !== "<class 'ethoscope.stimulators.stimulators.DefaultStimulator'>"
+            );
+        };
+
         /**
          * Calculate elapsed time from timestamp
-         * @param {number} t - Unix timestamp
-         * @returns {string} Formatted elapsed time string
          */
         $scope.ethoscope.elapsedtime = function(t) {
             var now = Math.floor(Date.now() / 1000);
@@ -1500,19 +753,15 @@
 
         /**
          * Create readable URL from full path
-         * @param {string} url - Full URL path
-         * @returns {string} Shortened readable URL
          */
         $scope.ethoscope.readable_url = function(url) {
             if (!url) return '';
             var parts = url.split("/");
-            return ".../" + parts[parts.length - 1];
+            return ".../"+parts[parts.length-1];
         };
 
         /**
          * Convert Unix timestamp to readable date string
-         * @param {number} unix_timestamp - Unix timestamp
-         * @returns {string} Formatted date string
          */
         $scope.ethoscope.start_date_time = function(unix_timestamp) {
             return new Date(unix_timestamp * 1000).toUTCString();
@@ -1520,49 +769,9 @@
 
         /**
          * Show alert message
-         * @param {string} message - Alert message
          */
         $scope.ethoscope.alert = function(message) {
             alert(message);
-        };
-
-        // Check if ROI template is properly selected for tracking
-        $scope.isRoiTemplateSelected = function() {
-            if (!$scope.selected_options || !$scope.selected_options.tracking || !$scope.selected_options.tracking.roi_builder) {
-                return false;
-            }
-
-            var roiBuilderOption = $scope.selected_options.tracking.roi_builder;
-
-            // Check if roi_builder is FileBasedROIBuilder (which requires template selection)
-            if (roiBuilderOption.name && roiBuilderOption.name.includes('FileBasedROIBuilder')) {
-                var args = roiBuilderOption.arguments || {};
-                var templateName = args.template_name;
-
-                // Valid if we have a non-empty template_name
-                if (templateName && templateName !== '' && templateName !== 'None' && templateName !== 'null' && templateName !== undefined) {
-                    return true;
-                }
-
-                return false;
-            }
-
-            // For other ROI builders, no template validation needed
-            return true;
-        };
-
-        // Check if user is properly selected for tracking
-        $scope.isUserSelected = function() {
-            if (!$scope.selected_options || !$scope.selected_options.tracking || !$scope.selected_options.tracking.experimental_info) {
-                return false;
-            }
-
-            var experimentalInfo = $scope.selected_options.tracking.experimental_info;
-            var args = experimentalInfo.arguments || {};
-            var userName = args.name;
-
-            // Valid if we have a non-empty user name
-            return userName && userName !== '' && userName !== 'None' && userName !== 'null' && userName !== undefined;
         };
 
         // Watch for changes in template selection to update UI
@@ -1573,14 +782,12 @@
             }
         });
 
-
         // ===========================
         // TRACKING & RECORDING FUNCTIONS
         // ===========================
 
         /**
          * Start tracking with selected options
-         * @param {Object} option - Selected tracking options
          */
         $scope.ethoscope.start_tracking = function(option) {
             $("#startModal").modal('hide');
@@ -1600,7 +807,7 @@
 
             // Add sensor IP based on selected incubator name
             if (option.experimental_info && option.experimental_info.arguments && option.experimental_info.arguments.location) {
-                var selectedIncubatorName = option.experimental_info.arguments.location; // This field contains the incubator name
+                var selectedIncubatorName = option.experimental_info.arguments.location;
                 option.experimental_info.arguments.sensor = $scope.get_ip_of_sensor(selectedIncubatorName);
             }
 
@@ -1698,13 +905,6 @@
 
                     console.log('Starting tracking with options:', option);
 
-                    // Debug: log database_to_append specifically
-                    for (var opt in option) {
-                        if (option[opt].arguments && option[opt].arguments.database_to_append) {
-                            console.log('Found database_to_append:', option[opt].arguments.database_to_append);
-                        }
-                    }
-
                     // Send start command to ethoscope
                     $http.post('/device/' + device_id + '/controls/start', option)
                         .then(function(response) {
@@ -1722,8 +922,6 @@
 
         // Helper function to get template information by name
         $scope.getSelectedTemplateInfo = function(templateName) {
-            // This would be populated from the dropdown options
-            // For now, we can check if there are any custom templates
             if ($scope.available_templates) {
                 for (var i = 0; i < $scope.available_templates.length; i++) {
                     if ($scope.available_templates[i].value === templateName) {
@@ -1733,7 +931,6 @@
             }
             return null;
         };
-
 
         // Load ROI templates from node server
         $scope.loadRoiTemplates = function() {
@@ -1879,10 +1076,8 @@
                 });
         };
 
-
         /**
          * Start video recording with selected options
-         * @param {Object} option - Selected recording options
          */
         $scope.ethoscope.start_recording = function(option) {
             $("#recordModal").modal('hide');
@@ -1931,7 +1126,6 @@
 
         /**
          * Update machine settings
-         * @param {Object} option - Machine update options
          */
         $scope.ethoscope.update_machine = function(option) {
             $("#changeInfo").modal('hide');
@@ -2025,7 +1219,6 @@
 
         /**
          * Convert H264 video chunks to MP4 format
-         * EXPERIMENTAL FEATURE - Only available on experimental builds
          */
         $scope.ethoscope.convertvideos = function() {
             console.log("Converting H264 chunks to MP4");
@@ -2258,9 +1451,10 @@
                 .then(function(response) {
                     var data = response.data;
 
-                    // Preserve backup_info and backup_status_detailed during device refresh
+                    // Preserve backup_info, backup_status_detailed, and databases during device refresh
                     var existingBackupInfo = $scope.device ? $scope.device.backup_info : null;
                     var existingBackupStatusDetailed = $scope.device ? $scope.device.backup_status_detailed : null;
+                    var existingDatabases = $scope.device ? $scope.device.databases : null;
 
                     $scope.device = data;
 
@@ -2272,6 +1466,11 @@
                     // Restore preserved detailed backup status
                     if (existingBackupStatusDetailed) {
                         $scope.device.backup_status_detailed = existingBackupStatusDetailed;
+                    }
+
+                    // Restore preserved databases info (if not present in fresh data)
+                    if (existingDatabases && (!data.databases || Object.keys(data.databases).length === 0)) {
+                        $scope.device.databases = existingDatabases;
                     }
 
                     console.log('DEBUG: Data received in refresh function:', data);
@@ -2317,13 +1516,9 @@
         loadNodeData();
         loadDeviceData();
         loadBackupInfo(true); // Load backup info (force on initial load)
-        // Note: loadUserOptions() is now called within loadDeviceData() via batch endpoint
 
         /**
          * Formats raw database information into a simplified list of dictionaries.
-         * @param {object} databasesData - A dictionary containing 'SQLite' and 'MariaDB' database information.
-         * @returns {object} A dictionary with a single key "database_list" containing a list
-         *                   of simplified database information dictionaries.
          */
         function formatDatabasesInfo(databasesData) {
             var databaseList = [];
@@ -2480,7 +1675,7 @@
                                 videoFileArray.push({
                                     name: filename,
                                     size_bytes: fileInfo.size_bytes || 0,
-                                    size_human: fileInfo.size_human || formatBytes(fileInfo.size_bytes || 0),
+                                    size_human: fileInfo.size_human || $scope.formatFileSize(fileInfo.size_bytes || 0),
                                     status: fileInfo.status || 'unknown',
                                     path: fileInfo.path || '',
                                     is_h264: filename.endsWith('.h264')
@@ -2533,8 +1728,6 @@
                 'min-width': '2px'
             };
         };
-
-        // ===========================
 
         // Add click handler for radio button labels after DOM is ready
         setTimeout(function() {
