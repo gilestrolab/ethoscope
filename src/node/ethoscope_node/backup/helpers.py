@@ -2322,6 +2322,170 @@ def _is_file_older_than_week(file_path: str) -> bool:
         return False
 
 
+def _get_device_size_cache_path(device_id: str, base_directory: str = "/ethoscope_data") -> str:
+    """Get the file path for device size cache."""
+    import os
+    cache_dir = os.path.join(base_directory, ".cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    return os.path.join(cache_dir, f"device_size_cache_{device_id}.pkl")
+
+
+def _load_device_size_cache(device_id: str, base_directory: str = "/ethoscope_data") -> dict:
+    """Load device size cache from disk."""
+    import os
+    import pickle
+    import logging
+    import time
+    
+    cache_path = _get_device_size_cache_path(device_id, base_directory)
+    try:
+        if os.path.exists(cache_path):
+            with open(cache_path, 'rb') as f:
+                cache_data = pickle.load(f)
+                
+                # Validate cache structure and check TTL
+                if (isinstance(cache_data, dict) and 
+                    'videos_size' in cache_data and 
+                    'results_size' in cache_data and 
+                    'timestamp' in cache_data):
+                    
+                    # Check if cache is still valid (1 hour TTL)
+                    cache_age = time.time() - cache_data['timestamp']
+                    cache_ttl = cache_data.get('ttl', 3600)  # Default 1 hour
+                    
+                    if cache_age < cache_ttl:
+                        return cache_data
+                    else:
+                        logging.debug(f"Device size cache expired for {device_id} (age: {cache_age:.0f}s)")
+                        
+    except Exception as e:
+        logging.warning(f"Failed to load device size cache for {device_id}: {e}")
+    
+    return {'videos_size': 0, 'results_size': 0, 'timestamp': 0, 'ttl': 3600}
+
+
+def _save_device_size_cache(device_id: str, videos_size: int, results_size: int, 
+                           base_directory: str = "/ethoscope_data") -> None:
+    """Save device size cache to disk."""
+    import pickle
+    import time
+    import logging
+    
+    cache_path = _get_device_size_cache_path(device_id, base_directory)
+    try:
+        cache_data = {
+            'videos_size': videos_size,
+            'results_size': results_size,
+            'timestamp': time.time(),
+            'ttl': 3600  # 1 hour cache TTL
+        }
+        
+        with open(cache_path, 'wb') as f:
+            pickle.dump(cache_data, f)
+            
+        logging.info(f"Saved device size cache for {device_id}: videos={_format_bytes_simple(videos_size)}, "
+                    f"results={_format_bytes_simple(results_size)}")
+                    
+    except Exception as e:
+        logging.warning(f"Failed to save device size cache for {device_id}: {e}")
+
+
+def _get_device_disk_usage(device_id: str, base_directory: str, subdirectory: str) -> int:
+    """
+    Get disk usage for a specific device directory using du command.
+    
+    Args:
+        device_id: The ethoscope device ID
+        base_directory: Base directory (e.g., '/ethoscope_data')  
+        subdirectory: Subdirectory name ('videos' or 'results')
+        
+    Returns:
+        int: Size in bytes, 0 if directory doesn't exist or command fails
+    """
+    import os
+    import subprocess
+    import logging
+    
+    device_dir = os.path.join(base_directory, subdirectory, device_id)
+    
+    if not os.path.exists(device_dir):
+        return 0
+    
+    try:
+        # Use du -sb for size in bytes, -x to stay on same filesystem
+        result = subprocess.run(
+            ['du', '-sbx', device_dir], 
+            capture_output=True, 
+            text=True, 
+            timeout=30  # 30 second timeout for large directories
+        )
+        
+        if result.returncode == 0:
+            # du output format: "size_bytes    directory_path"
+            size_bytes = int(result.stdout.split()[0])
+            logging.debug(f"Device {device_id} {subdirectory} size: {_format_bytes_simple(size_bytes)}")
+            return size_bytes
+        else:
+            logging.warning(f"du command failed for {device_dir}: {result.stderr}")
+            return 0
+            
+    except subprocess.TimeoutExpired:
+        logging.warning(f"du command timeout for {device_dir}")
+        return 0
+    except (ValueError, IndexError, OSError) as e:
+        logging.warning(f"Error calculating disk usage for {device_dir}: {e}")
+        return 0
+
+
+def _get_device_backup_sizes_cached(device_id: str, base_directory: str = "/ethoscope_data") -> dict:
+    """
+    Get device-specific backup sizes with caching for performance.
+    
+    Returns cached values immediately if available, and optionally triggers
+    background update if cache is expired.
+    
+    Args:
+        device_id: The ethoscope device ID
+        base_directory: Base directory containing videos and results
+        
+    Returns:
+        dict: {'videos_size': bytes, 'results_size': bytes, 'cache_hit': bool, 'cache_age': seconds}
+    """
+    import time
+    import logging
+    
+    # Load cached values first
+    cache_data = _load_device_size_cache(device_id, base_directory)
+    cache_hit = cache_data['timestamp'] > 0
+    cache_age = time.time() - cache_data['timestamp'] if cache_hit else float('inf')
+    
+    # If cache is valid (< 1 hour old), return cached values
+    cache_ttl = cache_data.get('ttl', 3600)
+    if cache_age < cache_ttl:
+        return {
+            'videos_size': cache_data['videos_size'],
+            'results_size': cache_data['results_size'], 
+            'cache_hit': True,
+            'cache_age': cache_age
+        }
+    
+    # Cache is expired or missing, calculate new values
+    logging.info(f"Calculating fresh disk usage for device {device_id} (cache age: {cache_age:.0f}s)")
+    
+    videos_size = _get_device_disk_usage(device_id, base_directory, 'videos')
+    results_size = _get_device_disk_usage(device_id, base_directory, 'results')
+    
+    # Save updated cache
+    _save_device_size_cache(device_id, videos_size, results_size, base_directory)
+    
+    return {
+        'videos_size': videos_size,
+        'results_size': results_size,
+        'cache_hit': False,
+        'cache_age': 0
+    }
+
+
 def _enhance_databases_with_rsync_info(device_id: str, databases: dict) -> dict:
     """
     Enhance database information with file sizes from rsync backup service.
@@ -2477,15 +2641,26 @@ def _enhance_databases_with_rsync_info(device_id: str, databases: dict) -> dict:
                 except Exception as e:
                     logging.warning(f"[ENHANCE] Cache-aware filesystem video enumeration failed: {e}")
             
-            # Get summary information from video_data
-            total_video_size = video_data.get('disk_usage_bytes', 0)
+            # Get device-specific backup sizes using cached du calculation
+            # This replaces the problematic disk_usage_bytes which was returning total directory size
+            device_sizes = _get_device_backup_sizes_cached(device_id)
+            
+            logging.info(f"[ENHANCE] Device {device_id} backup sizes: "
+                        f"videos={_format_bytes_simple(device_sizes['videos_size'])}, "
+                        f"cache_hit={device_sizes['cache_hit']}, "
+                        f"cache_age={device_sizes.get('cache_age', 0):.0f}s")
+            
+            # Use device-specific video size from cache/du calculation
+            total_video_size = device_sizes['videos_size']
             total_video_files = video_data.get('local_files', 0)
             
-            # If no summary data from video_data, calculate from file details
-            if total_video_size == 0 and video_files:
-                total_video_size = sum(f.get('size_bytes', 0) for f in video_files.values())
+            # If no file count from rsync but we have video files from detailed scan, use that count
             if total_video_files == 0 and video_files:
                 total_video_files = len(video_files)
+            
+            # If we have individual file details but no cached size, calculate from file details
+            if total_video_size == 0 and video_files:
+                total_video_size = sum(f.get('size_bytes', 0) for f in video_files.values())
             
             databases['Video']['video_backup'] = {
                 'total_files': total_video_files,
@@ -2522,12 +2697,15 @@ def get_device_backup_info(device_id: str, databases: dict) -> dict:
     # Enhance with rsync backup service file sizes if available
     databases = _enhance_databases_with_rsync_info(device_id, databases)
     
+    # Get device-specific backup sizes for accurate reporting
+    device_sizes = _get_device_backup_sizes_cached(device_id)
+    
     backup_info = {
         'device_id': device_id,
         'databases': databases,
         'backup_status': {
-            'mysql': {'available': False, 'database_count': 0, 'databases': []},
-            'sqlite': {'available': False, 'database_count': 0, 'databases': []},
+            'mysql': {'available': False, 'database_count': 0, 'databases': [], 'total_size_bytes': 0},
+            'sqlite': {'available': False, 'database_count': 0, 'databases': [], 'total_size_bytes': 0},
             'video': {'available': False, 'file_count': 0, 'total_size_bytes': 0, 'size_human': '0B'},
             'total_databases': 0
         },
@@ -2547,6 +2725,9 @@ def get_device_backup_info(device_id: str, databases: dict) -> dict:
             backup_info['backup_status']['mysql']['available'] = True
             backup_info['backup_status']['mysql']['database_count'] = len(mysql_databases)
             backup_info['backup_status']['mysql']['databases'] = mysql_databases
+            # For MySQL, we could calculate exported backup size specifically, but for now use results size
+            # This represents the size of data that would be backed up from this device's database
+            backup_info['backup_status']['mysql']['total_size_bytes'] = device_sizes['results_size']
             total_db_count += len(mysql_databases)
     
     # Check for SQLite databases
@@ -2557,6 +2738,8 @@ def get_device_backup_info(device_id: str, databases: dict) -> dict:
             backup_info['backup_status']['sqlite']['available'] = True
             backup_info['backup_status']['sqlite']['database_count'] = len(sqlite_databases)
             backup_info['backup_status']['sqlite']['databases'] = sqlite_databases
+            # For SQLite, use results directory size (where SQLite files are stored)
+            backup_info['backup_status']['sqlite']['total_size_bytes'] = device_sizes['results_size']
             total_db_count += len(sqlite_databases)
     
     # Check for Video backup
