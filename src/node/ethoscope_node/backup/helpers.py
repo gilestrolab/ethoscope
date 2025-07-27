@@ -2665,9 +2665,9 @@ def _enhance_databases_with_rsync_info(device_id: str, databases: dict) -> dict:
             databases['Video']['video_backup'] = {
                 'total_files': total_video_files,
                 'total_size_bytes': total_video_size,
-                'size_human': video_data.get('disk_usage_human') or _format_bytes_simple(total_video_size),
+                'size_human': _format_bytes_simple(total_video_size),
                 'files': video_files,
-                'directory': video_data.get('directory', '/ethoscope_data/videos'),
+                'directory': f"{video_data.get('directory', '/ethoscope_data/videos')}/{device_id}",
                 'rsync_enhanced': len(video_files) > 0
             }
                     
@@ -2753,7 +2753,7 @@ def get_device_backup_info(device_id: str, databases: dict) -> dict:
                 backup_info['backup_status']['video']['file_count'] = video_backup.get('total_files', 0)
                 backup_info['backup_status']['video']['total_size_bytes'] = video_backup.get('total_size_bytes', 0)
                 backup_info['backup_status']['video']['size_human'] = video_backup.get('size_human', '0B')
-                backup_info['backup_status']['video']['directory'] = video_backup.get('directory', '/ethoscope_data/videos')
+                backup_info['backup_status']['video']['directory'] = video_backup.get('directory', f'/ethoscope_data/videos/{device_id}')
     
     backup_info['backup_status']['total_databases'] = total_db_count
     
