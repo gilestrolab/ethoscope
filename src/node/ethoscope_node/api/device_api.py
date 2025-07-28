@@ -46,6 +46,9 @@ class DeviceAPI(BaseAPI):
         self.app.route('/device/<id>/controls/<instruction>', method='POST')(self._post_device_instructions)
         self.app.route('/device/<id>/log', method='POST')(self._get_log)
         
+        # Mask creation endpoints
+        self.app.route('/device/<id>/mask_creation/status', method='GET')(self._get_mask_creation_status)
+        
         # Optimized batch endpoints
         self.app.route('/device/<id>/batch', method='GET')(self._get_device_batch)
         self.app.route('/device/<id>/batch-critical', method='GET')(self._get_device_batch_critical)
@@ -341,6 +344,32 @@ class DeviceAPI(BaseAPI):
         """Get device logs."""
         device = self.validate_device_exists(id)
         return device.get_log()
+    
+    @error_decorator
+    def _get_mask_creation_status(self, id):
+        """Get current mask creation status and ROI parameters."""
+        device = self.validate_device_exists(id)
+        
+        # Send get_current_rois command to device to get ROI status
+        try:
+            return device.send_instruction('get_current_rois', b'{}')
+        except ValueError as e:
+            # Handle unknown instruction error
+            self.logger.error(f"Mask creation status error for device {id}: {e}")
+            return {
+                'error': str(e),
+                'roi_count': 0,
+                'targets_detected': False,
+                'mask_creation_active': False
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to get mask creation status for device {id}: {e}")
+            return {
+                'error': str(e),
+                'roi_count': 0,
+                'targets_detected': False,
+                'mask_creation_active': False
+            }
     
     @error_decorator
     def _get_device_batch(self, id):

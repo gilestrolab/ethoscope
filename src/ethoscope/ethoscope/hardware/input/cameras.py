@@ -569,8 +569,8 @@ class PiFrameGrabber2(PiFrameGrabber):
                                 buffer_count = 2, #Still image capture normally configures only a single buffer, as this is all you need. But if you're doing some form of burst capture, increasing the buffer count may enable the application to receive images more quickly.
                                 controls = { 
                                     'FrameRate': self._target_fps,
-                                    'AeEnable': True,                    # Enable auto-exposure for day/night adaptation
-                                    'AwbEnable': False,                  # Disable auto-white balance (IR light confuses AWB)
+                                    # Note: AeEnable/AwbEnable not supported on IMX219 with this libcamera version
+                                    # Auto-exposure and auto-white balance are handled by default ISP algorithms
                                 },
                                 )
                 capture.configure(config)

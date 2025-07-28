@@ -120,8 +120,119 @@
 </div>
 
 <div class="last_drawn_img">
+    <!-- Standard streaming or last image display -->
     <img ng-if="device.status == 'running' || device.status == 'recording'" ng-src="{{device.url_img}}" alt="" width="640"></img>
-    <img ng-if="device.status == 'streaming'" ng-src="{{device.url_stream}}" alt="" width=""></img>
+    <img ng-if="device.status == 'streaming' && !mask_creation.show_interface" ng-src="{{device.url_stream}}" alt="" width="640"></img>
+    
+    <!-- Mask Creation Video Stream -->
+    <div ng-if="mask_creation.show_interface" style="position: relative;">
+        <img ng-src="{{getMaskCreationStreamUrl()}}" alt="Mask Creation Stream" width="640" style="display: block;">
+        <!-- Status overlay -->
+        <div style="position: absolute; bottom: 10px; left: 10px; right: 10px; background: rgba(0,0,0,0.8); padding: 8px; border-radius: 4px; color: white;">
+            <div ng-show="mask_creation.detecting_targets">
+                <i class="fa fa-spinner fa-spin"></i> Detecting targets...
+            </div>
+            <div ng-show="mask_creation.targets_detected && !mask_creation.detecting_targets">
+                <i class="fa fa-check-circle" style="color: #00ff00;"></i> Targets detected! ROI count: {{mask_creation.roi_count}}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mask Creation Controls -->
+<div ng-show="mask_creation.show_interface" class="panel panel-default" style="margin-top: 20px;">
+    <div class="panel-heading">
+        <h4><i class="fa fa-crop"></i> Custom ROI Mask Creation</h4>
+    </div>
+    <div class="panel-body">
+        <div class="row">
+            <!-- Control Buttons -->
+            <div class="col-md-12" style="margin-bottom: 15px;">
+                <div ng-show="mask_creation.detecting_targets" class="alert alert-info">
+                    <i class="fa fa-spinner fa-spin"></i> Starting mask creation and detecting targets...
+                </div>
+                <div ng-show="mask_creation.targets_detected" class="alert alert-success">
+                    <i class="fa fa-check-circle"></i> Targets detected! Use the controls below to adjust ROI parameters.
+                </div>
+                <button type="button" class="btn btn-warning" ng-show="mask_creation.active" ng-click="stopMaskCreation()">
+                    <i class="fa fa-stop"></i> Stop Mask Creation
+                </button>
+                <button type="button" class="btn btn-secondary" ng-click="hideMaskCreation()" ng-style="mask_creation.active ? {'margin-left': '10px'} : {}">
+                    <i class="fa fa-times"></i> Close
+                </button>
+            </div>
+        </div>
+        
+        <!-- ROI Parameter Controls -->
+        <div class="row" ng-show="mask_creation.active">
+            <div class="col-md-6">
+                <h5>Grid Configuration</h5>
+                <div class="form-group">
+                    <label>Rows: {{mask_creation.params.n_rows}}</label>
+                    <input type="range" min="1" max="16" step="1" ng-model="mask_creation.params.n_rows" ng-change="updateROIParams()" class="form-control" ng-disabled="!mask_creation.targets_detected">
+                </div>
+                <div class="form-group">  
+                    <label>Columns: {{mask_creation.params.n_cols}}</label>
+                    <input type="range" min="1" max="16" step="1" ng-model="mask_creation.params.n_cols" ng-change="updateROIParams()" class="form-control" ng-disabled="!mask_creation.targets_detected">
+                </div>
+                
+                <h5>Fill Ratios</h5>
+                <div class="form-group">
+                    <label>Horizontal Fill: {{mask_creation.params.horizontal_fill | number:3}}</label>
+                    <input type="range" min="0" max="1" step="0.01" ng-model="mask_creation.params.horizontal_fill" ng-change="updateROIParams()" class="form-control" ng-disabled="!mask_creation.targets_detected">
+                </div>
+                <div class="form-group">
+                    <label>Vertical Fill: {{mask_creation.params.vertical_fill | number:3}}</label>
+                    <input type="range" min="0" max="1" step="0.01" ng-model="mask_creation.params.vertical_fill" ng-change="updateROIParams()" class="form-control" ng-disabled="!mask_creation.targets_detected">
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <h5>Margins</h5>
+                <div class="form-group">
+                    <label>Top Margin: {{mask_creation.params.top_margin | number:3}}</label>
+                    <input type="range" min="0" max="1" step="0.01" ng-model="mask_creation.params.top_margin" ng-change="updateROIParams()" class="form-control" ng-disabled="!mask_creation.targets_detected">
+                </div>
+                <div class="form-group">
+                    <label>Bottom Margin: {{mask_creation.params.bottom_margin | number:3}}</label>
+                    <input type="range" min="0" max="1" step="0.01" ng-model="mask_creation.params.bottom_margin" ng-change="updateROIParams()" class="form-control" ng-disabled="!mask_creation.targets_detected">
+                </div>
+                <div class="form-group">
+                    <label>Left Margin: {{mask_creation.params.left_margin | number:3}}</label>
+                    <input type="range" min="0" max="1" step="0.01" ng-model="mask_creation.params.left_margin" ng-change="updateROIParams()" class="form-control" ng-disabled="!mask_creation.targets_detected">
+                </div>
+                <div class="form-group">
+                    <label>Right Margin: {{mask_creation.params.right_margin | number:3}}</label>
+                    <input type="range" min="0" max="1" step="0.01" ng-model="mask_creation.params.right_margin" ng-change="updateROIParams()" class="form-control" ng-disabled="!mask_creation.targets_detected">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Save Mask Section -->
+        <div class="row" ng-show="mask_creation.targets_detected">
+            <div class="col-md-12">
+                <div class="panel panel-success">
+                    <div class="panel-heading">
+                        <h5>Save Custom Mask</h5>
+                    </div>
+                    <div class="panel-body">
+                        <div class="form-group">
+                            <label for="mask-name-input">Mask Name:</label>
+                            <input type="text" id="mask-name-input" ng-model="mask_creation.mask_name" class="form-control" placeholder="Enter mask name..." maxlength="50">
+                        </div>
+                        <button type="button" class="btn btn-success" ng-click="saveMask()" ng-disabled="!mask_creation.mask_name || mask_creation.saving">
+                            <i class="fa fa-save"></i> 
+                            <span ng-show="!mask_creation.saving">Save Mask</span>
+                            <span ng-show="mask_creation.saving">Saving...</span>
+                        </button>
+                        <div ng-show="mask_creation.save_message" class="alert" ng-class="{'alert-success': mask_creation.save_success, 'alert-danger': !mask_creation.save_success}" style="margin-top: 10px;">
+                            {{mask_creation.save_message}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Database Backup Status Section -->
@@ -335,7 +446,7 @@
             <input type="checkbox" class="dd-input" id="track-drop" ng-disabled="!isActive">
             <ul class="dd-menu">
                 <li ng-class="{'disabled':!isActive || (delta_t_min > 3) || (machine_info.camera && machine_info.camera.indexOf('No camera hardware detected') === 0)}" data-toggle="{{isActive && machine_info.camera && machine_info.camera.indexOf('No camera hardware detected') !== 0 ? 'modal' : ''}}" data-target="#startModal" title="{{machine_info.camera && machine_info.camera.indexOf('No camera hardware detected') === 0 ? 'Camera hardware required for video tracking' : ''}}">Start Tracking</li>
-                <li class="disabled">New Mask</li>
+                <li ng-class="{'disabled':!isActive || (machine_info.camera && machine_info.camera.indexOf('No camera hardware detected') === 0)}" ng-click="toggleMaskCreation()" title="{{machine_info.camera && machine_info.camera.indexOf('No camera hardware detected') === 0 ? 'Camera hardware required for mask creation' : ''}}">New Mask</li>
             </ul>
         </label>
 

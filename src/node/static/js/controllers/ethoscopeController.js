@@ -1233,6 +1233,333 @@
         };
 
         // ===========================
+        // MASK CREATION FUNCTIONS
+        // ===========================
+
+        // Initialize mask creation state
+        $scope.mask_creation = {
+            show_interface: false,
+            active: false,
+            detecting_targets: false,
+            targets_detected: false,
+            roi_count: 0,
+            mask_name: '',
+            saving: false,
+            save_message: '',
+            save_success: false,
+            params: {
+                n_rows: 10,
+                n_cols: 2,
+                top_margin: 0.0,
+                bottom_margin: 0.0,
+                left_margin: 0.0,
+                right_margin: 0.0,
+                horizontal_fill: 0.9,
+                vertical_fill: 0.9
+            }
+        };
+
+        /**
+         * Get mask creation stream URL with cache busting
+         */
+        $scope.getMaskCreationStreamUrl = function() {
+            return '/device/' + device_id + '/stream?' + Date.now();
+        };
+
+        /**
+         * Toggle mask creation interface visibility and auto-start
+         */
+        $scope.toggleMaskCreation = function() {
+            if (!$scope.isActive) {
+                return; // Don't allow if device is not active
+            }
+            
+            if ($scope.mask_creation.show_interface) {
+                // If currently showing, hide and stop
+                $scope.hideMaskCreation();
+            } else {
+                // If not showing, show interface and automatically start mask creation
+                $scope.mask_creation.show_interface = true;
+                $scope.startMaskCreation();
+            }
+        };
+
+        /**
+         * Hide mask creation interface
+         */
+        $scope.hideMaskCreation = function() {
+            $scope.mask_creation.show_interface = false;
+            
+            // Stop mask creation if active
+            if ($scope.mask_creation.active) {
+                $scope.stopMaskCreation();
+            }
+            
+            // Clear any remaining state
+            $scope.maskStatusPollCount = 0;
+        };
+
+        /**
+         * Start mask creation mode with streaming and ROI detection
+         */
+        $scope.startMaskCreation = function() {
+            console.log("Starting mask creation mode");
+            
+            // Clear any existing polling
+            if ($scope.maskStatusPoller) {
+                clearTimeout($scope.maskStatusPoller);
+                $scope.maskStatusPoller = null;
+            }
+            
+            $scope.mask_creation.active = true;
+            $scope.mask_creation.detecting_targets = true;
+            $scope.mask_creation.targets_detected = false;
+            $scope.mask_creation.roi_count = 0;
+            $scope.mask_creation.save_message = '';
+            $scope.maskStatusPollCount = 0; // Reset poll counter
+            
+            // Start mask creation streaming with initial parameters
+            $http.post('/device/' + device_id + '/controls/start_mask_creation', {
+                roi_params: $scope.mask_creation.params
+            })
+            .then(function(response) {
+                $scope.device.status = response.data.status;
+                console.log("Mask creation started:", response.data);
+                
+                // Start polling for target detection status with a shorter delay
+                setTimeout(function() {
+                    pollMaskCreationStatus();
+                }, 1000); // Reduced delay to 1 second
+            })
+            .catch(function(error) {
+                console.error('Failed to start mask creation:', error);
+                $scope.mask_creation.active = false;
+                $scope.mask_creation.detecting_targets = false;
+                
+                // Show error to user
+                $scope.mask_creation.save_message = 'Failed to start mask creation: ' + (error.data ? error.data.message : error.statusText);
+                $scope.mask_creation.save_success = false;
+            });
+        };
+
+        /**
+         * Stop mask creation and streaming
+         */
+        $scope.stopMaskCreation = function() {
+            console.log("Stopping mask creation mode");
+            
+            // Stop any status polling
+            if ($scope.maskStatusPoller) {
+                clearTimeout($scope.maskStatusPoller);
+                $scope.maskStatusPoller = null;
+            }
+            
+            // Reset state
+            $scope.mask_creation.active = false;
+            $scope.mask_creation.detecting_targets = false;
+            $scope.mask_creation.targets_detected = false;
+            $scope.mask_creation.roi_count = 0;
+            $scope.mask_creation.save_message = '';
+            $scope.streamUrl = null;
+            
+            // Stop streaming on device
+            $http.post('/device/' + device_id + '/controls/stop', {})
+            .then(function(response) {
+                $scope.device.status = response.data.status;
+                console.log("Mask creation stopped");
+            })
+            .catch(function(error) {
+                console.error('Failed to stop mask creation:', error);
+            });
+        };
+
+        /**
+         * Update ROI parameters in real-time
+         */
+        $scope.updateROIParams = function() {
+            if (!$scope.mask_creation.targets_detected) {
+                return; // Don't update if targets not detected yet
+            }
+            
+            console.log("Updating ROI parameters:", $scope.mask_creation.params);
+            
+            $http.post('/device/' + device_id + '/controls/update_roi_params', $scope.mask_creation.params)
+            .then(function(response) {
+                if (response.data && response.data.roi_count !== undefined) {
+                    $scope.mask_creation.roi_count = response.data.roi_count;
+                }
+                console.log("ROI parameters updated:", response.data);
+            })
+            .catch(function(error) {
+                console.error('Failed to update ROI parameters:', error);
+            });
+        };
+
+        /**
+         * Save current mask configuration as a template
+         */
+        $scope.saveMask = function() {
+            if (!$scope.mask_creation.mask_name || !$scope.mask_creation.targets_detected) {
+                return;
+            }
+            
+            console.log("Saving mask:", $scope.mask_creation.mask_name);
+            
+            $scope.mask_creation.saving = true;
+            $scope.mask_creation.save_message = '';
+            
+            $http.post('/device/' + device_id + '/controls/save_custom_mask', {
+                template_name: $scope.mask_creation.mask_name
+            })
+            .then(function(response) {
+                $scope.mask_creation.saving = false;
+                
+                if (response.data && response.data.result === 'success') {
+                    $scope.mask_creation.save_success = true;
+                    $scope.mask_creation.save_message = 'Mask saved successfully as "' + $scope.mask_creation.mask_name + '"';
+                    
+                    // Clear the name for next use
+                    $scope.mask_creation.mask_name = '';
+                    
+                    // Reload ROI templates to include the new one
+                    $scope.loadRoiTemplates();
+                } else {
+                    $scope.mask_creation.save_success = false;
+                    $scope.mask_creation.save_message = response.data.comment || 'Failed to save mask';
+                }
+            })
+            .catch(function(error) {
+                console.error('Failed to save mask:', error);
+                $scope.mask_creation.saving = false;
+                $scope.mask_creation.save_success = false;
+                $scope.mask_creation.save_message = 'Error saving mask: ' + (error.data ? error.data.message : error.statusText);
+            });
+        };
+
+        /**
+         * Poll mask creation status to check target detection progress
+         */
+        function pollMaskCreationStatus() {
+            if (!$scope.mask_creation.active) {
+                return;
+            }
+            
+            // Add timeout counter to prevent infinite polling
+            if (!$scope.maskStatusPollCount) {
+                $scope.maskStatusPollCount = 0;
+            }
+            $scope.maskStatusPollCount++;
+            
+            // Stop polling after 30 attempts (30 seconds) if no targets detected
+            if ($scope.maskStatusPollCount > 30 && $scope.mask_creation.detecting_targets) {
+                console.warn('Target detection timeout after 30 seconds');
+                $scope.mask_creation.save_message = 'Target detection timed out. Please try again or check camera.';
+                $scope.mask_creation.save_success = false;
+                $scope.mask_creation.detecting_targets = false;
+                return;
+            }
+            
+            $http.get('/device/' + device_id + '/mask_creation/status')
+            .then(function(response) {
+                var status = response.data;
+                
+                if (status.targets_detected && $scope.mask_creation.detecting_targets) {
+                    // Targets just detected
+                    $scope.mask_creation.detecting_targets = false;
+                    $scope.mask_creation.targets_detected = true;
+                    $scope.mask_creation.roi_count = status.roi_count || 0;
+                    $scope.maskStatusPollCount = 0; // Reset counter
+                    console.log("Target detection completed, ROI count:", $scope.mask_creation.roi_count);
+                } else if (status.targets_detected) {
+                    // Update ROI count if changed
+                    $scope.mask_creation.roi_count = status.roi_count || 0;
+                }
+                
+                // Continue polling if still active and targets not detected yet
+                if ($scope.mask_creation.active && $scope.mask_creation.detecting_targets) {
+                    $scope.maskStatusPoller = setTimeout(function() {
+                        pollMaskCreationStatus();
+                    }, 1000); // Poll every second
+                }
+            })
+            .catch(function(error) {
+                console.error('Failed to get mask creation status:', error);
+                
+                // Stop after too many consecutive errors
+                if ($scope.maskStatusPollCount > 10) {
+                    console.error('Too many polling errors, stopping');
+                    $scope.mask_creation.save_message = 'Connection error while detecting targets. Please try again.';
+                    $scope.mask_creation.save_success = false;
+                    $scope.mask_creation.detecting_targets = false;
+                    return;
+                }
+                
+                // Retry polling if still active
+                if ($scope.mask_creation.active) {
+                    $scope.maskStatusPoller = setTimeout(function() {
+                        pollMaskCreationStatus();
+                    }, 2000); // Retry after 2 seconds
+                }
+            });
+        }
+
+        // Clean up polling when scope is destroyed
+        $scope.$on('$destroy', function() {
+            if ($scope.maskStatusPoller) {
+                clearTimeout($scope.maskStatusPoller);
+            }
+        });
+
+        // Check if device is in mask creation mode on page load
+        function checkInitialMaskCreationState() {
+            // Only check if device data is available and status suggests potential mask creation
+            if (!$scope.device) {
+                return;
+            }
+            
+            // Check for mask creation mode only if device status is streaming or mask_creation
+            if ($scope.device.status === 'streaming' || $scope.device.status === 'mask_creation') {
+                // Try to get mask creation status to see if it's actually mask creation
+                $http.get('/device/' + device_id + '/mask_creation/status')
+                .then(function(response) {
+                    var status = response.data;
+                    // Only restore state if there's clear evidence of active mask creation
+                    if (status && (status.mask_creation_active === true || status.targets_detected === true)) {
+                        // Device is in mask creation mode, restore interface
+                        $scope.mask_creation.show_interface = true;
+                        $scope.mask_creation.active = true;
+                        $scope.mask_creation.detecting_targets = !status.targets_detected;
+                        $scope.mask_creation.targets_detected = status.targets_detected || false;
+                        $scope.mask_creation.roi_count = status.roi_count || 0;
+                        $scope.maskStatusPollCount = 0; // Reset poll counter
+                        
+                        // Start polling if still detecting
+                        if ($scope.mask_creation.detecting_targets) {
+                            setTimeout(function() {
+                                pollMaskCreationStatus();
+                            }, 1000);
+                        }
+                        
+                        console.log("Restored mask creation state on page refresh:", status);
+                    } else {
+                        console.log("Device is streaming but not in mask creation mode");
+                    }
+                })
+                .catch(function(error) {
+                    // Ignore errors - device might not support mask creation or might not be in mask creation mode
+                    console.log("No active mask creation found on page load or error checking:", error);
+                });
+            }
+        }
+
+        // Call this after device data is loaded
+        $scope.$watch('device.status', function(newStatus, oldStatus) {
+            if (newStatus && newStatus !== oldStatus) {
+                checkInitialMaskCreationState();
+            }
+        });
+
+        // ===========================
         // MAINTENANCE FUNCTIONS
         // ===========================
 

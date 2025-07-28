@@ -133,11 +133,11 @@ class commandingThread(threading.Thread):
         act on client's instructions
         '''
         
-        if not data and action in ['start', 'start_record']:
+        if not data and action in ['start', 'start_record', 'start_mask_creation', 'update_roi_params']:
             return 'This action requires JSON data'
         
         if action == 'help':
-            return "Commands that do not require JSON info: help, info, status, stop, stream, remove, restart.\nCommands that do require JSON info: start, start_record."
+            return "Commands that do not require JSON info: help, info, status, stop, stream, remove, restart, get_mask_status, get_current_rois_template.\nCommands that do require JSON info: start, start_record, start_mask_creation, update_roi_params, save_custom_mask."
         
         elif action == 'info':
             return self.control.info
@@ -179,7 +179,7 @@ class commandingThread(threading.Thread):
             return "Starting recording or streaming activity"
 
 
-        elif action == 'stop' and self.control.info['status'] in ['running', 'recording', 'streaming'] :
+        elif action == 'stop' and self.control.info['status'] in ['running', 'recording', 'streaming', 'mask_creation'] :
             logging.info("Stopping monitor")
             self.control.stop()
             logging.info("Joining monitor")
@@ -188,7 +188,7 @@ class commandingThread(threading.Thread):
             logging.info("Monitor stopped")
             return "Stopping ethoscope activity"
 
-        elif action == 'remove' and self.control.info['status'] not in ['running', 'recording', 'streaming']:
+        elif action == 'remove' and self.control.info['status'] not in ['running', 'recording', 'streaming', 'mask_creation']:
             logging.info("Removing persistent file.")
             try:
                 if os.path.exists(pi.PERSISTENT_STATE):
@@ -199,7 +199,7 @@ class commandingThread(threading.Thread):
             except:
                 return "The persistent file exists but could not be removed"
 
-        elif action == 'restart' and self.control.info['status'] not in ['running', 'recording', 'streaming']:
+        elif action == 'restart' and self.control.info['status'] not in ['running', 'recording', 'streaming', 'mask_creation']:
             logging.info("Restarting the ethoscope device service")
             with os.popen('systemctl restart ethoscope_device.service') as df:
                 outcome = df.read()
@@ -213,6 +213,69 @@ class commandingThread(threading.Thread):
         elif action == 'test_module' and data:
             logging.info("Restarting the ethoscope device service")
             return pi.getModuleCapabilities(command=data['command'])
+
+        elif action == 'start_mask_creation':
+            # Start mask creation mode using MaskCreationStreamer
+            mask_data = data or {}
+            mask_data.update({
+                'recorder': {
+                    'name': 'MaskCreationStreamer',
+                    'arguments': mask_data.get('roi_params', {})
+                }
+            })
+            
+            self.control = ControlThreadVideoRecording(
+                machine_id=self.ethoscope_info['MACHINE_ID'],
+                name=self.ethoscope_info['MACHINE_NAME'],
+                version=self.ethoscope_info['GIT_VERSION'], 
+                ethoscope_dir=self.ethoscope_info['ETHOSCOPE_VIDEOS_DIR'],
+                data=mask_data
+            )
+            
+            self.control.start()
+            logging.info("Starting mask creation mode")
+            return "Starting mask creation mode"
+
+        elif action == 'update_roi_params':
+            # Update ROI parameters in real-time
+            if hasattr(self.control, '_recorder') and self.control._recorder:
+                recorder = self.control._recorder
+                if hasattr(recorder, 'update_roi_parameters'):
+                    result = recorder.update_roi_parameters(data or {})
+                    logging.info(f"Updated ROI parameters: {data}")
+                    return result
+                else:
+                    return {'success': False, 'message': 'ROI parameter update not supported by current recorder'}
+            else:
+                return {'success': False, 'message': 'No active recorder found'}
+
+        elif action == 'save_custom_mask':
+            # Save current mask configuration as template
+            return {'result': 'fail', 'comment': 'Save mask functionality handled by device_server.py'}
+
+        elif action == 'get_current_rois_template':
+            # Get current ROI configuration as template
+            if hasattr(self.control, '_recorder') and self.control._recorder:
+                recorder = self.control._recorder
+                if hasattr(recorder, 'get_current_rois_as_template'):
+                    result = recorder.get_current_rois_as_template()
+                    return result
+                else:
+                    return {'success': False, 'message': 'Template export not supported by current recorder'}
+            else:
+                return {'success': False, 'message': 'No active recorder found'}
+
+        elif action == 'get_mask_status':
+            # Get current mask creation status
+            if hasattr(self.control, '_recorder') and self.control._recorder:
+                recorder = self.control._recorder
+                if hasattr(recorder, 'get_detection_status'):
+                    result = recorder.get_detection_status()
+                    return result
+                else:
+                    return {'targets_detected': False, 'mask_creation_active': False, 'roi_count': 0}
+            else:
+                return {'targets_detected': False, 'mask_creation_active': False, 'roi_count': 0}
 
         else:
             #raise Exception("No such command: %s. Available commands are info, status, start, stop, start_record, stream " % action)

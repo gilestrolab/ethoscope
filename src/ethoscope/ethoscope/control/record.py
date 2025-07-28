@@ -37,7 +37,7 @@ class cameraCaptureThread(threading.Thread):
     '''
         
     _VIDEO_CHUNCK_DURATION = 30 * 10
-    def __init__(self, cameraClass, camera_kwargs, img_path, video_prefix, width, height, fps, bitrate, quality, stream=False, record_video=False):
+    def __init__(self, cameraClass, camera_kwargs, img_path, video_prefix, width, height, fps, bitrate, quality, stream=False, record_video=False, frame_processor=None):
 
         self._img_path = img_path
         self._stream = stream
@@ -52,6 +52,8 @@ class cameraCaptureThread(threading.Thread):
         if self._record_video: self._create_recording_folder()
         logging.info(f"video_prefix_basethread: {video_prefix}")
 
+        # Frame processor for custom streaming overlays (used by MaskCreationStreamer)
+        self._frame_processor = frame_processor
 
         try:
             self.camera = cameraClass ( target_fps = fps , target_resolution = (width, height), video_prefix = video_prefix, record_video=self._record_video, quality = quality, **camera_kwargs )
@@ -153,6 +155,18 @@ class cameraCaptureThread(threading.Thread):
                     
                     #annotate frame for streaming
                     frame = cv2.resize(frame, (640,480))
+                    
+                    # Apply custom frame processing if available (for MaskCreationStreamer)
+                    if self._frame_processor:
+                        try:
+                            frame = self._frame_processor(frame)
+                        except Exception as e:
+                            logging.error(f"Error in frame processor: {e}")
+                            # Add error message to frame
+                            cv2.putText(frame, f"Frame processor error: {str(e)}", (10, 30), 
+                                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                    
+                    # Add standard FPS overlay
                     frame = cv2.putText(frame, 'FPS: ' + str(round(self.camera.fps,2)) , (20,20) , 1 , 1 , (255,255,255) )
                     _, frame = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
                     
@@ -188,12 +202,12 @@ class GeneralVideoRecorder(DescribedObject):
                                ]}
     status = "recording" #this is the default status. The alternative is streaming
 
-    def __init__(self, cameraClass, camera_kwargs, img_path, video_prefix, width=1280, height=960, fps=25, bitrate=200000, quality=20, stream = False, record_video=True):
+    def __init__(self, cameraClass, camera_kwargs, img_path, video_prefix, width=1280, height=960, fps=25, bitrate=200000, quality=20, stream = False, record_video=True, frame_processor=None):
 
         self._stream = stream
 
         #This used to be a process but it's best handled as a thread. See also commit https://github.com/gilestrolab/ethoscope/commit/c2e8a7f656611cc10379c8e93ff4205220c8807a
-        self._p = cameraCaptureThread(cameraClass, camera_kwargs, img_path, video_prefix, width, height, fps, bitrate, quality, stream)
+        self._p = cameraCaptureThread(cameraClass, camera_kwargs, img_path, video_prefix, width, height, fps, bitrate, quality, stream, record_video, frame_processor)
 
 
     def start_recording(self):
@@ -226,7 +240,7 @@ class HDVideoRecorder(GeneralVideoRecorder):
     status = "recording"
 
     def __init__(self, cameraClass, camera_kwargs, video_prefix, img_path):
-        super(HDVideoRecorder, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix, width=1920, height=1088, quality=28, fps=25, bitrate=1000000)
+        super(HDVideoRecorder, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix, width=1920, height=1088, quality=28, fps=25, bitrate=1000000, frame_processor=None)
 
 class StandardVideoRecorder(GeneralVideoRecorder):
     _description  = { "overview": "A preset 1280 x 960, 25fps, bitrate = 2e5 video recorder.",
@@ -234,7 +248,7 @@ class StandardVideoRecorder(GeneralVideoRecorder):
     status = "recording"
     
     def __init__(self, cameraClass, camera_kwargs, video_prefix, img_path):
-        super(StandardVideoRecorder, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix, width=1280, height=960, fps=25, bitrate=500000)
+        super(StandardVideoRecorder, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix, width=1280, height=960, fps=25, bitrate=500000, frame_processor=None)
 
 class Streamer(GeneralVideoRecorder):
     _description  = { "overview": "A preset 960 x 720, 25fps, bitrate = 2e5 streamer. Active on port 8887.", 
@@ -245,7 +259,198 @@ class Streamer(GeneralVideoRecorder):
     
     def __init__(self, cameraClass, camera_kwargs, video_prefix, img_path):
         logging.info(f"video_prefix_streamer: {video_prefix}")
-        super(Streamer, self).__init__(cameraClass, camera_kwargs, img_path="", video_prefix="", width=960, height=720, fps=25, bitrate=500000, stream=True, record_video=False)
+        super(Streamer, self).__init__(cameraClass, camera_kwargs, img_path="", video_prefix="", width=960, height=720, fps=25, bitrate=500000, stream=True, record_video=False, frame_processor=None)
+
+
+class MaskCreationStreamer(GeneralVideoRecorder):
+    """
+    Streamer specifically designed for interactive mask creation.
+    
+    Extends the streaming functionality to include ROI overlay and real-time
+    parameter updates for mask creation workflows.
+    """
+    
+    _description = {
+        "overview": "Interactive mask creation streamer with ROI overlay and real-time parameter updates.",
+        "arguments": [],
+        "hidden": True
+    }
+    status = "mask_creation"
+    
+    def __init__(self, cameraClass, camera_kwargs, video_prefix, img_path, 
+                 roi_builder=None, roi_params=None):
+        """
+        Initialize MaskCreationStreamer.
+        
+        Args:
+            cameraClass: Camera class to use
+            camera_kwargs: Camera initialization arguments
+            video_prefix: Video file prefix (unused in streaming)
+            img_path: Path for preview images (unused in streaming)
+            roi_builder: DynamicMaskROIBuilder instance for ROI management
+            roi_params: Initial ROI parameters dictionary
+        """
+        logging.info("Initializing MaskCreationStreamer for interactive mask creation")
+        
+        # Initialize parent with streaming enabled and frame processor
+        super(MaskCreationStreamer, self).__init__(
+            cameraClass, camera_kwargs, 
+            img_path="", video_prefix="", 
+            width=960, height=720, fps=25, bitrate=500000, 
+            stream=True, record_video=False,
+            frame_processor=self._process_frame_for_streaming
+        )
+        
+        # ROI management
+        self._roi_builder = roi_builder
+        self._roi_params = roi_params or {}
+        self._targets_detected = False
+        self._mask_creation_active = True
+        
+        # Import here to avoid circular imports
+        from ethoscope.roi_builders.dynamic_mask_roi_builder import DynamicMaskROIBuilder
+        
+        # Create ROI builder if not provided
+        if self._roi_builder is None:
+            self._roi_builder = DynamicMaskROIBuilder(**self._roi_params)
+            
+        logging.info("MaskCreationStreamer initialized successfully")
+    
+    def update_roi_parameters(self, params):
+        """
+        Update ROI parameters in real-time.
+        
+        Args:
+            params (dict): New ROI parameters
+            
+        Returns:
+            dict: Updated parameters and status
+        """
+        try:
+            if self._roi_builder and self._targets_detected:
+                # Update parameters using the ROI builder
+                reference_points, rois = self._roi_builder.update_roi_parameters(params)
+                
+                logging.info(f"Updated ROI parameters: {params}")
+                return {
+                    'success': True,
+                    'message': 'ROI parameters updated successfully',
+                    'roi_count': len(rois),
+                    'current_params': self._roi_builder.get_current_parameters()
+                }
+            elif not self._targets_detected:
+                return {
+                    'success': False,
+                    'message': 'Cannot update parameters: targets not detected yet'
+                }
+            else:
+                return {
+                    'success': False,
+                    'message': 'ROI builder not available'
+                }
+        except Exception as e:
+            logging.error(f"Error updating ROI parameters: {e}")
+            return {
+                'success': False,
+                'message': f'Error updating parameters: {str(e)}'
+            }
+    
+    def get_current_rois_as_template(self):
+        """
+        Export current ROI configuration as a template.
+        
+        Returns:
+            dict: Template data or error information
+        """
+        try:
+            if self._roi_builder and self._targets_detected:
+                template_data = self._roi_builder.get_current_rois_as_template()
+                return {
+                    'success': True,
+                    'template_data': template_data
+                }
+            elif not self._targets_detected:
+                return {
+                    'success': False,
+                    'message': 'Cannot export template: targets not detected yet'
+                }
+            else:
+                return {
+                    'success': False,
+                    'message': 'ROI builder not available'
+                }
+        except Exception as e:
+            logging.error(f"Error exporting template: {e}")
+            return {
+                'success': False,
+                'message': f'Error exporting template: {str(e)}'
+            }
+    
+    def get_detection_status(self):
+        """
+        Get current target detection and mask creation status.
+        
+        Returns:
+            dict: Status information
+        """
+        if self._roi_builder:
+            params = self._roi_builder.get_current_parameters()
+            return {
+                'targets_detected': params['targets_detected'],
+                'mask_creation_active': params['mask_creation_active'],
+                'roi_count': len(self._roi_builder._current_rois) if hasattr(self._roi_builder, '_current_rois') else 0,
+                'current_params': params
+            }
+        else:
+            return {
+                'targets_detected': False,
+                'mask_creation_active': False,
+                'roi_count': 0,
+                'current_params': {}
+            }
+    
+    def _process_frame_for_streaming(self, frame):
+        """
+        Process frame before streaming to add ROI overlay.
+        
+        Args:
+            frame: Input frame from camera
+            
+        Returns:
+            frame: Processed frame with ROI overlay
+        """
+        try:
+            # Attempt target detection on first frame if not yet detected
+            if self._roi_builder and not self._targets_detected:
+                logging.info(f"Attempting target detection on frame of shape: {frame.shape}")
+                if self._roi_builder.detect_targets_once(frame):
+                    self._targets_detected = True
+                    logging.info("Target detection completed for mask creation")
+                else:
+                    logging.warning("Target detection failed, will retry on next frame")
+            
+            # Add ROI overlay if ROI builder is available
+            if self._roi_builder:
+                frame = self._roi_builder.draw_roi_overlay(frame)
+            
+            # Add mask creation status overlay
+            if self._targets_detected:
+                cv2.putText(frame, "MASK CREATION MODE - Ready for editing", 
+                           (10, frame.shape[0] - 50), cv2.FONT_HERSHEY_SIMPLEX, 
+                           0.7, (0, 255, 0), 2)
+            else:
+                cv2.putText(frame, "MASK CREATION MODE - Detecting targets...", 
+                           (10, frame.shape[0] - 50), cv2.FONT_HERSHEY_SIMPLEX, 
+                           0.7, (0, 255, 255), 2)
+            
+            return frame
+            
+        except Exception as e:
+            logging.error(f"Error processing frame for streaming: {e}")
+            # Add error overlay
+            cv2.putText(frame, f"Error: {str(e)}", (10, 50), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+            return frame
         
 
 class timedStop(DescribedObject):
@@ -302,7 +507,7 @@ class ControlThreadVideoRecording(ControlThread):
                     "possible_classes":[ExperimentalInformation],
                     }),
             ("recorder", {
-                    "possible_classes":[StandardVideoRecorder, HDVideoRecorder, GeneralVideoRecorder, Streamer],
+                    "possible_classes":[StandardVideoRecorder, HDVideoRecorder, GeneralVideoRecorder, Streamer, MaskCreationStreamer],
                     }),
             ("time_control", {
                     "possible_classes":[timedStop],

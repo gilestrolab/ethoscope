@@ -36,6 +36,7 @@ api = bottle.Bottle()
 tracking_json_data = {}
 recording_json_data = {}
 update_machine_json_data = {}
+mask_creation_json_data = {}  # For mask creation streamer data
 
 """
 /update/<id>                            POST    update machine parameters (number, name, nodeIP, WIFI credentials, time)
@@ -303,6 +304,60 @@ def controls(id, action):
         logging.info("Sending a test command to the connected module.")
         module_info = interfaces.getModuleCapabilities(test=True)
         return info(id)
+    
+    elif action == 'start_mask_creation':
+        # Start mask creation mode with MaskCreationStreamer
+        data = bottle.request.json or {}
+        mask_creation_json_data.update(data)
+        
+        # Use mask creation streamer for interactive ROI editing
+        mask_creation_data = {
+            'recorder': {
+                'name': 'MaskCreationStreamer',
+                'arguments': {}
+            }
+        }
+        mask_creation_data.update(mask_creation_json_data)
+        
+        send_command('stream', mask_creation_data)
+        return info(id)
+    
+    elif action == 'update_roi_params':
+        # Update ROI parameters in real-time during mask creation
+        data = bottle.request.json or {}
+        
+        # Send command to update ROI parameters
+        send_command('update_roi_params', data)
+        
+        # Return current device info 
+        return info(id)
+    
+    elif action == 'save_custom_mask':
+        # Save current mask configuration as a template
+        data = bottle.request.json or {}
+        template_name = data.get('template_name', f'custom_mask_{int(time.time())}')
+        
+        # Get current ROI configuration from the running streamer
+        result = send_command('get_current_rois_template')
+        
+        if result and result.get('success'):
+            template_data = result.get('template_data')
+            
+            # Update template info with user-provided name
+            if template_data and 'template_info' in template_data:
+                template_data['template_info']['name'] = template_name
+                template_data['template_info']['created_timestamp'] = time.time()
+            
+            # Save template using existing function
+            save_result = _save_roi_template(template_data, template_name, validate=True)
+            return save_result
+        else:
+            return {'result': 'fail', 'comment': 'Could not retrieve current ROI configuration'}
+    
+    elif action == 'get_current_rois':
+        # Get current ROI positions and parameters
+        result = send_command('get_mask_status')
+        return result or {'roi_count': 0, 'targets_detected': False}
                 
     else:
         raise Exception("No such action: %s" % action)

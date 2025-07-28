@@ -49,14 +49,18 @@ class Ethoscope(BaseDevice):
         "stream": ["stopped"],
         "start": ["stopped"], 
         "start_record": ["stopped"],
-        "stop": ["streaming", "running", "recording"],
+        "stop": ["streaming", "running", "recording", "mask_creation"],
         "poweroff": ["stopped"],
         "reboot": ["stopped"],
         "restart": ["stopped"],
         "dumpdb": ["stopped"],
         "offline": [],
         "convertvideos": ["stopped"],
-        "test_module": ["stopped"]
+        "test_module": ["stopped"],
+        "start_mask_creation": ["stopped"],
+        "update_roi_params": ["mask_creation", "streaming"],
+        "save_custom_mask": ["mask_creation", "streaming"],
+        "get_current_rois": ["mask_creation", "streaming", "stopped"]
     }
     
     def __init__(self, ip: str, port: int = ETHOSCOPE_PORT, refresh_period: float = 5,
