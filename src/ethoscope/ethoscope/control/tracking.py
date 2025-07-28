@@ -940,12 +940,37 @@ class ControlThread(Thread):
         except EthoscopeException as e:
             if e.img is not  None:
                 cv2.imwrite(self._info["dbg_img"], e.img)
-            # This is an exception-based stop, so it's not graceful
-            self.stop(traceback.format_exc())
+            
+            # Check if this is a camera hardware issue that should not cause a permanent failure
+            error_msg = str(e).lower()
+            if ("camera hardware not available" in error_msg or 
+                "video tracking and recording are disabled" in error_msg or
+                "picamera2 compatibility" in error_msg or
+                "allocator" in error_msg):
+                logging.error(f"Camera initialization failed: {e}")
+                self._info["status"] = "stopped"
+                self._info["error"] = f"Camera initialization failed: {str(e)}"
+                self._info["time"] = time.time()
+                # Don't call stop() which would set error traceback - just clean exit
+                return
+            else:
+                # This is an exception-based stop, so it's not graceful
+                self.stop(traceback.format_exc())
         
         except Exception as e:
-            # This is an exception-based stop, so it's not graceful
-            self.stop(traceback.format_exc())
+            # Check if this is a camera-related exception that should not cause permanent failure
+            error_msg = str(e).lower()
+            if ("allocator" in error_msg or "picamera" in error_msg or 
+                "camera" in error_msg and "hardware" in error_msg):
+                logging.error(f"Camera-related error during initialization: {e}")
+                self._info["status"] = "stopped"
+                self._info["error"] = f"Camera error: {str(e)}"
+                self._info["time"] = time.time()
+                # Don't call stop() which would set error traceback - just clean exit
+                return
+            else:
+                # This is an exception-based stop, so it's not graceful
+                self.stop(traceback.format_exc())
 
         finally:
             try:

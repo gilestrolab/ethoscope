@@ -516,10 +516,11 @@ class PiFrameGrabber(threading.Thread):
                         self._queue.put(frame.array[:, :, 0])  # Get first channel (Y) for grayscale
 
         except Exception as e:
-            # Check if this is a camera hardware issue
+            # Check if this is a camera hardware issue or PiCamera compatibility issue
             error_msg = str(e).lower()
-            if "libbcm_host.so" in error_msg or "camera" in error_msg or "mmal" in error_msg:
-                logging.error(f"Camera hardware not available: {e}")
+            if ("libbcm_host.so" in error_msg or "camera" in error_msg or "mmal" in error_msg or 
+                "allocator" in error_msg or "attributeerror" in error_msg):
+                logging.error(f"Camera hardware or PiCamera compatibility issue: {e}")
                 # Put a special frame to signal no camera hardware
                 self._queue.put(None)
             else:
@@ -631,10 +632,11 @@ class PiFrameGrabber2(PiFrameGrabber):
                     capture.stop()
 
         except Exception as e:
-            # Check if this is a camera hardware issue
+            # Check if this is a camera hardware issue or PiCamera2 compatibility issue
             error_msg = str(e).lower()
-            if "libbcm_host.so" in error_msg or "camera" in error_msg or "mmal" in error_msg:
-                logging.error(f"Camera hardware not available: {e}")
+            if ("libbcm_host.so" in error_msg or "camera" in error_msg or "mmal" in error_msg or 
+                "allocator" in error_msg or "attributeerror" in error_msg):
+                logging.error(f"Camera hardware or PiCamera2 compatibility issue: {e}")
                 # Put a special frame to signal no camera hardware
                 self._queue.put(None)
             else:
@@ -643,17 +645,8 @@ class PiFrameGrabber2(PiFrameGrabber):
         finally:
             # Ensure camera cleanup for PiFrameGrabber2
             try:
-                # Force cleanup of any Picamera2 instances that might be lingering
-                gc.collect()
-                
-                # Try to explicitly close any remaining camera connections
-                try:
-                    from picamera2 import Picamera2
-                    # Clear any global camera instances if they exist
-                    if hasattr(Picamera2, '_instances'):
-                        Picamera2._instances.clear()
-                except Exception:
-                    pass
+                # Use the static cleanup method with no delay (we're in thread shutdown)
+                OurPiCameraAsync._perform_camera_cleanup(delay=0)
                     
             except Exception as cleanup_e:
                 logging.error(f"Error during frame grabber cleanup: {cleanup_e}")
@@ -665,6 +658,39 @@ class PiFrameGrabber2(PiFrameGrabber):
 class OurPiCameraAsync(BaseCamera):
     _description = {"overview": "Default class to acquire frames from the raspberry pi camera asynchronously.",
                     "arguments": []}
+    
+    @staticmethod
+    def _perform_camera_cleanup(delay=1.0):
+        """
+        Perform aggressive camera cleanup to release resources.
+        
+        Args:
+            delay: Time to wait after cleanup for hardware reset (default 1.0s)
+        """
+        try:
+            logging.warning("Performing camera cleanup to release resources")
+            # Force garbage collection to clean up any lingering camera objects
+            gc.collect()
+            
+            # Try to reset Picamera2 global state
+            try:
+                from picamera2 import Picamera2
+                # Some versions of picamera2 maintain global state
+                if hasattr(Picamera2, '_instances'):
+                    Picamera2._instances.clear()
+                if hasattr(Picamera2, '_global_camera_info'):
+                    Picamera2._global_camera_info = None
+                    
+            except Exception:
+                # If Picamera2 cleanup fails, that's okay
+                pass
+            
+            # Wait for hardware to reset
+            if delay > 0:
+                time.sleep(delay)
+                        
+        except Exception as cleanup_e:
+            logging.error(f"Error during camera cleanup: {cleanup_e}")
                                    
 
     def __init__(self, target_fps=20, target_resolution=(1280, 960), video_prefix=None, *args, **kwargs):
@@ -682,6 +708,11 @@ class OurPiCameraAsync(BaseCamera):
         self.canbepickled = True #cv2.videocapture object cannot be serialized, hence cannot be picked
         self.isPiCamera = True
         self._frame_grabber_class = PiFrameGrabber2 if USE_PICAMERA2 else PiFrameGrabber
+        
+        # Proactively clean up any lingering camera resources before initialization
+        # Only needed for PiCamera2 as it has more complex resource management
+        if USE_PICAMERA2:
+            self._perform_camera_cleanup(delay=1.0)
 
         w,h = target_resolution
         if not isinstance(target_fps, int):
@@ -762,29 +793,8 @@ class OurPiCameraAsync(BaseCamera):
         finally:
             # Additional cleanup for Picamera2 global state - only on actual failures
             if force_global_cleanup:
-                try:
-                    logging.warning("Performing aggressive camera cleanup due to hardware failure")
-                    # Force garbage collection to clean up any lingering camera objects
-                    gc.collect()
-                    
-                    # Try to reset Picamera2 global state
-                    try:
-                        from picamera2 import Picamera2
-                        # Some versions of picamera2 maintain global state
-                        if hasattr(Picamera2, '_instances'):
-                            Picamera2._instances.clear()
-                        if hasattr(Picamera2, '_global_camera_info'):
-                            Picamera2._global_camera_info = None
-                            
-                        # Wait a bit for hardware to reset
-                        time.sleep(0.5)
-                            
-                    except Exception:
-                        # If Picamera2 cleanup fails, that's okay
-                        pass
-                        
-                except Exception as global_cleanup_e:
-                    logging.error(f"Error during global camera cleanup: {global_cleanup_e}")
+                # Use the static cleanup method with shorter delay (0.5s) for existing cleanup
+                self._perform_camera_cleanup(delay=0.5)
             else:
                 # Normal cleanup - just basic garbage collection without disrupting camera state
                 gc.collect()
