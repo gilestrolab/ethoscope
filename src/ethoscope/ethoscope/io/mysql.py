@@ -194,7 +194,7 @@ class MySQLResultWriter(BaseResultWriter):
         _null: Value to use for NULL in database
     """
     _description = {
-        "overview": "MySQL/MariaDB result writer - stores tracking data to a mySQL/mariadb database server.",
+        "overview": "MySQL/MariaDB result writer - stores tracking data to a mySQL/mariadb database server. Legacy.",
         "arguments": [
             {"name": "db_host", "description": "Database server hostname or IP address", "type": "str", "default": "localhost", "options": ["localhost", "node"]},
             {"name": "take_frame_shots", "description": "Save periodic frame snapshots", "type": "boolean", "default": True},

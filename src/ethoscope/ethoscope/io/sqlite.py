@@ -113,10 +113,10 @@ class SQLiteResultWriter(BaseResultWriter):
     - Use of AsyncSQLiteWriter instead of AsyncMySQLWriter
     - NULL instead of 0 for auto-increment fields
     - Removal of MySQL-specific table options
-    - Automatic placeholder conversion from MySQL (%s) to SQLite (?)
+    - Proper handling of SQLite ? placeholders for parameterized queries
     """
     _description = {
-        "overview": "SQLite result writer - stores tracking data to local SQLite database file using consistent directory structure. Each experiment creates a unique file, preserving historical data. Compatible with rsync-based backups. Supports sensor data collection when sensors are available.",
+        "overview": "SQLite result writer - Preferred. Stores tracking data to local SQLite database file using consistent directory structure. Each experiment creates a unique file, preserving historical data. Compatible with rsync-based backups.",
         "arguments": [
             {"name": "take_frame_shots", "description": "Save periodic frame snapshots", "type": "boolean", "default": True},
             {"name": "make_dam_like_table", "description": "Create DAM-compatible activity summary table", "type": "boolean", "default": False}
