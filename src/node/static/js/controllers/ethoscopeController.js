@@ -828,42 +828,64 @@
                     }
                 }
 
-                // Replace the interactor section with MultiStimulator configuration
-                option.interactor = {
-                    name: 'MultiStimulator',
-                    arguments: {
-                        stimulator_sequence: $scope.stimulatorSequence.map(function(stim) {
-                            // Create a clean copy of arguments without the date_range
-                            var cleanArguments = {};
-                            if (stim.arguments) {
-                                for (var key in stim.arguments) {
-                                    if (key !== 'date_range') {
-                                        cleanArguments[key] = stim.arguments[key];
+                // If only one stimulator, use it directly without MultiStimulator wrapper
+                if ($scope.stimulatorSequence.length === 1) {
+                    var singleStimulator = $scope.stimulatorSequence[0];
+                    
+                    // Create arguments object including date_range
+                    var stimulatorArguments = {};
+                    if (singleStimulator.arguments) {
+                        for (var key in singleStimulator.arguments) {
+                            stimulatorArguments[key] = singleStimulator.arguments[key];
+                        }
+                    }
+                    
+                    option.interactor = {
+                        name: singleStimulator.name,
+                        arguments: stimulatorArguments
+                    };
+                    
+                    console.log('Configured single stimulator:', singleStimulator.name, 'with arguments:', stimulatorArguments);
+                    
+                } else {
+                    // Multiple stimulators - use MultiStimulator configuration
+                    option.interactor = {
+                        name: 'MultiStimulator',
+                        arguments: {
+                            stimulator_sequence: $scope.stimulatorSequence.map(function(stim) {
+                                // Create a clean copy of arguments without the date_range
+                                var cleanArguments = {};
+                                if (stim.arguments) {
+                                    for (var key in stim.arguments) {
+                                        if (key !== 'date_range') {
+                                            cleanArguments[key] = stim.arguments[key];
+                                        }
                                     }
                                 }
-                            }
 
-                            return {
-                                class_name: stim.name,
-                                arguments: cleanArguments,
-                                date_range: (stim.arguments && stim.arguments.date_range) ?
-                                    (typeof stim.arguments.date_range === 'string' ? stim.arguments.date_range : '') : ''
-                            };
-                        })
-                    }
-                };
-                // Sanitize the data to prevent JSON errors
-                try {
-                    JSON.stringify(option.interactor.arguments.stimulator_sequence);
-                    console.log('Configured MultiStimulator with sequence:', option.interactor.arguments.stimulator_sequence);
-                } catch (jsonError) {
-                    console.error('JSON serialization error in stimulator sequence:', jsonError);
-                    console.log('Raw stimulator sequence:', $scope.stimulatorSequence);
-                    // Fallback to DefaultStimulator if JSON serialization fails
-                    option.interactor = {
-                        name: 'DefaultStimulator',
-                        arguments: {}
+                                return {
+                                    class_name: stim.name,
+                                    arguments: cleanArguments,
+                                    date_range: (stim.arguments && stim.arguments.date_range) ?
+                                        (typeof stim.arguments.date_range === 'string' ? stim.arguments.date_range : '') : ''
+                                };
+                            })
+                        }
                     };
+                    
+                    // Sanitize the data to prevent JSON errors
+                    try {
+                        JSON.stringify(option.interactor.arguments.stimulator_sequence);
+                        console.log('Configured MultiStimulator with sequence:', option.interactor.arguments.stimulator_sequence);
+                    } catch (jsonError) {
+                        console.error('JSON serialization error in stimulator sequence:', jsonError);
+                        console.log('Raw stimulator sequence:', $scope.stimulatorSequence);
+                        // Fallback to DefaultStimulator if JSON serialization fails
+                        option.interactor = {
+                            name: 'DefaultStimulator',
+                            arguments: {}
+                        };
+                    }
                 }
             } else {
                 // If no stimulators in sequence, use DefaultStimulator
