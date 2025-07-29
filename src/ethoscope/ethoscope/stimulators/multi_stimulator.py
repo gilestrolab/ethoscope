@@ -250,3 +250,25 @@ class MultiStimulator(BaseStimulator):
                 'is_active': stimulator_info['scheduler'].check_time_range()
             })
         return info
+
+    def get_stimulator_state(self, t=None):
+        """
+        Get state for MultiStimulator - delegates to active stimulator.
+        
+        Args:
+            t: timestamp to check (None = current time)
+            
+        Returns:
+            str: "inactive", "scheduled", or "stimulating"
+        """
+        # Find currently active stimulators
+        active_stimulators = []
+        for stimulator_info in self._stimulators:
+            if stimulator_info['scheduler'].check_time_range(t):
+                active_stimulators.append(stimulator_info)
+        
+        if not active_stimulators:
+            return "inactive"
+        
+        # Use first active stimulator's state (follows same logic as _decide)
+        return active_stimulators[0]['instance'].get_stimulator_state(t)

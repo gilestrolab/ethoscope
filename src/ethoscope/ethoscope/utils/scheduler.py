@@ -53,6 +53,18 @@ class Scheduler(object):
             t= time.time()
         return self._in_range(t)
 
+    def get_schedule_state(self, t=None):
+        """
+        Get the current scheduling state for visual feedback.
+        :param t: the time to test. When ``None``, the system time is used
+        :type t: float
+        :return: ``"scheduled"`` if within range, ``"inactive"`` if outside range
+        :rtype: str
+        """
+        if t is None:
+            t = time.time()
+        return "scheduled" if self._in_range(t) else "inactive"
+
     def _in_range(self, t):
         for r in self._date_ranges:
             if r[1] > t > r[0]:

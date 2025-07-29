@@ -1,5 +1,6 @@
 __author__ = 'quentin'
 
+import time
 from ethoscope.utils.description import DescribedObject
 from ethoscope.core.variables import BaseIntVariable
 from ethoscope.hardware.interfaces.interfaces import DefaultInterface
@@ -57,9 +58,17 @@ class   BaseStimulator(DescribedObject):
         if self._tracker is None:
             raise ValueError("No tracker bound to this stimulator. Use `bind_tracker()` methods")
 
+        current_time = time.time() * 1000  # Convert to ms for consistency with tracker timestamps
+
         if self._scheduler.check_time_range() is False:
+            self._track_interaction_state(False, current_time)
             return HasInteractedVariable(False) , {}
+        
         interact, result  = self._decide()
+        
+        # Track interaction state for visual feedback
+        self._track_interaction_state(interact, current_time)
+        
         if interact > 0:
             self._deliver(**result)
 
@@ -81,6 +90,40 @@ class   BaseStimulator(DescribedObject):
     def _deliver(self, **kwargs):
         if self._hardware_connection is not None:
             self._hardware_connection.send_instruction(kwargs)
+
+    def get_stimulator_state(self, t=None):
+        """
+        Get comprehensive stimulator state combining schedule and interaction status.
+        :param t: timestamp to check (None = current time)
+        :return: "inactive", "scheduled", or "stimulating"
+        :rtype: str
+        """
+        # First check scheduler state
+        schedule_state = self._scheduler.get_schedule_state(t)
+        if schedule_state == "inactive":
+            return "inactive"
+        
+        # If scheduled, check if currently stimulating
+        if hasattr(self, '_last_interaction_time') and hasattr(self, '_last_interaction_value'):
+            # Check if recent interaction occurred (within last few seconds)
+            current_time = t if t is not None else time.time() * 1000  # Convert to ms
+            time_since_interaction = current_time - self._last_interaction_time
+            
+            # Consider "stimulating" if interaction happened in last 2 seconds
+            if time_since_interaction < 2000 and self._last_interaction_value > 0:
+                return "stimulating"
+        
+        return "scheduled"
+
+    def _track_interaction_state(self, interact, current_time):
+        """
+        Internal method to track interaction timing for state determination.
+        Called from apply() method.
+        :param interact: interaction result from _decide()
+        :param current_time: current timestamp in milliseconds
+        """
+        self._last_interaction_time = current_time
+        self._last_interaction_value = int(interact) if interact else 0
 
     def _apply_template_overrides(self):
         """

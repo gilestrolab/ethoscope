@@ -124,6 +124,34 @@ class DefaultDrawer(BaseDrawer):
         """
         super(DefaultDrawer,self).__init__(video_out=video_out, draw_frames=draw_frames, **kwargs)
 
+    def _draw_stimulator_indicator(self, img, roi, stimulator_state):
+        """
+        Draw stimulator state indicator in ROI corner.
+        
+        :param img: the frame to draw on
+        :param roi: the ROI object
+        :param stimulator_state: "inactive", "scheduled", or "stimulating"
+        """
+        # Position indicator in top-right corner of ROI  
+        x, y = roi.offset
+        roi_points = roi.polygon
+        # Calculate approximate ROI width from polygon points
+        roi_width = max([p[0] for p in roi_points]) - min([p[0] for p in roi_points])
+        
+        center = (int(x + roi_width - 20), int(y + 20))
+        radius = 8
+        
+        if stimulator_state == "inactive":
+            # Empty white circle (planned but not scheduled)
+            cv2.circle(img, center, radius, (255,255,255), 1)
+        elif stimulator_state == "scheduled":
+            # Lightly filled gray circle (scheduled but not stimulating)  
+            cv2.circle(img, center, radius, (128,128,128), -1)
+            cv2.circle(img, center, radius, (255,255,255), 1)
+        elif stimulator_state == "stimulating":
+            # Full white circle (actively stimulating)
+            cv2.circle(img, center, radius, (255,255,255), -1)
+
     def _annotate_frame(self, img, positions, tracking_units, reference_points=None):
         '''
         Annotate frames with information about ROIs and moving objects
@@ -158,6 +186,14 @@ class DefaultDrawer(BaseDrawer):
             sub_roi_colour = (255, 0, 0)
             cv2.drawContours(img,[track_u.roi.polygon],-1, black_colour, 3, LINE_AA)
             cv2.drawContours(img,[track_u.roi.polygon],-1, roi_colour, 1, LINE_AA)
+            
+            # Add stimulator state indicator
+            try:
+                stimulator_state = track_u.stimulator.get_stimulator_state()
+                self._draw_stimulator_indicator(img, track_u.roi, stimulator_state)
+            except (AttributeError, Exception):
+                # Handle cases where stimulator doesn't support state tracking
+                pass
             #cv2.drawContours(img,track_u.roi.regions, -1, sub_roi_colour, 1, LINE_AA)
             try:
                 pos_list = positions[track_u.roi.idx]
