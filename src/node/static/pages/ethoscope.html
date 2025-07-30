@@ -103,7 +103,84 @@
 <div class="jumbotron-fluid" ng-if="hasValidInteractor(device)">
     <button data-toggle="collapse" data-target="#interactor" style="float:right; border:none; background:none; padding:0;" ng-style="{'color': machine_info.Module.Connected ? 'var(--sky-blue)' : 'var(--deep-red)'}" class="fa fa-robot fa-3x" ng-attr-title="{{machine_info.Module.Connected ? 'Stimulator connected and active' : 'Stimulator NOT connected - hardware module disconnected'}}"></button>
     <div class="collapse" id="interactor">
-        <li ng-repeat="(name, value) in device.experimental_info.current.interactor">{{name}}: {{value}}</li>
+        <!-- Enhanced Stimulator Status Information -->
+        <div class="stimulator-status-panel" style="background-color: #f8f9fa; border-radius: 8px; padding: 15px; margin: 10px 0; border-left: 4px solid {{machine_info.Module.Connected ? '#28a745' : '#dc3545'}};">
+            
+            <!-- Stimulator Type and Connection Status -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h5 style="margin: 0; color: #495057;">
+                    <i class="fa fa-robot"></i> Stimulator Status
+                </h5>
+                <span class="badge" ng-class="machine_info.Module.Connected ? 'badge-success' : 'badge-danger'">
+                    {{machine_info.Module.Connected ? 'Hardware Connected' : 'Hardware Disconnected'}}
+                </span>
+            </div>
+
+            <!-- Current Active Stimulator -->
+            <div ng-if="device.experimental_info.current.interactor.name">
+                <div class="status-item" style="margin-bottom: 10px;">
+                    <strong style="color: #495057;">Active Stimulator:</strong>
+                    <span style="font-family: monospace; background-color: #e9ecef; padding: 2px 6px; border-radius: 3px; margin-left: 8px;">
+                        {{getReadableStimulatorName(device.experimental_info.current.interactor.name)}}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Schedule Information -->
+            <div ng-if="device.experimental_info.current.interactor.arguments.date_range" class="status-item" style="margin-bottom: 10px;">
+                <strong style="color: #495057;">Schedule:</strong>
+                <span style="margin-left: 8px;">{{formatDateRange(device.experimental_info.current.interactor.arguments.date_range)}}</span>
+            </div>
+
+            <!-- MultiStimulator Sequence -->
+            <div ng-if="device.experimental_info.current.interactor.name.indexOf('MultiStimulator') > -1 && device.experimental_info.current.interactor.arguments.stimulator_sequence">
+                <div style="margin-top: 10px;">
+                    <strong style="color: #495057;">Stimulator Sequence:</strong>
+                    <div style="margin-top: 8px;">
+                        <div ng-repeat="stim in device.experimental_info.current.interactor.arguments.stimulator_sequence" 
+                             style="background-color: white; border-radius: 4px; padding: 8px; margin: 4px 0; border: 1px solid #dee2e6;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-weight: 500;">{{stim.class_name}}</span>
+                                <small style="color: #6c757d;">{{formatDateRange(stim.date_range)}}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Time Status -->
+            <div class="status-item" style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong style="color: #495057;">Current Status:</strong>
+                        <span ng-if="machine_info.Module.Connected" style="margin-left: 8px;">
+                            <span class="badge badge-info" ng-if="isStimulatorScheduled()">Scheduled</span>
+                            <span class="badge badge-warning" ng-if="!isStimulatorScheduled()">Outside Schedule</span>
+                        </span>
+                        <span ng-if="!machine_info.Module.Connected" style="margin-left: 8px;">
+                            <span class="badge badge-secondary">Hardware Required</span>
+                        </span>
+                    </div>
+                    <small style="color: #6c757d;">{{getDeviceTimeString()}}</small>
+                </div>
+            </div>
+
+            <!-- Configuration Details (Collapsible) -->
+            <div style="margin-top: 10px;">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-toggle="collapse" data-target="#stimulator-config" style="font-size: 12px;">
+                    <i class="fa fa-cog"></i> Show Configuration
+                </button>
+                <div class="collapse" id="stimulator-config" style="margin-top: 8px;">
+                    <div style="background-color: white; border-radius: 4px; padding: 10px; font-family: monospace; font-size: 12px; border: 1px solid #dee2e6;">
+                        <div ng-repeat="(name, value) in device.experimental_info.current.interactor" style="margin-bottom: 4px;">
+                            <span style="color: #007bff; font-weight: bold;">{{name}}:</span> 
+                            <span style="color: #6c757d;">{{formatConfigValue(value)}}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
     </div>
 </div>
 

@@ -497,11 +497,30 @@ class ControlThread(Thread):
                         hardware_connection, StimulatorClass, stimulator_kwargs, time_offset=0):
 
         #Here the stimulator passes args. Hardware connection was previously open as thread.
-        stimulators = [StimulatorClass(hardware_connection, **stimulator_kwargs) for _ in rois]
+        logging.info(f"Creating stimulators: StimulatorClass={StimulatorClass}, hardware_connection={hardware_connection}, stimulator_kwargs={stimulator_kwargs}")
+        logging.info(f"Number of ROIs: {len(rois)}")
+        
+        stimulators = []
+        for i, roi in enumerate(rois):
+            try:
+                stimulator = StimulatorClass(hardware_connection, **stimulator_kwargs)
+                logging.info(f"Successfully created stimulator {i+1}/{len(rois)}: {type(stimulator).__name__}")
+                stimulators.append(stimulator)
+            except Exception as e:
+                logging.error(f"Failed to create stimulator {i+1}/{len(rois)}: {e}")
+                # Fall back to DefaultStimulator
+                from ethoscope.stimulators.stimulators import DefaultStimulator
+                fallback_stimulator = DefaultStimulator(None)
+                logging.warning(f"Using DefaultStimulator fallback for ROI {i+1}")
+                stimulators.append(fallback_stimulator)
         
         kwargs = self._monit_kwargs.copy()
         kwargs.update(tracker_kwargs)
 
+        logging.info(f"Creating Monitor with {len(stimulators)} stimulators")
+        for i, stimulator in enumerate(stimulators):
+            logging.info(f"Stimulator {i+1}: {type(stimulator).__name__}")
+            
         self._monit = Monitor(camera, TrackerClass, rois,
                               reference_points = reference_points,
                               stimulators=stimulators,

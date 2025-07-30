@@ -1770,6 +1770,149 @@
             });
         }, 100);
 
+        // ===========================
+        // STIMULATOR STATUS FUNCTIONS
+        // ===========================
+
+        /**
+         * Get a human-readable stimulator name from the class name
+         */
+        $scope.getReadableStimulatorName = function(className) {
+            if (!className) return 'None';
+            
+            // Extract class name from full path format
+            var match = className.match(/class '([^']+)'/);
+            if (match) {
+                className = match[1];
+            }
+            
+            // Extract just the class name without module path
+            var parts = className.split('.');
+            var shortName = parts[parts.length - 1];
+            
+            // Convert common stimulator names to readable format
+            var nameMapping = {
+                'DefaultStimulator': 'Default (No Stimulation)',
+                'MultiStimulator': 'Multi-Stimulator Sequence',
+                'mAGO': 'mAGO Sleep Depriver',
+                'AGO': 'AGO Sleep Depriver',
+                'SleepDepStimulator': 'Sleep Deprivation',
+                'OptomotorSleepDepriver': 'Optomotor Sleep Depriver',
+                'MiddleCrossingStimulator': 'Middle Crossing Stimulator',
+                'ExperimentalSleepDepStimulator': 'Experimental Sleep Depriver',
+                'DynamicOdourSleepDepriver': 'Dynamic Odour Sleep Depriver',
+                'OptoMidlineCrossStimulator': 'Optomotor Midline Cross',
+                'OptomotorSleepDepriverSystematic': 'Systematic Optomotor Sleep Depriver',
+                'MiddleCrossingOdourStimulator': 'Middle Crossing Odour Stimulator',
+                'MiddleCrossingOdourStimulatorFlushed': 'Flushed Odour Stimulator'
+            };
+            
+            return nameMapping[shortName] || shortName;
+        };
+
+        /**
+         * Format date range string for display
+         */
+        $scope.formatDateRange = function(dateRange) {
+            if (!dateRange || dateRange.trim() === '') {
+                return 'Always Active';
+            }
+            
+            try {
+                // Parse the date range format "YYYY-MM-DD HH:mm:ss > YYYY-MM-DD HH:mm:ss"
+                var parts = dateRange.split('>');
+                if (parts.length === 2) {
+                    var startStr = parts[0].trim();
+                    var endStr = parts[1].trim();
+                    
+                    if (startStr && endStr) {
+                        // Format dates to be more readable
+                        var startDate = new Date(startStr.replace(/ /, 'T'));
+                        var endDate = new Date(endStr.replace(/ /, 'T'));
+                        
+                        var formatDate = function(date) {
+                            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                        };
+                        
+                        return formatDate(startDate) + ' → ' + formatDate(endDate);
+                    }
+                }
+                
+                return dateRange;
+            } catch (e) {
+                return dateRange;
+            }
+        };
+
+        /**
+         * Check if stimulator is currently scheduled to be active
+         */
+        $scope.isStimulatorScheduled = function() {
+            if (!$scope.device || !$scope.device.experimental_info || 
+                !$scope.device.experimental_info.current || 
+                !$scope.device.experimental_info.current.interactor) {
+                return false;
+            }
+            
+            var dateRange = $scope.device.experimental_info.current.interactor.arguments.date_range;
+            if (!dateRange || dateRange.trim() === '') {
+                return true; // Always active if no date range specified
+            }
+            
+            try {
+                var parts = dateRange.split('>');
+                if (parts.length === 2) {
+                    var startStr = parts[0].trim();
+                    var endStr = parts[1].trim();
+                    
+                    if (startStr && endStr) {
+                        var startDate = new Date(startStr.replace(/ /, 'T'));
+                        var endDate = new Date(endStr.replace(/ /, 'T'));
+                        var now = new Date();
+                        
+                        return now >= startDate && now <= endDate;
+                    }
+                }
+            } catch (e) {
+                console.error('Error parsing date range:', e);
+            }
+            
+            return false;
+        };
+
+        /**
+         * Get device time as a formatted string
+         */
+        $scope.getDeviceTimeString = function() {
+            if ($scope.device_datetime) {
+                return $scope.device_datetime;
+            }
+            return new Date().toLocaleString();
+        };
+
+        /**
+         * Format configuration values for display
+         */
+        $scope.formatConfigValue = function(value) {
+            if (value === null || value === undefined) {
+                return 'null';
+            }
+            
+            if (typeof value === 'object') {
+                try {
+                    return JSON.stringify(value, null, 2);
+                } catch (e) {
+                    return '[Object]';
+                }
+            }
+            
+            if (typeof value === 'string' && value.length > 100) {
+                return value.substring(0, 100) + '...';
+            }
+            
+            return String(value);
+        };
+
     });
 
 })();
