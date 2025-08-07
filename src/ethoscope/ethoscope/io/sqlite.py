@@ -324,37 +324,97 @@ class SQLiteResultWriter(BaseResultWriter):
         
     def _add(self, t, roi, data_rows):
         """
-        Add data with SQLite-specific NULL handling.
+        Add data with proper type preservation and parameterized queries.
         
-        Uses None instead of Null() object and converts to string properly for SQLite.
+        Uses parameterized queries to prevent SQL injection and preserve data types.
+        Converts booleans to integers (0/1) for SQLite storage.
         """
         t = int(round(t))
         roi_id = roi.idx
+        
+        # Initialize insert data list for this ROI if not exists
+        if roi_id not in self._insert_dict:
+            self._insert_dict[roi_id] = []
+        
         for dr in data_rows:
-            # Convert Null() to None, then build tuple for string representation
+            # Build values tuple with proper type handling
             values = [None if isinstance(self._null, Null) else self._null, t] + list(dr.values())
-            # Convert None to NULL string for SQL, others to their string representation
-            sql_values = []
+            
+            # Convert values to proper SQLite types
+            sqlite_values = []
             for val in values:
-                if val is None:
-                    sql_values.append("NULL")
-                elif isinstance(val, str):
-                    sql_values.append(f"'{val}'")  # Quote strings
+                if val is None or isinstance(val, Null):
+                    sqlite_values.append(None)  # SQLite NULL
+                elif isinstance(val, bool):
+                    sqlite_values.append(1 if val else 0)  # Convert bool to int
                 else:
-                    sql_values.append(str(val))
+                    sqlite_values.append(val)  # Keep original type
             
-            value_str = "(" + ", ".join(sql_values) + ")"
-            
-            if roi_id not in self._insert_dict or self._insert_dict[roi_id] == "":
-                command = f'INSERT INTO ROI_{roi_id} VALUES {value_str}'
-                self._insert_dict[roi_id] = command
-            else:
-                self._insert_dict[roi_id] += f",{value_str}"
+            # Store as tuple for parameterized query
+            self._insert_dict[roi_id].append(tuple(sqlite_values))
         
         # now this is irrelevant when tracking multiple animals
         if self._dam_file_helper is not None:
             for dr in data_rows:
                 self._dam_file_helper.input_roi_data(t, roi, dr)
+
+    def flush(self, t, img=None):
+        """
+        Flush accumulated data to database using parameterized queries.
+        
+        Overrides base class flush to handle list-based insert data with proper types.
+        """
+        # Handle helper flushes (dam, shots, sensors) same as base class
+        if self._dam_file_helper is not None:
+            out = self._dam_file_helper.flush(t)
+            for c in out:
+                self._write_async_command(c)
+        if self._shot_saver is not None and img is not None:
+            c_args = self._shot_saver.flush(t, img)
+            if c_args is not None:
+                self._write_async_command(*c_args)
+        if self._sensor_saver is not None:
+            c_args = self._sensor_saver.flush(t)
+            if c_args is not None:
+                self._write_async_command(*c_args)
+        
+        # Handle ROI data inserts with parameterized queries
+        for roi_id, value_list in list(self._insert_dict.items()):
+            if len(value_list) >= self._max_insert_string_len:
+                # Execute batch insert with parameterized query
+                if value_list:  # Only if we have data
+                    placeholders = ', '.join(['?' for _ in value_list[0]])  # Create ? placeholders
+                    command = f'INSERT INTO ROI_{roi_id} VALUES ({placeholders})'
+                    
+                    # Execute each row as individual parameterized query
+                    for values in value_list:
+                        self._write_async_command(command, values)
+                    
+                    # Clear the list after flushing
+                    self._insert_dict[roi_id] = []
+        return False
+
+    def close(self):
+        """
+        Close the writer and flush any remaining data.
+        
+        Ensures all accumulated data is written before shutdown.
+        """
+        # Final flush of any remaining data
+        for roi_id, value_list in list(self._insert_dict.items()):
+            if value_list:  # Only if we have data
+                placeholders = ', '.join(['?' for _ in value_list[0]])  # Create ? placeholders
+                command = f'INSERT INTO ROI_{roi_id} VALUES ({placeholders})'
+                
+                # Execute each row as individual parameterized query
+                for values in value_list:
+                    self._write_async_command(command, values)
+                
+                # Clear the list after flushing
+                self._insert_dict[roi_id] = []
+        
+        # Call parent close method
+        super(SQLiteResultWriter, self).close()
 
     def _create_all_tables(self):
         """
