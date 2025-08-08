@@ -71,10 +71,10 @@ class Scheduler(object):
                 return True
         return False
 
-    def _parse_date_range(self, str):
+    def _parse_date_range(self, date_range_str):
         self._start_date = 0
         self._stop_date = float('inf')
-        dates = re.split(r"\s*>\s*", str)
+        dates = re.split(r"\s*>\s*", date_range_str)
 
         if len(dates) > 2:
             raise DateRangeError(" found several '>' symbol. Only one is allowed")
@@ -102,17 +102,20 @@ class Scheduler(object):
         else:
             raise Exception("Unexpected date string")
         if out[0] >= out[1]:
-            raise DateRangeError("Error in date %s, the end date appears to be in the past" % str)
+            raise DateRangeError("Error in date %s, the end date appears to be in the past" % date_range_str)
         return out
         
-    def _parse_date(self, str):
+    def _parse_date(self, date_str):
         pattern = re.compile(r"^\s*(?P<date>[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2})\s*$")
-        if re.match(r"^\s*$", str):
+        if re.match(r"^\s*$", date_str):
             return None
-        if not re.match(pattern, str):
-            raise DateRangeError("%s not match the expected pattern" % str)
-        datestr = re.match(pattern, str).groupdict()["date"]
-        return time.mktime(datetime.datetime.strptime(datestr,'%Y-%m-%d %H:%M:%S').timetuple())
+        if not re.match(pattern, date_str):
+            raise DateRangeError("%s not match the expected pattern" % date_str)
+        datestr = re.match(pattern, date_str).groupdict()["date"]
+        try:
+            return time.mktime(datetime.datetime.strptime(datestr,'%Y-%m-%d %H:%M:%S').timetuple())
+        except (ValueError, OverflowError) as e:
+            raise DateRangeError("Invalid date format: %s (%s)" % (datestr, str(e)))
 
 
 class DailyScheduler(object):

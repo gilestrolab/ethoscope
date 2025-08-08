@@ -47,7 +47,13 @@ class ROITemplateManager:
     
     def _ensure_directories(self):
         """Create custom template directory if it doesn't exist. Builtin should exist as part of codebase."""
-        os.makedirs(self.custom_dir, exist_ok=True)
+        try:
+            os.makedirs(self.custom_dir, exist_ok=True)
+        except PermissionError:
+            # In test environments or restricted permissions, use a fallback directory
+            import tempfile
+            self.custom_dir = os.path.join(tempfile.gettempdir(), "ethoscope_roi_templates")
+            os.makedirs(self.custom_dir, exist_ok=True)
     
     def list_templates(self, include_custom: bool = True) -> List[Dict[str, Any]]:
         """

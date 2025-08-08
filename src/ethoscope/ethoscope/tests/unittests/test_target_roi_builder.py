@@ -12,8 +12,11 @@ try:
 except ImportError:
     from cv2 import LINE_AA
 
-images = {"bright_targets":"../static_files/img/bright_targets.png",
-           "dark_targets": "../static_files/img/dark_targets.png"}
+# Get the absolute path to the test images
+import pathlib
+test_dir = pathlib.Path(__file__).parent.parent / "static_files" / "img"
+images = {"bright_targets": str(test_dir / "bright_targets.png"),
+          "dark_targets": str(test_dir / "dark_targets.png")}
 
 
 LOG_DIR = "./test_logs/"
@@ -39,7 +42,9 @@ class TestTargetROIBuilder(unittest.TestCase):
 
 
     def test_all(self):
-
+        # Ensure test logs directory exists
+        os.makedirs(LOG_DIR, exist_ok=True)
+        
         for k,i in list(images.items()):
             out = os.path.join(LOG_DIR,k+".png")
             print(out)
