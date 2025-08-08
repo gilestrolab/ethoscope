@@ -137,12 +137,8 @@ class TestInvalidDeviceFiltering:
         assert 'device_with_name_only' in devices_info
         assert devices_info['device_with_name_only']['name'] == 'Valid Device Name'
     
-    @patch('ethoscope_node.scanner.ethoscope_scanner.EthoscopeScanner._get_last_backup_time')
-    @patch('ethoscope_node.scanner.ethoscope_scanner.EthoscopeScanner._get_backup_size')
-    def test_filter_scanner_devices_with_empty_id(self, mock_backup_size, mock_backup_time):
+    def test_filter_scanner_devices_with_empty_id(self):
         """Test that scanner devices with empty IDs are filtered out."""
-        mock_backup_size.return_value = 0
-        mock_backup_time.return_value = None
         
         # Mock database to return no devices
         self.mock_edb.getEthoscope.return_value = {}
@@ -179,12 +175,8 @@ class TestInvalidDeviceFiltering:
         assert 'valid_device_id' in devices_info
         assert devices_info['valid_device_id']['name'] == 'Valid Device'
     
-    @patch('ethoscope_node.scanner.ethoscope_scanner.EthoscopeScanner._get_last_backup_time')
-    @patch('ethoscope_node.scanner.ethoscope_scanner.EthoscopeScanner._get_backup_size')
-    def test_filter_scanner_devices_with_no_name_and_no_ip(self, mock_backup_size, mock_backup_time):
+    def test_filter_scanner_devices_with_no_name_and_no_ip(self):
         """Test that scanner devices with no name and no IP are filtered out."""
-        mock_backup_size.return_value = 0
-        mock_backup_time.return_value = None
         
         # Mock database to return no devices
         self.mock_edb.getEthoscope.return_value = {}
