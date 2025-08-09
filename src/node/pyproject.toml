@@ -71,6 +71,9 @@ dev = [
     "fakeredis>=2.0.0",
     "Sphinx>=1.4.4",
     "sphinx_rtd_theme>=0.1.9",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "pre-commit>=3.0.0",
 ]
 testing = [
     "psutil>=5.8.0",

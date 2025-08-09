@@ -84,6 +84,9 @@ dev = [
     "pytest-asyncio>=0.21.0",
     "responses>=0.25.0",
     "fakeredis>=2.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "pre-commit>=3.0.0",
 ]
 testing = [
     "psutil>=5.8.0",

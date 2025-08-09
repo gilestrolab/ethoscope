@@ -1,0 +1,66 @@
+repos:
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        language_version: python3
+        args: [--line-length=88]
+        files: ^(src/|scripts/|run_tests\.py).*\.py$
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.8
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-zero]  # Don't fail on unfixable issues
+        files: ^(src/|scripts/|run_tests\.py).*\.py$
+
+  - repo: local
+    hooks:
+      - id: python-check-syntax
+        name: Check Python syntax
+        entry: python
+        language: system
+        args: [-m, py_compile]
+        files: \.py$
+        
+      - id: python-import-check
+        name: Check Python imports
+        entry: bash
+        language: system
+        args:
+          - -c
+          - |
+            source .venv/bin/activate
+            python -c "
+            import sys
+            import importlib.util
+            for file in sys.argv[1:]:
+                spec = importlib.util.spec_from_file_location('module', file)
+                try:
+                    module = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(module)
+                    print(f'✓ {file}')
+                except Exception as e:
+                    print(f'✗ {file}: {e}')
+                    sys.exit(1)
+            " 
+        files: \.py$
+        pass_filenames: true
+        
+      # Optional: Run quick tests only for critical files
+      - id: critical-tests
+        name: Run tests for critical changes
+        entry: bash
+        language: system
+        args:
+          - -c
+          - |
+            if echo "$PRE_COMMIT_FROM_REF $PRE_COMMIT_TO_REF" | grep -E "(monitor|tracker|stimulator)"; then
+              echo "Critical files changed, running relevant tests..."
+              cd src/ethoscope && source ../../.venv/bin/activate && python -m pytest ethoscope/tests/unittests/test_multi_stimulator.py -v --tb=short
+            else
+              echo "No critical files changed, skipping tests"
+            fi
+        files: ^src/ethoscope/ethoscope/(core|trackers|stimulators)/.*\.py$
+        pass_filenames: false
+        stages: [manual]  # Only run when explicitly called with --hook-stage manual
