@@ -14,6 +14,7 @@ import json
 
 import subprocess
 import signal
+import threading
 
 import trace
 from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera, V4L2Camera
@@ -926,9 +927,33 @@ class ControlThread(Thread):
         except Exception as e:
             logging.error(f"Failed to save debug image: {e}")
 
+    def _initialization_timeout_handler(self):
+        """
+        Emergency timeout handler that kills the ethoscope process if initialization takes too long.
+        This prevents the ethoscope from hanging indefinitely in 'initialising' state.
+        """
+        time.sleep(120)  # Wait 2 minutes
+        if self._info["status"] == "initialising":
+            logging.critical("INITIALIZATION TIMEOUT: Ethoscope has been stuck in initializing state for 2 minutes")
+            logging.critical("This usually indicates a camera hardware or picamera2 compatibility issue")
+            logging.critical("Terminating ethoscope process to prevent indefinite hang")
+            
+            # Set error state before terminating
+            self._info["status"] = "error"
+            self._info["error"] = "Initialization timeout: Process terminated after 2 minutes in initializing state"
+            self._info["time"] = time.time()
+            
+            # Force kill the current process
+            os.kill(os.getpid(), signal.SIGKILL)
+
     def run(self):
         cam = None
         hardware_connection = None
+
+        # Start timeout watchdog thread
+        timeout_thread = threading.Thread(target=self._initialization_timeout_handler, daemon=True)
+        timeout_thread.start()
+        logging.info("Started initialization timeout watchdog (2 minute limit)")
 
         try:
             self._info["status"] = "initialising"
@@ -949,6 +974,9 @@ class ControlThread(Thread):
                 return  # Exit gracefully without crashing
                 
             cam, rw, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, time_offset = tracking_setup
+            
+            # Initialization completed successfully
+            logging.info("Initialization completed successfully - starting tracking")
             
             with rw as result_writer:
                 # Start tracking directly (pickle saving removed)

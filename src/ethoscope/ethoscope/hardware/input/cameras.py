@@ -547,6 +547,7 @@ class PiFrameGrabber2(PiFrameGrabber):
 
         try:
             from picamera2 import Picamera2, MappedArray
+            logging.info(f"Successfully imported picamera2 version: {getattr(Picamera2, '__version__', 'unknown')}")
         except (ImportError, OSError) as e:
             logging.error(f"Failed to import picamera2: {e}")
             self._queue.task_done()
@@ -555,14 +556,23 @@ class PiFrameGrabber2(PiFrameGrabber):
         Picamera2.set_logging(logging.ERROR)
 
         try:
+            logging.info("Attempting to create Picamera2 instance")
             with Picamera2() as capture:
+                logging.info(f"Picamera2 instance created successfully: {type(capture)}")
+                
+                # Log camera properties for debugging
+                try:
+                    camera_info = capture.global_camera_info()
+                    logging.info(f"Camera info: {camera_info}")
+                except Exception as info_e:
+                    logging.warning(f"Could not get camera info: {info_e}")
            
                 # The appropriate size of the image acquisition is tricky and depends on the actual hardware. 
                 # With IMX219 640x480 will not return the full FoV. 960x720 does.
                 # See https://picamera.readthedocs.io/en/release-1.13/fov.html for a full description
 
-
                 w, h = self._target_resolution
+                logging.info(f"Configuring camera with resolution: {w}x{h}, fps: {self._target_fps}")
 
                 config = capture.create_video_configuration(
                                 main = { 'size' : (w, h), 'format': 'YUV420' },
@@ -574,7 +584,19 @@ class PiFrameGrabber2(PiFrameGrabber):
                                     'AwbEnable': False,                  # Disable auto-white balance (IR light confuses AWB)
                                 },
                                 )
+                logging.info("Camera configuration created successfully")
                 capture.configure(config)
+                logging.info("Camera configured successfully")
+                
+                # Explicitly enable auto-exposure after configuration
+                capture.set_controls({'AeEnable': True})
+                
+                # Log auto-exposure status for debugging
+                try:
+                    ae_status = capture.camera_controls.get('AeEnable', 'Unknown')
+                    logging.info(f"Auto-exposure status: {ae_status}")
+                except Exception as e:
+                    logging.warning(f"Could not check auto-exposure status: {e}")
 
                 self._save_camera_info (capture.global_camera_info()[0])
 
@@ -634,9 +656,19 @@ class PiFrameGrabber2(PiFrameGrabber):
         except Exception as e:
             # Check if this is a camera hardware issue or PiCamera2 compatibility issue
             error_msg = str(e).lower()
+            logging.error(f"PiFrameGrabber2 exception: {e}")
+            logging.error(f"Exception type: {type(e).__name__}")
+            if hasattr(e, '__traceback__'):
+                import traceback
+                logging.error(f"Full traceback: {traceback.format_exc()}")
+            
             if ("libbcm_host.so" in error_msg or "camera" in error_msg or "mmal" in error_msg or 
                 "allocator" in error_msg or "attributeerror" in error_msg):
-                logging.error(f"Camera hardware or PiCamera2 compatibility issue: {e}")
+                logging.error(f"Camera hardware or PiCamera2 compatibility issue detected")
+                # Check for specific picamera2 version compatibility issues
+                if "allocator" in error_msg and "attributeerror" in error_msg:
+                    logging.error("DETECTED: Picamera2 version compatibility issue - 'allocator' attribute missing")
+                    logging.error("This usually indicates an incompatible picamera2 version or system library mismatch")
                 # Put a special frame to signal no camera hardware
                 self._queue.put(None)
             else:
@@ -709,6 +741,10 @@ class OurPiCameraAsync(BaseCamera):
         self.isPiCamera = True
         self._frame_grabber_class = PiFrameGrabber2 if USE_PICAMERA2 else PiFrameGrabber
         
+        # Add fallback mechanism for picamera2 allocator issues
+        self._initialization_attempts = 0
+        self._max_initialization_attempts = 2
+        
         # Proactively clean up any lingering camera resources before initialization
         # Only needed for PiCamera2 as it has more complex resource management
         if USE_PICAMERA2:
@@ -724,28 +760,61 @@ class OurPiCameraAsync(BaseCamera):
         self._queue = queue.Queue(maxsize=1)
         self._stop_queue = queue.Queue(maxsize=1)
 
-        self._p = self._frame_grabber_class(target_fps, target_resolution, self._queue, self._stop_queue, video_prefix=video_prefix, *args, **kwargs)
+        # Retry initialization with fallback mechanisms
+        while self._initialization_attempts < self._max_initialization_attempts:
+            self._initialization_attempts += 1
+            logging.info(f"Camera initialization attempt {self._initialization_attempts}/{self._max_initialization_attempts}")
+            
+            try:
+                # If this is a retry and we're using picamera2, try fallback to picamera
+                if self._initialization_attempts > 1 and USE_PICAMERA2:
+                    logging.warning("Retrying with legacy PiFrameGrabber due to picamera2 issues")
+                    self._frame_grabber_class = PiFrameGrabber
+                    
+                self._p = self._frame_grabber_class(target_fps, target_resolution, self._queue, self._stop_queue, video_prefix=video_prefix, *args, **kwargs)
 
-        self._p.daemon = True
-        self._p.start()
-        
-        try:
-            self._frame = first_frame = self._queue.get(timeout=10)
-            
-            # Check if camera hardware is not available
-            if first_frame is None:
-                logging.error("Camera hardware not available - no video capabilities")
-                self._cleanup_frame_grabber(force_global_cleanup=True)  # Hardware failure - use aggressive cleanup
-                # Add delay to allow hardware to reset between initialization attempts
-                time.sleep(1.0)
-                raise EthoscopeException("Camera hardware not available. Video tracking and recording are disabled.")
-            
-        except Exception as e:
-            logging.error("Could not get any frame from the camera after the initialisation!")
-            self._cleanup_frame_grabber(force_global_cleanup=True)  # Initialization failure - use aggressive cleanup
-            # Add delay to allow hardware to reset between initialization attempts
-            time.sleep(1.0)
-            raise e
+                self._p.daemon = True
+                self._p.start()
+                
+                try:
+                    logging.info("Waiting for first frame from camera (timeout: 30 seconds)...")
+                    self._frame = first_frame = self._queue.get(timeout=30)
+                    
+                    # Check if camera hardware is not available
+                    if first_frame is None:
+                        logging.error("Camera hardware not available - no video capabilities")
+                        self._cleanup_frame_grabber(force_global_cleanup=True)  # Hardware failure - use aggressive cleanup
+                        # Add delay to allow hardware to reset between initialization attempts
+                        time.sleep(2.0)
+                        if self._initialization_attempts >= self._max_initialization_attempts:
+                            raise EthoscopeException("Camera hardware not available. Video tracking and recording are disabled.")
+                        continue  # Try again
+                    
+                    logging.info("Successfully received first frame from camera")
+                    break  # Success - exit retry loop
+                    
+                except queue.Empty:
+                    logging.error("Timeout waiting for first frame from camera (30 seconds expired)")
+                    self._cleanup_frame_grabber(force_global_cleanup=True)
+                    time.sleep(2.0)
+                    if self._initialization_attempts >= self._max_initialization_attempts:
+                        raise EthoscopeException("Camera initialization timeout: No frames received within 30 seconds. This may indicate a camera hardware issue or picamera2 compatibility problem.")
+                    continue  # Try again
+                    
+            except Exception as e:
+                logging.error(f"Camera initialization attempt {self._initialization_attempts} failed: {e}")
+                if hasattr(self, '_p'):
+                    self._cleanup_frame_grabber(force_global_cleanup=True)
+                time.sleep(2.0)
+                
+                # Check if this is a picamera2-specific error that should trigger fallback
+                error_msg = str(e).lower()
+                if "allocator" in error_msg and "attributeerror" in error_msg and USE_PICAMERA2 and self._initialization_attempts == 1:
+                    logging.warning("Detected picamera2 allocator issue - will retry with legacy picamera")
+                    continue
+                
+                if self._initialization_attempts >= self._max_initialization_attempts:
+                    raise e
             
         if len(first_frame.shape) < 2:
             raise EthoscopeException("The camera image is corrupted (less that 2 dimensions)")
