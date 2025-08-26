@@ -15,6 +15,7 @@ from typing import Dict, Any, Optional, List
 from .base import NotificationAnalyzer
 from .email import EmailNotificationService
 from .mattermost import MattermostNotificationService
+from .slack import SlackNotificationService
 from ..utils.configuration import EthoscopeConfiguration
 from ..utils.etho_db import ExperimentalDB
 
@@ -69,7 +70,19 @@ class NotificationManager(NotificationAnalyzer):
             else:
                 self.logger.debug("Mattermost notifications are disabled")
             
-            # Future services can be added here (Telegram, Slack, etc.)
+            # Initialize Slack service
+            slack_config = self.config.content.get('slack', {})
+            if slack_config.get('enabled', False):
+                try:
+                    slack_service = SlackNotificationService(self.config, self.db)
+                    self._services.append(('slack', slack_service))
+                    self.logger.info("Slack notification service initialized")
+                except Exception as e:
+                    self.logger.error(f"Failed to initialize Slack service: {e}")
+            else:
+                self.logger.debug("Slack notifications are disabled")
+            
+            # Future services can be added here (Telegram, etc.)
             
             self.logger.info(f"Notification manager initialized with {len(self._services)} active services")
             
@@ -221,6 +234,8 @@ class NotificationManager(NotificationAnalyzer):
                     result = service.test_email_configuration()
                 elif hasattr(service, 'test_mattermost_configuration') and service_name == 'mattermost':
                     result = service.test_mattermost_configuration()
+                elif hasattr(service, 'test_slack_configuration') and service_name == 'slack':
+                    result = service.test_slack_configuration()
                 else:
                     result = {'success': False, 'error': 'No test method available'}
                 

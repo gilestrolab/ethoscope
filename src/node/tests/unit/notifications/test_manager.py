@@ -33,6 +33,12 @@ class TestNotificationManager:
                 'bot_token': 'token123',
                 'channel_id': 'channel123'
             },
+            'slack': {
+                'enabled': False,
+                'webhook_url': '',
+                'bot_token': '',
+                'channel': ''
+            },
             'alerts': {
                 'cooldown_seconds': 300
             }
@@ -58,6 +64,12 @@ class TestNotificationManager:
                 'bot_token': '',
                 'channel_id': ''
             },
+            'slack': {
+                'enabled': False,
+                'webhook_url': '',
+                'bot_token': '',
+                'channel': ''
+            },
             'alerts': {
                 'cooldown_seconds': 300
             }
@@ -80,6 +92,71 @@ class TestNotificationManager:
                 'bot_token': '',
                 'channel_id': ''
             },
+            'slack': {
+                'enabled': False,
+                'webhook_url': '',
+                'bot_token': '',
+                'channel': ''
+            },
+            'alerts': {
+                'cooldown_seconds': 300
+            }
+        }
+        return config
+    
+    @pytest.fixture
+    def mock_config_all_enabled(self):
+        """Mock configuration with all services enabled."""
+        config = Mock()
+        config.content = {
+            'smtp': {
+                'enabled': True,
+                'host': 'smtp.example.com',
+                'port': 587,
+                'username': 'test@example.com',
+                'password': 'password',
+                'from_email': 'ethoscope@example.com'
+            },
+            'mattermost': {
+                'enabled': True,
+                'server_url': 'https://mattermost.example.com',
+                'bot_token': 'token123',
+                'channel_id': 'channel123'
+            },
+            'slack': {
+                'enabled': True,
+                'webhook_url': 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX',
+                'channel': '#alerts',
+                'use_webhook': True
+            },
+            'alerts': {
+                'cooldown_seconds': 300
+            }
+        }
+        return config
+    
+    @pytest.fixture
+    def mock_config_slack_only(self):
+        """Mock configuration with only Slack enabled."""
+        config = Mock()
+        config.content = {
+            'smtp': {
+                'enabled': False,
+                'host': 'smtp.example.com',
+                'port': 587
+            },
+            'mattermost': {
+                'enabled': False,
+                'server_url': '',
+                'bot_token': '',
+                'channel_id': ''
+            },
+            'slack': {
+                'enabled': True,
+                'webhook_url': 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX',
+                'channel': '#alerts',
+                'use_webhook': True
+            },
             'alerts': {
                 'cooldown_seconds': 300
             }
@@ -93,8 +170,9 @@ class TestNotificationManager:
     
     @patch('ethoscope_node.notifications.manager.EmailNotificationService')
     @patch('ethoscope_node.notifications.manager.MattermostNotificationService')
-    def test_init_both_services_enabled(self, mock_mattermost_cls, mock_email_cls, mock_config_both_enabled, mock_db):
-        """Test initialization with both services enabled."""
+    @patch('ethoscope_node.notifications.manager.SlackNotificationService')
+    def test_init_both_services_enabled(self, mock_slack_cls, mock_mattermost_cls, mock_email_cls, mock_config_both_enabled, mock_db):
+        """Test initialization with both email and Mattermost services enabled."""
         mock_email_service = Mock()
         mock_mattermost_service = Mock()
         mock_email_cls.return_value = mock_email_service
@@ -106,9 +184,11 @@ class TestNotificationManager:
         service_names = [name for name, _ in manager._services]
         assert 'email' in service_names
         assert 'mattermost' in service_names
+        assert 'slack' not in service_names  # Slack is disabled in this config
         
         mock_email_cls.assert_called_once_with(mock_config_both_enabled, mock_db)
         mock_mattermost_cls.assert_called_once_with(mock_config_both_enabled, mock_db)
+        mock_slack_cls.assert_not_called()
     
     @patch('ethoscope_node.notifications.manager.EmailNotificationService')
     @patch('ethoscope_node.notifications.manager.MattermostNotificationService')
@@ -364,3 +444,191 @@ class TestNotificationManager:
         assert hasattr(manager, 'get_device_logs')
         assert hasattr(manager, 'get_device_users')
         assert hasattr(manager, 'get_admin_emails')
+    
+    # New test cases for Slack integration
+    
+    @patch('ethoscope_node.notifications.manager.EmailNotificationService')
+    @patch('ethoscope_node.notifications.manager.MattermostNotificationService')
+    @patch('ethoscope_node.notifications.manager.SlackNotificationService')
+    def test_init_all_services_enabled(self, mock_slack_cls, mock_mattermost_cls, mock_email_cls, mock_config_all_enabled, mock_db):
+        """Test initialization with all three services enabled."""
+        mock_email_service = Mock()
+        mock_mattermost_service = Mock()
+        mock_slack_service = Mock()
+        mock_email_cls.return_value = mock_email_service
+        mock_mattermost_cls.return_value = mock_mattermost_service
+        mock_slack_cls.return_value = mock_slack_service
+        
+        manager = NotificationManager(config=mock_config_all_enabled, db=mock_db)
+        
+        assert len(manager._services) == 3
+        service_names = [name for name, _ in manager._services]
+        assert 'email' in service_names
+        assert 'mattermost' in service_names
+        assert 'slack' in service_names
+        
+        mock_email_cls.assert_called_once_with(mock_config_all_enabled, mock_db)
+        mock_mattermost_cls.assert_called_once_with(mock_config_all_enabled, mock_db)
+        mock_slack_cls.assert_called_once_with(mock_config_all_enabled, mock_db)
+    
+    @patch('ethoscope_node.notifications.manager.EmailNotificationService')
+    @patch('ethoscope_node.notifications.manager.MattermostNotificationService')
+    @patch('ethoscope_node.notifications.manager.SlackNotificationService')
+    def test_init_slack_only(self, mock_slack_cls, mock_mattermost_cls, mock_email_cls, mock_config_slack_only, mock_db):
+        """Test initialization with only Slack enabled."""
+        mock_slack_service = Mock()
+        mock_slack_cls.return_value = mock_slack_service
+        
+        manager = NotificationManager(config=mock_config_slack_only, db=mock_db)
+        
+        assert len(manager._services) == 1
+        service_names = [name for name, _ in manager._services]
+        assert 'slack' in service_names
+        assert 'email' not in service_names
+        assert 'mattermost' not in service_names
+        
+        mock_slack_cls.assert_called_once_with(mock_config_slack_only, mock_db)
+        mock_email_cls.assert_not_called()
+        mock_mattermost_cls.assert_not_called()
+    
+    def test_send_device_stopped_alert_all_services_success(self, mock_config_all_enabled, mock_db):
+        """Test device stopped alert with all three services succeeding."""
+        with patch('ethoscope_node.notifications.manager.EmailNotificationService') as mock_email_cls, \
+             patch('ethoscope_node.notifications.manager.MattermostNotificationService') as mock_mattermost_cls, \
+             patch('ethoscope_node.notifications.manager.SlackNotificationService') as mock_slack_cls:
+            
+            mock_email_service = Mock()
+            mock_mattermost_service = Mock()
+            mock_slack_service = Mock()
+            mock_email_service.send_device_stopped_alert.return_value = True
+            mock_mattermost_service.send_device_stopped_alert.return_value = True
+            mock_slack_service.send_device_stopped_alert.return_value = True
+            mock_email_cls.return_value = mock_email_service
+            mock_mattermost_cls.return_value = mock_mattermost_service
+            mock_slack_cls.return_value = mock_slack_service
+            
+            manager = NotificationManager(config=mock_config_all_enabled, db=mock_db)
+            
+            result = manager.send_device_stopped_alert(
+                device_id="test_device",
+                device_name="Test Device",
+                run_id="run123",
+                last_seen=datetime.datetime.now()
+            )
+            
+            assert result == True
+            mock_email_service.send_device_stopped_alert.assert_called_once()
+            mock_mattermost_service.send_device_stopped_alert.assert_called_once()
+            mock_slack_service.send_device_stopped_alert.assert_called_once()
+    
+    def test_send_device_stopped_alert_slack_only_success(self, mock_config_slack_only, mock_db):
+        """Test device stopped alert with only Slack service succeeding."""
+        with patch('ethoscope_node.notifications.manager.SlackNotificationService') as mock_slack_cls:
+            
+            mock_slack_service = Mock()
+            mock_slack_service.send_device_stopped_alert.return_value = True
+            mock_slack_cls.return_value = mock_slack_service
+            
+            manager = NotificationManager(config=mock_config_slack_only, db=mock_db)
+            
+            result = manager.send_device_stopped_alert(
+                device_id="test_device",
+                device_name="Test Device",
+                run_id="run123",
+                last_seen=datetime.datetime.now()
+            )
+            
+            assert result == True
+            mock_slack_service.send_device_stopped_alert.assert_called_once()
+    
+    def test_send_storage_warning_alert_all_services_mixed_results(self, mock_config_all_enabled, mock_db):
+        """Test storage warning alert with mixed success/failure across services."""
+        with patch('ethoscope_node.notifications.manager.EmailNotificationService') as mock_email_cls, \
+             patch('ethoscope_node.notifications.manager.MattermostNotificationService') as mock_mattermost_cls, \
+             patch('ethoscope_node.notifications.manager.SlackNotificationService') as mock_slack_cls:
+            
+            mock_email_service = Mock()
+            mock_mattermost_service = Mock()
+            mock_slack_service = Mock()
+            # Email fails, Mattermost fails, Slack succeeds
+            mock_email_service.send_storage_warning_alert.return_value = False
+            mock_mattermost_service.send_storage_warning_alert.return_value = False
+            mock_slack_service.send_storage_warning_alert.return_value = True
+            mock_email_cls.return_value = mock_email_service
+            mock_mattermost_cls.return_value = mock_mattermost_service
+            mock_slack_cls.return_value = mock_slack_service
+            
+            manager = NotificationManager(config=mock_config_all_enabled, db=mock_db)
+            
+            result = manager.send_storage_warning_alert(
+                device_id="test_device",
+                device_name="Test Device",
+                storage_percent=85.5,
+                available_space="2.1 GB"
+            )
+            
+            assert result == True  # Should succeed if at least one service works
+            mock_email_service.send_storage_warning_alert.assert_called_once()
+            mock_mattermost_service.send_storage_warning_alert.assert_called_once()
+            mock_slack_service.send_storage_warning_alert.assert_called_once()
+    
+    def test_test_all_configurations_with_slack(self, mock_config_all_enabled, mock_db):
+        """Test configuration testing for all services including Slack."""
+        with patch('ethoscope_node.notifications.manager.EmailNotificationService') as mock_email_cls, \
+             patch('ethoscope_node.notifications.manager.MattermostNotificationService') as mock_mattermost_cls, \
+             patch('ethoscope_node.notifications.manager.SlackNotificationService') as mock_slack_cls:
+            
+            mock_email_service = Mock()
+            mock_mattermost_service = Mock()
+            mock_slack_service = Mock()
+            mock_email_service.test_email_configuration.return_value = {'success': True}
+            mock_mattermost_service.test_mattermost_configuration.return_value = {'success': True}
+            mock_slack_service.test_slack_configuration.return_value = {'success': True}
+            mock_email_cls.return_value = mock_email_service
+            mock_mattermost_cls.return_value = mock_mattermost_service
+            mock_slack_cls.return_value = mock_slack_service
+            
+            manager = NotificationManager(config=mock_config_all_enabled, db=mock_db)
+            
+            results = manager.test_all_configurations()
+            
+            assert 'email' in results
+            assert 'mattermost' in results
+            assert 'slack' in results
+            assert results['email']['success'] == True
+            assert results['mattermost']['success'] == True
+            assert results['slack']['success'] == True
+            mock_email_service.test_email_configuration.assert_called_once()
+            mock_mattermost_service.test_mattermost_configuration.assert_called_once()
+            mock_slack_service.test_slack_configuration.assert_called_once()
+    
+    def test_service_exception_handling_with_slack(self, mock_config_all_enabled, mock_db):
+        """Test that exceptions in Slack service don't affect others."""
+        with patch('ethoscope_node.notifications.manager.EmailNotificationService') as mock_email_cls, \
+             patch('ethoscope_node.notifications.manager.MattermostNotificationService') as mock_mattermost_cls, \
+             patch('ethoscope_node.notifications.manager.SlackNotificationService') as mock_slack_cls:
+            
+            mock_email_service = Mock()
+            mock_mattermost_service = Mock()
+            mock_slack_service = Mock()
+            # Email and Mattermost succeed, Slack throws exception
+            mock_email_service.send_device_stopped_alert.return_value = True
+            mock_mattermost_service.send_device_stopped_alert.return_value = True
+            mock_slack_service.send_device_stopped_alert.side_effect = Exception("Slack API error")
+            mock_email_cls.return_value = mock_email_service
+            mock_mattermost_cls.return_value = mock_mattermost_service
+            mock_slack_cls.return_value = mock_slack_service
+            
+            manager = NotificationManager(config=mock_config_all_enabled, db=mock_db)
+            
+            result = manager.send_device_stopped_alert(
+                device_id="test_device",
+                device_name="Test Device",
+                run_id="run123",
+                last_seen=datetime.datetime.now()
+            )
+            
+            assert result == True  # Should succeed because email and Mattermost worked
+            mock_email_service.send_device_stopped_alert.assert_called_once()
+            mock_mattermost_service.send_device_stopped_alert.assert_called_once()
+            mock_slack_service.send_device_stopped_alert.assert_called_once()

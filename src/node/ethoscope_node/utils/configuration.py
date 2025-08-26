@@ -118,6 +118,13 @@ class EthoscopeConfiguration:
             'bot_token': '',
             'channel_id': ''
         },
+        'slack': {
+            'enabled': False,
+            'webhook_url': '',
+            'bot_token': '',
+            'channel': '',
+            'use_webhook': True
+        },
         'alerts': {
             'enabled': True,
             'cooldown_seconds': 3600,
@@ -148,7 +155,7 @@ class EthoscopeConfiguration:
         }
     }
     
-    REQUIRED_SECTIONS = ['folders', 'incubators', 'sensors', 'commands', 'custom', 'smtp', 'mattermost', 'alerts', 'setup', 'tunnel']
+    REQUIRED_SECTIONS = ['folders', 'incubators', 'sensors', 'commands', 'custom', 'smtp', 'mattermost', 'slack', 'alerts', 'setup', 'tunnel']
     REQUIRED_FOLDERS = ['results', 'video', 'temporary']
     
     def __init__(self, config_file: str = "/etc/ethoscope/ethoscope.conf"):
@@ -692,7 +699,8 @@ class EthoscopeConfiguration:
                 'admin_users': admin_count,
                 'incubators': incubator_count,
                 'smtp_configured': self._settings.get('smtp', {}).get('enabled', False),
-                'mattermost_configured': self._settings.get('mattermost', {}).get('enabled', False)
+                'mattermost_configured': self._settings.get('mattermost', {}).get('enabled', False),
+                'slack_configured': self._settings.get('slack', {}).get('enabled', False)
             }
             
         except Exception as e:

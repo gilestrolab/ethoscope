@@ -17,12 +17,12 @@ Organisation of the code
 Branching system
 --------------------------
 
-* `master` is **only** used for hosting tested **stable** software. As of June 2020 `master` is now fully based on Python 3.
+* `main` is **only** used for hosting tested **stable** software.
 * `dev` is a fairly stable developmental used in @gilestrolab.
 
 The workflow is to make issue branches from `dev`, test them as much a possible before merging them to `dev`.
 Then, we deploy them in `dev`, and update all devices in the @gilestrolab.
-If we experience no new critical issues over several weeks, we can merge `dev` to `master`, allowing the rest of the world to upgrade. The last merge from `dev ` to `master` dates to March 2022.
+If we experience no new critical issues over several weeks, we can merge `dev` to `main`, allowing the rest of the world to upgrade. The last merge from `dev ` to `main` dates to March 2022.
 
 License
 ---------------

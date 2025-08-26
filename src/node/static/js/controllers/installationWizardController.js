@@ -64,6 +64,13 @@
                 server_url: '',
                 bot_token: '',
                 channel_id: ''
+            },
+            slack: {
+                enabled: false,
+                webhook_url: '',
+                channel: '',
+                use_webhook: true,
+                use_manual_setup: false  // false = marketplace app, true = manual setup
             }
         };
         
@@ -232,6 +239,15 @@
                                 $scope.notifications.mattermost.server_url = config.notifications.mattermost.server_url || '';
                                 $scope.notifications.mattermost.bot_token = config.notifications.mattermost.bot_token || ''; // Load masked token if configured
                                 $scope.notifications.mattermost.channel_id = config.notifications.mattermost.channel_id || '';
+                            }
+                            
+                            // Slack settings
+                            if (config.notifications.slack) {
+                                $scope.notifications.slack.enabled = config.notifications.slack.enabled || false;
+                                $scope.notifications.slack.webhook_url = config.notifications.slack.webhook_url || '';
+                                $scope.notifications.slack.channel = config.notifications.slack.channel || '';
+                                $scope.notifications.slack.use_webhook = config.notifications.slack.use_webhook !== false; // Default to true
+                                $scope.notifications.slack.use_manual_setup = config.notifications.slack.use_manual_setup || false;
                             }
                         }
                         
@@ -673,6 +689,33 @@
                 })
                 .catch(function(error) {
                     $scope.showMessage('Mattermost test error: ' + (error.data?.message || error.statusText), 'error');
+                })
+                .finally(function() {
+                    $scope.isLoading = false;
+                });
+        };
+        
+        $scope.testSlack = function() {
+            if (!$scope.notifications.slack.webhook_url) {
+                $scope.showMessage('Webhook URL is required for testing Slack.', 'error');
+                return;
+            }
+            
+            $scope.isLoading = true;
+            
+            $http.post('/setup/test-notifications', {
+                type: 'slack',
+                config: $scope.notifications.slack
+            })
+                .then(function(response) {
+                    if (response.data.result === 'success') {
+                        $scope.showMessage('Slack test successful! Message sent to channel.', 'success');
+                    } else {
+                        $scope.showMessage('Slack test failed: ' + response.data.message, 'error');
+                    }
+                })
+                .catch(function(error) {
+                    $scope.showMessage('Slack test error: ' + (error.data?.message || error.statusText), 'error');
                 })
                 .finally(function() {
                     $scope.isLoading = false;

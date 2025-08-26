@@ -11,6 +11,7 @@ including email, and future support for telegram, whatsapp, etc.
 from .base import NotificationAnalyzer
 from .email import EmailNotificationService
 from .mattermost import MattermostNotificationService
+from .slack import SlackNotificationService
 from .manager import NotificationManager
 
-__all__ = ['NotificationAnalyzer', 'EmailNotificationService', 'MattermostNotificationService', 'NotificationManager']
+__all__ = ['NotificationAnalyzer', 'EmailNotificationService', 'MattermostNotificationService', 'SlackNotificationService', 'NotificationManager']

@@ -716,7 +716,7 @@
                         </div>
 
                         <!-- Mattermost Configuration -->
-                        <div class="card">
+                        <div class="card mb-3">
                             <div class="card-header">
                                 <label class="toggle-check mb-0">
                                     <input type="checkbox" class="toggle-check-input" ng-model="notifications.mattermost.enabled">
@@ -744,6 +744,172 @@
                                 </div>
                                 <button class="btn btn-outline-primary" ng-click="testMattermost()" ng-disabled="isLoading">
                                     <i class="fa fa-paper-plane"></i> Test Mattermost
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Slack Configuration -->
+                        <div class="card">
+                            <div class="card-header">
+                                <label class="toggle-check mb-0">
+                                    <input type="checkbox" class="toggle-check-input" ng-model="notifications.slack.enabled">
+                                    <span class="toggle-check-text"></span>
+                                    <i class="fa fa-slack ml-2"></i> Slack Notifications
+                                </label>
+                            </div>
+                            <div class="card-body" ng-if="notifications.slack.enabled">
+                                <div class="alert alert-info">
+                                    <h6><i class="fa fa-info-circle"></i> Slack Integration Options</h6>
+                                    <p class="mb-0">Choose your preferred method to set up Slack notifications for your Ethoscope node.</p>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Setup Method</label>
+                                    <div class="card-deck">
+                                        <div class="card" ng-class="{'border-success': !notifications.slack.use_manual_setup}">
+                                            <div class="card-body text-center p-3">
+                                                <div class="custom-control custom-radio">
+                                                    <input type="radio" class="custom-control-input" id="slackMethodApp" 
+                                                           ng-model="notifications.slack.use_manual_setup" ng-value="false">
+                                                    <label class="custom-control-label" for="slackMethodApp">
+                                                        <strong>🏪 Marketplace App</strong>
+                                                    </label>
+                                                </div>
+                                                <small class="text-success">Recommended - One-click setup</small>
+                                            </div>
+                                        </div>
+                                        <div class="card" ng-class="{'border-secondary': notifications.slack.use_manual_setup}">
+                                            <div class="card-body text-center p-3">
+                                                <div class="custom-control custom-radio">
+                                                    <input type="radio" class="custom-control-input" id="slackMethodManual" 
+                                                           ng-model="notifications.slack.use_manual_setup" ng-value="true">
+                                                    <label class="custom-control-label" for="slackMethodManual">
+                                                        <strong>🔧 Manual Setup</strong>
+                                                    </label>
+                                                </div>
+                                                <small class="text-muted">Advanced users, full control</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Marketplace App Configuration -->
+                                <div ng-if="!notifications.slack.use_manual_setup">
+                                    <div class="alert alert-success">
+                                        <h6><i class="fa fa-star"></i> Ethoscope Slack App (Recommended)</h6>
+                                        <p class="mb-2">The easiest way to get Slack notifications. Install our official app from the Slack marketplace.</p>
+                                        <p class="mb-0">✅ One-click setup • ✅ No technical configuration • ✅ Automatic updates</p>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="card bg-light">
+                                                <div class="card-body text-center py-4">
+                                                    <h6><i class="fa fa-external-link-alt text-primary"></i> Step 1: Install App</h6>
+                                                    <p class="mb-3">Install the Ethoscope app in your Slack workspace</p>
+                                                    <a href="https://slack.ethoscope.net" target="_blank" class="btn btn-primary">
+                                                        <i class="fab fa-slack"></i> Open Ethoscope Slack App
+                                                    </a>
+                                                    <p class="mt-2 mb-0"><small class="text-muted">Opens in new window</small></p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="card bg-light">
+                                                <div class="card-body text-center py-4">
+                                                    <h6><i class="fa fa-link text-success"></i> Step 2: Get Webhook URL</h6>
+                                                    <p class="mb-3">Copy the webhook URL from your configuration page</p>
+                                                    <div class="form-group mb-3">
+                                                        <input type="url" class="form-control" ng-model="notifications.slack.webhook_url" 
+                                                               placeholder="Paste webhook URL here...">
+                                                    </div>
+                                                    <small class="text-success">✓ Paste the URL you got from the app</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="alert alert-light mt-3">
+                                        <h6>Quick Setup Instructions:</h6>
+                                        <ol class="mb-0">
+                                            <li>Click "Open Ethoscope Slack App" above</li>
+                                            <li>Click "Add to Slack" and authorize the app</li>
+                                            <li>Copy the webhook URL from the configuration page</li>
+                                            <li>Paste it in the field above and continue setup</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                                
+                                <!-- Manual Setup Configuration -->
+                                <div ng-if="notifications.slack.use_manual_setup">
+                                    <div class="alert alert-warning">
+                                        <h6><i class="fa fa-tools"></i> Manual Slack Setup</h6>
+                                        <p class="mb-0">Advanced option - requires creating your own Slack app and webhook. Most users should use the marketplace app above.</p>
+                                    </div>
+                                    
+                                    <div class="form-group">
+                                        <label>Webhook URL *</label>
+                                        <input type="url" class="form-control" ng-model="notifications.slack.webhook_url" 
+                                               placeholder="https://hooks.slack.com/services/...">
+                                        <small class="form-text text-muted">
+                                            Create an incoming webhook in your Slack workspace settings
+                                        </small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Channel Override</label>
+                                        <input type="text" class="form-control" ng-model="notifications.slack.channel" 
+                                               placeholder="#alerts">
+                                        <small class="form-text text-muted">
+                                            Optional: Override the default channel set in the webhook (include #)
+                                        </small>
+                                    </div>
+                                    <div class="alert alert-light">
+                                        <h6>Manual Setup Instructions:</h6>
+                                        <ol class="mb-0">
+                                            <li>Go to <a href="https://api.slack.com/apps" target="_blank">api.slack.com/apps</a> and click "Create New App"</li>
+                                            <li>Choose "From scratch" and give your app a name (e.g., "Ethoscope Notifications")</li>
+                                            <li>Select your workspace and click "Create App"</li>
+                                            <li>In the app settings, go to "Incoming Webhooks" and toggle it "On"</li>
+                                            <li>Click "Add New Webhook to Workspace" and select your target channel</li>
+                                            <li>Copy the webhook URL and paste it above</li>
+                                            <li>Test the connection using the button below</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                                
+                                <!-- Future: Bot Token Configuration for advanced features
+                                <div ng-if="!notifications.slack.use_webhook">
+                                    <div class="form-group">
+                                        <label>Bot Token *</label>
+                                        <input type="password" class="form-control" ng-model="notifications.slack.bot_token" 
+                                               placeholder="xoxb-...">
+                                        <small class="form-text text-muted">
+                                            Bot User OAuth Token from your Slack app
+                                        </small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Channel *</label>
+                                        <input type="text" class="form-control" ng-model="notifications.slack.channel" 
+                                               placeholder="#alerts">
+                                        <small class="form-text text-muted">
+                                            Channel where notifications will be sent (include # or @)
+                                        </small>
+                                    </div>
+                                    <div class="alert alert-light">
+                                        <h6>Setup Instructions:</h6>
+                                        <ol class="mb-0">
+                                            <li>Create a Slack app at <a href="https://api.slack.com/apps" target="_blank">api.slack.com/apps</a></li>
+                                            <li>Add the "chat:write" bot scope</li>
+                                            <li>Install the app to your workspace</li>
+                                            <li>Copy the "Bot User OAuth Token" and paste above</li>
+                                            <li>Invite the bot to your target channel</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                                -->
+                                
+                                <button class="btn btn-outline-primary" ng-click="testSlack()" ng-disabled="isLoading">
+                                    <i class="fa fa-paper-plane"></i> Test Slack
                                 </button>
                             </div>
                         </div>
@@ -783,6 +949,7 @@
                                 <li ng-if="virtualSensor.enabled"><i class="fa fa-check" style="color: var(--warm-gray)"></i> Virtual sensor configured</li>
                                 <li ng-if="notifications.smtp.enabled"><i class="fa fa-check" style="color: var(--warm-gray)"></i> Email notifications enabled</li>
                                 <li ng-if="notifications.mattermost.enabled"><i class="fa fa-check" style="color: var(--warm-gray)"></i> Mattermost notifications enabled</li>
+                                <li ng-if="notifications.slack.enabled"><i class="fa fa-check" style="color: var(--warm-gray)"></i> Slack notifications enabled</li>
                             </ul>
                         </div>
                         

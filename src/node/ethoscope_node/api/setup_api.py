@@ -511,6 +511,31 @@ class SetupAPI(BaseAPI):
                 # Store directly under 'mattermost' key (matching configuration.py structure)
                 self.config._settings['mattermost'] = mattermost_settings
             
+            # Update Slack settings (stored directly under 'slack' key)
+            slack_config = data.get('slack', {})
+            if slack_config:
+                current_slack = self.config._settings.get('slack', {})
+                
+                # Handle masked webhook URL - preserve existing URL if user didn't change it
+                submitted_webhook_url = slack_config.get('webhook_url', '')
+                if submitted_webhook_url == '***CONFIGURED***' and current_slack.get('webhook_url'):
+                    # User didn't change the masked webhook URL, preserve existing one
+                    actual_webhook_url = current_slack.get('webhook_url')
+                else:
+                    # User provided a new webhook URL (or cleared it)
+                    actual_webhook_url = submitted_webhook_url
+                
+                slack_settings = {
+                    'enabled': slack_config.get('enabled', False),
+                    'webhook_url': actual_webhook_url,
+                    'channel': slack_config.get('channel', ''),
+                    'use_webhook': slack_config.get('use_webhook', True),
+                    'use_manual_setup': slack_config.get('use_manual_setup', False)
+                }
+                
+                # Store directly under 'slack' key (matching configuration.py structure)
+                self.config._settings['slack'] = slack_settings
+            
             # Save configuration
             self.config.save()
             self.config.mark_setup_step_completed('notifications')
@@ -583,6 +608,8 @@ class SetupAPI(BaseAPI):
                 return self._test_smtp(data.get('config', {}))
             elif test_type == 'mattermost':
                 return self._test_mattermost(data.get('config', {}))
+            elif test_type == 'slack':
+                return self._test_slack(data.get('config', {}))
             else:
                 return {'result': 'error', 'message': f'Unknown test type: {test_type}'}
                 
@@ -709,6 +736,75 @@ Ethoscope Node Setup Wizard
             return {
                 'result': 'error',
                 'message': f'Mattermost test failed: {str(e)}'
+            }
+    
+    def _test_slack(self, slack_config):
+        """Test Slack configuration by sending a test message."""
+        import requests
+        
+        try:
+            # Get configuration
+            webhook_url = slack_config.get('webhook_url', '')
+            channel = slack_config.get('channel', '')
+            
+            # Handle masked webhook URL - use the actual stored URL if masked value is sent
+            if webhook_url == '***CONFIGURED***':
+                current_slack = self.config._settings.get('slack', {})
+                webhook_url = current_slack.get('webhook_url', '')
+            
+            if not webhook_url:
+                return {
+                    'result': 'error',
+                    'message': 'Webhook URL is required for Slack testing'
+                }
+            
+            # Prepare test message with Block Kit formatting
+            message = {
+                'blocks': [
+                    {
+                        'type': 'section',
+                        'text': {
+                            'type': 'mrkdwn',
+                            'text': '🧪 *Ethoscope Test Message*'
+                        }
+                    },
+                    {
+                        'type': 'section',
+                        'text': {
+                            'type': 'mrkdwn',
+                            'text': 'This is a test message from the Ethoscope Node installation wizard. If you see this, your Slack configuration is working correctly!'
+                        }
+                    }
+                ],
+                'text': '🧪 Ethoscope Test Message - Slack notifications are working correctly!'
+            }
+            
+            # Add channel override if specified
+            if channel:
+                message['channel'] = channel
+            
+            # Send test message
+            response = requests.post(
+                webhook_url,
+                json=message,
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                return {
+                    'result': 'success',
+                    'message': 'Test message sent successfully to Slack'
+                }
+            else:
+                return {
+                    'result': 'error',
+                    'message': f'Slack test failed: HTTP {response.status_code} - {response.text}'
+                }
+                
+        except Exception as e:
+            return {
+                'result': 'error',
+                'message': f'Slack test failed: {str(e)}'
             }
     
     def _setup_virtual_sensor(self):
@@ -916,6 +1012,13 @@ Ethoscope Node Setup Wizard
                         'server_url': '',
                         'bot_token': '',
                         'channel_id': ''
+                    },
+                    'slack': {
+                        'enabled': False,
+                        'webhook_url': '',
+                        'channel': '',
+                        'use_webhook': True,
+                        'use_manual_setup': False
                     }
                 },
                 'virtual_sensor': {
@@ -1002,6 +1105,21 @@ Ethoscope Node Setup Wizard
                         'server_url': mattermost_config.get('server_url', ''),
                         'bot_token': masked_token,  # Show masked token for UX, empty if none exists
                         'channel_id': mattermost_config.get('channel_id', '')
+                    })
+                
+                # Slack settings - stored directly under 'slack' key
+                slack_config = self.config._settings.get('slack', {})
+                if slack_config:
+                    # Show masked webhook URL if one exists, empty if none configured
+                    existing_webhook_url = slack_config.get('webhook_url', '')
+                    masked_webhook_url = '***CONFIGURED***' if existing_webhook_url else ''
+                    
+                    config_data['notifications']['slack'].update({
+                        'enabled': slack_config.get('enabled', False),
+                        'webhook_url': masked_webhook_url,  # Show masked webhook URL for UX, empty if none exists
+                        'channel': slack_config.get('channel', ''),
+                        'use_webhook': slack_config.get('use_webhook', True),
+                        'use_manual_setup': slack_config.get('use_manual_setup', False)
                     })
             except Exception as e:
                 self.logger.warning(f"Could not load notification settings: {e}")

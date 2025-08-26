@@ -456,3 +456,325 @@ class MockNotificationService:
 def mock_notification_service():
     """Mock notification service fixture."""
     return MockNotificationService()
+
+
+# Slack-specific fixtures
+
+@pytest.fixture
+def slack_webhook_config():
+    """Slack webhook configuration for testing."""
+    return {
+        'slack': {
+            'enabled': True,
+            'webhook_url': 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX',
+            'channel': '#ethoscope-alerts',
+            'use_webhook': True
+        },
+        'alerts': {
+            'cooldown_seconds': 300
+        }
+    }
+
+
+@pytest.fixture
+def slack_bot_token_config():
+    """Slack bot token configuration for testing."""
+    return {
+        'slack': {
+            'enabled': True,
+            'bot_token': 'fake_bot_token_for_testing_only',
+            'channel': '#ethoscope-alerts',
+            'use_webhook': False
+        },
+        'alerts': {
+            'cooldown_seconds': 300
+        }
+    }
+
+
+@pytest.fixture
+def slack_disabled_config():
+    """Disabled Slack configuration for testing."""
+    return {
+        'slack': {
+            'enabled': False,
+            'webhook_url': '',
+            'bot_token': '',
+            'channel': '',
+            'use_webhook': True
+        },
+        'alerts': {
+            'cooldown_seconds': 300
+        }
+    }
+
+
+@pytest.fixture
+def slack_webhook_response_success():
+    """Mock successful Slack webhook response."""
+    response = Mock()
+    response.status_code = 200
+    response.text = 'ok'
+    response.raise_for_status = Mock()
+    return response
+
+
+@pytest.fixture
+def slack_webhook_response_failure():
+    """Mock failed Slack webhook response."""
+    response = Mock()
+    response.status_code = 200
+    response.text = 'invalid_payload'
+    response.raise_for_status = Mock()
+    return response
+
+
+@pytest.fixture
+def slack_bot_api_response_success():
+    """Mock successful Slack bot API response."""
+    response = Mock()
+    response.status_code = 200
+    response.json = Mock(return_value={'ok': True, 'ts': '1234567890.123456'})
+    response.raise_for_status = Mock()
+    return response
+
+
+@pytest.fixture
+def slack_bot_api_response_failure():
+    """Mock failed Slack bot API response."""
+    response = Mock()
+    response.status_code = 200
+    response.json = Mock(return_value={'ok': False, 'error': 'channel_not_found'})
+    response.raise_for_status = Mock()
+    return response
+
+
+@pytest.fixture
+def sample_slack_blocks_device_stopped():
+    """Sample Slack blocks for device stopped alert."""
+    return [
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": "🚨 Device Alert: Test Device stopped",
+                "emoji": True
+            }
+        },
+        {
+            "type": "section",
+            "fields": [
+                {
+                    "type": "mrkdwn",
+                    "text": "*Device:* Test Device (ETHOSCOPE_001)"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": "*Status:* Failed while running"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": "*Run ID:* run_001"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": "*Last Seen:* 2024-01-01 12:00:00"
+                }
+            ]
+        }
+    ]
+
+
+@pytest.fixture
+def sample_slack_blocks_storage_warning():
+    """Sample Slack blocks for storage warning alert."""
+    return [
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": "⚠️ Storage Warning: Test Device",
+                "emoji": True
+            }
+        },
+        {
+            "type": "section",
+            "fields": [
+                {
+                    "type": "mrkdwn",
+                    "text": "*Device:* Test Device (ETHOSCOPE_001)"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": "*Storage Used:* 85.5%"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": "*Available Space:* 2.1 GB"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": "*Status:* 🟡 Warning"
+                }
+            ]
+        }
+    ]
+
+
+@pytest.fixture
+def sample_slack_blocks_device_unreachable():
+    """Sample Slack blocks for device unreachable alert."""
+    return [
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": "📵 Device Unreachable: Test Device",
+                "emoji": True
+            }
+        },
+        {
+            "type": "section",
+            "fields": [
+                {
+                    "type": "mrkdwn",
+                    "text": "*Device:* Test Device (ETHOSCOPE_001)"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": "*Last Seen:* 2024-01-01 10:00:00"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": "*Offline Duration:* 2.0 hours"
+                },
+                {
+                    "type": "mrkdwn",
+                    "text": "*Status:* 🔴 Offline"
+                }
+            ]
+        }
+    ]
+
+
+class MockSlackService:
+    """Mock Slack service for comprehensive testing."""
+    
+    def __init__(self, config=None):
+        self.config = config or {}
+        self.sent_messages = []
+        self.failed_messages = []
+        self.webhook_calls = []
+        self.bot_api_calls = []
+        
+    def send_webhook_message(self, blocks, text=None):
+        """Mock webhook message sending."""
+        call_data = {
+            'method': 'webhook',
+            'blocks': blocks,
+            'text': text,
+            'timestamp': datetime.datetime.now()
+        }
+        self.webhook_calls.append(call_data)
+        
+        # Simulate failure for certain conditions
+        if text and 'FAIL' in text:
+            self.failed_messages.append(call_data)
+            return False
+            
+        self.sent_messages.append(call_data)
+        return True
+    
+    def send_bot_api_message(self, blocks, text=None, channel=None):
+        """Mock bot API message sending."""
+        call_data = {
+            'method': 'bot_api',
+            'blocks': blocks,
+            'text': text,
+            'channel': channel,
+            'timestamp': datetime.datetime.now()
+        }
+        self.bot_api_calls.append(call_data)
+        
+        # Simulate failure for certain conditions
+        if channel and 'invalid' in channel:
+            self.failed_messages.append(call_data)
+            return False
+            
+        self.sent_messages.append(call_data)
+        return True
+    
+    def get_sent_messages(self):
+        """Get all sent messages."""
+        return self.sent_messages
+    
+    def get_failed_messages(self):
+        """Get all failed messages."""
+        return self.failed_messages
+    
+    def get_webhook_calls(self):
+        """Get all webhook calls."""
+        return self.webhook_calls
+    
+    def get_bot_api_calls(self):
+        """Get all bot API calls."""
+        return self.bot_api_calls
+    
+    def clear_history(self):
+        """Clear all call history."""
+        self.sent_messages = []
+        self.failed_messages = []
+        self.webhook_calls = []
+        self.bot_api_calls = []
+
+
+@pytest.fixture
+def mock_slack_service():
+    """Mock Slack service fixture."""
+    return MockSlackService()
+
+
+@pytest.fixture
+def complete_notification_config():
+    """Complete notification configuration with all services enabled."""
+    return {
+        'smtp': {
+            'enabled': True,
+            'host': 'smtp.example.com',
+            'port': 587,
+            'username': 'ethoscope@example.com',
+            'password': 'secure_password',
+            'from_email': 'ethoscope@example.com',
+            'use_tls': True
+        },
+        'mattermost': {
+            'enabled': True,
+            'server_url': 'https://mattermost.example.com',
+            'bot_token': 'mmtoken123456789',
+            'channel_id': 'channel123456789'
+        },
+        'slack': {
+            'enabled': True,
+            'webhook_url': 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX',
+            'channel': '#ethoscope-alerts',
+            'use_webhook': True
+        },
+        'alerts': {
+            'cooldown_seconds': 300,
+            'storage_warning_threshold': 80
+        },
+        'users': {
+            'researcher1': {
+                'email': 'researcher1@example.com',
+                'isAdmin': False,
+                'active': True,
+                'name': 'Dr. Alice Researcher'
+            },
+            'admin': {
+                'email': 'admin@example.com',
+                'isAdmin': True,
+                'active': True,
+                'name': 'System Administrator'
+            }
+        }
+    }
