@@ -1,0 +1,192 @@
+/* Installation Wizard Styles */
+.installation-wizard {
+    padding: 20px;
+    min-height: 100vh;
+    background-color: #f8f9fa;
+}
+
+/* Center the main wizard content */
+.installation-wizard .row {
+    justify-content: center;
+    margin: 0 auto;
+    max-width: 1200px;
+}
+
+.progress-container {
+    position: relative;
+    margin: 0 auto 30px auto;
+    max-width: 1000px;
+    width: 100%;
+}
+
+.progress-bar-custom {
+    height: 4px;
+    background: var(--light-gray);
+    border-radius: 2px;
+    margin: 20px 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(to right, var(--deep-blue), var(--warm-gray));
+    border-radius: 2px;
+    transition: width 0.3s ease;
+}
+
+.step-indicators {
+    display: flex;
+    justify-content: space-between;
+    position: absolute;
+    width: 100%;
+    top: 7px;
+}
+
+.step-indicator {
+    text-align: center;
+    cursor: pointer;
+    flex: 1;
+}
+
+.step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--light-gray);
+    color: var(--medium-gray);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 8px;
+    border: 2px solid var(--light-gray);
+    transition: all 0.3s ease;
+}
+
+.step-indicator.active .step-circle {
+    background: var(--deep-blue);
+    color: white;
+    border-color: var(--deep-blue);
+}
+
+.step-indicator.completed .step-circle {
+    background: var(--warm-gray);
+    color: white;
+    border-color: var(--warm-gray);
+}
+
+.step-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--medium-gray);
+}
+
+.step-indicator.active .step-label {
+    color: var(--deep-blue);
+    font-weight: 600;
+}
+
+.step-indicator.completed .step-label {
+    color: var(--warm-gray);
+}
+
+.wizard-step {
+    animation: fadeIn 0.3s ease;
+    margin: 30px auto;
+    width: 100%;
+}
+
+/* Ensure cards have proper spacing and shadows */
+.wizard-step .card {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: none;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.8);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.spinner-container {
+    text-align: center;
+}
+
+.setup-checklist {
+    list-style: none;
+    padding: 0;
+}
+
+.setup-checklist li {
+    padding: 8px 0;
+    color: var(--warm-gray);
+}
+
+.setup-checklist i {
+    width: 20px;
+    margin-right: 10px;
+}
+
+.disk-item {
+    margin-bottom: 15px;
+}
+
+.disk-item .progress {
+    height: 20px;
+    margin: 5px 0;
+}
+
+.users-list, .incubators-list {
+    margin-top: 20px;
+}
+
+.setup-summary {
+    margin: 20px 0;
+}
+
+.setup-summary ul li {
+    padding: 5px 0;
+}
+
+/* Modal shadow enhancement */
+.modal-dialog {
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1), 0 5px 15px rgba(0, 0, 0, 0.08);
+    margin-top: 50px;
+}
+
+.modal-content {
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12), 0 8px 25px rgba(0, 0, 0, 0.08);
+}
+
+.modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.6);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .step-indicators {
+        display: none;
+    }
+    
+    .progress-container {
+        margin-bottom: 20px;
+    }
+    
+    .wizard-step .card {
+        margin: 0 10px;
+    }
+}

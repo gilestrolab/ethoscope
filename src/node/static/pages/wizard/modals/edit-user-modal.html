@@ -1,0 +1,78 @@
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">
+                    <i class="fa fa-edit"></i> Edit User
+                </h4>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form name="editUserForm" novalidate>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Full Name *</label>
+                                <input type="text" class="form-control" ng-model="editingUser.fullname" 
+                                       placeholder="Jane Doe" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Username *</label>
+                                <input type="text" class="form-control" ng-model="editingUser.username" 
+                                       placeholder="jane.doe" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Email *</label>
+                                <input type="email" class="form-control" ng-model="editingUser.email" 
+                                       placeholder="jane.doe@university.edu" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Phone</label>
+                                <input type="tel" class="form-control" ng-model="editingUser.telephone" 
+                                       placeholder="+1234567890">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>PIN Code</label>
+                                <input type="text" class="form-control" ng-model="editingUser.pin" 
+                                       placeholder="1234" maxlength="4">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Team</label>
+                                <input type="text" class="form-control" ng-model="editingUser.labname" 
+                                       placeholder="Research Team">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" ng-model="editingUser.isadmin" id="editUserIsAdmin">
+                            <label class="form-check-label" for="editUserIsAdmin">Administrator privileges</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" ng-click="updateUser()" 
+                        ng-disabled="!editingUser.username || !editingUser.email">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>

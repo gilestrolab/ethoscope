@@ -1,0 +1,58 @@
+<!-- Step 1: Welcome -->
+<div class="wizard-step" ng-if="currentStep === 1">
+    <div class="row">
+        <div class="col-lg-8 offset-lg-2">
+            <div class="card">
+                <div class="card-header">
+                    <h3>
+                        <i class="fa fa-home"></i> 
+                        {{isReconfigureMode ? 'Reconfigure Ethoscope Node' : 'Welcome to Ethoscope Node Setup'}}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <h4>{{isReconfigureMode ? 'System Reconfiguration' : 'Welcome!'}}</h4>
+                    <p class="lead">
+                        {{isReconfigureMode ? 
+                            'This wizard will help you reconfigure your Ethoscope Node settings. You can update any configuration and test the system.' :
+                            'This installation wizard will help you configure your Ethoscope Node for the first time.'}}
+                    </p>
+                    
+                    <!-- Reconfigure mode notice -->
+                    <div class="alert alert-info" ng-if="isReconfigureMode">
+                        <i class="fa fa-info-circle"></i> 
+                        <strong>Reconfiguration Mode:</strong> Your system is already configured, but you can update any settings through this wizard.
+                    </div>
+                    
+                    <h5>What we'll configure:</h5>
+                    <ul class="setup-checklist">
+                        <li><i class="fa fa-cog"></i> Basic system settings and data directories</li>
+                        <li><i class="fa fa-user-shield"></i> Administrator account setup</li>
+                        <li><i class="fa fa-users"></i> Additional user accounts (optional)</li>
+                        <li><i class="fa fa-thermometer-half"></i> Incubator configurations (optional)</li>
+                        <li><i class="fa fa-bell"></i> Email and chat notifications (optional)</li>
+                    </ul>
+
+                    <div class="system-info" ng-if="systemInfo.hostname">
+                        <h5>System Information:</h5>
+                        <table class="table table-sm">
+                            <tr><td><strong>Hostname:</strong></td><td>{{systemInfo.hostname}}</td></tr>
+                            <tr><td><strong>User:</strong></td><td>{{systemInfo.current_user}}</td></tr>
+                            <tr ng-if="systemInfo.memory.total"><td><strong>Memory:</strong></td><td>{{(systemInfo.memory.total / 1024 / 1024 / 1024) | number:1}} GB</td></tr>
+                        </table>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <button class="btn btn-primary" ng-click="nextStep()">
+                            {{isReconfigureMode ? 'Start Reconfiguration' : 'Start Setup'}}
+                        </button>
+                        
+                        <!-- Reset button for testing (only in reconfigure mode) -->
+                        <button class="btn btn-outline-danger ml-3" ng-if="isReconfigureMode" ng-click="resetSetup()">
+                            <i class="fa fa-undo"></i> Reset Setup Status
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

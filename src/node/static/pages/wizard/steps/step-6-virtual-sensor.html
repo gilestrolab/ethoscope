@@ -1,0 +1,115 @@
+<!-- Step 6: Virtual Sensor -->
+<div class="wizard-step" ng-if="currentStep === 6">
+    <div class="row">
+        <div class="col-lg-8 offset-lg-2">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa fa-cloud-sun"></i> Virtual Sensor <small class="text-muted">(Optional)</small></h3>
+                </div>
+                <div class="card-body">
+                    <p class="lead">Configure a virtual sensor to provide environmental data (temperature, humidity, pressure, light) for your experiments.</p>
+                    
+                    <div class="form-group">
+                        <div class="custom-control custom-switch">
+                            <input type="checkbox" class="custom-control-input" id="enableVirtualSensor" ng-model="virtualSensor.enabled">
+                            <label class="custom-control-label" for="enableVirtualSensor">
+                                <strong>Enable Virtual Sensor</strong>
+                            </label>
+                        </div>
+                        <small class="form-text text-muted">
+                            The virtual sensor provides environmental readings that can be used in experiments and monitoring.
+                        </small>
+                    </div>
+                    
+                    <div ng-if="virtualSensor.enabled">
+                        <div class="alert alert-info">
+                            <h6><i class="fa fa-info-circle"></i> About Virtual Sensor</h6>
+                            <p class="mb-2">The virtual sensor can provide either simulated data or real weather data from an external API.</p>
+                            <p class="mb-0">For real weather data, you'll need a free API key from OpenWeatherMap.</p>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="sensorName">Sensor Name *</label>
+                                    <input type="text" class="form-control" id="sensorName" 
+                                           ng-model="virtualSensor.sensor_name" 
+                                           placeholder="virtual-sensor" required>
+                                    <small class="form-text text-muted">Unique name for this sensor</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="sensorLocation">Location *</label>
+                                    <input type="text" class="form-control" id="sensorLocation" 
+                                           ng-model="virtualSensor.location" 
+                                           placeholder="Lab" required>
+                                    <small class="form-text text-muted">Physical location of the sensor</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Real Weather Data (Optional)</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="alert alert-light">
+                                    <p class="mb-2"><strong>To use real weather data:</strong></p>
+                                    <ol class="mb-2">
+                                        <li>Sign up for free at <a href="https://openweathermap.org/api" target="_blank">OpenWeatherMap</a></li>
+                                        <li>Get your API key from the dashboard</li>
+                                        <li>Enter your location and API key below</li>
+                                    </ol>
+                                    <p class="mb-0"><small>Leave blank to use simulated random data.</small></p>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="weatherLocation">Weather Location</label>
+                                            <input type="text" class="form-control" id="weatherLocation" 
+                                                   ng-model="virtualSensor.weather_location" 
+                                                   placeholder="London,GB or 51.5074,-0.1278 or 2643743">
+                                            <small class="form-text text-muted">
+                                                City name (London,GB), coordinates (lat,lon), or city ID
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="weatherApiKey">OpenWeatherMap API Key</label>
+                                            <input type="password" class="form-control" id="weatherApiKey" 
+                                                   ng-model="virtualSensor.api_key" 
+                                                   placeholder="Enter your API key">
+                                            <small class="form-text text-muted">
+                                                Optional - required for real weather data
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <button class="btn btn-outline-primary" ng-click="testVirtualSensor()" 
+                                        ng-disabled="!virtualSensor.weather_location || !virtualSensor.api_key || isLoading">
+                                    <i class="fa fa-thermometer-half"></i> Test Weather API
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info" ng-if="!virtualSensor.enabled">
+                        <i class="fa fa-info-circle"></i> Virtual sensor is disabled. You can enable it later in the system settings.
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-secondary" ng-click="previousStep()">
+                        <i class="fa fa-arrow-left"></i> Back
+                    </button>
+                    <button class="btn btn-primary float-right" ng-click="processVirtualSensor()">
+                        Next <i class="fa fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

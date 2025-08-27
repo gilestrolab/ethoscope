@@ -1,0 +1,58 @@
+<!-- Include wizard styles -->
+<style>
+@import url("/static/pages/wizard/wizard.css");
+</style>
+
+<!-- Installation Wizard Container -->
+<div class="container-fluid installation-wizard" ng-cloak>
+    
+    <!-- Progress Bar -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="progress-container">
+                <div class="progress-bar-custom">
+                    <div class="progress-fill" ng-style="{'width': getProgressPercentage() + '%'}"></div>
+                </div>
+                <div class="step-indicators">
+                    <div ng-repeat="step in steps" 
+                         class="step-indicator" 
+                         ng-class="{'active': currentStep === step.number, 'completed': currentStep > step.number}"
+                         ng-click="goToStep(step.number)">
+                        <div class="step-circle">
+                            <i class="fa" ng-class="step.icon" ng-if="currentStep <= step.number"></i>
+                            <i class="fa fa-check" ng-if="currentStep > step.number"></i>
+                        </div>
+                        <div class="step-label">{{step.title}}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Messages -->
+    <div class="row" ng-if="errorMessage || successMessage">
+        <div class="col-12">
+            <div class="alert alert-danger" ng-if="errorMessage" ng-bind="errorMessage"></div>
+            <div class="alert alert-success" ng-if="successMessage" ng-bind="successMessage"></div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" ng-if="isLoading">
+        <div class="spinner-container">
+            <i class="fa fa-spinner fa-spin fa-3x"></i>
+            <p>Processing...</p>
+        </div>
+    </div>
+
+    <!-- Dynamic Step Content -->
+    <div ng-include="getStepTemplate()"></div>
+    
+    <!-- Modal Content -->
+    <div ng-include="'/static/pages/wizard/modals/add-user-modal.html'"></div>
+    <div ng-include="'/static/pages/wizard/modals/edit-user-modal.html'"></div>
+    <div ng-include="'/static/pages/wizard/modals/add-incubator-modal.html'"></div>
+    <div ng-include="'/static/pages/wizard/modals/edit-incubator-modal.html'"></div>
+    
+</div>
+

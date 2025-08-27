@@ -1,0 +1,64 @@
+<!-- Step 4: Additional Users -->
+<div class="wizard-step" ng-if="currentStep === 4">
+    <div class="row">
+        <div class="col-lg-10 offset-lg-1">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa fa-users"></i> Additional Users <small class="text-muted">(Optional)</small></h3>
+                </div>
+                <div class="card-body">
+                    <p class="lead">You can add additional users now or skip this step and add users later through the management interface.</p>
+                    
+                    <div class="mb-3">
+                        <button class="btn btn-success" data-toggle="modal" data-target="#addUserModal">
+                            <i class="fa fa-plus"></i> Add User
+                        </button>
+                    </div>
+
+                    <div class="users-list" ng-if="additionalUsers.length > 0">
+                        <h5>Added Users:</h5>
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Admin</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr ng-repeat="user in additionalUsers">
+                                    <td>{{user.fullname}}</td>
+                                    <td>{{user.username}}</td>
+                                    <td>{{user.email}}</td>
+                                    <td><span class="badge" ng-class="user.isadmin ? 'badge-warning' : 'badge-secondary'">
+                                        {{user.isadmin ? 'Yes' : 'No'}}
+                                    </span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" ng-click="editUser($index)" 
+                                                data-toggle="modal" data-target="#editUserModal">
+                                            <i class="fa fa-edit"></i> Edit
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="alert alert-info" ng-if="additionalUsers.length === 0">
+                        <i class="fa fa-info-circle"></i> No additional users have been added. You can skip this step and add users later.
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-secondary" ng-click="previousStep()">
+                        <i class="fa fa-arrow-left"></i> Back
+                    </button>
+                    <button class="btn btn-primary float-right" ng-click="nextStep()">
+                        Next <i class="fa fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

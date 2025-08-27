@@ -1,0 +1,60 @@
+<!-- Step 2: Basic Setup -->
+<div class="wizard-step" ng-if="currentStep === 2">
+    <div class="row">
+        <div class="col-lg-8 offset-lg-2">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa fa-cog"></i> Basic Configuration</h3>
+                </div>
+                <div class="card-body">
+                    <form name="basicInfoForm" novalidate>
+                        
+                        <div class="form-group">
+                            <label for="hostname">Node Hostname</label>
+                            <input type="text" class="form-control" id="hostname" 
+                                   ng-model="basicInfo.hostname" placeholder="ethoscope-node" readonly>
+                            <small class="form-text text-muted">System hostname (read-only)</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dataDir">Data Directory *</label>
+                            <input type="text" class="form-control" id="dataDir" 
+                                   ng-model="basicInfo.dataDir" placeholder="/ethoscope_data" required>
+                            <small class="form-text text-muted">Directory where ethoscope data will be stored</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="configDir">Configuration Directory *</label>
+                            <input type="text" class="form-control" id="configDir" 
+                                   ng-model="basicInfo.configDir" placeholder="/etc/ethoscope" required>
+                            <small class="form-text text-muted">Directory where configuration files will be stored</small>
+                        </div>
+
+                        <div class="disk-usage" ng-if="systemInfo.disk_usage">
+                            <h5>Disk Usage:</h5>
+                            <div ng-repeat="(name, disk) in systemInfo.disk_usage" class="disk-item">
+                                <strong>{{name | uppercase}}:</strong> {{disk.path}}
+                                <div class="progress">
+                                    <div class="progress-bar" ng-class="{'bg-warning': disk.percent > 80, 'bg-danger': disk.percent > 90}" 
+                                         ng-style="{'width': disk.percent + '%'}">
+                                        {{disk.percent | number:1}}%
+                                    </div>
+                                </div>
+                                <small>{{(disk.free / 1024 / 1024 / 1024) | number:1}} GB free of {{(disk.total / 1024 / 1024 / 1024) | number:1}} GB</small>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-secondary" ng-click="previousStep()">
+                        <i class="fa fa-arrow-left"></i> Back
+                    </button>
+                    <button class="btn btn-primary float-right" ng-click="processBasicInfo()" 
+                            ng-disabled="!isStepValid(2) || isLoading">
+                        Next <i class="fa fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

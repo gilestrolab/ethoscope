@@ -93,7 +93,7 @@
 
             // route for the installation wizard
             .when('/installation-wizard', {
-                templateUrl: '/static/pages/installation-wizard.html',
+                templateUrl: '/static/pages/wizard/installation-wizard.html',
                 controller: 'installationWizardController',
             })
 

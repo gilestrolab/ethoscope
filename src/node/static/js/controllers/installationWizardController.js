@@ -97,6 +97,27 @@
             { number: 8, title: 'Notifications', description: 'Setup email and chat notifications (optional)', icon: 'fa-bell' }
         ];
         
+        // Template helper functions for dynamic step loading
+        $scope.getStepTemplate = function() {
+            var stepName = $scope.getStepName($scope.currentStep);
+            return '/static/pages/wizard/steps/step-' + $scope.currentStep + '-' + stepName + '.html';
+        };
+        
+        $scope.getStepName = function(stepNumber) {
+            var stepNames = {
+                1: 'welcome',
+                2: 'basic-setup', 
+                3: 'admin-user',
+                4: 'additional-users',
+                5: 'incubators',
+                6: 'virtual-sensor',
+                7: 'remote-access',
+                8: 'notifications',
+                9: 'completion'
+            };
+            return stepNames[stepNumber] || 'welcome';
+        };
+        
         // Initialize the wizard
         $scope.init = function() {
             console.log('Installation Wizard init() called');
@@ -811,7 +832,7 @@
         // Get effective domain for tunnel preview
         $scope.getEffectiveDomain = function() {
             if ($scope.tunnel.mode === 'ethoscope_net') {
-                return 'ethoscope.net';
+                return 'remote.ethoscope.net';
             }
             return $scope.tunnel.custom_domain || 'your-domain.com';
         };
