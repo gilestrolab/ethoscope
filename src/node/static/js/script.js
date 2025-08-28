@@ -97,6 +97,11 @@
                 controller: 'installationWizardController',
             })
 
+            // route for the login page
+            .when('/login', {
+                templateUrl: '/static/pages/login.html',
+                controller: 'authController',
+            })
 
         // route for the help page
         /*.when('/help', {
@@ -109,8 +114,198 @@
         $locationProvider.hashPrefix('!');
     });
 
+    // Initialize authentication service and add route protection
+    app.run(function($rootScope, $location, AuthService, $timeout, $http) {
+        // Public routes that don't require authentication
+        var publicRoutes = ['/login', '/installation-wizard'];
+        
+        // Set up global authentication state in $rootScope for header navigation
+        var updateGlobalAuthState = function() {
+            $rootScope.isAuthenticated = AuthService.isAuthenticated;
+            $rootScope.currentUser = AuthService.getCurrentUser();  
+            $rootScope.isAdmin = AuthService.isAdmin;
+        };
+        
+        // Watch for authentication state changes globally
+        $rootScope.$watch(function() {
+            return AuthService.isAuthenticated;
+        }, function(newVal, oldVal) {
+            if (newVal !== oldVal) {
+                updateGlobalAuthState();
+            }
+        });
+        
+        // Initial global state
+        updateGlobalAuthState();
+        
+        // Route change listener for authentication protection
+        $rootScope.$on('$routeChangeStart', function(event, next, current) {
+            var path = $location.path();
+            
+            // Check if this is a public route
+            var isPublicRoute = publicRoutes.some(function(route) {
+                return path.indexOf(route) === 0;
+            });
+            
+            // Always allow public routes
+            if (isPublicRoute) {
+                return;
+            }
+            
+            // For all other routes, check authentication
+            // Initialize authentication and check if user is authenticated
+            AuthService.initialize().then(function() {
+                updateGlobalAuthState();
+                
+                // Check if authentication is actually required by checking backend
+                $http.get('/auth/session').then(function(response) {
+                    if (response.data && response.data.authenticated !== undefined) {
+                        // Authentication is configured, check if user is authenticated
+                        if (!AuthService.isAuthenticated) {
+                            // Redirect to login page
+                            event.preventDefault();
+                            $location.path('/login');
+                        }
+                    } else {
+                        // Authentication not configured, allow access
+                        // This handles the case when auth is disabled
+                    }
+                }).catch(function(error) {
+                    // If auth check fails, allow access (auth might be disabled)
+                });
+            }).catch(function(error) {
+                updateGlobalAuthState();
+            });
+        });
+        
+        // Initialize authentication service
+        AuthService.initialize().then(function(isAuthenticated) {
+            updateGlobalAuthState(); // Update global state after initialization
+        }).catch(function(error) {
+            updateGlobalAuthState();
+        });
+        
+        // Add global logout function for header
+        $rootScope.logout = function() {
+            AuthService.logout();
+        };
+        
+        // Global change PIN modal state
+        $rootScope.showChangePinForm = false;
+        $rootScope.changePinForm = {
+            currentPin: '',
+            newPin: '',
+            confirmPin: '',
+            isSubmitting: false
+        };
+        $rootScope.changePinError = '';
+        $rootScope.changePinSuccess = '';
+        
+        // Add global showChangePin function for header
+        $rootScope.showChangePin = function() {
+            $rootScope.showChangePinForm = true;
+            $rootScope.changePinError = '';
+            $rootScope.changePinSuccess = '';
+            // Clear form
+            $rootScope.changePinForm = {
+                currentPin: '',
+                newPin: '',
+                confirmPin: '',
+                isSubmitting: false
+            };
+        };
+        
+        // Add global hideChangePin function
+        $rootScope.hideChangePin = function() {
+            $rootScope.showChangePinForm = false;
+            $rootScope.changePinError = '';
+            $rootScope.changePinSuccess = '';
+        };
+        
+        // Add global submitChangePin function
+        $rootScope.submitChangePin = function() {
+            if ($rootScope.changePinForm.isSubmitting) {
+                return;
+            }
+            
+            // Clear previous messages
+            $rootScope.changePinError = '';
+            $rootScope.changePinSuccess = '';
+            
+            // Validate form
+            if (!$rootScope.changePinForm.currentPin || !$rootScope.changePinForm.newPin || !$rootScope.changePinForm.confirmPin) {
+                $rootScope.changePinError = 'All fields are required';
+                return;
+            }
+            
+            if ($rootScope.changePinForm.newPin !== $rootScope.changePinForm.confirmPin) {
+                $rootScope.changePinError = 'New PIN confirmation does not match';
+                return;
+            }
+            
+            if ($rootScope.changePinForm.newPin === $rootScope.changePinForm.currentPin) {
+                $rootScope.changePinError = 'New PIN must be different from current PIN';
+                return;
+            }
+            
+            $rootScope.changePinForm.isSubmitting = true;
+            
+            AuthService.changePin(
+                $rootScope.changePinForm.currentPin,
+                $rootScope.changePinForm.newPin,
+                $rootScope.changePinForm.confirmPin
+            )
+            .then(function(result) {
+                $rootScope.changePinForm.isSubmitting = false;
+                
+                if (result.success) {
+                    $rootScope.changePinSuccess = result.message;
+                    
+                    // Clear form on success
+                    $rootScope.changePinForm = {
+                        currentPin: '',
+                        newPin: '',
+                        confirmPin: '',
+                        isSubmitting: false
+                    };
+                    
+                    // Hide form after 3 seconds
+                    $timeout(function() {
+                        $rootScope.hideChangePin();
+                    }, 3000);
+                } else {
+                    $rootScope.changePinError = result.message;
+                    
+                    // Clear PIN fields for security
+                    $rootScope.changePinForm.currentPin = '';
+                    $rootScope.changePinForm.newPin = '';
+                    $rootScope.changePinForm.confirmPin = '';
+                }
+            })
+            .catch(function(error) {
+                $rootScope.changePinForm.isSubmitting = false;
+                $rootScope.changePinError = 'PIN change failed due to connection error';
+                
+                // Clear all fields
+                $rootScope.changePinForm = {
+                    currentPin: '',
+                    newPin: '',
+                    confirmPin: '',
+                    isSubmitting: false
+                };
+            });
+        };
+        
+        // Add global enter key handler for change PIN
+        $rootScope.onChangePinEnter = function($event) {
+            if ($event.which === 13) { // Enter key
+                $rootScope.submitChangePin();
+            }
+        };
+    });
+
     // create the controller and inject Angular's $scope
-    app.controller('mainController', function($scope, $http, $interval, $timeout, $location) {
+    app.controller('mainController', function($scope, $http, $interval, $timeout, $location, AuthService) {
 
         // ===========================
         // SETUP CHECK
@@ -120,12 +315,10 @@
         var checkSetupStatus = function() {
             $http.get('/setup/status').then(function(response) {
                 if (response.data && response.data.required && !response.data.completed) {
-                    console.log('Setup required, redirecting to installation wizard');
                     $location.path('/installation-wizard');
                 }
             }).catch(function(error) {
                 // If setup API is not available or there's an error, continue normally
-                console.warn('Could not check setup status:', error);
             });
         };
 
@@ -142,6 +335,23 @@
         $scope.notifications = {};
         $scope.showOnline = true; // show only online devices by default
         $scope.groupActions = {};
+        
+        // Authentication properties
+        $scope.currentUser = null;
+        $scope.isAuthenticated = false;
+        $scope.isAdmin = false;
+        
+        // Update authentication state from service
+        var updateAuthState = function() {
+            $scope.currentUser = AuthService.getCurrentUser();
+            $scope.isAuthenticated = AuthService.isAuthenticated;
+            $scope.isAdmin = AuthService.isAdmin;
+        };
+        
+        // Initialize authentication state
+        updateAuthState();
+        
+        // Authentication state watching is handled in the startup sequence below
 
         // ===========================
         // HELPER FUNCTIONS
@@ -173,7 +383,9 @@
                 var data = response.data;
                 $scope.sensors = data;
                 $scope.has_sensors = Object.keys($scope.sensors).length;
-            })
+            }).catch(function(error) {
+                // Silently fail - sensors are optional
+            });
         };
 
         var get_backup_status = function() {
@@ -193,7 +405,7 @@
                 $scope.rsync_backup_available = summary.services && summary.services.rsync_service_available || false;
                 $scope.backup_service_available = $scope.mysql_backup_available || $scope.rsync_backup_available;
 
-            }).catch(function() {
+            }).catch(function(error) {
                 $scope.backup_status = {};
                 $scope.backup_service_available = false;
                 $scope.mysql_backup_available = false;
@@ -218,6 +430,8 @@
                 var data = response.data;
                 var t = new Date(data.time);
                 $scope.time = formatConciseTime(t);
+            }).catch(function(error) {
+                // Silently fail - time will be updated on next refresh
             });
             var t = new Date();
             $scope.localtime = formatConciseTime(t);
@@ -249,7 +463,9 @@
 
 
                 $scope.status_n_summary = status_summary
-            })
+            }).catch(function(error) {
+                // Silently fail - devices will be refreshed on next cycle
+            });
         };
 
         // ===========================
@@ -854,7 +1070,6 @@
         });
 
         $scope.editSensor = function() {
-            console.log($scope.sensoredit);
             $http.post('/sensor/set', data = $scope.sensoredit)
                 .then(function() {
                     refresh_platform();
@@ -903,7 +1118,6 @@
          * Initialize all platform data immediately on page load
          */
         var initialize_platform = function() {
-            console.log("Initializing platform data...");
             get_devices();
             update_local_times();
             get_sensors();
@@ -919,15 +1133,14 @@
                     .then(function(response) {
                         var data = response.data;
                         if (data.added && data.added.length > 0) {
-                            console.log('Successfully poked device:', device.id);
                             // Refresh devices to show updated status
                             get_devices();
                         } else if (data.problems && data.problems.length > 0) {
-                            console.log('Failed to poke device:', device.id, data.problems);
+                            // Handle problems silently
                         }
                     })
                     .catch(function(error) {
-                        console.error('Error poking device:', error);
+                        // Handle errors silently
                     });
             }
         };
@@ -936,15 +1149,33 @@
         // STARTUP SEQUENCE
         // ===========================
 
-        // Initialize platform data immediately (no delay)
-        initialize_platform();
+        var refreshInterval = null;
 
+        // Always initialize platform data immediately - authentication handled at API level
+        initialize_platform();
+        
         // Set up periodic refresh every 5 seconds
-        var refresh_data = $interval(refresh_platform, 5 * 1000);
+        refreshInterval = $interval(refresh_platform, 5 * 1000);
+
+        // ===========================
+        // AUTHENTICATION FUNCTIONS
+        // ===========================
+        
+        $scope.logout = function() {
+            AuthService.logout();
+        };
+        
+        $scope.showChangePin = function() {
+            // Trigger change PIN modal in auth controller
+            $scope.$broadcast('showChangePinModal');
+        };
 
         // Clean up interval when scope is destroyed
         $scope.$on("$destroy", function() {
-            $interval.cancel(refresh_data);
+            if (refreshInterval) {
+                $interval.cancel(refreshInterval);
+            }
+            AuthService.stopSessionMonitoring();
         });
     });
 })()

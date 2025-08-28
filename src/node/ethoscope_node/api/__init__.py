@@ -28,6 +28,7 @@ from .file_api import FileAPI
 from .database_api import DatabaseAPI
 from .setup_api import SetupAPI
 from .tunnel_utils import TunnelUtils
+from .auth_api import AuthAPI
 
 __all__ = [
     'BaseAPI',
@@ -39,5 +40,6 @@ __all__ = [
     'FileAPI',
     'DatabaseAPI',
     'SetupAPI',
-    'TunnelUtils'
+    'TunnelUtils',
+    'AuthAPI'
 ]

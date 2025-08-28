@@ -17,6 +17,45 @@
                         <p class="mb-0">Your node will be accessible at: <strong>{{getTunnelPreview()}}</strong></p>
                     </div>
 
+                    <!-- Authentication Configuration -->
+                    <div class="card mb-3" ng-class="{'border-warning': tunnel.enabled && !tunnel.authentication_enabled}">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="fa fa-shield-alt"></i>
+                                Security Configuration
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group mb-2">
+                                <div class="custom-control custom-switch">
+                                    <input type="checkbox" 
+                                           class="custom-control-input" 
+                                           id="enableAuthentication" 
+                                           ng-model="tunnel.authentication_enabled"
+                                           ng-disabled="!canDisableAuthentication()">
+                                    <label class="custom-control-label" for="enableAuthentication">
+                                        <strong>{{getAuthToggleLabel()}}</strong>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div ng-if="!tunnel.enabled" class="alert alert-info mb-0">
+                                <small>
+                                    <i class="fa fa-info-circle"></i>
+                                    Authentication is optional for local-only access, but provides an extra security layer by requiring users to log in with their PIN.
+                                </small>
+                            </div>
+                            
+                            <div ng-if="tunnel.enabled" class="alert alert-warning mb-0">
+                                <small>
+                                    <i class="fa fa-exclamation-triangle"></i>
+                                    <strong>Authentication is required when remote access is enabled</strong> to prevent unauthorized internet access to your ethoscope node.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Remote Access Configuration -->
                     <div class="form-group">
                         <div class="custom-control custom-switch">
                             <input type="checkbox" class="custom-control-input" id="enableTunnel" ng-model="tunnel.enabled">
@@ -125,7 +164,7 @@
                         <button type="button" class="btn btn-secondary" ng-click="goToPreviousStep()">
                             <i class="fa fa-arrow-left"></i> Previous
                         </button>
-                        <button type="button" class="btn btn-primary" ng-click="processTunnel()" ng-disabled="tunnel.enabled && !tunnel.token">
+                        <button type="button" class="btn btn-primary" ng-click="processTunnel()" ng-disabled="!isStepValid(7)">
                             Next <i class="fa fa-arrow-right"></i>
                         </button>
                     </div>

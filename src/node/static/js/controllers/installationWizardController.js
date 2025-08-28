@@ -1,8 +1,6 @@
 (function(){
     var installationWizardController = function($scope, $http, $timeout, $location){
         
-        console.log('Installation Wizard Controller loaded');
-        
         // Initialize scope variables
         $scope.setupStatus = {};
         $scope.currentStep = 1;
@@ -41,12 +39,18 @@
         
         $scope.tunnel = {
             enabled: false,
-            mode: 'custom',  // 'custom' (free) or 'ethoscope_net' (paid)
+            mode: 'custom',
             token: '',
             node_id: 'auto',
             domain: 'ethoscope.net',
-            custom_domain: ''
+            custom_domain: '',
+            authentication_enabled: false  // Optional for local-only, required for remote access
         };
+        
+        // Ensure authentication setting is always properly initialized
+        if (typeof $scope.tunnel.authentication_enabled !== 'boolean') {
+            $scope.tunnel.authentication_enabled = false;
+        }
         
         $scope.notifications = {
             smtp: {
@@ -118,34 +122,21 @@
             return stepNames[stepNumber] || 'welcome';
         };
         
-        // Initialize the wizard
+        // Initialize controller
         $scope.init = function() {
-            console.log('Installation Wizard init() called');
+            // Check if we're in reconfigure mode from URL
+            var search = $location.search();
+            var hash = $location.hash();
             
-            // Check if we're in reconfigure mode (URL parameter or query string)
-            try {
-                // Check URL parameters in hash or search
-                var search = window.location.search || '';
-                var hash = window.location.hash || '';
-                
-                console.log('Current URL - search:', search, 'hash:', hash);
-                
-                if (search.indexOf('reconfigure=true') !== -1 || 
-                    hash.indexOf('reconfigure=true') !== -1) {
-                    $scope.isReconfigureMode = true;
-                    console.log('Reconfigure mode enabled');
-                }
-            } catch (e) {
-                console.warn('Error checking reconfigure mode:', e);
-                // Continue without reconfigure mode
-            }
-            
-            $scope.loadSetupStatus();
-            $scope.loadSystemInfo();
-            
-            // Load existing configuration if in reconfigure mode
-            if ($scope.isReconfigureMode) {
+            // Check for reconfigure parameter in both search and hash
+            if ((search.reconfigure && search.reconfigure.toLowerCase() === 'true') ||
+                (hash && hash.includes('reconfigure=true'))) {
+                $scope.isReconfigureMode = true;
+                $scope.totalSteps = 8; // Skip basic info step in reconfigure mode
                 $scope.loadExistingConfig();
+            } else {
+                $scope.isReconfigureMode = false;
+                $scope.totalSteps = 9;
             }
         };
         
@@ -178,36 +169,23 @@
                 });
         };
         
-        // Load system information
-        $scope.loadSystemInfo = function() {
-            $http.get('/setup/system-info')
-                .then(function(response) {
-                    $scope.systemInfo = response.data;
-                    
-                    // Set default values from system info
-                    if ($scope.systemInfo.hostname) {
-                        $scope.basicInfo.hostname = $scope.systemInfo.hostname;
-                    }
-                })
-                .catch(function(error) {
-                    console.error('Error loading system info:', error);
-                });
-        };
+        // Load system information for advanced configuration
+        $http.get('/setup/system-info').then(function(response) {
+            if (response.data.result === 'success') {
+                $scope.systemInfo = response.data.info;
+            }
+        }).catch(function(error) {
+            // Silently fail - system info is optional
+        });
         
-        // Load existing users for admin replacement option
-        $scope.loadExistingUsers = function() {
-            $http.get('/node/users')
-                .then(function(response) {
-                    $scope.existingUsers = response.data;
-                })
-                .catch(function(error) {
-                    console.error('Error loading existing users:', error);
-                });
-        };
-        
-        // Load existing configuration for reconfigure mode
-        $scope.loadExistingConfig = function() {
-            console.log('Loading existing configuration for reconfigure mode');
+        // Load existing users for admin user selection
+        $http.get('/setup/existing-users').then(function(response) {
+            if (response.data.result === 'success') {
+                $scope.existingUsers = response.data.users;
+            }
+        }).catch(function(error) {
+            // Silently fail - existing users are optional
+        });
             $http.get('/setup/current-config')
                 .then(function(response) {
                     if (response.data.result === 'success') {
@@ -239,6 +217,19 @@
                             $scope.tunnel.node_id = config.tunnel.node_id || 'auto';
                             $scope.tunnel.domain = config.tunnel.domain || 'ethoscope.net';
                             $scope.tunnel.custom_domain = config.tunnel.custom_domain || '';
+                        }
+                        
+                        // Load authentication setting from config (new separate section)
+                        if (config.authentication) {
+                            $scope.tunnel.authentication_enabled = config.authentication.enabled || false;
+                        } else {
+                            // Default to false if no authentication config exists
+                            $scope.tunnel.authentication_enabled = false;
+                        }
+                        
+                        // Ensure authentication setting is always a boolean
+                        if (typeof $scope.tunnel.authentication_enabled !== 'boolean') {
+                            $scope.tunnel.authentication_enabled = false;
                         }
                         
                         // Load notification settings
@@ -291,15 +282,26 @@
                             $scope.virtualSensor.api_key = config.virtual_sensor.api_key || '';
                         }
                         
-                        console.log('Existing configuration loaded successfully');
+                        // Configuration loaded successfully
                     } else {
-                        console.warn('Failed to load existing configuration:', response.data.message);
+                        // Failed to load existing configuration
                     }
                 })
-                .catch(function(error) {
-                    console.error('Error loading existing configuration:', error);
-                });
+                // Handle reconfigure mode detection errors silently
+            }).catch(function(e) {
+                // Silently fail - continue with normal setup
+            });
         };
+        
+        // Watch for remote access changes to automatically enable/require authentication
+        $scope.$watch('tunnel.enabled', function(newValue, oldValue) {
+            if (newValue && !oldValue) {
+                // Remote access was just enabled - automatically enable authentication
+                $scope.tunnel.authentication_enabled = true;
+            }
+            // Note: We don't automatically disable authentication when remote access is disabled
+            // to allow users to keep it enabled for local security if they want
+        });
         
         // Navigation functions
         $scope.nextStep = function() {
@@ -343,6 +345,7 @@
                     if (!$scope.tunnel.enabled) return true; // If disabled, always valid
                     if (!$scope.tunnel.token) return false; // Token always required
                     if ($scope.tunnel.mode === 'custom' && !$scope.tunnel.custom_domain) return false; // Custom domain required for free mode
+                    if ($scope.tunnel.enabled && !$scope.tunnel.authentication_enabled) return false; // Authentication required when remote access is enabled
                     return true;
                 case 8:
                     return true; // Notifications are optional
@@ -504,52 +507,42 @@
                 });
         };
         
-        // Edit incubator - populate the edit modal with existing data
-        $scope.editIncubator = function(index) {
-            $scope.editingIncubator = angular.copy($scope.incubators[index]);
-            $scope.editingIncubatorIndex = index;
-            console.log('Editing incubator:', $scope.editingIncubator);
-        };
-        
-        // Update incubator
-        $scope.updateIncubator = function() {
-            console.log('updateIncubator called');
-            console.log('editingIncubator:', $scope.editingIncubator);
+        $scope.editIncubator = function(incubator) {
+                $scope.editingIncubator = angular.copy(incubator);
+                $scope.editingIncubatorIndex = $scope.incubators.indexOf(incubator);
+            };
             
-            if (!$scope.editingIncubator.name) {
-                $scope.showMessage('Incubator name is required.', 'error');
-                return;
-            }
-            
-            $scope.isLoading = true;
-            
-            var updateData = angular.copy($scope.editingIncubator);
-            updateData.original_name = $scope.incubators[$scope.editingIncubatorIndex].name;
-            
-            console.log('Sending update data:', updateData);
-            console.log('Making request to /setup/update-incubator');
-            
-            $http.post('/setup/update-incubator', updateData)
-                .then(function(response) {
-                    console.log('Update response:', response.data);
-                    if (response.data.result === 'success') {
-                        $scope.incubators[$scope.editingIncubatorIndex] = angular.copy($scope.editingIncubator);
-                        $scope.editingIncubator = {};
-                        $scope.editingIncubatorIndex = -1;
-                        $scope.showMessage('Incubator updated successfully.', 'success');
-                        $('#editIncubatorModal').modal('hide');
-                    } else {
-                        $scope.showMessage('Error: ' + (response.data.message || 'Unknown error'), 'error');
-                    }
-                })
-                .catch(function(error) {
-                    console.log('Update error:', error);
-                    $scope.showMessage('Error updating incubator: ' + (error.data?.message || error.statusText), 'error');
-                })
-                .finally(function() {
-                    $scope.isLoading = false;
-                });
-        };
+            $scope.updateIncubator = function() {
+                if (!$scope.editingIncubator || !$scope.editingIncubator.name) {
+                    $scope.editIncubatorError = 'Incubator name is required';
+                    return;
+                }
+                
+                var updateData = {
+                    index: $scope.editingIncubatorIndex,
+                    name: $scope.editingIncubator.name,
+                    description: $scope.editingIncubator.description || '',
+                    location: $scope.editingIncubator.location || '',
+                    owner: $scope.editingIncubator.owner || ''
+                };
+                
+                $http.post('/setup/update-incubator', updateData)
+                    .then(function(response) {
+                        if (response.data.result === 'success') {
+                            // Update the incubator in the list
+                            $scope.incubators[$scope.editingIncubatorIndex] = angular.copy($scope.editingIncubator);
+                            $scope.editingIncubator = null;
+                            $scope.editingIncubatorIndex = -1;
+                            $scope.editIncubatorError = '';
+                            $('#editIncubatorModal').modal('hide');
+                        } else {
+                            $scope.editIncubatorError = response.data.message || 'Failed to update incubator';
+                        }
+                    })
+                    .catch(function(error) {
+                        $scope.editIncubatorError = 'Failed to update incubator: ' + (error.data?.message || error.statusText);
+                    });
+            };
         
         // Tunnel configuration
         $scope.processTunnel = function() {
@@ -840,6 +833,18 @@
         // Get full tunnel URL preview
         $scope.getTunnelPreview = function() {
             return $scope.getComputedNodeId() + '.' + $scope.getEffectiveDomain();
+        };
+        
+        // Check if authentication can be disabled
+        $scope.canDisableAuthentication = function() {
+            return !$scope.tunnel.enabled;
+        };
+        
+        // Get authentication toggle label based on remote access status
+        $scope.getAuthToggleLabel = function() {
+            return $scope.tunnel.enabled ? 
+                'Enable authentication (required for remote access)' : 
+                'Enable authentication (optional for local access)';
         };
         
         // Generate username from full name

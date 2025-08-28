@@ -33,6 +33,7 @@ import multiprocessing
 import sqlite3
 import logging
 import traceback
+from typing import Optional
 
 from ethoscope_node.utils.configuration import migrate_conf_file
 
@@ -1626,6 +1627,198 @@ class ExperimentalDB(multiprocessing.Process):
             logging.info(f"No stale devices found to cleanup (not seen for >{threshold_hours} hours)")
         
         return cleaned_count
+    
+    # PIN Authentication Methods
+    
+    def hash_pin(self, pin: str) -> str:
+        """
+        Hash a PIN using PBKDF2-SHA256 with random salt (built-in Python libraries only).
+        
+        Args:
+            pin: Plain text PIN to hash
+            
+        Returns:
+            Hashed PIN string in format: pbkdf2$salt$hash
+        """
+        try:
+            import hashlib
+            import secrets
+            
+            # Generate a random salt (32 bytes as hex = 64 characters)
+            salt = secrets.token_hex(32)
+            pin_bytes = pin.encode('utf-8')
+            salt_bytes = salt.encode('utf-8')
+            
+            # Use PBKDF2 with SHA-256 and 100,000 iterations
+            key = hashlib.pbkdf2_hmac('sha256', pin_bytes, salt_bytes, 100000)
+            
+            # Store as pbkdf2$salt$hash format for easy parsing
+            return f"pbkdf2${salt}${key.hex()}"
+            
+        except Exception as e:
+            logging.error(f"Error hashing PIN: {e}")
+            return ""
+    
+    def verify_pin(self, username: str, pin: str) -> bool:
+        """
+        Verify a PIN against the stored hash.
+        
+        Args:
+            username: Username to verify PIN for
+            pin: Plain text PIN to verify
+            
+        Returns:
+            True if PIN is correct, False otherwise
+        """
+        try:
+            import hashlib
+            
+            # Get user data
+            user = self.getUserByName(username, asdict=True)
+            if not user:
+                logging.warning(f"PIN verification failed - user not found: {username}")
+                return False
+            
+            stored_hash = user.get('pin', '')
+            if not stored_hash:
+                logging.warning(f"PIN verification failed - no PIN set for user: {username}")
+                return False
+            
+            # Check if stored hash is in new PBKDF2 format
+            if stored_hash.startswith('pbkdf2$'):
+                try:
+                    # Parse the hash: pbkdf2$salt$hash
+                    _, salt, hash_hex = stored_hash.split('$', 2)
+                    
+                    # Recreate the hash with the provided PIN and stored salt
+                    pin_bytes = pin.encode('utf-8')
+                    salt_bytes = salt.encode('utf-8')
+                    key = hashlib.pbkdf2_hmac('sha256', pin_bytes, salt_bytes, 100000)
+                    
+                    return key.hex() == hash_hex
+                    
+                except (ValueError, IndexError):
+                    logging.error(f"Invalid PBKDF2 hash format for user: {username}")
+                    return False
+            else:
+                # Legacy formats - check plaintext first, then upgrade
+                if stored_hash == pin:
+                    # Plaintext match - hash it and update
+                    logging.info(f"Upgrading plaintext PIN to hashed for user: {username}")
+                    hashed_pin = self.hash_pin(pin)
+                    if hashed_pin:
+                        self.updateUser(username=username, pin=hashed_pin)
+                    return True
+                else:
+                    # Check if it's the old simple hash (fixed salt)
+                    simple_hash = hashlib.pbkdf2_hmac('sha256', pin.encode('utf-8'), b'ethoscope_salt', 100000).hex()
+                    if stored_hash == simple_hash:
+                        # Upgrade to new format with random salt
+                        logging.info(f"Upgrading simple hash to PBKDF2 for user: {username}")
+                        hashed_pin = self.hash_pin(pin)
+                        if hashed_pin:
+                            self.updateUser(username=username, pin=hashed_pin)
+                        return True
+                    
+                    return False
+            
+        except Exception as e:
+            logging.error(f"Error verifying PIN for user {username}: {e}")
+            return False
+    
+    def authenticate_user(self, username: str, pin: str) -> Optional[dict]:
+        """
+        Authenticate a user with username and PIN.
+        
+        Args:
+            username: Username to authenticate
+            pin: PIN to verify
+            
+        Returns:
+            User dictionary if authentication successful, None otherwise
+        """
+        try:
+            # Get user data
+            user = self.getUserByName(username, asdict=True)
+            if not user:
+                return None
+            
+            # Check if user is active
+            if not user.get('active', 0):
+                logging.warning(f"Authentication failed - inactive user: {username}")
+                return None
+            
+            # Verify PIN
+            if not self.verify_pin(username, pin):
+                return None
+            
+            logging.info(f"User authenticated successfully: {username}")
+            return user
+            
+        except Exception as e:
+            logging.error(f"Error authenticating user {username}: {e}")
+            return None
+    
+    def migrate_plaintext_pins(self) -> int:
+        """
+        Migrate any plaintext PINs to hashed format.
+        
+        Returns:
+            Number of PINs migrated
+        """
+        try:
+            # Get all users with PINs
+            sql_get_users_with_pins = f"""
+            SELECT username, pin FROM {self._users_table_name} 
+            WHERE pin IS NOT NULL AND pin != '' AND active = 1
+            """
+            
+            result = self.executeSQL(sql_get_users_with_pins)
+            if not result:
+                return 0
+            
+            migrated_count = 0
+            
+            for row in result:
+                username = row['username']
+                current_pin = row['pin']
+                
+                # Skip if already hashed (bcrypt format)
+                if current_pin.startswith('$2b$') or current_pin.startswith('$2a$'):
+                    continue
+                
+                # Skip if it looks like a simple hash (hex string)
+                try:
+                    int(current_pin, 16)  # If this succeeds, it's probably already hashed
+                    if len(current_pin) == 64:  # SHA256 hex length
+                        continue
+                except ValueError:
+                    pass  # Not a hex string, probably plaintext
+                
+                # Hash the plaintext PIN
+                hashed_pin = self.hash_pin(current_pin)
+                if not hashed_pin:
+                    logging.error(f"Failed to hash PIN for user: {username}")
+                    continue
+                
+                # Update the user with hashed PIN
+                result = self.updateUser(username=username, pin=hashed_pin)
+                if result >= 0:
+                    migrated_count += 1
+                    logging.info(f"Migrated plaintext PIN to hash for user: {username}")
+                else:
+                    logging.error(f"Failed to update hashed PIN for user: {username}")
+            
+            if migrated_count > 0:
+                logging.info(f"Successfully migrated {migrated_count} plaintext PINs to hashed format")
+            else:
+                logging.info("No plaintext PINs found to migrate")
+                
+            return migrated_count
+            
+        except Exception as e:
+            logging.error(f"Error migrating plaintext PINs: {e}")
+            return 0
         
 class simpleDB(object):
     '''

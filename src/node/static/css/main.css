@@ -2235,3 +2235,112 @@ body {
     margin-bottom: 40px;
 }
 
+/* ==========================================================================
+   User Dropdown Menu Fixes
+   ========================================================================== */
+
+/* Fix user dropdown positioning and prevent layout shift */
+.navbar .dropdown {
+    position: relative;
+}
+
+.navbar .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: auto;
+    z-index: 1000;
+    min-width: 280px;
+    margin-top: 2px;
+    border: 1px solid var(--light-gray);
+    border-radius: 4px;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.175);
+    background-color: var(--pure-white);
+}
+
+.navbar .dropdown-menu.dropdown-menu-right {
+    right: 0;
+    left: auto;
+}
+
+/* User information section styling */
+.navbar .dropdown-menu .user-info-item {
+    padding: 0;
+    margin: 0;
+}
+
+.navbar .dropdown-menu .user-info-item div {
+    padding: 12px 20px !important;
+    margin: 0;
+    background-color: var(--off-white) !important;
+    border-top: 1px solid var(--light-gray);
+    border-bottom: 1px solid var(--light-gray);
+    cursor: default !important;
+}
+
+.navbar .dropdown-menu .user-info-item div:hover {
+    background-color: var(--off-white) !important;
+}
+
+/* Dropdown header styling */
+.navbar .dropdown-menu .dropdown-header {
+    padding: 8px 20px;
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.42857143;
+    color: var(--medium-gray);
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+/* Dropdown links styling */
+.navbar .dropdown-menu li a {
+    display: block;
+    padding: 10px 20px;
+    clear: both;
+    font-weight: normal;
+    line-height: 1.42857143;
+    color: var(--warm-gray);
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.navbar .dropdown-menu li a:hover,
+.navbar .dropdown-menu li a:focus {
+    color: var(--deep-purple);
+    background-color: var(--off-white);
+    text-decoration: none;
+}
+
+/* Divider styling */
+.navbar .dropdown-menu .divider {
+    height: 1px;
+    margin: 5px 0;
+    overflow: hidden;
+    background-color: var(--light-gray);
+}
+
+/* Admin badge styling */
+.badge-warning {
+    background-color: var(--golden-honey);
+    color: var(--pure-white);
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+/* Prevent layout shift when dropdown opens */
+.navbar .dropdown.open .dropdown-toggle {
+    background-color: transparent;
+    border-color: transparent;
+}
+
+/* Icon spacing */
+.navbar .dropdown-menu li a i {
+    margin-right: 8px;
+    width: 14px;
+    text-align: center;
+}
+

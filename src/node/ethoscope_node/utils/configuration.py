@@ -141,6 +141,9 @@ class EthoscopeConfiguration:
             'setup_completed': None,
             'setup_version': '1.0'
         },
+        'authentication': {
+            'enabled': False  # Global authentication setting, independent of tunnel
+        },
         'tunnel': {
             'enabled': False,
             'provider': 'cloudflare',
@@ -152,10 +155,11 @@ class EthoscopeConfiguration:
             'status': 'disconnected',
             'last_connected': None,
             'container_name': 'ethoscope-cloudflare-tunnel'
+            # authentication_enabled removed from tunnel section
         }
     }
     
-    REQUIRED_SECTIONS = ['folders', 'incubators', 'sensors', 'commands', 'custom', 'smtp', 'mattermost', 'slack', 'alerts', 'setup', 'tunnel']
+    REQUIRED_SECTIONS = ['folders', 'incubators', 'sensors', 'commands', 'custom', 'smtp', 'mattermost', 'slack', 'alerts', 'setup', 'authentication', 'tunnel']
     REQUIRED_FOLDERS = ['results', 'video', 'temporary']
     
     def __init__(self, config_file: str = "/etc/ethoscope/ethoscope.conf"):
@@ -243,6 +247,16 @@ class EthoscopeConfiguration:
                 else:
                     target[key] = value
             return target
+        
+        # Handle backward compatibility: migrate authentication_enabled from tunnel to authentication section
+        if 'tunnel' in config_data and 'authentication_enabled' in config_data['tunnel']:
+            # Move authentication_enabled from tunnel to authentication section
+            if 'authentication' not in config_data:
+                config_data['authentication'] = {}
+            config_data['authentication']['enabled'] = config_data['tunnel']['authentication_enabled']
+            # Remove from tunnel section
+            del config_data['tunnel']['authentication_enabled']
+            self._logger.info("Migrated authentication_enabled from tunnel section to authentication section")
         
         # Merge configuration with defaults (users are handled by database)
         merged = deep_merge(merged, config_data)
@@ -853,6 +867,121 @@ class EthoscopeConfiguration:
             tunnel_config['is_paid_mode'] = False
         
         return tunnel_config
+    
+    def update_authentication_config(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Update authentication configuration.
+        
+        Args:
+            config_data: Authentication configuration data
+            
+        Returns:
+            Updated authentication configuration
+            
+        Raises:
+            ValueError: If configuration data is invalid
+        """
+        if 'authentication' not in self._settings:
+            self._settings['authentication'] = self.DEFAULT_SETTINGS['authentication'].copy()
+        
+        # Validate and update authentication settings
+        allowed_keys = ['enabled']
+        
+        for key, value in config_data.items():
+            if key in allowed_keys:
+                self._settings['authentication'][key] = value
+            else:
+                self._logger.warning(f"Unknown authentication configuration key: {key}")
+        
+        self.save()
+        self._logger.info(f"Updated authentication configuration: {list(config_data.keys())}")
+        
+        return self._settings['authentication']
+    
+    def get_authentication_config(self) -> Dict[str, Any]:
+        """
+        Get current authentication configuration.
+        
+        Returns:
+            Authentication configuration dictionary
+        """
+        return self._settings.get('authentication', self.DEFAULT_SETTINGS['authentication']).copy()
+    
+    def migrate_user_pins(self, dry_run: bool = False) -> int:
+        """
+        Migrate plaintext PINs to secure hashed format.
+        
+        Args:
+            dry_run: If True, only report what would be migrated without making changes
+            
+        Returns:
+            Number of PINs migrated
+            
+        Raises:
+            ConfigurationError: If migration fails
+        """
+        try:
+            from ethoscope_node.utils.etho_db import ExperimentalDB
+            
+            # Initialize database
+            db = ExperimentalDB()
+            
+            # Get all users with PINs
+            all_users = db.getAllUsers(active_only=False, asdict=True)
+            
+            if not all_users:
+                self._logger.info("No users found in database")
+                return 0
+            
+            plaintext_users = []
+            
+            for username, user_data in all_users.items():
+                pin = user_data.get('pin', '')
+                if pin:
+                    # Check if PIN looks like plaintext (not bcrypt hash)
+                    if not (pin.startswith('$2b$') or pin.startswith('$2a$')):
+                        # Also check if it's not a simple hex hash
+                        is_hex_hash = False
+                        try:
+                            int(pin, 16)
+                            if len(pin) == 64:  # SHA256 hex length
+                                is_hex_hash = True
+                        except ValueError:
+                            pass
+                        
+                        if not is_hex_hash:
+                            plaintext_users.append(username)
+            
+            self._logger.info(f"Found {len(plaintext_users)} users with plaintext PINs")
+            
+            if len(plaintext_users) == 0:
+                self._logger.info("No plaintext PINs found - all PINs are already secure")
+                return 0
+            
+            if dry_run:
+                self._logger.info("DRY RUN - Would migrate the following users:")
+                for username in plaintext_users:
+                    self._logger.info(f"  - {username}")
+                return len(plaintext_users)
+            
+            # Perform migration
+            self._logger.info("Starting PIN migration...")
+            migrated_count = db.migrate_plaintext_pins()
+            
+            if migrated_count > 0:
+                self._logger.info(f"Successfully migrated {migrated_count} plaintext PINs to secure format")
+                
+                # Mark this migration step as completed
+                self.mark_setup_step_completed('pin_migration')
+            else:
+                self._logger.warning("No PINs were migrated - check logs for errors")
+            
+            return migrated_count
+            
+        except Exception as e:
+            error_msg = f"PIN migration failed: {e}"
+            self._logger.error(error_msg)
+            raise ConfigurationError(error_msg)
 
 
 def _setup_system_ssh_config(private_key_path: str) -> None:

@@ -43,6 +43,8 @@
     <script src="static/js/controllers/usersController.js"></script>
     <script src="static/js/controllers/installationWizardController.js"></script>
     <script src="static/js/controllers/footerController.js"></script>
+    <script src="static/js/controllers/authService.js"></script>
+    <script src="static/js/controllers/authController.js"></script>
 
     <script src="static/js/vendor/daterangepicker.js"></script>
     <script src="static/js/vendor/angular-daterangepicker.js"></script>
@@ -62,12 +64,50 @@
                 </div>
 
                 <ul class="nav navbar-nav navbar-right">
-                    <li><a href="/update" target="_blank"><i class="fa fa-refresh"></i>Update System</a></li>
-                    <li><a href="#!/more/all"><i class="fa fa-cog"></i> Management</a></li>
-                    <li><a href="#!/users"><i class="fa fa-users"></i> Users</a></li>
-                    <li><a href="#!/sensors_data"><i class="fa fa-temperature-quarter"></i> Sensors</a></li>
-                    <li><a href="#!/experiments"><i class="fa fa-clipboard-list"></i> Experiments</a></li>
-                    <li><a href="#!/resources"><i class="fa fa-book"></i> Resources<span id="notification-badge" class="notification-badge" title="">{{notifications.length}}</span></a></li>
+                    <!-- Main navigation items (show only when authenticated) -->
+                    <li ng-show="isAuthenticated"><a href="/update" target="_blank"><i class="fa fa-refresh"></i> Update System</a></li>
+                    <li ng-show="isAuthenticated"><a href="#!/more/all"><i class="fa fa-cog"></i> Management</a></li>
+                    <li ng-show="isAuthenticated"><a href="#!/users"><i class="fa fa-users"></i> Users</a></li>
+                    <li ng-show="isAuthenticated"><a href="#!/sensors_data"><i class="fa fa-temperature-quarter"></i> Sensors</a></li>
+                    <li ng-show="isAuthenticated"><a href="#!/experiments"><i class="fa fa-clipboard-list"></i> Experiments</a></li>
+                    <li ng-show="isAuthenticated"><a href="#!/resources"><i class="fa fa-book"></i> Resources<span id="notification-badge" class="notification-badge" title="">{{notifications.length}}</span></a></li>
+                    
+                    <!-- User menu dropdown (show only when authenticated with real user) -->
+                    <li ng-show="isAuthenticated && currentUser.username !== 'system'" class="dropdown">
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false" onclick="return false;">
+                            <i class="fa fa-user-circle"></i> 
+                            {{currentUser.fullname || currentUser.username}}
+                            <span ng-if="isAdmin" class="badge badge-warning ml-1" title="Administrator">Admin</span>
+                            <span class="caret"></span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-right">
+                            <li class="dropdown-header">
+                                <i class="fa fa-info-circle"></i> User Information
+                            </li>
+                            <li class="user-info-item">
+                                <div class="px-3 py-2" style="cursor: default; background: none; border: none;">
+                                    <strong>{{currentUser.fullname || currentUser.username}}</strong><br>
+                                    <small class="text-muted">{{currentUser.email}}</small><br>
+                                    <small class="text-muted">Lab: {{currentUser.labname}}</small>
+                                </div>
+                            </li>
+                            <li role="separator" class="divider"></li>
+                            <li><a href="#" ng-click="showChangePin()" onclick="return false;">
+                                <i class="fa fa-key"></i> Change PIN
+                            </a></li>
+                            <li role="separator" class="divider"></li>
+                            <li><a href="#" ng-click="logout()" onclick="return false;">
+                                <i class="fa fa-sign-out-alt"></i> Logout
+                            </a></li>
+                        </ul>
+                    </li>
+                    
+                    <!-- Login link (show only when not authenticated) -->
+                    <li ng-hide="isAuthenticated">
+                        <a href="#!/login">
+                            <i class="fa fa-sign-in-alt"></i> Login
+                        </a>
+                    </li>
                 </ul>
             </div>
         </nav>
@@ -81,6 +121,79 @@
 
     <div id="footer" ng-controller="FooterController" class="text-center text-muted">
         <small>Git: {{gitInfo.branch}} ({{gitInfo.commit}}) - {{gitInfo.date}}</small>
+    </div>
+
+    <!-- Change PIN Modal (available globally) -->
+    <div ng-if="showChangePinForm" style="display: block; background: rgba(0,0,0,0.5); position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999;">
+        <div style="margin: 80px auto; width: 500px; background: white; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">
+            <!-- Modal Header -->
+            <div style="padding: 20px 25px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+                <h4 style="margin: 0;"><i class="fa fa-key"></i> Change PIN</h4>
+                <button type="button" ng-click="hideChangePin()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #999;">&times;</button>
+            </div>
+            
+            <!-- Modal Body -->
+            <div style="padding: 25px;">
+                <form ng-submit="submitChangePin()" novalidate>
+                    <!-- Current PIN -->
+                    <div style="margin-bottom: 20px;">
+                        <label for="currentPin" style="display: block; margin-bottom: 5px; font-weight: bold;">Current PIN</label>
+                        <input 
+                            type="password" 
+                            class="form-control" 
+                            id="currentPin"
+                            ng-model="changePinForm.currentPin" 
+                            placeholder="Enter your current PIN"
+                            style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    
+                    <!-- New PIN -->
+                    <div style="margin-bottom: 20px;">
+                        <label for="newPin" style="display: block; margin-bottom: 5px; font-weight: bold;">New PIN</label>
+                        <input 
+                            type="password" 
+                            class="form-control" 
+                            id="newPin"
+                            ng-model="changePinForm.newPin" 
+                            placeholder="Enter your new PIN"
+                            style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    
+                    <!-- Confirm New PIN -->
+                    <div style="margin-bottom: 20px;">
+                        <label for="confirmPin" style="display: block; margin-bottom: 5px; font-weight: bold;">Confirm New PIN</label>
+                        <input 
+                            type="password" 
+                            class="form-control" 
+                            id="confirmPin"
+                            ng-model="changePinForm.confirmPin" 
+                            placeholder="Confirm your new PIN"
+                            style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    
+                    <!-- Error Message -->
+                    <div ng-if="changePinError" style="margin-bottom: 15px; padding: 10px; background: #f2dede; color: #a94442; border: 1px solid #ebccd1; border-radius: 4px;">
+                        <i class="fa fa-exclamation-triangle"></i> {{changePinError}}
+                    </div>
+                    
+                    <!-- Success Message -->
+                    <div ng-if="changePinSuccess" style="margin-bottom: 15px; padding: 10px; background: #dff0d8; color: #3c763d; border: 1px solid #d6e9c6; border-radius: 4px;">
+                        <i class="fa fa-check-circle"></i> {{changePinSuccess}}
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Modal Footer -->
+            <div style="padding: 15px 25px; border-top: 1px solid #ddd; display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" ng-click="hideChangePin()" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    Cancel
+                </button>
+                <button type="button" ng-click="submitChangePin()" ng-disabled="!changePinForm.currentPin || !changePinForm.newPin || !changePinForm.confirmPin" 
+                        style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    <i class="fa fa-key"></i> Change PIN
+                </button>
+            </div>
+        </div>
     </div>
 
 </body>

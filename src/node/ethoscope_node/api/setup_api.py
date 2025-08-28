@@ -566,12 +566,17 @@ class SetupAPI(BaseAPI):
             
             # Update tunnel configuration with dual mode support
             tunnel_config = {
-                'enabled': data.get('enabled', False),
-                'mode': data.get('mode', 'custom'),  # 'custom' (free) or 'ethoscope_net' (paid)
+                'enabled': data.get('tunnel_enabled', False),
+                'mode': data.get('tunnel_mode', 'custom'),
                 'token': actual_token,
                 'node_id': data.get('node_id', 'auto'),
                 'domain': data.get('domain', 'ethoscope.net'),
                 'custom_domain': data.get('custom_domain', '')  # For custom domain mode
+            }
+            
+            # Extract authentication setting for separate configuration
+            auth_config = {
+                'enabled': data.get('authentication_enabled', False)
             }
             
             # Validate configuration based on mode
@@ -581,9 +586,13 @@ class SetupAPI(BaseAPI):
                 
                 if tunnel_config['mode'] == 'custom' and not tunnel_config['custom_domain']:
                     return {'result': 'error', 'message': 'Custom domain is required for free mode'}
+                
+                if not auth_config['enabled']:
+                    return {'result': 'error', 'message': 'Authentication must be enabled when remote access is active for security reasons'}
             
-            # Update configuration using the existing method
+            # Update configuration using the existing methods
             self.config.update_tunnel_config(tunnel_config)
+            self.config.update_authentication_config(auth_config)
             
             # Update the tunnel environment file if server is available
             if hasattr(self, 'server') and self.server:
@@ -997,6 +1006,9 @@ Ethoscope Node Setup Wizard
                     'domain': 'ethoscope.net',
                     'custom_domain': ''
                 },
+                'authentication': {
+                    'enabled': False
+                },
                 'notifications': {
                     'smtp': {
                         'enabled': False,
@@ -1073,6 +1085,16 @@ Ethoscope Node Setup Wizard
                     })
             except Exception as e:
                 self.logger.warning(f"Could not load tunnel settings: {e}")
+            
+            # Get authentication settings
+            try:
+                auth_config = self.config._settings.get('authentication', {})
+                if auth_config:
+                    config_data['authentication'].update({
+                        'enabled': auth_config.get('enabled', False)
+                    })
+            except Exception as e:
+                self.logger.warning(f"Could not load authentication settings: {e}")
             
             # Get notification settings (from correct configuration paths)
             try:

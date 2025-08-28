@@ -1,0 +1,92 @@
+<!-- Login Page for Ethoscope Node -->
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-4">
+            <div class="card mt-5">
+                <div class="card-header text-center">
+                    <h3 class="mb-0">
+                        <i class="fa fa-sign-in-alt"></i> Ethoscope Node Login
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <!-- Login Form -->
+                    <form ng-submit="submitLogin()" name="loginFormElement" novalidate>
+                    <!-- Username Field -->
+                    <div class="form-group">
+                        <label for="loginUsername">Username</label>
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text">
+                                    <i class="fa fa-user"></i>
+                                </span>
+                            </div>
+                            <input 
+                                type="text" 
+                                class="form-control" 
+                                id="loginUsername"
+                                name="username"
+                                ng-model="loginForm.username" 
+                                placeholder="Enter your username"
+                                required
+                                ng-keypress="onLoginEnter($event)"
+                                ng-disabled="loginForm.isSubmitting">
+                        </div>
+                    </div>
+                    
+                    <!-- PIN Field -->
+                    <div class="form-group">
+                        <label for="loginPin">PIN</label>
+                        <div class="input-group">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text">
+                                    <i class="fa fa-key"></i>
+                                </span>
+                            </div>
+                            <input 
+                                type="password" 
+                                class="form-control" 
+                                id="loginPin"
+                                name="pin"
+                                ng-model="loginForm.pin" 
+                                placeholder="Enter your PIN"
+                                required
+                                ng-keypress="onLoginEnter($event)"
+                                ng-disabled="loginForm.isSubmitting">
+                        </div>
+                    </div>
+                    
+                    <!-- Error Message -->
+                    <div ng-if="loginError" class="alert alert-danger">
+                        <i class="fa fa-exclamation-triangle"></i>
+                        {{loginError}}
+                    </div>
+                    
+                    <!-- Login Button -->
+                    <div class="form-group">
+                        <button 
+                            type="submit" 
+                            class="btn btn-primary btn-block"
+                            ng-disabled="loginForm.isSubmitting || !loginForm.username || !loginForm.pin">
+                            <span ng-if="loginForm.isSubmitting">
+                                <i class="fa fa-spinner fa-spin"></i> Signing in...
+                            </span>
+                            <span ng-if="!loginForm.isSubmitting">
+                                <i class="fa fa-sign-in-alt"></i> Sign In
+                            </span>
+                        </button>
+                    </div>
+                    </form>
+                </div>
+                
+                <!-- Card Footer -->
+                <div class="card-footer text-center text-muted">
+                    <small>
+                        <i class="fa fa-shield-alt"></i>
+                        Secure PIN-based authentication
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+

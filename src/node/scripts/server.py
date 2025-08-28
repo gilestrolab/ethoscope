@@ -21,8 +21,10 @@ from ethoscope_node.backup.helpers import GenericBackupWrapper
 from ethoscope_node.utils.etho_db import ExperimentalDB
 from ethoscope_node.api import (
     DeviceAPI, BackupAPI, SensorAPI, ROITemplateAPI, 
-    NodeAPI, FileAPI, DatabaseAPI, SetupAPI, TunnelUtils
+    NodeAPI, FileAPI, DatabaseAPI, SetupAPI, TunnelUtils, AuthAPI
 )
+from ethoscope_node.auth import AuthMiddleware
+from ethoscope_node.auth.middleware import require_auth
 
 # Constants
 DEFAULT_PORT = 80
@@ -203,7 +205,8 @@ class EthoscopeNodeServer:
             FileAPI,
             DatabaseAPI,
             SetupAPI,
-            TunnelUtils
+            TunnelUtils,
+            AuthAPI
         ]
         
         for api_class in api_classes:
@@ -264,6 +267,17 @@ class EthoscopeNodeServer:
             else:
                 self.database = ExperimentalDB()
             self.logger.info("Database connection established")
+            
+            # Initialize authentication middleware
+            try:
+                self.auth_middleware = AuthMiddleware(self.database, self.config)
+                # Make auth middleware available to the bottle app
+                self.app.auth_middleware = self.auth_middleware
+                self.logger.info("Authentication middleware initialized")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize authentication middleware: {e}")
+                # Continue without authentication for now (backward compatibility)
+                self.auth_middleware = None
             
             # Retire inactive devices at startup
             try:
