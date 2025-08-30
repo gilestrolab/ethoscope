@@ -308,6 +308,11 @@ h6 { font-size: 12px !important; }
     float: left;
 }
 
+/* Move main content cards down by 50px */
+.card {
+    margin-top: 50px;
+}
+
 .notification-badge {
     background-color: #d9534f;
     color: white;

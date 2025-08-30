@@ -186,6 +186,9 @@
         }).catch(function(error) {
             // Silently fail - existing users are optional
         });
+        
+        // Load existing configuration for reconfigure mode
+        $scope.loadExistingConfig = function() {
             $http.get('/setup/current-config')
                 .then(function(response) {
                     if (response.data.result === 'success') {
@@ -287,10 +290,9 @@
                         // Failed to load existing configuration
                     }
                 })
-                // Handle reconfigure mode detection errors silently
-            }).catch(function(e) {
-                // Silently fail - continue with normal setup
-            });
+                .catch(function(e) {
+                    // Silently fail - continue with normal setup
+                });
         };
         
         // Watch for remote access changes to automatically enable/require authentication

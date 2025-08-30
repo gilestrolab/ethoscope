@@ -32,6 +32,8 @@ class SetupAPI(BaseAPI):
             return self._validate_folders()
         elif action == 'current-config':
             return self._get_current_config()
+        elif action == 'existing-users':
+            return self._get_existing_users()
         else:
             bottle.abort(404, f"Setup action '{action}' not found")
     
@@ -180,6 +182,31 @@ class SetupAPI(BaseAPI):
             validation_results[folder_name] = result
         
         return {'validation_results': validation_results}
+    
+    def _get_existing_users(self):
+        """Get existing users from the database for admin replacement option."""
+        try:
+            users = self.db.get_all_users()
+            user_list = []
+            
+            for user in users:
+                user_info = {
+                    'username': user.get('username', ''),
+                    'fullname': user.get('fullname', ''),
+                    'email': user.get('email', ''),
+                    'labname': user.get('labname', '')
+                }
+                user_list.append(user_info)
+            
+            return {
+                'result': 'success',
+                'users': user_list
+            }
+        except Exception as e:
+            return {
+                'result': 'error',
+                'message': f'Failed to fetch existing users: {str(e)}'
+            }
     
     def _setup_basic_info(self):
         """Configure basic system information."""
