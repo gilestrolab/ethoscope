@@ -1,0 +1,106 @@
+{
+    "template_info": {
+        "name": "HD Mating Arena (6 ROIs)",
+        "version": "1.0",
+        "description": "High-definition mating arena with 6 ROIs arranged in 2 rows × 3 columns",
+        "author": "Giorgio Gilestro",
+        "hardware_type": "hd_mating_arena",
+        "default": true,
+        "created": "2025-01-15T12:00:00"
+    },
+    "roi_definition": {
+        "type": "grid_with_targets",
+        "grid": {
+            "n_rows": 2,
+            "n_cols": 3,
+            "orientation": "rectangular"
+        },
+        "alignment": {
+            "target_detection": true,
+            "expected_targets": 3,
+            "adaptive_radius": 0.10,
+            "min_target_distance": 10
+        },
+        "positioning": {
+            "margins": {
+                "top": -0.21,
+                "bottom": -0.13,
+                "left": 0.05,
+                "right": 0.05
+            },
+            "fill_ratios": {
+                "horizontal": 0.85,
+                "vertical": 1.3
+            }
+        }
+    },
+    "validation": {
+        "min_roi_area": 500,
+        "max_roi_overlap": 0.02,
+        "required_targets": 3
+    },
+    "experimental_context": {
+        "typical_use": "Drosophila mating assays",
+        "subjects_per_roi": "1 pair (male + female)",
+        "recording_duration": "30-60 minutes",
+        "behavioral_metrics": [
+            "courtship behavior",
+            "mating success",
+            "locomotion patterns",
+            "spatial preferences"
+        ]
+    },
+    "roi_specifications": {
+        "roi_1": {
+            "position": "top-left",
+            "grid_coordinates": [0, 0],
+            "typical_subjects": "1 pair"
+        },
+        "roi_2": {
+            "position": "top-center",
+            "grid_coordinates": [0, 1],
+            "typical_subjects": "1 pair"
+        },
+        "roi_3": {
+            "position": "top-right",
+            "grid_coordinates": [0, 2],
+            "typical_subjects": "1 pair"
+        },
+        "roi_4": {
+            "position": "bottom-left",
+            "grid_coordinates": [1, 0],
+            "typical_subjects": "1 pair"
+        },
+        "roi_5": {
+            "position": "bottom-center",
+            "grid_coordinates": [1, 1],
+            "typical_subjects": "1 pair"
+        },
+        "roi_6": {
+            "position": "bottom-right",
+            "grid_coordinates": [1, 2],
+            "typical_subjects": "1 pair"
+        }
+    },
+    "tracking_recommendations": {
+        "tracker_class": "MultiFlyTracker",
+        "parameters": {
+            "maxN": 2,
+            "visualise": false,
+            "fg_data": {
+                "sample_size": 400,
+                "normal_limits": [800, 2000],
+                "tolerance": 0.8
+            }
+        },
+        "notes": "Empirically optimized for HD video Drosophila (42.7±X px diameter, ~1430px² area). Based on 29,442+ detections from 2025-07-15 video analysis.",
+        "calibration_data": {
+            "video_resolution": "1920x1088",
+            "fly_diameter_px": 42.7,
+            "fly_area_px": 1430,
+            "roi_size_ratio": 0.0826,
+            "detection_count": 29442,
+            "date_calibrated": "2025-01-15"
+        }
+    }
+}

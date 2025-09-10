@@ -80,13 +80,17 @@ class ForegroundModel(object):
             self.fig.canvas.draw()
             self.fig.canvas.flush_events()
 
+        # ALWAYS enforce hard limits to prevent false positives
+        if area < self.normal_limits[0] or area > self.normal_limits[1]:
+            return False
+
         # The initial phase. This is not completely agnostic: we add everything to the training pool as long as it is within the reasonable limits
         # Limits are quite loose though and refinement happens during the actual tracking
-        if len(self.limited_pool) < self.sample_size and area >= self.normal_limits[0] and area <= self.normal_limits[1]:
+        if len(self.limited_pool) < self.sample_size:
             self.limited_pool.append(area)
             return True
        
-        # Once we have a running queue, we add everything that is not an outlier
+        # Once we have a running queue, we add everything that is not an outlier AND within hard limits
         if not self._is_outlier(area, tolerance=self.tolerance):
             self.limited_pool.append(area)
             return True
@@ -101,27 +105,40 @@ class MultiFlyTracker(BaseTracker):
 
     def __init__(self, roi, data = { 'maxN' : 50, 
                                      'visualise' : False ,
-                                     'fg_data' : { 'sample_size' : 400, 'normal_limits' : (50, 200), 'tolerance' : 0.8 }
+                                     'fg_data' : { 'sample_size' : 400, 'normal_limits' : (50, 200), 'tolerance' : 0.8 },
+                                     'adaptive_threshold': True,
+                                     'min_fg_threshold': 10,
+                                     'max_fg_threshold': 50
                                    }
                                    ):
         """
-        An adaptive background subtraction model to find position of one animal in one roi.
-
-        TODO more description here
-        :param roi:
-        :param data:
+        An adaptive background subtraction model to find position of multiple animals in one roi.
+        
+        Improved to handle different lighting conditions and uses consistent foreground model
+        for all size validations.
+        
+        :param roi: Region of interest
+        :param data: Configuration dictionary with tracking parameters
         :return:
         """
         
         self.maxN = data['maxN'] 
         self._visualise = data['visualise']
         
+        # Adaptive thresholding parameters
+        self._adaptive_threshold = data.get('adaptive_threshold', True)
+        self._min_fg_threshold = data.get('min_fg_threshold', 10)
+        self._max_fg_threshold = data.get('max_fg_threshold', 50)
+        self._current_fg_threshold = 20  # Starting threshold
+        
         self._previous_shape=None
         
-        # TO DO: This needs to be reviewed. It's inherited from the regular bg subtraction but needs to be either homogenised with the 
-        # foreground model or removed or be made more agnostic. 
-        self._object_expected_size = 0.05 # proportion of the roi main axis
-        self._max_area = (5 * self._object_expected_size) ** 2
+        # FIXED: Remove conflicting _object_expected_size and rely entirely on ForegroundModel
+        # The ForegroundModel already handles size validation through normal_limits
+        # Calculate max area from foreground model limits instead
+        fg_data = data.get('fg_data', {'normal_limits': (50, 200)})
+        max_expected_area = fg_data['normal_limits'][1] * 2  # Allow 2x max normal size
+        self._max_area_ratio = max_expected_area / (roi.polygon.shape[0] * roi.polygon.shape[1] * 0.5)  # Rough ROI area estimate
 
         self._smooth_mode = deque()
         self._smooth_mode_tstamp = deque()
@@ -160,10 +177,14 @@ class MultiFlyTracker(BaseTracker):
         '''
         Receives the whole img, a mask describing the ROI and time t
         Returns a grey converted image in which the tracking routine should then look for objects
+        Enhanced with adaptive preprocessing for different lighting conditions.
         '''
         
-        #blur radius is a function of the object's expected size
-        blur_rad = int(self._object_expected_size * np.max(img.shape) / 2.0)
+        # Calculate blur radius from foreground model limits instead of hardcoded size
+        # Use median expected size from normal_limits for blur calculation
+        median_expected_area = np.mean(self._fg_model.normal_limits)
+        median_diameter = 2 * np.sqrt(median_expected_area / np.pi)
+        blur_rad = max(1, int(median_diameter / 4.0))
 
         #and should always be an odd number
         if blur_rad % 2 == 0:
@@ -185,10 +206,25 @@ class MultiFlyTracker(BaseTracker):
             cv2.subtract(255, self._buff_grey, self._buff_grey)
 
 
-        #here we do some scaling of the image. why??
+        # Adaptive image scaling based on lighting conditions
         mean = cv2.mean(self._buff_grey, mask)
-        scale = 128. / mean[0]
+        
+        # Enhanced scaling for different lighting conditions
+        if mean[0] > 150:  # Bright image
+            # For bright images, use more aggressive normalization
+            target_mean = 100.0
+        elif mean[0] < 80:   # Dark image  
+            # For dark images, use gentler normalization
+            target_mean = 140.0
+        else:  # Normal lighting
+            target_mean = 128.0
+            
+        scale = target_mean / mean[0]
         cv2.multiply(self._buff_grey, scale, dst = self._buff_grey)
+        
+        # Apply histogram equalization for very bright or very dark images
+        if mean[0] > 180 or mean[0] < 60:
+            self._buff_grey = cv2.equalizeHist(self._buff_grey)
 
         #applies the mask if exists
         if mask is not None:
@@ -203,6 +239,62 @@ class MultiFlyTracker(BaseTracker):
         '''
         d = distance.cdist([node], nodes)
         return d.min(), d.argmin()
+
+    def _apply_morphological_filtering(self, fg_img):
+        '''
+        Apply morphological operations to remove compression artifacts and noise.
+        Enhanced to better handle large false positive regions.
+        
+        Args:
+            fg_img: Foreground image to filter
+            
+        Returns:
+            Filtered foreground image
+        '''
+        # Calculate kernel size based on expected fly size
+        median_expected_area = np.mean(self._fg_model.normal_limits)
+        median_diameter = int(2 * np.sqrt(median_expected_area / np.pi))
+        
+        # More aggressive opening to break up large connected regions from compression artifacts
+        opening_kernel_size = max(3, median_diameter // 4)  # Larger kernel to break connections
+        opening_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, 
+                                                  (opening_kernel_size, opening_kernel_size))
+        
+        # Smaller closing to avoid merging separate objects
+        closing_kernel_size = max(2, median_diameter // 8)  # Much smaller closing
+        closing_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, 
+                                                  (closing_kernel_size, closing_kernel_size))
+        
+        # Apply more aggressive morphological opening first
+        cv2.morphologyEx(fg_img, cv2.MORPH_OPEN, opening_kernel, dst=fg_img)
+        
+        # Then minimal closing to preserve individual objects
+        cv2.morphologyEx(fg_img, cv2.MORPH_CLOSE, closing_kernel, dst=fg_img)
+        
+        # Additional filtering: remove very large connected components
+        # Find connected components and filter by size
+        num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(fg_img, connectivity=8)
+        
+        # Create filtered image
+        filtered_img = np.zeros_like(fg_img)
+        
+        for i in range(1, num_labels):  # Skip background (label 0)
+            area = stats[i, cv2.CC_STAT_AREA]
+            
+            # Only keep components within reasonable size range
+            # Upper limit: 3x max normal size to handle edge cases
+            max_reasonable_area = self._fg_model.normal_limits[1] * 3
+            
+            if self._fg_model.normal_limits[0] <= area <= max_reasonable_area:
+                # Keep this component
+                filtered_img[labels == i] = 255
+        
+        # Copy filtered result back to input
+        fg_img[:] = filtered_img
+        
+        logging.debug(f"Applied enhanced morphological filtering: opening({opening_kernel_size}), closing({closing_kernel_size}), removed {num_labels-1-np.count_nonzero(np.unique(filtered_img))+1} large components")
+        
+        return fg_img
 
     def _find_position(self, img, mask,t):
         '''
@@ -234,15 +326,29 @@ class MultiFlyTracker(BaseTracker):
         bg = self._bg_model.bg_img.astype(np.uint8)
         cv2.subtract(grey, bg, self._buff_fg)
 
-        cv2.threshold(self._buff_fg,20,255,cv2.THRESH_TOZERO, dst=self._buff_fg)
+        # Adaptive threshold based on image statistics
+        if self._adaptive_threshold:
+            # Calculate adaptive threshold based on foreground statistics
+            fg_mean = np.mean(self._buff_fg[self._buff_fg > 0]) if np.any(self._buff_fg > 0) else 20
+            self._current_fg_threshold = max(self._min_fg_threshold, 
+                                           min(self._max_fg_threshold, 
+                                               int(fg_mean * 0.3)))
+        
+        cv2.threshold(self._buff_fg, self._current_fg_threshold, 255, cv2.THRESH_TOZERO, dst=self._buff_fg)
+        
+        # Apply morphological filtering to remove compression artifacts
+        self._apply_morphological_filtering(self._buff_fg)
+        
         self._buff_fg_backup = np.copy(self._buff_fg)
 
         n_fg_pix = np.count_nonzero(self._buff_fg)
         prop_fg_pix  = n_fg_pix / (1.0 * grey.shape[0] * grey.shape[1])
         is_ambiguous = False
 
-        if  prop_fg_pix > self._max_area:
+        # Use foreground-model-based max area calculation
+        if  prop_fg_pix > self._max_area_ratio:
             self._bg_model.increase_learning_rate()
+            logging.debug(f"Too much foreground: {prop_fg_pix:.3f} > {self._max_area_ratio:.3f}")
             raise NoPositionError
 
         if  prop_fg_pix == 0:
@@ -260,16 +366,20 @@ class MultiFlyTracker(BaseTracker):
 
         if len(contours) == 0:
             self._bg_model.increase_learning_rate()
-            print ("no contour detected")
+            logging.debug(f"No contours detected (threshold: {self._current_fg_threshold})")
             raise NoPositionError
 
         else :
             for c in contours:
                 if self._fg_model.is_contour_valid(c, img):
                     valid_contours.append(c)
+            
+            # If no valid contours found but contours exist, log for debugging
+            if len(valid_contours) == 0 and len(contours) > 0:
+                areas = [cv2.contourArea(c) for c in contours]
+                logging.debug(f"No valid contours: found {len(contours)} contours with areas {areas}, limits: {self._fg_model.normal_limits}")
 
         out_pos = []
-        #raw_pos = []
         
         for n_vc, vc in enumerate(valid_contours):
             
@@ -292,40 +402,7 @@ class MultiFlyTracker(BaseTracker):
             pos = x +1.0j*y
             pos /= w_im
 
-            #draw the ellipse around the blob
             cv2.ellipse(self._buff_fg , ((x,y), (int(w*1.5),int(h*1.5)),angle), 255, 1)
-
-            ## Some debugging info
-            ##contour_area = cv2.contourArea(vc)
-            ##contour_moments = cv2.moments(vc)
-            
-            ##cX = int(contour_moments["m10"] / contour_moments["m00"])
-            ##cY = int(contour_moments["m01"] / contour_moments["m00"])
-            ##contour_crentroid = (cX, cY) # this is actually the same as x,y - so pointless to calculate
-            
-            # # idx = 0
-            # # nf = 0
-            # # d = 0
-            # # ox = 0
-            # # oy = 0
-            # # if not self._firstrun:
-                # # d, idx = self._closest_node((x, y), self.last_positions)
-                # # print (d, idx)
-                
-                # # self.last_positions[idx] = [x,y]
-
-                # # if d < 10:
-                    # # nf = idx
-                    # # ox, oy = self.last_positions[idx]
-
-                # # else: 
-                    # # nf = "new"
-            
-            # # label = "%s: %.1f" % (nf, d)
-            # # cv2.putText(self._buff_fg , label, (cX, cY), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 1)
-
-            # # cv2.circle(self._buff_fg, (cX, cY), 3, (255, 0, 0), -1)
-            # # cv2.drawMarker(self._buff_fg, (int(ox), int(oy)), (255, 0, 0), cv2.MARKER_CROSS, 10)
 
             # store the blob info in a list
             x_var = XPosVariable(int(round(x)))
@@ -333,10 +410,6 @@ class MultiFlyTracker(BaseTracker):
             w_var = WidthVariable(int(round(w)))
             h_var = HeightVariable(int(round(h)))
             phi_var = PhiVariable(int(round(angle)))
-            
-            #raw = (x, y, w, h, angle)
-            #raw_pos.append(raw)
-            
             
             out = DataPoint([ x_var, y_var, w_var, h_var, phi_var ])
             out_pos.append(out)
@@ -348,7 +421,16 @@ class MultiFlyTracker(BaseTracker):
         
         if len(out_pos) == 0:
             self._bg_model.increase_learning_rate()
+            logging.debug(f"No valid positions found after processing {len(valid_contours)} valid contours")
             raise NoPositionError
+            
+        # Limit to maxN detections to prevent false positives
+        if len(out_pos) > self.maxN:
+            # Sort by area (larger flies are more likely to be real)
+            out_pos_with_area = [(pos, int(pos['w']) * int(pos['h'])) for pos in out_pos]  # w*h as area proxy
+            out_pos_with_area.sort(key=lambda x: x[1], reverse=True)
+            out_pos = [pos for pos, area in out_pos_with_area[:self.maxN]]
+            logging.debug(f"Limited detections from {len(out_pos_with_area)} to {len(out_pos)}")
 
         cv2.bitwise_and(self._buff_fg_backup, self._buff_fg,self._buff_fg_backup)
 
