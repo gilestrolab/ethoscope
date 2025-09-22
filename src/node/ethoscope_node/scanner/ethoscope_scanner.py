@@ -284,14 +284,21 @@ class Ethoscope(BaseDevice):
         """Relay video stream from ethoscope using shared connection."""
         # Lazy import to avoid circular dependencies
         #from .streaming import EthoscopeStreamManager
-        
+
         # Create stream manager if it doesn't exist
         if self._stream_manager is None:
             self._stream_manager = EthoscopeStreamManager(self._ip, self._id)
-        
+
         # Delegate to stream manager
         return self._stream_manager.get_stream_for_client()
-    
+
+    def cleanup_stream_manager(self):
+        """Clean up the stream manager to force connection reset on next streaming attempt."""
+        if self._stream_manager is not None:
+            self._logger.info(f"Cleaning up stream manager for device {self._id}")
+            self._stream_manager.stop()
+            self._stream_manager = None
+
     def stop(self):
         """Stop the ethoscope device and cleanup streaming connections."""
         # Stop stream manager if it exists
@@ -342,7 +349,12 @@ class Ethoscope(BaseDevice):
         if previous_status != new_status:
             self._update_device_status(new_status, is_user_triggered, trigger_source,
                                      metadata={"previous_status": previous_status})
-        
+
+            # Clean up stream manager when device stops streaming
+            if previous_status == "streaming" and new_status != "streaming":
+                self._logger.info(f"Device {self._id} stopped streaming (status changed from {previous_status} to {new_status})")
+                self.cleanup_stream_manager()
+
         # Handle device states
         if previous_status == "offline" and new_status != "offline":
             self._handle_device_coming_online()

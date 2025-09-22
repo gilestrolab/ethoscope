@@ -11,6 +11,7 @@ import struct
 import pickle
 import time
 import logging
+import errno
 from threading import Thread, RLock
 from typing import Iterator, Dict, Tuple
 
@@ -98,10 +99,48 @@ class EthoscopeStreamManager:
         self._stop_shared_streaming()
     
     def _ensure_streaming_connection(self):
-        """Ensure shared streaming connection is active."""
+        """Ensure shared streaming connection is active and healthy."""
         with self._streaming_lock:
-            if self._shared_socket is None or not self._streaming_running:
+            # Check if we need to start/restart connection
+            need_restart = (
+                self._shared_socket is None or
+                not self._streaming_running or
+                not self._is_socket_healthy()
+            )
+
+            if need_restart:
+                if self._shared_socket is not None:
+                    self._logger.info(f"Stream connection to {self.device_ip} needs restart")
                 self._start_shared_streaming()
+
+    def _is_socket_healthy(self):
+        """Check if the current socket connection is healthy."""
+        if self._shared_socket is None:
+            return False
+
+        try:
+            # Use a non-blocking check to see if socket is still connected
+            # This will detect closed connections without sending data
+            self._shared_socket.settimeout(0)
+            self._shared_socket.recv(0)
+            return True
+        except (socket.error, OSError) as e:
+            # If we get EAGAIN/EWOULDBLOCK, socket is healthy but no data available
+            if e.errno in (errno.EAGAIN, errno.EWOULDBLOCK):
+                return True
+            # Any other error means socket is not healthy
+            self._logger.debug(f"Socket health check failed: {e}")
+            return False
+        except Exception as e:
+            self._logger.debug(f"Socket health check failed: {e}")
+            return False
+        finally:
+            # Reset socket to blocking mode
+            if self._shared_socket:
+                try:
+                    self._shared_socket.settimeout(None)
+                except:
+                    pass
     
     def _start_shared_streaming(self):
         """Start the shared streaming connection and broadcasting thread."""
@@ -207,9 +246,15 @@ class EthoscopeStreamManager:
             except Exception as e:
                 if self._streaming_running:
                     self._logger.error(f"Streaming broadcast error: {e}")
+                    # If this is a connection error, the health check will catch it
+                    # and restart the connection on the next streaming attempt
                 break
-        
+
         self._logger.info("Streaming broadcast loop ended")
+
+        # Mark that streaming has stopped so health check will trigger restart
+        with self._streaming_lock:
+            self._streaming_running = False
     
     def _broadcast_frame(self, frame_bytes):
         """Broadcast frame to all connected clients."""
