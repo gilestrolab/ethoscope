@@ -2,29 +2,38 @@
 <div class="jumbotron text-center" ng-cloak>
 
     <div class="header" style="position: relative;">
-        <!-- Robot Icon for Module Connected -->
-        <span ng-if="machine_info.Module.Connected" class="fa fa-robot fa-3x" title="Hardware module connected" style="position: absolute; top: -2px; right: 180px; color: var(--medium-gray); transform: scale(0.9);">
-        </span>
+        <!-- Status Icons Container - Dynamic Layout -->
+        <div class="status-icons" style="position: absolute; top: 0px; right: 0px; display: flex; align-items: center; gap: 20px;">
 
-        <!-- Underpowered Icon -->
-        <span ng-if="device.underpowered == true" class="fa fa-bolt fa-3x" title="The PI is underpowered!" style="position: absolute; top: 0px; right: 120px; color: #ff9966;">
-        </span>
+            <!-- Robot Icon for Module Connected -->
+            <span ng-if="machine_info.Module.Connected" class="fa fa-robot fa-3x" title="Hardware module connected" style="color: var(--medium-gray); transform: scale(0.9);">
+            </span>
 
-        <!-- Dynamic Hard Drive Icon -->
-        <span ng-if="device.used_space !== undefined && device.used_space !== null" class="fa-solid fa-hard-drive fa-3x" title="The device is using {{device.used_space || 0}}% of its space" ng-class="{
-        'low-usage': device.used_space < 50,
-        'medium-usage': device.used_space >= 60 && device.used_space < 80,
-        'high-usage': device.used_space >= 80
-            }" style="position: absolute; top: 0px; right: 60px;">
-        </span>
+            <!-- Underpowered Icon -->
+            <span ng-if="device.underpowered == true" class="fa fa-bolt fa-3x" title="The PI is underpowered!" style="color: #ff9966;">
+            </span>
 
-        <!-- Display When Used Space Is Not Available -->
-        <span ng-if="device.used_space === undefined || device.used_space === null" class="fa-solid fa-question-circle fa-3x" title="Disk usage information not available" style="position: absolute; top: 0px; right: 60px; color: gray;">
-        </span>
+            <!-- NoIR Camera Icon -->
+            <span ng-if="machine_info.use_noir_tuning" class="fa fa-cloud-moon fa-3x" title="NoIR tuning enabled for IR pass-through filter" style="color: #9966ff;">
+            </span>
 
-        <!-- Response Time Icon -->
-        <span ng-if="device.response_time !== undefined && device.response_time !== null" ng-class="{'fa fa-smile': device.response_time < 500.0, 'fa fa-face-dizzy': device.response_time >= 500.0}" class="fa-3x" title="Response time: {{device.response_time}} ms" style="position: absolute; top: 0px; right: 0px; color: var(--medium-gray); transform: scale(0.9);">
-        </span>
+            <!-- Dynamic Hard Drive Icon -->
+            <span ng-if="device.used_space !== undefined && device.used_space !== null" class="fa-solid fa-hard-drive fa-3x" title="The device is using {{device.used_space || 0}}% of its space" ng-class="{
+            'low-usage': device.used_space < 50,
+            'medium-usage': device.used_space >= 60 && device.used_space < 80,
+            'high-usage': device.used_space >= 80
+                }">
+            </span>
+
+            <!-- Display When Used Space Is Not Available -->
+            <span ng-if="device.used_space === undefined || device.used_space === null" class="fa-solid fa-question-circle fa-3x" title="Disk usage information not available" style="color: gray;">
+            </span>
+
+            <!-- Response Time Icon -->
+            <span ng-if="device.response_time !== undefined && device.response_time !== null" ng-class="{'fa fa-smile': device.response_time < 500.0, 'fa fa-face-dizzy': device.response_time >= 500.0}" class="fa-3x" title="Response time: {{device.response_time}} ms" style="color: var(--medium-gray); transform: scale(0.9);">
+            </span>
+
+        </div>
 
         <h1>{{device.name}}</h1>
         <ul>

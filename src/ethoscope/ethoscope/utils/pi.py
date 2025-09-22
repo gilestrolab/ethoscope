@@ -954,5 +954,44 @@ def expand_rootfs():
     except Exception as e:
         result['message'] = f'Error in expand_rootfs: {str(e)}'
         logging.error(result['message'])
-    
+
     return result
+
+
+def get_noir_setting(path="/etc/ethoscope/use_noir_tuning"):
+    """
+    Reads the NoIR tuning setting for cameras with IR pass-through filters.
+
+    Returns:
+        bool: True if NoIR tuning should be used, False otherwise
+    """
+    try:
+        if os.path.exists(path):
+            with open(path, 'r') as f:
+                content = f.read().strip().lower()
+                return content in ['true', '1', 'yes']
+        return False
+    except Exception as e:
+        logging.warning(f"Error reading NoIR setting from {path}: {e}")
+        return False
+
+
+def set_noir_setting(use_noir, path="/etc/ethoscope/use_noir_tuning"):
+    """
+    Sets the NoIR tuning preference for cameras with IR pass-through filters.
+
+    Args:
+        use_noir (bool): True to enable NoIR tuning, False to use dynamic adaptation
+        path (str): Path to the configuration file
+    """
+    try:
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+
+        with open(path, 'w') as f:
+            f.write('true' if use_noir else 'false')
+
+        logging.info(f"NoIR tuning setting updated: use_noir={use_noir}")
+    except Exception as e:
+        logging.error(f"Error setting NoIR preference to {path}: {e}")
+        raise

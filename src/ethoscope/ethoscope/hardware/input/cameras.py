@@ -225,7 +225,10 @@ class MovieVirtualCamera(BaseCamera):
         )
 
     def _next_image(self):
-        _, frame = self.capture.read()
+        ret, frame = self.capture.read()
+        if not ret or frame is None:
+            # End of video or error reading frame
+            return None
         return cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     def _time_stamp(self):
@@ -636,8 +639,25 @@ class PiFrameGrabber2(PiFrameGrabber):
         Picamera2.set_logging(logging.ERROR)
 
         try:
-            logging.info("Attempting to create Picamera2 instance")
-            with Picamera2() as capture:
+            # Check machine NoIR setting to determine tuning approach
+            from ethoscope.utils import pi
+            use_noir_tuning = pi.get_noir_setting()
+
+            if use_noir_tuning:
+                # Force NoIR tuning file for cameras with IR pass-through filters
+                logging.info("Creating Picamera2 instance with forced NoIR tuning for IR pass-through filter")
+                try:
+                    capture = Picamera2(tuning=Picamera2.load_tuning_file("/usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json"))
+                    logging.info("Successfully loaded NoIR tuning file")
+                except Exception as e:
+                    logging.warning(f"Failed to load NoIR tuning file, falling back to automatic detection: {e}")
+                    capture = Picamera2()
+            else:
+                # Use automatic tuning detection for dynamic day/night adaptation
+                logging.info("Creating Picamera2 instance with automatic tuning detection for dynamic light adaptation")
+                capture = Picamera2()
+
+            with capture:
                 logging.info(
                     f"Picamera2 instance created successfully: {type(capture)}"
                 )
@@ -649,6 +669,9 @@ class PiFrameGrabber2(PiFrameGrabber):
                 except Exception as info_e:
                     logging.warning(f"Could not get camera info: {info_e}")
 
+                # Log dynamic adaptation approach
+                logging.info("Using automatic tuning detection for optimal day/night light adaptation")
+
                 # The appropriate size of the image acquisition is tricky and depends on the actual hardware.
                 # With IMX219 640x480 will not return the full FoV. 960x720 does.
                 # See https://picamera.readthedocs.io/en/release-1.13/fov.html for a full description
@@ -658,15 +681,24 @@ class PiFrameGrabber2(PiFrameGrabber):
                     f"Configuring camera with resolution: {w}x{h}, fps: {self._target_fps}"
                 )
 
+                # Configure camera controls optimized for dynamic day/night adaptation
+                camera_controls = {
+                    "FrameRate": self._target_fps,
+                    "AeEnable": True,           # Enable auto-exposure for dynamic adaptation
+                    "AeExposureMode": 0,        # Normal exposure mode for best adaptation
+                    "AwbEnable": False,         # Disable auto-white balance (NoIR cameras)
+                    # Let auto-exposure run freely for proper dynamic adaptation
+                    # Based on picamera2 docs: camera must run continuously for AGC/AEC to work
+                }
+
+                # Note: Automatic tuning detection allows libcamera to choose optimal settings
+                # for current illumination conditions (day/night, visible/IR light)
+
                 config = capture.create_video_configuration(
                     main={"size": (w, h), "format": "YUV420"},
                     raw=None,  # Explicitly disable raw stream to prevent dual-stream issues
                     buffer_count=2,  # Still image capture normally configures only a single buffer, as this is all you need. But if you're doing some form of burst capture, increasing the buffer count may enable the application to receive images more quickly.
-                    controls={
-                        "FrameRate": self._target_fps,
-                        "AeEnable": True,  # Enable auto-exposure for day/night adaptation
-                        "AwbEnable": False,  # Disable auto-white balance (IR light confuses AWB)
-                    },
+                    controls=camera_controls,
                 )
                 logging.info("Camera configuration created successfully")
                 capture.configure(config)

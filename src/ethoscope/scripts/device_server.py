@@ -243,6 +243,10 @@ def update_machine_info(id):
         pi.loggingStatus(update_machine_json_data['remoteLogging'])
         haschanged = True
 
+    if 'use_noir_tuning' in update_machine_json_data and update_machine_json_data['use_noir_tuning'] != machine_info.get('use_noir_tuning', False):
+        pi.set_noir_setting(update_machine_json_data['use_noir_tuning'])
+        haschanged = True
+
     if 'expand_rootfs' in update_machine_json_data and update_machine_json_data['expand_rootfs']:
         expansion_result = pi.expand_rootfs()
         logging.info(f"Root filesystem expansion requested: {expansion_result}")
@@ -389,6 +393,11 @@ def get_machine_info(id):
         machine_info['remoteLogging'] = pi.loggingStatus()
     except:
         machine_info['remoteLogging'] = False
+
+    try:
+        machine_info['use_noir_tuning'] = pi.get_noir_setting()
+    except:
+        machine_info['use_noir_tuning'] = False
 
     machine_info['SD_CARD_AGE'] = pi.get_SD_CARD_AGE()
     machine_info['partitions'] = pi.get_partition_info()
@@ -668,12 +677,14 @@ def user_options(id):
                             "arguments": [
                                 {"type": "number", "name":"etho_number", "description": "An ID number (5-250) unique to this ethoscope","default": machine_info['machine-number'] },
                                 {"type": "boolean", "name":"isexperimental", "description": "Specify if the ethoscope is to be treated as experimental", "default": machine_info['isExperimental']}, 
+                                {"type": "boolean", "name":"use_noir_tuning", "description": "Use NoIR tuning for cameras with IR pass-through filters", "default": machine_info.get('use_noir_tuning', False)},
                                 {"type": "boolean", "name":"useSTATIC", "description": "Use a static IP address instead of obtaining one with DHCP. The last number in the IP address will be the current ethoscope number", "default" : machine_info['useSTATIC']},
                                 {"type": "boolean", "name":"remoteLogging", "description": "The ethoscope logs events directly on the node.", "default" : machine_info['remoteLogging']},
                                 {"type": "boolean", "name":"expand_rootfs", "description": "Expand root filesystem to use full SD card space", "default" : False},
                                 {"type": "str", "name":"node_ip", "description": "The IP address that you want to record as the node (do not change this value unless you know what you are doing!)","default": machine_info['node_ip']},
                                 {"type": "str", "name":"ESSID", "description": "The name of the WIFI SSID","default": machine_info['WIFI_SSID'] },
-                                {"type": "str", "name":"Key", "description": "The WPA password for the WIFI SSID","default": machine_info['WIFI_PASSWORD'] }],
+                                {"type": "str", "name":"Key", "description": "The WPA password for the WIFI SSID","default": machine_info['WIFI_PASSWORD'] },
+                                ],
                             "name" : "Ethoscope Options"}],
 
                                } }
