@@ -247,6 +247,10 @@ def update_machine_info(id):
         pi.set_noir_setting(update_machine_json_data['use_noir_tuning'])
         haschanged = True
 
+    if 'maxfps_setting' in update_machine_json_data and update_machine_json_data['maxfps_setting'] != machine_info.get('maxfps_setting', 15):
+        pi.set_maxfps_setting(int(update_machine_json_data['maxfps_setting']))
+        haschanged = True
+
     if 'expand_rootfs' in update_machine_json_data and update_machine_json_data['expand_rootfs']:
         expansion_result = pi.expand_rootfs()
         logging.info(f"Root filesystem expansion requested: {expansion_result}")
@@ -398,6 +402,11 @@ def get_machine_info(id):
         machine_info['use_noir_tuning'] = pi.get_noir_setting()
     except:
         machine_info['use_noir_tuning'] = False
+
+    try:
+        machine_info['maxfps_setting'] = pi.get_maxfps_setting()
+    except:
+        machine_info['maxfps_setting'] = 15
 
     machine_info['SD_CARD_AGE'] = pi.get_SD_CARD_AGE()
     machine_info['partitions'] = pi.get_partition_info()
@@ -676,6 +685,7 @@ def user_options(id):
         "update_machine": { "machine_options": [{"overview": "Machine information that can be set by the user",
                             "arguments": [
                                 {"type": "number", "name":"etho_number", "description": "An ID number (5-250) unique to this ethoscope","default": machine_info['machine-number'] },
+                                {"type": "number", "name":"maxfps_setting", "description": "Maximum camera FPS (frames per second)", "default": machine_info.get('maxfps_setting', 15), "min": 1, "max": 30, "step": 1},
                                 {"type": "boolean", "name":"isexperimental", "description": "Specify if the ethoscope is to be treated as experimental", "default": machine_info['isExperimental']}, 
                                 {"type": "boolean", "name":"use_noir_tuning", "description": "Use NoIR tuning for cameras with IR pass-through filters", "default": machine_info.get('use_noir_tuning', False)},
                                 {"type": "boolean", "name":"useSTATIC", "description": "Use a static IP address instead of obtaining one with DHCP. The last number in the IP address will be the current ethoscope number", "default" : machine_info['useSTATIC']},

@@ -24,6 +24,7 @@ except ImportError:
     from cv2 import CAP_PROP_POS_MSEC
 
 from ethoscope.utils.debug import EthoscopeException
+from ethoscope.utils import pi
 
 try:
     import picamera2
@@ -264,7 +265,7 @@ class V4L2Camera(BaseCamera):
     }
 
     def __init__(
-        self, device=0, target_fps=5, target_resolution=(960, 720), *args, **kwargs
+        self, device=0, target_fps=None, target_resolution=(960, 720), *args, **kwargs
     ):
         """
         class to acquire stream from a video for linux compatible device (v4l2).
@@ -296,6 +297,16 @@ class V4L2Camera(BaseCamera):
         else:
             self.capture.set(CAP_PROP_FRAME_WIDTH, w)
             self.capture.set(CAP_PROP_FRAME_HEIGHT, h)
+
+        # Get target FPS from system setting if not specified
+        if target_fps is None:
+            target_fps = pi.get_maxfps_setting()
+
+        # Apply max FPS constraint
+        max_fps = pi.get_maxfps_setting()
+        if target_fps > max_fps:
+            logging.warning(f"Requested FPS {target_fps} exceeds maximum {max_fps}, using {max_fps}")
+            target_fps = max_fps
 
         if not isinstance(target_fps, int):
             raise EthoscopeException("FPS must be an integer number")
@@ -869,7 +880,7 @@ class OurPiCameraAsync(BaseCamera):
 
     def __init__(
         self,
-        target_fps=15,
+        target_fps=None,
         target_resolution=(1280, 960),
         video_prefix=None,
         *args,
@@ -900,6 +911,16 @@ class OurPiCameraAsync(BaseCamera):
         # Only needed for PiCamera2 as it has more complex resource management
         if USE_PICAMERA2:
             self._perform_camera_cleanup(delay=1.0)
+
+        # Get target FPS from system setting if not specified
+        if target_fps is None:
+            target_fps = pi.get_maxfps_setting()
+
+        # Apply max FPS constraint
+        max_fps = pi.get_maxfps_setting()
+        if target_fps > max_fps:
+            logging.warning(f"Requested FPS {target_fps} exceeds maximum {max_fps}, using {max_fps}")
+            target_fps = max_fps
 
         w, h = target_resolution
         if not isinstance(target_fps, int):

@@ -68,7 +68,7 @@ def isMachinePI(version=None):
         return (pi_ver == int(version))
 
 
-def get_machine_name(path="/etc/ethoscope/machine-name"):
+def get_machine_name(path="/etc/machine-name"):
     """
     Reads the machine name
     This file will be present only on a real ethoscope
@@ -83,7 +83,7 @@ def get_machine_name(path="/etc/ethoscope/machine-name"):
     else:
         return 'VIRTUA_' + get_machine_id()[:3]
         
-def set_machine_name(id, path="/etc/ethoscope/machine-name"):
+def set_machine_name(id, path="/etc/machine-name"):
     '''
     Takes an id and updates the machine name accordingly in the format
     ETHOSCOPE_id; changes the hostname too.
@@ -1004,4 +1004,55 @@ def set_noir_setting(use_noir, path="/etc/ethoscope/use_noir_tuning"):
         logging.info(f"NoIR tuning setting updated: use_noir={use_noir}")
     except Exception as e:
         logging.error(f"Error setting NoIR preference to {path}: {e}")
+        raise
+
+
+def get_maxfps_setting(path="/etc/ethoscope/maxfps_setting"):
+    """
+    Reads the maximum FPS setting for camera operation.
+
+    Args:
+        path (str): Path to the configuration file
+
+    Returns:
+        int: Maximum FPS value, defaults to 15 if file doesn't exist or invalid
+    """
+    try:
+        if os.path.exists(path):
+            with open(path, 'r') as f:
+                content = f.read().strip()
+                fps_value = int(content)
+                # Validate range
+                if 1 <= fps_value <= 30:
+                    return fps_value
+                else:
+                    logging.warning(f"Invalid FPS value {fps_value} in {path}, using default 15")
+                    return 15
+        return 15  # Default value
+    except (ValueError, OSError) as e:
+        logging.warning(f"Error reading max FPS setting from {path}: {e}, using default 15")
+        return 15
+
+
+def set_maxfps_setting(max_fps, path="/etc/ethoscope/maxfps_setting"):
+    """
+    Sets the maximum FPS preference for camera operation.
+
+    Args:
+        max_fps (int): Maximum FPS value (1-30)
+        path (str): Path to the configuration file
+    """
+    try:
+        # Validate input
+        if not isinstance(max_fps, int) or not (1 <= max_fps <= 30):
+            raise ValueError(f"Max FPS must be an integer between 1 and 30, got {max_fps}")
+
+        ensure_dir_exists(path)
+
+        with open(path, 'w') as f:
+            f.write(str(max_fps))
+
+        logging.info(f"Max FPS setting updated: max_fps={max_fps}")
+    except Exception as e:
+        logging.error(f"Error setting max FPS preference to {path}: {e}")
         raise
