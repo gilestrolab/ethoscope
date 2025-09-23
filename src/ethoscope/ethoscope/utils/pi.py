@@ -13,6 +13,15 @@ from ethoscope.utils.rpi_bad_power import powerChecker
 
 PERSISTENT_STATE = "/var/cache/ethoscope/persistent_state.pkl"
 
+def ensure_dir_exists(file_path):
+    """
+    Ensures that the directory for the given file path exists.
+
+    Args:
+        file_path (str): Full path to a file whose directory should be created
+    """
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
 def pi_version():
     """
     Detect the version of the Raspberry Pi.
@@ -59,7 +68,7 @@ def isMachinePI(version=None):
         return (pi_ver == int(version))
 
 
-def get_machine_name(path="/etc/machine-name"):
+def get_machine_name(path="/etc/ethoscope/machine-name"):
     """
     Reads the machine name
     This file will be present only on a real ethoscope
@@ -74,7 +83,7 @@ def get_machine_name(path="/etc/machine-name"):
     else:
         return 'VIRTUA_' + get_machine_id()[:3]
         
-def set_machine_name(id, path="/etc/machine-name"):
+def set_machine_name(id, path="/etc/ethoscope/machine-name"):
     '''
     Takes an id and updates the machine name accordingly in the format
     ETHOSCOPE_id; changes the hostname too.
@@ -84,6 +93,7 @@ def set_machine_name(id, path="/etc/machine-name"):
     
     machine_name = "ETHOSCOPE_%03d" % id
     try:
+        ensure_dir_exists(path)
         with open(path, 'w') as f:
             f.write(machine_name)
         logging.warning("Wrote new information in file: %s" % path)
@@ -398,7 +408,7 @@ def getPiCameraVersion():
     
     known_versions = {'RP_ov5647': 'PINoIR 1', 'RP_imx219': 'PINoIR 2'}
     
-    picamera_info_file = '/etc/picamera-version'
+    picamera_info_file = '/etc/ethoscope/picamera-version'
     
     if hasPiCamera():
 
@@ -435,14 +445,14 @@ def isExperimental(new_value=None):
     """
     return true if the machine is to be used as experimental
     this mymics a non-PI or a PI without plugged in camera
-    to activate, create an empty file called /etc/isexperimental
+    to activate, create an empty file called /etc/ethoscope/isexperimental
     """
     
     # If the ethoscope is running on something that is not a pi, it will be always flagged as experimental
     if new_value == None and not isMachinePI():
         return True
     
-    filename = '/etc/isexperimental'
+    filename = '/etc/ethoscope/isexperimental'
     current_value = os.path.exists(filename)
     
     if new_value == None:
@@ -450,6 +460,7 @@ def isExperimental(new_value=None):
         
     if new_value == True and current_value == False:
         #create file
+        ensure_dir_exists(filename)
         with open(filename, mode='w'):
             logging.warning("Created a new empty file in %s. The machine is now experimental." % filename)
     
@@ -985,8 +996,7 @@ def set_noir_setting(use_noir, path="/etc/ethoscope/use_noir_tuning"):
         path (str): Path to the configuration file
     """
     try:
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        ensure_dir_exists(path)
 
         with open(path, 'w') as f:
             f.write('true' if use_noir else 'false')

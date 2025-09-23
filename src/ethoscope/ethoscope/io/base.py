@@ -370,8 +370,15 @@ class BaseResultWriter(object):
         """
         logging.info("Closing result writer...")
         for k, v in list(self._insert_dict.items()):
-            self._write_async_command(v)
-            self._insert_dict[k] = ""
+            # Check if v is a string (command) or a list (data)
+            if isinstance(v, str):
+                # Original behavior for string commands
+                self._write_async_command(v)
+                self._insert_dict[k] = ""
+            elif isinstance(v, list):
+                # For list-based data (e.g., SQLiteResultWriter), do nothing here
+                # The subclass should handle flushing lists appropriately
+                pass
         try:
             command = "INSERT INTO METADATA VALUES (%s, %s)"
             self._write_async_command(command, ("stop_date_time", str(int(time.time()))))
@@ -508,8 +515,15 @@ class BaseResultWriter(object):
                 self._write_async_command(*c_args)
         for k, v in list(self._insert_dict.items()):
             if len(v) > self._max_insert_string_len:
-                self._write_async_command(v)
-                self._insert_dict[k] = ""
+                # Check if v is a string (command) or a list (data)
+                if isinstance(v, str):
+                    # Original behavior for string commands
+                    self._write_async_command(v)
+                    self._insert_dict[k] = ""
+                elif isinstance(v, list):
+                    # For list-based data (e.g., SQLiteResultWriter), do nothing here
+                    # The subclass should handle flushing lists appropriately
+                    pass
         return False
 
     def _add(self, t, roi, data_rows):

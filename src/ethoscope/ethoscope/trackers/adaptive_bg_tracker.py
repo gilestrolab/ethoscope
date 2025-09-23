@@ -273,13 +273,33 @@ class AdaptiveBGModel(BaseTracker):
         - data: dict or None, optional
             An optional dictionary of additional data or parameters that may be required for initializing the tracking model.
             This could include calibration data, model parameters, or other configuration settings relevant to the tracking process.
+            
+            Supported parameters:
+            - 'object_expected_size': float (default: 0.05) - Expected object size as proportion of ROI main axis.
+                                     For HD videos with small flies, use smaller values like 0.01-0.02
+            - 'max_area_factor': float (default: 5) - Maximum area multiplier for object detection.
+                                Larger values are more permissive for size variations
 
         The method sets up internal buffers and default settings necessary for the operation of the tracking model, including
         object size expectations, smoothing mechanisms for mode detection, and initialization of both background and foreground models.
         """
         self._previous_shape=None
-        self._object_expected_size = 0.05 # proportion of the roi main axis
-        self._max_area = (5 * self._object_expected_size) ** 2
+        
+        # Configure object size expectations from data parameter (retro-compatible)
+        if data is not None and isinstance(data, dict):
+            # Allow configuration of object size expectations for different video resolutions
+            self._object_expected_size = data.get('object_expected_size', 0.05)  # Default: 5% of ROI
+            max_area_factor = data.get('max_area_factor', 5)  # Default: 5x the expected size
+            self._max_area = (max_area_factor * self._object_expected_size) ** 2
+            
+            # Special mode: disable size filtering for detection analysis
+            if data.get('disable_size_filtering', False):
+                self._object_expected_size = 0.001  # Very small - won't affect blur
+                self._max_area = 1.0  # Allow detection of any size (100% of ROI)
+        else:
+            # Backward compatibility: use original hardcoded values
+            self._object_expected_size = 0.05 # proportion of the roi main axis
+            self._max_area = (5 * self._object_expected_size) ** 2
 
         self._smooth_mode = deque()
         self._smooth_mode_tstamp = deque()

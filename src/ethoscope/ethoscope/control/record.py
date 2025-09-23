@@ -182,13 +182,13 @@ class GeneralVideoRecorder(DescribedObject):
                             "arguments": [
                                 {"type": "number", "name":"width", "description": "The width of the frame","default":1280, "min":480, "max":1980,"step":1},
                                 {"type": "number", "name":"height", "description": "The height of the frame","default":960, "min":360, "max":1088,"step":1},
-                                {"type": "number", "name":"fps", "description": "The target number of frames per seconds","default":25, "min":1, "max":25,"step":1},
+                                {"type": "number", "name":"fps", "description": "The target number of frames per seconds","default":15, "min":1, "max":25,"step":1},
                                 {"type": "number", "name":"bitrate", "description": "The target bitrate","default":200000, "min":0, "max":10000000,"step":1000},
                                 {"type": "number", "name":"quality", "description": "10 is extremely high quality, 40 is extremely low", "default":20, "min":10, "max":40,"step":1},
                                ]}
     status = "recording" #this is the default status. The alternative is streaming
 
-    def __init__(self, cameraClass, camera_kwargs, img_path, video_prefix, width=1280, height=960, fps=25, bitrate=200000, quality=20, stream = False, record_video=True):
+    def __init__(self, cameraClass, camera_kwargs, img_path, video_prefix, width=1280, height=960, fps=15, bitrate=200000, quality=20, stream = False, record_video=True):
 
         self._stream = stream
 
@@ -219,25 +219,25 @@ class GeneralVideoRecorder(DescribedObject):
 # When using the default camera PI, frames should be multiple of 16 in X and 32 in Y
 
 class HDVideoRecorder(GeneralVideoRecorder):
-    _description  = { "overview": "A preset 1920 x 1088, 25fps, bitrate = 5e5 video recorder. "
+    _description  = { "overview": "A preset 1920 x 1088, 15fps, bitrate = 5e5 video recorder. "
                                   "At this resolution, the field of view is only partial, "
                                   "so we effectively zoom in the middle of arenas",
                       "arguments": []}
     status = "recording"
 
     def __init__(self, cameraClass, camera_kwargs, video_prefix, img_path):
-        super(HDVideoRecorder, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix, width=1920, height=1088, quality=28, fps=25, bitrate=1000000)
+        super(HDVideoRecorder, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix, width=1920, height=1088, quality=28, fps=15, bitrate=1000000)
 
 class StandardVideoRecorder(GeneralVideoRecorder):
-    _description  = { "overview": "A preset 1280 x 960, 25fps, bitrate = 2e5 video recorder.",
+    _description  = { "overview": "A preset 1280 x 960, 15fps, bitrate = 2e5 video recorder.",
                       "arguments": []}
     status = "recording"
     
     def __init__(self, cameraClass, camera_kwargs, video_prefix, img_path):
-        super(StandardVideoRecorder, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix, width=1280, height=960, fps=25, bitrate=500000)
+        super(StandardVideoRecorder, self).__init__(cameraClass, camera_kwargs, img_path, video_prefix, width=1280, height=960, fps=15, bitrate=500000)
 
 class Streamer(GeneralVideoRecorder):
-    _description  = { "overview": "A preset 960 x 720, 25fps, bitrate = 2e5 streamer. Active on port 8887.", 
+    _description  = { "overview": "A preset 960 x 720, 15fps, bitrate = 2e5 streamer. Active on port 8887.",
                       "arguments": [], 
                       "hidden": True
                     }
@@ -245,7 +245,7 @@ class Streamer(GeneralVideoRecorder):
     
     def __init__(self, cameraClass, camera_kwargs, video_prefix, img_path):
         logging.info(f"video_prefix_streamer: {video_prefix}")
-        super(Streamer, self).__init__(cameraClass, camera_kwargs, img_path="", video_prefix="", width=960, height=720, fps=25, bitrate=500000, stream=True, record_video=False)
+        super(Streamer, self).__init__(cameraClass, camera_kwargs, img_path="", video_prefix="", width=960, height=720, fps=15, bitrate=500000, stream=True, record_video=False)
         
 
 class timedStop(DescribedObject):

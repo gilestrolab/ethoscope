@@ -684,11 +684,11 @@ class PiFrameGrabber2(PiFrameGrabber):
                 # Configure camera controls optimized for dynamic day/night adaptation
                 camera_controls = {
                     "FrameRate": self._target_fps,
-                    "AeEnable": True,           # Enable auto-exposure for dynamic adaptation
-                    "AeExposureMode": 0,        # Normal exposure mode for best adaptation
+                    "ExposureTime": 0,          # 0 = auto-exposure (libcamera 0.5.0 compatible)
+                    "AnalogueGain": 0,          # 0 = auto-gain (libcamera 0.5.0 compatible)
                     "AwbEnable": False,         # Disable auto-white balance (NoIR cameras)
-                    # Let auto-exposure run freely for proper dynamic adaptation
-                    # Based on picamera2 docs: camera must run continuously for AGC/AEC to work
+                    # Auto-exposure enabled by setting ExposureTime and AnalogueGain to 0
+                    # This is the libcamera 0.5.0 compatible method
                 }
 
                 # Note: Automatic tuning detection allows libcamera to choose optimal settings
@@ -704,13 +704,14 @@ class PiFrameGrabber2(PiFrameGrabber):
                 capture.configure(config)
                 logging.info("Camera configured successfully")
 
-                # Explicitly enable auto-exposure after configuration
-                capture.set_controls({"AeEnable": True})
+                # Explicitly enable auto-exposure after configuration (libcamera 0.5.0 compatible)
+                capture.set_controls({"ExposureTime": 0, "AnalogueGain": 0})
 
                 # Log auto-exposure status for debugging
                 try:
-                    ae_status = capture.camera_controls.get("AeEnable", "Unknown")
-                    logging.info(f"Auto-exposure status: {ae_status}")
+                    exposure_time = capture.camera_controls.get("ExposureTime", "Unknown")
+                    analogue_gain = capture.camera_controls.get("AnalogueGain", "Unknown")
+                    logging.info(f"Auto-exposure status - ExposureTime: {exposure_time}, AnalogueGain: {analogue_gain}")
                 except Exception as e:
                     logging.warning(f"Could not check auto-exposure status: {e}")
 
@@ -868,7 +869,7 @@ class OurPiCameraAsync(BaseCamera):
 
     def __init__(
         self,
-        target_fps=20,
+        target_fps=15,
         target_resolution=(1280, 960),
         video_prefix=None,
         *args,

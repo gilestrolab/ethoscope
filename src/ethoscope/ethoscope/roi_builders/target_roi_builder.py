@@ -104,9 +104,9 @@ class TargetGridROIBuilder(BaseROIBuilder):
         self._diagnostics = None
         
         # Multi-frame detection configuration
-        self._max_detection_attempts = max_detection_attempts
+        self._max_detection_attempts = min(max_detection_attempts, 3)  # Limit to 3 attempts
         self._enable_frame_averaging = enable_frame_averaging
-        self._frame_buffer = []  # Buffer for frame averaging
+        self._previous_frame = None  # Simple previous frame storage
         
         if self._enable_diagnostics:
             self._diagnostics = TargetDetectionDiagnostics(device_id=device_id)
@@ -181,6 +181,53 @@ class TargetGridROIBuilder(BaseROIBuilder):
         x2 , y2  = pt2
         return np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
+    def _validate_target_geometry(self, sorted_points, tolerance=0.15):
+        '''
+        Validate that the three targets form the expected right-angle configuration.
+        Expected: A (upper-right), B (lower-right), C (lower-left)
+        '''
+        if len(sorted_points) != 3:
+            return False
+
+        a, b, c = sorted_points
+
+        # Calculate distances to verify the sorting is correct
+        ab_dist = self._points_distance(a, b)
+        bc_dist = self._points_distance(b, c)
+        ac_dist = self._points_distance(a, c)
+
+        # AC should be the hypotenuse (longest distance)
+        max_dist = max(ab_dist, bc_dist, ac_dist)
+        if ac_dist != max_dist:
+            return False
+
+        # Validate right-angle configuration
+        # A should be upper-right relative to B (higher y, similar x)
+        # C should be lower-left relative to B (similar y, lower x)
+
+        # Check vertical alignment: A and B should have similar x-coordinates
+        x_alignment_tolerance = tolerance * abs(a[0] - c[0])  # relative to width
+        if abs(a[0] - b[0]) > x_alignment_tolerance:
+            return False
+
+        # Check horizontal alignment: B and C should have similar y-coordinates
+        y_alignment_tolerance = tolerance * abs(a[1] - b[1])  # relative to height
+        if abs(b[1] - c[1]) > y_alignment_tolerance:
+            return False
+
+        # Check aspect ratio consistency (width/height should be reasonable)
+        width = abs(b[0] - c[0])
+        height = abs(a[1] - b[1])
+        if height == 0 or width == 0:
+            return False
+
+        aspect_ratio = width / height
+        # Expect roughly 1:1 to 3:1 aspect ratio for typical arenas
+        if aspect_ratio < 0.3 or aspect_ratio > 4.0:
+            return False
+
+        return True
+
     def _score_targets(self,contour, im):
 
         area = cv2.contourArea(contour)
@@ -196,102 +243,52 @@ class TargetGridROIBuilder(BaseROIBuilder):
 
     def _find_target_coordinates(self, img):
         '''
-        Finds the coordinates of the three blobs on the given img with multi-attempt robust detection
+        Finds the coordinates of the three blobs on the given img with simplified multi-attempt detection
         '''
         start_time = time.time() if self._enable_diagnostics else None
-        
-        # Try multiple attempts with different strategies
+
+        # Try simplified detection with up to 3 attempts
         for attempt in range(self._max_detection_attempts):
             logging.debug(f"Target detection attempt {attempt + 1}/{self._max_detection_attempts}")
-            
-            # Use frame averaging for noise reduction if enabled and we have buffered frames
-            processed_img = self._prepare_image_for_detection(img, attempt)
-            
+
+            # Use frame averaging on second attempt if enabled
+            if attempt == 1 and self._enable_frame_averaging and self._previous_frame is not None:
+                # Simple 2-frame average
+                processed_img = ((img.astype(np.float32) + self._previous_frame.astype(np.float32)) / 2).astype(np.uint8)
+            else:
+                processed_img = img
+
             # Attempt detection on processed image
             result = self._single_detection_attempt(processed_img, attempt)
-            
+
             if result is not None:
                 # Success - log and return
                 if self._enable_diagnostics:
                     processing_time = time.time() - start_time if start_time else None
-                    self._log_successful_detection(processed_img, result, attempt, processing_time)
+                    self._log_detection_result(processed_img, result, True, attempt, processing_time)
                 return result
-            
-            # Failed attempt - add current image to buffer for potential averaging
-            if self._enable_frame_averaging:
-                self._update_frame_buffer(img)
-        
+
+        # Store current frame for next detection
+        if self._enable_frame_averaging:
+            self._previous_frame = img.copy()
+
         # All attempts failed
         if self._enable_diagnostics:
             processing_time = time.time() - start_time if start_time else None
-            self._log_failed_detection(img, processing_time)
-        
+            self._log_detection_result(img, None, False, self._max_detection_attempts - 1, processing_time)
+
         logging.error(f"Target detection failed after {self._max_detection_attempts} attempts")
         return None
     
-    def _prepare_image_for_detection(self, img, attempt):
-        '''
-        Prepare image for detection based on attempt number and available strategies
-        '''
-        if attempt == 0 or not self._enable_frame_averaging or len(self._frame_buffer) == 0:
-            # First attempt or no averaging - use original image
-            return img
-        
-        # Use frame averaging for noise reduction
-        return self._create_averaged_frame(img)
-    
-    def _update_frame_buffer(self, img):
-        '''
-        Update the frame buffer for averaging, keeping only recent frames
-        '''
-        max_buffer_size = 3  # Keep last 3 frames for averaging
-        
-        # Convert to float for averaging if needed
-        if img.dtype != np.float32:
-            img_float = img.astype(np.float32)
-        else:
-            img_float = img.copy()
-            
-        self._frame_buffer.append(img_float)
-        
-        # Keep buffer size manageable
-        if len(self._frame_buffer) > max_buffer_size:
-            self._frame_buffer.pop(0)
-    
-    def _create_averaged_frame(self, current_img):
-        '''
-        Create an averaged frame from buffer + current image for noise reduction
-        '''
-        if len(self._frame_buffer) == 0:
-            return current_img
-        
-        # Convert current image to float
-        if current_img.dtype != np.float32:
-            current_float = current_img.astype(np.float32)
-        else:
-            current_float = current_img.copy()
-        
-        # Average with buffered frames
-        all_frames = self._frame_buffer + [current_float]
-        averaged = np.mean(all_frames, axis=0)
-        
-        # Convert back to uint8
-        return averaged.astype(np.uint8)
     
     def _single_detection_attempt(self, img, attempt):
         '''
-        Perform a single detection attempt with progressive tolerance relaxation
+        Perform a single detection attempt with geometric validation
         '''
         map = self._find_blobs(img, self._score_targets)
         bin = np.zeros_like(map)
 
-        # Smart threshold selection: prioritize finding exactly 3 high-quality targets
-        contours = []
-        best_contours = []
-        best_threshold = -1
-        best_quality_score = -1
-        optimal_threshold = -1
-        
+        # Find threshold that gives exactly 3 high-quality, geometrically valid targets
         for t in range(0, 255, 1):
             cv2.threshold(map, t, 255, cv2.THRESH_BINARY, bin)
             if CV_VERSION == 3:
@@ -299,161 +296,102 @@ class TargetGridROIBuilder(BaseROIBuilder):
             else:
                 contours, h = cv2.findContours(bin, cv2.RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)
 
-            # Primary goal: find the first (lowest) threshold that gives exactly 3 targets
-            if len(contours) == 3 and optimal_threshold == -1:
-                # Verify these are high-quality circular targets
-                quality_scores = [self._score_targets(c, img) for c in contours]
-                if all(score > 0 for score in quality_scores):  # All targets are circular enough
-                    optimal_threshold = t
-                    best_contours = contours
-                    best_threshold = t
-                    break  # Use first good threshold, not maximum contours
-            
-            # Fallback: track the threshold with best quality targets (not just most contours)
-            if len(contours) >= 3:
-                # Score the quality of the top 3 contours by area (likely to be real targets)
-                sorted_contours = sorted(contours, key=lambda c: cv2.contourArea(c), reverse=True)
-                top_3_contours = sorted_contours[:3]
-                quality_scores = [self._score_targets(c, img) for c in top_3_contours]
-                avg_quality = sum(quality_scores) / len(quality_scores) if quality_scores else 0
-                
-                # Prefer higher quality over more contours
-                if avg_quality > best_quality_score:
-                    best_quality_score = avg_quality
-                    best_contours = top_3_contours
-                    best_threshold = t
-        
-        # Use results from optimal threshold or best quality fallback
-        if optimal_threshold != -1:
-            # Found exactly 3 targets at optimal threshold
-            contours = best_contours
-            threshold_used = optimal_threshold
-            logging.debug(f"Found exactly 3 targets at optimal threshold {optimal_threshold} (attempt {attempt + 1})")
-        elif len(best_contours) >= 3:
-            # Use best quality targets as fallback
-            contours = best_contours
-            threshold_used = best_threshold
-            logging.debug(f"Using 3 best quality targets from threshold {best_threshold} (attempt {attempt + 1}, quality score: {best_quality_score:.2f})")
-        else:
-            # No good targets found
-            logging.debug(f"Could not find 3 quality targets on attempt {attempt + 1}. Found {len(best_contours)} targets at threshold {best_threshold}")
-            return None  # Early return for this attempt
-        
-        if len(contours) < 3:
-            logging.debug(f"Only found {len(contours)} targets on attempt {attempt + 1}")
-            return None  # Early return for this attempt
-
-        # Progressive diameter tolerance relaxation
-        base_tolerance = 0.10
-        tolerance_multiplier = 1.0 + (attempt * 0.5)  # Increase tolerance by 50% per attempt
-        current_tolerance = min(base_tolerance * tolerance_multiplier, 0.30)  # Cap at 30%
-        
-        target_diams = [cv2.boundingRect(c)[2] for c in contours]
-        mean_diam = np.mean(target_diams)
-        mean_sd = np.std(target_diams)
-        diameter_variation = mean_sd/mean_diam if mean_diam > 0 else 1.0
-
-        if diameter_variation > current_tolerance:
-            logging.debug(f"Diameter variation {diameter_variation:.3f} exceeds tolerance {current_tolerance:.3f} on attempt {attempt + 1}")
-            return None  # Early return for this attempt
-
-        # Success! Process the target coordinates
-        src_points = []
-        for c in contours:
-            moms = cv2.moments(c)
-            x , y = moms["m10"]/moms["m00"],  moms["m01"]/moms["m00"]
-            src_points.append((x,y))
-
-        a ,b, c = src_points
-        pairs = [(a,b), (b,c), (a,c)]
-
-        dists = [self._points_distance(*p) for p in pairs]
-        # that is the AC pair
-        hypo_vertices = pairs[np.argmax(dists)]
-
-        # this is B : the only point not in (a,c)
-        for sp in src_points:
-            if not sp in hypo_vertices:
-                break
-        sorted_b = sp
-
-        dist = 0
-        for sp in src_points:
-            if sorted_b is sp:
+            # Only proceed if we have exactly 3 contours
+            if len(contours) != 3:
                 continue
-            # b-c is the largest distance, so we can infer what point is c
-            if self._points_distance(sp, sorted_b) > dist:
-                dist = self._points_distance(sp, sorted_b)
-                sorted_c = sp
 
-        # the remaining point is a
-        sorted_a = [sp for sp in src_points if not sp is sorted_b and not sp is sorted_c][0]
-        sorted_src_pts = np.array([sorted_a, sorted_b, sorted_c], dtype=np.float32)
-        
-        #sorted_src_pts will return something like this
-        #[[1193.1302, 125.34195 ], [1209.0566, 857.9937  ], [  46.788918, 859.4524  ]]
+            # Verify circular quality
+            quality_scores = [self._score_targets(c, img) for c in contours]
+            if not all(score > 0 for score in quality_scores):
+                continue
 
-        return sorted_src_pts
+            # Check diameter consistency (fixed tolerance)
+            target_diams = [cv2.boundingRect(c)[2] for c in contours]
+            mean_diam = np.mean(target_diams)
+            mean_sd = np.std(target_diams)
+            diameter_variation = mean_sd/mean_diam if mean_diam > 0 else 1.0
+            if diameter_variation > 0.15:  # Fixed 15% tolerance
+                continue
+
+            # Extract and sort target coordinates
+            src_points = []
+            for c in contours:
+                moms = cv2.moments(c)
+                x, y = moms["m10"]/moms["m00"], moms["m01"]/moms["m00"]
+                src_points.append((x, y))
+
+            # Sort points: A (upper-right), B (lower-right), C (lower-left)
+            a, b, c = src_points
+            pairs = [(a,b), (b,c), (a,c)]
+            dists = [self._points_distance(*p) for p in pairs]
+            hypo_vertices = pairs[np.argmax(dists)]  # AC should be longest
+
+            # Find B (not in AC pair)
+            for sp in src_points:
+                if not sp in hypo_vertices:
+                    break
+            sorted_b = sp
+
+            # Find C (point with largest distance from B, excluding B itself)
+            dist = 0
+            for sp in src_points:
+                if sorted_b is sp:
+                    continue
+                if self._points_distance(sp, sorted_b) > dist:
+                    dist = self._points_distance(sp, sorted_b)
+                    sorted_c = sp
+
+            # A is the remaining point
+            sorted_a = [sp for sp in src_points if not sp is sorted_b and not sp is sorted_c][0]
+            sorted_src_pts = np.array([sorted_a, sorted_b, sorted_c], dtype=np.float32)
+
+            # Validate geometry - this is the key improvement
+            geometric_tolerance = 0.10 + (attempt * 0.05)  # Modest tolerance increase
+            if self._validate_target_geometry(sorted_src_pts, geometric_tolerance):
+                logging.debug(f"Found valid target geometry at threshold {t} (attempt {attempt + 1})")
+                return sorted_src_pts
+            else:
+                logging.debug(f"Invalid geometry at threshold {t} (attempt {attempt + 1})")
+
+        # No valid configuration found
+        logging.debug(f"No geometrically valid targets found on attempt {attempt + 1}")
+        return None
     
-    def _log_successful_detection(self, img, result, attempt, processing_time):
+    def _log_detection_result(self, img, result, success, attempt, processing_time):
         '''
-        Log successful detection with multi-attempt context
+        Consolidated logging for both successful and failed detection attempts
         '''
         if not self._enable_diagnostics or not self._diagnostics:
             return
-            
-        target_coordinates = [(float(pt[0]), float(pt[1])) for pt in result]
-        
+
+        if success and result is not None:
+            target_coordinates = [(float(pt[0]), float(pt[1])) for pt in result]
+            logging.info(f"Target detection SUCCESS on attempt {attempt + 1}: Found 3/3 targets")
+        else:
+            target_coordinates = []
+
         metadata = self._diagnostics.log_detection_attempt(
             image=img,
             targets_found=target_coordinates,
-            expected_targets=3,
-            threshold_used=None,  # Not available in success case
-            circularity_scores=[],
-            processing_time=processing_time
-        )
-        
-        # Add multi-attempt specific metadata
-        metadata['detection_attempts'] = attempt + 1
-        metadata['used_frame_averaging'] = self._enable_frame_averaging and len(self._frame_buffer) > 0
-        
-        logging.info(f"Target detection SUCCESS on attempt {attempt + 1}: Found 3/3 targets")
-        
-        if self._save_success_images:
-            self._diagnostics.save_detection_image(
-                image=img,
-                metadata=metadata,
-                save_success=True,
-                save_failed=False
-            )
-    
-    def _log_failed_detection(self, img, processing_time):
-        '''
-        Log failed detection after all attempts
-        '''
-        if not self._enable_diagnostics or not self._diagnostics:
-            return
-            
-        metadata = self._diagnostics.log_detection_attempt(
-            image=img,
-            targets_found=[],
             expected_targets=3,
             threshold_used=None,
             circularity_scores=[],
             processing_time=processing_time
         )
-        
-        # Add multi-attempt specific metadata
-        metadata['detection_attempts'] = self._max_detection_attempts
-        metadata['used_frame_averaging'] = self._enable_frame_averaging
-        metadata['frame_buffer_size'] = len(self._frame_buffer)
-        
-        self._diagnostics.save_detection_image(
-            image=img,
-            metadata=metadata,
-            save_success=False,
-            save_failed=True
-        )
+
+        # Add simplified metadata
+        metadata['detection_attempts'] = attempt + 1 if success else self._max_detection_attempts
+        metadata['used_frame_averaging'] = self._enable_frame_averaging and self._previous_frame is not None
+        metadata['geometric_validation'] = True
+
+        # Save diagnostic images based on success and configuration
+        if (success and self._save_success_images) or (not success):
+            self._diagnostics.save_detection_image(
+                image=img,
+                metadata=metadata,
+                save_success=success,
+                save_failed=not success
+            )
 
     def _rois_from_img(self,img):
         '''

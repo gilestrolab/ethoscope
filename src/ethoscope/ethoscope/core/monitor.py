@@ -111,7 +111,7 @@ class Monitor(object):
             for i,(t, frame) in enumerate(self._camera):
                 
                 # This is useful feedback when we do offline tracking
-                if verbose and t % 5000 == 0: print ( str(datetime.timedelta(milliseconds=t)) )
+                if verbose and t % 5000 == 0: print ( str(datetime.timedelta(milliseconds=t)), end="\r", flush=True )
 
                 if self._force_stop:
                     logging.info("Monitor object stopped from external request")
