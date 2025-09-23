@@ -1056,3 +1056,54 @@ def set_maxfps_setting(max_fps, path="/etc/ethoscope/maxfps_setting"):
     except Exception as e:
         logging.error(f"Error setting max FPS preference to {path}: {e}")
         raise
+
+
+def get_gain_setting(path="/etc/ethoscope/gain_setting"):
+    """
+    Reads the camera gain setting for optimal tracking performance.
+
+    Args:
+        path (str): Path to the configuration file
+
+    Returns:
+        float: Camera gain value, defaults to 1.0 if file doesn't exist or invalid
+    """
+    try:
+        if os.path.exists(path):
+            with open(path, 'r') as f:
+                content = f.read().strip()
+                gain_value = float(content)
+                # Validate range (1.0 to 16.0 is typical for Pi cameras)
+                if 1.0 <= gain_value <= 16.0:
+                    return gain_value
+                else:
+                    logging.warning(f"Invalid gain value {gain_value} in {path}, using default 1.0")
+                    return 1.0
+        return 1.0  # Default value for minimal noise
+    except (ValueError, OSError) as e:
+        logging.warning(f"Error reading gain setting from {path}: {e}, using default 1.0")
+        return 1.0
+
+
+def set_gain_setting(gain, path="/etc/ethoscope/gain_setting"):
+    """
+    Sets the camera gain preference for optimal tracking performance.
+
+    Args:
+        gain (float): Camera gain value (1.0-16.0, lower values reduce noise artifacts)
+        path (str): Path to the configuration file
+    """
+    try:
+        # Validate input
+        if not isinstance(gain, (int, float)) or not (1.0 <= gain <= 16.0):
+            raise ValueError(f"Gain must be a number between 1.0 and 16.0, got {gain}")
+
+        ensure_dir_exists(path)
+
+        with open(path, 'w') as f:
+            f.write(str(float(gain)))
+
+        logging.info(f"Camera gain setting updated: gain={gain}")
+    except Exception as e:
+        logging.error(f"Error setting gain preference to {path}: {e}")
+        raise

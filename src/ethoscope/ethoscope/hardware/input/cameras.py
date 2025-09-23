@@ -629,6 +629,14 @@ class PiFrameGrabber2(PiFrameGrabber):
     Same as PiFrameGrabber but uses picamera2
     """
 
+    def __init__(self, *args, **kwargs):
+        """
+        Initialize PiFrameGrabber2 with configurable gain from system settings.
+        """
+        # Get gain from system setting
+        self._gain = pi.get_gain_setting()
+        super().__init__(*args, **kwargs)
+
     def run(self):
         """
         Initialise pi camera, get frames, convert them fo greyscale, and make them available in a queue.
@@ -692,14 +700,14 @@ class PiFrameGrabber2(PiFrameGrabber):
                     f"Configuring camera with resolution: {w}x{h}, fps: {self._target_fps}"
                 )
 
-                # Configure camera controls optimized for dynamic day/night adaptation
+                # Configure camera controls optimized for tracking (prioritize exposure over gain)
                 camera_controls = {
                     "FrameRate": self._target_fps,
                     "ExposureTime": 0,          # 0 = auto-exposure (libcamera 0.5.0 compatible)
-                    "AnalogueGain": 0,          # 0 = auto-gain (libcamera 0.5.0 compatible)
+                    "AnalogueGain": self._gain,  # Fixed gain to avoid tracking artifacts
                     "AwbEnable": False,         # Disable auto-white balance (NoIR cameras)
-                    # Auto-exposure enabled by setting ExposureTime and AnalogueGain to 0
-                    # This is the libcamera 0.5.0 compatible method
+                    # Prioritize exposure adjustments over gain to minimize noise artifacts
+                    # that interfere with background subtraction tracking algorithms
                 }
 
                 # Note: Automatic tuning detection allows libcamera to choose optimal settings
@@ -715,8 +723,8 @@ class PiFrameGrabber2(PiFrameGrabber):
                 capture.configure(config)
                 logging.info("Camera configured successfully")
 
-                # Explicitly enable auto-exposure after configuration (libcamera 0.5.0 compatible)
-                capture.set_controls({"ExposureTime": 0, "AnalogueGain": 0})
+                # Explicitly configure exposure/gain after configuration (libcamera 0.5.0 compatible)
+                capture.set_controls({"ExposureTime": 0, "AnalogueGain": self._gain})
 
                 # Log auto-exposure status for debugging
                 try:

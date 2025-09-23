@@ -251,6 +251,10 @@ def update_machine_info(id):
         pi.set_maxfps_setting(int(update_machine_json_data['maxfps_setting']))
         haschanged = True
 
+    if 'gain_setting' in update_machine_json_data and update_machine_json_data['gain_setting'] != machine_info.get('gain_setting', 1.0):
+        pi.set_gain_setting(float(update_machine_json_data['gain_setting']))
+        haschanged = True
+
     if 'expand_rootfs' in update_machine_json_data and update_machine_json_data['expand_rootfs']:
         expansion_result = pi.expand_rootfs()
         logging.info(f"Root filesystem expansion requested: {expansion_result}")
@@ -407,6 +411,11 @@ def get_machine_info(id):
         machine_info['maxfps_setting'] = pi.get_maxfps_setting()
     except:
         machine_info['maxfps_setting'] = 15
+
+    try:
+        machine_info['gain_setting'] = pi.get_gain_setting()
+    except:
+        machine_info['gain_setting'] = 1.0
 
     machine_info['SD_CARD_AGE'] = pi.get_SD_CARD_AGE()
     machine_info['partitions'] = pi.get_partition_info()
@@ -686,11 +695,12 @@ def user_options(id):
                             "arguments": [
                                 {"type": "number", "name":"etho_number", "description": "An ID number (5-250) unique to this ethoscope","default": machine_info['machine-number'] },
                                 {"type": "number", "name":"maxfps_setting", "description": "Maximum camera FPS (frames per second)", "default": machine_info.get('maxfps_setting', 15), "min": 1, "max": 30, "step": 1},
-                                {"type": "boolean", "name":"isexperimental", "description": "Specify if the ethoscope is to be treated as experimental", "default": machine_info['isExperimental']}, 
+                                {"type": "number", "name":"gain_setting", "description": "Camera gain (lower values reduce noise artifacts for better tracking)", "default": machine_info.get('gain_setting', 1.0), "min": 1.0, "max": 16.0, "step": 0.1},
                                 {"type": "boolean", "name":"use_noir_tuning", "description": "Use NoIR tuning for cameras with IR pass-through filters", "default": machine_info.get('use_noir_tuning', False)},
-                                {"type": "boolean", "name":"useSTATIC", "description": "Use a static IP address instead of obtaining one with DHCP. The last number in the IP address will be the current ethoscope number", "default" : machine_info['useSTATIC']},
+                                {"type": "boolean", "name":"isexperimental", "description": "Specify if the ethoscope is to be treated as experimental", "default": machine_info['isExperimental']}, 
                                 {"type": "boolean", "name":"remoteLogging", "description": "The ethoscope logs events directly on the node.", "default" : machine_info['remoteLogging']},
                                 {"type": "boolean", "name":"expand_rootfs", "description": "Expand root filesystem to use full SD card space", "default" : False},
+                                {"type": "boolean", "name":"useSTATIC", "description": "Use a static IP address instead of obtaining one with DHCP. The last number in the IP address will be the current ethoscope number", "default" : machine_info['useSTATIC']},
                                 {"type": "str", "name":"node_ip", "description": "The IP address that you want to record as the node (do not change this value unless you know what you are doing!)","default": machine_info['node_ip']},
                                 {"type": "str", "name":"ESSID", "description": "The name of the WIFI SSID","default": machine_info['WIFI_SSID'] },
                                 {"type": "str", "name":"Key", "description": "The WPA password for the WIFI SSID","default": machine_info['WIFI_PASSWORD'] },
