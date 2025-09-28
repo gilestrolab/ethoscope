@@ -5,7 +5,6 @@
         "description": "High-definition mating arena with 6 ROIs arranged in 2 rows × 3 columns",
         "author": "Giorgio Gilestro",
         "hardware_type": "hd_mating_arena",
-        "default": true,
         "created": "2025-01-15T12:00:00"
     },
     "roi_definition": {

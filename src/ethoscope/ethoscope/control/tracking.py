@@ -582,8 +582,6 @@ class ControlThread(Thread):
         """
         CameraClass = self._option_dict["camera"]["class"]
         camera_kwargs = self._option_dict["camera"]["kwargs"]
-        ROIBuilderClass = self._option_dict["roi_builder"]["class"]
-        roi_builder_kwargs = self._option_dict["roi_builder"]["kwargs"]
 
         StimulatorClass = self._option_dict["interactor"]["class"]
         stimulator_kwargs = self._option_dict["interactor"]["kwargs"]
@@ -608,30 +606,11 @@ class ControlThread(Thread):
             else:
                 raise e
 
-        roi_builder = ROIBuilderClass(**roi_builder_kwargs)
-        
-        try:
-            reference_points, rois = roi_builder.build(cam)
-            
-            # Handle graceful failure when ROI building returns None values
-            if reference_points is None or rois is None:
-                logging.warning("ROI building failed: insufficient targets detected.")
-                # Save debug image to help user understand the issue
-                self._save_roi_debug_image(cam, "Insufficient targets detected")
-                try:
-                    cam._close()
-                    # Add a delay to allow camera hardware to reset
-                    time.sleep(2.0)
-                    logging.info("Camera cleanup completed, hardware should be available for next attempt")
-                except Exception as cleanup_error:
-                    logging.error(f"Error during camera cleanup: {cleanup_error}")
-                # Return None to indicate failure instead of raising exception
-                return None
-                
-        except (EthoscopeException, Exception) as e:
-            logging.error(f"ROI building failed: {e}")
-            # Save debug image with exception details
-            self._save_roi_debug_image(cam, f"ROI building error: {str(e)}")
+        # Use new shared target detection method
+        reference_points, rois = self._detect_and_store_targets(cam)
+
+        # Handle detection failure
+        if reference_points is None or rois is None:
             try:
                 cam._close()
                 # Add a delay to allow camera hardware to reset
@@ -884,6 +863,46 @@ class ControlThread(Thread):
         return  (cam, rw, rois, reference_points, TrackerClass, tracker_kwargs,
                         hardware_connection, StimulatorClass, stimulator_kwargs, time_offset)
 
+    def _detect_and_store_targets(self, cam):
+        """
+        Detect targets using ROI builder and store coordinates in experimental_info.
+
+        Args:
+            cam: Camera instance to use for detection
+
+        Returns:
+            tuple: (reference_points, rois) or (None, None) if detection failed
+        """
+        ROIBuilderClass = self._option_dict["roi_builder"]["class"]
+        roi_builder_kwargs = self._option_dict["roi_builder"]["kwargs"]
+
+        roi_builder = ROIBuilderClass(**roi_builder_kwargs)
+
+        try:
+            reference_points, rois = roi_builder.build(cam)
+
+            # Handle graceful failure when ROI building returns None values
+            if reference_points is None or rois is None:
+                logging.warning("ROI building failed: insufficient targets detected.")
+                # Save debug image to help user understand the issue
+                self._save_roi_debug_image(cam, "Insufficient targets detected")
+                return None, None
+
+            # Store target coordinates in experimental_info for API access
+            if "experimental_info" in self._info:
+                self._info["experimental_info"]["target_coordinates"] = [
+                    [float(p[0]), float(p[1])] for p in reference_points
+                ]
+                logging.info(f"Stored {len(reference_points)} target coordinates in experimental_info")
+
+            return reference_points, rois
+
+        except (EthoscopeException, Exception) as e:
+            logging.error(f"Target detection failed: {e}")
+            # Save debug image with exception details
+            self._save_roi_debug_image(cam, f"Target detection error: {str(e)}")
+            return None, None
+
     def _save_roi_debug_image(self, cam, error_message):
         """
         Save a debug image when ROI building fails to help user understand the issue.
@@ -891,19 +910,19 @@ class ControlThread(Thread):
         try:
             # Get a frame from the camera to show what was detected
             _, frame = next(iter(cam))
-            
+
             # Convert to color if it's grayscale for better annotation visibility
             if len(frame.shape) == 2:
                 debug_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
             else:
                 debug_frame = frame.copy()
-            
+
             # Add timestamp in bottom right corner in white text
             font = cv2.FONT_HERSHEY_SIMPLEX
             font_scale = 2.0  # 4x larger than 0.5
             color = (255, 255, 255)  # White color
             thickness = 3  # Thicker for better visibility
-            
+
             # Get current timestamp with timezone
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
             # If no timezone info, add local timezone indicator
@@ -911,19 +930,19 @@ class ControlThread(Thread):
                 import time
                 tz_name = time.tzname[time.daylight]
                 timestamp = f"{timestamp.rstrip()} {tz_name}"
-            
+
             # Calculate text size to position it in bottom right
             text_size = cv2.getTextSize(timestamp, font, font_scale, thickness)[0]
             text_x = debug_frame.shape[1] - text_size[0] - 10  # 10 pixels from right edge
             text_y = debug_frame.shape[0] - 10  # 10 pixels from bottom edge
-            
+
             cv2.putText(debug_frame, timestamp, (text_x, text_y), font, font_scale, color, thickness)
-            
+
             # Save the debug image
             debug_path = self._info["dbg_img"]
             cv2.imwrite(debug_path, debug_frame)
             logging.info(f"Debug image saved to: {debug_path}")
-            
+
         except Exception as e:
             logging.error(f"Failed to save debug image: {e}")
 
