@@ -4,6 +4,7 @@ import traceback
 import datetime, time
 import os
 import re
+import glob
 from uuid import uuid4
 import netifaces
 import git
@@ -345,85 +346,208 @@ def cpu_serial():
     return serial
         
         
+def _detect_camera_via_i2c():
+    """
+    Detect camera via I2C bus devices (Pi 4+ method).
+    Returns the sensor name if found, None otherwise.
+    """
+    known_sensors = ['imx219', 'ov5647', 'imx477', 'imx708']
+
+    try:
+        i2c_devices = glob.glob('/sys/bus/i2c/devices/*/name')
+        for device_path in i2c_devices:
+            with open(device_path, 'r') as f:
+                sensor_name = f.read().strip()
+                if sensor_name in known_sensors:
+                    return sensor_name
+    except Exception:
+        pass
+    return None
+
+def _detect_camera_via_v4l2_subdev():
+    """
+    Detect camera via V4L2 subdevices (Pi 4+ method).
+    Returns True if camera subdevice found, False otherwise.
+    """
+    v4l2_subdevs = glob.glob('/dev/v4l-subdev*')
+    return len(v4l2_subdevs) > 0
+
+def _detect_camera_via_bcm2835_platform():
+    """
+    Detect camera via bcm2835-camera platform device (Pi 2/3 method).
+    Returns True if bcm2835-camera device found, False otherwise.
+    """
+    # Primary path for Pi 3
+    bcm2835_paths = [
+        '/sys/devices/platform/soc/3f00b840.mailbox/bcm2835-camera',
+        '/sys/devices/platform/soc/*/mailbox/bcm2835-camera'  # Alternative patterns
+    ]
+
+    for path_pattern in bcm2835_paths:
+        if '*' in path_pattern:
+            matches = glob.glob(path_pattern)
+            if matches:
+                return True
+        else:
+            if os.path.exists(path_pattern):
+                return True
+    return False
+
+def _legacy_camera_detection():
+    """
+    Fallback to original camera detection methods when safe to do so.
+    """
+    try:
+        if isMachinePI(2) or isMachinePI(3):
+            # Use vcgencmd if available
+            vcgencmd_possible_locations = ['/opt/vc/bin/vcgencmd', '/usr/bin/vcgencmd']
+            vcgencmd = None
+
+            for loc in vcgencmd_possible_locations:
+                if os.path.isfile(loc):
+                    vcgencmd = "%s get_camera" % loc
+                    break
+
+            if vcgencmd:
+                with os.popen(vcgencmd) as cmd:
+                    out_cmd = cmd.read().strip()
+                if 'detected=1' in out_cmd and 'supported=1' in out_cmd:
+                    return True
+
+        elif isMachinePI(4):
+            # Use libcamera-hello as fallback (may fail if camera in use)
+            with os.popen("timeout 3 libcamera-hello --list-cameras --timeout 2000") as cmd:
+                out_cmd = cmd.read()
+            match = re.search(r'\d+ : (\w+)', out_cmd)
+            if match:
+                return True
+
+    except Exception:
+        pass
+    return False
+
 def hasPiCamera():
     """
-    return True if a piCamera is supported and detected
+    Detect Pi camera using filesystem checks to avoid conflicts with active camera usage.
 
-    In PI3 with libcamera support we can use vcgencmd which outputs something like this:
-    'supported=1 detected=1, libcamera interfaces=1'
-    'supported=1 detected=0, libcamera interfaces=1'
+    This function uses non-intrusive methods to detect camera hardware without trying
+    to access the camera directly, preventing false negatives when the camera is
+    actively being used for tracking, recording, or streaming.
 
-    With PI4, however, we need to use libcamera-hello which has the following output
-
+    Returns:
+        bool: True if camera hardware is detected, False otherwise
     """
     if not isMachinePI():
         return False
 
     if isMachinePI(2) or isMachinePI(3):
+        # Method 1: Check bcm2835-camera platform device (most reliable for Pi 2/3)
+        if _detect_camera_via_bcm2835_platform():
+            return True
 
-        # older versions had vcgencmd coming from raspberrypi-firmware and located in /opt/vc/bin
-        # in newer versions, the command comes from raspberrypi-utils and it's in /usr/bin
-        # we try this for future compatibility even though we still have to use raspberrypi-firmware for now
-        # we get it from https://alaa.ad24.cz/packages/r/raspberrypi-firmware/raspberrypi-firmware-20231019-1-armv7h.pkg.tar.xz
-        vcgencmd_possible_locations = ['/opt/vc/bin/vcgencmd', '/usr/bin/vcgencmd']
-        for loc in vcgencmd_possible_locations:
-            if os.path.isfile(loc):
-                vcgencmd = "%s get_camera" % loc
-                break
-
-        with os.popen(vcgencmd) as cmd:
-            out_cmd = cmd.read().strip()
-        out = dict(x.split('=') for x in out_cmd.split(',')[0].split(' '))
-        
-        # If libcamera interfaces are available but vcgencmd shows detected=0,
-        # fall back to libcamera detection method
-        if 'libcamera' in out_cmd and 'interfaces=1' in out_cmd and out["detected"] == "0":
-            with os.popen("libcamera-hello --list-cameras") as cmd:
-                libcam_out = cmd.read()
-            match = re.search(r'\d+ : (\w+)', libcam_out)
-            return bool(match)
-        
-        return out["detected"] == out["supported"] == "1"
+        # Method 2: Fallback to legacy vcgencmd method
+        return _legacy_camera_detection()
 
     if isMachinePI(4):
-        with os.popen("libcamera-hello --list-cameras") as cmd:
-            out_cmd = cmd.read()
-        match = re.search(r'\d+ : (\w+)', out_cmd)
-        if match:
-            return match.group(1)
-        else:
-            return False
+        # Method 1: Check I2C camera sensors (most reliable for Pi 4+)
+        if _detect_camera_via_i2c():
+            return True
+
+        # Method 2: Check V4L2 subdevices
+        if _detect_camera_via_v4l2_subdev():
+            return True
+
+        # Method 3: Fallback to legacy libcamera method
+        return _legacy_camera_detection()
+
+    return False
 
         
+def _get_camera_sensor_info():
+    """
+    Get camera sensor information from I2C devices (Pi 4+) or other sources.
+    Returns sensor name or None if not available.
+    """
+    # Try I2C sensor detection (Pi 4+)
+    sensor_name = _detect_camera_via_i2c()
+    if sensor_name:
+        return sensor_name
+
+    # Try libcamera detection as fallback
+    try:
+        if isMachinePI(4):
+            with os.popen("timeout 2 libcamera-hello --list-cameras --timeout 1000") as cmd:
+                out_cmd = cmd.read()
+            match = re.search(r'\d+ : (\w+)', out_cmd)
+            if match:
+                return match.group(1)
+    except Exception:
+        pass
+
+    return None
+
 def getPiCameraVersion():
     """
-    If a PiCamera is connected, returns the model
+    Returns camera information if a PiCamera is connected.
 
-    #PINoIR v1
-    #{'IFD0.Model': 'RP_ov5647', 'IFD0.Make': 'RaspberryPi'}
-    #PINoIR v2
-    #{'IFD0.Model': 'RP_imx219', 'IFD0.Make': 'RaspberryPi'}
-    
+    Returns:
+        dict or str: Camera information dictionary with version details,
+                    or descriptive string about camera status.
+
+    Examples:
+        Pi with camera: {'IFD0.Model': 'RP_imx219', 'IFD0.Make': 'RaspberryPi', 'version': 'PINoIR 2', 'sensor': 'imx219'}
+        New ethoscope: "This is a new ethoscope. Run tracking once to detect the camera module"
+        No camera: "No camera hardware detected - video capabilities disabled"
     """
-    
-    known_versions = {'RP_ov5647': 'PINoIR 1', 'RP_imx219': 'PINoIR 2'}
-    
-    picamera_info_file = '/etc/ethoscope/picamera-version'
-    
-    if hasPiCamera():
 
+    known_versions = {
+        'RP_ov5647': 'PINoIR 1',
+        'RP_imx219': 'PINoIR 2',
+        'RP_imx477': 'HQ Camera',
+        'RP_imx708': 'Camera Module 3'
+    }
+
+    # Map sensor names to known Pi camera versions
+    sensor_to_version = {
+        'ov5647': 'PINoIR 1',
+        'imx219': 'PINoIR 2',
+        'imx477': 'HQ Camera',
+        'imx708': 'Camera Module 3'
+    }
+
+    picamera_info_file = '/etc/ethoscope/picamera-version'
+
+    if hasPiCamera():
         try:
+            # Try to read cached camera info file
             with open(picamera_info_file, 'r') as infile:
                 camera_info = eval(infile.read())
-            
-            camera_info['version'] = known_versions[ camera_info['IFD0.Model'] ]
-            
-        except:
-            camera_info = "This is a new ethoscope. Run tracking once to detect the camera module"
-            
-        return camera_info
+
+            if 'IFD0.Model' in camera_info and camera_info['IFD0.Model'] in known_versions:
+                camera_info['version'] = known_versions[camera_info['IFD0.Model']]
+
+            # Add detected sensor information if available
+            sensor_name = _get_camera_sensor_info()
+            if sensor_name:
+                camera_info['sensor'] = sensor_name
+                if 'version' not in camera_info and sensor_name in sensor_to_version:
+                    camera_info['version'] = sensor_to_version[sensor_name]
+
+            return camera_info
+
+        except Exception:
+            # Fallback: try to provide sensor info even without cache file
+            sensor_name = _get_camera_sensor_info()
+            if sensor_name and sensor_name in sensor_to_version:
+                return {
+                    'sensor': sensor_name,
+                    'version': sensor_to_version[sensor_name],
+                    'detected_via': 'filesystem'
+                }
+
+            return "This is a new ethoscope. Run tracking once to detect the camera module"
+
     else:
-        
         return "No camera hardware detected - video capabilities disabled"
 
 def isSuperscope():
