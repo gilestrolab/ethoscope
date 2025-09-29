@@ -70,6 +70,7 @@ class ROI(object):
         raise NotImplementedError
 
 
+    @property
     def mask(self):
         """
         :return: The mask as a single chanel, `uint8` image.
@@ -182,18 +183,31 @@ class ROI(object):
         except Exception as e:
             raise EthoscopeException("Error whilst slicing region of interest %s: %s" % (str(self.get_feature_dict()), str(e)), img)
 
-        # The mask should be applied to the *clamped* output, so it needs to be adjusted as well.
-        # For now, we'll just check the shape. If the mask needs to be adjusted, that's a more complex change.
+        # Ensure output dimensions match expected clamped dimensions
         if out.shape[0:2] != (h_clamped, w_clamped):
             raise EthoscopeException("Error whilst slicing region of interest. Output shape mismatch after clamping: %s" % str(self.get_feature_dict()), img )
 
-        # If the original mask shape doesn't match the clamped output shape, we need to re-evaluate how the mask is used.
-        # For now, we'll assume the mask is still valid for the *original* ROI, and the clamping is just for the image slice.
-        # If the mask needs to be cropped/adjusted, that's a more significant change.
-        # For now, we'll proceed with the original mask, but this might need further investigation if issues persist.
-        return out, self._mask
+        # Adjust mask to match the clamped output dimensions
+        # Calculate the offset into the original mask based on clamping
+        mask_x_offset = max(0, x - x1)  # How much was clipped from left
+        mask_y_offset = max(0, y - y1)  # How much was clipped from top
 
-        return out, self._mask
+        # Crop the mask to match the clamped output dimensions
+        mask_x_end = mask_x_offset + w_clamped
+        mask_y_end = mask_y_offset + h_clamped
+
+        # Ensure we don't exceed mask boundaries
+        mask_x_end = min(mask_x_end, self._mask.shape[1])
+        mask_y_end = min(mask_y_end, self._mask.shape[0])
+
+        adjusted_mask = self._mask[mask_y_offset:mask_y_end, mask_x_offset:mask_x_end]
+
+        # Final safety check: ensure mask and output have identical dimensions
+        if adjusted_mask.shape != out.shape[0:2]:
+            # Fallback: create a full mask if adjustment failed
+            adjusted_mask = np.ones(out.shape[0:2], dtype=np.uint8) * 255
+
+        return out, adjusted_mask
 
     @property
     def regions(self):
