@@ -919,15 +919,15 @@
 
                                         <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=file name={{arg.name}} ng-model="selected_options.update_machine[name]['arguments'][arg.name]">
 
-                                        <label ng-if="arg.type == 'number'" for="input-{{arg.name}}">{{arg.description}}</label>
+                                        <label ng-if="arg.type == 'number'" for="input-{{arg.name}}">{{arg.description}} <i ng-if="arg.requires_reboot" class="fa fa-refresh" style="color: #ff6b35; margin-left: 5px;" title="Requires reboot to take effect"></i></label>
                                         <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}} ng-model="selected_options.update_machine[name]['arguments'][arg.name]">
 
-                                        <label ng-if="arg.type == 'str'" for="input-{{arg.name}}">{{arg.description}}</label>
+                                        <label ng-if="arg.type == 'str'" for="input-{{arg.name}}">{{arg.description}} <i ng-if="arg.requires_reboot" class="fa fa-refresh" style="color: #ff6b35; margin-left: 5px;" title="Requires reboot to take effect"></i></label>
                                         <input ng-if="arg.type == 'str'" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.update_machine[name]['arguments'][arg.name]">
 
 
                                         <div ng-if="arg.type == 'boolean' && arg.name != 'expand_rootfs'" style="display: flex; align-items: center; justify-content: space-between;">
-                                            <label for="input-{{arg.name}}" class="switchlabel" style="margin: 0; flex: 1;">{{arg.description}}</label>
+                                            <label for="input-{{arg.name}}" class="switchlabel" style="margin: 0; flex: 1;">{{arg.description}} <i ng-if="arg.requires_reboot" class="fa fa-refresh" style="color: #ff6b35; margin-left: 5px;" title="Requires reboot to take effect"></i></label>
                                             <label class="switch" style="margin: 0;">
                                                 <input id="input-{{arg.name}}" type="checkbox" name={{arg.name}} ng-model="selected_options.update_machine[name]['arguments'][arg.name]"><span class="slider"></span>
                                             </label>
