@@ -332,6 +332,17 @@ class EthoscopeNodeServer:
                     f"Failed to cleanup offline busy devices at startup: {e}"
                 )
 
+            # Clean up orphaned running sessions at startup
+            try:
+                orphaned_count = self.database.cleanup_orphaned_running_sessions()
+                self.logger.info(
+                    f"Cleaned up {orphaned_count} orphaned running sessions at startup"
+                )
+            except Exception as e:
+                self.logger.warning(
+                    f"Failed to cleanup orphaned running sessions at startup: {e}"
+                )
+
             # Initialize device scanner
             try:
                 # Pass config_dir explicitly to scanner as it needs it for SSH key management

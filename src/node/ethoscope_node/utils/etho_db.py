@@ -1981,6 +1981,241 @@ class ExperimentalDB(multiprocessing.Process):
 
         return cleaned_count
 
+    def cleanup_orphaned_running_sessions(self, min_age_hours: int = 1) -> int:
+        """
+        Clean up orphaned "running" sessions that have end_time='0'.
+
+        A session is considered orphaned if:
+        1. It has status='running' with end_time='0' (never properly closed)
+        2. AND the same device has a NEWER running session (device restarted without closing old session)
+        3. OR it's older than min_age_hours AND device is not currently in 'running' status
+
+        This approach ensures we never mark legitimate long-running experiments as orphaned.
+
+        Args:
+            min_age_hours: Minimum age in hours before considering cleanup (safety threshold)
+
+        Returns:
+            Number of orphaned sessions that were marked as stopped
+        """
+        min_age_cutoff = datetime.datetime.now() - datetime.timedelta(
+            hours=min_age_hours
+        )
+
+        # Query for all running sessions with end_time='0'
+        sql_get_running = (
+            """
+            SELECT run_id, ethoscope_id, ethoscope_name, start_time, user_name
+            FROM %s
+            WHERE status = 'running'
+            AND (end_time = '0' OR end_time = 0 OR end_time IS NULL)
+            ORDER BY ethoscope_id, start_time DESC
+        """
+            % self._runs_table_name
+        )
+
+        running_sessions = self.executeSQL(sql_get_running)
+        if not isinstance(running_sessions, list) or not running_sessions:
+            logging.info("No running sessions found")
+            return 0
+
+        # Group running sessions by device to find duplicates
+        device_sessions = {}
+        for session in running_sessions:
+            run_id = session[0]
+            ethoscope_id = session[1]
+            ethoscope_name = session[2]
+            start_time = session[3]
+            user_name = session[4] if len(session) > 4 else "Unknown"
+
+            if ethoscope_id not in device_sessions:
+                device_sessions[ethoscope_id] = []
+
+            device_sessions[ethoscope_id].append(
+                {
+                    "run_id": run_id,
+                    "ethoscope_id": ethoscope_id,
+                    "ethoscope_name": ethoscope_name,
+                    "start_time": start_time,
+                    "user_name": user_name,
+                }
+            )
+
+        # Get current device statuses from ethoscopes table
+        sql_device_status = (
+            "SELECT ethoscope_id, status FROM %s" % self._ethoscopes_table_name
+        )
+        device_statuses = self.executeSQL(sql_device_status)
+        device_status_map = {}
+        if isinstance(device_statuses, list):
+            for status_row in device_statuses:
+                device_status_map[status_row[0]] = status_row[1]
+
+        orphans_to_cleanup = []
+
+        # Analyze each device's running sessions
+        for ethoscope_id, sessions in device_sessions.items():
+            if len(sessions) == 1:
+                # Only one running session for this device
+                session = sessions[0]
+                start_time = session["start_time"]
+
+                # Parse start time
+                start_dt = self._parse_session_time(start_time)
+                if not start_dt:
+                    continue
+
+                # Check if device is currently NOT in running status AND session is old
+                current_device_status = device_status_map.get(ethoscope_id, "unknown")
+
+                # Only mark as orphaned if:
+                # 1. Device is not currently in 'running' status
+                # 2. Session is older than minimum age threshold
+                if (
+                    current_device_status not in ["running", "recording", "streaming"]
+                    and start_dt < min_age_cutoff
+                ):
+                    age_days = (datetime.datetime.now() - start_dt).days
+                    orphans_to_cleanup.append(
+                        (
+                            session["run_id"],
+                            session["ethoscope_id"],
+                            session["ethoscope_name"],
+                            session["user_name"],
+                            age_days,
+                            f"Device status '{current_device_status}' but has running session",
+                        )
+                    )
+            else:
+                # Multiple running sessions for same device - keep only the most recent
+                # Sort by start_time (most recent first)
+                sessions_with_time = []
+                for session in sessions:
+                    start_dt = self._parse_session_time(session["start_time"])
+                    if start_dt:
+                        sessions_with_time.append((start_dt, session))
+
+                if len(sessions_with_time) < 2:
+                    continue
+
+                # Sort by start time descending (newest first)
+                sessions_with_time.sort(key=lambda x: x[0], reverse=True)
+
+                # Most recent is legitimate, all others are orphaned
+                for i, (start_dt, session) in enumerate(sessions_with_time):
+                    if i == 0:
+                        # This is the most recent - keep it
+                        logging.info(
+                            f"Keeping most recent running session for {session['ethoscope_name']}: "
+                            f"run_id={session['run_id']}, started={start_dt}"
+                        )
+                        continue
+
+                    # All older sessions are orphaned
+                    age_days = (datetime.datetime.now() - start_dt).days
+                    orphans_to_cleanup.append(
+                        (
+                            session["run_id"],
+                            session["ethoscope_id"],
+                            session["ethoscope_name"],
+                            session["user_name"],
+                            age_days,
+                            f"Superseded by newer session (device has {len(sessions)} running sessions)",
+                        )
+                    )
+
+        if not orphans_to_cleanup:
+            logging.info("No orphaned running sessions found to cleanup")
+            return 0
+
+        # Clean up the orphaned sessions by marking them as stopped with current timestamp
+        cleaned_count = 0
+        current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+
+        for (
+            run_id,
+            ethoscope_id,
+            ethoscope_name,
+            user_name,
+            age_days,
+            reason,
+        ) in orphans_to_cleanup:
+            sql_cleanup = """
+                UPDATE %s
+                SET status = 'stopped', end_time = '%s',
+                    problems = CASE
+                        WHEN problems IS NULL OR problems = '' THEN 'Orphaned session cleanup (age: %d days) - %s'
+                        ELSE problems || '; Orphaned session cleanup (age: %d days) - %s'
+                    END
+                WHERE run_id = '%s'
+            """ % (
+                self._runs_table_name,
+                current_time,
+                age_days,
+                reason,
+                age_days,
+                reason,
+                run_id,
+            )
+
+            result = self.executeSQL(sql_cleanup)
+            if result != -1:
+                cleaned_count += 1
+                logging.info(
+                    f"Cleaned up orphaned running session: {ethoscope_name} ({ethoscope_id}), "
+                    f"run_id={run_id}, user={user_name}, age={age_days} days - {reason}"
+                )
+            else:
+                logging.error(f"Failed to cleanup orphaned run {run_id}")
+
+        if cleaned_count > 0:
+            logging.info(
+                f"Cleaned up {cleaned_count} orphaned running sessions (min age: {min_age_hours} hours)"
+            )
+        else:
+            logging.info(
+                f"No orphaned running sessions found (min age: {min_age_hours} hours)"
+            )
+
+        return cleaned_count
+
+    def _parse_session_time(self, start_time):
+        """
+        Parse a session start_time value which could be a string, float, or datetime object.
+
+        Args:
+            start_time: The start_time value from database
+
+        Returns:
+            datetime object, or None if parsing fails
+        """
+        try:
+            if isinstance(start_time, str):
+                # Try different datetime formats
+                for fmt in [
+                    "%Y-%m-%d %H:%M:%S.%f",
+                    "%Y-%m-%d %H:%M:%S",
+                ]:
+                    try:
+                        return datetime.datetime.strptime(start_time, fmt)
+                    except ValueError:
+                        continue
+
+                # Try parsing as timestamp
+                try:
+                    return datetime.datetime.fromtimestamp(float(start_time))
+                except:
+                    pass
+            elif isinstance(start_time, (int, float)):
+                return datetime.datetime.fromtimestamp(float(start_time))
+            elif hasattr(start_time, "timestamp"):
+                return start_time
+
+            return None
+        except Exception as e:
+            logging.warning(f"Failed to parse session time '{start_time}': {e}")
+            return None
+
     # PIN Authentication Methods
 
     def hash_pin(self, pin: str) -> str:
