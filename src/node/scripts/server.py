@@ -582,30 +582,43 @@ def setup_logging(debug: bool = False):
 
 
 def parse_command_line():
-    """Parse command line arguments."""
+    """Parse command line arguments with environment variable fallbacks."""
     import argparse
 
+    # Get defaults from environment variables
+    env_port = int(os.getenv("NODE_PORT", DEFAULT_PORT))
+    env_debug = os.getenv("NODE_DEBUG", "false").lower() == "true"
+    env_data_dir = os.getenv("ETHOSCOPE_DATA_DIR", "/ethoscope_data")
+    env_config_dir = os.getenv("ETHOSCOPE_CONFIG_DIR")
+
     parser = argparse.ArgumentParser(description="Ethoscope Node Server")
-    parser.add_argument("-D", "--debug", action="store_true", help="Enable debug mode")
+    parser.add_argument(
+        "-D",
+        "--debug",
+        action="store_true",
+        default=env_debug,
+        help=f"Enable debug mode (default: {env_debug})",
+    )
     parser.add_argument(
         "-p",
         "--port",
         type=int,
-        default=DEFAULT_PORT,
-        help=f"Server port (default: {DEFAULT_PORT})",
+        default=env_port,
+        help=f"Server port (default: {env_port})",
     )
     parser.add_argument(
         "-e",
         "--data-dir",
         dest="ethoscope_data_dir",
-        default="/ethoscope_data",
-        help='Root directory for all result files (default: "/ethoscope_data")',
+        default=env_data_dir,
+        help=f'Root directory for all result files (default: "{env_data_dir}")',
     )
     parser.add_argument(
         "-c",
         "--configuration",
         dest="config_dir",
-        help="Path to configuration directory (default: /etc/ethoscope)",
+        default=env_config_dir,
+        help=f"Path to configuration directory (default: {env_config_dir or '/etc/ethoscope'})",
     )
 
     return parser.parse_args()

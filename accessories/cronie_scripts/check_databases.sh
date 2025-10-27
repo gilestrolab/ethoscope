@@ -1,8 +1,13 @@
 #!/bin/bash
 # Script to check integrity of all ethoscope databases
 
-# Default settings
-DATA_DIR="/ethoscope_data/results"
+# Load environment variables if available
+if [ -f /etc/ethoscope/environment ]; then
+    source /etc/ethoscope/environment
+fi
+
+# Default settings (can be overridden by environment variables)
+DATA_DIR="${ETHOSCOPE_RESULTS_DIR:-/ethoscope_data/results}"
 DEEP=false
 FORCE=false
 

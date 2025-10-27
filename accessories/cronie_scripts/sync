@@ -2,9 +2,16 @@
 # This should run on a hourly frequency
 # If it's not there already, link it or copy it to /etc/cron.hourly
 
-# Define default variables
-REMOTE_HOST="gg@turing.lab.gilest.ro"
-MOUNT_PATH="/mnt/data"
+# Load environment variables if available
+if [ -f /etc/ethoscope/environment ]; then
+    source /etc/ethoscope/environment
+fi
+
+# Define default variables (can be overridden by environment variables)
+REMOTE_HOST="${BACKUP_REMOTE_HOST:-gg@turing.lab.gilest.ro}"
+MOUNT_PATH="${BACKUP_REMOTE_PATH:-/mnt/data}"
+VIDEOS_DIR="${ETHOSCOPE_VIDEOS_DIR:-/ethoscope_data/videos}"
+RESULTS_DIR="${ETHOSCOPE_RESULTS_DIR:-/ethoscope_data/results}"
 
 # Parse command line arguments
 while getopts "h:m:" opt; do
@@ -23,5 +30,5 @@ while getopts "h:m:" opt; do
 done
 
 # Use rsync to sync videos and tracking results
-rsync -rav --update /ethoscope_data/videos/* "${REMOTE_HOST}:${MOUNT_PATH}/videos/"
-rsync -rav --update /ethoscope_data/results/* "${REMOTE_HOST}:${MOUNT_PATH}/results/"
+rsync -rav --update "${VIDEOS_DIR}"/* "${REMOTE_HOST}:${MOUNT_PATH}/videos/"
+rsync -rav --update "${RESULTS_DIR}"/* "${REMOTE_HOST}:${MOUNT_PATH}/results/"
