@@ -408,7 +408,7 @@ class NotificationAnalyzer:
 
     def get_device_users(self, device_id: str) -> List[str]:
         """
-        Get list of user email addresses associated with a device.
+        Get list of user email addresses for users with currently running experiments on a device.
 
         Args:
             device_id: Device identifier
@@ -417,41 +417,60 @@ class NotificationAnalyzer:
             List of email addresses
         """
         try:
-            # Get recent runs for this device
-            runs = self.db.getRun("all", asdict=True)
+            # Get users with currently running experiments on this device
+            users = self.db.getUsersForDevice(device_id, running_only=True, asdict=True)
 
-            user_emails = set()
-            for run_id, run_data in runs.items():
-                if run_data.get("ethoscope_id") == device_id:
-                    user_name = run_data.get("user_name")
-                    if user_name:
-                        # Get user email from configuration
-                        users = self.config.content.get("users", {})
-                        if user_name in users:
-                            email = users[user_name].get("email")
-                            if email:
-                                user_emails.add(email)
+            user_emails = []
+            for user_data in users:
+                email = user_data.get("email")
+                if email:
+                    user_emails.append(email)
 
-            return list(user_emails)
+            return user_emails
 
         except Exception as e:
             self.logger.error(f"Error getting device users for {device_id}: {e}")
             return []
 
     def get_admin_emails(self) -> List[str]:
-        """Get list of admin email addresses."""
+        """Get list of active admin email addresses."""
         try:
-            users = self.config.content.get("users", {})
+            # Get all active admin users from database
+            users = self.db.getAllUsers(active_only=True, admin_only=True, asdict=True)
             admin_emails = []
 
             for user_data in users.values():
-                if user_data.get("isAdmin", False) and user_data.get("active", False):
-                    email = user_data.get("email")
-                    if email:
-                        admin_emails.append(email)
+                email = user_data.get("email")
+                if email:
+                    admin_emails.append(email)
 
             return admin_emails
 
         except Exception as e:
             self.logger.error(f"Error getting admin emails: {e}")
+            return []
+
+    def get_stopped_experiment_user(self, run_id: str) -> List[str]:
+        """
+        Get email address for the user who owns a specific experiment run.
+
+        Args:
+            run_id: Run identifier
+
+        Returns:
+            List containing the user's email address (empty list if not found or user inactive)
+        """
+        try:
+            # Get user who owns this run
+            user = self.db.getUserByRun(run_id, asdict=True)
+
+            if user and user.get("active") == 1:
+                email = user.get("email")
+                if email:
+                    return [email]
+
+            return []
+
+        except Exception as e:
+            self.logger.error(f"Error getting user for run {run_id}: {e}")
             return []

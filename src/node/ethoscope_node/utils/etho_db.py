@@ -975,25 +975,53 @@ class ExperimentalDB(multiprocessing.Process):
         else:
             return row[0]
 
-    def getUsersForDevice(self, device_id: str, asdict: bool = False):
+    def getUserByRun(self, run_id: str, asdict: bool = False):
+        """
+        Get user information for the owner of a specific run.
+
+        Args:
+            run_id: Run ID to look up
+            asdict: Return as dictionary if True
+
+        Returns:
+            User data from database or empty dict if not found
+        """
+        sql_get_user = "SELECT u.* FROM %s u JOIN %s r ON u.username = r.user_name WHERE r.run_id = '%s'" % (
+            self._users_table_name,
+            self._runs_table_name,
+            run_id,
+        )
+
+        row = self.executeSQL(sql_get_user)
+
+        if type(row) != list or len(row) == 0:
+            return {}
+
+        if asdict:
+            return dict(row[0])
+        else:
+            return row[0]
+
+    def getUsersForDevice(self, device_id: str, running_only: bool = True, asdict: bool = False):
         """
         Get all users who have run experiments on a specific device.
 
         Args:
             device_id: Device ID to look up
+            running_only: If True, only return users with currently running experiments
             asdict: Return as dictionary if True
 
         Returns:
             List of user data for users who have used this device
         """
-        sql_get_users = """
-        SELECT DISTINCT u.* FROM %s u
-        JOIN %s r ON u.username = r.user_name
-        WHERE r.ethoscope_id = '%s' AND u.active = 1
-        """ % (
+        conditions = ["r.ethoscope_id = '%s'" % device_id, "u.active = 1"]
+        if running_only:
+            conditions.append("r.status = 'running'")
+
+        sql_get_users = "SELECT DISTINCT u.* FROM %s u JOIN %s r ON u.username = r.user_name WHERE %s" % (
             self._users_table_name,
             self._runs_table_name,
-            device_id,
+            " AND ".join(conditions),
         )
 
         rows = self.executeSQL(sql_get_users)
@@ -1187,12 +1215,13 @@ class ExperimentalDB(multiprocessing.Process):
         else:
             return row[0]
 
-    def getAllUsers(self, active_only: bool = False, asdict: bool = False):
+    def getAllUsers(self, active_only: bool = False, admin_only: bool = False, asdict: bool = False):
         """
         Get all users from the database.
 
         Args:
             active_only: If True, only return active users
+            admin_only: If True, only return admin users
             asdict: Return as dictionary if True
 
         Returns:
@@ -1200,8 +1229,14 @@ class ExperimentalDB(multiprocessing.Process):
         """
         sql_get_users = f"SELECT * FROM {self._users_table_name}"
 
+        conditions = []
         if active_only:
-            sql_get_users += " WHERE active = 1"
+            conditions.append("active = 1")
+        if admin_only:
+            conditions.append("isadmin = 1")
+
+        if conditions:
+            sql_get_users += " WHERE " + " AND ".join(conditions)
 
         sql_get_users += " ORDER BY username"
 

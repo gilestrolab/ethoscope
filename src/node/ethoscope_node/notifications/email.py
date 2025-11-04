@@ -214,11 +214,11 @@ class EmailNotificationService(NotificationAnalyzer):
         
         # Get comprehensive device failure analysis
         failure_analysis = self.analyze_device_failure(device_id)
-        
-        # Get recipients
-        device_users = self.get_device_users(device_id)
+
+        # Get recipients: user whose experiment stopped + admins
+        stopped_user = self.get_stopped_experiment_user(run_id)
         admin_emails = self.get_admin_emails()
-        all_emails = list(set(device_users + admin_emails))
+        all_emails = list(set(stopped_user + admin_emails))
         
         if not all_emails:
             self.logger.warning(f"No email recipients for device {device_id}")
