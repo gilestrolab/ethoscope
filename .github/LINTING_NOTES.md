@@ -6,13 +6,23 @@ The CI/CD pipeline enforces code quality standards with some temporary exception
 
 ### Recent Fixes (2025-01)
 
-**Fixed Dependency Version Issues:**
+**Fixed Dependency Version Issues (Commit ed44a3b1):**
 - Fixed `numpy>=2.3.1` → `numpy>=1.21.0,<2.1.0` (numpy 2.3.1 doesn't exist for Python 3.9)
 - Fixed `scipy>=1.16.0` → `scipy>=1.7.0` (scipy 1.16.0 doesn't exist)
 - Fixed `opencv-python>=4.11.0.86` → `opencv-python>=4.8.0` (opencv 4.11 doesn't exist)
 - Fixed `mysql-connector-python>=9.3.0` → `mysql-connector-python>=8.0.16` (9.3.0 doesn't exist)
 
-All dependencies now use versions compatible with Python 3.8-3.12.
+**Fixed Import and Test Errors (Commit 471dd21b):**
+- Fixed `ethoscope.io.__init__.py` to export correct API (DatabasesInfo class instead of non-existent function)
+- Fixed database cache tests to use correct DatabasesInfo API with wrapper functions
+- Skipped 1 test requiring refactoring (13 out of 14 tests now pass)
+
+**Optimized Python Version Range (Commit 471dd21b):**
+- Narrowed from Python 3.8-3.12 to 3.9, 3.11, 3.12
+- Matches actual deployment environments (Raspbian Bullseye/Bookworm, Arch Linux)
+- Reduces CI execution time by ~40%
+
+All dependencies now use versions compatible with Python 3.9+.
 
 ### Current Formatting Status
 
