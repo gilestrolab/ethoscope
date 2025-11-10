@@ -130,14 +130,43 @@ The workflows will automatically run when:
 - Pull requests are opened or updated
 - Version tags are pushed (for releases)
 
-### 2. Configure Secrets (Optional)
+### 2. Configure Secrets
 
-#### Codecov Integration
-To enable coverage tracking:
-1. Sign up at https://codecov.io
-2. Add your repository
-3. Get the Codecov token
-4. Add as repository secret: `CODECOV_TOKEN`
+#### Codecov Integration (Required for Coverage Tracking)
+
+**Your Codecov Token:** `0690a06c-2270-4ed1-8d6d-003d518ecf77`
+
+To enable coverage tracking and reporting:
+
+1. **Add the token to GitHub:**
+   - Go to: https://github.com/gilestrolab/ethoscope/settings/secrets/actions
+   - Click **New repository secret**
+   - Name: `CODECOV_TOKEN`
+   - Secret: `0690a06c-2270-4ed1-8d6d-003d518ecf77`
+   - Click **Add secret**
+
+2. **Verify it works:**
+   ```bash
+   # Trigger CI by pushing a commit
+   git commit --allow-empty -m "test: Verify Codecov integration"
+   git push origin dev
+
+   # Check workflow status
+   open https://github.com/gilestrolab/ethoscope/actions
+
+   # View coverage reports
+   open https://codecov.io/gh/gilestrolab/ethoscope
+   ```
+
+3. **Expected outcome:**
+   - ✅ CI workflow uploads coverage without errors
+   - ✅ Codecov badge in README shows coverage percentage
+   - ✅ Coverage reports appear on Codecov dashboard
+   - ✅ PR comments show coverage changes
+
+**Documentation:** See `.github/CODECOV_SETUP.md` for detailed setup guide
+
+**Quick Reference:** See `ADD_CODECOV_SECRET.txt` for one-page instructions
 
 #### PyPI Publishing
 To enable PyPI publishing:
