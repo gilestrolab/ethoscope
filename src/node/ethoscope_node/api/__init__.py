@@ -31,15 +31,15 @@ from .tunnel_utils import TunnelUtils
 from .auth_api import AuthAPI
 
 __all__ = [
-    'BaseAPI',
-    'DeviceAPI', 
-    'BackupAPI',
-    'SensorAPI',
-    'ROITemplateAPI',
-    'NodeAPI',
-    'FileAPI',
-    'DatabaseAPI',
-    'SetupAPI',
-    'TunnelUtils',
-    'AuthAPI'
+    "BaseAPI",
+    "DeviceAPI",
+    "BackupAPI",
+    "SensorAPI",
+    "ROITemplateAPI",
+    "NodeAPI",
+    "FileAPI",
+    "DatabaseAPI",
+    "SetupAPI",
+    "TunnelUtils",
+    "AuthAPI",
 ]

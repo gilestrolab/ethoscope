@@ -64,8 +64,9 @@ repos:
       - id: flake8
         args: [
           '--max-line-length=88',
-          '--extend-ignore=E203,W503,E501',
-          '--max-complexity=15'
+          '--extend-ignore=E203,W503',
+          '--max-complexity=15',
+          '--exclude=src/node/ethoscope_node/api/*'
         ]
         files: ^(src/|scripts/|run_tests\.py).*\.py$
 

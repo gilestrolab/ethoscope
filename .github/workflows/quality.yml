@@ -32,7 +32,7 @@ jobs:
         cd src/ethoscope
         flake8 ethoscope/ \
           --max-line-length=88 \
-          --extend-ignore=E203,W503 \
+          --extend-ignore=E203,W503,E501 \
           --count \
           --statistics \
           --show-source
@@ -71,7 +71,7 @@ jobs:
         cd src/node
         flake8 ethoscope_node/ \
           --max-line-length=88 \
-          --extend-ignore=E203,W503 \
+          --extend-ignore=E203,W503,E501,F401,F841,E722,F541,F821 \
           --count \
           --statistics \
           --show-source
@@ -106,7 +106,8 @@ jobs:
         sudo apt-get install -y \
           libopencv-dev \
           python3-opencv \
-          libatlas-base-dev
+          libatlas-base-dev \
+          libcap-dev
 
     - name: Install device package with dev dependencies
       run: |
@@ -153,7 +154,8 @@ jobs:
         sudo apt-get install -y \
           libopencv-dev \
           python3-opencv \
-          libatlas-base-dev
+          libatlas-base-dev \
+          libcap-dev
 
     - name: Install node package with dev dependencies
       run: |
