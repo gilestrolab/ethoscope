@@ -52,11 +52,11 @@ echo "ethoscope_node.service restarted"
 # 5. If --all flag is used, restart additional services
 if [[ "$ALL_FLAG" == "true" ]]; then
     echo "Restarting additional services..."
-    
+
     # Restart update server
     echo "Restarting ethoscope_update_server..."
     sudo systemctl restart ethoscope_update_server.service || echo "Warning: ethoscope_update_server.service not found or failed to restart"
-    
+
     # Find and restart active backup service
     echo "Finding active backup service..."
     if systemctl is-active --quiet ethoscope_backup_unified.service; then
@@ -78,11 +78,11 @@ if [[ "$ALL_FLAG" == "true" ]]; then
     elif systemctl is-active --quiet ethoscope_backup_sqlite.service; then
         echo "Restarting ethoscope_backup_sqlite.service..."
         sudo systemctl restart ethoscope_backup_sqlite.service
-        
+
     else
         echo "Warning: No active backup service found"
     fi
-    
+
     echo "All services restarted"
 fi
 

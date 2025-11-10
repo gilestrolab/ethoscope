@@ -5,7 +5,7 @@
 
     app.factory('ethoscopeBackupService', function($http) {
         return {
-            
+
             /**
              * Load backup information from the device-specific endpoint
              */
@@ -24,19 +24,19 @@
                     .then(function(response) {
                         var backupData = response.data;
                         console.log('DEBUG: Received backup data from endpoint:', backupData);
-                        
+
                         // Store backup info directly - the endpoint returns the complete backup status
                         $scope.device.backup_info = backupData;
-                        
+
                         // Transform the data to match the expected frontend structure
                         if (backupData.backup_status) {
                             // Deep copy the backup_status to avoid modifying the original
                             var backupTypes = JSON.parse(JSON.stringify(backupData.backup_status));
-                            
+
                             // Enhance MySQL backup status with last_backup date from MariaDB data
-                            if (backupTypes.mysql && backupTypes.mysql.available && 
+                            if (backupTypes.mysql && backupTypes.mysql.available &&
                                 backupData.databases && backupData.databases.MariaDB) {
-                                
+
                                 // Find the most recent MariaDB database date
                                 var latestDate = 0;
                                 for (var dbName in backupData.databases.MariaDB) {
@@ -47,10 +47,10 @@
                                         }
                                     }
                                 }
-                                
+
                                 if (latestDate > 0) {
                                     backupTypes.mysql.last_backup = latestDate;
-                                    
+
                                     // Also add size information from MariaDB data
                                     var totalSize = 0;
                                     for (var dbName in backupData.databases.MariaDB) {
@@ -62,20 +62,20 @@
                                         }
                                     }
                                     backupTypes.mysql.size = totalSize;
-                                    
+
                                     console.log('DEBUG: Enhanced MySQL backup status - last_backup:', latestDate, 'size:', totalSize);
                                 }
                             }
-                            
+
                             $scope.device.backup_status_detailed = {
                                 backup_types: backupTypes,
                                 individual_files: {}
                             };
-                            
+
                             // Transform SQLite individual files data
                             if (backupData.databases && backupData.databases.SQLite) {
                                 var sqliteFiles = [];
-                                
+
                                 // Local utility function for file size formatting
                                 function formatBytes(bytes) {
                                     if (!bytes || bytes === 0) return '0 B';
@@ -84,25 +84,25 @@
                                     const i = Math.floor(Math.log(bytes) / Math.log(k));
                                     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
                                 }
-                                
+
                                 for (var fileName in backupData.databases.SQLite) {
                                     if (backupData.databases.SQLite.hasOwnProperty(fileName)) {
                                         var fileInfo = backupData.databases.SQLite[fileName];
-                                        
+
                                         // Check for enhanced data sources
                                         var isRsyncEnhanced = fileInfo.rsync_enhanced || false;
                                         var isFilesystemEnhanced = fileInfo.filesystem_enhanced || false;
                                         var enhancementSource = '';
-                                        
+
                                         if (isRsyncEnhanced) {
                                             enhancementSource = 'rsync';
                                         } else if (isFilesystemEnhanced) {
                                             enhancementSource = 'filesystem';
                                         }
-                                        
+
                                         // Use enhanced size_human if available, otherwise format filesize
                                         var sizeHuman = fileInfo.size_human || formatBytes(fileInfo.filesize || 0);
-                                        
+
                                         sqliteFiles.push({
                                             name: fileName,
                                             modified: fileInfo.date || 0,
@@ -116,40 +116,40 @@
                                         });
                                     }
                                 }
-                                
+
                                 $scope.device.backup_status_detailed.individual_files.sqlite = {
                                     files: sqliteFiles
                                 };
-                                
+
                                 console.log('DEBUG: Created individual SQLite files structure:', sqliteFiles.length, 'files');
                             }
-                            
+
                             // Process video files if available from enhanced rsync data
-                            if (backupData.video_files || (backupData.backup_status && backupData.backup_status.video) || 
+                            if (backupData.video_files || (backupData.backup_status && backupData.backup_status.video) ||
                                 (backupData.databases && backupData.databases.Video)) {
-                                
+
                                 var videoFileArray = [];
-                                
+
                                 // Process video data from databases.Video structure (preferred method)
                                 if (backupData.databases && backupData.databases.Video && backupData.databases.Video.video_backup) {
                                     var videoBackup = backupData.databases.Video.video_backup;
                                     var videoFiles = videoBackup.files || {};
-                                    
+
                                     for (var filename in videoFiles) {
                                         if (videoFiles.hasOwnProperty(filename)) {
                                             var fileInfo = videoFiles[filename];
-                                            
+
                                             // Check enhancement source
                                             var isRsyncEnhanced = fileInfo.rsync_enhanced || false;
                                             var isFilesystemEnhanced = fileInfo.filesystem_enhanced || false;
                                             var enhancementSource = '';
-                                            
+
                                             if (isRsyncEnhanced) {
                                                 enhancementSource = 'rsync';
                                             } else if (isFilesystemEnhanced) {
                                                 enhancementSource = 'filesystem';
                                             }
-                                            
+
                                             function formatBytes(bytes) {
                                                 if (!bytes || bytes === 0) return '0 B';
                                                 const k = 1024;
@@ -157,7 +157,7 @@
                                                 const i = Math.floor(Math.log(bytes) / Math.log(k));
                                                 return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
                                             }
-                                            
+
                                             videoFileArray.push({
                                                 name: filename,
                                                 size_bytes: fileInfo.size_bytes || 0,
@@ -169,26 +169,26 @@
                                             });
                                         }
                                     }
-                                    
+
                                     console.log('DEBUG: Processed video data from databases.Video:', videoFileArray.length, 'files');
                                 }
-                                
+
                                 $scope.device.backup_status_detailed.individual_files.videos = {
                                     files: videoFileArray
                                 };
-                                
+
                                 // If no video data in databases.Video, fall back to enhanced rsync status
                                 if (videoFileArray.length === 0) {
                                     // loadEnhancedVideoInfo() - would need to be implemented if needed
                                 }
                             }
-                            
+
                             // Also preserve the legacy databases structure for MariaDB (since it's not in individual_files yet)
                             if (backupData.databases) {
                                 $scope.device.databases = backupData.databases;
                             }
                         }
-                        
+
                         // Update backup summary
                         this.updateBackupSummary($scope);
                         return response;
@@ -279,8 +279,8 @@
                     missing: missing,
                     overallStatus: overallStatus,
                     useDetailedStatus: true,
-                    hasIndividualFiles: $scope.device.backup_status_detailed && 
-                                       $scope.device.backup_status_detailed.individual_files && 
+                    hasIndividualFiles: $scope.device.backup_status_detailed &&
+                                       $scope.device.backup_status_detailed.individual_files &&
                                        $scope.device.backup_status_detailed.individual_files.sqlite
                 });
 

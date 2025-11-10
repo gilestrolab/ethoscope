@@ -1,9 +1,11 @@
 __author__ = "quentin"
 
-import cv2
-import unittest
 import os
+import unittest
+
+import cv2
 import numpy as np
+
 from ethoscope.roi_builders.target_roi_builder import TargetGridROIBuilder
 
 try:

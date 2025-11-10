@@ -15,29 +15,29 @@ function maxLengthCheck(object) {
         $scope.showAll = false; // By default, show only active users
         $scope.sortType = 'fullname'; // Match home.html naming
         $scope.sortReverse = false;
-        
+
         // Phone number validation pattern
         $scope.phonePattern = /^\+((?:9[679]|8[035789]|6[789]|5[90]|42|3[578]|2[1-689])|9[0-58]|8[1246]|6[0-6]|5[1-8]|4[013-9]|3[0-469]|2[70]|7|1)(?:\W*\d){0,13}\d$/;
 
         // Custom filter function for users (similar to home.html pattern)
         $scope.userFilter = function(users, searchText, showAll) {
             if (!users) return [];
-            
+
             var filteredUsers = [];
-            
+
             // Convert users object to array for easier filtering
             for (var key in users) {
                 var user = users[key];
                 user.key = key; // Store the key for reference
-                
+
                 // If showAll is false, only show active users
                 if (!showAll && !user.active) {
                     continue;
                 }
-                
+
                 filteredUsers.push(user);
             }
-            
+
             // Apply search filter
             if (searchText) {
                 filteredUsers = filteredUsers.filter(function(user) {
@@ -49,7 +49,7 @@ function maxLengthCheck(object) {
                            (user.telephone && user.telephone.toLowerCase().indexOf(searchLower) !== -1);
                 });
             }
-            
+
             return filteredUsers;
         };
 
@@ -59,7 +59,7 @@ function maxLengthCheck(object) {
                 .then(function(response) {
                     var data = response.data;
                     $scope.users = data;
-                    
+
                     // Extract unique groups
                     $scope.groups = [];
                     for (var user in $scope.users) {
@@ -106,7 +106,7 @@ function maxLengthCheck(object) {
                     .replace(/\s+/g, '.') // Replace spaces with dots
                     .replace(/\.+/g, '.') // Replace multiple dots with single dot
                     .replace(/^\.|\.$/g, ''); // Remove leading/trailing dots
-                
+
                 $scope.selectedUser.name = username;
             }
         };
@@ -118,7 +118,7 @@ function maxLengthCheck(object) {
             if (loadingContainer) {
                 loadingContainer.appendChild(spinner.el);
             }
-            
+
             $http.post('/node-actions', {
                 action: 'adduser',
                 userdata: $scope.selectedUser
@@ -128,7 +128,7 @@ function maxLengthCheck(object) {
                 if (data.result === 'success') {
                     $scope.users = data.data;
                     $scope.clearSelectedUser();
-                    
+
                     // Update groups list
                     $scope.groups = [];
                     for (var user in $scope.users) {
@@ -156,7 +156,7 @@ function maxLengthCheck(object) {
         $scope.toggleUserStatus = function(user) {
             var updatedUser = angular.copy(user);
             updatedUser.active = !updatedUser.active;
-            
+
             $http.post('/node-actions', {
                 action: 'adduser',
                 userdata: updatedUser
@@ -186,7 +186,7 @@ function maxLengthCheck(object) {
             // Note: This functionality would need to be implemented in the backend
             // For now, we'll show a message that this feature is not yet implemented
             alert('Delete functionality is not yet implemented in the backend. Please contact the system administrator.');
-            
+
             // When backend is ready, uncomment and modify this:
             /*
             $http.post('/node-actions', {
@@ -219,7 +219,7 @@ function maxLengthCheck(object) {
             // Check if we're editing a user (button has data-user attribute) or adding new
             var button = $(e.relatedTarget);
             var isEditMode = button.hasClass('edit-user-btn');
-            
+
             if (!isEditMode) {
                 // This is for adding a new user
                 $scope.clearSelectedUser();

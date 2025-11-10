@@ -6,9 +6,9 @@ from MySQL (port 8090) and rsync (port 8093) backup services.
 """
 
 import json
-import urllib.request
 import time
-from typing import Dict, Any
+import urllib.request
+
 from .base import BaseAPI, error_decorator
 
 
@@ -312,7 +312,7 @@ class BackupAPI(BaseAPI):
 
                     devices_backup[device_id] = device_backup_data
 
-                except Exception as e:
+                except Exception:
                     # If we can't get backup info for this device, mark as unknown
                     devices_backup[device_id] = {
                         "backup_types": {
@@ -349,7 +349,7 @@ class BackupAPI(BaseAPI):
                         "overall_status": "unknown",
                     }
 
-        except Exception as e:
+        except Exception:
             # If we can't get device list, return empty dict
             pass
 

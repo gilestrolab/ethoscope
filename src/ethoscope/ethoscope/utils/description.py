@@ -1,7 +1,7 @@
 __author__ = "quentin"
 
 
-class DescribedObject(object):
+class DescribedObject:
     r"""
     An object that contains a ``description`` attribute.
     This is used to parse user option for the web interface.

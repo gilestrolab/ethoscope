@@ -118,14 +118,14 @@
     app.run(function($rootScope, $location, AuthService, $timeout, $http) {
         // Public routes that don't require authentication
         var publicRoutes = ['/login', '/installation-wizard'];
-        
+
         // Set up global authentication state in $rootScope for header navigation
         var updateGlobalAuthState = function() {
             $rootScope.isAuthenticated = AuthService.isAuthenticated;
-            $rootScope.currentUser = AuthService.getCurrentUser();  
+            $rootScope.currentUser = AuthService.getCurrentUser();
             $rootScope.isAdmin = AuthService.isAdmin;
         };
-        
+
         // Watch for authentication state changes globally
         $rootScope.$watch(function() {
             return AuthService.isAuthenticated;
@@ -134,29 +134,29 @@
                 updateGlobalAuthState();
             }
         });
-        
+
         // Initial global state
         updateGlobalAuthState();
-        
+
         // Route change listener for authentication protection
         $rootScope.$on('$routeChangeStart', function(event, next, current) {
             var path = $location.path();
-            
+
             // Check if this is a public route
             var isPublicRoute = publicRoutes.some(function(route) {
                 return path.indexOf(route) === 0;
             });
-            
+
             // Always allow public routes
             if (isPublicRoute) {
                 return;
             }
-            
+
             // For all other routes, check authentication
             // Initialize authentication and check if user is authenticated
             AuthService.initialize().then(function() {
                 updateGlobalAuthState();
-                
+
                 // Check if authentication is actually required by checking backend
                 $http.get('/auth/session').then(function(response) {
                     if (response.data && response.data.authenticated !== undefined) {
@@ -177,19 +177,19 @@
                 updateGlobalAuthState();
             });
         });
-        
+
         // Initialize authentication service
         AuthService.initialize().then(function(isAuthenticated) {
             updateGlobalAuthState(); // Update global state after initialization
         }).catch(function(error) {
             updateGlobalAuthState();
         });
-        
+
         // Add global logout function for header
         $rootScope.logout = function() {
             AuthService.logout();
         };
-        
+
         // Global change PIN modal state
         $rootScope.showChangePinForm = false;
         $rootScope.changePinForm = {
@@ -200,7 +200,7 @@
         };
         $rootScope.changePinError = '';
         $rootScope.changePinSuccess = '';
-        
+
         // Add global showChangePin function for header
         $rootScope.showChangePin = function() {
             $rootScope.showChangePinForm = true;
@@ -214,42 +214,42 @@
                 isSubmitting: false
             };
         };
-        
+
         // Add global hideChangePin function
         $rootScope.hideChangePin = function() {
             $rootScope.showChangePinForm = false;
             $rootScope.changePinError = '';
             $rootScope.changePinSuccess = '';
         };
-        
+
         // Add global submitChangePin function
         $rootScope.submitChangePin = function() {
             if ($rootScope.changePinForm.isSubmitting) {
                 return;
             }
-            
+
             // Clear previous messages
             $rootScope.changePinError = '';
             $rootScope.changePinSuccess = '';
-            
+
             // Validate form
             if (!$rootScope.changePinForm.currentPin || !$rootScope.changePinForm.newPin || !$rootScope.changePinForm.confirmPin) {
                 $rootScope.changePinError = 'All fields are required';
                 return;
             }
-            
+
             if ($rootScope.changePinForm.newPin !== $rootScope.changePinForm.confirmPin) {
                 $rootScope.changePinError = 'New PIN confirmation does not match';
                 return;
             }
-            
+
             if ($rootScope.changePinForm.newPin === $rootScope.changePinForm.currentPin) {
                 $rootScope.changePinError = 'New PIN must be different from current PIN';
                 return;
             }
-            
+
             $rootScope.changePinForm.isSubmitting = true;
-            
+
             AuthService.changePin(
                 $rootScope.changePinForm.currentPin,
                 $rootScope.changePinForm.newPin,
@@ -257,10 +257,10 @@
             )
             .then(function(result) {
                 $rootScope.changePinForm.isSubmitting = false;
-                
+
                 if (result.success) {
                     $rootScope.changePinSuccess = result.message;
-                    
+
                     // Clear form on success
                     $rootScope.changePinForm = {
                         currentPin: '',
@@ -268,14 +268,14 @@
                         confirmPin: '',
                         isSubmitting: false
                     };
-                    
+
                     // Hide form after 3 seconds
                     $timeout(function() {
                         $rootScope.hideChangePin();
                     }, 3000);
                 } else {
                     $rootScope.changePinError = result.message;
-                    
+
                     // Clear PIN fields for security
                     $rootScope.changePinForm.currentPin = '';
                     $rootScope.changePinForm.newPin = '';
@@ -285,7 +285,7 @@
             .catch(function(error) {
                 $rootScope.changePinForm.isSubmitting = false;
                 $rootScope.changePinError = 'PIN change failed due to connection error';
-                
+
                 // Clear all fields
                 $rootScope.changePinForm = {
                     currentPin: '',
@@ -295,7 +295,7 @@
                 };
             });
         };
-        
+
         // Add global enter key handler for change PIN
         $rootScope.onChangePinEnter = function($event) {
             if ($event.which === 13) { // Enter key
@@ -335,22 +335,22 @@
         $scope.notifications = {};
         $scope.showOnline = true; // show only online devices by default
         $scope.groupActions = {};
-        
+
         // Authentication properties
         $scope.currentUser = null;
         $scope.isAuthenticated = false;
         $scope.isAdmin = false;
-        
+
         // Update authentication state from service
         var updateAuthState = function() {
             $scope.currentUser = AuthService.getCurrentUser();
             $scope.isAuthenticated = AuthService.isAuthenticated;
             $scope.isAdmin = AuthService.isAdmin;
         };
-        
+
         // Initialize authentication state
         updateAuthState();
-        
+
         // Authentication state watching is handled in the startup sequence below
 
         // ===========================
@@ -416,7 +416,7 @@
         var formatConciseTime = function(date) {
             var options = {
                 weekday: 'short', // Mon
-                month: 'short', // Jun  
+                month: 'short', // Jun
                 day: 'numeric', // 28
                 hour: '2-digit', // 14
                 minute: '2-digit', // 25
@@ -974,12 +974,12 @@
 
         /**
          * Format bytes as human-readable text.
-         * 
+         *
          * @param bytes Number of bytes.
-         * @param si True to use metric (SI) units, aka powers of 1000. False to use 
+         * @param si True to use metric (SI) units, aka powers of 1000. False to use
          *           binary (IEC), aka powers of 1024.
          * @param dp Number of decimal places to display.
-         * 
+         *
          * @return Formatted string.
          */
         $scope.humanFileSize = function(bytes, si = false, dp = 1) {
@@ -1153,18 +1153,18 @@
 
         // Always initialize platform data immediately - authentication handled at API level
         initialize_platform();
-        
+
         // Set up periodic refresh every 5 seconds
         refreshInterval = $interval(refresh_platform, 5 * 1000);
 
         // ===========================
         // AUTHENTICATION FUNCTIONS
         // ===========================
-        
+
         $scope.logout = function() {
             AuthService.logout();
         };
-        
+
         $scope.showChangePin = function() {
             // Trigger change PIN modal in auth controller
             $scope.$broadcast('showChangePinModal');

@@ -1,52 +1,53 @@
-import tempfile
-import os
-import traceback
-import shutil
-import logging
-import time
 import datetime
-import re
-import cv2
-from threading import Thread
-import secrets
-from collections import OrderedDict
 import json
-
-import subprocess
+import logging
+import os
+import re
+import secrets
+import shutil
 import signal
+import tempfile
 import threading
+import time
+import traceback
+from collections import OrderedDict
+from threading import Thread
 
-import trace
+import cv2
+
+from ethoscope.core.monitor import Monitor
+from ethoscope.drawers.drawers import DefaultDrawer, NullDrawer
 from ethoscope.hardware.input.cameras import (
-    OurPiCameraAsync,
     MovieVirtualCamera,
+    OurPiCameraAsync,
     V4L2Camera,
 )
-from ethoscope.roi_builders.target_roi_builder import TargetGridROIBuilder
-from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
-from ethoscope.core.monitor import Monitor
-from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
-from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
-from ethoscope.hardware.interfaces.interfaces import HardwareConnection, EthoscopeSensor
-from ethoscope.stimulators.stimulators import DefaultStimulator
-from ethoscope.stimulators.sleep_depriver_stimulators import *  # importing all stimulators - remember to add the allowed ones to line 84
-from ethoscope.stimulators.sleep_restriction_stimulators import (
-    mAGOSleepRestriction,
-    SimpleTimeRestrictedStimulator,
+from ethoscope.hardware.interfaces.interfaces import EthoscopeSensor, HardwareConnection
+from ethoscope.io import (
+    MySQLResultWriter,
+    SQLiteResultWriter,
+    create_metadata_cache,
+    dbAppender,
 )
+from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
+from ethoscope.roi_builders.target_roi_builder import TargetGridROIBuilder
+from ethoscope.stimulators.multi_stimulator import MultiStimulator
 from ethoscope.stimulators.odour_stimulators import (
     DynamicOdourSleepDepriver,
     MiddleCrossingOdourStimulator,
     MiddleCrossingOdourStimulatorFlushed,
 )
 from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulator
-from ethoscope.stimulators.multi_stimulator import MultiStimulator
-
-from ethoscope.utils.debug import EthoscopeException
-from ethoscope.io import MySQLResultWriter, SQLiteResultWriter, dbAppender
-from ethoscope.io import create_metadata_cache
-from ethoscope.utils.description import DescribedObject
+from ethoscope.stimulators.sleep_depriver_stimulators import *  # importing all stimulators - remember to add the allowed ones to line 84
+from ethoscope.stimulators.sleep_restriction_stimulators import (
+    SimpleTimeRestrictedStimulator,
+    mAGOSleepRestriction,
+)
+from ethoscope.stimulators.stimulators import DefaultStimulator
+from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.utils import pi
+from ethoscope.utils.debug import EthoscopeException
+from ethoscope.utils.description import DescribedObject
 
 
 class ExperimentalInformation(DescribedObject):
@@ -457,7 +458,7 @@ class ControlThread(Thread):
                 if cache_files:
                     recent_cache_path = cache_files[0]["path"]
                     if os.path.exists(recent_cache_path):
-                        with open(recent_cache_path, "r") as f:
+                        with open(recent_cache_path) as f:
                             cache_data = json.load(f)
 
                         # Check if experiment was stopped gracefully

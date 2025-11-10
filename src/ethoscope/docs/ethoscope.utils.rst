@@ -42,4 +42,3 @@ ethoscope.utils.io module
     :members:
     :undoc-members:
     :show-inheritance:
-

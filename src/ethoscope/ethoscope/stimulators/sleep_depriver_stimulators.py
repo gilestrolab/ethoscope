@@ -5,19 +5,16 @@ any new class added here need to be added to web_utils/control_thread.py too
 __author__ = "quentin"
 
 
-from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVariable
+import logging
+import random
 
 from ethoscope.hardware.interfaces.interfaces import DefaultInterface
+from ethoscope.hardware.interfaces.optomotor import OptoMotor
 from ethoscope.hardware.interfaces.sleep_depriver_interface import (
     SleepDepriverInterface,
     SleepDepriverInterfaceCR,
 )
-from ethoscope.hardware.interfaces.optomotor import OptoMotor
-
-
-import random
-import time
-import logging
+from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVariable
 
 
 class IsMovingStimulator(BaseStimulator):
@@ -879,9 +876,9 @@ class AGO(SleepDepStimulator):
 
         self._stim_prob = stimulus_probability
 
-        self._count_roi_stim = {i: 0 for i in range(1, 11)}
+        self._count_roi_stim = dict.fromkeys(range(1, 11), 0)
 
-        self._prob_dict = {i: stimulus_probability for i in range(1, 11)}
+        self._prob_dict = dict.fromkeys(range(1, 11), stimulus_probability)
 
         logging.info(f"num stim {self._number_of_stimuli} at start")
 

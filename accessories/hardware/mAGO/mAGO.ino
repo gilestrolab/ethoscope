@@ -1,21 +1,21 @@
 /* =============================================================================
  * ARDUINO MOTOR/VALVE CONTROL MODULE
  * =============================================================================
- * 
+ *
  * Purpose:
  *   Controls motors and solenoid valves using Darlington arrays via serial commands.
  *   Supports multiple module configurations for flexible use cases.
- * 
+ *
  * Supported Modules:
  *   - MODULE 0: N20 Sleep Deprivation Module
  *       * Rotates up to twenty N20 geared motors independently.
- * 
+ *
  *   - MODULE 1: AGOSD Sleep Deprivation and Odour Arousal Module
  *       * Operates ten N20 geared motors and ten solenoid valves independently.
- * 
+ *
  *   - MODULE 2: AGO Odour Arousal Module
  *       * Operates ten solenoid valves independently.
- * 
+ *
  * Hardware Configuration:
  *   - PCB Version: Defined by PCBVERSION (10 for v1.0, 11 for v1.1)
  *   - Module Type: Defined by MODULE (0, 1, or 2)
@@ -30,11 +30,11 @@
  *   - Darlington Arrays:
  *     * Example: ULN2803 or similar
  *     * Ensure proper heat sinking and current ratings
- * 
+ *
  * Serial Communication:
  *   - Baud Rate: 115200 (fixed)
  *   - Format: ASCII commands terminated by newline/carriage return
- * 
+ *
  * Serial Commands Overview:
  * +---------+-------------------------+------------------------------------------+
  * | Command | Format                  | Description                              |
@@ -45,40 +45,40 @@
  * | T       | T                       | Output module capabilities in JSON       |
  * | H       | H                       | Display help/menu information            |
  * +---------+-------------------------+------------------------------------------+
- * 
+ *
  * Command Details:
- * 
+ *
  * 1. Pulse Single Channel:
  *    - Command: `P [channel] [duration_ms]`
  *    - Example: `P 5 1000` activates channel 5 for 1000 milliseconds.
- * 
+ *
  * 2. Activate All Motors:
  *    - Command: `A [duration_ms]`
  *    - Example: `A 5000` activates all motors (channels 0-9) for 5000 seconds.
- * 
+ *
  * 3. Demo Mode:
  *    - Command: `D`
  *    - Description: Sequentially activates all available channels with predefined durations.
- * 
+ *
  * 4. Teach Command:
  *    - Command: `T`
  *    - Description: Outputs module capabilities in JSON format for dynamic learning.
- * 
+ *
  * 5. Help Menu:
  *    - Command: `H`
  *    - Description: Displays a list of available commands and their formats.
- * 
+ *
  * Safety Features:
  *   - Non-blocking operations using millis() to allow concurrent command processing.
  *   - Input validation to prevent invalid channel numbers and durations.
  *   - Emergency shutdown function to deactivate all channels in case of overload.
  *   - Current monitoring (implementation placeholder) for advanced protection.
- * 
+ *
  * Revision History:
  *   v2.1 (2023-08-20) - Added module flexibility, non-blocking activation, input validation.
  *   v2.0 (2023-07-15) - Implemented activate all motors feature with non-blocking timing.
  *   v1.1 (2020-07-08) - Original implementation with basic serial commands.
- * 
+ *
  * Connections:
  *   - Motors: Connected to channels 0-9 via Darlington arrays.
  *   - Valves: Connected to channels 10-19 via Darlington arrays (if applicable).
@@ -87,27 +87,27 @@
  *     * Motors and valves should have a common ground with the Arduino.
  *     * Use appropriate wiring (e.g., 16-14 AWG) for power distribution.
  *     * Consider separate power supplies for motors/valves and Arduino for stability.
- * 
+ *
  * Troubleshooting:
  *   Q: Channels not activating.
- *   A: 
+ *   A:
  *      1. Verify power supply connections and ratings.
  *      2. Ensure PCBVERSION and MODULE are correctly defined.
  *      3. Check Darlington array orientation and connections.
  *      4. Confirm serial communication settings.
- * 
+ *
  *   Q: Random or unintended activations.
  *   A:
  *      1. Inspect for ground loops or electrical noise.
  *      2. Check serial cable integrity and shielding.
  *      3. Ensure appropriate current limiting and protection.
- * 
+ *
  * License:
  *   MIT Open Source License
- * 
+ *
  * Author:
  *   Giorgio Gilestro <giorgio@gilest.ro>
- * 
+ *
  * Repository:
  *   https://github.com/gilestrolab/ethoscope
  * =============================================================================
@@ -211,7 +211,7 @@ void setup() {
         pinMode(pins[i], OUTPUT);
         digitalWrite(pins[i], LOW);
     }
-    
+
     // Register serial commands
     SCmd.addCommand("P", control);     // Pulse single channel
     SCmd.addCommand("D", demo);        // Demo mode
@@ -220,7 +220,7 @@ void setup() {
 
     #if MOTOR_COUNT > 0
         SCmd.addCommand("A", activateAllMotors);
-    #endif    
+    #endif
     // Optional: Uncomment the following line to run demo on startup
     // demo();
 }
@@ -243,15 +243,15 @@ void loop() {
 void control() {
     char *arg1 = SCmd.next(); // Channel number
     char *arg2 = SCmd.next(); // Duration in ms
-    
+
     if (!arg1 || !arg2) {
         Serial.println("ERROR: P command requires two arguments: P [channel 0-19] [duration_ms]");
         return;
     }
-    
+
     int channel = atoi(arg1);
     int duration = atoi(arg2);
-    
+
     // Input validation
     if (channel < 0 || channel >= TOTAL_CHANNELS) {
         Serial.print("ERROR: Invalid channel number. Must be between 0 and ");
@@ -262,7 +262,7 @@ void control() {
         Serial.println("ERROR: Duration must be a positive integer.");
         return;
     }
-    
+
     // Activate the specified channel
     activate(channel, duration);
 }
@@ -271,14 +271,14 @@ void control() {
 void activateAllMotors() {
     #if (MOTOR_COUNT > 0)
         char *arg = SCmd.next(); // Duration in seconds
-        
+
         if (!arg) {
             Serial.println("ERROR: A command requires one argument: A [duration_s]");
             return;
         }
-        
+
         int duration_s = atoi(arg);
-        
+
         // Input validation
         if (duration_s <= 0) {
             Serial.println("ERROR: Duration must be a positive integer greater than 0.");
@@ -295,7 +295,7 @@ void activateAllMotors() {
         }
 
         motorsActive = true;
-        
+
         Serial.print("All motors activated for ");
         Serial.print(duration_s);
         Serial.println(" seconds.");
@@ -399,11 +399,11 @@ void teach() {
 void helpMenu(){
     Serial.println("=== Command Reference ===");
     Serial.println("P [0-19] [ms]  - Pulse single channel for specified milliseconds. Example: P 5 1000");
-    
+
     #if (MOTOR_COUNT > 0)
         Serial.println("A [ms]         - Activate all motors for specified milliseconds. Example: A 5000");
     #endif
-    
+
     Serial.println("D              - Run demo sequence activating all channels.");
     Serial.println("T              - Output module capabilities in JSON format.");
     Serial.println("H              - Display this help menu.");
@@ -418,11 +418,11 @@ void helpMenu(){
 void activate(uint8_t channel, unsigned long duration) {
     // Activate the channel
     digitalWrite(pins[channel], HIGH);
-    
+
     // Set the end time for deactivation
     activeChannels[channel].physicalPin = pins[channel];
     activeChannels[channel].endTime = millis() + duration;
-    
+
     Serial.print("Channel ");
     Serial.print(channel);
     Serial.print(" activated for ");
@@ -433,7 +433,7 @@ void activate(uint8_t channel, unsigned long duration) {
 // Updates channels to deactivate them when their time has elapsed
 void updateChannels() {
     unsigned long currentTime = millis();
-    
+
     for (uint8_t i = 0; i < TOTAL_CHANNELS; i++) {
         if (activeChannels[i].endTime > 0 && currentTime >= activeChannels[i].endTime) {
             digitalWrite(activeChannels[i].physicalPin, LOW); // Deactivate channel

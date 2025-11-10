@@ -117,7 +117,7 @@
                     compiled(scope);
                 };
             }
-        }; 
+        };
     }]);
 
     module.directive('dirPaginationControls', ['paginationService', 'paginationTemplate', function(paginationService, paginationTemplate) {
@@ -239,7 +239,7 @@
                         generatePagination();
                     }
                 });
-                
+
                 scope.$watch(function() {
                     return (paginationService.getItemsPerPage(paginationId));
                 }, function(current, previous) {
@@ -393,15 +393,15 @@
             return instances[instanceId].asyncMode;
         };
     });
-    
+
     module.provider('paginationTemplate', function() {
 
         var templatePath = 'static/js/directives/pagination/dirPagination.tpl.html';
-        
+
         this.setPath = function(path) {
             templatePath = path;
         };
-        
+
         this.$get = function() {
             return {
                 getPath: function() {

@@ -57,10 +57,10 @@ def main():
 Examples:
     # Check what would be migrated (dry run)
     python migrate_user_pins.py --dry-run
-    
+
     # Perform actual migration
     python migrate_user_pins.py
-    
+
     # Use custom config directory
     python migrate_user_pins.py --config-dir /custom/path
         """
@@ -85,12 +85,12 @@ Examples:
         action='store_true',
         help='Force migration even if bcrypt is not available'
     )
-    
+
     args = parser.parse_args()
-    
+
     setup_logging(args.verbose)
     logger = logging.getLogger(__name__)
-    
+
     try:
         # Check bcrypt availability
         if not check_bcrypt_availability():
@@ -102,13 +102,13 @@ Examples:
                 logger.warning("bcrypt not available, using fallback hashing (less secure)")
         else:
             logger.info("bcrypt library available - using secure hashing")
-        
+
         # Initialize configuration with custom config directory
         config_file = f"{args.config_dir}/ethoscope.conf"
         logger.info(f"Using configuration file: {config_file}")
-        
+
         config = EthoscopeConfiguration(config_file=config_file)
-        
+
         # Perform migration
         if args.dry_run:
             logger.info("=== DRY RUN MODE ===")
@@ -127,9 +127,9 @@ Examples:
                 logger.info("You can now safely enable the new authentication system")
             else:
                 logger.info("No plaintext PINs were found to migrate")
-        
+
         return 0
-        
+
     except KeyboardInterrupt:
         logger.info("Migration cancelled by user")
         return 1

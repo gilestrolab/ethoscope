@@ -5,20 +5,21 @@ This module tests the database listing and caching features used for
 the append functionality dropdown population.
 """
 
-import pytest
-import unittest
-import tempfile
+import json
 import os
 import sqlite3
-import json
+import tempfile
 import time
-from unittest.mock import Mock, patch, MagicMock
+import unittest
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # Import the classes we're testing
 from ethoscope.io import (
     DatabasesInfo,
-    SQLiteDatabaseMetadataCache,
     MySQLDatabaseMetadataCache,
+    SQLiteDatabaseMetadataCache,
     create_metadata_cache,
 )
 

@@ -7,11 +7,12 @@ try:
 except:
     CV_VERSION = 2
 
-import numpy as np
 import logging
 
-from ethoscope.roi_builders.roi_builders import BaseROIBuilder
+import numpy as np
+
 from ethoscope.core.roi import ROI
+from ethoscope.roi_builders.roi_builders import BaseROIBuilder
 
 
 class ArenaMaskROIBuilder(BaseROIBuilder):

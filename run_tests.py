@@ -6,14 +6,17 @@ This script provides a unified interface for running tests across both
 device and node packages with various options and configurations.
 """
 
-import os
-import sys
-import subprocess
 import argparse
 import json
+import os
+import subprocess
+import sys
 import time
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
 
 class TestRunner:
@@ -262,7 +265,7 @@ class TestRunner:
                 report_lines.append("")
 
         report_lines.append("-" * 80)
-        report_lines.append(f"SUMMARY:")
+        report_lines.append("SUMMARY:")
         report_lines.append(f"  Total tests: {total_tests}")
         report_lines.append(f"  Passed: {passed_tests}")
         report_lines.append(f"  Failed: {failed_tests}")

@@ -104,7 +104,7 @@
             // Use $evalAsync to ensure this runs after current digest cycle
             $scope.$evalAsync(function() {
                 // PRESERVE the array reference - modify in place
-                
+
                 // First, clear all existing items (preserve reference)
                 $scope.selected_devices.splice(0, $scope.selected_devices.length);
 
@@ -113,7 +113,7 @@
                     angular.forEach($scope.devices, function(device) {
                         // Match the HTML filter: (device.status == 'stopped' && device.up_to_date == false) || showAll
                         var shouldInclude = (device.status == 'stopped' && device.up_to_date == false) || $scope.showAll;
-                        
+
                         if (shouldInclude && validStates.includes(device.status)) {
                             $scope.selected_devices.push(device);
                         }
@@ -202,19 +202,19 @@
             data = {
                 "devices": devices
             };
-            
+
             // Show better progress message
             $scope.system.info = 'Processing ' + action + ' for ' + devices.length + ' device(s). This may take several minutes...';
             $scope.system.error = ''; // Clear any previous errors
             $scope.system.success = ''; // Clear any previous success messages
-            
+
             // Configure longer timeout for update operations (10 minutes)
             var config = {
                 timeout: 600000 // 10 minutes in milliseconds
             };
-            
+
             console.log('Starting', action, 'operation for', devices.length, 'devices');
-            
+
             $http.post(url, data, config)
                 .then(function(response) {
                     console.log('Operation completed successfully for', devices.length, 'devices');
@@ -233,7 +233,7 @@
                 }).catch(function(error) {
                     console.log('Operation failed for', devices.length, 'devices:', error.statusText || 'Unknown error');
                     $scope.system.info = ''; // Clear progress message
-                    
+
                     // Better error handling for different types of failures
                     var errorMessage = 'Operation failed: ';
                     if (error.status === 504) {
@@ -247,7 +247,7 @@
                     } else {
                         errorMessage += 'Unknown error occurred';
                     }
-                    
+
                     $scope.system.error = errorMessage;
                     spin("stop");
                 });

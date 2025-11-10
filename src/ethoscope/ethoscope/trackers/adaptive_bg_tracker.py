@@ -1,7 +1,8 @@
 __author__ = "quentin"
 
 from collections import deque
-from math import log10, sqrt, pi
+from math import log10, pi, sqrt
+
 import cv2
 
 try:
@@ -10,24 +11,24 @@ except:
     CV_VERSION = 2
 
 
-import numpy as np
-from scipy import ndimage
-from ethoscope.core.variables import (
-    XPosVariable,
-    YPosVariable,
-    XYDistance,
-    WidthVariable,
-    HeightVariable,
-    PhiVariable,
-    Label,
-)
-from ethoscope.core.data_point import DataPoint
-from ethoscope.trackers.trackers import BaseTracker, NoPositionError
-
 import logging
 
+import numpy as np
+from scipy import ndimage
 
-class ObjectModel(object):
+from ethoscope.core.data_point import DataPoint
+from ethoscope.core.variables import (
+    HeightVariable,
+    PhiVariable,
+    WidthVariable,
+    XPosVariable,
+    XYDistance,
+    YPosVariable,
+)
+from ethoscope.trackers.trackers import BaseTracker, NoPositionError
+
+
+class ObjectModel:
     """
     A class to model, update and predict foreground object (i.e. tracked animal).
     """
@@ -193,7 +194,7 @@ class ObjectModel(object):
         return features
 
 
-class BackgroundModel(object):
+class BackgroundModel:
     """
     A class to model background. It uses a dynamic running average and support arbitrary and heterogeneous frame rates
     """

@@ -1,34 +1,29 @@
+import datetime
+import glob
+import json
 import logging
+import os
+import socket
+import subprocess
+import time
 import traceback
 from optparse import OptionParser
-import subprocess
-import json
-import os
-import glob
-import time
-import datetime
-
-from threading import Thread 
 
 import bottle
-import socket
 import netifaces as ni
+from ethoclient import listenerIsAlive, send_command
 from zeroconf import ServiceInfo, Zeroconf
 
-from ethoclient import send_command, listenerIsAlive
-from ethoscope.control.tracking import ControlThread
 from ethoscope.control.record import ControlThreadVideoRecording
-
-from ethoscope.utils import pi
-from ethoscope.utils.video import list_local_video_files
+from ethoscope.control.tracking import ControlThread
 from ethoscope.hardware.interfaces import interfaces
 from ethoscope.io.cache import DatabasesInfo
-
+from ethoscope.utils import pi
 
 try:
     from cheroot.wsgi import Server as WSGIServer
 except ImportError:
-    from cherrypy.wsgiserver import CherryPyWSGIServer as WSGIServer
+    pass
 
 
 api = bottle.Bottle()
@@ -56,6 +51,7 @@ update_machine_json_data = {}
 
 """
 
+
 class WrongMachineID(Exception):
     pass
 
@@ -64,289 +60,366 @@ def error_decorator(func):
     """
     A simple decorator to return an error dict so we can display it the ui
     """
+
     def func_wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except Exception as e:
+        except Exception:
             logging.error(traceback.format_exc())
-            return {'error': traceback.format_exc()}
+            return {"error": traceback.format_exc()}
+
     return func_wrapper
+
 
 def _save_roi_template(template_data, template_name, validate=True):
     """Save ROI template data to the templates directory.
-    
+
     Args:
         template_data: Dictionary containing template data
         template_name: Name for the template file (without extension)
         validate: Whether to validate template structure
-        
+
     Returns:
         dict: Result dictionary with success/failure status
     """
     try:
         # Ensure custom templates directory exists
-        custom_templates_dir = '/ethoscope_data/roi_templates'
+        custom_templates_dir = "/ethoscope_data/roi_templates"
         os.makedirs(custom_templates_dir, exist_ok=True)
-        
+
         # Validate template structure if requested
         if validate:
             if not isinstance(template_data, dict):
-                return {'result': 'fail', 'comment': 'Template data must be a JSON object'}
-            
-            if "template_info" not in template_data or "roi_definition" not in template_data:
-                return {'result': 'fail', 'comment': 'Invalid ROI template format - missing required fields'}
-        
+                return {
+                    "result": "fail",
+                    "comment": "Template data must be a JSON object",
+                }
+
+            if (
+                "template_info" not in template_data
+                or "roi_definition" not in template_data
+            ):
+                return {
+                    "result": "fail",
+                    "comment": "Invalid ROI template format - missing required fields",
+                }
+
         # Save template with name-based filename
         filename = f"{template_name}.json"
         filepath = os.path.join(custom_templates_dir, filename)
-        
-        with open(filepath, 'w') as f:
+
+        with open(filepath, "w") as f:
             json.dump(template_data, f, indent=2)
-        
+
         return {
-            'result': 'success',
-            'path': filepath,
-            'message': f'Template {template_name} saved successfully'
+            "result": "success",
+            "path": filepath,
+            "message": f"Template {template_name} saved successfully",
         }
-        
+
     except Exception as e:
-        return {'result': 'fail', 'comment': f'Error saving template: {str(e)}'}
+        return {"result": "fail", "comment": f"Error saving template: {str(e)}"}
 
 
-@api.route('/upload/<id>', method='POST')
+@api.route("/upload/<id>", method="POST")
 def do_upload(id):
-    
+
     if id != _MACHINE_ID:
         raise WrongMachineID
-    
+
     # Check if this is a JSON template upload (direct data, not file)
-    if bottle.request.content_type and 'application/json' in bottle.request.content_type:
+    if (
+        bottle.request.content_type
+        and "application/json" in bottle.request.content_type
+    ):
         data = bottle.request.json
         if not data:
-            return {'result': 'fail', 'comment': 'No JSON data provided'}
-        
-        template_data = data.get('template_data')
-        template_name = data.get('template_name', 'uploaded_template')
-        
+            return {"result": "fail", "comment": "No JSON data provided"}
+
+        template_data = data.get("template_data")
+        template_name = data.get("template_name", "uploaded_template")
+
         if not template_data:
-            return {'result': 'fail', 'comment': 'No template data provided'}
-        
+            return {"result": "fail", "comment": "No template data provided"}
+
         return _save_roi_template(template_data, template_name, validate=True)
-    
+
     # Handle file upload
-    upload = bottle.request.files.get('upload')
+    upload = bottle.request.files.get("upload")
     if not upload:
-        return {'result': 'fail', 'comment': 'No file uploaded'}
-        
+        return {"result": "fail", "comment": "No file uploaded"}
+
     name, ext = os.path.splitext(upload.filename)
 
-    if ext in ('.mp4', '.avi'):
-        category = 'video'
-    elif ext in ('.jpg', '.png'):
-        category = 'images'
-    elif ext in ('.msk'):
-        category = 'masks'
-    elif ext in ('.json'):
-        category = 'templates'
+    if ext in (".mp4", ".avi"):
+        category = "video"
+    elif ext in (".jpg", ".png"):
+        category = "images"
+    elif ext in (".msk"):
+        category = "masks"
+    elif ext in (".json"):
+        category = "templates"
     else:
-        return {'result' : 'fail', 'comment' : "File extension not allowed. You can upload only movies, images, masks, or JSON templates"}
+        return {
+            "result": "fail",
+            "comment": "File extension not allowed. You can upload only movies, images, masks, or JSON templates",
+        }
 
-    save_path = os.path.join(_ETHOSCOPE_UPLOAD, "{category}".format(category=category))
+    save_path = os.path.join(_ETHOSCOPE_UPLOAD, f"{category}")
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    file_path = "{path}/{file}".format(path=save_path, file=upload.filename)
+    file_path = f"{save_path}/{upload.filename}"
     upload.save(file_path)
-    
+
     # Special handling for ROI templates - save to roi_templates directory
-    if ext == '.json' and category == 'templates':
+    if ext == ".json" and category == "templates":
         try:
-            with open(file_path, 'r') as f:
+            with open(file_path) as f:
                 template_data = json.load(f)
-            
+
             # Use filename without extension as template name
             template_name = name
-            template_result = _save_roi_template(template_data, template_name, validate=True)
-            
-            if template_result['result'] == 'success':
+            template_result = _save_roi_template(
+                template_data, template_name, validate=True
+            )
+
+            if template_result["result"] == "success":
                 return {
-                    'result': 'success',
-                    'path': file_path,
-                    'template_path': template_result['path']
+                    "result": "success",
+                    "path": file_path,
+                    "template_path": template_result["path"],
                 }
             else:
                 return template_result
-                
-        except json.JSONDecodeError:
-            return {'result': 'fail', 'comment': 'Invalid JSON format in template file'}
-        except Exception as e:
-            return {'result': 'fail', 'comment': f'Error processing template: {str(e)}'}
-    
-    return { 'result' : 'success', 'path' : file_path }
 
-@api.route('/static/<filepath:path>')
+        except json.JSONDecodeError:
+            return {"result": "fail", "comment": "Invalid JSON format in template file"}
+        except Exception as e:
+            return {"result": "fail", "comment": f"Error processing template: {str(e)}"}
+
+    return {"result": "success", "path": file_path}
+
+
+@api.route("/static/<filepath:path>")
 def server_static(filepath):
     download = filepath.lower().endswith(".h264")
     result = bottle.static_file(filepath, root="/", download=download)
-    bottle.response.headers['Cache-Control'] = 'public, max-age=86400'
+    bottle.response.headers["Cache-Control"] = "public, max-age=86400"
     return result
 
-@api.route('/download/<filepath:path>')
+
+@api.route("/download/<filepath:path>")
 def server_static(filepath):
     return bottle.static_file(filepath, root="/", download=filepath)
 
-@api.get('/id')
+
+@api.get("/id")
 @error_decorator
 def name():
     return {"id": _MACHINE_ID}
 
-@api.post('/update/<id>')
+
+@api.post("/update/<id>")
 def update_machine_info(id):
-    '''
+    """
     Updates the private machine informations
-    '''
+    """
     haschanged = False
     machine_info = get_machine_info(id)
-    
+
     if id != _MACHINE_ID:
         raise WrongMachineID
-        
+
     data = bottle.request.json
-    update_machine_json_data.update(data['machine_options']['arguments'])
-    
-    if 'node_ip' in update_machine_json_data and update_machine_json_data['node_ip'] != machine_info['etc_node_ip']:
-        pi.set_etc_hostname(update_machine_json_data['node_ip'])
-        haschanged = True
-    
-    if 'etho_number' in update_machine_json_data and int(update_machine_json_data['etho_number']) != int(machine_info['machine-number']):
-        pi.set_machine_name(update_machine_json_data['etho_number'])
-        pi.set_machine_id(update_machine_json_data['etho_number'])
+    update_machine_json_data.update(data["machine_options"]["arguments"])
 
-        if 'useSTATIC' in update_machine_json_data:
-            pi.set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'], useSTATIC=update_machine_json_data['useSTATIC'])
-        
-        haschanged = True
-    
-    if 'ESSID' in update_machine_json_data and 'Key' in update_machine_json_data and (update_machine_json_data['ESSID'] != machine_info['WIFI_SSID'] or update_machine_json_data['Key'] != machine_info['WIFI_PASSWORD']):
-        pi.set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'])
+    if (
+        "node_ip" in update_machine_json_data
+        and update_machine_json_data["node_ip"] != machine_info["etc_node_ip"]
+    ):
+        pi.set_etc_hostname(update_machine_json_data["node_ip"])
         haschanged = True
 
-    if 'useSTATIC' in update_machine_json_data and update_machine_json_data['useSTATIC'] != machine_info['useSTATIC']:
-        pi.set_WIFI(ssid=update_machine_json_data['ESSID'], wpakey=update_machine_json_data['Key'], useSTATIC=update_machine_json_data['useSTATIC'])
+    if "etho_number" in update_machine_json_data and int(
+        update_machine_json_data["etho_number"]
+    ) != int(machine_info["machine-number"]):
+        pi.set_machine_name(update_machine_json_data["etho_number"])
+        pi.set_machine_id(update_machine_json_data["etho_number"])
+
+        if "useSTATIC" in update_machine_json_data:
+            pi.set_WIFI(
+                ssid=update_machine_json_data["ESSID"],
+                wpakey=update_machine_json_data["Key"],
+                useSTATIC=update_machine_json_data["useSTATIC"],
+            )
+
         haschanged = True
 
-    if 'isexperimental' in update_machine_json_data and update_machine_json_data['isexperimental'] != machine_info['isExperimental']:
-        pi.isExperimental(update_machine_json_data['isexperimental'])
+    if (
+        "ESSID" in update_machine_json_data
+        and "Key" in update_machine_json_data
+        and (
+            update_machine_json_data["ESSID"] != machine_info["WIFI_SSID"]
+            or update_machine_json_data["Key"] != machine_info["WIFI_PASSWORD"]
+        )
+    ):
+        pi.set_WIFI(
+            ssid=update_machine_json_data["ESSID"],
+            wpakey=update_machine_json_data["Key"],
+        )
         haschanged = True
 
-    if 'remoteLogging' in update_machine_json_data and update_machine_json_data['remoteLogging'] != machine_info['remoteLogging']:
-        pi.loggingStatus(update_machine_json_data['remoteLogging'])
+    if (
+        "useSTATIC" in update_machine_json_data
+        and update_machine_json_data["useSTATIC"] != machine_info["useSTATIC"]
+    ):
+        pi.set_WIFI(
+            ssid=update_machine_json_data["ESSID"],
+            wpakey=update_machine_json_data["Key"],
+            useSTATIC=update_machine_json_data["useSTATIC"],
+        )
         haschanged = True
 
-    if 'use_noir_tuning' in update_machine_json_data and update_machine_json_data['use_noir_tuning'] != machine_info.get('use_noir_tuning', False):
-        pi.set_noir_setting(update_machine_json_data['use_noir_tuning'])
+    if (
+        "isexperimental" in update_machine_json_data
+        and update_machine_json_data["isexperimental"] != machine_info["isExperimental"]
+    ):
+        pi.isExperimental(update_machine_json_data["isexperimental"])
         haschanged = True
 
-    if 'maxfps_setting' in update_machine_json_data and update_machine_json_data['maxfps_setting'] != machine_info.get('maxfps_setting', 15):
-        pi.set_maxfps_setting(int(update_machine_json_data['maxfps_setting']))
+    if (
+        "remoteLogging" in update_machine_json_data
+        and update_machine_json_data["remoteLogging"] != machine_info["remoteLogging"]
+    ):
+        pi.loggingStatus(update_machine_json_data["remoteLogging"])
         haschanged = True
 
-    if 'gain_setting' in update_machine_json_data and update_machine_json_data['gain_setting'] != machine_info.get('gain_setting', 1.0):
-        pi.set_gain_setting(float(update_machine_json_data['gain_setting']))
+    if "use_noir_tuning" in update_machine_json_data and update_machine_json_data[
+        "use_noir_tuning"
+    ] != machine_info.get("use_noir_tuning", False):
+        pi.set_noir_setting(update_machine_json_data["use_noir_tuning"])
         haschanged = True
 
-    if 'expand_rootfs' in update_machine_json_data and update_machine_json_data['expand_rootfs']:
+    if "maxfps_setting" in update_machine_json_data and update_machine_json_data[
+        "maxfps_setting"
+    ] != machine_info.get("maxfps_setting", 15):
+        pi.set_maxfps_setting(int(update_machine_json_data["maxfps_setting"]))
+        haschanged = True
+
+    if "gain_setting" in update_machine_json_data and update_machine_json_data[
+        "gain_setting"
+    ] != machine_info.get("gain_setting", 1.0):
+        pi.set_gain_setting(float(update_machine_json_data["gain_setting"]))
+        haschanged = True
+
+    if (
+        "expand_rootfs" in update_machine_json_data
+        and update_machine_json_data["expand_rootfs"]
+    ):
         expansion_result = pi.expand_rootfs()
         logging.info(f"Root filesystem expansion requested: {expansion_result}")
-        if expansion_result['expanded']:
+        if expansion_result["expanded"]:
             haschanged = True
-    
-    #Time comes as number of milliseconds from timestamp
-    if 'datetime' in update_machine_json_data and update_machine_json_data['datetime']:
-        tn = datetime.datetime.fromtimestamp(update_machine_json_data['datetime'])
+
+    # Time comes as number of milliseconds from timestamp
+    if "datetime" in update_machine_json_data and update_machine_json_data["datetime"]:
+        tn = datetime.datetime.fromtimestamp(update_machine_json_data["datetime"])
         pi.set_datetime(tn)
-        
 
     return {"haschanged": haschanged}
 
-@api.post('/controls/<id>/<action>')
+
+@api.post("/controls/<id>/<action>")
 @error_decorator
 def controls(id, action):
     if id != _MACHINE_ID:
         raise WrongMachineID
 
-    if action == 'start':
+    if action == "start":
         data = bottle.request.json
         tracking_json_data.update(data)
         send_command(action, tracking_json_data)
         return info(id)
 
-    elif action in ['stop', 'close', 'poweroff', 'reboot', 'restart']:
+    elif action in ["stop", "close", "poweroff", "reboot", "restart"]:
 
-        send_command('stop')
+        send_command("stop")
 
-        if action == 'close':
+        if action == "close":
             close()
 
-        if action == 'poweroff':
+        if action == "poweroff":
             logging.info("Stopping monitor due to poweroff request")
             logging.info("Powering off Device.")
-            subprocess.call('poweroff')
+            subprocess.call("poweroff")
 
-        if action == 'reboot':
+        if action == "reboot":
             logging.info("Stopping monitor due to reboot request")
             logging.info("Powering off Device.")
-            subprocess.call('reboot')
+            subprocess.call("reboot")
 
-        if action == 'restart':
+        if action == "restart":
             logging.info("Restarting service")
-            send_command('remove')
-            subprocess.call(['systemctl', 'restart', 'ethoscope_device'])
+            send_command("remove")
+            subprocess.call(["systemctl", "restart", "ethoscope_device"])
 
         return info(id)
 
-    elif action in ['start_record', 'stream']:
+    elif action in ["start_record", "stream"]:
         data = bottle.request.json
         recording_json_data.update(data)
         send_command(action, recording_json_data)
         return info(id)
-        
-    elif action == 'test_module':
+
+    elif action == "test_module":
         logging.info("Sending a test command to the connected module.")
         module_info = interfaces.getModuleCapabilities(test=True)
         return info(id)
-                
+
     else:
         raise Exception("No such action: %s" % action)
 
-@api.get('/data/listfiles/<category>/<id>')
+
+@api.get("/data/listfiles/<category>/<id>")
 @error_decorator
 def list_data_files(category, id):
-    '''
+    """
     provides a list of files in the ethoscope data folders, that were either uploaded or generated
     category is the name of the folder
     this is not meant to report db files or h264 files but it's supposed to be working for things like masks and other user generated files
-    '''
-    
-    filelist = {'filelist' : []}
-    
+    """
+
+    filelist = {"filelist": []}
+
     if id != _MACHINE_ID:
         raise WrongMachineID
 
-    path = os.path.join (_ETHOSCOPE_UPLOAD, category)
+    path = os.path.join(_ETHOSCOPE_UPLOAD, category)
 
     if os.path.exists(path):
-        filelist = {'filelist' : [{'filename': i, 'fullpath' : os.path.abspath(os.path.join(path,i))} for i in os.listdir(path)]}
+        filelist = {
+            "filelist": [
+                {"filename": i, "fullpath": os.path.abspath(os.path.join(path, i))}
+                for i in os.listdir(path)
+            ]
+        }
 
-    if category == 'video':
-        converted_mp4s = [f for f in [ x[0] for x in os.walk(_ETHOSCOPE_VIDEOS_DIR) ] if glob.glob(os.path.join(f, "*.mp4"))]
-        filelist['filelist'] = filelist['filelist'] + [{'filename': os.path.basename(i), 'fullpath' : i} for i in glob.glob(_ETHOSCOPE_VIDEOS_DIR+'/**/*.mp4', recursive=True)]
-
+    if category == "video":
+        converted_mp4s = [
+            f
+            for f in [x[0] for x in os.walk(_ETHOSCOPE_VIDEOS_DIR)]
+            if glob.glob(os.path.join(f, "*.mp4"))
+        ]
+        filelist["filelist"] = filelist["filelist"] + [
+            {"filename": os.path.basename(i), "fullpath": i}
+            for i in glob.glob(_ETHOSCOPE_VIDEOS_DIR + "/**/*.mp4", recursive=True)
+        ]
 
     return filelist
 
 
-@api.get('/machine/<id>')
+@api.get("/machine/<id>")
 @error_decorator
 def get_machine_info(id):
     """
@@ -358,74 +431,78 @@ def get_machine_info(id):
         raise WrongMachineID
 
     machine_info = {}
-    machine_info['node_ip'] = bottle.request.environ.get('HTTP_X_FORWARDED_FOR') or bottle.request.environ.get('REMOTE_ADDR')
-    
-    try:
-        machine_info['etc_node_ip'] = pi.get_etc_hostnames()[NODE]
-    except:
-        machine_info['etc_node_ip'] = "not set"
-
-    machine_info['knows_node_ip'] = ( machine_info['node_ip'] == machine_info['etc_node_ip'] )
-    machine_info['hostname'] = os.uname()[1]
-    machine_info['isExperimental'] = pi.isExperimental()
-    
-    machine_info['machine-name'] = _MACHINE_NAME
-    
-    try:
-        machine_info['machine-number'] = int ( machine_info['machine-name'].split("_")[1] )
-    except:
-        machine_info['machine-number'] = 0
-        
-        
-    machine_info['machine-id'] = _MACHINE_ID
-    machine_info['kernel'] = os.uname()[2]
-    machine_info['pi_version'] = pi.pi_version()
-    machine_info['camera'] = pi.getPiCameraVersion()
+    machine_info["node_ip"] = bottle.request.environ.get(
+        "HTTP_X_FORWARDED_FOR"
+    ) or bottle.request.environ.get("REMOTE_ADDR")
 
     try:
-        machine_info['WIFI_SSID'] = pi.get_WIFI()['ESSID']
-    except: 
-        machine_info['WIFI_SSID'] = "not set"
-
-    try:    
-        machine_info['WIFI_PASSWORD'] = pi.get_WIFI()['Key']
+        machine_info["etc_node_ip"] = pi.get_etc_hostnames()[NODE]
     except:
-        machine_info['WIFI_PASSWORD'] = "not set"
+        machine_info["etc_node_ip"] = "not set"
+
+    machine_info["knows_node_ip"] = (
+        machine_info["node_ip"] == machine_info["etc_node_ip"]
+    )
+    machine_info["hostname"] = os.uname()[1]
+    machine_info["isExperimental"] = pi.isExperimental()
+
+    machine_info["machine-name"] = _MACHINE_NAME
 
     try:
-        machine_info['useSTATIC'] = (pi.get_WIFI()['IP'].strip().upper() == 'STATIC')
+        machine_info["machine-number"] = int(machine_info["machine-name"].split("_")[1])
     except:
-        machine_info['useSTATIC'] = False
+        machine_info["machine-number"] = 0
+
+    machine_info["machine-id"] = _MACHINE_ID
+    machine_info["kernel"] = os.uname()[2]
+    machine_info["pi_version"] = pi.pi_version()
+    machine_info["camera"] = pi.getPiCameraVersion()
 
     try:
-        machine_info['remoteLogging'] = pi.loggingStatus()
+        machine_info["WIFI_SSID"] = pi.get_WIFI()["ESSID"]
     except:
-        machine_info['remoteLogging'] = False
+        machine_info["WIFI_SSID"] = "not set"
 
     try:
-        machine_info['use_noir_tuning'] = pi.get_noir_setting()
+        machine_info["WIFI_PASSWORD"] = pi.get_WIFI()["Key"]
     except:
-        machine_info['use_noir_tuning'] = False
+        machine_info["WIFI_PASSWORD"] = "not set"
 
     try:
-        machine_info['maxfps_setting'] = pi.get_maxfps_setting()
+        machine_info["useSTATIC"] = pi.get_WIFI()["IP"].strip().upper() == "STATIC"
     except:
-        machine_info['maxfps_setting'] = 15
+        machine_info["useSTATIC"] = False
 
     try:
-        machine_info['gain_setting'] = pi.get_gain_setting()
+        machine_info["remoteLogging"] = pi.loggingStatus()
     except:
-        machine_info['gain_setting'] = 1.0
+        machine_info["remoteLogging"] = False
 
-    machine_info['SD_CARD_AGE'] = pi.get_SD_CARD_AGE()
-    machine_info['partitions'] = pi.get_partition_info()
-    machine_info['SD_CARD_NAME'] = pi.get_SD_CARD_NAME()
+    try:
+        machine_info["use_noir_tuning"] = pi.get_noir_setting()
+    except:
+        machine_info["use_noir_tuning"] = False
 
-    machine_info['Module'] = interfaces.getModuleCapabilities(shallow=True)
+    try:
+        machine_info["maxfps_setting"] = pi.get_maxfps_setting()
+    except:
+        machine_info["maxfps_setting"] = 15
+
+    try:
+        machine_info["gain_setting"] = pi.get_gain_setting()
+    except:
+        machine_info["gain_setting"] = 1.0
+
+    machine_info["SD_CARD_AGE"] = pi.get_SD_CARD_AGE()
+    machine_info["partitions"] = pi.get_partition_info()
+    machine_info["SD_CARD_NAME"] = pi.get_SD_CARD_NAME()
+
+    machine_info["Module"] = interfaces.getModuleCapabilities(shallow=True)
 
     return machine_info
 
-@api.get('/module/<id>')
+
+@api.get("/module/<id>")
 def connectedModule(id):
     """
     Interrogates the serial port to see if a) a known module is connected and b) the module can tell us something about itself.
@@ -434,18 +511,17 @@ def connectedModule(id):
 
     if id != _MACHINE_ID:
         raise WrongMachineID
-    
+
     else:
         return interfaces.getModuleCapabilities(test=False)
 
 
-
-@api.get('/data/<id>')
+@api.get("/data/<id>")
 @error_decorator
 def info(id):
     """
     This is information that is changing in time as the machine operates, such as FPS during tracking, CPU temperature etc
-    
+
     {
     "status": "stopped",
     "time": 1753341761.4723725,
@@ -486,45 +562,51 @@ def info(id):
     }
 
     """
-    
+
     if id != _MACHINE_ID:
         raise WrongMachineID
 
-    runninginfo = send_command('info')
-    
+    runninginfo = send_command("info")
+
     # Safety check: ensure runninginfo is a dictionary before calling update()
     if not isinstance(runninginfo, dict):
-        logging.warning(f"send_command('info') returned non-dict: {type(runninginfo)} - {str(runninginfo)[:200]}")
+        logging.warning(
+            f"send_command('info') returned non-dict: {type(runninginfo)} - {str(runninginfo)[:200]}"
+        )
         # Create fallback info dictionary
         runninginfo = {
-            "status": 'communication_error',
+            "status": "communication_error",
             "id": _MACHINE_ID,
             "name": _MACHINE_NAME,
             "version": _GIT_VERSION,
             "error": f"Control thread returned: {type(runninginfo).__name__}",
-            "time": bottle.time.time()
+            "time": bottle.time.time(),
         }
-    
-    _, response_time = send_command(action='status', return_timing=True)
 
-    runninginfo.update ( { "CPU_temp" : pi.get_core_temperature(), 
-                           "underpowered" : pi.underPowered(),
-                           "current_timestamp" : bottle.time.time(),
-                           "response_time" : "%.2f" % response_time } )
-        
+    _, response_time = send_command(action="status", return_timing=True)
+
+    runninginfo.update(
+        {
+            "CPU_temp": pi.get_core_temperature(),
+            "underpowered": pi.underPowered(),
+            "current_timestamp": bottle.time.time(),
+            "response_time": "%.2f" % response_time,
+        }
+    )
+
     # except:
-        # runninginfo = {
-                        # "status": 'not available',
-                        # "id" : _MACHINE_ID,
-                        # "name" : _MACHINE_NAME,
-                        # "version" : _GIT_VERSION,
-                        # "time" : bottle.time.time()
-                       # }
-    
+    # runninginfo = {
+    # "status": 'not available',
+    # "id" : _MACHINE_ID,
+    # "name" : _MACHINE_NAME,
+    # "version" : _GIT_VERSION,
+    # "time" : bottle.time.time()
+    # }
+
     return runninginfo
 
 
-@api.get('/data/databases/<id>')
+@api.get("/data/databases/<id>")
 @error_decorator
 def info(id):
     if id != _MACHINE_ID:
@@ -532,111 +614,142 @@ def info(id):
 
     return DB_INFO.get_databases_info()
 
+
 def _inject_roi_template_options(tracking_options):
     """
     Inject ROI template dropdown options into FileBasedROIBuilder options.
-    
+
     Args:
         tracking_options: Dictionary of tracking options from ControlThread
-        
+
     Returns:
         Modified tracking options with ROI template dropdown
     """
     # Scan for available ROI templates
     builtin_options = []
     custom_options = []
-    
+
     # Builtin templates directory (part of codebase)
-    builtin_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "roi_templates", "builtin"))
-    
+    builtin_dir = os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__), "..", "..", "..", "roi_templates", "builtin"
+        )
+    )
+
     # Custom templates directory (in ethoscope_data)
     custom_dir = "/ethoscope_data/roi_templates"
-    
+
     # Ensure custom templates directory exists
     os.makedirs(custom_dir, exist_ok=True)
-    
+
     # Scan builtin templates first
     if os.path.exists(builtin_dir):
         for filename in os.listdir(builtin_dir):
-            if filename.endswith('.json'):
+            if filename.endswith(".json"):
                 filepath = os.path.join(builtin_dir, filename)
                 try:
-                    with open(filepath, 'r') as f:
+                    with open(filepath) as f:
                         template_data = json.load(f)
-                    
+
                     template_info = template_data.get("template_info", {})
                     template_name = template_info.get("name", filename[:-5])
                     template_value = filename[:-5]  # Remove .json extension
-                    
-                    builtin_options.append({
-                        "value": template_value,
-                        "text": f"{template_name}",
-                        "type": "builtin"
-                    })
+
+                    builtin_options.append(
+                        {
+                            "value": template_value,
+                            "text": f"{template_name}",
+                            "type": "builtin",
+                        }
+                    )
                 except Exception:
                     # Skip invalid templates
                     continue
-    
+
     # Scan custom templates second
     if os.path.exists(custom_dir):
         for filename in os.listdir(custom_dir):
-            if filename.endswith('.json'):
+            if filename.endswith(".json"):
                 filepath = os.path.join(custom_dir, filename)
                 try:
-                    with open(filepath, 'r') as f:
+                    with open(filepath) as f:
                         template_data = json.load(f)
-                    
+
                     template_info = template_data.get("template_info", {})
                     template_name = template_info.get("name", filename[:-5])
                     template_value = filename[:-5]  # Remove .json extension
-                    
-                    custom_options.append({
-                        "value": template_value,
-                        "text": f"{template_name}",
-                        "type": "custom"
-                    })
-                    logging.info(f"Loaded custom template: {template_name} -> {template_value}")
+
+                    custom_options.append(
+                        {
+                            "value": template_value,
+                            "text": f"{template_name}",
+                            "type": "custom",
+                        }
+                    )
+                    logging.info(
+                        f"Loaded custom template: {template_name} -> {template_value}"
+                    )
                 except Exception as e:
                     # Skip invalid templates but log the error
                     logging.warning(f"Failed to load custom template {filename}: {e}")
                     continue
     else:
         logging.info(f"Custom templates directory does not exist: {custom_dir}")
-    
+
     # Add default builtin templates if directory is empty
     if not builtin_options:
         builtin_options = [
-            {"value": "sleep_monitor_20tube", "text": "Sleep Monitor (20 tubes)", "type": "builtin"},
-            {"value": "sleep_monitor_30tube", "text": "Sleep Monitor (30 tubes)", "type": "builtin"},
-            {"value": "olfaction_assay_10tube", "text": "Olfaction Assay (10 tubes)", "type": "builtin"},
-            {"value": "electric_shock_5tube", "text": "Electric Shock (5 tubes)", "type": "builtin"},
+            {
+                "value": "sleep_monitor_20tube",
+                "text": "Sleep Monitor (20 tubes)",
+                "type": "builtin",
+            },
+            {
+                "value": "sleep_monitor_30tube",
+                "text": "Sleep Monitor (30 tubes)",
+                "type": "builtin",
+            },
+            {
+                "value": "olfaction_assay_10tube",
+                "text": "Olfaction Assay (10 tubes)",
+                "type": "builtin",
+            },
+            {
+                "value": "electric_shock_5tube",
+                "text": "Electric Shock (5 tubes)",
+                "type": "builtin",
+            },
             {"value": "hd_12tubes", "text": "HD 12 Tubes", "type": "builtin"},
-            {"value": "default_full_image", "text": "Full Image ROI", "type": "builtin"}
+            {
+                "value": "default_full_image",
+                "text": "Full Image ROI",
+                "type": "builtin",
+            },
         ]
-    
+
     # Sort each group by name
     builtin_options.sort(key=lambda x: x["text"])
     custom_options.sort(key=lambda x: x["text"])
-    
+
     # Create grouped options structure
     template_options = []
-    
+
     # Add builtin group
     if builtin_options:
-        template_options.append({
-            "group": "builtin", 
-            "label": "Built-in Templates",
-            "options": builtin_options
-        })
-    
+        template_options.append(
+            {
+                "group": "builtin",
+                "label": "Built-in Templates",
+                "options": builtin_options,
+            }
+        )
+
     # Add custom group if any exist
     if custom_options:
-        template_options.append({
-            "group": "custom",
-            "label": "Custom Templates", 
-            "options": custom_options
-        })
-    
+        template_options.append(
+            {"group": "custom", "label": "Custom Templates", "options": custom_options}
+        )
+
     # Find and modify FileBasedROIBuilder in tracking options
     if "roi_builder" in tracking_options:
         for roi_option in tracking_options["roi_builder"]:
@@ -644,77 +757,156 @@ def _inject_roi_template_options(tracking_options):
                 # Add template dropdown argument
                 if "arguments" not in roi_option:
                     roi_option["arguments"] = []
-                
+
                 # Add template_name dropdown argument
                 template_arg = {
                     "name": "template_name",
                     "description": "ROI Template",
                     "type": "dropdown",
                     "groups": template_options,
-                    "default": ""
+                    "default": "",
                 }
-                
+
                 # Insert at beginning or replace existing template_name argument
                 existing_template_arg = None
                 for i, arg in enumerate(roi_option["arguments"]):
                     if arg.get("name") == "template_name":
                         existing_template_arg = i
                         break
-                
+
                 if existing_template_arg is not None:
                     roi_option["arguments"][existing_template_arg] = template_arg
                 else:
                     roi_option["arguments"].insert(0, template_arg)
-                
+
                 break
-    
+
     return tracking_options
 
-@api.get('/user_options/<id>')
+
+@api.get("/user_options/<id>")
 @error_decorator
 def user_options(id):
-    '''
+    """
     Passing back options regarding what information can be changed on the the device. This populates the form on the node GUI
-    '''
+    """
     if id != _MACHINE_ID:
         raise WrongMachineID
 
     machine_info = get_machine_info(id)
-    
+
     # Get base tracking options
     tracking_options = ControlThread.user_options()
-    
+
     # Inject ROI template dropdown options for FileBasedROIBuilder
     tracking_options = _inject_roi_template_options(tracking_options)
 
     return {
         "tracking": tracking_options,
-        "recording":ControlThreadVideoRecording.user_options(),
+        "recording": ControlThreadVideoRecording.user_options(),
         "streaming": {},
-        "update_machine": { "machine_options": [{"overview": "Machine information that can be set by the user",
-                            "arguments": [
-                                {"type": "number", "name":"etho_number", "description": "An ID number (5-250) unique to this ethoscope","default": machine_info['machine-number'], "requires_reboot" : True },
-                                {"type": "number", "name":"maxfps_setting", "description": "Maximum camera FPS (frames per second)", "default": machine_info.get('maxfps_setting', 15), "min": 1, "max": 30, "step": 1, "requires_reboot" : False },
-                                {"type": "number", "name":"gain_setting", "description": "Camera gain (lower values reduce noise artifacts for better tracking)", "default": machine_info.get('gain_setting', 1.0), "min": 1.0, "max": 16.0, "step": 0.1, "requires_reboot" : False },
-                                {"type": "boolean", "name":"use_noir_tuning", "description": "Use NoIR tuning for cameras with IR pass-through filters", "default": machine_info.get('use_noir_tuning', False), "requires_reboot" : False },
-                                {"type": "boolean", "name":"isexperimental", "description": "Specify if the ethoscope is to be treated as experimental", "default": machine_info['isExperimental'], "requires_reboot" : True }, 
-                                {"type": "boolean", "name":"remoteLogging", "description": "The ethoscope logs events directly on the node.", "default" : machine_info['remoteLogging'], "requires_reboot" : True },
-                                {"type": "boolean", "name":"expand_rootfs", "description": "Expand root filesystem to use full SD card space", "default" : False, "requires_reboot" : True },
-                                {"type": "boolean", "name":"useSTATIC", "description": "Use a static IP address instead of obtaining one with DHCP. The last number in the IP address will be the current ethoscope number", "default" : machine_info['useSTATIC'], "requires_reboot" : True },
-                                {"type": "str", "name":"node_ip", "description": "The IP address that you want to record as the node (do not change this value unless you know what you are doing!)","default": machine_info['node_ip'], "requires_reboot" : True },
-                                {"type": "str", "name":"ESSID", "description": "The name of the WIFI SSID","default": machine_info['WIFI_SSID'], "requires_reboot" : True },
-                                {"type": "str", "name":"Key", "description": "The WPA password for the WIFI SSID","default": machine_info['WIFI_PASSWORD'], "requires_reboot" : True },
-                                ],
-                            "name" : "Ethoscope Options"}],
+        "update_machine": {
+            "machine_options": [
+                {
+                    "overview": "Machine information that can be set by the user",
+                    "arguments": [
+                        {
+                            "type": "number",
+                            "name": "etho_number",
+                            "description": "An ID number (5-250) unique to this ethoscope",
+                            "default": machine_info["machine-number"],
+                            "requires_reboot": True,
+                        },
+                        {
+                            "type": "number",
+                            "name": "maxfps_setting",
+                            "description": "Maximum camera FPS (frames per second)",
+                            "default": machine_info.get("maxfps_setting", 15),
+                            "min": 1,
+                            "max": 30,
+                            "step": 1,
+                            "requires_reboot": False,
+                        },
+                        {
+                            "type": "number",
+                            "name": "gain_setting",
+                            "description": "Camera gain (lower values reduce noise artifacts for better tracking)",
+                            "default": machine_info.get("gain_setting", 1.0),
+                            "min": 1.0,
+                            "max": 16.0,
+                            "step": 0.1,
+                            "requires_reboot": False,
+                        },
+                        {
+                            "type": "boolean",
+                            "name": "use_noir_tuning",
+                            "description": "Use NoIR tuning for cameras with IR pass-through filters",
+                            "default": machine_info.get("use_noir_tuning", False),
+                            "requires_reboot": False,
+                        },
+                        {
+                            "type": "boolean",
+                            "name": "isexperimental",
+                            "description": "Specify if the ethoscope is to be treated as experimental",
+                            "default": machine_info["isExperimental"],
+                            "requires_reboot": True,
+                        },
+                        {
+                            "type": "boolean",
+                            "name": "remoteLogging",
+                            "description": "The ethoscope logs events directly on the node.",
+                            "default": machine_info["remoteLogging"],
+                            "requires_reboot": True,
+                        },
+                        {
+                            "type": "boolean",
+                            "name": "expand_rootfs",
+                            "description": "Expand root filesystem to use full SD card space",
+                            "default": False,
+                            "requires_reboot": True,
+                        },
+                        {
+                            "type": "boolean",
+                            "name": "useSTATIC",
+                            "description": "Use a static IP address instead of obtaining one with DHCP. The last number in the IP address will be the current ethoscope number",
+                            "default": machine_info["useSTATIC"],
+                            "requires_reboot": True,
+                        },
+                        {
+                            "type": "str",
+                            "name": "node_ip",
+                            "description": "The IP address that you want to record as the node (do not change this value unless you know what you are doing!)",
+                            "default": machine_info["node_ip"],
+                            "requires_reboot": True,
+                        },
+                        {
+                            "type": "str",
+                            "name": "ESSID",
+                            "description": "The name of the WIFI SSID",
+                            "default": machine_info["WIFI_SSID"],
+                            "requires_reboot": True,
+                        },
+                        {
+                            "type": "str",
+                            "name": "Key",
+                            "description": "The WPA password for the WIFI SSID",
+                            "default": machine_info["WIFI_PASSWORD"],
+                            "requires_reboot": True,
+                        },
+                    ],
+                    "name": "Ethoscope Options",
+                }
+            ],
+        },
+    }
 
-                               } }
 
-@api.get('/data/log/<id>')
+@api.get("/data/log/<id>")
 @error_decorator
 def get_log(id, service="ethoscope_listener"):
-    '''
+    """
     returns the journalctl log since last service start
-    '''
+    """
 
     services = ["ethoscope_listener", "ethoscope_device"]
 
@@ -726,28 +918,31 @@ def get_log(id, service="ethoscope_listener"):
     for service in services:
         try:
             output += f"==== last available logs for {service} ====\n"
-            with os.popen(f'journalctl -u {service}.service -rb --since "$(systemctl show {service}.service --property=ActiveEnterTimestamp --value)"') as p:
+            with os.popen(
+                f'journalctl -u {service}.service -rb --since "$(systemctl show {service}.service --property=ActiveEnterTimestamp --value)"'
+            ) as p:
                 output += p.read()
             output += f"===== end of logs for {service} =====\n\n"
 
-        except Exception as e:
+        except Exception:
             logging.error(traceback.format_exc())
             output = "Error getting logs using journalctl"
 
-    return {'message' : output}
+    return {"message": output}
 
 
 def close(exit_status=0):
     os._exit(exit_status)
 
+
 def get_ip_address(interface_name=None):
     """
     Get IP address for specified interface or main IP address if no interface specified.
-    
+
     Args:
         interface_name (str, optional): Specific interface name (e.g., 'wlan0', 'eth0').
                                       If None, returns the main non-loopback IP address.
-    
+
     Returns:
         str or None: IP address string, or None if not found
     """
@@ -755,7 +950,7 @@ def get_ip_address(interface_name=None):
         # Get IP for specific interface
         try:
             interface_addresses = ni.ifaddresses(interface_name)
-            ip_address = interface_addresses[ni.AF_INET][0]['addr']
+            ip_address = interface_addresses[ni.AF_INET][0]["addr"]
             return ip_address
         except (ValueError, KeyError):
             return None
@@ -765,7 +960,7 @@ def get_ip_address(interface_name=None):
             addresses = ni.ifaddresses(interface)
             try:
                 ipv4_info = addresses[ni.AF_INET][0]
-                ip_address = ipv4_info['addr']
+                ip_address = ipv4_info["addr"]
                 if not ip_address.startswith("127.0"):
                     return ip_address
             except KeyError:
@@ -773,11 +968,18 @@ def get_ip_address(interface_name=None):
         return None
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     parser = OptionParser()
     parser.add_option("-p", "--port", dest="port", default=9000, help="port")
-    parser.add_option("-D", "--debug", dest="debug", default=False, help="Shows all logging messages", action="store_true")
+    parser.add_option(
+        "-D",
+        "--debug",
+        dest="debug",
+        default=False,
+        help="Shows all logging messages",
+        action="store_true",
+    )
 
     (options, args) = parser.parse_args()
     option_dict = vars(options)
@@ -793,28 +995,31 @@ if __name__ == '__main__':
     _MACHINE_ID = pi.get_machine_id()
     _MACHINE_NAME = pi.get_machine_name()
     _GIT_VERSION = pi.get_git_version()
-    
-    _ETHOSCOPE_DIR = '/ethoscope_data'
-    _ETHOSCOPE_UPLOAD = os.path.join(_ETHOSCOPE_DIR, 'upload')
-    _ETHOSCOPE_VIDEOS_DIR = os.path.join(_ETHOSCOPE_DIR, 'videos')
-    _ETHOSCOPE_TRACKING_DIR = os.path.join(_ETHOSCOPE_DIR, 'results')
-    _ETHOSCOPE_CACHE_DIR = os.path.join(_ETHOSCOPE_DIR, 'cache')
+
+    _ETHOSCOPE_DIR = "/ethoscope_data"
+    _ETHOSCOPE_UPLOAD = os.path.join(_ETHOSCOPE_DIR, "upload")
+    _ETHOSCOPE_VIDEOS_DIR = os.path.join(_ETHOSCOPE_DIR, "videos")
+    _ETHOSCOPE_TRACKING_DIR = os.path.join(_ETHOSCOPE_DIR, "results")
+    _ETHOSCOPE_CACHE_DIR = os.path.join(_ETHOSCOPE_DIR, "cache")
 
     if not listenerIsAlive():
-        logging.error('An Ethoscope controlling service is not running on this machine! I will be starting one for you but this is not the way this should work. Update your SD card.')
+        logging.error(
+            "An Ethoscope controlling service is not running on this machine! I will be starting one for you but this is not the way this should work. Update your SD card."
+        )
 
         from device_listener import commandingThread
-        
-        ethoscope_info = { 'MACHINE_ID' : _MACHINE_ID,
-                      'MACHINE_NAME' : _MACHINE_NAME,
-                      'GIT_VERSION' : _GIT_VERSION,
-                      'ETHOSCOPE_DIR' : _ETHOSCOPE_DIR,
-                      'ETHOSCOPE_UPLOAD' : _ETHOSCOPE_UPLOAD,
-                      'ETHOSCOPE_VIDEOS_DIR' : _ETHOSCOPE_VIDEOS_DIR,
-                      'ETHOSCOPE_TRACKING_DIR' : _ETHOSCOPE_TRACKING_DIR,
-                      'ETHOSCOPE_CACHE_DIR' : _ETHOSCOPE_CACHE_DIR,
-                      'DATA' : ''
-                    }
+
+        ethoscope_info = {
+            "MACHINE_ID": _MACHINE_ID,
+            "MACHINE_NAME": _MACHINE_NAME,
+            "GIT_VERSION": _GIT_VERSION,
+            "ETHOSCOPE_DIR": _ETHOSCOPE_DIR,
+            "ETHOSCOPE_UPLOAD": _ETHOSCOPE_UPLOAD,
+            "ETHOSCOPE_VIDEOS_DIR": _ETHOSCOPE_VIDEOS_DIR,
+            "ETHOSCOPE_TRACKING_DIR": _ETHOSCOPE_TRACKING_DIR,
+            "ETHOSCOPE_CACHE_DIR": _ETHOSCOPE_CACHE_DIR,
+            "DATA": "",
+        }
 
         ethoscope = commandingThread(ethoscope_info)
         ethoscope.start()
@@ -822,14 +1027,13 @@ if __name__ == '__main__':
     try:
         # Register the ethoscope using zeroconf so that the node knows about it.
         hostname = socket.gethostname()
-        uid = "%s-%s" % ( hostname, _MACHINE_ID )
-        
+        uid = "%s-%s" % (hostname, _MACHINE_ID)
+
         ip_attempts = 0
         ip_address = None
         logging.warning("Waiting for a network connection")
-        
-        
-        #tries for one minute or until an IP ip_address is obtained
+
+        # tries for one minute or until an IP ip_address is obtained
         while ip_address is None and ip_attempts < 60:
 
             try:
@@ -839,41 +1043,38 @@ if __name__ == '__main__':
 
             ip_attempts += 1
             time.sleep(0.1)
-            
+
         logging.info("Registering device on zeroconf with IP: %s" % ip_address)
-            
-        serviceInfo = ServiceInfo("_ethoscope._tcp.local.",
-                        uid + "._ethoscope._tcp.local.",
-                        addresses = [socket.inet_aton(ip_address)],
-                        port = PORT,
-                        properties = {
-                            'version': '0.2',
-                            'id_page': '/id',
-                            'id' : _MACHINE_ID
-                        } )
+
+        serviceInfo = ServiceInfo(
+            "_ethoscope._tcp.local.",
+            uid + "._ethoscope._tcp.local.",
+            addresses=[socket.inet_aton(ip_address)],
+            port=PORT,
+            properties={"version": "0.2", "id_page": "/id", "id": _MACHINE_ID},
+        )
 
         try:
             zeroconf = Zeroconf(zeroconf.IPVersion.V4Only)
         except:
             zeroconf = Zeroconf()
-            
+
         zeroconf.register_service(serviceInfo)
 
         DB_INFO = DatabasesInfo(device_name=_MACHINE_NAME)
 
-        #the webserver on the ethoscope side is quite basic so we can safely run the original bottle version based on WSGIRefServer()
-        bottle.run(api, host='0.0.0.0', port=PORT, debug=DEBUG, quiet=True)
+        # the webserver on the ethoscope side is quite basic so we can safely run the original bottle version based on WSGIRefServer()
+        bottle.run(api, host="0.0.0.0", port=PORT, debug=DEBUG, quiet=True)
 
-    
-    #this applies to any network error the will prevent zeroconf or the webserver from working
-    except Exception as e:
+    # this applies to any network error the will prevent zeroconf or the webserver from working
+    except Exception:
         logging.error(traceback.format_exc())
         try:
             zeroconf.unregister_service(serviceInfo)
         except:
             pass
         close(1)
-        
+
     finally:
         try:
             zeroconf.unregister_service(serviceInfo)

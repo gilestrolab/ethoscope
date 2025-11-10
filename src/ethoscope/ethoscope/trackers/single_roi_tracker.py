@@ -1,6 +1,7 @@
 __author__ = "quentin"
 
 from collections import deque
+
 import cv2
 
 try:
@@ -10,14 +11,15 @@ except:
 
 
 import numpy as np
+
+from ethoscope.core.data_point import DataPoint
 from ethoscope.core.variables import (
-    XPosVariable,
-    YPosVariable,
-    WidthVariable,
     HeightVariable,
     PhiVariable,
+    WidthVariable,
+    XPosVariable,
+    YPosVariable,
 )
-from ethoscope.core.data_point import DataPoint
 from ethoscope.trackers.adaptive_bg_tracker import BackgroundModel
 from ethoscope.trackers.trackers import BaseTracker, NoPositionError
 from ethoscope.utils.img_proc import merge_blobs

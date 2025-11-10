@@ -1,24 +1,26 @@
-__author__ = 'quentin'
+__author__ = "quentin"
 
 
-import os
-import logging
 import datetime
+import http.client
 import json
-import traceback
+import logging
+import os
 import random
 import subprocess
 import time
-
-import urllib.request, urllib.error, urllib.parse
-import http.client
+import traceback
+import urllib.error
+import urllib.parse
+import urllib.request
 
 
 class WrongMachineID(Exception):
     pass
 
+
 try:
-    from netifaces import ifaddresses, AF_INET, AF_LINK
+    pass
 except:
     logging.warning("Could not load netifaces. This is needed for node stuff")
 try:
@@ -27,24 +29,33 @@ try:
 except:
     logging.warning("Could not load concurrent. This is needed for node stuff")
 
+
 class UnexpectedAction(Exception):
     pass
+
 
 class NotNode(Exception):
     pass
 
+
 def get_commit_version(commit):
-    return {"id":str(commit),
-            "date":datetime.datetime.utcfromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M:%S')
-                    }
-                    
+    return {
+        "id": str(commit),
+        "date": datetime.datetime.utcfromtimestamp(commit.committed_date).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        ),
+    }
+
+
 def assert_node(is_node):
     if not is_node:
         raise NotNode("This device is not a node.")
 
+
 def close(exit_status=0):
     logging.info("Closing server")
     os._exit(exit_status)
+
 
 def get_machine_name(path="/etc/machine-name"):
     """
@@ -52,14 +63,15 @@ def get_machine_name(path="/etc/machine-name"):
     This file will be present only on a real ethoscope
     When running locally, it will generate a randome name
     """
-    
+
     if os.path.exists(path):
-        with open(path,'r') as f:
+        with open(path) as f:
             info = f.readline().rstrip()
         return info
 
     else:
-        return 'VIRTUASCOPE_' + str(random.randint(100,999))
+        return "VIRTUASCOPE_" + str(random.randint(100, 999))
+
 
 def scan_one_device(ip, timeout=2, port=8888, page="id"):
     """
@@ -70,34 +82,41 @@ def scan_one_device(ip, timeout=2, port=8888, page="id"):
     If the url could not be reached/parsed, (None,None) is returned
     """
 
-
-    url="%s:%i/%s" % (ip, port, page)
+    url = "%s:%i/%s" % (ip, port, page)
     try:
         req = urllib.request.Request(url)
         f = urllib.request.urlopen(req, timeout=timeout)
         message = f.read()
 
         if not message:
-            logging.error("URL error whist scanning url: %s. No message back." % url )
+            logging.error("URL error whist scanning url: %s. No message back." % url)
             raise urllib.error.URLError("No message back")
         try:
             resp = json.loads(message)
-            return (resp['id'],ip)
+            return (resp["id"], ip)
         except ValueError:
-            logging.error("Could not parse response from %s as JSON object" % url )
+            logging.error("Could not parse response from %s as JSON object" % url)
 
     except urllib.error.URLError:
         pass
         # logging.error("URL error whist scanning url: %s. Server down?" % url )
 
     except Exception as e:
-        logging.error("Unexpected error whilst scanning url: %s" % url )
+        logging.error("Unexpected error whilst scanning url: %s" % url)
         raise e
 
     return None, ip
 
 
-def update_dev_map_wrapped (devices_map, id, what="data", type=None, port=9000, data=None, result_main_dir="/ethoscope_data/results"):
+def update_dev_map_wrapped(
+    devices_map,
+    id,
+    what="data",
+    type=None,
+    port=9000,
+    data=None,
+    result_main_dir="/ethoscope_data/results",
+):
     """
     Just a routine to format our GET urls. This improves readability whilst allowing us to change convention (e.g. port) without rewriting everything.
 
@@ -110,12 +129,13 @@ def update_dev_map_wrapped (devices_map, id, what="data", type=None, port=9000, 
 
     ip = devices_map[id]["ip"]
 
-    request_url = "{ip}:{port}/{what}/{id}".format(ip=ip,port=port,what=what,id=id)
+    request_url = f"{ip}:{port}/{what}/{id}"
     if type is not None:
         request_url = request_url + "/" + type
 
-
-    req = urllib.request.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
+    req = urllib.request.Request(
+        url=request_url, data=data, headers={"Content-Type": "application/json"}
+    )
 
     logging.info("requesting %s" % request_url)
 
@@ -126,8 +146,10 @@ def update_dev_map_wrapped (devices_map, id, what="data", type=None, port=9000, 
         if message:
             data = json.loads(message)
 
-            if not id in devices_map:
-                logging.warning("Device %s is not in device map. Rescanning subnet..." % id)
+            if id not in devices_map:
+                logging.warning(
+                    "Device %s is not in device map. Rescanning subnet..." % id
+                )
                 generate_new_device_map(result_main_dir=result_main_dir)
             try:
                 devices_map[id].update(data)
@@ -138,50 +160,54 @@ def update_dev_map_wrapped (devices_map, id, what="data", type=None, port=9000, 
                 raise KeyError("Device %s is not detected" % id)
 
     except http.client.BadStatusLine as e:
-        logging.error('BadlineSatus, most probably due to update device and auto-reset')
+        logging.error("BadlineSatus, most probably due to update device and auto-reset")
         raise e
 
     except (urllib.error.URLError, TimeoutError) as e:
-        if hasattr(e, 'reason'):
-            logging.error('We failed to reach a server.')
-            logging.error('Reason: '+ str(e.reason))
+        if hasattr(e, "reason"):
+            logging.error("We failed to reach a server.")
+            logging.error("Reason: " + str(e.reason))
             raise e
-        elif hasattr(e, 'code'):
-            logging.error('The server couldn\'t fulfill the request.')
-            logging.error('Error code: '+ str(e.code))
+        elif hasattr(e, "code"):
+            logging.error("The server couldn't fulfill the request.")
+            logging.error("Error code: " + str(e.code))
             raise e
         elif isinstance(e, TimeoutError):
-            logging.error('Request timed out.')
+            logging.error("Request timed out.")
             raise e
 
     return devices_map
 
+
 def receive_device_IPs():
-    '''
+    """
     Interrogates the NODE on its current knowledge of devices, then extracts from the JSON record
     only the IPs
-    '''
+    """
     devices = []
     try:
         url = "http://localhost/devices"
-        req = urllib.request.Request(url, headers={'Content-Type': 'application/json'})            
+        req = urllib.request.Request(url, headers={"Content-Type": "application/json"})
         f = urllib.request.urlopen(req, timeout=10)
         js = json.load(f)
         for key in js:
-            if js[key]['status'] != "offline" and 'ip' in js[key]:
-                devices.append("http://%s" % js[key]['ip'])
-        #devices = [ "http://" + js[key]['ip'] for key in js.keys() if js[key]['status'] != "offline" ]
+            if js[key]["status"] != "offline" and "ip" in js[key]:
+                devices.append("http://%s" % js[key]["ip"])
+        # devices = [ "http://" + js[key]['ip'] for key in js.keys() if js[key]['status'] != "offline" ]
     except:
-        logging.error("The node ethoscope server is not running or cannot be reached. A list of available ethoscopes could not be found.")
+        logging.error(
+            "The node ethoscope server is not running or cannot be reached. A list of available ethoscopes could not be found."
+        )
         logging.error(traceback.format_exc())
-        
+
     return devices
-        
+
+
 def generate_new_device_map():
-    '''
+    """
     Generate the device map as JSON dictionary
     Interrogates only IPs passed on by the NODE, thus piggybacking on the node's knowledge of the subnet
-    '''
+    """
     devices_map = {}
     urls = receive_device_IPs()
 
@@ -196,26 +222,26 @@ def generate_new_device_map():
                 id, ip = f.result()
                 if id is None:
                     continue
-                devices_map[id] = {"ip":ip, "status": "Software broken", "id":id}
+                devices_map[id] = {"ip": ip, "status": "Software broken", "id": id}
 
-
-            except Exception as e:
+            except Exception:
                 logging.error("Error whilst pinging url")
                 logging.error(traceback.format_exc())
-                
+
     if len(devices_map) < 1:
         logging.warning("No device detected")
-        return  devices_map
+        return devices_map
 
-    logging.info("Detected %i devices:\n%s" % (len(devices_map), str(list(devices_map.keys()))))
-
+    logging.info(
+        "Detected %i devices:\n%s" % (len(devices_map), str(list(devices_map.keys())))
+    )
 
     # We can use a with statement to ensure threads are cleaned up promptly
     with futures.ThreadPoolExecutor(max_workers=128) as executor:
         # Start the load operations and mark each future with its URL
         fs = {}
         for id in list(devices_map.keys()):
-            fs[executor.submit(update_dev_map_wrapped,devices_map, id)] = id
+            fs[executor.submit(update_dev_map_wrapped, devices_map, id)] = id
 
         for f in concurrent.futures.as_completed(fs):
             id = fs[f]
@@ -225,7 +251,9 @@ def generate_new_device_map():
             except Exception as e:
                 if isinstance(e.__cause__, (TimeoutError, urllib.error.URLError)):
                     devices_map[id]["status"] = "Unreachable"
-                    logging.warning("Device %s is unreachable (timeout/network error)" % id)
+                    logging.warning(
+                        "Device %s is unreachable (timeout/network error)" % id
+                    )
                 else:
                     devices_map[id]["status"] = "Software broken"
                     logging.error("Could not get data from device %s :" % id)
@@ -234,9 +262,17 @@ def generate_new_device_map():
     # Adds the active_branch to devices_,map
     with futures.ThreadPoolExecutor(max_workers=128) as executor:
         # Start the load operations and mark each future with its URL
-        fs={}
+        fs = {}
         for id in list(devices_map.keys()):
-            fs[executor.submit(update_dev_map_wrapped,devices_map, id,what='device/active_branch',port='8888')] = id
+            fs[
+                executor.submit(
+                    update_dev_map_wrapped,
+                    devices_map,
+                    id,
+                    what="device/active_branch",
+                    port="8888",
+                )
+            ] = id
         for f in concurrent.futures.as_completed(fs):
             id = fs[f]
             try:
@@ -245,7 +281,9 @@ def generate_new_device_map():
             except Exception as e:
                 if isinstance(e.__cause__, (TimeoutError, urllib.error.URLError)):
                     devices_map[id]["status"] = "Unreachable"
-                    logging.warning("Device %s is unreachable (timeout/network error)" % id)
+                    logging.warning(
+                        "Device %s is unreachable (timeout/network error)" % id
+                    )
                 else:
                     logging.error("Could not get data from device %s :" % id)
                     logging.error(traceback.format_exc())
@@ -253,9 +291,17 @@ def generate_new_device_map():
     # Adds the check_update to devices_,map
     with futures.ThreadPoolExecutor(max_workers=128) as executor:
         # Start the load operations and mark each future with its URL
-        fs={}
+        fs = {}
         for id in list(devices_map.keys()):
-            fs[executor.submit(update_dev_map_wrapped,devices_map, id,what='device/check_update',port='8888')] = id
+            fs[
+                executor.submit(
+                    update_dev_map_wrapped,
+                    devices_map,
+                    id,
+                    what="device/check_update",
+                    port="8888",
+                )
+            ] = id
         for f in concurrent.futures.as_completed(fs):
             id = fs[f]
             try:
@@ -264,30 +310,33 @@ def generate_new_device_map():
             except Exception as e:
                 if isinstance(e.__cause__, (TimeoutError, urllib.error.URLError)):
                     devices_map[id]["status"] = "Unreachable"
-                    logging.warning("Device %s is unreachable (timeout/network error)" % id)
+                    logging.warning(
+                        "Device %s is unreachable (timeout/network error)" % id
+                    )
                 else:
                     logging.error("Could not get data from device %s :" % id)
                     logging.error(traceback.format_exc())
-
 
     return devices_map
 
 
 def updates_api_wrapper(ip, id, what="check_update", type=None, port=8888, data=None):
-    response = ''
-    
+    response = ""
+
     hn = urllib.parse.urlparse(ip).hostname
-    
-    request_url = "http://{ip}:{port}/{what}/{id}".format(ip=hn, port=port, what=what, id=id)
+
+    request_url = f"http://{hn}:{port}/{what}/{id}"
 
     # if type is not None:
     #     request_url = request_url + "/" + type
     if data is not None:
-        data = json.dumps(data).encode('utf-8')
+        data = json.dumps(data).encode("utf-8")
 
-    req = urllib.request.Request(url=request_url, data = data, headers={'Content-Type': 'application/json'})
+    req = urllib.request.Request(
+        url=request_url, data=data, headers={"Content-Type": "application/json"}
+    )
 
-    logging.info("requesting %s" %request_url)
+    logging.info("requesting %s" % request_url)
 
     try:
         f = urllib.request.urlopen(req, timeout=10)
@@ -297,33 +346,35 @@ def updates_api_wrapper(ip, id, what="check_update", type=None, port=8888, data=
             response = json.loads(message)
 
     except http.client.BadStatusLine as e:
-        logging.error('BadlineSatus, most probably due to update device and auto-reset')
+        logging.error("BadlineSatus, most probably due to update device and auto-reset")
         raise e
 
     except (urllib.error.URLError, TimeoutError) as e:
-        if hasattr(e, 'reason'):
-            logging.error('We failed to reach a server.')
-            logging.error('Reason: '+ str(e.reason))
+        if hasattr(e, "reason"):
+            logging.error("We failed to reach a server.")
+            logging.error("Reason: " + str(e.reason))
             raise e
-        elif hasattr(e, 'code'):
-            logging.error('The server couldn\'t fulfill the request.')
-            logging.error('Error code: '+ str(e.code))
+        elif hasattr(e, "code"):
+            logging.error("The server couldn't fulfill the request.")
+            logging.error("Error code: " + str(e.code))
             raise e
         elif isinstance(e, TimeoutError):
-            logging.error('Request timed out.')
+            logging.error("Request timed out.")
             raise e
 
     return response
 
+
 def _reload_daemon(name):
-    subprocess.call(["systemctl","restart", name])
+    subprocess.call(["systemctl", "restart", name])
+
 
 def reload_node_daemon():
     _reload_daemon("ethoscope_node")
+
 
 def reload_device_daemon():
     _reload_daemon("ethoscope_listener")
     _reload_daemon("ethoscope_GPIO_listener")
     time.sleep(3)
     _reload_daemon("ethoscope_device")
-

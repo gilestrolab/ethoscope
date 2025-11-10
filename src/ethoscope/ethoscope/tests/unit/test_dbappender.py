@@ -6,13 +6,13 @@ This module tests the dbAppender meta-class which provides unified interface
 for appending to both SQLite and MySQL databases with automatic type detection.
 """
 
-import unittest
-import tempfile
+import json
+import logging
 import os
 import shutil
-import logging
-from unittest.mock import Mock, patch, MagicMock
-import json
+import tempfile
+import unittest
+from unittest.mock import MagicMock, Mock, patch
 
 # Configure logging for tests
 logging.basicConfig(level=logging.INFO)
@@ -23,7 +23,7 @@ import sys
 sys.path.insert(0, "/home/gg/Data/ethoscope_project/ethoscope/src/ethoscope")
 
 # Import the actual classes we're testing
-from ethoscope.io import dbAppender, MySQLResultWriter, SQLiteResultWriter
+from ethoscope.io import MySQLResultWriter, SQLiteResultWriter, dbAppender
 
 
 class TestDbAppender(unittest.TestCase):

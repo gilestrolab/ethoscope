@@ -46,21 +46,16 @@ Key Design Patterns:
 - Context Manager: BaseResultWriter implements __enter__/__exit__ for proper cleanup
 """
 
-import multiprocessing
-import time, datetime
-import traceback
-import logging
-from collections import OrderedDict, deque
-import tempfile
-import os
-import numpy as np
-import sqlite3
-import mysql.connector
 import json
-from cv2 import imwrite, IMWRITE_JPEG_QUALITY
+import logging
+import multiprocessing
+import os
+import time
+import traceback
+from collections import deque
 
 # Import helper classes
-from .helpers import SensorDataHelper, ImgSnapshotHelper, DAMFileHelper
+from .helpers import DAMFileHelper, ImgSnapshotHelper, SensorDataHelper
 
 # Character encoding for MariaDB/MySQL connections
 SQL_CHARSET = "latin1"
@@ -258,7 +253,7 @@ class BaseAsyncSQLWriter(multiprocessing.Process):
         pass
 
 
-class BaseResultWriter(object):
+class BaseResultWriter:
     """
     Abstract base class for all result writers with common functionality.
 
@@ -431,7 +426,7 @@ class BaseResultWriter(object):
             while not self._queue.empty():
                 logging.info("waiting for queue to be processed")
                 time.sleep(QUEUE_CHECK_INTERVAL)
-        except Exception as e:
+        except Exception:
             logging.error("Error writing metadata stop time:")
             logging.error(traceback.format_exc())
         finally:
@@ -933,7 +928,7 @@ class BaseResultWriter(object):
             time.sleep(QUEUE_CHECK_INTERVAL)
 
 
-class dbAppender(object):
+class dbAppender:
     """
     Meta-class for appending to existing databases.
 

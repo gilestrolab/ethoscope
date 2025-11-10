@@ -6,11 +6,7 @@ import shutil
 import socket
 import subprocess
 from pathlib import Path
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # Configuration validation constants
 USERS_KEYS = [
@@ -185,7 +181,7 @@ class EthoscopeConfiguration:
             "custom_domain": "",  # For custom domain mode
             "status": "disconnected",
             "last_connected": None,
-            "container_name": "ethoscope-cloudflare-tunnel"
+            "container_name": "ethoscope-cloudflare-tunnel",
             # authentication_enabled removed from tunnel section
         },
     }
@@ -963,9 +959,9 @@ class EthoscopeConfiguration:
         if tunnel_config.get("mode", "custom") == "ethoscope_net":
             # Paid mode: use ethoscope.net
             tunnel_config["effective_domain"] = "ethoscope.net"
-            tunnel_config[
-                "full_domain"
-            ] = f"{tunnel_config['computed_node_id']}.ethoscope.net"
+            tunnel_config["full_domain"] = (
+                f"{tunnel_config['computed_node_id']}.ethoscope.net"
+            )
             tunnel_config["is_paid_mode"] = True
         else:
             # Free mode: use custom domain

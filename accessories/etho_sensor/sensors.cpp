@@ -4,7 +4,7 @@ bool initializeSensors() {
     Wire.begin();
     Wire.setClock(100000);  // Set to 100kHz
     delay(100);  // Add small delay after Wire initialization
-    
+
     // Try both possible BME280 I2C addresses
     if (!bme.begin(0x76)) {
         delay(100);
@@ -38,32 +38,32 @@ bool initializeSensors() {
     // }
 
     #if defined(USELIGHT)
-        LightSensor.begin();  
+        LightSensor.begin();
     #endif
 
     return true;
 }
 
-bool readSensorData() { 
+bool readSensorData() {
     float temp = bme.readTemperature();
     if (temp == NAN) return false;
-    
+
     float press = bme.readPressure();
     if (press == NAN) return false;
-    
+
     env.temperature = temp;
     env.pressure = press / 100.0F;
-    
+
     #if defined(__BME280_H__)
         float hum = bme.readHumidity();
         if (hum != NAN) {
             env.humidity = hum;
         }
     #endif
-    
+
     #if defined(USELIGHT)
         env.lux = LightSensor.GetLightIntensity();
     #endif
-    
+
     return true;
 }

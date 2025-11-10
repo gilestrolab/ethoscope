@@ -5,16 +5,17 @@ This module contains comprehensive tests for the new external ROI template syste
 including template loading, validation, and ROI generation.
 """
 
-import unittest
-import tempfile
-import os
-import json
 import copy
+import json
+import os
+import tempfile
+import unittest
 from unittest.mock import Mock, patch
+
 import numpy as np
 
-from ethoscope.roi_builders.template import ROITemplate, ROITemplateValidationError
 from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
+from ethoscope.roi_builders.template import ROITemplate, ROITemplateValidationError
 from ethoscope.utils.roi_template_manager import (
     ROITemplateManager,
     convert_legacy_to_template,
@@ -169,7 +170,7 @@ class TestROITemplate(unittest.TestCase):
             template.save(temp_file)
 
             # Load and verify
-            with open(temp_file, "r") as f:
+            with open(temp_file) as f:
                 saved_data = json.load(f)
 
             self.assertEqual(saved_data["template_info"]["name"], "Test Template")

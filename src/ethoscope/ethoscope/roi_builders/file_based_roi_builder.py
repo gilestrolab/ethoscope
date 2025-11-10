@@ -6,13 +6,12 @@ with external template files, allowing users to create and modify ROI configurat
 """
 
 import os
-import json
-from typing import Dict, List, Union, Optional, Any
 import warnings
+from typing import Any, Dict, List, Optional
 
+from ethoscope.core.roi import ROI
 from ethoscope.roi_builders.roi_builders import BaseROIBuilder
 from ethoscope.roi_builders.template import ROITemplate, ROITemplateValidationError
-from ethoscope.core.roi import ROI
 
 
 class FileBasedROIBuilder(BaseROIBuilder):
@@ -219,7 +218,6 @@ class FileBasedROIBuilder(BaseROIBuilder):
 
     def _check_roi_overlap(self, rois: List[ROI], max_overlap: float):
         """Check for excessive ROI overlap."""
-        import cv2
 
         # Create masks for each ROI
         if not rois:

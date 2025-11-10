@@ -8,7 +8,7 @@
                 </div>
                 <div class="card-body">
                     <p class="lead">Configure email and chat notifications to be alerted about system events and experiment status.</p>
-                    
+
                     <!-- SMTP Configuration -->
                     <div class="card mb-3">
                         <div class="card-header">
@@ -23,14 +23,14 @@
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label>SMTP Host *</label>
-                                        <input type="text" class="form-control" ng-model="notifications.smtp.host" 
+                                        <input type="text" class="form-control" ng-model="notifications.smtp.host"
                                                placeholder="smtp.gmail.com">
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label>Port *</label>
-                                        <input type="number" class="form-control" ng-model="notifications.smtp.port" 
+                                        <input type="number" class="form-control" ng-model="notifications.smtp.port"
                                                placeholder="587">
                                     </div>
                                 </div>
@@ -39,14 +39,14 @@
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label>Username</label>
-                                        <input type="text" class="form-control" ng-model="notifications.smtp.username" 
+                                        <input type="text" class="form-control" ng-model="notifications.smtp.username"
                                                placeholder="your-email@gmail.com">
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label>Password</label>
-                                        <input type="password" class="form-control" ng-model="notifications.smtp.password" 
+                                        <input type="password" class="form-control" ng-model="notifications.smtp.password"
                                                placeholder="your-password">
                                     </div>
                                 </div>
@@ -55,7 +55,7 @@
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label>From Email *</label>
-                                        <input type="email" class="form-control" ng-model="notifications.smtp.from_email" 
+                                        <input type="email" class="form-control" ng-model="notifications.smtp.from_email"
                                                placeholder="ethoscope@your-domain.com">
                                     </div>
                                 </div>
@@ -89,18 +89,18 @@
                         <div class="card-body" ng-if="notifications.mattermost.enabled">
                             <div class="form-group">
                                 <label>Server URL *</label>
-                                <input type="url" class="form-control" ng-model="notifications.mattermost.server_url" 
+                                <input type="url" class="form-control" ng-model="notifications.mattermost.server_url"
                                        placeholder="https://your-mattermost-server.com">
                             </div>
                             <div class="form-group">
                                 <label>Bot Token *</label>
-                                <input type="text" class="form-control" ng-model="notifications.mattermost.bot_token" 
+                                <input type="text" class="form-control" ng-model="notifications.mattermost.bot_token"
                                        placeholder="Bot access token">
                                 <small class="form-text text-muted">Create a bot account and get the access token</small>
                             </div>
                             <div class="form-group">
                                 <label>Channel ID *</label>
-                                <input type="text" class="form-control" ng-model="notifications.mattermost.channel_id" 
+                                <input type="text" class="form-control" ng-model="notifications.mattermost.channel_id"
                                        placeholder="Channel ID">
                                 <small class="form-text text-muted">Channel where notifications will be sent</small>
                             </div>
@@ -124,14 +124,14 @@
                                 <h6><i class="fa fa-info-circle"></i> Slack Integration Options</h6>
                                 <p class="mb-0">Choose your preferred method to set up Slack notifications for your Ethoscope node.</p>
                             </div>
-                            
+
                             <div class="form-group">
                                 <label>Setup Method</label>
                                 <div class="card-deck">
                                     <div class="card" ng-class="{'border-success': !notifications.slack.use_manual_setup}">
                                         <div class="card-body text-center p-3">
                                             <div class="custom-control custom-radio">
-                                                <input type="radio" class="custom-control-input" id="slackMethodApp" 
+                                                <input type="radio" class="custom-control-input" id="slackMethodApp"
                                                        ng-model="notifications.slack.use_manual_setup" ng-value="false">
                                                 <label class="custom-control-label" for="slackMethodApp">
                                                     <strong>🏪 Marketplace App</strong>
@@ -143,7 +143,7 @@
                                     <div class="card" ng-class="{'border-secondary': notifications.slack.use_manual_setup}">
                                         <div class="card-body text-center p-3">
                                             <div class="custom-control custom-radio">
-                                                <input type="radio" class="custom-control-input" id="slackMethodManual" 
+                                                <input type="radio" class="custom-control-input" id="slackMethodManual"
                                                        ng-model="notifications.slack.use_manual_setup" ng-value="true">
                                                 <label class="custom-control-label" for="slackMethodManual">
                                                     <strong>🔧 Manual Setup</strong>
@@ -154,7 +154,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Marketplace App Configuration -->
                             <div ng-if="!notifications.slack.use_manual_setup">
                                 <div class="alert alert-success">
@@ -162,7 +162,7 @@
                                     <p class="mb-2">The easiest way to get Slack notifications. Install our official app from the Slack marketplace.</p>
                                     <p class="mb-0">✅ One-click setup • ✅ No technical configuration • ✅ Automatic updates</p>
                                 </div>
-                                
+
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="card bg-light">
@@ -182,7 +182,7 @@
                                                 <h6><i class="fa fa-link text-success"></i> Step 2: Get Webhook URL</h6>
                                                 <p class="mb-3">Copy the webhook URL from your configuration page</p>
                                                 <div class="form-group mb-3">
-                                                    <input type="url" class="form-control" ng-model="notifications.slack.webhook_url" 
+                                                    <input type="url" class="form-control" ng-model="notifications.slack.webhook_url"
                                                            placeholder="Paste webhook URL here...">
                                                 </div>
                                                 <small class="text-success">✓ Paste the URL you got from the app</small>
@@ -190,7 +190,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                
+
                                 <div class="alert alert-light mt-3">
                                     <h6>Quick Setup Instructions:</h6>
                                     <ol class="mb-0">
@@ -201,17 +201,17 @@
                                     </ol>
                                 </div>
                             </div>
-                            
+
                             <!-- Manual Setup Configuration -->
                             <div ng-if="notifications.slack.use_manual_setup">
                                 <div class="alert alert-warning">
                                     <h6><i class="fa fa-tools"></i> Manual Slack Setup</h6>
                                     <p class="mb-0">Advanced option - requires creating your own Slack app and webhook. Most users should use the marketplace app above.</p>
                                 </div>
-                                
+
                                 <div class="form-group">
                                     <label>Webhook URL *</label>
-                                    <input type="url" class="form-control" ng-model="notifications.slack.webhook_url" 
+                                    <input type="url" class="form-control" ng-model="notifications.slack.webhook_url"
                                            placeholder="https://hooks.slack.com/services/...">
                                     <small class="form-text text-muted">
                                         Create an incoming webhook in your Slack workspace settings
@@ -219,7 +219,7 @@
                                 </div>
                                 <div class="form-group">
                                     <label>Channel Override</label>
-                                    <input type="text" class="form-control" ng-model="notifications.slack.channel" 
+                                    <input type="text" class="form-control" ng-model="notifications.slack.channel"
                                            placeholder="#alerts">
                                     <small class="form-text text-muted">
                                         Optional: Override the default channel set in the webhook (include #)
@@ -238,7 +238,7 @@
                                     </ol>
                                 </div>
                             </div>
-                            
+
                             <button class="btn btn-outline-primary" ng-click="testSlack()" ng-disabled="isLoading">
                                 <i class="fa fa-paper-plane"></i> Test Slack
                             </button>

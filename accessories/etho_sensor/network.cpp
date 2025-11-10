@@ -3,22 +3,22 @@
 bool setupWiFi() {
     WiFi.mode(WIFI_STA);
     WiFi.begin(cfg.wifi_ssid, cfg.wifi_pwd);
-    
+
     unsigned long startAttemptTime = millis();
-    
-    while (WiFi.status() != WL_CONNECTED && 
+
+    while (WiFi.status() != WL_CONNECTED &&
            millis() - startAttemptTime < WIFI_CONNECT_TIMEOUT) {
         delay(100);
         DEBUG_PRINT(".");
     }
-    
+
     if (WiFi.status() != WL_CONNECTED) {
         return false;
     }
-    
+
     DEBUG_PRINTLN("\nConnected to WiFi");
     DEBUG_PRINTLN(WiFi.localIP());
-    
+
     setupMDNS();
     return true;
 }
@@ -39,12 +39,12 @@ void PLATFORM_ATTR setupWebServer() {
     server.onNotFound([]() {
         server.send(404, FPSTR(TEXT_PLAIN), FPSTR(NOT_FOUND));
     });
-    
+
     server.on("/", HTTP_GET, handleRoot);
     server.on("/web", HTTP_GET, handleWeb);
     server.on("/set", HTTP_POST, handleConfig);
     server.on("/reset", HTTP_GET, handleReset);
-    
+
     server.begin();
 }
 
@@ -62,7 +62,7 @@ void PLATFORM_ATTR handleReset() {
     // Send JSON response
     String jsonResponse = "{\"status\":\"OK\",\"message\":\"Resetting\"}";
     server.send(200, F("application/json"), jsonResponse);
-    
+
     // Delay to allow the response to be sent before resetting
     delay(100);  // You can adjust the delay as needed
 
@@ -151,8 +151,8 @@ String PLATFORM_ATTR getMacAddress() {
     uint8_t baseMac[6];
     WiFi.macAddress(baseMac);
     char baseMacChr[18] = {0};
-    sprintf(baseMacChr, "%02X:%02X:%02X:%02X:%02X:%02X", 
-            baseMac[0], baseMac[1], baseMac[2], 
+    sprintf(baseMacChr, "%02X:%02X:%02X:%02X:%02X:%02X",
+            baseMac[0], baseMac[1], baseMac[2],
             baseMac[3], baseMac[4], baseMac[5]);
     return String(baseMacChr);
 }
@@ -173,7 +173,7 @@ String PLATFORM_ATTR SendJSON() {
     #if defined(USELIGHT)
         static char luxStr[LUX_BUFFER_SIZE];
     #endif
-    
+
     // Convert float values to strings with specified precision
     dtostrf(env.temperature, -6, 2, tempStr);
     dtostrf(env.humidity, -5, 2, humStr);
@@ -184,7 +184,7 @@ String PLATFORM_ATTR SendJSON() {
 
     String macAddr = getMacAddress();
     String ipAddr = WiFi.localIP().toString();
-    
+
     // Format JSON using snprintf
     int written = snprintf(jsonBuffer, JSON_BUFFER_SIZE,
         "{"
@@ -210,14 +210,14 @@ String PLATFORM_ATTR SendJSON() {
         , luxStr
         #endif
     );
-    
+
     // Check if buffer overflow would have occurred
     if (written >= JSON_BUFFER_SIZE) {
         DEBUG_PRINTLN("Warning: JSON buffer size too small");
         DEBUG_PRINT("Required size: ");
         DEBUG_PRINTLN(written + 1);
     }
-    
+
     return String(jsonBuffer);
 }
 
@@ -367,7 +367,7 @@ static const char PROGMEM HTML_FORM_HEAD[] = R"(
                 name: document.getElementById('name').value,
                 location: document.getElementById('location').value
             };
-            
+
             fetch('/set', {
                 method: 'POST',
                 headers: {
@@ -403,96 +403,96 @@ String PLATFORM_ATTR SendConfigHTML() {
     ptr +="<body>\n";
     ptr +="<div class='container'>\n";
     ptr +="<h1>Environmental Sensor Station</h1>\n";
-    
+
     // Device Information Grid
     ptr +="<div class='info-grid'>\n";
-    
+
     // Add Board Information first
     ptr +="<div class='info-box system'>\n";
     ptr +="<div class='label'>Board Type</div>\n";
     ptr +="<div class='value'>" + String(getPlatformName()) + "</div>\n";
     ptr +="</div>\n";
-    
+
     // System Information
     ptr +="<div class='info-box system'>\n";
     ptr +="<div class='label'>Device Name</div>\n";
     ptr +="<div class='value'>" + String(cfg.name) + "</div>\n";
     ptr +="</div>\n";
-    
+
     ptr +="<div class='info-box system'>\n";
     ptr +="<div class='label'>Location</div>\n";
     ptr +="<div class='value'>" + String(cfg.location) + "</div>\n";
     ptr +="</div>\n";
-    
+
     ptr +="<div class='info-box system'>\n";
     ptr +="<div class='label'>Device ID</div>\n";
     ptr +="<div class='value'>" + getMacAddress() + "</div>\n";
     ptr +="</div>\n";
-    
+
     ptr +="<div class='info-box system'>\n";
     ptr +="<div class='label'>IP Address</div>\n";
     ptr +="<div class='value'>" + WiFi.localIP().toString() + "</div>\n";
     ptr +="</div>\n";
-    
+
     // Sensor Readings
     ptr +="<div class='info-box environment'>\n";
     ptr +="<div class='label'>Temperature</div>\n";
     ptr +="<div class='value'>" + String(env.temperature, 1) + " C</div>\n";
     ptr +="</div>\n";
-    
+
     #if defined(__BME280_H__)
     ptr +="<div class='info-box environment'>\n";
     ptr +="<div class='label'>Humidity</div>\n";
     ptr +="<div class='value'>" + String(env.humidity, 1) + " %</div>\n";
     ptr +="</div>\n";
     #endif
-    
+
     ptr +="<div class='info-box environment'>\n";
     ptr +="<div class='label'>Pressure</div>\n";
     ptr +="<div class='value'>" + String(env.pressure, 1) + " hPa</div>\n";
     ptr +="</div>\n";
-    
+
     #if defined(USELIGHT)
     ptr +="<div class='info-box environment'>\n";
     ptr +="<div class='label'>Light Level</div>\n";
     ptr +="<div class='value'>" + String(env.lux) + " lux</div>\n";
     ptr +="</div>\n";
     #endif
-    
+
     ptr +="</div>\n"; // Close info-grid
 
     // Collapsible Configuration Section
     ptr +="<button class='collapsible'>Configuration Settings</button>\n";
     ptr +="<div class='config-content'>\n";
     ptr +="<div style='padding: 20px;'>\n";  // Add padding to the content
-    
+
     // Configuration form
     ptr +="<form onsubmit='submitForm(event)'>\n";
     ptr +="<div class='form-group'>\n";
     ptr +="<label for='name'>Device Name:</label>\n";
     ptr +="<input type='text' id='name' name='name' value='" + String(cfg.name) + "'>\n";
     ptr +="</div>\n";
-    
+
     ptr +="<div class='form-group'>\n";
     ptr +="<label for='location'>Location:</label>\n";
     ptr +="<input type='text' id='location' name='location' value='" + String(cfg.location) + "'>\n";
     ptr +="</div>\n";
-    
+
     ptr +="<button type='submit' class='button'>Update Configuration</button>\n";
     ptr +="<a href='/reset' class='button' style='margin-left: 10px;'>Reset Device</a>\n";
 
     ptr +="</form>\n";
-    
+
     // API Documentation
     ptr +="<div class='api-info'>\n";
     ptr +="<h3>API Usage</h3>\n";
     ptr +="<p>Configure this device using POST request with JSON:</p>\n";
     ptr +="<code>echo '{\"name\": \"etho_sensor-001\", \"location\": \"Incubator-18C\"}' | curl -d @- http://" + WiFi.localIP().toString() + "/set</code>\n";
     ptr +="</div>\n";
-    
+
     ptr +="</div>\n"; // Close padding div
     ptr +="</div>\n"; // Close config-content
-    
+
     ptr +="</div>\n"; // Close container
     ptr +="</body>\n";
     ptr +="</html>\n";

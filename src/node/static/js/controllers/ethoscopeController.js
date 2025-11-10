@@ -577,7 +577,7 @@
 
             // If using backup info, try to get file path/name
             if ($scope.backupSummary && $scope.backupSummary.useBackupInfo && backupType && $scope.device.backup_info) {
-                
+
                 // For MySQL, get the backup filename from MariaDB databases
                 if (backupType === 'mysql' && $scope.device.databases && $scope.device.databases.MariaDB) {
                     var filePaths = [];
@@ -597,7 +597,7 @@
                         return filePaths.join(', ');
                     }
                 }
-                
+
                 const backupStatus = $scope.device.backup_info.backup_status[backupType];
                 if (backupStatus) {
                     if (backupStatus.available && backupStatus.database_count > 0) {
@@ -831,7 +831,7 @@
                 // If only one stimulator, use it directly without MultiStimulator wrapper
                 if ($scope.stimulatorSequence.length === 1) {
                     var singleStimulator = $scope.stimulatorSequence[0];
-                    
+
                     // Create arguments object including date_range
                     var stimulatorArguments = {};
                     if (singleStimulator.arguments) {
@@ -839,14 +839,14 @@
                             stimulatorArguments[key] = singleStimulator.arguments[key];
                         }
                     }
-                    
+
                     option.interactor = {
                         name: singleStimulator.name,
                         arguments: stimulatorArguments
                     };
-                    
+
                     console.log('Configured single stimulator:', singleStimulator.name, 'with arguments:', stimulatorArguments);
-                    
+
                 } else {
                     // Multiple stimulators - use MultiStimulator configuration
                     option.interactor = {
@@ -872,7 +872,7 @@
                             })
                         }
                     };
-                    
+
                     // Sanitize the data to prevent JSON errors
                     try {
                         JSON.stringify(option.interactor.arguments.stimulator_sequence);
@@ -1686,11 +1686,11 @@
                 .then(function(response) {
                     var rsyncData = response.data;
                     var deviceData = rsyncData.devices && rsyncData.devices[device_id];
-                    
+
                     if (deviceData && deviceData.transfer_details && deviceData.transfer_details.videos) {
                         var videoFiles = deviceData.transfer_details.videos.files || {};
                         var videoFileArray = [];
-                        
+
                         for (var filename in videoFiles) {
                             if (videoFiles.hasOwnProperty(filename)) {
                                 var fileInfo = videoFiles[filename];
@@ -1704,11 +1704,11 @@
                                 });
                             }
                         }
-                        
+
                         $scope.device.backup_status_detailed.individual_files.videos = {
                             files: videoFileArray
                         };
-                        
+
                         console.log('DEBUG: Loaded video transfer details:', videoFileArray.length, 'files');
                     }
                 })
@@ -1728,8 +1728,8 @@
          * Get video backup tooltip
          */
         $scope.getVideoBackupTooltip = function() {
-            if ($scope.device.backup_status_detailed && 
-                $scope.device.backup_status_detailed.individual_files && 
+            if ($scope.device.backup_status_detailed &&
+                $scope.device.backup_status_detailed.individual_files &&
                 $scope.device.backup_status_detailed.individual_files.videos) {
                 var videos = $scope.device.backup_status_detailed.individual_files.videos.files;
                 var h264Files = videos.filter($scope.filterH264Files);
@@ -1744,7 +1744,7 @@
         $scope.getVideoSegmentStyle = function(currentFile, allVideoFiles) {
             var h264Files = allVideoFiles.filter($scope.filterH264Files);
             var segmentWidth = h264Files.length > 0 ? (100 / h264Files.length) : 100;
-            
+
             return {
                 'width': segmentWidth + '%',
                 'min-width': '2px'
@@ -1779,17 +1779,17 @@
          */
         $scope.getReadableStimulatorName = function(className) {
             if (!className) return 'None';
-            
+
             // Extract class name from full path format
             var match = className.match(/class '([^']+)'/);
             if (match) {
                 className = match[1];
             }
-            
+
             // Extract just the class name without module path
             var parts = className.split('.');
             var shortName = parts[parts.length - 1];
-            
+
             // Convert common stimulator names to readable format
             var nameMapping = {
                 'DefaultStimulator': 'Default (No Stimulation)',
@@ -1806,7 +1806,7 @@
                 'MiddleCrossingOdourStimulator': 'Middle Crossing Odour Stimulator',
                 'MiddleCrossingOdourStimulatorFlushed': 'Flushed Odour Stimulator'
             };
-            
+
             return nameMapping[shortName] || shortName;
         };
 
@@ -1817,27 +1817,27 @@
             if (!dateRange || dateRange.trim() === '') {
                 return 'Always Active';
             }
-            
+
             try {
                 // Parse the date range format "YYYY-MM-DD HH:mm:ss > YYYY-MM-DD HH:mm:ss"
                 var parts = dateRange.split('>');
                 if (parts.length === 2) {
                     var startStr = parts[0].trim();
                     var endStr = parts[1].trim();
-                    
+
                     if (startStr && endStr) {
                         // Format dates to be more readable
                         var startDate = new Date(startStr.replace(/ /, 'T'));
                         var endDate = new Date(endStr.replace(/ /, 'T'));
-                        
+
                         var formatDate = function(date) {
                             return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                         };
-                        
+
                         return formatDate(startDate) + ' → ' + formatDate(endDate);
                     }
                 }
-                
+
                 return dateRange;
             } catch (e) {
                 return dateRange;
@@ -1848,35 +1848,35 @@
          * Check if stimulator is currently scheduled to be active
          */
         $scope.isStimulatorScheduled = function() {
-            if (!$scope.device || !$scope.device.experimental_info || 
-                !$scope.device.experimental_info.current || 
+            if (!$scope.device || !$scope.device.experimental_info ||
+                !$scope.device.experimental_info.current ||
                 !$scope.device.experimental_info.current.interactor) {
                 return false;
             }
-            
+
             var dateRange = $scope.device.experimental_info.current.interactor.arguments.date_range;
             if (!dateRange || dateRange.trim() === '') {
                 return true; // Always active if no date range specified
             }
-            
+
             try {
                 var parts = dateRange.split('>');
                 if (parts.length === 2) {
                     var startStr = parts[0].trim();
                     var endStr = parts[1].trim();
-                    
+
                     if (startStr && endStr) {
                         var startDate = new Date(startStr.replace(/ /, 'T'));
                         var endDate = new Date(endStr.replace(/ /, 'T'));
                         var now = new Date();
-                        
+
                         return now >= startDate && now <= endDate;
                     }
                 }
             } catch (e) {
                 console.error('Error parsing date range:', e);
             }
-            
+
             return false;
         };
 
@@ -1897,7 +1897,7 @@
             if (value === null || value === undefined) {
                 return 'null';
             }
-            
+
             if (typeof value === 'object') {
                 try {
                     return JSON.stringify(value, null, 2);
@@ -1905,11 +1905,11 @@
                     return '[Object]';
                 }
             }
-            
+
             if (typeof value === 'string' && value.length > 100) {
                 return value.substring(0, 100) + '...';
             }
-            
+
             return String(value);
         };
 

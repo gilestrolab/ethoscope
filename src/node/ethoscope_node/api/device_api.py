@@ -5,11 +5,13 @@ Handles all device-related endpoints including device discovery, management,
 control, and information retrieval.
 """
 
-import bottle
 import json
-import tempfile
-import shutil
 import os
+import shutil
+import tempfile
+
+import bottle
+
 from .base import BaseAPI, error_decorator, warning_decorator
 
 

@@ -4,20 +4,21 @@ Unit tests for sleep restriction functionality.
 Tests for DailyScheduler and mAGOSleepRestriction stimulator classes.
 """
 
-import unittest
-import tempfile
-import os
-import time
 import json
-from unittest.mock import Mock, patch, MagicMock
+import os
+import tempfile
+import time
+import unittest
+from unittest.mock import MagicMock, Mock, patch
 
-# Import the classes we're testing
-from ethoscope.utils.scheduler import DailyScheduler, DailyScheduleError
 from ethoscope.stimulators.sleep_restriction_stimulators import (
-    mAGOSleepRestriction,
     SimpleTimeRestrictedStimulator,
+    mAGOSleepRestriction,
 )
 from ethoscope.stimulators.stimulators import HasInteractedVariable
+
+# Import the classes we're testing
+from ethoscope.utils.scheduler import DailyScheduleError, DailyScheduler
 
 
 class TestDailyScheduler(unittest.TestCase):
@@ -191,7 +192,7 @@ class TestDailyScheduler(unittest.TestCase):
         self.assertTrue(os.path.exists(self.state_file))
 
         # Load and verify state content
-        with open(self.state_file, "r") as f:
+        with open(self.state_file) as f:
             state = json.load(f)
 
         self.assertIsInstance(state, dict)

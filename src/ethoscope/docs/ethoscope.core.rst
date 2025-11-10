@@ -54,4 +54,3 @@ ethoscope.core.data_point module
     :members:
     :undoc-members:
     :show-inheritance:
-

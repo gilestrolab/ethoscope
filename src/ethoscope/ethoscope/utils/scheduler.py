@@ -1,9 +1,9 @@
-import re
 import datetime
-import time
-import logging
 import json
+import logging
 import os
+import re
+import time
 
 
 class DateRangeError(Exception):
@@ -14,7 +14,7 @@ class DailyScheduleError(Exception):
     pass
 
 
-class Scheduler(object):
+class Scheduler:
     def __init__(self, in_str):
         """
         Class to express time constrains.
@@ -128,7 +128,7 @@ class Scheduler(object):
             raise DateRangeError("Invalid date format: %s (%s)" % (datestr, str(e)))
 
 
-class DailyScheduler(object):
+class DailyScheduler:
     """
     Enhanced scheduler for daily time-restricted operations.
 
@@ -209,9 +209,9 @@ class DailyScheduler(object):
             return {}
 
         try:
-            with open(self._state_file_path, "r") as f:
+            with open(self._state_file_path) as f:
                 return json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             logging.warning(f"Could not load scheduler state: {e}")
             return {}
 
@@ -224,7 +224,7 @@ class DailyScheduler(object):
             os.makedirs(os.path.dirname(self._state_file_path), exist_ok=True)
             with open(self._state_file_path, "w") as f:
                 json.dump(self._state, f, indent=2)
-        except IOError as e:
+        except OSError as e:
             logging.error(f"Could not save scheduler state: {e}")
 
     def is_active_period(self, t=None):

@@ -1,16 +1,15 @@
-import random
+import datetime
+import glob
 import logging
-import traceback
-import datetime, time
 import os
 import re
-import glob
+import time
 from uuid import uuid4
-import netifaces
+
 import git
+import netifaces
 
 from ethoscope.utils.rpi_bad_power import powerChecker
-
 
 PERSISTENT_STATE = "/var/cache/ethoscope/persistent_state.pkl"
 
@@ -41,7 +40,7 @@ def pi_version():
     """
 
     try:
-        with open("/sys/firmware/devicetree/base/model", "r") as file:
+        with open("/sys/firmware/devicetree/base/model") as file:
             model_info = file.read().strip()
 
         match = re.search(r"Raspberry Pi (\d+)([A-Za-z ]+)", model_info)
@@ -55,7 +54,7 @@ def pi_version():
         # Return the information as a dictionary
         return {"model_number": model_number, "model_type": model_type}
 
-    except Exception as e:
+    except Exception:
         return {"model_number": 0, "model_type": None}
         # return {'error': str(e)}
 
@@ -80,7 +79,7 @@ def get_machine_name(path="/etc/machine-name"):
     """
 
     if os.path.exists(path):
-        with open(path, "r") as f:
+        with open(path) as f:
             info = f.readline().rstrip()
         return info
 
@@ -169,7 +168,7 @@ def get_WIFI():
 
     if network_service["netctl"]:
         netctl_file = "/etc/netctl/wlan"
-        with open(netctl_file, "r") as f:
+        with open(netctl_file) as f:
             wlan_settings = f.readlines()
 
         for line in wlan_settings:
@@ -182,7 +181,7 @@ def get_WIFI():
         wpasupplicant_file = "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
         systemd_file = "/etc/systemd/network/25-wireless.network"
 
-        with open(wpasupplicant_file, "r") as f:
+        with open(wpasupplicant_file) as f:
             wlan_settings = f.readlines()
 
         for line in wlan_settings:
@@ -203,7 +202,7 @@ def get_WIFI():
         with os.popen("ip route | grep default | head -n 1 | cut -d ' ' -f 3") as cmd:
             data["Gateway"] = cmd.read().strip()
 
-        with open(systemd_file, "r") as f:
+        with open(systemd_file) as f:
             net_settings = f.readlines()
 
         for line in net_settings:
@@ -359,7 +358,7 @@ def cpu_serial():
     serial = ""
 
     if isMachinePI():
-        with open("/proc/cpuinfo", "r") as infile:
+        with open("/proc/cpuinfo") as infile:
             cpuinfo = infile.read()
         # Match a line like 'Serial   : xxxxx'
         serial = re.search(
@@ -381,7 +380,7 @@ def _detect_camera_via_i2c():
     try:
         i2c_devices = glob.glob("/sys/bus/i2c/devices/*/name")
         for device_path in i2c_devices:
-            with open(device_path, "r") as f:
+            with open(device_path) as f:
                 sensor_name = f.read().strip()
                 if sensor_name in known_sensors:
                     return sensor_name
@@ -554,7 +553,7 @@ def getPiCameraVersion():
     if hasPiCamera():
         try:
             # Try to read cached camera info file
-            with open(picamera_info_file, "r") as infile:
+            with open(picamera_info_file) as infile:
                 camera_info = eval(infile.read())
 
             if (
@@ -666,7 +665,7 @@ def get_machine_id(path="/etc/machine-id"):
     """
     try:
         if os.path.exists(path):
-            with open(path, "r") as f:
+            with open(path) as f:
                 info = f.readline().rstrip()
             return info
 
@@ -680,7 +679,7 @@ def get_etc_hostnames():
     """
     Parses /etc/hosts file and returns all the hostnames in a dictionary.
     """
-    with open("/etc/hosts", "r") as f:
+    with open("/etc/hosts") as f:
         hostlines = f.readlines()
 
     hostlines = [
@@ -1202,7 +1201,7 @@ def get_noir_setting(path="/etc/ethoscope/use_noir_tuning"):
     """
     try:
         if os.path.exists(path):
-            with open(path, "r") as f:
+            with open(path) as f:
                 content = f.read().strip().lower()
                 return content in ["true", "1", "yes"]
         return False
@@ -1243,7 +1242,7 @@ def get_maxfps_setting(path="/etc/ethoscope/maxfps_setting"):
     """
     try:
         if os.path.exists(path):
-            with open(path, "r") as f:
+            with open(path) as f:
                 content = f.read().strip()
                 fps_value = int(content)
                 # Validate range
@@ -1300,7 +1299,7 @@ def get_gain_setting(path="/etc/ethoscope/gain_setting"):
     """
     try:
         if os.path.exists(path):
-            with open(path, "r") as f:
+            with open(path) as f:
                 content = f.read().strip()
                 gain_value = float(content)
                 # Validate range (1.0 to 16.0 is typical for Pi cameras)

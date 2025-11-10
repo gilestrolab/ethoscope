@@ -6,20 +6,20 @@ Demonstration script for the new sleep restriction functionality.
 This script shows how to use the new DailyScheduler and mAGOSleepRestriction classes.
 """
 
-import sys
-import os
-import time
 import datetime
+import os
+import sys
+import time
 from unittest.mock import Mock
 
 # Add the ethoscope package to the path
 sys.path.insert(0, "src/ethoscope")
 
-from ethoscope.utils.scheduler import DailyScheduler, DailyScheduleError
 from ethoscope.stimulators.sleep_restriction_stimulators import (
-    mAGOSleepRestriction,
     SimpleTimeRestrictedStimulator,
+    mAGOSleepRestriction,
 )
+from ethoscope.utils.scheduler import DailyScheduleError, DailyScheduler
 
 
 def demo_daily_scheduler():

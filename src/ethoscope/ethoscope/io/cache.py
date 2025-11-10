@@ -1,10 +1,11 @@
-import os
-import time
+import ast
 import json
 import logging
+import os
 import sqlite3
+import time
+
 import mysql.connector
-import ast
 
 
 class BaseDatabaseMetadataCache:
@@ -442,7 +443,7 @@ class BaseDatabaseMetadataCache:
                 # Check if this cache file has experiment info
                 cache_file_path = recent_data.get("cache_file")
                 if cache_file_path and os.path.exists(cache_file_path):
-                    with open(cache_file_path, "r") as f:
+                    with open(cache_file_path) as f:
                         cache_data = json.load(f)
 
                     experiment_info = cache_data.get("experiment_info", {})
@@ -475,7 +476,7 @@ class BaseDatabaseMetadataCache:
                     data = self.get_cached_metadata(cache_index=cache_index)
                     cache_file_path = data.get("cache_file")
                     if cache_file_path and os.path.exists(cache_file_path):
-                        with open(cache_file_path, "r") as f:
+                        with open(cache_file_path) as f:
                             cache_data = json.load(f)
 
                         experiment_info = cache_data.get("experiment_info", {})
@@ -536,7 +537,7 @@ class BaseDatabaseMetadataCache:
                 data = self.get_cached_metadata(cache_index=cache_index)
                 cache_file_path = data.get("cache_file")
                 if cache_file_path and os.path.exists(cache_file_path):
-                    with open(cache_file_path, "r") as f:
+                    with open(cache_file_path) as f:
                         cache_data = json.load(f)
 
                     experiment_info = cache_data.get("experiment_info", {})
@@ -620,7 +621,7 @@ class BaseDatabaseMetadataCache:
         try:
             # Read existing cache file or create new one
             if os.path.exists(cache_file_path):
-                with open(cache_file_path, "r") as f:
+                with open(cache_file_path) as f:
                     cache_data = json.load(f)
             else:
                 if finalise and not experiment_info:
@@ -782,7 +783,7 @@ class BaseDatabaseMetadataCache:
         Returns:
             dict: Parsed cache data
         """
-        with open(cache_file_path, "r") as f:
+        with open(cache_file_path) as f:
             cache_data = json.load(f)
 
         return {
@@ -1393,7 +1394,7 @@ class DatabasesInfo:
                         logging.warning(f"Cannot access cache file {cache_file}: {e}")
                         continue
 
-                    with open(cache_file, "r", encoding="utf-8") as f:
+                    with open(cache_file, encoding="utf-8") as f:
                         cache_data = json.load(f)
 
                     # Validate cache data structure

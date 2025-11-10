@@ -1,10 +1,10 @@
 __author__ = "quentin"
-from ethoscope.core.variables import BaseRelativeVariable
 from ethoscope.core.data_point import DataPoint
+from ethoscope.core.variables import BaseRelativeVariable
 from ethoscope.stimulators.stimulators import DefaultStimulator
 
 
-class TrackingUnit(object):
+class TrackingUnit:
     def __init__(self, tracking_class, roi, stimulator=None, *args, **kwargs):
         r"""
         Class instantiating a tracker(:class:`~ethoscope.trackers.trackers.BaseTracker`),

@@ -1,7 +1,7 @@
 # Coverage configuration for the Ethoscope device package
 [run]
 source = ethoscope
-omit = 
+omit =
     */tests/*
     */test_*
     */conftest.py

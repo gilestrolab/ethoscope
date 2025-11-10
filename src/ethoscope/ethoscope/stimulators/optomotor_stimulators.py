@@ -1,5 +1,5 @@
-from ethoscope.stimulators.sleep_depriver_stimulators import MiddleCrossingStimulator
 from ethoscope.hardware.interfaces.optomotor import OptoMotor
+from ethoscope.stimulators.sleep_depriver_stimulators import MiddleCrossingStimulator
 
 
 class OptoMidlineCrossStimulator(MiddleCrossingStimulator):

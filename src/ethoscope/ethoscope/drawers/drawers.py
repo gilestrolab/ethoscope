@@ -1,20 +1,20 @@
 __author__ = "quentin"
 
-import cv2
 import logging
 
-try:
-    from cv2.cv import CV_FOURCC as VideoWriter_fourcc
-    from cv2.cv import CV_AA as LINE_AA
-except ImportError:
-    from cv2 import VideoWriter_fourcc
-    from cv2 import LINE_AA
+import cv2
 
-from ethoscope.utils.description import DescribedObject
+try:
+    from cv2.cv import CV_AA as LINE_AA
+    from cv2.cv import CV_FOURCC as VideoWriter_fourcc
+except ImportError:
+    from cv2 import LINE_AA
+    from cv2 import VideoWriter_fourcc
+
 import os
 
 
-class BaseDrawer(object):
+class BaseDrawer:
     def __init__(
         self,
         video_out=None,

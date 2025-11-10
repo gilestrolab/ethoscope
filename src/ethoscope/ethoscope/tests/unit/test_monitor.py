@@ -5,10 +5,11 @@ This module contains tests for the core Monitor functionality
 that coordinates the tracking pipeline.
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-import time
 import threading
+import time
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # Note: Actual imports would need to be adjusted based on the real module structure
 # from ethoscope.core.monitor import Monitor

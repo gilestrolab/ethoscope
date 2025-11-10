@@ -1,6 +1,6 @@
 /**
  * Authentication Service for Ethoscope Node
- * 
+ *
  * Handles user login, logout, session management, and authentication checks.
  */
 (function() {
@@ -8,15 +8,15 @@
 
     angular.module('flyApp').service('AuthService', function($http, $location, $timeout, $interval) {
         var self = this;
-        
+
         // Current user data
         self.currentUser = null;
         self.isAuthenticated = false;
         self.isAdmin = false;
-        
+
         // Session check interval
         var sessionCheckInterval = null;
-        
+
         /**
          * Check if user is currently authenticated
          */
@@ -39,7 +39,7 @@
                     return false;
                 });
         };
-        
+
         /**
          * Login with username and PIN
          */
@@ -53,10 +53,10 @@
                     self.currentUser = response.data.user;
                     self.isAuthenticated = true;
                     self.isAdmin = response.data.user.isadmin || false;
-                    
+
                     // Start session monitoring
                     self.startSessionMonitoring();
-                    
+
                     return {
                         success: true,
                         message: response.data.message,
@@ -78,14 +78,14 @@
                 } else if (error.status === 429) {
                     message = 'Too many login attempts. Please try again later.';
                 }
-                
+
                 return {
                     success: false,
                     message: message
                 };
             });
         };
-        
+
         /**
          * Logout current user
          */
@@ -109,7 +109,7 @@
                     };
                 });
         };
-        
+
         /**
          * Change user's PIN
          */
@@ -130,14 +130,14 @@
                 if (error.data && error.data.message) {
                     message = error.data.message;
                 }
-                
+
                 return {
                     success: false,
                     message: message
                 };
             });
         };
-        
+
         /**
          * Clear session data
          */
@@ -147,14 +147,14 @@
             self.isAdmin = false;
             self.stopSessionMonitoring();
         };
-        
+
         /**
          * Start monitoring session validity
          */
         self.startSessionMonitoring = function() {
             // Stop any existing interval
             self.stopSessionMonitoring();
-            
+
             // Check session every 5 minutes
             sessionCheckInterval = $interval(function() {
                 self.checkAuthenticationStatus().then(function(isAuth) {
@@ -166,7 +166,7 @@
                 });
             }, 5 * 60 * 1000); // 5 minutes
         };
-        
+
         /**
          * Stop session monitoring
          */
@@ -176,28 +176,28 @@
                 sessionCheckInterval = null;
             }
         };
-        
+
         /**
          * Check if user has admin privileges
          */
         self.requireAdmin = function() {
             return self.isAuthenticated && self.isAdmin;
         };
-        
+
         /**
          * Get current user information
          */
         self.getCurrentUser = function() {
             return self.currentUser;
         };
-        
+
         /**
          * Initialize authentication service
          */
         self.initialize = function() {
             return self.checkAuthenticationStatus();
         };
-        
+
         // Cleanup on service destroy
         self.$onDestroy = function() {
             self.stopSessionMonitoring();

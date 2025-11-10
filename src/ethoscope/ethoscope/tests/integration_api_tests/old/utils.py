@@ -1,13 +1,14 @@
-import tempfile
 import os
+import tempfile
+
 from ethoscope.core.monitor import Monitor
-from ethoscope.hardware.input.cameras import MovieVirtualCamera
-from ethoscope.io import SQLiteResultWriter, ResultWriter
-from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.drawers.drawers import DefaultDrawer
-from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
+from ethoscope.hardware.input.cameras import MovieVirtualCamera
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection
-from ethoscope.tests.integration_api_tests._constants import VIDEO, DRAW_FRAMES
+from ethoscope.io import ResultWriter, SQLiteResultWriter
+from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
+from ethoscope.tests.integration_api_tests._constants import DRAW_FRAMES, VIDEO
+from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 
 
 def test_stimulator(
@@ -15,7 +16,7 @@ def test_stimulator(
 ):
     tmp = tempfile.mkstemp(suffix="_ethoscope_test.db")[1]
 
-    print(("Making a tmp db: " + tmp))
+    print("Making a tmp db: " + tmp)
     cam = MovieVirtualCamera(VIDEO, drop_each=15)
     rb = FileBasedROIBuilder(template_name="sleep_monitor_20tube")
     reference_points, rois = rb.build(cam)
@@ -38,8 +39,8 @@ def test_stimulator(
 
     finally:
         if remove_db_file:
-            print(("Removing temp db (" + tmp + ")"))
+            print("Removing temp db (" + tmp + ")")
             os.remove(tmp)
         else:
-            print(("db file lives in (" + tmp + ")"))
+            print("db file lives in (" + tmp + ")")
         connection.stop()

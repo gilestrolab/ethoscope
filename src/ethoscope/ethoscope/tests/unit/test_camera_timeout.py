@@ -5,17 +5,18 @@ Unit tests for camera initialization timeout mechanisms.
 Tests the failsafe mechanisms implemented to prevent ethoscope from hanging
 indefinitely during camera initialization, particularly for picamera2 compatibility issues.
 """
-import pytest
-import time
-import threading
 import logging
-import tempfile
 import os
-from unittest.mock import Mock, patch, MagicMock, PropertyMock
 import queue
+import tempfile
+import threading
+import time
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
-from ethoscope.hardware.input.cameras import OurPiCameraAsync, PiFrameGrabber2
+import pytest
+
 from ethoscope.control.tracking import ControlThread
+from ethoscope.hardware.input.cameras import OurPiCameraAsync, PiFrameGrabber2
 from ethoscope.utils.debug import EthoscopeException
 
 

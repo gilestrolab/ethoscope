@@ -1,8 +1,9 @@
-import os
-import time
 import logging
-import traceback
+import os
 import sqlite3
+import time
+import traceback
+
 from .base import BaseAsyncSQLWriter, BaseResultWriter
 from .helpers import Null
 
@@ -563,6 +564,7 @@ class SQLiteResultWriter(BaseResultWriter):
     def _insert_metadata(self):
         """Insert experimental metadata into METADATA table with SQLite duplicate prevention."""
         import json
+
         from .base import METADATA_MAX_VALUE_LENGTH
 
         for k, v in list(self.metadata.items()):

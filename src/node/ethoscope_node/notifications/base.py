@@ -3,10 +3,7 @@
 import datetime
 import logging
 import time
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 
@@ -177,12 +174,12 @@ class NotificationAnalyzer:
                 "problems": last_run.get("problems", ""),
                 "experimental_data": experimental_data,
                 "experiment_type": experimental_data.get("type", "tracking"),
-                "start_time": datetime.datetime.fromtimestamp(start_time)
-                if start_time
-                else None,
-                "end_time": datetime.datetime.fromtimestamp(end_time)
-                if end_time
-                else None,
+                "start_time": (
+                    datetime.datetime.fromtimestamp(start_time) if start_time else None
+                ),
+                "end_time": (
+                    datetime.datetime.fromtimestamp(end_time) if end_time else None
+                ),
                 "device_problems": device_info.get("problems", ""),
                 "device_active": device_info.get("active", False),
             }

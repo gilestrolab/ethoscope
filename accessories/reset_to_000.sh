@@ -48,56 +48,56 @@ validate_git_repo() {
 # Function to perform update
 update_repository() {
     log_info "Updating repository and changing origin..."
-    
+
     if [[ ! -d "$ETHOSCOPE_PATH" ]]; then
         log_error "Ethoscope directory not found at $ETHOSCOPE_PATH"
         log_info "Use --fresh flag to clone the repository"
         exit 1
     fi
-    
+
     cd "$ETHOSCOPE_PATH" || {
         log_error "Failed to change directory to $ETHOSCOPE_PATH"
         exit 1
     }
-    
+
     validate_git_repo "$ETHOSCOPE_PATH"
-    
+
     # Stash any local changes to avoid conflicts
     if git status --porcelain | grep -q .; then
         log_warn "Local changes detected. Stashing them..."
         git stash
     fi
-    
+
     git remote set-url origin "$GITHUB_REPO"
     git fetch origin
     git pull origin dev
     git checkout dev
     git remote set-url origin "$LOCAL_REPO"
-    
+
     log_info "Repository updated successfully"
 }
 
 # Function to remove and reinstall repository
 remove_and_reinstall_repository() {
     log_info "Performing fresh installation..."
-    
+
     # Remove existing ethoscope directories
     rm -rf /opt/ethoscope*
-    
+
     # Clone repository
     if ! git clone "$GITHUB_REPO" "$ETHOSCOPE_PATH"; then
         log_error "Failed to clone repository"
         exit 1
     fi
-    
+
     cd "$ETHOSCOPE_PATH" || {
         log_error "Failed to change directory to $ETHOSCOPE_PATH"
         exit 1
     }
-    
+
     git checkout dev
     git remote set-url origin "$LOCAL_REPO"
-    
+
     # Install ethoscope package
     if [[ -d "$ETHOSCOPE_PATH/src/ethoscope" ]]; then
         cd "$ETHOSCOPE_PATH/src/ethoscope"
@@ -110,7 +110,7 @@ remove_and_reinstall_repository() {
     else
         log_warn "Ethoscope source directory not found. Skipping pip install"
     fi
-    
+
     # Enable systemd services
     for service in ethoscope_device ethoscope_listener; do
         if systemctl list-unit-files | grep -q "^$service.service"; then
@@ -120,18 +120,18 @@ remove_and_reinstall_repository() {
             log_warn "$service.service not found. Skipping enable"
         fi
     done
-    
+
     log_info "Fresh installation completed successfully"
 }
 
 # Function to set system date
 set_system_date() {
     log_info "Setting correct date from internet..."
-    
+
     if command -v wget &> /dev/null; then
         local date_string
         date_string=$(wget --method=HEAD -qSO- --max-redirect=0 --timeout=10 google.com 2>&1 | grep "Date:" | cut -d' ' -f5-10)
-        
+
         if [[ -n "$date_string" ]]; then
             date -s "$date_string"
             log_info "System date updated"
@@ -146,17 +146,17 @@ set_system_date() {
 # Function to configure machine identity
 configure_machine_identity() {
     log_info "Configuring machine identity..."
-    
+
     echo "$MACHINE_NAME" > /etc/machine-name
     echo "$MACHINE_NAME" > /etc/hostname
-    
+
     log_info "Machine name set to $MACHINE_NAME"
 }
 
 # Function to set timezone
 set_timezone() {
     log_info "Setting timezone to UTC..."
-    
+
     if command -v timedatectl &> /dev/null; then
         timedatectl set-timezone UTC
     else
@@ -167,7 +167,7 @@ set_timezone() {
 # Function to create network configuration
 create_network_config() {
     log_info "Creating network configuration files..."
-    
+
     # Wired network configuration
     cat > /etc/systemd/network/20-wired.network << 'EOF'
 [Match]
@@ -198,7 +198,7 @@ EOF
 # Function to clean package cache
 clean_package_cache() {
     log_info "Cleaning package cache..."
-    
+
     if command -v pacman &> /dev/null; then
         log_info "Cleaning Pacman cache..."
         pacman -Scc --noconfirm
@@ -220,7 +220,7 @@ Options:
     --fresh     Remove and reinstall repository completely
     --help      Show this help message
 
-If no option is provided, the script will update the repository and 
+If no option is provided, the script will update the repository and
 perform full system configuration.
 EOF
 }
@@ -228,7 +228,7 @@ EOF
 # Main execution logic
 main() {
     check_root
-    
+
     case "${1:-}" in
         --update)
             update_repository
@@ -251,17 +251,17 @@ main() {
             exit 1
             ;;
     esac
-    
+
     # Full setup (when no flags provided)
     log_info "Starting full ethoscope setup..."
-    
+
     update_repository
     set_system_date
     configure_machine_identity
     set_timezone
     create_network_config
     clean_package_cache
-    
+
     log_info "Setup completed successfully!"
     log_warn "System reboot recommended"
 }

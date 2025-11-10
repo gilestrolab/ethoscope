@@ -23,8 +23,8 @@ except ImportError:
     from cv2 import CAP_PROP_FRAME_WIDTH
     from cv2 import CAP_PROP_POS_MSEC
 
-from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils import pi
+from ethoscope.utils.debug import EthoscopeException
 
 try:
     import picamera2
@@ -646,8 +646,7 @@ class PiFrameGrabber2(PiFrameGrabber):
         """
 
         try:
-            from picamera2 import MappedArray
-            from picamera2 import Picamera2
+            from picamera2 import MappedArray, Picamera2
 
             logging.info(
                 f"Successfully imported picamera2 version: {getattr(Picamera2, '__version__', 'unknown')}"

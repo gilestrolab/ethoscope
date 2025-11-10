@@ -5,24 +5,24 @@
             <div class="card">
                 <div class="card-header">
                     <h3>
-                        <i class="fa fa-home"></i> 
+                        <i class="fa fa-home"></i>
                         {{isReconfigureMode ? 'Reconfigure Ethoscope Node' : 'Welcome to Ethoscope Node Setup'}}
                     </h3>
                 </div>
                 <div class="card-body">
                     <h4>{{isReconfigureMode ? 'System Reconfiguration' : 'Welcome!'}}</h4>
                     <p class="lead">
-                        {{isReconfigureMode ? 
+                        {{isReconfigureMode ?
                             'This wizard will help you reconfigure your Ethoscope Node settings. You can update any configuration and test the system.' :
                             'This installation wizard will help you configure your Ethoscope Node for the first time.'}}
                     </p>
-                    
+
                     <!-- Reconfigure mode notice -->
                     <div class="alert alert-info" ng-if="isReconfigureMode">
-                        <i class="fa fa-info-circle"></i> 
+                        <i class="fa fa-info-circle"></i>
                         <strong>Reconfiguration Mode:</strong> Your system is already configured, but you can update any settings through this wizard.
                     </div>
-                    
+
                     <h5>What we'll configure:</h5>
                     <ul class="setup-checklist">
                         <li><i class="fa fa-cog"></i> Basic system settings and data directories</li>
@@ -40,12 +40,12 @@
                             <tr ng-if="systemInfo.memory.total"><td><strong>Memory:</strong></td><td>{{(systemInfo.memory.total / 1024 / 1024 / 1024) | number:1}} GB</td></tr>
                         </table>
                     </div>
-                    
+
                     <div class="mt-4">
                         <button class="btn btn-primary" ng-click="nextStep()">
                             {{isReconfigureMode ? 'Start Reconfiguration' : 'Start Setup'}}
                         </button>
-                        
+
                         <!-- Reset button for testing (only in reconfigure mode) -->
                         <button class="btn btn-outline-danger ml-3" ng-if="isReconfigureMode" ng-click="resetSetup()">
                             <i class="fa fa-undo"></i> Reset Setup Status

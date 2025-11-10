@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+
 from ethoscope.utils.debug import EthoscopeException
 
 try:
@@ -10,7 +11,7 @@ except:
 __author__ = "quentin"
 
 
-class ROI(object):
+class ROI:
 
     def __init__(
         self, polygon, idx, value=None, orientation=None, regions=None, hierarchy=None

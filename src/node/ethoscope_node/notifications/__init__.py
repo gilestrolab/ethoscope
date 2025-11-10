@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 """
 Notification system for Ethoscope alerts and monitoring.
@@ -10,8 +9,14 @@ including email, and future support for telegram, whatsapp, etc.
 
 from .base import NotificationAnalyzer
 from .email import EmailNotificationService
+from .manager import NotificationManager
 from .mattermost import MattermostNotificationService
 from .slack import SlackNotificationService
-from .manager import NotificationManager
 
-__all__ = ['NotificationAnalyzer', 'EmailNotificationService', 'MattermostNotificationService', 'SlackNotificationService', 'NotificationManager']
+__all__ = [
+    "NotificationAnalyzer",
+    "EmailNotificationService",
+    "MattermostNotificationService",
+    "SlackNotificationService",
+    "NotificationManager",
+]

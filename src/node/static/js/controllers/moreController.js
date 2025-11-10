@@ -20,7 +20,7 @@ function maxLengthCheck(object) {
         $scope.folders = {};
         $scope.incubators = {};
         $scope.sensors = {};
-        
+
         $scope.phoneNumbr = /^\+((?:9[679]|8[035789]|6[789]|5[90]|42|3[578]|2[1-689])|9[0-58]|8[1246]|6[0-6]|5[1-8]|4[013-9]|3[0-469]|2[70]|7|1)(?:\W*\d){0,13}\d$/;
 
         $scope.selected = { 'files': [],
@@ -28,7 +28,7 @@ function maxLengthCheck(object) {
                             'incubators' : {},
                             'sensors' : {}
                           };
-                          
+
         $scope.selected_all = false;
         $scope.showOptions = true;
         $scope.options = [{name:"Browse / Download Files",
@@ -98,7 +98,7 @@ function maxLengthCheck(object) {
                     break;
             };
         };
-        
+
         if ($routeParams.option != 'undefined'){
         $scope.$on('$viewContentLoaded',$scope.exec_option);
         }
@@ -175,7 +175,7 @@ function maxLengthCheck(object) {
                 $scope.selected_all = false;
             }
         };
-        
+
         var bytesToSize = function (bytes) {
            if(bytes == 0) return '0 Byte';
            var k = 1000;
@@ -186,23 +186,23 @@ function maxLengthCheck(object) {
 
 /// Node Management update
         $scope.nodeManagement = {};
-        
+
         var get_node_info = function(){
             $http.get('/node/info').then(function(response) { var res = response.data;
                 $scope.nodeManagement.info = res;
             })
         }
-        
+
         $scope.nodeManagement.time = new Date();
         $scope.nodeManagement.time = $scope.nodeManagement.time.toString();
-        
+
         $scope.nodeManagement.exec_cmd = function(cmd_name){
             $http.post('/node-actions', data = {'action': 'exec_cmd', 'cmd_name' : cmd_name})
             .then(function(response) { var data = response.data;
                 $scope.nodeManagement.std_output = data;
             });
         };
-        
+
         $scope.nodeManagement.action = function(action){
                $http.post('/node-actions', data = {'action': action})
                .then(function(response) { var res = response.data;
@@ -268,7 +268,7 @@ function maxLengthCheck(object) {
                         spin('stop');
                      });
         };
-        
+
 ///  Admin configurations
         var getNodeConfiguration = function(){
             ///var log_file_path = $scope.device.log_file;
@@ -283,7 +283,7 @@ function maxLengthCheck(object) {
                     $scope.selected['folders'] = data;
             });
 
-            
+
 
             $http.get('/node/incubators')
                  .then(function(response) { var data = response.data;
@@ -294,19 +294,19 @@ function maxLengthCheck(object) {
                  .then(function(response) { var data = response.data;
                     $scope.sensors = data;
             });
-        
+
             $http.get('/node/commands')
                  .then(function(response) { var data = response.data;
                     $scope.commands = data;
             });
 
-        
+
         };
 
-        
+
 }
 
- angular.module('flyApp').controller('moreController', 
+ angular.module('flyApp').controller('moreController',
     ['$scope', '$http', '$timeout', '$routeParams', '$window', '$location', moreController]);
 
 })()

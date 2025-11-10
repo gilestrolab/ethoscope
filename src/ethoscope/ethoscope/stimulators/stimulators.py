@@ -1,9 +1,10 @@
 __author__ = "quentin"
 
 import time
-from ethoscope.utils.description import DescribedObject
+
 from ethoscope.core.variables import BaseIntVariable
 from ethoscope.hardware.interfaces.interfaces import DefaultInterface
+from ethoscope.utils.description import DescribedObject
 from ethoscope.utils.scheduler import Scheduler
 
 

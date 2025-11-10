@@ -4,14 +4,14 @@ These tests are designed to prevent double scheduling issues and ensure
 correct timing behavior for both single and multi-stimulator configurations.
 """
 
-import unittest
 import time
-from unittest.mock import Mock, patch
+import unittest
 from datetime import datetime, timedelta
+from unittest.mock import Mock, patch
 
-from ethoscope.utils.scheduler import Scheduler, DateRangeError
 from ethoscope.stimulators.multi_stimulator import MultiStimulator
 from ethoscope.stimulators.stimulators import DefaultStimulator, HasInteractedVariable
+from ethoscope.utils.scheduler import DateRangeError, Scheduler
 
 # Optional imports for specific stimulator tests
 try:

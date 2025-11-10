@@ -1,7 +1,8 @@
 __author__ = "quentin"
+import itertools
+
 import cv2
 import numpy as np
-import itertools
 
 
 def merge_blobs(contours, prop=0.5):

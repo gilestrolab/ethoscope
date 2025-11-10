@@ -5,17 +5,18 @@ Tests specifically for the boundary validation and size compatibility fixes
 to prevent OpenCV size mismatch crashes.
 """
 
-import pytest
-import numpy as np
-import cv2
 from unittest.mock import Mock, patch
+
+import cv2
+import numpy as np
+import pytest
 
 try:
     from ethoscope.trackers.adaptive_bg_tracker import ObjectModel
 except ImportError:
     # Handle import for different test runner contexts
-    import sys
     import os
+    import sys
 
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../.."))
     from ethoscope.trackers.adaptive_bg_tracker import ObjectModel

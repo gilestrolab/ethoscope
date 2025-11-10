@@ -1,14 +1,14 @@
 (function(){
     var footerController = function($scope, $http){
-        
+
         $scope.gitInfo = {
             branch: 'loading...',
             commit: 'loading...',
             date: 'loading...'
         };
-        
+
         var loadGitInfo = function(){
-            $http.get('/node/info').then(function(response) { 
+            $http.get('/node/info').then(function(response) {
                 var res = response.data;
                 $scope.gitInfo = {
                     branch: res.GIT_BRANCH || 'Unknown',
@@ -23,13 +23,13 @@
                 };
             });
         };
-        
+
         // Load git info on controller initialization
         loadGitInfo();
-        
+
     };
 
-    angular.module('flyApp').controller('FooterController', 
+    angular.module('flyApp').controller('FooterController',
         ['$scope', '$http', footerController]);
 
 })();

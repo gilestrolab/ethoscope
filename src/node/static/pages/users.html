@@ -139,10 +139,10 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label class="form-label">Full Name <span class="text-danger">*</span></label>
-                                <input type="text" 
-                                       class="form-control" 
-                                       name="fullname" 
-                                       ng-model="selectedUser.fullname" 
+                                <input type="text"
+                                       class="form-control"
+                                       name="fullname"
+                                       ng-model="selectedUser.fullname"
                                        ng-blur="createUsername()"
                                        required>
                                 <div class="invalid-feedback" ng-show="userForm.fullname.$invalid && userForm.fullname.$touched">
@@ -153,24 +153,24 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label class="form-label">Username</label>
-                                <input type="text" 
-                                       class="form-control" 
-                                       name="username" 
-                                       ng-model="selectedUser.name" 
+                                <input type="text"
+                                       class="form-control"
+                                       name="username"
+                                       ng-model="selectedUser.name"
                                        readonly>
                                 <small class="form-text text-muted">Generated automatically from full name</small>
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label class="form-label">Email Address <span class="text-danger">*</span></label>
-                                <input type="email" 
-                                       class="form-control" 
-                                       name="email" 
-                                       ng-model="selectedUser.email" 
+                                <input type="email"
+                                       class="form-control"
+                                       name="email"
+                                       ng-model="selectedUser.email"
                                        required>
                                 <div class="invalid-feedback" ng-show="userForm.email.$invalid && userForm.email.$touched">
                                     Valid email address is required.
@@ -180,13 +180,13 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label class="form-label">PIN <span class="text-danger">*</span></label>
-                                <input type="text" 
-                                       class="form-control" 
-                                       name="PIN" 
-                                       ng-model="selectedUser.PIN" 
-                                       maxlength="4" 
-                                       pattern="[0-9]{4}" 
-                                       title="4-digit PIN" 
+                                <input type="text"
+                                       class="form-control"
+                                       name="PIN"
+                                       ng-model="selectedUser.PIN"
+                                       maxlength="4"
+                                       pattern="[0-9]{4}"
+                                       title="4-digit PIN"
                                        required>
                                 <div class="invalid-feedback" ng-show="userForm.PIN.$invalid && userForm.PIN.$touched">
                                     4-digit PIN is required.
@@ -194,15 +194,15 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label class="form-label">Phone Number</label>
-                                <input type="tel" 
-                                       class="form-control" 
-                                       name="telephone" 
-                                       ng-model="selectedUser.telephone" 
+                                <input type="tel"
+                                       class="form-control"
+                                       name="telephone"
+                                       ng-model="selectedUser.telephone"
                                        ng-pattern="phonePattern">
                                 <div class="invalid-feedback" ng-show="userForm.telephone.$invalid && userForm.telephone.$touched">
                                     Please enter a valid phone number.
@@ -212,24 +212,24 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label class="form-label">Team/Group</label>
-                                <input type="text" 
-                                       class="form-control" 
-                                       name="group" 
-                                       ng-model="selectedUser.group" 
+                                <input type="text"
+                                       class="form-control"
+                                       name="group"
+                                       ng-model="selectedUser.group"
                                        uib-typeahead="group for group in groups | filter:$viewValue"
                                        typeahead-min-length="0">
                                 <small class="form-text text-muted">Start typing to see existing groups</small>
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label class="toggle-check">User is Active
-                                    <input type="checkbox" 
-                                           class="toggle-check-input" 
-                                           name="active" 
+                                    <input type="checkbox"
+                                           class="toggle-check-input"
+                                           name="active"
                                            ng-model="selectedUser.active">
                                     <span class="toggle-check-text"></span>
                                 </label>
@@ -239,9 +239,9 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label class="toggle-check">User is Administrator
-                                    <input type="checkbox" 
-                                           class="toggle-check-input" 
-                                           name="isAdmin" 
+                                    <input type="checkbox"
+                                           class="toggle-check-input"
+                                           name="isAdmin"
                                            ng-model="selectedUser.isAdmin">
                                     <span class="toggle-check-text"></span>
                                 </label>
@@ -255,9 +255,9 @@
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">
                     <i class="fa fa-times"></i> Cancel
                 </button>
-                <button type="button" 
-                        class="btn btn-primary" 
-                        ng-click="saveUser()" 
+                <button type="button"
+                        class="btn btn-primary"
+                        ng-click="saveUser()"
                         ng-disabled="userForm.$invalid"
                         data-dismiss="modal">
                     <i class="fa fa-save"></i> {{selectedUser.id ? 'Update User' : 'Add User'}}
@@ -287,8 +287,8 @@
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">
                     <i class="fa fa-times"></i> Cancel
                 </button>
-                <button type="button" 
-                        class="btn btn-danger" 
+                <button type="button"
+                        class="btn btn-danger"
                         ng-click="deleteUser()"
                         data-dismiss="modal">
                     <i class="fa fa-trash"></i> Delete User

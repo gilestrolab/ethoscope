@@ -1,10 +1,13 @@
 #!/bin/env python
-from optparse import OptionParser
-import threading
-import time, os
-import RPi.GPIO as GPIO
+import ast
+import json
 import logging
-import json, ast
+import os
+import threading
+import time
+from optparse import OptionParser
+
+import RPi.GPIO as GPIO
 
 GPIO.setmode(GPIO.BOARD)
 DEFAULT_JSON_FILE = "/etc/gpio.conf"
@@ -95,7 +98,7 @@ class GPIOButtons:
     def json_load(self, filename="/etc/gpio.conf"):
         """ """
         if os.path.exists(filename):
-            with open(filename, "r") as fp:
+            with open(filename) as fp:
                 content = json.load(fp)
         else:
             content = self.json_create()

@@ -1,1 +1,1 @@
-__author__ = 'quentin'
+__author__ = "quentin"

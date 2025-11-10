@@ -9,23 +9,23 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: ethoscope-cloudflare-tunnel
     restart: unless-stopped
-    
+
     # Use tunnel token from environment file
     command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
-    
+
     environment:
       - TUNNEL_TOKEN=${TUNNEL_TOKEN}
       - NODE_ID=${NODE_ID:-auto}
-    
+
     # DNS configuration to fix resolution issues
     dns:
       - 1.1.1.1
       - 1.0.0.1
       - 8.8.8.8
-    
+
     # Use host networking to access services running on the host
     network_mode: host
-    
+
     # Health check to monitor tunnel status
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep '[c]loudflared' || exit 1"]
@@ -33,7 +33,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-    
+
     # Logging configuration
     logging:
       driver: "json-file"

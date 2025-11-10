@@ -8,7 +8,7 @@
                 </div>
                 <div class="card-body">
                     <form name="adminUserForm" novalidate>
-                        
+
                         <div class="alert alert-info" ng-if="Object.keys(existingUsers).length > 0">
                             <h5>Existing Admin Users Found</h5>
                             <p>The system already has admin users. You can replace one of them or create a new admin account.</p>
@@ -16,7 +16,7 @@
                                 <label>Replace existing user (optional):</label>
                                 <select class="form-control" ng-model="adminUser.replaceUser">
                                     <option value="">Create new admin user</option>
-                                    <option ng-repeat="(username, user) in existingUsers" 
+                                    <option ng-repeat="(username, user) in existingUsers"
                                             ng-if="user.isadmin" value="{{username}}">
                                         Replace {{user.fullname}} ({{username}})
                                     </option>
@@ -28,8 +28,8 @@
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="adminFullname">Full Name *</label>
-                                    <input type="text" class="form-control" id="adminFullname" 
-                                           ng-model="adminUser.fullname" 
+                                    <input type="text" class="form-control" id="adminFullname"
+                                           ng-model="adminUser.fullname"
                                            ng-change="generateUsername(adminUser.fullname, adminUser)"
                                            placeholder="John Smith" required>
                                 </div>
@@ -37,7 +37,7 @@
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="adminUsername">Username *</label>
-                                    <input type="text" class="form-control" id="adminUsername" 
+                                    <input type="text" class="form-control" id="adminUsername"
                                            ng-model="adminUser.username" placeholder="john.smith" required>
                                 </div>
                             </div>
@@ -47,14 +47,14 @@
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="adminEmail">Email Address *</label>
-                                    <input type="email" class="form-control" id="adminEmail" 
+                                    <input type="email" class="form-control" id="adminEmail"
                                            ng-model="adminUser.email" placeholder="john.smith@university.edu" required>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="adminTelephone">Phone Number</label>
-                                    <input type="tel" class="form-control" id="adminTelephone" 
+                                    <input type="tel" class="form-control" id="adminTelephone"
                                            ng-model="adminUser.telephone" placeholder="+1234567890">
                                 </div>
                             </div>
@@ -64,7 +64,7 @@
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="adminPin">PIN Code</label>
-                                    <input type="text" class="form-control" id="adminPin" 
+                                    <input type="text" class="form-control" id="adminPin"
                                            ng-model="adminUser.pin" placeholder="1234" maxlength="4">
                                     <small class="form-text text-muted">4-digit PIN for device access</small>
                                 </div>
@@ -72,7 +72,7 @@
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="adminLabname">Team/Group</label>
-                                    <input type="text" class="form-control" id="adminLabname" 
+                                    <input type="text" class="form-control" id="adminLabname"
                                            ng-model="adminUser.labname" placeholder="Smith Team">
                                 </div>
                             </div>
@@ -83,7 +83,7 @@
                     <button class="btn btn-secondary" ng-click="previousStep()">
                         <i class="fa fa-arrow-left"></i> Back
                     </button>
-                    <button class="btn btn-primary float-right" ng-click="processAdminUser()" 
+                    <button class="btn btn-primary float-right" ng-click="processAdminUser()"
                             ng-disabled="!isStepValid(3) || isLoading">
                         Next <i class="fa fa-arrow-right"></i>
                     </button>

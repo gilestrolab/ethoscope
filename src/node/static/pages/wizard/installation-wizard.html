@@ -5,7 +5,7 @@
 
 <!-- Installation Wizard Container -->
 <div class="container-fluid installation-wizard" ng-cloak>
-    
+
     <!-- Progress Bar -->
     <div class="row mb-4">
         <div class="col-12">
@@ -14,8 +14,8 @@
                     <div class="progress-fill" ng-style="{'width': getProgressPercentage() + '%'}"></div>
                 </div>
                 <div class="step-indicators">
-                    <div ng-repeat="step in steps" 
-                         class="step-indicator" 
+                    <div ng-repeat="step in steps"
+                         class="step-indicator"
                          ng-class="{'active': currentStep === step.number, 'completed': currentStep > step.number}"
                          ng-click="goToStep(step.number)">
                         <div class="step-circle">
@@ -47,12 +47,11 @@
 
     <!-- Dynamic Step Content -->
     <div ng-include="getStepTemplate()"></div>
-    
+
     <!-- Modal Content -->
     <div ng-include="'/static/pages/wizard/modals/add-user-modal.html'"></div>
     <div ng-include="'/static/pages/wizard/modals/edit-user-modal.html'"></div>
     <div ng-include="'/static/pages/wizard/modals/add-incubator-modal.html'"></div>
     <div ng-include="'/static/pages/wizard/modals/edit-incubator-modal.html'"></div>
-    
-</div>
 
+</div>

@@ -181,11 +181,11 @@
     .step-indicators {
         display: none;
     }
-    
+
     .progress-container {
         margin-bottom: 20px;
     }
-    
+
     .wizard-step .card {
         margin: 0 10px;
     }

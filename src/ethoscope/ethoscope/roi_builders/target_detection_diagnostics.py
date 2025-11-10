@@ -8,14 +8,14 @@ and systematic collection of detection samples for future analysis.
 
 __author__ = "giorgio"
 
-import cv2
-import os
 import json
 import logging
-import numpy as np
 from datetime import datetime
-from typing import Optional, Dict, List, Tuple, Any
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import cv2
+import numpy as np
 
 
 class TargetDetectionDiagnostics:

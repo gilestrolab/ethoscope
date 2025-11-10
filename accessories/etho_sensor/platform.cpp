@@ -93,7 +93,7 @@ void PLATFORM_ATTR softReset() {
     delay(1000); // Allow some time for disconnection
 
     // Restart the device
-    #if defined(ESP8266) 
+    #if defined(ESP8266)
         ESP.restart();
     #elif defined(ESP32)
         esp_restart();

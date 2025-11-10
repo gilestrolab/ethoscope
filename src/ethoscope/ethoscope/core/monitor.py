@@ -1,14 +1,14 @@
 __author__ = "quentin"
 
-from .tracking_unit import TrackingUnit
-import logging
-import traceback
-import time
-
 import datetime
+import logging
+import time
+import traceback
+
+from .tracking_unit import TrackingUnit
 
 
-class Monitor(object):
+class Monitor:
 
     def __init__(
         self,

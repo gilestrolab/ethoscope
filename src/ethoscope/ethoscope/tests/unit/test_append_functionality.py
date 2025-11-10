@@ -5,19 +5,21 @@ This module tests the append features for both MySQL and SQLite databases,
 ensuring proper time offset handling and database compatibility.
 """
 
-import pytest
-import unittest
-import tempfile
+import logging
 import os
 import sqlite3
+import tempfile
 import time
-import logging
-from unittest.mock import Mock, patch, MagicMock
+import unittest
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
+
+from ethoscope.core.monitor import Monitor
+from ethoscope.core.roi import ROI
 
 # Import the classes we're testing
 from ethoscope.io import MySQLResultWriter, SQLiteResultWriter
-from ethoscope.core.monitor import Monitor
-from ethoscope.core.roi import ROI
 
 
 @pytest.fixture

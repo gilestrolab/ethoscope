@@ -5,11 +5,12 @@ This module provides mock implementations of hardware components
 like cameras, stimulators, and sensors for use in tests.
 """
 
-import numpy as np
-from unittest.mock import Mock, MagicMock
-from typing import List, Dict, Any, Optional, Tuple
-import time
 import threading
+import time
+from typing import Any, Dict, List, Optional, Tuple
+from unittest.mock import MagicMock, Mock
+
+import numpy as np
 
 
 class MockCamera:

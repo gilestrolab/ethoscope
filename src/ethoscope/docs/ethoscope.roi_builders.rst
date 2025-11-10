@@ -35,4 +35,3 @@ ethoscope.roi_builders.target_roi_builder module
     :members:
     :undoc-members:
     :show-inheritance:
-

@@ -22,7 +22,7 @@
     #include <ESPmDNS.h>
     #include "esp_task_wdt.h"
     typedef WebServer WebServer;
-    #define PLATFORM_ATTR 
+    #define PLATFORM_ATTR
 #else
     #error "This sketch is only for ESP8266 or ESP32"
 #endif

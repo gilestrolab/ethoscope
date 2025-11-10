@@ -63,20 +63,20 @@ try:
     from ethoscope.core.monitor import Monitor
     from ethoscope.core.roi import ROI
     from unittest.mock import Mock
-    
+
     print("✓ Successfully imported required modules")
-    
+
     # Test 1: SQLite append functionality
     print("\nTesting SQLite append functionality...")
-    
+
     # Create test database
     fd, temp_db = tempfile.mkstemp(suffix='.db')
     os.close(fd)
-    
+
     try:
         conn = sqlite3.connect(temp_db)
         cursor = conn.cursor()
-        
+
         # Create ROI table with test data
         cursor.execute("""
             CREATE TABLE ROI_1 (
@@ -86,20 +86,20 @@ try:
                 y REAL
             )
         """)
-        
+
         cursor.execute("INSERT INTO ROI_1 (t, x, y) VALUES (?, ?, ?)", (5000, 10.5, 20.5))
         cursor.execute("INSERT INTO ROI_1 (t, x, y) VALUES (?, ?, ?)", (10000, 15.5, 25.5))
-        
+
         conn.commit()
         conn.close()
-        
+
         # Create mock ROI
         roi = Mock()
         roi.idx = 1
         roi.get_feature_dict = Mock(return_value={
             "idx": 1, "value": 255, "x": 10, "y": 10, "w": 100, "h": 100
         })
-        
+
         # Test SQLite writer append
         db_credentials = {"name": temp_db}
         writer = SQLiteResultWriter(
@@ -107,29 +107,29 @@ try:
             rois=[roi],
             erase_old_db=False
         )
-        
+
         last_timestamp = writer.append()
         print(f"✓ SQLite append returned timestamp: {last_timestamp}")
-        
+
         assert last_timestamp == 10000, f"Expected 10000, got {last_timestamp}"
         print("✓ SQLite append test passed")
-        
+
     finally:
         if os.path.exists(temp_db):
             os.unlink(temp_db)
-    
+
     # Test 2: Monitor with time offset
     print("\nTesting Monitor with time offset...")
-    
+
     mock_camera = Mock()
     mock_camera.__iter__ = Mock(return_value=iter([
         (0, Mock()),
         (1000, Mock()),
         (2000, Mock()),
     ]))
-    
+
     mock_tracker_class = Mock()
-    
+
     time_offset = 10000
     monitor = Monitor(
         camera=mock_camera,
@@ -137,15 +137,15 @@ try:
         rois=[roi],
         time_offset=time_offset
     )
-    
+
     assert monitor._time_offset == time_offset, f"Expected {time_offset}, got {monitor._time_offset}"
     assert monitor._last_time_stamp == time_offset, f"Expected {time_offset}, got {monitor._last_time_stamp}"
-    
+
     print(f"✓ Monitor initialized with time_offset: {time_offset}")
     print("✓ Monitor time offset test passed")
-    
+
     print("\n=== All integration tests passed! ===")
-    
+
 except ImportError as e:
     print(f"✗ Import error: {e}")
     sys.exit(1)

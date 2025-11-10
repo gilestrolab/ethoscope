@@ -4,14 +4,14 @@
         $scope.selectedSensors = {};
         $scope.sensorData = {};
         $scope.showPressure = false; // Hidden by default
-        
+
         // Default color palette for sensors
         var defaultColors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9', '#F8C471', '#82E0AA'];
         var colorIndex = 0;
 
         // Load the list of CSV files and initialize sensor selection objects
         $http.get('/list_sensor_csv_files')
-            .then(function(response) { 
+            .then(function(response) {
                 var data = response.data;
                 $scope.csvFiles = data.files.map(function(file) {
                     return file.replace('.csv', '');
@@ -44,9 +44,9 @@
             if (!filename || $scope.selectedSensors[filename].loading) {
                 return;
             }
-            
+
             $scope.selectedSensors[filename].loading = true;
-            
+
             $http.get('/get_sensor_csv_data/' + filename + '.csv')
                 .then(function(response) {
                     var data = response.data;
@@ -69,11 +69,11 @@
             var selectedFiles = Object.keys($scope.selectedSensors).filter(function(file) {
                 return $scope.selectedSensors[file].selected;
             });
-            
+
             var sensorsWithData = selectedFiles.filter(function(file) {
                 return $scope.selectedSensors[file].data;
             });
-            
+
             if (sensorsWithData.length > 0) {
                 plotMultiSensorData(sensorsWithData);
             } else if (selectedFiles.length === 0) {
@@ -87,14 +87,14 @@
             var selectedFiles = Object.keys($scope.selectedSensors).filter(function(file) {
                 return $scope.selectedSensors[file].selected;
             });
-            
+
             // Fetch data for newly selected sensors
             selectedFiles.forEach(function(file) {
                 if (!$scope.selectedSensors[file].data && !$scope.selectedSensors[file].loading) {
                     $scope.fetchSensorData(file);
                 }
             });
-            
+
             // Plot sensors that already have data
             $scope.plotSelectedSensors();
         };
@@ -117,7 +117,7 @@
         function plotMultiSensorData(sensorFiles) {
             var traces = [];
             var allDates = [];
-            
+
             // Process data for each selected sensor
             sensorFiles.forEach(function(filename) {
                 var sensorInfo = $scope.selectedSensors[filename];
@@ -125,24 +125,24 @@
                     console.warn('Invalid sensor data for', filename);
                     return;
                 }
-                
+
                 var data = sensorInfo.data.rows;
                 var color = sensorInfo.color;
-                
+
                 var dates = [], temperature = [], humidity = [], pressure = [], light = [];
-                
+
                 // Limit the number of data points to prevent performance issues
                 var maxDataPoints = 10000;
-                var dataToProcess = data.length > maxDataPoints ? 
+                var dataToProcess = data.length > maxDataPoints ?
                     data.slice(-maxDataPoints) : data;
-                
+
                 dataToProcess.forEach(function(row) {
                     // Skip header rows and metadata (lines starting with # or containing column names)
-                    if (row && row[0] && !row[0].toString().startsWith('#') && 
-                        row[0] !== 'Temperature' && 
+                    if (row && row[0] && !row[0].toString().startsWith('#') &&
+                        row[0] !== 'Temperature' &&
                         row.length >= 5 &&
                         !isNaN(Date.parse(row[0]))) {
-                        
+
                         try {
                             var date = new Date(row[0]);
                             if (date && !isNaN(date.getTime())) {
@@ -221,16 +221,16 @@
             // Calculate date range for display (last 7 days by default)
             var now = new Date();
             var sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
-            
+
             // Use reduce to find min/max dates to avoid stack overflow with large arrays
             var firstDate = sevenDaysAgo;
             var lastDate = now;
-            
+
             if (allDates.length > 0) {
                 firstDate = allDates.reduce(function(min, date) {
                     return date < min ? date : min;
                 }, allDates[0]);
-                
+
                 lastDate = allDates.reduce(function(max, date) {
                     return date > max ? date : max;
                 }, allDates[0]);
@@ -238,7 +238,7 @@
 
             // Create legend annotations for each graph
             var annotations = [];
-            
+
             // Build legend text for each graph
             var legendText = sensorFiles.map(function(filename) {
                 var color = $scope.selectedSensors[filename].color;

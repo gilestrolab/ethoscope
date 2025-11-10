@@ -1,6 +1,8 @@
 import logging
 import time
+
 import serial
+
 from ethoscope.hardware.interfaces.interfaces import SimpleSerialInterface
 
 

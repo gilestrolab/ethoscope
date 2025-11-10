@@ -5,13 +5,13 @@ Handles node system management including information, daemon control,
 configuration management, and system actions.
 """
 
-import bottle
-import os
 import datetime
+import os
 import subprocess
-import netifaces
-from .base import BaseAPI, error_decorator
 
+import netifaces
+
+from .base import BaseAPI, error_decorator
 
 # System daemons configuration
 SYSTEM_DAEMONS = {

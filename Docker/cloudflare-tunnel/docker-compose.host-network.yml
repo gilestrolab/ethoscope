@@ -9,17 +9,17 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: ethoscope-cloudflare-tunnel
     restart: unless-stopped
-    
+
     # Use host networking to bypass Docker DNS issues
     network_mode: host
-    
+
     # Use tunnel token from environment file
     command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
-    
+
     environment:
       - TUNNEL_TOKEN=${TUNNEL_TOKEN}
       - NODE_ID=${NODE_ID:-auto}
-    
+
     # Health check to monitor tunnel status
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep '[c]loudflared' || exit 1"]
@@ -27,7 +27,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-    
+
     # Logging configuration
     logging:
       driver: "json-file"

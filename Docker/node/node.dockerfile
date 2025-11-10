@@ -14,7 +14,7 @@ RUN pacman -Sy \
 RUN pacman -Sy --needed --noconfirm python-setuptools python-pip python-ifaddr python-numpy \
                                     python-bottle python-pyserial python-mysql-connector python-netifaces python-cherrypy \
                                     python-eventlet python-dnspython python-greenlet python-monotonic \
-                                    python-zeroconf python-cheroot python-opencv python-gitpython 
+                                    python-zeroconf python-cheroot python-opencv python-gitpython
 
 
 RUN cd /opt && git clone https://github.com/gilestrolab/ethoscope.git

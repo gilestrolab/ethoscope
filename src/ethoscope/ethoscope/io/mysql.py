@@ -1,7 +1,9 @@
-import time
 import logging
+import time
 import traceback
+
 import mysql.connector
+
 from .base import BaseAsyncSQLWriter, BaseResultWriter
 
 # Character encoding for MariaDB/MySQL connections
@@ -71,7 +73,7 @@ class AsyncMySQLWriter(BaseAsyncSQLWriter):
             )
             return
 
-        except Exception as e:
+        except Exception:
             logging.error(traceback.format_exc())
             return
         c = db.cursor()
@@ -402,6 +404,7 @@ class MySQLResultWriter(BaseResultWriter):
     def _insert_metadata(self):
         """Insert experimental metadata into METADATA table with MySQL duplicate prevention."""
         import json
+
         from .base import METADATA_MAX_VALUE_LENGTH
 
         for k, v in list(self.metadata.items()):

@@ -5,8 +5,8 @@ Provides utilities for tunnel configuration and URL management.
 """
 
 import os
-import logging
-from typing import Optional, Dict, Any
+from typing import Any, Dict
+
 from .base import BaseAPI, error_decorator
 
 

@@ -6,12 +6,9 @@ Allows multiple stimulators with individual date/time ranges within a single exp
 __author__ = "giorgio"
 
 import logging
-from ethoscope.stimulators.stimulators import (
-    BaseStimulator,
-    HasInteractedVariable,
-    DefaultStimulator,
-)
+
 from ethoscope.hardware.interfaces.interfaces import DefaultInterface
+from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVariable
 from ethoscope.utils.scheduler import Scheduler
 
 # Global flag to track if MultiStimulator has been logged before
@@ -98,15 +95,6 @@ class MultiStimulator(BaseStimulator):
             logging.debug(
                 "MultiStimulator with same config already logged, creating instance silently"
             )
-        from ethoscope.stimulators.sleep_depriver_stimulators import (
-            SleepDepStimulator,
-            OptomotorSleepDepriver,
-            MiddleCrossingStimulator,
-            ExperimentalSleepDepStimulator,
-            OptomotorSleepDepriverSystematic,
-            mAGO,
-            AGO,
-        )
         from ethoscope.stimulators.odour_stimulators import (
             DynamicOdourSleepDepriver,
             MiddleCrossingOdourStimulator,
@@ -114,6 +102,15 @@ class MultiStimulator(BaseStimulator):
         )
         from ethoscope.stimulators.optomotor_stimulators import (
             OptoMidlineCrossStimulator,
+        )
+        from ethoscope.stimulators.sleep_depriver_stimulators import (
+            AGO,
+            ExperimentalSleepDepStimulator,
+            MiddleCrossingStimulator,
+            OptomotorSleepDepriver,
+            OptomotorSleepDepriverSystematic,
+            SleepDepStimulator,
+            mAGO,
         )
         from ethoscope.stimulators.stimulators import DefaultStimulator  # noqa: F811
 

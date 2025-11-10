@@ -2,25 +2,25 @@
 A general test to try to find out if anything is wrong with the API.
 """
 
-import tempfile
 import os
-import time
 import random
+import tempfile
+import time
+import unittest
+
+from _constants import DRAW_FRAMES, VIDEO
+
 from ethoscope.core.monitor import Monitor
-from ethoscope.hardware.input.cameras import MovieVirtualCamera
-from ethoscope.io import SQLiteResultWriter
-from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.drawers.drawers import DefaultDrawer
-from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
+from ethoscope.hardware.input.cameras import MovieVirtualCamera
+from ethoscope.hardware.interfaces.interfaces import HardwareConnection
 from ethoscope.hardware.interfaces.interfaces import (
     SimpleSerialInterface as BaseInterface,
 )
-from ethoscope.hardware.interfaces.interfaces import HardwareConnection
-from _constants import VIDEO, DRAW_FRAMES
+from ethoscope.io import SQLiteResultWriter
+from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
 from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVariable
-
-
-import unittest
+from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 
 
 class MockInterface(BaseInterface):

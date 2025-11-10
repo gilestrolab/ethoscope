@@ -2,7 +2,7 @@
   ESP8266/ESP32 mDNS based environmental sensor for the ethoscope platform
 
    Soldier together the two sensors boards (BME280 and BH1750), using the same header
-  then connect to the ESP32 
+  then connect to the ESP32
   VCC -> 3.3V
   Gnd -> Gnd
   SDA -> D21
@@ -21,7 +21,7 @@
     - For Linux, install Avahi (http://avahi.org/).
     - For Windows, install Bonjour (http://www.apple.com/support/bonjour/).
     - For Mac OSX and iOS support is built in through Bonjour already.
-  
+
   - Point your browser to http://etho_sensor_000.local, you should see a JSON response.
   - http://etho_sensor_000.local/web will give you a html page
 
@@ -31,7 +31,7 @@
 
  	To rename from commandline use curl as below:
     echo '{"name": "etho_sensor-001", "location": "Incubator-18C"}' | curl -d @- http://etho_sensor_000.local/set
-  
+
   More easily, point your browser to http://etho_sensor_000.local/web
 
 */
@@ -133,12 +133,12 @@ void PLATFORM_ATTR handleSystemTasks() {
     static const uint32_t SYSTEM_CHECK_INTERVAL = 1000;
     static uint8_t errorCount = 0;
     static const uint8_t ERROR_THRESHOLD = 5;
-    
+
     const uint32_t currentMillis = millis();
-    
+
     if ((uint32_t)(currentMillis - lastCheck) >= SYSTEM_CHECK_INTERVAL) {
         lastCheck = currentMillis;
-        
+
         if (!checkSystem()) {
             errorCount++;
             if (errorCount >= ERROR_THRESHOLD) {
@@ -157,17 +157,17 @@ void PLATFORM_ATTR handleSystemTasks() {
 
 bool PLATFORM_ATTR checkSystem() {
     bool status = true;
-    
+
     if (WiFi.status() != WL_CONNECTED) {
         DEBUG_PRINTLN("WiFi connection lost. Reconnecting...");
         reconnectWiFi();
         status = false;
     }
-    
+
     if (!readSensorData()) {
         DEBUG_PRINTLN("Sensor read failed");
         status = false;
     }
-    
+
     return status;
 }

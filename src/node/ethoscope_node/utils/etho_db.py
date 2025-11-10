@@ -986,10 +986,13 @@ class ExperimentalDB(multiprocessing.Process):
         Returns:
             User data from database or empty dict if not found
         """
-        sql_get_user = "SELECT u.* FROM %s u JOIN %s r ON u.username = r.user_name WHERE r.run_id = '%s'" % (
-            self._users_table_name,
-            self._runs_table_name,
-            run_id,
+        sql_get_user = (
+            "SELECT u.* FROM %s u JOIN %s r ON u.username = r.user_name WHERE r.run_id = '%s'"
+            % (
+                self._users_table_name,
+                self._runs_table_name,
+                run_id,
+            )
         )
 
         row = self.executeSQL(sql_get_user)
@@ -1002,7 +1005,9 @@ class ExperimentalDB(multiprocessing.Process):
         else:
             return row[0]
 
-    def getUsersForDevice(self, device_id: str, running_only: bool = True, asdict: bool = False):
+    def getUsersForDevice(
+        self, device_id: str, running_only: bool = True, asdict: bool = False
+    ):
         """
         Get all users who have run experiments on a specific device.
 
@@ -1018,10 +1023,13 @@ class ExperimentalDB(multiprocessing.Process):
         if running_only:
             conditions.append("r.status = 'running'")
 
-        sql_get_users = "SELECT DISTINCT u.* FROM %s u JOIN %s r ON u.username = r.user_name WHERE %s" % (
-            self._users_table_name,
-            self._runs_table_name,
-            " AND ".join(conditions),
+        sql_get_users = (
+            "SELECT DISTINCT u.* FROM %s u JOIN %s r ON u.username = r.user_name WHERE %s"
+            % (
+                self._users_table_name,
+                self._runs_table_name,
+                " AND ".join(conditions),
+            )
         )
 
         rows = self.executeSQL(sql_get_users)
@@ -1215,7 +1223,9 @@ class ExperimentalDB(multiprocessing.Process):
         else:
             return row[0]
 
-    def getAllUsers(self, active_only: bool = False, admin_only: bool = False, asdict: bool = False):
+    def getAllUsers(
+        self, active_only: bool = False, admin_only: bool = False, asdict: bool = False
+    ):
         """
         Get all users from the database.
 

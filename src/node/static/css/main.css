@@ -12,7 +12,7 @@
     --light-gray: rgb(216, 216, 216);
     --off-white: rgb(245, 245, 245);
     --pure-white: rgb(255, 255, 255);
-    
+
     /* Purples */
     --deep-purple: rgb(107, 45, 107);
     --plum: rgb(139, 75, 140);
@@ -21,25 +21,25 @@
     --indigo: rgb(91, 70, 199);
     --lavender: rgb(123, 95, 231);
     --light-purple: rgb(155, 139, 235);
-    
+
     /* Reds */
     --deep-red: rgb(209, 51, 49);
     --coral-red: rgb(241, 80, 81);
     --light-coral: rgb(243, 122, 122);
     --pale-coral: rgb(245, 163, 163);
-    
+
     /* Oranges */
     --burnt-orange: rgb(196, 123, 47);
     --terracotta: rgb(230, 123, 71);
     --peach: rgb(235, 155, 111);
     --soft-peach: rgb(240, 188, 151);
-    
+
     /* Yellows */
     --deep-gold: rgb(180, 139, 49);
     --golden-honey: rgb(212, 164, 65);
     --light-gold: rgb(221, 189, 106);
     --pale-yellow: rgb(230, 214, 147);
-    
+
     /* Greens */
     --olive-green: rgb(152, 169, 60);
     --lime-green: rgb(184, 194, 92);
@@ -52,7 +52,7 @@
     --teal: rgb(60, 159, 127);
     --mint-green: rgb(92, 184, 151);
     --light-mint: rgb(124, 198, 175);
-    
+
     /* Blues */
     --deep-blue: rgb(60, 139, 181);
     --sky-blue: rgb(95, 164, 231);
@@ -609,8 +609,8 @@ label.dropdown {
 
 /*
  * Adapted from: https://codepen.io/nazarelen/pen/rLgLrA
- * 
- * 
+ *
+ *
  */
 
 .header ul {
@@ -756,7 +756,7 @@ custom-select-wrap .select-icon svg {
 /*
  * Labels inside form fields and nicer looking text inputs
  * Inspiration from http://steadicat.github.io/labels/
- * 
+ *
 */
 
 .input {
@@ -1579,11 +1579,11 @@ table thead th a:focus {
     .multi-stimulator-config {
         padding: 15px;
     }
-    
+
     .stimulator-item {
         margin-bottom: 20px;
     }
-    
+
     .stimulator-item .card-header h6 {
         font-size: 14px;
     }
@@ -1606,13 +1606,13 @@ table thead th a:focus {
         flex-direction: column !important;
         align-items: stretch !important;
     }
-    
+
     .modal-footer .alert-warning {
         max-width: 100% !important;
         margin-bottom: 15px !important;
         margin-right: 0 !important;
     }
-    
+
     .modal-footer > div:last-child {
         justify-content: center;
     }
@@ -1768,9 +1768,9 @@ table thead th a:focus {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(90deg, 
-        transparent 0%, 
-        rgba(255, 255, 255, 0.2) 50%, 
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.2) 50%,
         transparent 100%);
 }
 
@@ -1788,9 +1788,9 @@ table thead th a:focus {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(90deg, 
-        transparent 0%, 
-        rgba(255, 255, 255, 0.2) 50%, 
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.2) 50%,
         transparent 100%);
 }
 
@@ -1806,9 +1806,9 @@ table thead th a:focus {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(90deg, 
-        transparent 0%, 
-        rgba(255, 255, 255, 0.2) 50%, 
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.2) 50%,
         transparent 100%);
 }
 
@@ -2032,31 +2032,31 @@ table thead th a:focus {
         flex-direction: column;
         align-items: flex-start;
     }
-    
+
     .database-info {
         margin-right: 0;
         margin-bottom: 8px;
         width: 100%;
         min-width: auto;
     }
-    
+
     .backup-progress-container {
         width: 100%;
         margin-right: 0;
         margin-bottom: 8px;
     }
-    
+
     .database-file-size {
         width: 100%;
         text-align: left;
         min-width: auto;
     }
-    
+
     .backup-summary {
         flex-direction: column;
         align-items: flex-start;
     }
-    
+
     .summary-item {
         margin-bottom: 8px;
     }
@@ -2205,12 +2205,12 @@ table thead th a:focus {
     .additional-interactor-item {
         padding: 12px;
     }
-    
+
     .additional-interactor-arguments {
         padding: 12px;
         margin-top: 12px;
     }
-    
+
     .additional-interactor-item .form-control {
         font-size: 16px; /* Prevent zoom on iOS */
     }
@@ -2348,4 +2348,3 @@ body {
     width: 14px;
     text-align: center;
 }
-

@@ -6,16 +6,18 @@ except:
     CV_VERSION = 2
 
 try:
-    from cv2 import CV_LOAD_IMAGE_GRAYSCALE as IMG_READ_FLAG_GREY
-    from cv import CV_RETR_EXTERNAL as RETR_EXTERNAL
     from cv import CV_CHAIN_APPROX_SIMPLE as CHAIN_APPROX_SIMPLE
+    from cv import CV_RETR_EXTERNAL as RETR_EXTERNAL
+    from cv2 import CV_LOAD_IMAGE_GRAYSCALE as IMG_READ_FLAG_GREY
 except ImportError:
+    from cv2 import CHAIN_APPROX_SIMPLE
     from cv2 import IMREAD_GRAYSCALE as IMG_READ_FLAG_GREY
-    from cv2 import RETR_EXTERNAL, CHAIN_APPROX_SIMPLE
+    from cv2 import RETR_EXTERNAL
 
 import numpy as np
-from ethoscope.roi_builders.roi_builders import BaseROIBuilder
+
 from ethoscope.core.roi import ROI
+from ethoscope.roi_builders.roi_builders import BaseROIBuilder
 
 
 class ImgMaskROIBuilder(BaseROIBuilder):

@@ -1,7 +1,7 @@
 # Coverage configuration for the Ethoscope project
 [run]
 source = src/ethoscope/ethoscope, src/node/ethoscope_node
-omit = 
+omit =
     */tests/*
     */test_*
     */conftest.py

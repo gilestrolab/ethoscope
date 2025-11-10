@@ -1,11 +1,12 @@
-import os
-import time
 import datetime
 import logging
+import os
 import tempfile
-import numpy as np
+import time
 from collections import OrderedDict
-from cv2 import imwrite, IMWRITE_JPEG_QUALITY
+
+import numpy as np
+from cv2 import IMWRITE_JPEG_QUALITY, imwrite
 
 # Constants from base.py
 SENSOR_DEFAULT_PERIOD = 120.0  # Default sensor sampling period in seconds
@@ -15,7 +16,7 @@ IMG_SNAPSHOT_DEFAULT_PERIOD = (
 DAM_DEFAULT_PERIOD = 60.0  # Default DAM activity sampling period in seconds
 
 
-class SensorDataHelper(object):
+class SensorDataHelper:
     """
     Helper class for saving sensor data to database at regular intervals.
 
@@ -149,7 +150,7 @@ class SensorDataHelper(object):
         )
 
 
-class ImgSnapshotHelper(object):
+class ImgSnapshotHelper:
     """
     Helper class for saving image snapshots to database at regular intervals.
 
@@ -240,7 +241,7 @@ class ImgSnapshotHelper(object):
         return cmd, args
 
 
-class DAMFileHelper(object):
+class DAMFileHelper:
     """
     Helper class for generating DAM (Drosophila Activity Monitor) compatible data.
 
@@ -385,7 +386,7 @@ class DAMFileHelper(object):
         return out
 
 
-class Null(object):
+class Null:
     """
     Special NULL representation for SQLite compatibility.
 

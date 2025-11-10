@@ -4,12 +4,13 @@ Base API Infrastructure
 Provides common utilities, decorators, and base classes for all API modules.
 """
 
-import bottle
+import json
 import logging
 import traceback
-import json
-from typing import Any, Dict, Optional
 from functools import wraps
+from typing import Any, Dict
+
+import bottle
 
 
 def error_decorator(func):
@@ -19,7 +20,7 @@ def error_decorator(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except Exception as e:
+        except Exception:
             logging.error(traceback.format_exc())
             return {"error": traceback.format_exc()}
 

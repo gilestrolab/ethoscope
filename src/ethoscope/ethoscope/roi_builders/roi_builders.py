@@ -1,13 +1,12 @@
-from ethoscope.core.roi import ROI
-
 __author__ = "quentin"
+
+import logging
+import traceback
 
 import numpy as np
 
-from ethoscope.utils.description import DescribedObject
 from ethoscope.utils.debug import EthoscopeException
-import logging
-import traceback
+from ethoscope.utils.description import DescribedObject
 
 
 class BaseROIBuilder(DescribedObject):

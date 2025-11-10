@@ -1,24 +1,24 @@
-import traceback
-import logging
-import time
-from ethoscope.control.tracking import ControlThread, ExperimentalInformation
-from ethoscope.utils.description import DescribedObject
-from ethoscope.hardware.input.cameras import V4L2Camera, OurPiCameraAsync
-from ethoscope.utils.debug import EthoscopeException
-import tempfile
-import shutil
-import threading, queue
-import glob
 import datetime
+import logging
 import os
+import pickle
+
+# streaming socket
+import socket
+import struct
+import tempfile
+import threading
+import time
+import traceback
 from collections import OrderedDict
 
 # from cv2 import VideoWriter, VideoWriter_fourcc, imwrite
 import cv2
 
-# streaming socket
-import socket, struct, io
-import pickle
+from ethoscope.control.tracking import ControlThread, ExperimentalInformation
+from ethoscope.hardware.input.cameras import OurPiCameraAsync, V4L2Camera
+from ethoscope.utils.debug import EthoscopeException
+from ethoscope.utils.description import DescribedObject
 
 STREAMING_PORT = 8887
 
@@ -656,7 +656,7 @@ class ControlThreadVideoRecording(ControlThread):
                 timer.start()
                 self._info["autostop"] = self._timer.timer
 
-        except Exception as e:
+        except Exception:
             self.stop(traceback.format_exc())
 
         # for testing purposes

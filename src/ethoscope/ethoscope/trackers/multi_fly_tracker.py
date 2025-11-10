@@ -1,37 +1,32 @@
 __author__ = "quentin"
 # flake8: noqa: E402
-from .adaptive_bg_tracker import AdaptiveBGModel, BackgroundModel, ObjectModel
 from collections import deque
-from math import log10
+
 import cv2
+
+from .adaptive_bg_tracker import BackgroundModel
 
 CV_VERSION = int(cv2.__version__.split(".")[0])
 
-import numpy as np
-from scipy import ndimage
-from scipy.spatial import distance
-
-from ethoscope.core.variables import (
-    XPosVariable,
-    YPosVariable,
-    XYDistance,
-    WidthVariable,
-    HeightVariable,
-    PhiVariable,
-    Label,
-)
-from ethoscope.core.data_point import DataPoint
-from ethoscope.trackers.trackers import BaseTracker, NoPositionError
-from ethoscope.utils.debug import EthoscopeException
 import logging
-
-import matplotlib
-import matplotlib.pyplot as plt
-
 import os
 
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.spatial import distance
 
-class ForegroundModel(object):
+from ethoscope.core.data_point import DataPoint
+from ethoscope.core.variables import (
+    HeightVariable,
+    PhiVariable,
+    WidthVariable,
+    XPosVariable,
+    YPosVariable,
+)
+from ethoscope.trackers.trackers import BaseTracker, NoPositionError
+
+
+class ForegroundModel:
 
     def __init__(
         self,

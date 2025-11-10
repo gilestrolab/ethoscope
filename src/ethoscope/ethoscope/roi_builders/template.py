@@ -7,10 +7,9 @@ from external JSON files, replacing hardcoded parameters in ROI builders.
 
 import json
 import os
+from typing import Any, Dict, List, Union
+
 import numpy as np
-import cv2
-from typing import Dict, List, Union, Optional, Any
-import warnings
 
 from ethoscope.core.roi import ROI
 
@@ -186,7 +185,7 @@ class ROITemplate:
         if isinstance(source, str):
             if not os.path.exists(source):
                 raise FileNotFoundError(f"Template file not found: {source}")
-            with open(source, "r") as f:
+            with open(source) as f:
                 template_data = json.load(f)
         elif isinstance(source, dict):
             template_data = source.copy()

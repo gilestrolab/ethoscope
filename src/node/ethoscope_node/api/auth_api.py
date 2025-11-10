@@ -4,13 +4,9 @@ Authentication API Module
 Handles user authentication, login/logout, and session management endpoints.
 """
 
-import bottle
-import datetime
-import logging
-import time
-from typing import Dict, Any, Optional
-from .base import BaseAPI, error_decorator
 from ethoscope_node.auth.middleware import get_current_user, require_auth
+
+from .base import BaseAPI, error_decorator
 
 
 class AuthAPI(BaseAPI):

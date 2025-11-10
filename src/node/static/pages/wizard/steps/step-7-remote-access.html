@@ -28,9 +28,9 @@
                         <div class="card-body">
                             <div class="form-group mb-2">
                                 <div class="custom-control custom-switch">
-                                    <input type="checkbox" 
-                                           class="custom-control-input" 
-                                           id="enableAuthentication" 
+                                    <input type="checkbox"
+                                           class="custom-control-input"
+                                           id="enableAuthentication"
                                            ng-model="tunnel.authentication_enabled"
                                            ng-disabled="!canDisableAuthentication()">
                                     <label class="custom-control-label" for="enableAuthentication">
@@ -38,14 +38,14 @@
                                     </label>
                                 </div>
                             </div>
-                            
+
                             <div ng-if="!tunnel.enabled" class="alert alert-info mb-0">
                                 <small>
                                     <i class="fa fa-info-circle"></i>
                                     Authentication is optional for local-only access, but provides an extra security layer by requiring users to log in with their PIN.
                                 </small>
                             </div>
-                            
+
                             <div ng-if="tunnel.enabled" class="alert alert-warning mb-0">
                                 <small>
                                     <i class="fa fa-exclamation-triangle"></i>

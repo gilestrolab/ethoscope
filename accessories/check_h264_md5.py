@@ -2,25 +2,25 @@
 # -*- coding: utf-8 -*-
 #
 #  check_h264_md5.py
-#  
+#
 #  Copyright 2020 Giorgio Gilestro <giorgio@gilest.ro>
-#  
+#
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 2 of the License, or
 #  (at your option) any later version.
-#  
+#
 #  This program is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
-#  
+#
 #  You should have received a copy of the GNU General Public License
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
-#  
-  
+#
+
 import os
 import hashlib
 import argparse
@@ -51,7 +51,7 @@ def verify_md5(md5_file_path, replace):
     else:
         print(f"MD5 mismatch for: {h264_file_path}")
         print(f"Expected: {expected_md5}, Calculated: {calculated_md5}")
-        
+
         if replace:
             print("Removing the old .md5 file and creating a new one...")
             # Remove the old .md5 file
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Verify MD5 checksums for video files.')
     parser.add_argument('directory', type=str, help='The directory to crawl for .md5 files.')
     parser.add_argument('--replace', action='store_true', help='Remove the .md5 file on mismatch and replace it with the correct value.')
-    
+
     args = parser.parse_args()
-    
+
     main(args.directory, args.replace)

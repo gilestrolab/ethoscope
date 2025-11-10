@@ -5,9 +5,10 @@ This module contains tests for the various tracking algorithms
 used in the Ethoscope system.
 """
 
-import pytest
+from unittest.mock import MagicMock, Mock, patch
+
 import numpy as np
-from unittest.mock import Mock, patch, MagicMock
+import pytest
 
 # Note: Actual imports would need to be adjusted based on the real module structure
 # from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGTracker

@@ -96450,6 +96450,6 @@ M104 S0
 ;SETTING_3 \n\\n[values]\\n\\n", "extruder_quality": ["[general]\\nversion = 4\\
 ;SETTING_3 nname = Giorgio's Default Quality Settings\\ndefinition = creality_en
 ;SETTING_3 der3pro\\n\\n[metadata]\\ntype = quality_changes\\nquality_type = sta
-;SETTING_3 ndard\\nintent_category = default\\nposition = 0\\nsetting_version = 
+;SETTING_3 ndard\\nintent_category = default\\nposition = 0\\nsetting_version =
 ;SETTING_3 25\\n\\n[values]\\nsmall_feature_speed_factor = 30\\nsmall_hole_max_s
 ;SETTING_3 ize = 10\\n\\n"]}

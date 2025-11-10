@@ -5,12 +5,13 @@ This module provides common pytest fixtures and configuration for all tests
 in the ethoscope_node package.
 """
 
-import pytest
-import tempfile
 import os
 import shutil
-from unittest.mock import Mock, patch
+import tempfile
 from pathlib import Path
+from unittest.mock import Mock, patch
+
+import pytest
 
 # Test data directory
 TEST_DATA_DIR = Path(__file__).parent / "fixtures" / "data"
@@ -77,23 +78,15 @@ def mock_database():
 def mock_config():
     """Mock configuration for testing."""
     config = {
-        "server": {
-            "host": "localhost",
-            "port": 80,
-            "debug": False
-        },
+        "server": {"host": "localhost", "port": 80, "debug": False},
         "database": {
             "host": "localhost",
             "port": 3306,
             "user": "test_user",
             "password": "test_password",
-            "database": "ethoscope_test"
+            "database": "ethoscope_test",
         },
-        "backup": {
-            "enabled": True,
-            "interval": 3600,
-            "retention_days": 30
-        }
+        "backup": {"enabled": True, "interval": 3600, "retention_days": 30},
     }
     return config
 
@@ -111,8 +104,8 @@ def sample_experiment_data():
         "parameters": {
             "tracking_enabled": True,
             "video_recording": False,
-            "stimulation": False
-        }
+            "stimulation": False,
+        },
     }
 
 
@@ -129,7 +122,7 @@ def sample_tracking_data():
             "width": 50,
             "height": 30,
             "angle": 45.0,
-            "area": 1500
+            "area": 1500,
         },
         {
             "timestamp": "2025-01-01T00:00:01Z",
@@ -140,8 +133,8 @@ def sample_tracking_data():
             "width": 52,
             "height": 31,
             "angle": 46.5,
-            "area": 1612
-        }
+            "area": 1612,
+        },
     ]
 
 
@@ -172,11 +165,7 @@ def cleanup_test_files():
     """Automatically clean up test files after each test."""
     yield
     # Clean up any test files that might have been created
-    test_files = [
-        "test_backup.db",
-        "test_config.json",
-        "test_experiment.json"
-    ]
+    test_files = ["test_backup.db", "test_config.json", "test_experiment.json"]
     for file_path in test_files:
         if os.path.exists(file_path):
             os.remove(file_path)
@@ -202,8 +191,5 @@ def mock_zeroconf_service():
     service.port = 9000
     service.server = "test-device.local."
     service.addresses = [b"\xc0\xa8\x01\x64"]  # 192.168.1.100
-    service.properties = {
-        b"device_id": b"test_device_001",
-        b"version": b"1.0.0"
-    }
+    service.properties = {b"device_id": b"test_device_001", b"version": b"1.0.0"}
     return service

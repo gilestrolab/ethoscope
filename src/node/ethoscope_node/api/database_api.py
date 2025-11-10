@@ -5,7 +5,7 @@ Handles database queries for runs and experiments and cached database informatio
 """
 
 import json
-import logging
+
 from .base import BaseAPI, error_decorator
 
 

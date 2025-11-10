@@ -32,7 +32,7 @@ private:
     #elif defined(ESP32)
         static Preferences preferences;
     #endif
-    
+
     static bool initialized;
     static const char* NAMESPACE;
     static StorageError lastError;
@@ -40,19 +40,19 @@ private:
 public:
     static bool begin() {
         if (initialized) return true;
-        
+
         #if defined(ESP8266)
             eeprom.begin(EEPROM_SIZE);
             initialized = true;
         #elif defined(ESP32)
             initialized = preferences.begin(NAMESPACE, false);
         #endif
-        
+
         if (!initialized) {
             lastError = StorageError::NOT_INITIALIZED;
             return false;
         }
-        
+
         lastError = StorageError::NONE;
         return true;
     }
@@ -173,7 +173,7 @@ static bool loadConfig(configuration& cfg) {
             lastError = StorageError::NOT_INITIALIZED;
             return false;
         }
-        
+
         bool success = false;
         #if defined(ESP8266)
             configuration cfg;
@@ -181,7 +181,7 @@ static bool loadConfig(configuration& cfg) {
                 // lastError already set by loadConfig
                 return false;
             }
-            
+
             if (strcmp(field, "name") == 0)
                 strlcpy(cfg.name, value, sizeof(cfg.name));
             else if (strcmp(field, "location") == 0)
@@ -194,7 +194,7 @@ static bool loadConfig(configuration& cfg) {
                 lastError = StorageError::INVALID_FIELD;
                 return false;
             }
-            
+
             success = saveConfig(cfg);
         #elif defined(ESP32)
             success = preferences.putString(field, value);
@@ -203,7 +203,7 @@ static bool loadConfig(configuration& cfg) {
                 return false;
             }
         #endif
-        
+
         lastError = StorageError::NONE;
         return success;
     }
@@ -213,7 +213,7 @@ static bool loadConfig(configuration& cfg) {
             lastError = StorageError::NOT_INITIALIZED;
             return false;
         }
-        
+
         #if defined(ESP8266)
             eeprom.write(EEPROM_START, 0);  // Clear validation marker
             return eeprom.commit();

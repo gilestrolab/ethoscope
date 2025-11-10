@@ -1,13 +1,15 @@
 __author__ = "quentin"
 
-from threading import Thread
+import collections
+import json
+import logging
 import os
 import time
-import collections
-import logging
+import urllib.error
+import urllib.parse
+import urllib.request
+from threading import Thread
 
-import urllib.request, urllib.error, urllib.parse
-import json
 import serial
 
 
@@ -88,7 +90,7 @@ def connectedUSB(optional_file="/etc/ethoscope/modules.json"):
 
     # potential user-specified interactors
     if os.path.exists(optional_file):
-        with open(optional_file, "r") as optional_modules_file:
+        with open(optional_file) as optional_modules_file:
             known.update(json.load(optional_modules_file))
 
     try:  # needed for compatibility with older images
@@ -97,8 +99,8 @@ def connectedUSB(optional_file="/etc/ethoscope/modules.json"):
         devices = [
             "%s:%s"
             % (
-                "{:x}".format(dev.idVendor).zfill(4),
-                "{:x}".format(dev.idProduct).zfill(4),
+                f"{dev.idVendor:x}".zfill(4),
+                f"{dev.idProduct:x}".zfill(4),
             )
             for dev in usb.core.find(find_all=True)
         ]
@@ -185,7 +187,7 @@ class HardwareConnection(Thread):
         self.__init__(state["interface_class"], *state["interface_args"], **kwargs)
 
 
-class SimpleSerialInterface(object):
+class SimpleSerialInterface:
     def __init__(self, port=None, baud=115200, warmup=False):
         """
         Template class which is an abstract representation of a Serial hardware interface.
@@ -216,9 +218,9 @@ class SimpleSerialInterface(object):
             pass
 
     def _find_port(self):
-        from serial.tools import list_ports
-        import serial
         import os
+
+        from serial.tools import list_ports
 
         all_port_tuples = list_ports.comports()
         logging.info("listing serial ports")
@@ -340,7 +342,7 @@ class ScanException(Exception):
     pass
 
 
-class EthoscopeSensor(object):
+class EthoscopeSensor:
     """
     Class providing access to an ESP32 based WIFI ethoscope sensor
     """

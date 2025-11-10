@@ -5,10 +5,12 @@ Handles ROI template management including listing, uploading, and deployment
 to devices. Supports both built-in and custom templates.
 """
 
-import bottle
+import hashlib
 import json
 import os
-import hashlib
+
+import bottle
+
 from .base import BaseAPI, error_decorator
 
 
@@ -79,7 +81,7 @@ class ROITemplateAPI(BaseAPI):
     def _parse_template_file(self, filepath: str, template_type: str):
         """Parse a template file and return template info."""
         try:
-            with open(filepath, "r") as f:
+            with open(filepath) as f:
                 file_content = f.read()
                 template_data = json.loads(file_content)
 
@@ -128,7 +130,7 @@ class ROITemplateAPI(BaseAPI):
 
         if os.path.exists(builtin_path):
             try:
-                with open(builtin_path, "r") as f:
+                with open(builtin_path) as f:
                     return json.load(f)
             except Exception as e:
                 self.abort_with_error(500, f"Error loading builtin template: {e}")
@@ -137,7 +139,7 @@ class ROITemplateAPI(BaseAPI):
         custom_path = os.path.join(self.roi_templates_dir, f"{template_name}.json")
         if os.path.exists(custom_path):
             try:
-                with open(custom_path, "r") as f:
+                with open(custom_path) as f:
                     return json.load(f)
             except Exception as e:
                 self.abort_with_error(500, f"Error loading custom template: {e}")
@@ -166,7 +168,7 @@ class ROITemplateAPI(BaseAPI):
             upload.save(filepath)
 
             # Validate template
-            with open(filepath, "r") as f:
+            with open(filepath) as f:
                 template_data = json.load(f)
 
             # Basic validation

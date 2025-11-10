@@ -20,7 +20,7 @@ with open(links_file, 'r') as file:
 images = links['images']
 gcodes = links['gcodes']
 onshape = links['onshape']
-gcodes_zip = links['gcodes_zip']           
+gcodes_zip = links['gcodes_zip']
 
 # Open and read the txt file with news
 news = []
@@ -36,7 +36,7 @@ def enable_cors():
         bottle.response.headers['Access-Control-Allow-Origin'] = origin
     else:
         bottle.response.headers['Access-Control-Allow-Origin'] = '*'
-    
+
     # Other CORS headers
     bottle.response.headers['Access-Control-Allow-Methods'] = 'PUT, GET, POST, DELETE, OPTIONS'
     bottle.response.headers['Access-Control-Allow-Headers'] = 'Origin, Accept, Content-Type, X-Requested-With, X-CSRF-Token'
@@ -70,7 +70,7 @@ def resources():
         resolve = f"Error during DNS resolution: {str(e)}"
 
     logging.info("%s - Receiving request from %s - %s" % (datetime.datetime.now(), client, resolve))
-    
+
     bottle.response.content_type = 'application/json'
     return json.dumps({"images": images, "gcodes": gcodes, "onshape": onshape, 'gcodes_zip': gcodes_zip, 'date': "", 'version': ""})
 
@@ -107,10 +107,9 @@ if __name__ == '__main__':
     DEBUG = option_dict["debug"]
 
     if DEBUG:
-        logging.basicConfig(filename=LOGFILE, level=logging.INFO)    
+        logging.basicConfig(filename=LOGFILE, level=logging.INFO)
 
     if KEY and CERT:
         bottle.run(app, host='0.0.0.0', port=PORT, debug=DEBUG, server='gunicorn', reloader=1, keyfile='key.pem', certfile='cert.pem')
     else:
         bottle.run(app, host='0.0.0.0', port=PORT, debug=DEBUG)
-    

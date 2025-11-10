@@ -6,11 +6,10 @@ loading builtin templates, validating templates, and converting legacy
 ROI builders to template format.
 """
 
-import os
 import json
-from typing import Dict, List, Union, Optional, Any
+import os
 import warnings
-import shutil
+from typing import Any, Dict, List, Optional, Union
 
 from ethoscope.roi_builders.template import ROITemplate, ROITemplateValidationError
 
@@ -102,7 +101,7 @@ class ROITemplateManager:
 
             filepath = os.path.join(directory, filename)
             try:
-                with open(filepath, "r") as f:
+                with open(filepath) as f:
                     data = json.load(f)
 
                 template_info = data.get("template_info", {})
@@ -236,7 +235,7 @@ class ROITemplateManager:
 
                 filepath = os.path.join(directory, filename)
                 try:
-                    with open(filepath, "r") as f:
+                    with open(filepath) as f:
                         file_content = f.read()
                         template_data = json.loads(file_content)
 

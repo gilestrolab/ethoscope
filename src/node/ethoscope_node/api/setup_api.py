@@ -4,13 +4,13 @@ Setup API Module
 Handles installation wizard and first-time setup functionality.
 """
 
-import bottle
 import os
-import datetime
-import shutil
 from pathlib import Path
-from .base import BaseAPI, error_decorator
+
+import bottle
 from ethoscope_node.utils.etho_db import ExperimentalDB
+
+from .base import BaseAPI, error_decorator
 
 
 class SetupAPI(BaseAPI):
@@ -79,6 +79,7 @@ class SetupAPI(BaseAPI):
     def _get_system_info(self):
         """Get system information for setup validation."""
         import socket
+
         import psutil
 
         # Get hostname
@@ -402,7 +403,7 @@ class SetupAPI(BaseAPI):
             if (
                 result >= 0
             ):  # 0 means no changes needed, >= 1 means rows updated, -1 means error
-                return {"result": "success", "message": f"User updated successfully"}
+                return {"result": "success", "message": "User updated successfully"}
             else:
                 return {"result": "error", "message": "Failed to update user"}
 
@@ -487,7 +488,7 @@ class SetupAPI(BaseAPI):
             ):  # 0 means no changes needed, >= 1 means rows updated, -1 means error
                 return {
                     "result": "success",
-                    "message": f"Incubator updated successfully",
+                    "message": "Incubator updated successfully",
                 }
             else:
                 return {"result": "error", "message": "Failed to update incubator"}
@@ -694,8 +695,8 @@ class SetupAPI(BaseAPI):
     def _test_smtp(self, smtp_config):
         """Test SMTP configuration by sending a test email."""
         import smtplib
-        from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
 
         try:
             # Get configuration
@@ -928,9 +929,9 @@ Ethoscope Node Setup Wizard
                 }
 
             # Test the weather API
-            import urllib.request
-            import urllib.error
             import json
+            import urllib.error
+            import urllib.request
 
             # Determine URL format based on location
             if "," in weather_location and len(weather_location.split(",")) == 2:

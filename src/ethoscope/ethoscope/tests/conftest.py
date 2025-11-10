@@ -5,13 +5,14 @@ This module provides common pytest fixtures and configuration for all tests
 in the ethoscope device package.
 """
 
-import pytest
-import tempfile
 import os
 import shutil
-import numpy as np
-from unittest.mock import Mock, patch
+import tempfile
 from pathlib import Path
+from unittest.mock import Mock, patch
+
+import numpy as np
+import pytest
 
 # Test data directory
 TEST_DATA_DIR = Path(__file__).parent / "static_files"

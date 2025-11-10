@@ -35,5 +35,3 @@ ethoscope.trackers.adaptive_bg_tracker module
     :members:
     :undoc-members:
     :show-inheritance:
-
-

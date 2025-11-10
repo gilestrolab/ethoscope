@@ -17,12 +17,12 @@ def find_db_file(base_path, ethoscope_number, experiment_date):
     """
     matches = []
     pattern = f"{experiment_date}_*_*{ethoscope_number:03d}*.db"
-    
+
     # Walk through the directory and find matching files
     for root, dirnames, filenames in os.walk(base_path):
         for filename in fnmatch.filter(filenames, pattern):
             matches.append(os.path.join(root, filename))
-    
+
     return matches
 
 def main():
@@ -32,20 +32,20 @@ def main():
                                           "  %prog -e 268 -d 2024-06*\n"
                                           "  %prog -e 268 -d 2024*\n"
                                           "  %prog -e 268 -d 2024-06-21 --basepath /path/to/data")
-    
+
     parser.add_option('-e', '--ethoscope', dest='ethoscope_number', type='int', help='Ethoscope number', metavar='ETHOSCOPE_NUMBER')
     parser.add_option('-d', '--date', dest='experiment_date', help='Experiment date pattern (e.g., 2024-06-21, 2024-06*, 2024*)', metavar='DATE_PATTERN')
     parser.add_option('--basepath', dest='base_path', default='/mnt/data/results', help='Base path to search in (default: /mnt/data/results)', metavar='BASE_PATH')
-    
+
     (options, args) = parser.parse_args()
-    
+
     if not options.ethoscope_number:
         parser.error('Ethoscope number not given')
     if not options.experiment_date:
         parser.error('Experiment date not given')
-    
+
     matching_files = find_db_file(options.base_path, options.ethoscope_number, options.experiment_date)
-    
+
     if matching_files:
         for file_path in matching_files:
             print(file_path)

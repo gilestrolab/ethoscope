@@ -2,8 +2,8 @@ __author__ = "quentin"
 
 from collections import deque
 
-from ethoscope.utils.description import DescribedObject
 from ethoscope.core.variables import *
+from ethoscope.utils.description import DescribedObject
 
 
 class NoPositionError(Exception):

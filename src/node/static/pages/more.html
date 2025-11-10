@@ -5,9 +5,9 @@
             <div class="col-12">
                 <div class="d-flex flex-wrap justify-content-start">
                     <div ng-repeat="option in options" class="p-2">
-                        <a href="" ng-click="exec_option(option.opt)" data-toggle="tooltip" 
-                           class="option {{option.color}} d-flex align-items-center justify-content-center" 
-                           style="{{option.style}}; min-width: 120px; min-height: 80px;" 
+                        <a href="" ng-click="exec_option(option.opt)" data-toggle="tooltip"
+                           class="option {{option.color}} d-flex align-items-center justify-content-center"
+                           style="{{option.style}}; min-width: 120px; min-height: 80px;"
                            title="{{option.name}}">
                             <p class="{{option.icon}} mb-0"></p>
                         </a>
@@ -129,7 +129,7 @@
                 <h3>Upstream version: {{origin.version.id | limitTo:6}} ({{origin.version.date}})</h3>
                 <h3>Node version: {{node.version.id | limitTo:6}} ({{node.version.date}})</h3>
                 <h4>{{update_text}}</h4>
-                
+
                 <div class="mb-3">
         <!--<h2>The following devices will be updated.</h2>-->
         <button class="btn btn-success" ng-click="update_selected('all')" data-toggle="modal" data-target="#updateDevicesModal">Update All Devices</button>
@@ -235,7 +235,7 @@
                             <pre class="command">{{cmd.command}}</pre>
                         </div>
                     </li>
-                </ul>        
+                </ul>
             </div>
         </div>
     </div>
@@ -269,7 +269,7 @@
                 <p>Service running: {{nodeManagement.info.active_since}}</p>
             </div>
         </div>
-        
+
         <!-- Three-column layout for info sections -->
         <div class="row">
             <div class="col-md-4">
@@ -284,7 +284,7 @@
                     <li class="list-group-item">Result dir: {{nodeManagement.info.RDIR}}</li>
                 </ul>
             </div>
-            
+
             <div class="col-md-4">
                 <p><strong>Version info:</strong></p>
                 <ul class="list-group">
@@ -294,7 +294,7 @@
                     <li class="list-group-item">Needs update: {{nodeManagement.info.NEEDS_UPDATE}}</li>
                 </ul>
             </div>
-            
+
             <div class="col-md-4">
                 <p><strong>Network Cards:</strong></p>
                 <ul class="list-group">
@@ -360,7 +360,7 @@
               </span>
             </li>
         </ul>
-        
+
         <ul class="list-group col-12">
         <h3>Folders</h3>
             <form>
@@ -448,7 +448,7 @@
 
             <label class="input"><span ng-hide="selected['sensors'].name != null">Sensor Name</span><input type="text" name="name" ng-model="selected['sensors'].name" required ng-required="true" style="width: 240px;"></label>
             <label class="input"><span ng-hide="selected['sensors'].URL != null">URL</span><input type="text" name="url" ng-model="selected['sensors'].URL" required ng-required="true" style="width: 240px;"></label>
-            
+
 <!--
             <label class="input"><span ng-hide="selected['sensors'].location != null">Location</span><input type="text" name="location" ng-model="selected['sensors'].location" required ng-required="true" style="width: 240px;"></label>
 -->
@@ -484,4 +484,3 @@
                         });
 
 })();</script>
-

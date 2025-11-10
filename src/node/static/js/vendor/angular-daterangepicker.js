@@ -91,7 +91,7 @@
         _validateMax = _validate(function(max, end) {
           return max.isAfter(end) || max.isSame(end, 'day');
         });
-        //The formatter has been modified from original version 
+        //The formatter has been modified from original version
         //to provide a "formatted" field - this makes things easier to handle
         modelCtrl.$formatters.push(function(objValue) {
           var f;
@@ -101,12 +101,12 @@
               console.warn('Moment.js not available in daterangepicker formatter');
               return null; // Return null instead of empty string to prevent NaN display
             }
-            
+
             // Handle null/undefined dates
             if (date === null || date === undefined) {
               return null;
             }
-            
+
             var momentObj;
             try {
               if (!moment.isMoment(date)) {
@@ -114,26 +114,26 @@
               } else {
                 momentObj = date;
               }
-              
+
               // Validate the moment object before formatting
               if (!momentObj.isValid()) {
                 console.warn('Invalid date in daterangepicker formatter:', date);
                 return null;
               }
-              
+
               return momentObj.format(opts.locale.format);
             } catch (e) {
               console.warn('Error formatting date in daterangepicker:', date, e);
               return null;
             }
           };
-          
+
           if (opts.singleDatePicker && objValue) {
             return f(objValue);
           } else if (objValue && objValue.startDate) {
             var startFormatted = f(objValue.startDate);
             var endFormatted = f(objValue.endDate);
-            
+
             // Only format if both dates are valid and not null
             if (startFormatted !== null && endFormatted !== null && startFormatted && endFormatted) {
               objValue.formatted = [startFormatted, endFormatted].join(opts.locale.separator);
@@ -148,7 +148,7 @@
                 modelCtrl.$modelValue.formatted = modelCtrl.$viewValue;
             }
         });
-        
+
         modelCtrl.$render = function() {
           if (modelCtrl.$modelValue && modelCtrl.$modelValue.startDate) {
             _setStartDate(modelCtrl.$modelValue.startDate);
@@ -158,7 +158,7 @@
           }
           return el.val(modelCtrl.$viewValue);
         };
-        
+
         modelCtrl.$parsers.push(function(val) {
           var f, objValue, x;
           f = function(value) {
@@ -192,14 +192,14 @@
           }
           return objValue;
         });
-        
+
         modelCtrl.$isEmpty = function(val) {
           return !(angular.isString(val) && val.length > 0);
         };
         // Initialize retry tracking
         var retryCount = 0;
         var maxRetries = 10;
-        
+
         _init = function() {
           // Check if required dependencies are available
           if (typeof moment === 'undefined') {
@@ -213,7 +213,7 @@
             $timeout(_init, retryDelay);
             return;
           }
-          
+
           if (typeof $.fn.daterangepicker === 'undefined') {
             retryCount++;
             if (retryCount > maxRetries) {
@@ -225,10 +225,10 @@
             $timeout(_init, retryDelay);
             return;
           }
-          
+
           // Reset retry count on successful initialization
           retryCount = 0;
-          
+
           var eventType, results;
           el.daterangepicker(angular.extend(opts, {
             autoUpdateInput: false
@@ -251,7 +251,7 @@
           }
           return results;
         };
-        
+
         // Use $timeout to defer initialization until next digest cycle
         $timeout(_init, 0);
         $scope.$watch('model.startDate', function(n) {

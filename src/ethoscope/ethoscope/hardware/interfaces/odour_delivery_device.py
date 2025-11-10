@@ -4,9 +4,6 @@ _author__ = "quentin"
 import time
 
 from ethoscope.hardware.interfaces.lynx_motion import LynxMotionInterface
-from ethoscope.hardware.interfaces.sleep_depriver_interface import (
-    SleepDepriverInterface,
-)
 
 
 class OdourDelivererInterface(LynxMotionInterface):

@@ -32,7 +32,7 @@ ETHOSCOPE_DIR="/opt/ethoscope"
 # Service files for different installation types
 NODE_SERVICES=(
     "ethoscope_backup"
-    "ethoscope_node" 
+    "ethoscope_node"
     "ethoscope_update_node"
     "ethoscope_video_backup"
     "virtuascope"
@@ -79,15 +79,15 @@ detect_installation_type() {
             return
         fi
     done
-    
+
     # Check if device services are running
     for service in "${DEVICE_SERVICES[@]}"; do
         if systemctl is-active --quiet "${service}.service" 2>/dev/null; then
-            echo "device" 
+            echo "device"
             return
         fi
     done
-    
+
     echo "none"
 }
 
@@ -95,16 +95,16 @@ detect_installation_type() {
 show_status() {
     log "Ethoscope Installation Status"
     echo "=============================="
-    
+
     local install_type
     install_type=$(detect_installation_type)
     echo "Installation type: $install_type"
     echo
-    
+
     echo "Directory Status:"
     echo "  $ETHOSCOPE_DIR: $([ -d "$ETHOSCOPE_DIR" ] && echo "EXISTS" || echo "NOT FOUND")"
     echo
-    
+
     echo "Service Status:"
     for service in "${NODE_SERVICES[@]}" "${DEVICE_SERVICES[@]}"; do
         local status="INACTIVE"
@@ -119,7 +119,7 @@ show_status() {
 stop_services() {
     local services_to_check=()
     local install_type="$1"
-    
+
     case "$install_type" in
         "node")
             services_to_check+=("${NODE_SERVICES[@]}")
@@ -128,7 +128,7 @@ stop_services() {
             services_to_check+=("${DEVICE_SERVICES[@]}")
             ;;
     esac
-    
+
     log "Stopping services..."
     for service in "${services_to_check[@]}"; do
         if systemctl is-active --quiet "${service}.service" 2>/dev/null; then
@@ -136,7 +136,7 @@ stop_services() {
             systemctl stop "${service}.service" || warn "Failed to stop ${service}.service"
         fi
     done
-    
+
     # Wait for services to stop
     sleep 2
 }
@@ -144,31 +144,31 @@ stop_services() {
 # Fresh install node
 install_node() {
     log "Performing fresh node installation..."
-    
+
     # Remove old directories and clone fresh
     log "Removing old ethoscope directories..."
     rm -rf /opt/ethoscope*
-    
+
     log "Cloning fresh repository..."
     git clone git://node/ethoscope.git /opt/ethoscope
     cd /opt/ethoscope && git checkout dev
-    
+
     # Install Python packages
     log "Installing ethoscope Python package..."
     cd /opt/ethoscope/src/ethoscope/
     pip install -e . --break-system-packages --no-build-isolation || warn "Failed to install ethoscope package"
-    
+
     log "Installing node Python package..."
     cd /opt/ethoscope/src/node/
     pip install -e . --break-system-packages --no-build-isolation || warn "Failed to install node package"
-    
+
     # Remove old service files and link new ones
     log "Removing old service files..."
     rm -f /usr/lib/systemd/system/ethoscope*
-    
+
     log "Linking new service files..."
     ln -s /opt/ethoscope/scripts/ethoscope_{node,update_node,backup,video_backup}.service virtuascope.service /usr/lib/systemd/system/
-    
+
     # Reload systemd
     log "Reloading systemd daemon..."
     systemctl daemon-reload
@@ -177,31 +177,31 @@ install_node() {
 # Fresh install device
 install_device() {
     log "Performing fresh device installation..."
-    
+
     # Remove old directories and clone fresh
     log "Removing old ethoscope directories..."
     rm -rf /opt/ethoscope*
-    
+
     log "Cloning fresh repository..."
     git clone git://node/ethoscope.git /opt/ethoscope
     cd /opt/ethoscope && git checkout dev
-    
+
     # Install Python package
     log "Installing ethoscope Python package..."
     cd /opt/ethoscope/src/ethoscope/
     pip install -e . --break-system-packages --no-build-isolation || warn "Failed to install ethoscope package"
-    
+
     # Remove old service files and link new ones
     log "Removing old service files..."
     rm -f /usr/lib/systemd/system/ethoscope*
-    
+
     log "Linking new service files..."
     ln -s /opt/ethoscope/scripts/ethoscope_{listener,device,update,GPIO_listener}.service /usr/lib/systemd/system/
-    
+
     # Reload systemd
     log "Reloading systemd daemon..."
     systemctl daemon-reload
-    
+
     # Create ethoscope user
     log "Creating ethoscope user..."
     useradd -m ethoscope && passwd ethoscope
@@ -210,9 +210,9 @@ install_device() {
 # Start services
 finalize_installation() {
     local install_type="$1"
-    
+
     log "Starting services..."
-    
+
     case "$install_type" in
         "node")
             log "Starting node services..."
@@ -229,13 +229,13 @@ finalize_installation() {
 perform_installation() {
     local auto_mode="$1"
     local install_type="$2"
-    
+
     log "Starting ethoscope fresh installation..."
-    
+
     # If install type not provided, try to detect it
     if [[ -z "$install_type" ]]; then
         install_type=$(detect_installation_type)
-        
+
         # If still can't detect, ask user
         if [[ "$install_type" == "none" && "$auto_mode" != "--auto" ]]; then
             echo
@@ -262,9 +262,9 @@ perform_installation() {
             exit 1
         fi
     fi
-    
+
     log "Installation type: $install_type"
-    
+
     # Interactive confirmation unless in auto mode
     if [[ "$auto_mode" != "--auto" ]]; then
         echo
@@ -285,10 +285,10 @@ perform_installation() {
             exit 0
         fi
     fi
-    
+
     # Perform installation steps
     stop_services "$install_type"
-    
+
     case "$install_type" in
         "node")
             install_node
@@ -301,9 +301,9 @@ perform_installation() {
             exit 1
             ;;
     esac
-    
+
     finalize_installation "$install_type"
-    
+
     success "Fresh installation completed successfully!"
     echo
     log "Ethoscope installed at: $ETHOSCOPE_DIR"

@@ -5,7 +5,7 @@
 
     app.factory('ethoscopeFormService', function($http, $timeout) {
         return {
-            
+
             /**
              * Initialize form options with default values
              * @param {string} optionType - Type of options (tracking, recording, update_machine)

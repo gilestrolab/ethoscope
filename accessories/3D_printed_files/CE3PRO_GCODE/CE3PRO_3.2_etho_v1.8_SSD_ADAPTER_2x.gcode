@@ -94187,7 +94187,7 @@ M117 That's All Folks!
 M82 ;absolute extrusion mode
 M104 S0
 ;End of Gcode
-;SETTING_3 {"global_quality": "[general]\\nversion = 4\\nname = Lower Quality - 
+;SETTING_3 {"global_quality": "[general]\\nversion = 4\\nname = Lower Quality -
 ;SETTING_3 Higher speed\\ndefinition = creality_ender3pro\\n\\n[metadata]\\ntype
 ;SETTING_3  = quality_changes\\nquality_type = low\\nsetting_version = 25\\n\\n[
 ;SETTING_3 values]\\nspeed_slowdown_layers = 1\\n\\n", "extruder_quality": ["[ge

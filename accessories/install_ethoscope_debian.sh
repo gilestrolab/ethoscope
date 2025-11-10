@@ -46,7 +46,7 @@ detect_pi_model() {
     # Get the hardware model from /proc/cpuinfo
     local model=$(grep 'Model' /proc/cpuinfo | awk -F': ' '{print $2}')
     local revision=$(grep 'Revision' /proc/cpuinfo | awk '{print $3}')
-    
+
     # Determine Pi model for filename
     if [[ "$revision" == "a01041" || "$revision" == "a21041" || "$revision" == "a22042" ]]; then
         PI_MODEL="pi2"
@@ -59,7 +59,7 @@ detect_pi_model() {
     else
         PI_MODEL="pi"
     fi
-    
+
     echo "Detected Raspberry Pi model: $PI_MODEL (revision: $revision)"
 }
 
@@ -67,10 +67,10 @@ determine_config_paths() {
     # Initialize configuration paths
     MYCNF=""
     BOOTCFG=""
-    
+
     if [ -f "/etc/os-release" ]; then
         . /etc/os-release
-        
+
         if [[ "$ID" == "debian" ]]; then
             MYCNF="/etc/mysql/mariadb.conf.d/ethoscope.cnf"
             BOOTCFG="/boot/firmware/config.txt"
@@ -115,7 +115,7 @@ install_apt_packages() {
 
     #the rest will be installed via pip
 
-    echo "All necessary packages were installed. Now reboot."        
+    echo "All necessary packages were installed. Now reboot."
 }
 
 #===============================================================================
@@ -215,16 +215,16 @@ configure_time_sync() {
 enable_system_services() {
     echo "Enabling ethoscope device services..."
     systemctl enable ethoscope_device.service ethoscope_listener.service ethoscope_update.service ethoscope_GPIO_listener.service
-    
+
     # Enable system services with proper service names for Debian/Raspbian
     echo "Enabling system services..."
-    
+
     # NTP service - handle aliases and find the real service
     echo "Configuring NTP service..."
-    
+
     # First try to resolve the actual service behind ntp.service alias
     local actual_ntp_service=""
-    
+
     # Method 1: Check what ntp.service is aliased to
     if [ -L "/lib/systemd/system/ntp.service" ]; then
         actual_ntp_service=$(readlink -f "/lib/systemd/system/ntp.service" | xargs basename)
@@ -233,13 +233,13 @@ enable_system_services() {
         actual_ntp_service=$(readlink -f "/usr/lib/systemd/system/ntp.service" | xargs basename)
         echo "Found ntp.service aliased to: $actual_ntp_service"
     fi
-    
+
     # Method 2: Check if ntp.service is a real file (not alias)
     if [ -z "$actual_ntp_service" ] && [ -f "/lib/systemd/system/ntp.service" ] && [ ! -L "/lib/systemd/system/ntp.service" ]; then
         actual_ntp_service="ntp.service"
         echo "Found actual ntp.service file"
     fi
-    
+
     # Method 3: Fall back to common alternatives
     if [ -z "$actual_ntp_service" ]; then
         for service in "systemd-timesyncd.service" "ntpd.service" "chronyd.service"; do
@@ -250,7 +250,7 @@ enable_system_services() {
             fi
         done
     fi
-    
+
     # Enable the actual service
     if [ -n "$actual_ntp_service" ]; then
         if systemctl enable "$actual_ntp_service"; then
@@ -261,7 +261,7 @@ enable_system_services() {
     else
         echo "Warning: No NTP service found - manual NTP configuration may be required"
     fi
-    
+
     # MariaDB/MySQL service (usually mariadb.service on Debian)
     if systemctl list-unit-files | grep -q "^mariadb\.service"; then
         systemctl enable mariadb.service
@@ -275,7 +275,7 @@ enable_system_services() {
     else
         echo "Warning: No MySQL/MariaDB service found"
     fi
-    
+
     # SSH service (usually ssh.service on Debian)
     if systemctl list-unit-files | grep -q "^ssh\.service"; then
         systemctl enable ssh.service
@@ -286,7 +286,7 @@ enable_system_services() {
     else
         echo "Warning: No SSH service found"
     fi
-    
+
     # Avahi daemon (usually available)
     if systemctl list-unit-files | grep -q "^avahi-daemon\.service"; then
         systemctl enable avahi-daemon.service
@@ -302,11 +302,11 @@ enable_system_services() {
 
 configure_network() {
     echo "Configuring network interfaces (ethernet + WiFi)..."
-    
+
     # Disable conflicting network managers first
     systemctl disable NetworkManager ModemManager dhcpcd || true
     systemctl stop NetworkManager ModemManager dhcpcd || true
-    
+
     # Create wired network config for eth0
     cat > /etc/systemd/network/20-wired.network << 'EOF'
 [Match]
@@ -321,7 +321,7 @@ RouteMetric=10
 UseDNS=yes
 EOF
 
-    # WiFi configuration  
+    # WiFi configuration
     cat > /etc/systemd/network/25-wireless.network << 'EOF'
 [Match]
 Name=wlan0
@@ -338,12 +338,12 @@ EOF
     # Enable systemd-networkd and resolved
     systemctl enable systemd-networkd systemd-resolved
     systemctl disable systemd-networkd-wait-online  # Prevent boot hangs
-    
+
     # Ensure interfaces are up
     echo "Bringing up network interfaces..."
     ip link set eth0 up || true
     ip link set wlan0 up || true
-    
+
     # Create resolved configuration
     mkdir -p /etc/systemd/resolved.conf.d
     cat > /etc/systemd/resolved.conf.d/ethoscope.conf << 'EOF'
@@ -439,13 +439,13 @@ EOF
 
 configure_mariadb() {
     echo "Configuring MariaDB for ethoscope use on $PI_MODEL..."
-    
+
     # Set memory limits based on Pi model
     local buffer_pool_size="64M"
     local log_file_size="16M"
     local key_buffer_size="16M"
     local max_connections="50"
-    
+
     if [[ "$PI_MODEL" == "pi2" ]]; then
         buffer_pool_size="32M"
         log_file_size="8M"
@@ -467,11 +467,11 @@ configure_mariadb() {
         key_buffer_size="64M"
         max_connections="100"
     fi
-    
+
     # Ensure config directory exists
     if [ -n "$MYCNF" ]; then
         mkdir -p "$(dirname "$MYCNF")"
-        
+
         echo "Creating MariaDB configuration at $MYCNF..."
         cat > "$MYCNF" <<EOF
 [server]
@@ -494,7 +494,7 @@ max_connections = $max_connections
 innodb_flush_log_at_trx_commit = 2
 sync_binlog = 0
 EOF
-        
+
         echo "MariaDB configuration written successfully for $PI_MODEL"
     else
         echo "WARNING: Could not determine MariaDB config location for this OS"
@@ -507,9 +507,9 @@ EOF
 
 configure_raspberry_pi_hardware() {
     local revision=$(grep 'Revision' /proc/cpuinfo | awk '{print $3}')
-    
+
     echo "Configuring Raspberry Pi $PI_MODEL hardware..."
-    
+
     # Common settings for all Pi versions
     echo "Disabling Bluetooth (not needed for ethoscope)..."
     echo 'dtoverlay=disable-bt' >> "$BOOTCFG"
@@ -524,7 +524,7 @@ configure_raspberry_pi_hardware() {
     # Camera configuration based on Pi model
     echo "Configuring camera for $PI_MODEL..."
     echo 'disable_camera_led=1' >> "$BOOTCFG"
-    
+
     if [[ "$PI_MODEL" == "pi2" || "$PI_MODEL" == "pi3" ]]; then
         echo "Configuring legacy camera (Pi 2/3)..."
         echo 'start_file=start_x.elf' >> "$BOOTCFG"
@@ -539,25 +539,25 @@ configure_raspberry_pi_hardware() {
 
         echo 'Loading bcm2835 module for legacy camera'
         echo 'bcm2835-v4l2' > /etc/modules-load.d/picamera.conf
-        
+
     elif [[ "$PI_MODEL" == "pi4" ]]; then
         echo "Configuring camera for Pi 4..."
         echo 'dtoverlay=vc4-kms-v3d' >> "$BOOTCFG"
         echo 'gpu_mem=256' >> "$BOOTCFG"
         echo 'dtoverlay=imx219' >> "$BOOTCFG"
-        
+
     elif [[ "$PI_MODEL" == "pi5" ]]; then
         echo "Configuring camera for Pi 5..."
         echo 'dtoverlay=vc4-kms-v3d' >> "$BOOTCFG"
         echo 'gpu_mem=256' >> "$BOOTCFG"
         echo 'dtoverlay=imx219' >> "$BOOTCFG"
-        
+
     else
         echo "Unknown Pi model, using basic camera configuration..."
         echo 'gpu_mem=128' >> "$BOOTCFG"
         echo 'dtoverlay=imx219' >> "$BOOTCFG"
     fi
-    
+
     # Enable camera interface for all models
     echo 'camera_auto_detect=1' >> "$BOOTCFG"
     echo 'dtparam=camera=on' >> "$BOOTCFG"
@@ -571,7 +571,7 @@ main() {
     check_root
     detect_pi_model
     determine_config_paths
-    
+
     setup_ethoscope_user
     install_ethoscope_software
     configure_system_identity
@@ -582,7 +582,7 @@ main() {
     setup_mariadb
     configure_mariadb
     configure_raspberry_pi_hardware
-    
+
     echo ""
     echo "==============================================="
     echo "Ethoscope installation completed successfully!"
