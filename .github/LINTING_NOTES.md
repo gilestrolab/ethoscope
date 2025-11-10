@@ -22,6 +22,22 @@ The CI/CD pipeline enforces code quality standards with some temporary exception
 - Matches actual deployment environments (Raspbian Bullseye/Bookworm, Arch Linux)
 - Reduces CI execution time by ~40%
 
+**Fixed All Flake8 Linting Errors (Commit d06d7dcd):**
+Systematic fixes for all linting issues failing in CI:
+- **Trailing whitespace** (W291): Fixed in io/cache.py and io/helpers.py
+- **Undefined names** (F821): Added lazy imports in io/base.py
+- **Bad comparisons** (E712/E714/E711): Changed `== True/False/None` to `is True/False/None`
+- **Redefinitions** (F811): Added noqa comments for intentional overrides
+- **Import order** (E402): Fixed stdlib imports placement
+- **Ambiguous names** (E741): Renamed single-letter variables
+- **F-strings** (F541): Removed `f` prefix from strings without placeholders
+
+**Updated Pre-Commit Hooks (Commit d06d7dcd):**
+- Pre-commit hooks now use **exact same settings as CI**
+- All linting errors caught locally before pushing
+- Added docs/conf.py to exclusions
+- **Result**: If pre-commit passes, CI will pass!
+
 All dependencies now use versions compatible with Python 3.9+.
 
 ### Current Formatting Status
