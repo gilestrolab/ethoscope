@@ -129,26 +129,67 @@ repos:
           - |
             if [ -f .venv/bin/activate ]; then
               source .venv/bin/activate
-              python -c "
-              import sys
-              import importlib.util
-              for file in sys.argv[1:]:
-                  spec = importlib.util.spec_from_file_location('module', file)
-                  try:
-                      module = importlib.util.module_from_spec(spec)
-                      spec.loader.exec_module(module)
-                      print(f'✓ {file}')
-                  except Exception as e:
-                      print(f'✗ {file}: {e}')
-                      sys.exit(1)
-              "
+              for file in "$@"; do
+                python -c "import sys; import importlib.util; spec = importlib.util.spec_from_file_location('module', '$file'); module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)" 2>&1 && echo "✓ $file" || {
+                  echo "✗ $file: Import failed"
+                  echo "  Hint: Check if all imports can resolve - may be missing dependencies or cross-package imports"
+                  exit 1
+                }
+              done
             else
-              echo "⚠ Skipping import check (venv not found)"
+              echo "⚠ Skipping import check (venv not found at .venv)"
+              echo "  Hint: Create venv with: python -m venv .venv && source .venv/bin/activate && pip install -e src/ethoscope[dev] && pip install -e src/node[dev]"
             fi
         files: ^(src/|scripts/).*\.py$
         pass_filenames: true
-        # Only run manually to avoid slowing down commits
-        stages: [manual]
+        stages: [pre-commit]
+
+      - id: validate-cross-package-imports
+        name: Validate no cross-package imports (maintain package independence)
+        entry: bash
+        language: system
+        args:
+          - -c
+          - |
+            echo "Checking for cross-package imports between ethoscope and ethoscope_node..."
+            EXIT_CODE=0
+
+            # Check if node package imports from ethoscope package
+            # Only match lines that start with 'from' or 'import' (allowing leading whitespace)
+            if grep -rE "^[[:space:]]*(from ethoscope\.|import ethoscope)" src/node/ethoscope_node/ --include="*.py" 2>/dev/null; then
+              echo "❌ ERROR: Node package (ethoscope_node) imports from device package (ethoscope)"
+              echo "   This creates a cross-package dependency that breaks package independence."
+              echo ""
+              echo "   Found imports:"
+              grep -rnE "^[[:space:]]*(from ethoscope\.|import ethoscope)" src/node/ethoscope_node/ --include="*.py" 2>/dev/null || true
+              echo ""
+              echo "   Fix options:"
+              echo "   1. Copy the needed utility function to ethoscope_node package"
+              echo "   2. Extract shared code to a common utilities package"
+              echo "   3. If dependency is intentional, declare 'ethoscope' in src/node/pyproject.toml dependencies"
+              EXIT_CODE=1
+            fi
+
+            # Check if ethoscope package imports from node package (reverse dependency)
+            if grep -rE "^[[:space:]]*(from ethoscope_node\.|import ethoscope_node)" src/ethoscope/ethoscope/ --include="*.py" 2>/dev/null; then
+              echo "❌ ERROR: Device package (ethoscope) imports from node package (ethoscope_node)"
+              echo "   This creates a reverse dependency that breaks package architecture."
+              echo ""
+              echo "   Found imports:"
+              grep -rnE "^[[:space:]]*(from ethoscope_node\.|import ethoscope_node)" src/ethoscope/ethoscope/ --include="*.py" 2>/dev/null || true
+              echo ""
+              echo "   Fix: Remove these imports - device package should not depend on node package"
+              EXIT_CODE=1
+            fi
+
+            if [ $EXIT_CODE -eq 0 ]; then
+              echo "✓ No cross-package imports detected - packages are independent"
+            fi
+
+            exit $EXIT_CODE
+        files: ^src/.*\.(py|toml)$
+        pass_filenames: false
+        stages: [pre-commit]
 
       - id: critical-tests
         name: Run tests for critical changes
@@ -199,5 +240,5 @@ ci:
   autoupdate_branch: 'dev'
   autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
   autoupdate_schedule: monthly
-  skip: [python-import-check, critical-tests, update-copyright]
+  skip: [critical-tests, update-copyright]
   submodules: false

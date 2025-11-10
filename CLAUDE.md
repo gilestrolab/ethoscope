@@ -38,6 +38,37 @@ Central server for managing multiple Ethoscope devices and data collection.
 ### 3. Update System (`src/updater/`)
 Handles software updates for both devices and nodes via git-based distribution.
 
+## Package Independence Policy
+
+**IMPORTANT**: The device and node packages are designed to be independent and should not have cross-package dependencies.
+
+### Rules
+
+1. **No Cross-Package Imports**: Code in `ethoscope` package must not import from `ethoscope_node` package, and vice versa.
+2. **Shared Utilities**: If functionality needs to be shared between packages:
+   - **Option 1**: Duplicate the code in both packages (preferred for small utilities)
+   - **Option 2**: Extract to a separate shared utilities package
+   - **Option 3**: Declare formal dependency in `pyproject.toml` (only if absolutely necessary)
+
+### Rationale
+
+- **Independent Deployment**: Devices and nodes can be updated separately
+- **Cleaner Architecture**: Clear separation of concerns between tracking and management
+- **Isolated Testing**: Each package can be tested in isolation without installing the other
+- **CI Efficiency**: Parallel testing and isolated package builds
+
+### Enforcement
+
+Cross-package imports are detected and blocked by:
+- **Pre-commit Hook**: `validate-cross-package-imports` runs on every commit
+- **Import Check Hook**: `python-import-check` validates all imports can resolve
+
+### Example: Video Utilities
+
+The `list_local_video_files()` function was originally in `ethoscope.utils.video` and used by the node package for backup operations. To maintain package independence, it was duplicated to `ethoscope_node.utils.video_helpers` rather than creating a cross-package dependency.
+
+**Location**: `src/node/ethoscope_node/utils/video_helpers.py:15`
+
 ## Development Commands
 
 ### Device Package (src/ethoscope/)
