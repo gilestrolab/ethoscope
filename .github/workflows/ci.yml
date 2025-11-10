@@ -14,7 +14,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        # Test only versions used in deployment:
+        # - Python 3.9: Raspbian Bullseye (Ethoscope devices)
+        # - Python 3.11: Raspbian Bookworm & Arch Linux (Node server)
+        # - Python 3.12: Latest Arch Linux (Node server)
+        python-version: ['3.9', '3.11', '3.12']
 
     steps:
     - name: Checkout code
@@ -76,7 +80,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        # Test only versions used in deployment (same as device)
+        python-version: ['3.9', '3.11', '3.12']
 
     steps:
     - name: Checkout code

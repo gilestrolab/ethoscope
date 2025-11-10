@@ -94,6 +94,6 @@ __all__ = [
     "BaseDatabaseMetadataCache",
     "MySQLDatabaseMetadataCache",
     "SQLiteDatabaseMetadataCache",
+    "DatabasesInfo",
     "create_metadata_cache",
-    "get_all_databases_info",
 ]

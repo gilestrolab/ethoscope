@@ -5,7 +5,7 @@ Ethoscope
 [![Code Quality](https://github.com/gilestrolab/ethoscope/actions/workflows/quality.yml/badge.svg?branch=dev)](https://github.com/gilestrolab/ethoscope/actions/workflows/quality.yml)
 [![codecov](https://codecov.io/gh/gilestrolab/ethoscope/branch/dev/graph/badge.svg)](https://codecov.io/gh/gilestrolab/ethoscope)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![GitHub release](https://img.shields.io/github/v/release/gilestrolab/ethoscope)](https://github.com/gilestrolab/ethoscope/releases)
 [![Documentation](https://img.shields.io/badge/docs-lab.gilest.ro-brightgreen)](https://lab.gilest.ro/ethoscope-manual)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)

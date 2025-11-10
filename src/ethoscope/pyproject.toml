@@ -44,15 +44,12 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Image Processing",
     "Topic :: Multimedia :: Video :: Capture",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
 
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     "numpy>=1.21.0",
     "scipy>=1.7.0",
