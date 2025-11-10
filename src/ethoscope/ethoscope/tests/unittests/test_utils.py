@@ -1,6 +1,7 @@
-__author__ = 'quentin'
+__author__ = "quentin"
 
 import unittest
+
 
 class TestExple(unittest.TestCase):
 

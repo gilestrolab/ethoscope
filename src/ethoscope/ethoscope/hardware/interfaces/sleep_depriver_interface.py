@@ -1,4 +1,4 @@
-__author__ = 'quentin'
+__author__ = "quentin"
 from ethoscope.hardware.interfaces.lynx_motion import LynxMotionInterface
 
 
@@ -15,11 +15,11 @@ class SleepDepriverInterface(LynxMotionInterface):
         :type dt: int
         """
 
-        half_dt = int(float(dt)/2.0)
-        self.move_to_angle(channel, self._max_angle_pulse[0]-margin,half_dt)
-        self.move_to_angle(channel, self._min_angle_pulse[0]+margin,dt)
-        self.move_to_angle(channel, self._max_angle_pulse[0]-margin,dt)
-        self.move_to_angle(channel, 0,half_dt)
+        half_dt = int(float(dt) / 2.0)
+        self.move_to_angle(channel, self._max_angle_pulse[0] - margin, half_dt)
+        self.move_to_angle(channel, self._min_angle_pulse[0] + margin, dt)
+        self.move_to_angle(channel, self._max_angle_pulse[0] - margin, dt)
+        self.move_to_angle(channel, 0, half_dt)
 
 
 class SleepDepriverInterfaceCR(LynxMotionInterface):
@@ -34,17 +34,17 @@ class SleepDepriverInterfaceCR(LynxMotionInterface):
         :param margin: the number of degree to pad rotation. eg 5 -> rotation from 5 -> 175
         :type dt: int
         """
-                    
-        speed = 100
-        if dt < 800: dt = 800
 
-        half_dt = int(float(dt)/2.0)
+        speed = 100
+        if dt < 800:
+            dt = 800
+
+        half_dt = int(float(dt) / 2.0)
         self.move_with_speed(channel, speed, half_dt)
         self.move_with_speed(channel, -speed, half_dt)
-        self.move_with_speed(channel, 0, 100) #stop signal
+        self.move_with_speed(channel, 0, 100)  # stop signal
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     l = SleepDepriverInterface(warmup=True)
-    #l.send(1)
+    # l.send(1)

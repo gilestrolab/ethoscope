@@ -2,10 +2,11 @@ import logging
 import time
 from ethoscope.hardware.interfaces.interfaces import SimpleSerialInterface
 
+
 class LynxMotionInterface(SimpleSerialInterface):
 
-    _min_angle_pulse = (-90.,535.)
-    _max_angle_pulse = (90.,2500.)
+    _min_angle_pulse = (-90.0, 535.0)
+    _max_angle_pulse = (90.0, 2500.0)
     _n_channels = 10
 
     def __init__(self, port=115200, warmup=False, *args, **kwargs):
@@ -19,7 +20,7 @@ class LynxMotionInterface(SimpleSerialInterface):
         :param args: additional arguments
         :param kwargs: additional keyword arguments
         """
-        
+
         """
         for testing purposes, on a machine without real USB0 connection
         one can use a virtual terminal:
@@ -29,12 +30,11 @@ class LynxMotionInterface(SimpleSerialInterface):
         send data to /dev/pts/n and read from /dev/pts/n+1
             cat < /dev/pts/n+1
         """
-        
+
         logging.info("Connecting to Lynx motion serial port...")
         super(LynxMotionInterface, self).__init__(*args, **kwargs)
 
-
-    def _angle_to_pulse(self,angle):
+    def _angle_to_pulse(self, angle):
         """
         Convert an angle, to a pulse, using simple linear interpolation.
         :param angle: the angle to be converted, in degrees
@@ -49,11 +49,11 @@ class LynxMotionInterface(SimpleSerialInterface):
             raise Exception("Angle too wide: %i" % angle)
         if angle < min_a:
             raise Exception("Angle too narrow: %i" % angle)
-        slope = (max_p - min_p)/(max_a-min_a)
+        slope = (max_p - min_p) / (max_a - min_a)
         pulse = min_p + (angle - min_a) * slope
         return pulse
 
-    def move_to_angle(self,channel,angle=0., duration=1000):
+    def move_to_angle(self, channel, angle=0.0, duration=1000):
         """
         Move a given servo to an angle in a given time.
 
@@ -68,9 +68,9 @@ class LynxMotionInterface(SimpleSerialInterface):
         if channel < 1:
             raise Exception("idx must be greater or equal to one")
         pulse = self._angle_to_pulse(angle)
-        instruction = b"# %i P %i T %i\r" % (channel - 1,pulse,duration)
+        instruction = b"# %i P %i T %i\r" % (channel - 1, pulse, duration)
         o = self._serial.write(instruction)
-        time.sleep(float(duration)/1000.0)
+        time.sleep(float(duration) / 1000.0)
         return o
 
     def move_with_speed(self, channel, speed=0, duration=1000):
@@ -85,14 +85,14 @@ class LynxMotionInterface(SimpleSerialInterface):
         :type duration: int
         :return:
         """
-        
+
         if channel < 1:
             raise Exception("idx must be greater or equal to one")
         pulse = self._speed_to_pulse(speed)
-        instruction = b"# %i P %i T %i\r" % (channel - 1,pulse,duration)
+        instruction = b"# %i P %i T %i\r" % (channel - 1, pulse, duration)
         o = self._serial.write(instruction)
-        time.sleep(float(duration)/1000.0)
-        return o        
+        time.sleep(float(duration) / 1000.0)
+        return o
 
     def _speed_to_pulse(self, speed):
         """
@@ -105,10 +105,13 @@ class LynxMotionInterface(SimpleSerialInterface):
         """
         min_speed, max_speed = (-100, 100)
         min_pulse, mid_pulse, max_pulse = (700, 1500, 2300)
-        
+
         if speed < min_speed or speed > max_speed:
-            raise Exception("Speed value not valid: must be between %i and %i" % (min_speed, max_speed))
-        
+            raise Exception(
+                "Speed value not valid: must be between %i and %i"
+                % (min_speed, max_speed)
+            )
+
         pulse = (speed / 100.0) * (max_pulse - mid_pulse) + mid_pulse
         return int(pulse)
 
@@ -116,9 +119,9 @@ class LynxMotionInterface(SimpleSerialInterface):
         """
         The default sending paradigm is empty
         """
-        #raise NotImplementedError
+        # raise NotImplementedError
         pass
-        
+
     def _warm_up(self):
         """
         This will move all motors consecutively.

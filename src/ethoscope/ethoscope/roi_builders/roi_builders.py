@@ -1,6 +1,6 @@
 from ethoscope.core.roi import ROI
 
-__author__ = 'quentin'
+__author__ = "quentin"
 
 import numpy as np
 
@@ -35,21 +35,23 @@ class BaseROIBuilder(DescribedObject):
         else:
             for i, (_, frame) in enumerate(input):
                 accum.append(frame)
-                if i  >= 5:
+                if i >= 5:
                     break
 
-            accum = np.median(np.array(accum),0).astype(np.uint8)
+            accum = np.median(np.array(accum), 0).astype(np.uint8)
         try:
             reference_points, rois = self._rois_from_img(accum)
-            
+
             # Handle graceful failure when _rois_from_img returns None
             if reference_points is None or rois is None:
                 logging.warning("ROI building failed gracefully, no targets detected")
                 # Clean up input if it's not an array (i.e., if it's a camera object)
                 if not isinstance(input, np.ndarray):
                     del input
-                raise EthoscopeException("ROI building failed: insufficient targets detected")
-            
+                raise EthoscopeException(
+                    "ROI building failed: insufficient targets detected"
+                )
+
         except EthoscopeException:
             # Re-raise EthoscopeException without modification (input already cleaned up above)
             raise
@@ -69,20 +71,17 @@ class BaseROIBuilder(DescribedObject):
 
         return reference_points, rois
 
-
-
-    def _rois_from_img(self,img):
+    def _rois_from_img(self, img):
         raise NotImplementedError
 
     def _spatial_sorting(self, rois):
-        '''
+        """
         returns a sorted list of ROIs objects it in ascending order based on the first value in the rectangle property
-        '''
+        """
         return sorted(rois, key=lambda x: x.rectangle[0], reverse=False)
 
     def _value_sorting(self, rois):
-        '''
+        """
         returns a sorted list of ROIs objects it in ascending order based on the .value property
-        '''
+        """
         return sorted(rois, key=lambda x: x.value, reverse=False)
-

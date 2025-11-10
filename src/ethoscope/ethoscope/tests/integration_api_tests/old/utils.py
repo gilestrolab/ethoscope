@@ -10,7 +10,9 @@ from ethoscope.hardware.interfaces.interfaces import HardwareConnection
 from ethoscope.tests.integration_api_tests._constants import VIDEO, DRAW_FRAMES
 
 
-def test_stimulator(StimulatorClass, InterfaceClass, remove_db_file = True, *args, **kwargs):
+def test_stimulator(
+    StimulatorClass, InterfaceClass, remove_db_file=True, *args, **kwargs
+):
     tmp = tempfile.mkstemp(suffix="_ethoscope_test.db")[1]
 
     print(("Making a tmp db: " + tmp))
@@ -26,7 +28,7 @@ def test_stimulator(StimulatorClass, InterfaceClass, remove_db_file = True, *arg
         mon = Monitor(cam, AdaptiveBGModel, rois, stimulators=stimulators)
         drawer = DefaultDrawer(draw_frames=DRAW_FRAMES)
 
-        with SQLiteResultWriter(tmp , rois) as rw:
+        with SQLiteResultWriter(tmp, rois) as rw:
             mon.run(result_writer=rw, drawer=drawer)
         # cred = {"name": "ethoscope_db",
         #  "user": "ethoscope",
@@ -35,8 +37,8 @@ def test_stimulator(StimulatorClass, InterfaceClass, remove_db_file = True, *arg
         #     mon.run(result_writer=rw, drawer=drawer)
 
     finally:
-        if remove_db_file :
-            print(("Removing temp db (" + tmp+ ")"))
+        if remove_db_file:
+            print(("Removing temp db (" + tmp + ")"))
             os.remove(tmp)
         else:
             print(("db file lives in (" + tmp + ")"))

@@ -1,4 +1,4 @@
-__author__ = 'quentin'
+__author__ = "quentin"
 
 from . import input
 from . import interfaces

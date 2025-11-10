@@ -12,8 +12,7 @@ Overview:
 
 """
 
-
-__author__ = 'quentin'
+__author__ = "quentin"
 
 
 from . import monitor

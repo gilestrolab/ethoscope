@@ -82,7 +82,6 @@ we developed an ``R`` package named `rethomics <https://github.com/gilestrolab/r
 
 """
 
-
 from . import core
 from . import hardware
 from . import stimulators
@@ -90,6 +89,3 @@ from . import roi_builders
 from . import trackers
 from . import utils
 from . import control
-
-
-

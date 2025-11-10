@@ -7,12 +7,14 @@ try:
 except:
     CV_VERSION = 2
 
-__author__ = 'quentin'
+__author__ = "quentin"
 
 
 class ROI(object):
 
-    def __init__(self, polygon, idx, value=None, orientation = None, regions=None, hierarchy=None):
+    def __init__(
+        self, polygon, idx, value=None, orientation=None, regions=None, hierarchy=None
+    ):
         """
         Class to define a region of interest(ROI).
         Internally, ROIs are single polygons.
@@ -32,16 +34,16 @@ class ROI(object):
         # TODO if we do not need polygon, we can drop it
         self._polygon = np.array(polygon)
         if len(self._polygon.shape) == 2:
-            self._polygon = self._polygon.reshape((self._polygon.shape[0],1,self._polygon.shape[1]))
+            self._polygon = self._polygon.reshape(
+                (self._polygon.shape[0], 1, self._polygon.shape[1])
+            )
 
+        x, y, w, h = cv2.boundingRect(self._polygon)
 
-        x,y,w,h = cv2.boundingRect(self._polygon)
+        self._mask = np.zeros((h, w), np.uint8)
+        cv2.drawContours(self._mask, [self._polygon], 0, 255, -1, offset=(-x, -y))
 
-        self._mask = np.zeros((h,w), np.uint8)
-        cv2.drawContours(self._mask, [self._polygon], 0, 255,-1,offset=(-x,-y))
-
-
-        self._rectangle = x,y,w,h
+        self._rectangle = x, y, w, h
         # todo NOW! sort rois by value. if no values, left to right/ top to bottom!
         self._idx = idx
 
@@ -54,9 +56,13 @@ class ROI(object):
             self._regions = self._polygon
         else:
             if CV_VERSION == 3:
-                _, self._regions, self._hierarchy = cv2.findContours(np.copy(self._polygon), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                _, self._regions, self._hierarchy = cv2.findContours(
+                    np.copy(self._polygon), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+                )
             else:
-                self._regions, self._hierarchy = cv2.findContours(np.copy(self._polygon), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                self._regions, self._hierarchy = cv2.findContours(
+                    np.copy(self._polygon), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+                )
 
     @property
     def idx(self):
@@ -68,7 +74,6 @@ class ROI(object):
 
     def bounding_rect(self):
         raise NotImplementedError
-
 
     @property
     def mask(self):
@@ -84,8 +89,8 @@ class ROI(object):
         :return: the x,y offset of the ROI compared to the frame it was build on.
         :rtype: (int,int)
         """
-        x,y,w,h = self._rectangle
-        return x,y
+        x, y, w, h = self._rectangle
+        return x, y
 
     @property
     def polygon(self):
@@ -95,14 +100,13 @@ class ROI(object):
         """
         return self._polygon
 
-
     @property
     def longest_axis(self):
         """
         :return: the value of the longest axis (w or h)
         :rtype: float
         """
-        x,y,w,h = self._rectangle
+        x, y, w, h = self._rectangle
         return float(max(w, h))
 
     @property
@@ -126,18 +130,8 @@ class ROI(object):
 
         :rtype: dict
         """
-        x,y,w,h = self._rectangle
-        return {"x":x,
-                "y":y,
-                "w":w,
-                "h":h,
-                "value":self._value,
-                "idx":self.idx
-        }
-
-
-
-
+        x, y, w, h = self._rectangle
+        return {"x": x, "y": y, "w": w, "h": h, "value": self._value, "idx": self.idx}
 
     def set_value(self, new_val):
         """
@@ -152,7 +146,7 @@ class ROI(object):
         """
         return self._value
 
-    def apply(self,img):
+    def apply(self, img):
         """
         Cut an image where the ROI is defined.
 
@@ -161,7 +155,7 @@ class ROI(object):
         :return: a tuple containing the resulting cropped image and the associated mask (both have the same dimension).
         :rtype: (:class:`~numpy.ndarray`, :class:`~numpy.ndarray`)
         """
-        x,y,w,h = self._rectangle
+        x, y, w, h = self._rectangle
 
         img_h, img_w = img.shape[0:2]
 
@@ -176,16 +170,28 @@ class ROI(object):
         h_clamped = y2 - y1
 
         if w_clamped <= 0 or h_clamped <= 0:
-            raise EthoscopeException("Error whilst slicing region of interest. Clamped region has zero or negative width/height: %s" % str(self.get_feature_dict()), img)
+            raise EthoscopeException(
+                "Error whilst slicing region of interest. Clamped region has zero or negative width/height: %s"
+                % str(self.get_feature_dict()),
+                img,
+            )
 
         try:
-            out = img[y1 : y2, x1 : x2]
+            out = img[y1:y2, x1:x2]
         except Exception as e:
-            raise EthoscopeException("Error whilst slicing region of interest %s: %s" % (str(self.get_feature_dict()), str(e)), img)
+            raise EthoscopeException(
+                "Error whilst slicing region of interest %s: %s"
+                % (str(self.get_feature_dict()), str(e)),
+                img,
+            )
 
         # Ensure output dimensions match expected clamped dimensions
         if out.shape[0:2] != (h_clamped, w_clamped):
-            raise EthoscopeException("Error whilst slicing region of interest. Output shape mismatch after clamping: %s" % str(self.get_feature_dict()), img )
+            raise EthoscopeException(
+                "Error whilst slicing region of interest. Output shape mismatch after clamping: %s"
+                % str(self.get_feature_dict()),
+                img,
+            )
 
         # Adjust mask to match the clamped output dimensions
         # Calculate the offset into the original mask based on clamping

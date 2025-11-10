@@ -56,7 +56,7 @@ class OptoMotor(SimpleSerialInterface):
             raise Exception("chanel must be greater or equal to zero")
 
         duration = int(duration)
-        intensity= int(intensity)
+        intensity = int(intensity)
         instruction = b"P %i %i %i\r\n" % (channel, duration, intensity)
         o = self._serial.write(instruction)
         return o
@@ -70,4 +70,4 @@ class OptoMotor(SimpleSerialInterface):
         """
         for i in range(self._n_channels):
             self.send(i, duration=1000)
-            time.sleep(1.000) #s
+            time.sleep(1.000)  # s

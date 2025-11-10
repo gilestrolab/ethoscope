@@ -137,22 +137,12 @@ def mock_hardware_config():
             "type": "PiCamera",
             "resolution": [640, 480],
             "framerate": 30,
-            "rotation": 0
+            "rotation": 0,
         },
         "stimulators": [
-            {
-                "type": "OptomotorStimulator",
-                "gpio_pin": 18,
-                "frequency": 1.0
-            }
+            {"type": "OptomotorStimulator", "gpio_pin": 18, "frequency": 1.0}
         ],
-        "sensors": [
-            {
-                "type": "TemperatureSensor",
-                "gpio_pin": 4,
-                "interval": 60
-            }
-        ]
+        "sensors": [{"type": "TemperatureSensor", "gpio_pin": 4, "interval": 60}],
     }
     return config
 
@@ -169,7 +159,7 @@ def sample_tracking_results():
             "height": 30,
             "angle": 45.0,
             "area": 1500,
-            "timestamp": 1640995200.0
+            "timestamp": 1640995200.0,
         },
         {
             "roi_id": 2,
@@ -179,8 +169,8 @@ def sample_tracking_results():
             "height": 32,
             "angle": 30.0,
             "area": 1536,
-            "timestamp": 1640995200.0
-        }
+            "timestamp": 1640995200.0,
+        },
     ]
 
 
@@ -207,22 +197,10 @@ def mock_experiment_config():
         "tracking": {
             "enabled": True,
             "tracker": "AdaptiveBGTracker",
-            "parameters": {
-                "threshold": 30,
-                "min_area": 100,
-                "max_area": 10000
-            }
+            "parameters": {"threshold": 30, "min_area": 100, "max_area": 10000},
         },
-        "video_recording": {
-            "enabled": False,
-            "format": "mp4",
-            "quality": "medium"
-        },
-        "stimulation": {
-            "enabled": False,
-            "type": "optomotor",
-            "parameters": {}
-        }
+        "video_recording": {"enabled": False, "format": "mp4", "quality": "medium"},
+        "stimulation": {"enabled": False, "type": "optomotor", "parameters": {}},
     }
     return config
 
@@ -232,16 +210,14 @@ def test_images():
     """Provide paths to test images."""
     return {
         "bright_targets": TEST_DATA_DIR / "img" / "bright_targets.png",
-        "dark_targets": TEST_DATA_DIR / "img" / "dark_targets.png"
+        "dark_targets": TEST_DATA_DIR / "img" / "dark_targets.png",
     }
 
 
 @pytest.fixture
 def test_videos():
     """Provide paths to test videos."""
-    return {
-        "arena_video": TEST_DATA_DIR / "videos" / "arena_10x2_sortTubes.mp4"
-    }
+    return {"arena_video": TEST_DATA_DIR / "videos" / "arena_10x2_sortTubes.mp4"}
 
 
 @pytest.fixture(autouse=True)
@@ -253,7 +229,7 @@ def cleanup_test_files():
         "test_tracking.db",
         "test_video.mp4",
         "test_config.json",
-        "test_experiment.json"
+        "test_experiment.json",
     ]
     for file_path in test_files:
         if os.path.exists(file_path):

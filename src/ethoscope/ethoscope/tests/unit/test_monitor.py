@@ -16,7 +16,7 @@ import threading
 
 class TestMonitor:
     """Test class for Monitor."""
-    
+
     def test_monitor_initialization(self):
         """Test Monitor initialization with default parameters."""
         # This is a template - actual implementation depends on Monitor class
@@ -24,7 +24,7 @@ class TestMonitor:
         # assert monitor.is_running == False
         # assert monitor.frame_count == 0
         pass
-    
+
     def test_monitor_start_stop(self):
         """Test Monitor start and stop functionality."""
         # monitor = Monitor()
@@ -33,7 +33,7 @@ class TestMonitor:
         # monitor.stop()
         # assert monitor.is_running == False
         pass
-    
+
     @pytest.mark.unit
     def test_monitor_status_reporting(self):
         """Test Monitor status reporting."""
@@ -43,7 +43,7 @@ class TestMonitor:
         # assert 'is_running' in status
         # assert 'frame_count' in status
         pass
-    
+
     def test_monitor_with_mock_camera(self, mock_camera):
         """Test Monitor with mock camera."""
         # monitor = Monitor(camera=mock_camera)
@@ -52,7 +52,7 @@ class TestMonitor:
         # monitor.stop()
         # assert mock_camera.stop_preview.called
         pass
-    
+
     def test_monitor_with_mock_tracker(self, mock_tracker):
         """Test Monitor with mock tracker."""
         # monitor = Monitor(tracker=mock_tracker)
@@ -61,7 +61,7 @@ class TestMonitor:
         # monitor.stop()
         # assert mock_tracker.stop.called
         pass
-    
+
     def test_monitor_error_handling(self):
         """Test Monitor error handling."""
         # monitor = Monitor()
@@ -71,13 +71,13 @@ class TestMonitor:
         #     monitor.stop()
         #     assert monitor.has_error == True
         pass
-    
+
     @pytest.mark.slow
     def test_monitor_performance(self):
         """Test Monitor performance with realistic load."""
         # This test would measure performance metrics
         pass
-    
+
     def test_monitor_thread_safety(self):
         """Test Monitor thread safety."""
         # monitor = Monitor()
@@ -90,7 +90,7 @@ class TestMonitor:
         #     thread.join()
         # No assertions needed - test passes if no exceptions
         pass
-    
+
     def test_monitor_cleanup(self):
         """Test Monitor cleanup on exit."""
         # monitor = Monitor()

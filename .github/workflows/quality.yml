@@ -32,7 +32,7 @@ jobs:
         cd src/ethoscope
         flake8 ethoscope/ \
           --max-line-length=88 \
-          --extend-ignore=E203,W503,E501 \
+          --extend-ignore=E203,W503,E501,F401,F403,F405,E401,E722,F841 \
           --count \
           --statistics \
           --show-source

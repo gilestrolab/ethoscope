@@ -17,7 +17,11 @@ import signal
 import threading
 
 import trace
-from ethoscope.hardware.input.cameras import OurPiCameraAsync, MovieVirtualCamera, V4L2Camera
+from ethoscope.hardware.input.cameras import (
+    OurPiCameraAsync,
+    MovieVirtualCamera,
+    V4L2Camera,
+)
 from ethoscope.roi_builders.target_roi_builder import TargetGridROIBuilder
 from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
 from ethoscope.core.monitor import Monitor
@@ -25,47 +29,86 @@ from ethoscope.drawers.drawers import NullDrawer, DefaultDrawer
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection, EthoscopeSensor
 from ethoscope.stimulators.stimulators import DefaultStimulator
-from ethoscope.stimulators.sleep_depriver_stimulators import * #importing all stimulators - remember to add the allowed ones to line 84
-from ethoscope.stimulators.sleep_restriction_stimulators import mAGOSleepRestriction, SimpleTimeRestrictedStimulator
-from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver, MiddleCrossingOdourStimulator, MiddleCrossingOdourStimulatorFlushed
+from ethoscope.stimulators.sleep_depriver_stimulators import *  # importing all stimulators - remember to add the allowed ones to line 84
+from ethoscope.stimulators.sleep_restriction_stimulators import (
+    mAGOSleepRestriction,
+    SimpleTimeRestrictedStimulator,
+)
+from ethoscope.stimulators.odour_stimulators import (
+    DynamicOdourSleepDepriver,
+    MiddleCrossingOdourStimulator,
+    MiddleCrossingOdourStimulatorFlushed,
+)
 from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulator
 from ethoscope.stimulators.multi_stimulator import MultiStimulator
 
 from ethoscope.utils.debug import EthoscopeException
-from ethoscope.io import MySQLResultWriter, SQLiteResultWriter, dbAppender 
+from ethoscope.io import MySQLResultWriter, SQLiteResultWriter, dbAppender
 from ethoscope.io import create_metadata_cache
 from ethoscope.utils.description import DescribedObject
 from ethoscope.utils import pi
 
+
 class ExperimentalInformation(DescribedObject):
-    
-        _description  = {   "overview": "Optional information about your experiment",
-                            "arguments": [
-                                    {"type": "str", "name": "name", "description": "Who are you?", "default" : "", "asknode" : "users", "required" : "required"},
-                                    {"type": "str", "name": "location", "description": "Where is your device","default" : "", "asknode" : "incubators"},
-                                    {"type": "str", "name": "code", "description": "Would you like to add any code to the resulting filename or metadata?", "default" : ""},
-                                    {"type": "str", "name": "sensor", "description": "url to access the relevant ethoscope sensor", "default": "", "asknode" : "sensors", "hidden" : "true"}
-                                   ]}
-                                   
-        def __init__(self, name="", location="", code="", sensor=""):
-            self._check_code(code)
-            self._info_dic = {"name":name,
-                              "location":location,
-                              "code":code,
-                              "sensor":sensor}
 
-        def _check_code(self, code):
-            r = re.compile(r"[^a-zA-Z0-9-]")
-            clean_code = r.sub("",code)
-            if len(code) != len(clean_code):
-                logging.error("The provided string contains unallowed characters: %s" % code)
-                raise Exception("Code contains special characters. Please use only letters, digits or -")
+    _description = {
+        "overview": "Optional information about your experiment",
+        "arguments": [
+            {
+                "type": "str",
+                "name": "name",
+                "description": "Who are you?",
+                "default": "",
+                "asknode": "users",
+                "required": "required",
+            },
+            {
+                "type": "str",
+                "name": "location",
+                "description": "Where is your device",
+                "default": "",
+                "asknode": "incubators",
+            },
+            {
+                "type": "str",
+                "name": "code",
+                "description": "Would you like to add any code to the resulting filename or metadata?",
+                "default": "",
+            },
+            {
+                "type": "str",
+                "name": "sensor",
+                "description": "url to access the relevant ethoscope sensor",
+                "default": "",
+                "asknode": "sensors",
+                "hidden": "true",
+            },
+        ],
+    }
 
+    def __init__(self, name="", location="", code="", sensor=""):
+        self._check_code(code)
+        self._info_dic = {
+            "name": name,
+            "location": location,
+            "code": code,
+            "sensor": sensor,
+        }
 
+    def _check_code(self, code):
+        r = re.compile(r"[^a-zA-Z0-9-]")
+        clean_code = r.sub("", code)
+        if len(code) != len(clean_code):
+            logging.error(
+                "The provided string contains unallowed characters: %s" % code
+            )
+            raise Exception(
+                "Code contains special characters. Please use only letters, digits or -"
+            )
 
-        @property
-        def info_dic(self):
-            return self._info_dic
+    @property
+    def info_dic(self):
+        return self._info_dic
 
 
 class ControlThread(Thread):
@@ -76,81 +119,115 @@ class ControlThread(Thread):
     """
 
     _auto_SQL_backup_at_stop = False
-    
-    _option_dict = OrderedDict([
-        ("experimental_info", {
-                        "possible_classes":[ExperimentalInformation],
-                }),
-        ("interactor", {
-                        "possible_classes":[DefaultStimulator, 
-                                            SleepDepStimulator,
-                                            OptomotorSleepDepriver,
-                                            MiddleCrossingStimulator,
-                                            #SystematicSleepDepInteractor,
-                                            ExperimentalSleepDepStimulator,
-                                            #GearMotorSleepDepStimulator,
-                                            #DynamicOdourDeliverer,
-                                            DynamicOdourSleepDepriver,
-                                            OptoMidlineCrossStimulator,
-                                            OptomotorSleepDepriverSystematic,
-                                            MiddleCrossingOdourStimulator,
-                                            MiddleCrossingOdourStimulatorFlushed,
-                                            mAGO,
-                                            AGO,
-                                            mAGOSleepRestriction,
-                                            SimpleTimeRestrictedStimulator,
-                                            MultiStimulator
-                                            ],
-                    }),
-        ("roi_builder", {
-                "possible_classes":[FileBasedROIBuilder, TargetGridROIBuilder],
-            }),
-        ("tracker", {
-                "possible_classes":[AdaptiveBGModel],
-            }),
-        ("drawer", {
-                        "possible_classes":[DefaultDrawer, NullDrawer],
-                    }),
-        ("camera", {
-                        "possible_classes":[OurPiCameraAsync, MovieVirtualCamera, V4L2Camera],
-                    }),
-        ("result_writer", {
-                        "possible_classes":[SQLiteResultWriter, MySQLResultWriter, dbAppender],
-                }),
-     ])
-    
-    #some classes do not need to be offered as choices to the user in normal conditions
-    #these are shown only if the machine is not a PI
-    _is_a_rPi = pi.isMachinePI() and pi.hasPiCamera() and not pi.isExperimental()
-    _hidden_options = {'camera', 'tracker'}  # result_writer is now always available
-    
-    for k in _option_dict:
-        _option_dict[k]["class"] =_option_dict[k]["possible_classes"][0]
-        _option_dict[k]["kwargs"] ={}
 
+    _option_dict = OrderedDict(
+        [
+            (
+                "experimental_info",
+                {
+                    "possible_classes": [ExperimentalInformation],
+                },
+            ),
+            (
+                "interactor",
+                {
+                    "possible_classes": [
+                        DefaultStimulator,
+                        SleepDepStimulator,
+                        OptomotorSleepDepriver,
+                        MiddleCrossingStimulator,
+                        # SystematicSleepDepInteractor,
+                        ExperimentalSleepDepStimulator,
+                        # GearMotorSleepDepStimulator,
+                        # DynamicOdourDeliverer,
+                        DynamicOdourSleepDepriver,
+                        OptoMidlineCrossStimulator,
+                        OptomotorSleepDepriverSystematic,
+                        MiddleCrossingOdourStimulator,
+                        MiddleCrossingOdourStimulatorFlushed,
+                        mAGO,
+                        AGO,
+                        mAGOSleepRestriction,
+                        SimpleTimeRestrictedStimulator,
+                        MultiStimulator,
+                    ],
+                },
+            ),
+            (
+                "roi_builder",
+                {
+                    "possible_classes": [FileBasedROIBuilder, TargetGridROIBuilder],
+                },
+            ),
+            (
+                "tracker",
+                {
+                    "possible_classes": [AdaptiveBGModel],
+                },
+            ),
+            (
+                "drawer",
+                {
+                    "possible_classes": [DefaultDrawer, NullDrawer],
+                },
+            ),
+            (
+                "camera",
+                {
+                    "possible_classes": [
+                        OurPiCameraAsync,
+                        MovieVirtualCamera,
+                        V4L2Camera,
+                    ],
+                },
+            ),
+            (
+                "result_writer",
+                {
+                    "possible_classes": [
+                        SQLiteResultWriter,
+                        MySQLResultWriter,
+                        dbAppender,
+                    ],
+                },
+            ),
+        ]
+    )
+
+    # some classes do not need to be offered as choices to the user in normal conditions
+    # these are shown only if the machine is not a PI
+    _is_a_rPi = pi.isMachinePI() and pi.hasPiCamera() and not pi.isExperimental()
+    _hidden_options = {"camera", "tracker"}  # result_writer is now always available
+
+    for k in _option_dict:
+        _option_dict[k]["class"] = _option_dict[k]["possible_classes"][0]
+        _option_dict[k]["kwargs"] = {}
 
     _tmp_last_img_file = "last_img.jpg"
     _dbg_img_file = "dbg_img.png"
     _log_file = "ethoscope.log"
 
-    #give the database an ethoscope specific name
-    #future proof in case we want to use a remote server
-    _db_credentials = {"name": "%s_db" % pi.get_machine_name(),
-                      "user": "ethoscope",
-                      "password": "ethoscope"}
+    # give the database an ethoscope specific name
+    # future proof in case we want to use a remote server
+    _db_credentials = {
+        "name": "%s_db" % pi.get_machine_name(),
+        "user": "ethoscope",
+        "password": "ethoscope",
+    }
 
-    _default_monitor_info =  {
-                            #fixme, not needed
-                            "last_positions":None,
-
-                            "last_time_stamp":0,
-                            "fps":0
-                            }
+    _default_monitor_info = {
+        # fixme, not needed
+        "last_positions": None,
+        "last_time_stamp": 0,
+        "fps": 0,
+    }
 
     _persistent_state_file = pi.PERSISTENT_STATE
-    _last_run_info = '/var/run/last_run.ethoscope'
+    _last_run_info = "/var/run/last_run.ethoscope"
 
-    def __init__(self, machine_id, name, version, ethoscope_dir, data=None, *args, **kwargs):
+    def __init__(
+        self, machine_id, name, version, ethoscope_dir, data=None, *args, **kwargs
+    ):
 
         self._monit_args = args
         self._monit_kwargs = kwargs
@@ -159,10 +236,9 @@ class ControlThread(Thread):
         # for FPS computation
         self._last_info_t_stamp = 0
         self._last_info_frame_idx = 0
-        
+
         # for image write rate limiting (max 1 image per second)
         self._last_img_write_time = 0
-
 
         # We wipe off previous logs and debug images
         try:
@@ -188,43 +264,50 @@ class ControlThread(Thread):
         # Manage disk space before starting experiment
         try:
             space_result = pi.manage_disk_space(ethoscope_dir)
-            if space_result.get('cleanup_performed', False):
-                logging.info(f"Disk space cleanup completed: {space_result.get('cleanup_summary', {}).get('files_deleted', 0)} files removed")
+            if space_result.get("cleanup_performed", False):
+                logging.info(
+                    f"Disk space cleanup completed: {space_result.get('cleanup_summary', {}).get('files_deleted', 0)} files removed"
+                )
         except Exception as e:
             logging.warning(f"Disk space management failed, continuing anyway: {e}")
 
         self._tmp_dir = tempfile.mkdtemp(prefix="ethoscope_")
-        
+
         # Database metadata tracking
         self._tracking_start_time = None
         # DatabaseMetadataCache is only compatible with MySQL databases
         # For SQLite, we'll create it only when needed (see metadata cache initialization)
         self._metadata_cache = None
-        
-        #todo add 'data' -> how monitor was started to metadata
-        self._info = {  "status": "stopped",
-                        "time": time.time(), #this is time of last interaction, e.g. last reboot, last start, last stop.
-                        "error": None,
-                        "log_file": os.path.join(self._tmp_dir, self._log_file),
-                        "dbg_img": os.path.join(self._tmp_dir, self._dbg_img_file),
-                        "last_drawn_img": os.path.join(self._tmp_dir, self._tmp_last_img_file),
-                        "db_name": self._db_credentials["name"],
-                        "monitor_info": self._default_monitor_info,
-                        #"user_options": self._get_user_options(),
-                        "experimental_info": {},
-                        "database_info": {"db_size_bytes": 0, "table_counts": {}, "last_db_update": 0, "db_status": "initializing"},
 
-                        "id": machine_id,
-                        "name": name,
-                        "version": version,
-                        "used_space" : pi.get_partition_info(ethoscope_dir)['Use%'].replace("%","")
-                        }
+        # todo add 'data' -> how monitor was started to metadata
+        self._info = {
+            "status": "stopped",
+            "time": time.time(),  # this is time of last interaction, e.g. last reboot, last start, last stop.
+            "error": None,
+            "log_file": os.path.join(self._tmp_dir, self._log_file),
+            "dbg_img": os.path.join(self._tmp_dir, self._dbg_img_file),
+            "last_drawn_img": os.path.join(self._tmp_dir, self._tmp_last_img_file),
+            "db_name": self._db_credentials["name"],
+            "monitor_info": self._default_monitor_info,
+            # "user_options": self._get_user_options(),
+            "experimental_info": {},
+            "database_info": {
+                "db_size_bytes": 0,
+                "table_counts": {},
+                "last_db_update": 0,
+                "db_status": "initializing",
+            },
+            "id": machine_id,
+            "name": name,
+            "version": version,
+            "used_space": pi.get_partition_info(ethoscope_dir)["Use%"].replace("%", ""),
+        }
         self._monit = None
         self._drawer = None  # Initialize drawer to None until monitor starts
 
         # Initialize cache directory first
-        self._cache_dir = os.path.join (ethoscope_dir, 'cache')
-        
+        self._cache_dir = os.path.join(ethoscope_dir, "cache")
+
         # Try to get last experiment info from cache files (replaces pickle file)
         try:
             # Create temporary cache instance to read last experiment info
@@ -232,35 +315,46 @@ class ControlThread(Thread):
                 db_credentials={"name": "temp"},  # Temporary, will be replaced
                 device_name=name,
                 cache_dir=self._cache_dir,
-                database_type="SQLite3"  # Default, auto-detected later
+                database_type="SQLite3",  # Default, auto-detected later
             )
             last_experiment_info = temp_cache.get_last_experiment_info()
             if last_experiment_info and isinstance(last_experiment_info, dict):
                 self._info.update(last_experiment_info)
-                logging.info(f"Loaded last experiment info from cache: user={last_experiment_info.get('previous_user', 'unknown')}")
+                logging.info(
+                    f"Loaded last experiment info from cache: user={last_experiment_info.get('previous_user', 'unknown')}"
+                )
             elif last_experiment_info:
-                logging.warning(f"Cache returned non-dict experiment info: {type(last_experiment_info)}")
+                logging.warning(
+                    f"Cache returned non-dict experiment info: {type(last_experiment_info)}"
+                )
         except Exception as e:
             logging.warning(f"Failed to load last experiment info from cache: {e}")
             # Ensure _info is still a dictionary even if cache loading fails
             if not isinstance(self._info, dict):
-                logging.error("self._info became non-dict after cache failure, resetting")
+                logging.error(
+                    "self._info became non-dict after cache failure, resetting"
+                )
                 self._info = {
                     "id": machine_id,
                     "name": name,
                     "version": version,
-                    "used_space": pi.get_partition_info(ethoscope_dir)['Use%'].replace("%","")
+                    "used_space": pi.get_partition_info(ethoscope_dir)["Use%"].replace(
+                        "%", ""
+                    ),
                 }
-        
-        
+
         # Final safety check: ensure _info is always a dictionary
         if not isinstance(self._info, dict):
-            logging.error("self._info is not a dictionary after initialization, creating new one")
+            logging.error(
+                "self._info is not a dictionary after initialization, creating new one"
+            )
             self._info = {
                 "id": machine_id,
                 "name": name,
                 "version": version,
-                "used_space": pi.get_partition_info(ethoscope_dir)['Use%'].replace("%","")
+                "used_space": pi.get_partition_info(ethoscope_dir)["Use%"].replace(
+                    "%", ""
+                ),
             }
 
         # Initialize database info now that _info is fully constructed
@@ -268,44 +362,54 @@ class ControlThread(Thread):
             try:
                 self._info["database_info"] = self._metadata_cache.get_database_info()
             except Exception as e:
-                logging.warning(f"Failed to get database info from metadata cache during initialization: {e}")
+                logging.warning(
+                    f"Failed to get database info from metadata cache during initialization: {e}"
+                )
                 self._info["database_info"] = {
                     "db_size_bytes": 0,
                     "table_counts": {},
                     "last_db_update": 0,
-                    "db_status": "error"
+                    "db_status": "error",
                 }
         else:
             self._info["database_info"] = {
                 "db_size_bytes": 0,
                 "table_counts": {},
                 "last_db_update": 0,
-                "db_status": "no_cache"
+                "db_status": "no_cache",
             }
-        
+
         # Check for existing backup filename from metadata cache during initialization
         # This ensures backup_filename is available immediately for status requests
         if "backup_filename" not in self._info:
             if self._metadata_cache is not None:
                 try:
-                    existing_backup_filename = self._metadata_cache.get_backup_filename()
+                    existing_backup_filename = (
+                        self._metadata_cache.get_backup_filename()
+                    )
                     if existing_backup_filename:
                         self._info["backup_filename"] = existing_backup_filename
-                        logging.info(f"Found existing backup filename during initialization: {existing_backup_filename}")
+                        logging.info(
+                            f"Found existing backup filename during initialization: {existing_backup_filename}"
+                        )
                 except Exception as e:
-                    logging.warning(f"Failed to get backup filename from metadata cache during initialization: {e}")
+                    logging.warning(
+                        f"Failed to get backup filename from metadata cache during initialization: {e}"
+                    )
 
         self._parse_user_options(data)
-       
-        logging.info('Starting a new monitor control thread')
+
+        logging.info("Starting a new monitor control thread")
         super(ControlThread, self).__init__()
 
     def _create_backup_filename(self):
         current_time = self.info["time"]
-        date_and_time = datetime.datetime.utcfromtimestamp(current_time).strftime('%Y-%m-%d_%H-%M-%S')
+        date_and_time = datetime.datetime.utcfromtimestamp(current_time).strftime(
+            "%Y-%m-%d_%H-%M-%S"
+        )
         device_id = self._info["id"]
         return f"{date_and_time}_{device_id}.db"
-    
+
     @property
     def controltype(self):
         return "tracking"
@@ -315,26 +419,28 @@ class ControlThread(Thread):
         """
         This is information about the ethoscope that is not changing in time such as hardware specs and configuration parameters
         """
-        return { 'kernel'      : os.uname()[2],
-                 'pi_version'  : pi.pi_version(),
-                 'camera'      : pi.getPiCameraVersion(),
-                 'SD_CARD_AGE' : pi.get_SD_CARD_AGE(),
-                 'partitions'  : pi.get_partition_info(),
-                 'SD_CARD_NAME':  pi.get_SD_CARD_NAME()  }
-
-
+        return {
+            "kernel": os.uname()[2],
+            "pi_version": pi.pi_version(),
+            "camera": pi.getPiCameraVersion(),
+            "SD_CARD_AGE": pi.get_SD_CARD_AGE(),
+            "partitions": pi.get_partition_info(),
+            "SD_CARD_NAME": pi.get_SD_CARD_NAME(),
+        }
 
     @property
     def info(self):
         self._update_info()
         # Safety check: ensure we always return a dictionary
         if not isinstance(self._info, dict):
-            logging.error(f"self._info is not a dictionary ({type(self._info)}), creating emergency fallback")
+            logging.error(
+                f"self._info is not a dictionary ({type(self._info)}), creating emergency fallback"
+            )
             self._info = {
-                "id": getattr(self, '_machine_id', 'unknown'),
-                "name": getattr(self, '_name', 'unknown'),
+                "id": getattr(self, "_machine_id", "unknown"),
+                "name": getattr(self, "_name", "unknown"),
                 "version": "unknown",
-                "error": "info corruption detected and recovered"
+                "error": "info corruption detected and recovered",
             }
         return self._info
 
@@ -349,28 +455,32 @@ class ControlThread(Thread):
                 # Get the most recent cache files to check for graceful stop
                 cache_files = self._metadata_cache.list_cache_files()
                 if cache_files:
-                    recent_cache_path = cache_files[0]['path']
+                    recent_cache_path = cache_files[0]["path"]
                     if os.path.exists(recent_cache_path):
-                        with open(recent_cache_path, 'r') as f:
+                        with open(recent_cache_path, "r") as f:
                             cache_data = json.load(f)
-                        
+
                         # Check if experiment was stopped gracefully
-                        stopped_gracefully = cache_data.get('stopped_gracefully', False)
+                        stopped_gracefully = cache_data.get("stopped_gracefully", False)
                         return not stopped_gracefully
             except Exception as e:
                 logging.warning(f"Failed to check cache for graceful stop: {e}")
-        
+
         # Default to not interrupted if no cache info available
         return False
 
     @classmethod
     def user_options(self):
         out = {}
-        
+
         for key, value in list(self._option_dict.items()):
             # check if the options for the remote class will be visible
             # they will be visible only if they have a description, and if we are on a PC or they are not hidden
-            if key not in self._hidden_options or pi.isExperimental() or not self._is_a_rPi:
+            if (
+                key not in self._hidden_options
+                or pi.isExperimental()
+                or not self._is_a_rPi
+            ):
                 out[key] = []
                 for p in value["possible_classes"]:
                     try:
@@ -378,8 +488,12 @@ class ControlThread(Thread):
                             d = p.__dict__["_description"]
                             d["name"] = p.__name__
                             out[key].append(d)
-                            
-                        elif not pi.isExperimental() and 'hidden' not in p.__dict__['_description'] or not p.__dict__['_description']['hidden']:
+
+                        elif (
+                            not pi.isExperimental()
+                            and "hidden" not in p.__dict__["_description"]
+                            or not p.__dict__["_description"]["hidden"]
+                        ):
                             d = p.__dict__["_description"]
                             d["name"] = p.__name__
                             out[key].append(d)
@@ -389,14 +503,13 @@ class ControlThread(Thread):
 
         out_curated = {}
         for key, value in list(out.items()):
-            if len(value) >0:
+            if len(value) > 0:
                 out_curated[key] = value
 
         return out_curated
 
+    def _parse_one_user_option(self, field, data):
 
-    def _parse_one_user_option(self,field, data):
-    
         try:
             subdata = data[field]
         except KeyError:
@@ -405,11 +518,10 @@ class ControlThread(Thread):
 
         Class = eval(subdata["name"])
         kwargs = subdata["arguments"]
-    
+
         return Class, kwargs
 
-
-    def _parse_user_options(self,data):
+    def _parse_user_options(self, data):
 
         if data is None:
             return
@@ -421,20 +533,21 @@ class ControlThread(Thread):
 
             if Class is None:
 
-                self._option_dict[key]["class"] = self._option_dict[key]["possible_classes"][0]
+                self._option_dict[key]["class"] = self._option_dict[key][
+                    "possible_classes"
+                ][0]
                 self._option_dict[key]["kwargs"] = {}
                 continue
 
             self._option_dict[key]["class"] = Class
             self._option_dict[key]["kwargs"] = kwargs
 
-
     def _update_info(self):
-        '''
+        """
         Updates a dictionary with information that relates to the current status of the machine, ie data linked for instance to data acquisition
         Information that is not related to control and it is not experiment-dependent will come from elsewhere
-        '''
-        
+        """
+
         if self._monit is None:
             return
         t = self._monit.last_time_stamp
@@ -445,21 +558,25 @@ class ControlThread(Thread):
         df = float(frame_idx - self._last_info_frame_idx)
 
         if self._last_info_t_stamp == 0 or dt > 0:
-            f = round(df/dt, 2)
+            f = round(df / dt, 2)
         else:
-            f="NaN"
+            f = "NaN"
 
-        if t is not None:# and p is not None:
+        if t is not None:  # and p is not None:
             self._info["monitor_info"] = {
-                            # "last_positions":pos,
-                            "last_time_stamp":t,
-                            "fps": f
-                            }
+                # "last_positions":pos,
+                "last_time_stamp": t,
+                "fps": f,
+            }
 
         if self._drawer:
             frame = self._drawer.last_drawn_frame
             if frame is not None and (wall_time - self._last_img_write_time) >= 1.0:
-                cv2.imwrite(self._info["last_drawn_img"], frame, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
+                cv2.imwrite(
+                    self._info["last_drawn_img"],
+                    frame,
+                    [int(cv2.IMWRITE_JPEG_QUALITY), 50],
+                )
                 self._last_img_write_time = wall_time
 
         # Update database info using MetadataCache
@@ -472,114 +589,152 @@ class ControlThread(Thread):
                     "db_size_bytes": 0,
                     "table_counts": {},
                     "last_db_update": 0,
-                    "db_status": "error"
+                    "db_status": "error",
                 }
         else:
             self._info["database_info"] = {
                 "db_size_bytes": 0,
                 "table_counts": {},
                 "last_db_update": 0,
-                "db_status": "no_cache"
+                "db_status": "no_cache",
             }
-        
+
         # Update backup filename from result writer if available during tracking
-        if self._monit and hasattr(self._monit, '_result_writer'):
+        if self._monit and hasattr(self._monit, "_result_writer"):
             try:
                 backup_filename = self._monit._result_writer.get_backup_filename()
                 if backup_filename:
                     self._info["backup_filename"] = backup_filename
             except Exception as e:
-                logging.warning(f"Failed to get backup filename from result writer: {e}")
+                logging.warning(
+                    f"Failed to get backup filename from result writer: {e}"
+                )
 
         self._last_info_t_stamp = wall_time
         self._last_info_frame_idx = frame_idx
 
-    def _start_tracking(self, camera, result_writer, rois, reference_points, TrackerClass, tracker_kwargs,
-                        hardware_connection, StimulatorClass, stimulator_kwargs, time_offset=0):
+    def _start_tracking(
+        self,
+        camera,
+        result_writer,
+        rois,
+        reference_points,
+        TrackerClass,
+        tracker_kwargs,
+        hardware_connection,
+        StimulatorClass,
+        stimulator_kwargs,
+        time_offset=0,
+    ):
 
-        #Here the stimulator passes args. Hardware connection was previously open as thread.
-        logging.info(f"Creating stimulators: StimulatorClass={StimulatorClass}, hardware_connection={hardware_connection}, stimulator_kwargs={stimulator_kwargs}")
+        # Here the stimulator passes args. Hardware connection was previously open as thread.
+        logging.info(
+            f"Creating stimulators: StimulatorClass={StimulatorClass}, hardware_connection={hardware_connection}, stimulator_kwargs={stimulator_kwargs}"
+        )
         logging.info(f"Number of ROIs: {len(rois)}")
-        
+
         stimulators = []
         for i, roi in enumerate(rois):
             try:
                 stimulator = StimulatorClass(hardware_connection, **stimulator_kwargs)
-                logging.info(f"Successfully created stimulator {i+1}/{len(rois)}: {type(stimulator).__name__}")
+                logging.info(
+                    f"Successfully created stimulator {i+1}/{len(rois)}: {type(stimulator).__name__}"
+                )
                 stimulators.append(stimulator)
             except Exception as e:
                 logging.error(f"Failed to create stimulator {i+1}/{len(rois)}: {e}")
                 # Fall back to DefaultStimulator
                 from ethoscope.stimulators.stimulators import DefaultStimulator
+
                 fallback_stimulator = DefaultStimulator(None)
                 logging.warning(f"Using DefaultStimulator fallback for ROI {i+1}")
                 stimulators.append(fallback_stimulator)
-        
+
         kwargs = self._monit_kwargs.copy()
         kwargs.update(tracker_kwargs)
 
         logging.info(f"Creating Monitor with {len(stimulators)} stimulators")
         for i, stimulator in enumerate(stimulators):
             logging.info(f"Stimulator {i+1}: {type(stimulator).__name__}")
-            
-        self._monit = Monitor(camera, TrackerClass, rois,
-                              reference_points = reference_points,
-                              stimulators=stimulators,
-                              time_offset=time_offset,
-                              *self._monit_args)
-        
+
+        self._monit = Monitor(
+            camera,
+            TrackerClass,
+            rois,
+            reference_points=reference_points,
+            stimulators=stimulators,
+            time_offset=time_offset,
+            *self._monit_args,
+        )
+
         self._info["status"] = "running"
         logging.info("Setting monitor status as running: '%s'" % self._info["status"])
-        
+
         # Set tracking start time for database metadata
         # Use the original experiment start time from metadata/backup filename, not current time
-        if hasattr(self, '_metadata') and self._metadata is not None and 'date_time' in self._metadata:
+        if (
+            hasattr(self, "_metadata")
+            and self._metadata is not None
+            and "date_time" in self._metadata
+        ):
             # Use experiment start time from metadata (already updated for dbAppender)
-            self._tracking_start_time = self._metadata['date_time']
-            logging.info(f"Using experiment start time from metadata: {self._tracking_start_time}")
+            self._tracking_start_time = self._metadata["date_time"]
+            logging.info(
+                f"Using experiment start time from metadata: {self._tracking_start_time}"
+            )
 
-        elif self._info.get('backup_filename'):
+        elif self._info.get("backup_filename"):
             # Extract start time from backup filename as fallback
             try:
                 # Format: YYYY-MM-DD_HH-MM-SS_machine_id.db
-                timestamp_part = self._info['backup_filename'].split('_')[:2]  # Only take date and time parts
-                timestamp_str = '_'.join(timestamp_part)
-                self._tracking_start_time = time.mktime(time.strptime(timestamp_str, '%Y-%m-%d_%H-%M-%S'))
-                logging.info(f"Using experiment start time from backup filename: {self._tracking_start_time}")
+                timestamp_part = self._info["backup_filename"].split("_")[
+                    :2
+                ]  # Only take date and time parts
+                timestamp_str = "_".join(timestamp_part)
+                self._tracking_start_time = time.mktime(
+                    time.strptime(timestamp_str, "%Y-%m-%d_%H-%M-%S")
+                )
+                logging.info(
+                    f"Using experiment start time from backup filename: {self._tracking_start_time}"
+                )
             except (ValueError, IndexError) as e:
-                logging.warning(f"Could not parse time from backup filename {self._info['backup_filename']}: {e}")
+                logging.warning(
+                    f"Could not parse time from backup filename {self._info['backup_filename']}: {e}"
+                )
                 self._tracking_start_time = time.time()
         else:
             # Fallback to current time if no other information available
             self._tracking_start_time = time.time()
-            logging.warning("Using current time as tracking start time (no metadata/backup filename available)")
-        
+            logging.warning(
+                "Using current time as tracking start time (no metadata/backup filename available)"
+            )
+
         # Initialize database metadata for tracking
         if self._metadata_cache is not None:
             try:
                 self._info["database_info"] = self._metadata_cache.get_database_info()
             except Exception as e:
-                logging.warning(f"Failed to get database info from metadata cache for tracking: {e}")
+                logging.warning(
+                    f"Failed to get database info from metadata cache for tracking: {e}"
+                )
                 self._info["database_info"] = {
                     "db_size_bytes": 0,
                     "table_counts": {},
                     "last_db_update": 0,
-                    "db_status": "error"
+                    "db_status": "error",
                 }
         else:
             self._info["database_info"] = {
                 "db_size_bytes": 0,
                 "table_counts": {},
                 "last_db_update": 0,
-                "db_status": "no_cache"
+                "db_status": "no_cache",
             }
 
         self._monit.run(result_writer, self._drawer)
 
-
     def _set_tracking_from_scratch(self):
-        """
-        """
+        """ """
         CameraClass = self._option_dict["camera"]["class"]
         camera_kwargs = self._option_dict["camera"]["kwargs"]
 
@@ -602,7 +757,9 @@ class ControlThread(Thread):
         except EthoscopeException as e:
             if "Camera hardware not available" in str(e):
                 logging.error("Cannot start tracking: No camera hardware detected")
-                raise EthoscopeException("Tracking disabled: No camera hardware available. This ethoscope cannot perform video tracking or recording without camera hardware.")
+                raise EthoscopeException(
+                    "Tracking disabled: No camera hardware available. This ethoscope cannot perform video tracking or recording without camera hardware."
+                )
             else:
                 raise e
 
@@ -615,75 +772,90 @@ class ControlThread(Thread):
                 cam._close()
                 # Add a delay to allow camera hardware to reset
                 time.sleep(2.0)
-                logging.info("Camera cleanup completed, hardware should be available for next attempt")
+                logging.info(
+                    "Camera cleanup completed, hardware should be available for next attempt"
+                )
             except Exception as cleanup_error:
                 logging.error(f"Error during camera cleanup: {cleanup_error}")
             # Return None to indicate failure instead of raising exception
             return None
-
 
         logging.info("Initialising monitor")
         cam.restart()
 
         ExpInfoClass = self._option_dict["experimental_info"]["class"]
         exp_info_kwargs = self._option_dict["experimental_info"]["kwargs"]
-        
+
         # Debug: log what's being passed to ExperimentalInformation
-        logging.info(f"DEBUG: Creating ExperimentalInformation with kwargs: {exp_info_kwargs}")
-        
+        logging.info(
+            f"DEBUG: Creating ExperimentalInformation with kwargs: {exp_info_kwargs}"
+        )
+
         self._info["experimental_info"] = ExpInfoClass(**exp_info_kwargs).info_dic
-        
+
         # Debug: log the final experimental_info
-        logging.info(f"DEBUG: Final experimental_info created: {self._info['experimental_info']}")
-        
-        #here the hardwareconnection call the interface class without passing any argument!
+        logging.info(
+            f"DEBUG: Final experimental_info created: {self._info['experimental_info']}"
+        )
+
+        # here the hardwareconnection call the interface class without passing any argument!
         hardware_connection = HardwareConnection(HardWareInterfaceClass)
-        
-        #creates a unique tracking id to label this tracking run
+
+        # creates a unique tracking id to label this tracking run
         self._info["experimental_info"]["run_id"] = secrets.token_hex(8)
-        
-        
+
         if self._info["experimental_info"]["sensor"]:
-            #if is URL:
+            # if is URL:
             sensor = EthoscopeSensor(self._info["experimental_info"]["sensor"])
-            logging.info("Using sensor with URL %s" % self._info["experimental_info"]["sensor"])
+            logging.info(
+                "Using sensor with URL %s" % self._info["experimental_info"]["sensor"]
+            )
         else:
             sensor = None
 
         # Use current camera start time for experiment timestamp
         experiment_time = cam.start_time
         self._info["time"] = experiment_time
-        
+
         # Create initial backup filename - result writer may override this later
         self._info["backup_filename"] = self._create_backup_filename()
-        logging.info(f"Creating initial backup filename: {self._info['backup_filename']}")
-        
+        logging.info(
+            f"Creating initial backup filename: {self._info['backup_filename']}"
+        )
+
         # Determine result writer type
         ResultWriterClass = self._option_dict["result_writer"]["class"]
-        if hasattr(ResultWriterClass, '_database_type'):
+        if hasattr(ResultWriterClass, "_database_type"):
             result_writer_type = ResultWriterClass._database_type
         else:
             result_writer_type = ResultWriterClass.__name__
-        
+
         self._info["interactor"] = {}
-        self._info["interactor"]["name"] = str(self._option_dict['interactor']['class'])
-        self._info["interactor"].update ( self._option_dict['interactor']['kwargs'])
-        
+        self._info["interactor"]["name"] = str(self._option_dict["interactor"]["class"])
+        self._info["interactor"].update(self._option_dict["interactor"]["kwargs"])
+
         # For SQLite, construct the source database file path using consistent directory structure
         # Path: /ethoscope_data/results/{machine_id}/{machine_name}/{date_time}/{backup_filename}
         sqlite_source_path = None
-        if result_writer_type == "SQLite3" or result_writer_type == "SQLiteResultWriter":
+        if (
+            result_writer_type == "SQLite3"
+            or result_writer_type == "SQLiteResultWriter"
+        ):
             # Create new database with current timestamp
             # Parse backup filename format: YYYY-MM-DD_HH-MM-SS_machine_id.db
-            filename_parts = self._info["backup_filename"].replace('.db', '').split("_")
+            filename_parts = self._info["backup_filename"].replace(".db", "").split("_")
             if len(filename_parts) >= 3:
                 backup_date = filename_parts[0]
-                backup_time = filename_parts[1] 
-                etho_id = "_".join(filename_parts[2:])  # Join remaining parts as machine_id might contain underscores
+                backup_time = filename_parts[1]
+                etho_id = "_".join(
+                    filename_parts[2:]
+                )  # Join remaining parts as machine_id might contain underscores
                 sqlite_source_path = f"/ethoscope_data/results/{etho_id}/{self._info['name']}/{backup_date}_{backup_time}/{self._info['backup_filename']}"
             else:
-                raise ValueError(f"Invalid backup filename format: {self._info['backup_filename']}")
-        
+                raise ValueError(
+                    f"Invalid backup filename format: {self._info['backup_filename']}"
+                )
+
         self._metadata = {
             "machine_id": self._info["id"],
             "machine_name": self._info["name"],
@@ -693,13 +865,13 @@ class ControlThread(Thread):
             "version": self._info["version"]["id"],
             "experimental_info": str(self._info["experimental_info"]),
             "selected_options": str(self._option_dict),
-            "hardware_info" : str(self.hw_info),
-            "reference_points" : str([(p[0],p[1]) for p in reference_points]),
-            "backup_filename" : self._info["backup_filename"],
+            "hardware_info": str(self.hw_info),
+            "reference_points": str([(p[0], p[1]) for p in reference_points]),
+            "backup_filename": self._info["backup_filename"],
             "result_writer_type": result_writer_type,
-            "sqlite_source_path": sqlite_source_path
+            "sqlite_source_path": sqlite_source_path,
         }
-        
+
         # This is useful to retrieve the latest run's information after a reboot
         # Now stored in cache files instead of separate pickle file
         experiment_info_to_store = {
@@ -709,38 +881,49 @@ class ControlThread(Thread):
             "location": self._info["experimental_info"]["location"],
             "result_writer_type": result_writer_type,
             "sqlite_source_path": sqlite_source_path,
-            "run_id": self._info["experimental_info"]["run_id"]
+            "run_id": self._info["experimental_info"]["run_id"],
         }
-        
+
         # hardware_interface is a running thread
         # Use the selected result writer class and pass appropriate arguments
-        result_writer_kwargs.update({
-            'take_frame_shots': True, 
-            'erase_old_db': True,  # Always create new database (dbAppender handles append internally)
-            'sensor': sensor
-        })
-        
+        result_writer_kwargs.update(
+            {
+                "take_frame_shots": True,
+                "erase_old_db": True,  # Always create new database (dbAppender handles append internally)
+                "sensor": sensor,
+            }
+        )
+
         # Configure database credentials and metadata cache based on result writer type
-        if result_writer_type == "SQLite3" or result_writer_type == "SQLiteResultWriter":
+        if (
+            result_writer_type == "SQLite3"
+            or result_writer_type == "SQLiteResultWriter"
+        ):
             # SQLite uses the consistent directory structure for database file path
             if sqlite_source_path is None:
-                raise ValueError("SQLite source path is None - backup filename parsing failed")
-                
+                raise ValueError(
+                    "SQLite source path is None - backup filename parsing failed"
+                )
+
             # Ensure the directory structure exists before creating the database
             sqlite_dir = os.path.dirname(sqlite_source_path)
             os.makedirs(sqlite_dir, exist_ok=True)
             logging.info(f"Created SQLite directory structure: {sqlite_dir}")
-            
+
             # Create clean SQLite credentials (only database path, no MySQL connection params)
             sqlite_credentials = {"name": sqlite_source_path}
-            rw = ResultWriterClass(sqlite_credentials, rois, self._metadata, **result_writer_kwargs)
-            
+            rw = ResultWriterClass(
+                sqlite_credentials, rois, self._metadata, **result_writer_kwargs
+            )
+
             # Get the backup filename from the result writer (may be different from initial one)
             backup_filename_from_writer = rw.get_backup_filename()
             if backup_filename_from_writer:
                 self._info["backup_filename"] = backup_filename_from_writer
-                logging.info(f"Updated backup filename from result writer: {backup_filename_from_writer}")
-            
+                logging.info(
+                    f"Updated backup filename from result writer: {backup_filename_from_writer}"
+                )
+
             # Initialize SQLite metadata cache for JSON file generation
             # Use clean SQLite credentials (only database path)
             cache_credentials = {"name": sqlite_source_path}
@@ -748,7 +931,7 @@ class ControlThread(Thread):
                 db_credentials=cache_credentials,
                 device_name=self._info["name"],
                 cache_dir=self._cache_dir,
-                database_type="SQLite3"
+                database_type="SQLite3",
             )
         elif result_writer_type == "dbAppender":
             # dbAppender handles database discovery and append functionality internally
@@ -756,24 +939,28 @@ class ControlThread(Thread):
                 db_credentials=self._db_credentials,
                 rois=rois,
                 metadata=self._metadata,
-                **result_writer_kwargs
+                **result_writer_kwargs,
             )
-            
+
             # Get the backup filename from the result writer (may be different from initial one)
             backup_filename_from_writer = rw.get_backup_filename()
             if backup_filename_from_writer:
                 self._info["backup_filename"] = backup_filename_from_writer
-                logging.info(f"Updated backup filename from result writer: {backup_filename_from_writer}")
-            
+                logging.info(
+                    f"Updated backup filename from result writer: {backup_filename_from_writer}"
+                )
+
             # Initialize metadata cache based on detected database type
             # The dbAppender will have created the appropriate writer internally
-            if hasattr(rw, '_writer') and hasattr(rw._writer, '_database_type'):
+            if hasattr(rw, "_writer") and hasattr(rw._writer, "_database_type"):
                 db_type = rw._writer._database_type
-                
+
                 # Update result_writer_type to the actual database type instead of "dbAppender"
                 result_writer_type = db_type
-                logging.info(f"dbAppender: Updated result_writer_type from 'dbAppender' to '{db_type}'")
-                
+                logging.info(
+                    f"dbAppender: Updated result_writer_type from 'dbAppender' to '{db_type}'"
+                )
+
                 if db_type == "SQLite3":
                     cache_credentials = {"name": rw._writer._db_credentials["name"]}
                     cache_db_type = "SQLite3"
@@ -782,14 +969,14 @@ class ControlThread(Thread):
                 else:
                     cache_credentials = self._db_credentials
                     cache_db_type = "MySQL"
-                    
+
                 self._metadata_cache = create_metadata_cache(
                     db_credentials=cache_credentials,
                     device_name=self._info["name"],
                     cache_dir=self._cache_dir,
-                    database_type=cache_db_type
+                    database_type=cache_db_type,
                 )
-                
+
                 # For dbAppender, get the original experiment timestamp from the database
                 # This ensures we reuse the existing cache file instead of creating a new one
                 try:
@@ -797,34 +984,50 @@ class ControlThread(Thread):
                     if original_timestamp:
                         # Update the experiment time to use the original timestamp
                         experiment_time = original_timestamp
-                        logging.info(f"dbAppender: Using original experiment timestamp {original_timestamp} from database")
-                        
+                        logging.info(
+                            f"dbAppender: Using original experiment timestamp {original_timestamp} from database"
+                        )
+
                         # Update metadata with original experiment time
-                        self._metadata['date_time'] = experiment_time
-                        
+                        self._metadata["date_time"] = experiment_time
+
                         # Update backup filename to match original experiment
-                        original_backup_filename = self._metadata_cache.get_backup_filename()
+                        original_backup_filename = (
+                            self._metadata_cache.get_backup_filename()
+                        )
                         if original_backup_filename:
                             self._info["backup_filename"] = original_backup_filename
-                            logging.info(f"dbAppender: Using original backup filename {original_backup_filename}")
+                            logging.info(
+                                f"dbAppender: Using original backup filename {original_backup_filename}"
+                            )
                         else:
                             # Generate backup filename from original timestamp
-                            ts_str = time.strftime('%Y-%m-%d_%H-%M-%S', time.localtime(original_timestamp))
-                            self._info["backup_filename"] = f"{ts_str}_{self._info['id']}.db"
-                            logging.info(f"dbAppender: Generated backup filename from original timestamp: {self._info['backup_filename']}")
+                            ts_str = time.strftime(
+                                "%Y-%m-%d_%H-%M-%S", time.localtime(original_timestamp)
+                            )
+                            self._info["backup_filename"] = (
+                                f"{ts_str}_{self._info['id']}.db"
+                            )
+                            logging.info(
+                                f"dbAppender: Generated backup filename from original timestamp: {self._info['backup_filename']}"
+                            )
                     else:
-                        logging.warning("dbAppender: Could not retrieve original experiment timestamp, using new timestamp")
+                        logging.warning(
+                            "dbAppender: Could not retrieve original experiment timestamp, using new timestamp"
+                        )
                 except Exception as e:
-                    logging.warning(f"dbAppender: Failed to get original experiment timestamp: {e}")
+                    logging.warning(
+                        f"dbAppender: Failed to get original experiment timestamp: {e}"
+                    )
             else:
                 # Fallback to standard metadata cache
                 self._metadata_cache = create_metadata_cache(
                     db_credentials=self._db_credentials,
                     device_name=self._info["name"],
                     cache_dir=self._cache_dir,
-                    database_type="MySQL"
+                    database_type="MySQL",
                 )
-            
+
             # Update metadata and experiment_info_to_store with the correct result_writer_type
             # (they were created before we knew the actual database type)
             self._metadata["result_writer_type"] = result_writer_type
@@ -833,35 +1036,51 @@ class ControlThread(Thread):
             experiment_info_to_store["sqlite_source_path"] = sqlite_source_path
         else:
             # MySQL uses standard credentials and metadata cache
-            rw = ResultWriterClass(self._db_credentials, rois, self._metadata, **result_writer_kwargs)
-            
+            rw = ResultWriterClass(
+                self._db_credentials, rois, self._metadata, **result_writer_kwargs
+            )
+
             # Get the backup filename from the result writer (may be different from initial one)
             backup_filename_from_writer = rw.get_backup_filename()
             if backup_filename_from_writer:
                 self._info["backup_filename"] = backup_filename_from_writer
-                logging.info(f"Updated backup filename from result writer: {backup_filename_from_writer}")
-            
+                logging.info(
+                    f"Updated backup filename from result writer: {backup_filename_from_writer}"
+                )
+
             # Initialize MySQL metadata cache
             self._metadata_cache = create_metadata_cache(
                 db_credentials=self._db_credentials,
                 device_name=self._info["name"],
                 cache_dir=self._cache_dir,
-                database_type="MySQL"
+                database_type="MySQL",
             )
-        
+
         # Store experiment information in cache (replaces last_run_info file)
         if self._metadata_cache:
             # Use the experiment timestamp (which may be original timestamp for dbAppender)
             tracking_start_time = experiment_time
-            self._metadata_cache.store_experiment_info(tracking_start_time, experiment_info_to_store)
+            self._metadata_cache.store_experiment_info(
+                tracking_start_time, experiment_info_to_store
+            )
 
         time_offset = 0
         # dbAppender handles append functionality and time offset internally
-        if hasattr(rw, 'append'):
+        if hasattr(rw, "append"):
             time_offset = rw.append()
 
-        return  (cam, rw, rois, reference_points, TrackerClass, tracker_kwargs,
-                        hardware_connection, StimulatorClass, stimulator_kwargs, time_offset)
+        return (
+            cam,
+            rw,
+            rois,
+            reference_points,
+            TrackerClass,
+            tracker_kwargs,
+            hardware_connection,
+            StimulatorClass,
+            stimulator_kwargs,
+            time_offset,
+        )
 
     def _detect_and_store_targets(self, cam):
         """
@@ -893,7 +1112,9 @@ class ControlThread(Thread):
                 self._info["experimental_info"]["target_coordinates"] = [
                     [float(p[0]), float(p[1])] for p in reference_points
                 ]
-                logging.info(f"Stored {len(reference_points)} target coordinates in experimental_info")
+                logging.info(
+                    f"Stored {len(reference_points)} target coordinates in experimental_info"
+                )
 
             return reference_points, rois
 
@@ -926,17 +1147,28 @@ class ControlThread(Thread):
             # Get current timestamp with timezone
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
             # If no timezone info, add local timezone indicator
-            if not timestamp.endswith(' '):
+            if not timestamp.endswith(" "):
                 import time
+
                 tz_name = time.tzname[time.daylight]
                 timestamp = f"{timestamp.rstrip()} {tz_name}"
 
             # Calculate text size to position it in bottom right
             text_size = cv2.getTextSize(timestamp, font, font_scale, thickness)[0]
-            text_x = debug_frame.shape[1] - text_size[0] - 10  # 10 pixels from right edge
+            text_x = (
+                debug_frame.shape[1] - text_size[0] - 10
+            )  # 10 pixels from right edge
             text_y = debug_frame.shape[0] - 10  # 10 pixels from bottom edge
 
-            cv2.putText(debug_frame, timestamp, (text_x, text_y), font, font_scale, color, thickness)
+            cv2.putText(
+                debug_frame,
+                timestamp,
+                (text_x, text_y),
+                font,
+                font_scale,
+                color,
+                thickness,
+            )
 
             # Save the debug image
             debug_path = self._info["dbg_img"]
@@ -953,15 +1185,21 @@ class ControlThread(Thread):
         """
         time.sleep(120)  # Wait 2 minutes
         if self._info["status"] == "initialising":
-            logging.critical("INITIALIZATION TIMEOUT: Ethoscope has been stuck in initializing state for 2 minutes")
-            logging.critical("This usually indicates a camera hardware or picamera2 compatibility issue")
+            logging.critical(
+                "INITIALIZATION TIMEOUT: Ethoscope has been stuck in initializing state for 2 minutes"
+            )
+            logging.critical(
+                "This usually indicates a camera hardware or picamera2 compatibility issue"
+            )
             logging.critical("Terminating ethoscope process to prevent indefinite hang")
-            
+
             # Set error state before terminating
             self._info["status"] = "error"
-            self._info["error"] = "Initialization timeout: Process terminated after 2 minutes in initializing state"
+            self._info["error"] = (
+                "Initialization timeout: Process terminated after 2 minutes in initializing state"
+            )
             self._info["time"] = time.time()
-            
+
             # Force kill the current process
             os.kill(os.getpid(), signal.SIGKILL)
 
@@ -970,7 +1208,9 @@ class ControlThread(Thread):
         hardware_connection = None
 
         # Start timeout watchdog thread
-        timeout_thread = threading.Thread(target=self._initialization_timeout_handler, daemon=True)
+        timeout_thread = threading.Thread(
+            target=self._initialization_timeout_handler, daemon=True
+        )
         timeout_thread.start()
         logging.info("Started initialization timeout watchdog (2 minute limit)")
 
@@ -983,36 +1223,64 @@ class ControlThread(Thread):
 
             # Always create a new tracking instance (pickle resume logic removed)
             tracking_setup = self._set_tracking_from_scratch()
-            
+
             # Handle graceful failure when tracking setup fails
             if tracking_setup is None:
-                logging.warning("Tracking setup failed. Please check your arena setup and try again.")
+                logging.warning(
+                    "Tracking setup failed. Please check your arena setup and try again."
+                )
                 self._info["status"] = "stopped"  # Keep device available for restart
-                self._info["error"] = "ROI building failed: insufficient targets detected. Please check your arena has 3 circular targets visible."
+                self._info["error"] = (
+                    "ROI building failed: insufficient targets detected. Please check your arena has 3 circular targets visible."
+                )
                 # Don't exit, just stop this tracking attempt - device remains available
                 return  # Exit gracefully without crashing
-                
-            cam, rw, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, time_offset = tracking_setup
-            
+
+            (
+                cam,
+                rw,
+                rois,
+                reference_points,
+                TrackerClass,
+                tracker_kwargs,
+                hardware_connection,
+                StimulatorClass,
+                stimulator_kwargs,
+                time_offset,
+            ) = tracking_setup
+
             # Initialization completed successfully
             logging.info("Initialization completed successfully - starting tracking")
-            
+
             with rw as result_writer:
                 # Start tracking directly (pickle saving removed)
-                self._start_tracking(cam, result_writer, rois, reference_points, TrackerClass, tracker_kwargs, hardware_connection, StimulatorClass, stimulator_kwargs, time_offset=time_offset)
-            
-            #self.stop()
+                self._start_tracking(
+                    cam,
+                    result_writer,
+                    rois,
+                    reference_points,
+                    TrackerClass,
+                    tracker_kwargs,
+                    hardware_connection,
+                    StimulatorClass,
+                    stimulator_kwargs,
+                    time_offset=time_offset,
+                )
+
+            # self.stop()
 
         except EthoscopeException as e:
-            if e.img is not  None:
+            if e.img is not None:
                 cv2.imwrite(self._info["dbg_img"], e.img)
-            
+
             # Check if this is a camera hardware issue that should not cause a permanent failure
             error_msg = str(e).lower()
-            if ("camera hardware not available" in error_msg or 
-                "video tracking and recording are disabled" in error_msg or
-                "picamera2 compatibility" in error_msg or
-                "allocator" in error_msg):
+            if (
+                "camera hardware not available" in error_msg
+                or "video tracking and recording are disabled" in error_msg
+                or "picamera2 compatibility" in error_msg
+                or "allocator" in error_msg
+            ):
                 logging.error(f"Camera initialization failed: {e}")
                 self._info["status"] = "stopped"
                 self._info["error"] = f"Camera initialization failed: {str(e)}"
@@ -1022,12 +1290,16 @@ class ControlThread(Thread):
             else:
                 # This is an exception-based stop, so it's not graceful
                 self.stop(traceback.format_exc())
-        
+
         except Exception as e:
             # Check if this is a camera-related exception that should not cause permanent failure
             error_msg = str(e).lower()
-            if ("allocator" in error_msg or "picamera" in error_msg or 
-                "camera" in error_msg and "hardware" in error_msg):
+            if (
+                "allocator" in error_msg
+                or "picamera" in error_msg
+                or "camera" in error_msg
+                and "hardware" in error_msg
+            ):
                 logging.error(f"Camera-related error during initialization: {e}")
                 self._info["status"] = "stopped"
                 self._info["error"] = f"Camera error: {str(e)}"
@@ -1053,19 +1325,23 @@ class ControlThread(Thread):
                 logging.warning("Could not close hardware connection properly")
                 pass
 
-    def stop (self, error=None):
-        """
-        """
-        #We stop only if we are actually running - not when the thread simply dies
+    def stop(self, error=None):
+        """ """
+        # We stop only if we are actually running - not when the thread simply dies
         if self.info["status"] in ["running", "starting", "initialising"]:
 
             self._info["status"] = "stopping"
             self._info["time"] = time.time()
-            
+
             # we reset all the user data of the latest experiment except the run_id
             # a new run_id will be created when we start another experiment
-            if "experimental_info" in self._info and "run_id" in self._info["experimental_info"]:
-                self._info["experimental_info"] = { "run_id" : self._info["experimental_info"]["run_id"] }
+            if (
+                "experimental_info" in self._info
+                and "run_id" in self._info["experimental_info"]
+            ):
+                self._info["experimental_info"] = {
+                    "run_id": self._info["experimental_info"]["run_id"]
+                }
 
             if not self._monit is None:
                 self._monit.stop()
@@ -1073,64 +1349,90 @@ class ControlThread(Thread):
 
                 if self._auto_SQL_backup_at_stop:
                     logging.info("Performing a SQL dump of the database.")
-                    t = Thread( target = SQL_dump )
+                    t = Thread(target=SQL_dump)
                     t.start()
-
 
             self._info["status"] = "stopped"
             self._info["time"] = time.time()
             self._info["error"] = error
             self._info["monitor_info"] = self._default_monitor_info
-            
+
             # Finalize database cache file when tracking stops
             if self._tracking_start_time and self._metadata_cache is not None:
                 try:
                     # Determine if this was a graceful stop or an error
                     is_graceful = error is None
                     stop_reason = "error" if error else "user_stop"
-                    
-                    self._metadata_cache.finalize_cache(self._tracking_start_time, graceful=is_graceful, stop_reason=stop_reason)
-                    logging.info(f"Finalized database cache file for tracking session (graceful={is_graceful}, reason={stop_reason})")
+
+                    self._metadata_cache.finalize_cache(
+                        self._tracking_start_time,
+                        graceful=is_graceful,
+                        stop_reason=stop_reason,
+                    )
+                    logging.info(
+                        f"Finalized database cache file for tracking session (graceful={is_graceful}, reason={stop_reason})"
+                    )
                 except Exception as e:
                     logging.warning(f"Failed to finalize cache file: {e}")
-            
+
             # Update database info after stopping
             if self._metadata_cache is not None:
                 try:
-                    self._info["database_info"] = self._metadata_cache.get_database_info()
+                    self._info["database_info"] = (
+                        self._metadata_cache.get_database_info()
+                    )
                 except Exception as e:
-                    logging.warning(f"Failed to get database info from metadata cache after stopping: {e}")
+                    logging.warning(
+                        f"Failed to get database info from metadata cache after stopping: {e}"
+                    )
                     self._info["database_info"] = {
                         "db_size_bytes": 0,
                         "table_counts": {},
                         "last_db_update": 0,
-                        "db_status": "error"
+                        "db_status": "error",
                     }
             else:
                 self._info["database_info"] = {
                     "db_size_bytes": 0,
                     "table_counts": {},
                     "last_db_update": 0,
-                    "db_status": "no_cache"
+                    "db_status": "no_cache",
                 }
-            
+
             if "backup_filename" in self._info:
                 # Initialize experimental_info structure if not exists
                 if "experimental_info" not in self._info:
                     self._info["experimental_info"] = {"current": {}, "previous": {}}
-                elif not isinstance(self._info["experimental_info"], dict) or "previous" not in self._info["experimental_info"]:
+                elif (
+                    not isinstance(self._info["experimental_info"], dict)
+                    or "previous" not in self._info["experimental_info"]
+                ):
                     # Handle legacy format - preserve existing experimental_info as current
-                    existing_info = self._info["experimental_info"] if isinstance(self._info["experimental_info"], dict) else {}
-                    self._info["experimental_info"] = {"current": existing_info, "previous": {}}
-                
-                # Store previous experiment information in nested structure
-                self._info["experimental_info"]["previous"].update({
-                    "date_time": self._info["time"],
-                    "backup_filename": self._info["backup_filename"],
-                    "user": self._info["experimental_info"].get("current", {}).get("name", "") or self._info["experimental_info"].get("name", ""),
-                    "location": self._info["experimental_info"].get("current", {}).get("location", "") or self._info["experimental_info"].get("location", "")
-                })
+                    existing_info = (
+                        self._info["experimental_info"]
+                        if isinstance(self._info["experimental_info"], dict)
+                        else {}
+                    )
+                    self._info["experimental_info"] = {
+                        "current": existing_info,
+                        "previous": {},
+                    }
 
+                # Store previous experiment information in nested structure
+                self._info["experimental_info"]["previous"].update(
+                    {
+                        "date_time": self._info["time"],
+                        "backup_filename": self._info["backup_filename"],
+                        "user": self._info["experimental_info"]
+                        .get("current", {})
+                        .get("name", "")
+                        or self._info["experimental_info"].get("name", ""),
+                        "location": self._info["experimental_info"]
+                        .get("current", {})
+                        .get("location", "")
+                        or self._info["experimental_info"].get("location", ""),
+                    }
+                )
 
             if error is not None:
                 logging.error("Monitor closed with an error:")
@@ -1139,8 +1441,7 @@ class ControlThread(Thread):
                 logging.info("Monitor closed all right")
 
     def __del__(self):
-        """
-        """
+        """ """
 
         self.stop()
         shutil.rmtree(self._tmp_dir, ignore_errors=True)

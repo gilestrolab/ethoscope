@@ -1,4 +1,4 @@
-__author__ = 'quentin'
+__author__ = "quentin"
 from ethoscope.core.variables import BaseRelativeVariable
 from ethoscope.core.data_point import DataPoint
 from ethoscope.stimulators.stimulators import DefaultStimulator
@@ -22,16 +22,15 @@ class TrackingUnit(object):
         :param kwargs: additional keyword arguments passed to the tracking algorithm.
         """
 
-        self._tracker = tracking_class(roi,*args, **kwargs)
+        self._tracker = tracking_class(roi, *args, **kwargs)
         self._roi = roi
 
         if stimulator is not None:
-            self._stimulator= stimulator
+            self._stimulator = stimulator
         else:
             self._stimulator = DefaultStimulator(None)
 
         self._stimulator.bind_tracker(self._tracker)
-
 
     @property
     def stimulator(self):
@@ -49,7 +48,7 @@ class TrackingUnit(object):
         """
         return self._roi
 
-    def get_last_positions(self,absolute=False):
+    def get_last_positions(self, absolute=False):
         """
         The last position of the animal monitored by this `TrackingUnit`
 
@@ -63,10 +62,10 @@ class TrackingUnit(object):
         last_positions = self._tracker.positions[-1]
         if not absolute:
             return last_positions
-        out =[]
+        out = []
         for last_pos in last_positions:
             tmp_out = []
-            for k,i in list(last_pos.items()):
+            for k, i in list(last_pos.items()):
                 if isinstance(i, BaseRelativeVariable):
                     tmp_out.append(i.to_absolute(self.roi))
                 else:
@@ -74,10 +73,7 @@ class TrackingUnit(object):
             tmp_out = DataPoint(tmp_out)
             out.append(tmp_out)
 
-
         return out
-
-
 
     def track(self, t, img):
         """
@@ -91,7 +87,7 @@ class TrackingUnit(object):
         :return: The resulting data point
         :rtype:  :class:`~ethoscope.core.data_point.DataPoint`
         """
-        data_rows = self._tracker.track(t,img)
+        data_rows = self._tracker.track(t, img)
         #
         #
         # # TODO data_row should have some result

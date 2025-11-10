@@ -1,4 +1,4 @@
-__author__ = 'diana'
+__author__ = "diana"
 
 import cv2
 
@@ -13,6 +13,7 @@ import logging
 from ethoscope.roi_builders.roi_builders import BaseROIBuilder
 from ethoscope.core.roi import ROI
 
+
 class ArenaMaskROIBuilder(BaseROIBuilder):
 
     def __init__(self, mask_path):
@@ -25,12 +26,11 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
 
         super(ArenaMaskROIBuilder, self).__init__()
 
-
     def _find_target_coordinates(self, img):
         params = cv2.SimpleBlobDetector_Params()
         # Change thresholds
-        params.minThreshold = 0;
-        params.maxThreshold = 100;
+        params.minThreshold = 0
+        params.maxThreshold = 100
 
         # Filter by Area.
         params.filterByArea = True
@@ -40,7 +40,6 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
         # Filter by Circularity
         params.filterByCircularity = True
         params.minCircularity = 0.6
-
 
         # Filter by Convexity
         params.filterByConvexity = True
@@ -52,25 +51,24 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
 
         detector = cv2.SimpleBlobDetector(params)
 
-        #cv2.imshow('here', img)
-        #cv2.waitKey(0)
+        # cv2.imshow('here', img)
+        # cv2.waitKey(0)
 
         keypoints = detector.detect(img)
 
-        if np.size(keypoints) !=3:
-            logging.error('Just %s targets found instead of three', np.size(keypoints))
+        if np.size(keypoints) != 3:
+            logging.error("Just %s targets found instead of three", np.size(keypoints))
 
         return keypoints
 
     def _sort(keypoints):
-        #-----------A
-        #-----------
-        #C----------B
+        # -----------A
+        # -----------
+        # C----------B
         # initialize the three targets that we want to found
         sorted_a = cv2.KeyPoint()
         sorted_b = cv2.KeyPoint()
         sorted_c = cv2.KeyPoint()
-
 
         # find the minimum x and the minimum y coordinate between the three targets
         minx = min(keypoint.pt[0] for keypoint in keypoints)
@@ -95,42 +93,58 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
         return targets_sorted
 
     def _get_corrected_mask(self, img):
-        frame_targets_pts_sorted = self._get_targets_sorted(self,img)
+        frame_targets_pts_sorted = self._get_targets_sorted(self, img)
         mask_target_pts_sorted = self._get_targets_sorted(self, self._mask)
-        M = cv2.getAffineTransform(np.float32(mask_target_pts_sorted), np.float32(frame_targets_pts_sorted))
+        M = cv2.getAffineTransform(
+            np.float32(mask_target_pts_sorted), np.float32(frame_targets_pts_sorted)
+        )
         cols, rows, _ = self._mask.shape
-        mask_transformed = cv2.warpAffine(self._mask,M,(cols,rows))
+        mask_transformed = cv2.warpAffine(self._mask, M, (cols, rows))
         return mask_transformed
 
     def _is_contour_rectangular(c):
-	    # approximate the contour
-	    peri = cv2.arcLength(c, True)
-	    approx = cv2.approxPolyDP(c, 0.02 * peri, True)
-	    # the contour is 'bad' if it is not a rectangle
-	    return len(approx) == 4
+        # approximate the contour
+        peri = cv2.arcLength(c, True)
+        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+        # the contour is 'bad' if it is not a rectangle
+        return len(approx) == 4
 
-    def _rois_from_img(self,img):
+    def _rois_from_img(self, img):
         corrected_mask = self._get_corrected_mask(self, self._mask)
-        #get all external contours
+        # get all external contours
         if CV_VERSION == 3:
-            _, contours, hierarchy = cv2.findContours(np.copy(corrected_mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            _, contours, hierarchy = cv2.findContours(
+                np.copy(corrected_mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            )
         else:
-            contours, hierarchy = cv2.findContours(np.copy(corrected_mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            contours, hierarchy = cv2.findContours(
+                np.copy(corrected_mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            )
 
         rois = []
 
-        for i,c in enumerate(contours):
+        for i, c in enumerate(contours):
             if self._is_contour_rectangular(c):
                 tmp_mask = np.zeros_like(corrected_mask)
                 cv2.drawContours(tmp_mask, [c], 0, 1)
 
                 if CV_VERSION == 3:
-                    _, sub_contours, sub_hierarchy = cv2.findContours(np.copy(tmp_mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    _, sub_contours, sub_hierarchy = cv2.findContours(
+                        np.copy(tmp_mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+                    )
                 else:
-                    sub_contours, sub_hierarchy = cv2.findContours(np.copy(tmp_mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    sub_contours, sub_hierarchy = cv2.findContours(
+                        np.copy(tmp_mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+                    )
 
-                rois.append(ROI(c, i+1, value=None, regions=sub_contours, hierarchy=sub_hierarchy))
+                rois.append(
+                    ROI(
+                        c,
+                        i + 1,
+                        value=None,
+                        regions=sub_contours,
+                        hierarchy=sub_hierarchy,
+                    )
+                )
 
         return rois
-
-

@@ -1,4 +1,4 @@
-__author__ = 'quentin'
+__author__ = "quentin"
 
 import cv2
 import unittest
@@ -13,11 +13,15 @@ except ImportError:
 
 # Get the absolute path to the test images
 import pathlib
+
 test_dir = pathlib.Path(__file__).parent.parent / "static_files" / "img"
-images = {"bright_targets": str(test_dir / "bright_targets.png"),
-          "dark_targets": str(test_dir / "dark_targets.png")}
+images = {
+    "bright_targets": str(test_dir / "bright_targets.png"),
+    "dark_targets": str(test_dir / "dark_targets.png"),
+}
 
 LOG_DIR = "./test_logs/"
+
 
 class TestTargetROIBuilder(unittest.TestCase):
 
@@ -25,9 +29,7 @@ class TestTargetROIBuilder(unittest.TestCase):
         # Test with different configurations
         self.roi_builder_basic = TargetGridROIBuilder(n_rows=2, n_cols=1)
         self.roi_builder_diagnostic = TargetGridROIBuilder(
-            n_rows=2, n_cols=1,
-            enable_diagnostics=True,
-            device_id="test_device"
+            n_rows=2, n_cols=1, enable_diagnostics=True, device_id="test_device"
         )
 
     def _draw_rois(self, img, rois):
@@ -42,36 +44,42 @@ class TestTargetROIBuilder(unittest.TestCase):
                 # Draw circles for detected targets
                 cv2.circle(img, (int(pt[0]), int(pt[1])), 10, (0, 255, 0), 2)
                 # Label the points A, B, C
-                labels = ['A', 'B', 'C']
-                cv2.putText(img, labels[i], (int(pt[0])+15, int(pt[1])+15),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                labels = ["A", "B", "C"]
+                cv2.putText(
+                    img,
+                    labels[i],
+                    (int(pt[0]) + 15, int(pt[1]) + 15),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    (0, 255, 0),
+                    2,
+                )
 
     def test_geometric_validation(self):
         """Test the geometric validation function with known configurations"""
 
         # Good configuration (similar to expected arena layout)
-        good_points = np.array([
-            [400, 100],   # A - upper right
-            [405, 350],   # B - lower right
-            [100, 345]    # C - lower left
-        ], dtype=np.float32)
+        good_points = np.array(
+            [
+                [400, 100],  # A - upper right
+                [405, 350],  # B - lower right
+                [100, 345],  # C - lower left
+            ],
+            dtype=np.float32,
+        )
 
         # Bad configuration - points in a line
-        bad_points = np.array([
-            [100, 200],
-            [200, 200],
-            [300, 200]
-        ], dtype=np.float32)
+        bad_points = np.array([[100, 200], [200, 200], [300, 200]], dtype=np.float32)
 
         # Test geometric validation
         self.assertTrue(
             self.roi_builder_basic._validate_target_geometry(good_points),
-            "Good geometric configuration should pass validation"
+            "Good geometric configuration should pass validation",
         )
 
         self.assertFalse(
             self.roi_builder_basic._validate_target_geometry(bad_points),
-            "Bad geometric configuration should fail validation"
+            "Bad geometric configuration should fail validation",
         )
 
     def test_target_detection_with_sample_images(self):
@@ -92,13 +100,16 @@ class TestTargetROIBuilder(unittest.TestCase):
                 # For these specific test images, we expect to find targets
                 # (adjust expectation based on actual image content)
                 if target_points is not None:
-                    self.assertEqual(len(target_points), 3,
-                                   f"Should detect exactly 3 targets in {image_name}")
+                    self.assertEqual(
+                        len(target_points),
+                        3,
+                        f"Should detect exactly 3 targets in {image_name}",
+                    )
 
                     # Verify geometric validity
                     self.assertTrue(
                         self.roi_builder_basic._validate_target_geometry(target_points),
-                        f"Detected targets should have valid geometry in {image_name}"
+                        f"Detected targets should have valid geometry in {image_name}",
                     )
 
                     # Draw detected targets
@@ -108,8 +119,11 @@ class TestTargetROIBuilder(unittest.TestCase):
                     reference_points, rois = self.roi_builder_basic._rois_from_img(img)
 
                     if rois is not None:
-                        self.assertEqual(len(rois), 2,
-                                       f"Should create 2 ROIs (2 rows × 1 col) in {image_name}")
+                        self.assertEqual(
+                            len(rois),
+                            2,
+                            f"Should create 2 ROIs (2 rows × 1 col) in {image_name}",
+                        )
                         self._draw_rois(img_with_results, rois)
 
                 # Save result image for visual inspection
@@ -136,8 +150,7 @@ class TestTargetROIBuilder(unittest.TestCase):
         """Test simplified frame averaging functionality"""
 
         roi_builder = TargetGridROIBuilder(
-            n_rows=1, n_cols=1,
-            enable_frame_averaging=True
+            n_rows=1, n_cols=1, enable_frame_averaging=True
         )
 
         # Load test image
@@ -176,8 +189,9 @@ class TestTargetROIBuilder(unittest.TestCase):
         )
 
         # Should be capped at 3
-        self.assertEqual(roi_builder._max_detection_attempts, 3,
-                        "Max attempts should be capped at 3")
+        self.assertEqual(
+            roi_builder._max_detection_attempts, 3, "Max attempts should be capped at 3"
+        )
 
     def test_all(self):
         """Main test entry point - runs all target detection tests"""

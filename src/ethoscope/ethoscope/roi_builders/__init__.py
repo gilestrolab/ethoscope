@@ -6,6 +6,6 @@ This will typically be done when new arenas (hardware components) is defined.
 
 """
 
-__author__ = 'quentin'
+__author__ = "quentin"
 
 from . import roi_builders

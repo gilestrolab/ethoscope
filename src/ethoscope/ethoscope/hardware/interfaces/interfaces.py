@@ -1,4 +1,4 @@
-__author__ = 'quentin'
+__author__ = "quentin"
 
 from threading import Thread
 import os
@@ -10,13 +10,16 @@ import urllib.request, urllib.error, urllib.parse
 import json
 import serial
 
+
 class WrongSerialPortError(Exception):
     pass
+
 
 class NoValidPortError(Exception):
     pass
 
-def connectedUSB(optional_file='/etc/ethoscope/modules.json'):
+
+def connectedUSB(optional_file="/etc/ethoscope/modules.json"):
     """
     Returns a dictionary of connected USB devices from a known selection
 
@@ -31,39 +34,85 @@ def connectedUSB(optional_file='/etc/ethoscope/modules.json'):
     Bus 001 Device 008: ID 0403:6001 Future Technology Devices International, Ltd FT232 Serial (UART) IC
     """
 
-    
     # Hardwired interactors
     known = {
-                'arduino_nano' : {'name' : 'Arduino Nano', 'family' : 'arduino', 'model' : 'nano', 'used_for' : ['optomotor', 'mAGO'], 'id' : ['2341:0058'] },
-                'arduino_micro' : {'name' : 'Arduino Micro', 'family' : 'arduino', 'model' : 'micro', 'used_for' : ['optomotor', 'mAGO'], 'id' : ['2341:8037'] },
-                'arduino_uno' : {'name' : 'Arduino UNO', 'family' : 'arduino', 'model' : 'uno', 'used_for' : [], 'id' : ['2341:0043'] },
-                'arduino_leonardo' : {'name' : 'Arduino Leonardo', 'family' : 'arduino', 'model' : 'leonardo', 'used_for' : [], 'id' : ['2341:8036'] },
-                'wemos_D1' : {'name' : 'Wemos D1', 'family' : 'ESP8266', 'model' : 'D1', 'used_for' : [], 'id' : ['1a86:7523'], 'aka' : 'CH340' },
-                'lynxmotion_ssc32u' : {'name' : 'LynxMotion SSC-32U', 'family' : 'LynxMotion', 'model' : 'SSC-32U', 'used_for' : ['servo', 'AGO'], 'id' : ['0403:6001'], 'aka' : 'FT232'},
-                'noUSB' : {'name' : 'python-usb not loaded', 'id' : ['0000:0000']} #in case pyUSB cannot be loaded
-            }
+        "arduino_nano": {
+            "name": "Arduino Nano",
+            "family": "arduino",
+            "model": "nano",
+            "used_for": ["optomotor", "mAGO"],
+            "id": ["2341:0058"],
+        },
+        "arduino_micro": {
+            "name": "Arduino Micro",
+            "family": "arduino",
+            "model": "micro",
+            "used_for": ["optomotor", "mAGO"],
+            "id": ["2341:8037"],
+        },
+        "arduino_uno": {
+            "name": "Arduino UNO",
+            "family": "arduino",
+            "model": "uno",
+            "used_for": [],
+            "id": ["2341:0043"],
+        },
+        "arduino_leonardo": {
+            "name": "Arduino Leonardo",
+            "family": "arduino",
+            "model": "leonardo",
+            "used_for": [],
+            "id": ["2341:8036"],
+        },
+        "wemos_D1": {
+            "name": "Wemos D1",
+            "family": "ESP8266",
+            "model": "D1",
+            "used_for": [],
+            "id": ["1a86:7523"],
+            "aka": "CH340",
+        },
+        "lynxmotion_ssc32u": {
+            "name": "LynxMotion SSC-32U",
+            "family": "LynxMotion",
+            "model": "SSC-32U",
+            "used_for": ["servo", "AGO"],
+            "id": ["0403:6001"],
+            "aka": "FT232",
+        },
+        "noUSB": {
+            "name": "python-usb not loaded",
+            "id": ["0000:0000"],
+        },  # in case pyUSB cannot be loaded
+    }
 
     # potential user-specified interactors
     if os.path.exists(optional_file):
-        with open (optional_file, 'r') as optional_modules_file:
-            known.update ( json.load (optional_modules_file) )
+        with open(optional_file, "r") as optional_modules_file:
+            known.update(json.load(optional_modules_file))
 
-    try: #needed for compatibility with older images
-        import usb 
-        devices = ['%s:%s' % ('{:x}'.format(dev.idVendor).zfill(4), '{:x}'.format(dev.idProduct).zfill(4) ) for dev in usb.core.find(find_all=True)]
+    try:  # needed for compatibility with older images
+        import usb
+
+        devices = [
+            "%s:%s"
+            % (
+                "{:x}".format(dev.idVendor).zfill(4),
+                "{:x}".format(dev.idProduct).zfill(4),
+            )
+            for dev in usb.core.find(find_all=True)
+        ]
     except:
-        devices = ['0000:0000']
+        devices = ["0000:0000"]
 
     # matchmaking
     found = {}
     for dev in known:
-        for detected in devices: 
-            if detected in known[dev]['id']:
+        for detected in devices:
+            if detected in known[dev]["id"]:
                 found[dev] = known[dev]
 
-    return known, found       
-
-
+    return known, found
 
 
 class HardwareConnection(Thread):
@@ -86,20 +135,23 @@ class HardwareConnection(Thread):
         self._connection_open = True
         super(HardwareConnection, self).__init__()
         self.start()
-        
+
     def run(self):
         """
         Infinite loop that send instructions to the hardware interface
         Do not call directly, used the ``start()`` method instead.
         """
         while self._connection_open:
-            time.sleep(.1)
+            time.sleep(0.1)
             while len(self._instructions) > 0 and self._connection_open:
                 instruc = self._instructions.popleft()
                 try:
                     ret = self._interface.send(**instruc)
                 except:
-                    logging.error("Could not send the following instruction to the module. Instruction: %s" % instruc)
+                    logging.error(
+                        "Could not send the following instruction to the module. Instruction: %s"
+                        % instruc
+                    )
 
     def send_instruction(self, instruction=None):
         """
@@ -116,25 +168,25 @@ class HardwareConnection(Thread):
 
     def stop(self, error=None):
         self._connection_open = False
-        
+
     def __del__(self):
         self.stop()
 
     def __getstate__(self):
         return {
-                "interface_class": self._interface_class,
-                "interface_args": self._interface_args,
-                "interface_kwargs": self._interface_kwargs}
+            "interface_class": self._interface_class,
+            "interface_args": self._interface_args,
+            "interface_kwargs": self._interface_kwargs,
+        }
 
     def __setstate__(self, state):
         kwargs = state["interface_kwargs"]
         kwargs["warmup"] = False
-        self.__init__(state["interface_class"],
-                      *state["interface_args"], **kwargs)
+        self.__init__(state["interface_class"], *state["interface_args"], **kwargs)
 
 
 class SimpleSerialInterface(object):
-    def __init__(self, port = None, baud = 115200, warmup = False):
+    def __init__(self, port=None, baud=115200, warmup=False):
         """
         Template class which is an abstract representation of a Serial hardware interface.
         It must define, in :func:`~ethoscope.hardware.interfaces.interfaces.BaseInterface.__init__`,
@@ -156,13 +208,12 @@ class SimpleSerialInterface(object):
         try:
             self._serial = serial.Serial(self._port, baud, timeout=2)
             time.sleep(2)
-            #self._test_serial_connection()
+            # self._test_serial_connection()
 
             if warmup:
                 self._warm_up()
         except:
             pass
-
 
     def _find_port(self):
         from serial.tools import list_ports
@@ -180,14 +231,15 @@ class SimpleSerialInterface(object):
                 logging.info("\t%s", str(ap))
 
         if len(all_ports) == 0:
-            logging.error("No valid port detected!. Possibly, device not plugged/detected.")
-            #raise NoValidPortError()
+            logging.error(
+                "No valid port detected!. Possibly, device not plugged/detected."
+            )
+            # raise NoValidPortError()
             return ""
 
         elif len(all_ports) > 2:
             logging.info("Several port detected, using first one: %s", str(all_ports))
 
-        
         return all_ports.pop()
 
     def __del__(self):
@@ -226,21 +278,21 @@ class SimpleSerialInterface(object):
         # Send initial capability interrogation command
         self._serial.write(b"T\r\n")
         time.sleep(0.1)  # Buffer period for device response
-        
+
         # Parse and store device capability information
         info = eval(self._serial.read_all())
         # Initialize result tracking fields
-        info.update({'test': 'Not attempted', 'command': 'Not attempted'})
+        info.update({"test": "Not attempted", "command": "Not attempted"})
 
         if command:
             try:
                 logging.info("Initiating custom command execution")
                 cmd = f"{command}\r\n".encode()
                 self._serial.write(cmd)
-                info['command'] = 'Success'
+                info["command"] = "Success"
             except Exception:
                 logging.error("Custom command transmission failed")
-                info['command'] = 'Failed'
+                info["command"] = "Failed"
 
         if test:
             try:
@@ -251,18 +303,18 @@ class SimpleSerialInterface(object):
                 except KeyError:
                     # Fallback to legacy command structure (v1.0)
                     cmd = info["test_button"]["command"]
-                
+
                 self._serial.write(f"{cmd}\r\n".encode())
-                info['test'] = 'Success'
+                info["test"] = "Success"
             except Exception:
                 logging.error("Diagnostic test execution failed")
-                info['test'] = 'Failed'
+                info["test"] = "Failed"
 
         return info
 
     def _warm_up(self):
         raise NotImplementedError
-        
+
     def send(self, **kwargs):
         """
         Method to request hardware interface to interact with the physical world.
@@ -276,24 +328,29 @@ class DefaultInterface(SimpleSerialInterface):
     Class that implements a dummy interface that does nothing. This can be used to keep software consistency when
     no hardware is to be used.
     """
+
     def _warm_up(self):
         pass
+
     def send(self, **kwargs):
         pass
 
+
 class ScanException(Exception):
     pass
+
 
 class EthoscopeSensor(object):
     """
     Class providing access to an ESP32 based WIFI ethoscope sensor
     """
-    
-    _sensor_values = {"temperature" : "FLOAT",
-                      "humidity": "FLOAT",
-                      "light": "INT",
-                      "pressure" : "FLOAT"}
 
+    _sensor_values = {
+        "temperature": "FLOAT",
+        "humidity": "FLOAT",
+        "light": "INT",
+        "pressure": "FLOAT",
+    }
 
     def __init__(self, sensor_url):
         self._sensor_url = sensor_url
@@ -302,8 +359,11 @@ class EthoscopeSensor(object):
 
     def _get_json_from_url(self, url, timeout=5, post_data=None):
         try:
-            if not url.startswith("http://"): url = "http://" + url
-            req = urllib.request.Request(url, data=post_data, headers={'Content-Type': 'application/json'})
+            if not url.startswith("http://"):
+                url = "http://" + url
+            req = urllib.request.Request(
+                url, data=post_data, headers={"Content-Type": "application/json"}
+            )
             f = urllib.request.urlopen(req, timeout=timeout)
             message = f.read()
             if not message:
@@ -315,15 +375,15 @@ class EthoscopeSensor(object):
             except ValueError:
                 # logging.error("Could not parse response from %s as JSON object" % self._id_url)
                 raise ScanException("Could not parse Json object")
-        
+
         except urllib.error.HTTPError as e:
             raise ScanException("Error" + str(e.code))
-            #return e
-        
+            # return e
+
         except urllib.error.URLError as e:
             raise ScanException("Error" + str(e.reason))
-            #return e
-        
+            # return e
+
         except Exception as e:
             raise ScanException("Unexpected error" + str(e))
 
@@ -340,7 +400,7 @@ class EthoscopeSensor(object):
 
     def read_all(self):
         self._update()
-        return tuple( [self._sensor_data[name] for name in self.sensor_properties] )
+        return tuple([self._sensor_data[name] for name in self.sensor_properties])
 
     @property
     def sensor_properties(self):
@@ -373,28 +433,36 @@ class EthoscopeSensor(object):
         return self._sensor_data["pressure"]
 
 
-
 def getModuleCapabilities(test=False, shallow=False, command=""):
-    '''
+    """
     Tries to get information regarding a possible attached Module
-    '''
+    """
     _, found = connectedUSB()
 
     if shallow and found:
-        found.update({'Smart' : False, 'Connected' : True})
+        found.update({"Smart": False, "Connected": True})
         return found
-    
-    if found or 'noUSB' in found:
+
+    if found or "noUSB" in found:
 
         try:
             device = SimpleSerialInterface()
             dev_info = device.interrogate(test=test, command=command)
-            dev_info.update({'Smart' : True, 'Connected' : True})
+            dev_info.update({"Smart": True, "Connected": True})
             return dev_info
 
         except:
-            found = False if 'noUSB' in found else found
-            return {'Error': 'A known device is connected but could not open a connection with it.', 'found' : found, 'Smart' : False, 'Connected' : True}
+            found = False if "noUSB" in found else found
+            return {
+                "Error": "A known device is connected but could not open a connection with it.",
+                "found": found,
+                "Smart": False,
+                "Connected": True,
+            }
 
     else:
-            return {'Error': 'No known device is connected.', 'Smart' : False, 'Connected' : False}
+        return {
+            "Error": "No known device is connected.",
+            "Smart": False,
+            "Connected": False,
+        }

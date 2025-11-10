@@ -4,6 +4,7 @@ Code from https://github.com/shenxn/rpi-bad-power
 A library reading under voltage bit from the official Raspberry Pi Kernel.
 Minimal Kernel needed is 4.14+
 """
+
 import logging
 import os
 from typing import Optional, Text
@@ -56,7 +57,7 @@ class UnderVoltageNew(UnderVoltage):
         # Use new hwmon entry
         with open(os.path.join(self._hwmon, SYSFILE_HWMON_FILE)) as file:
             bit = file.read()[:-1]
-        #if debug:
+        # if debug:
         #    _LOGGER.debug("Get under voltage status: %s", bit)
         return bit == "1"
 

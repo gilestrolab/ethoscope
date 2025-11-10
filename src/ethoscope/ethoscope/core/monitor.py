@@ -1,4 +1,4 @@
-__author__ = 'quentin'
+__author__ = "quentin"
 
 from .tracking_unit import TrackingUnit
 import logging
@@ -10,11 +10,17 @@ import datetime
 
 class Monitor(object):
 
-    def __init__(self, camera, tracker_class,
-                 rois = None, reference_points = None, stimulators=None,
-                 time_offset=0,
-                 *args, **kwargs  # extra arguments for the tracker objects
-                 ):
+    def __init__(
+        self,
+        camera,
+        tracker_class,
+        rois=None,
+        reference_points=None,
+        stimulators=None,
+        time_offset=0,
+        *args,
+        **kwargs,  # extra arguments for the tracker objects
+    ):
         r"""
         Class to orchestrate the tracking of multiple objects.
         It performs, in order, the following actions:
@@ -43,7 +49,7 @@ class Monitor(object):
         """
 
         self._camera = camera
-        self._last_frame_idx =0
+        self._last_frame_idx = 0
         self._force_stop = False
         self._last_positions = {}
         self._time_offset = time_offset
@@ -51,15 +57,19 @@ class Monitor(object):
         self._is_running = False
         self._reference_points = reference_points
 
-
         if rois is None:
             raise NotImplementedError("rois must exist (cannot be None)")
 
         if stimulators is None:
-            self._unit_trackers = [TrackingUnit(tracker_class, r, None, *args, **kwargs) for r in rois]
+            self._unit_trackers = [
+                TrackingUnit(tracker_class, r, None, *args, **kwargs) for r in rois
+            ]
 
         elif len(stimulators) == len(rois):
-            self._unit_trackers = [TrackingUnit(tracker_class, r, inter, *args, **kwargs) for r, inter in zip(rois, stimulators)]
+            self._unit_trackers = [
+                TrackingUnit(tracker_class, r, inter, *args, **kwargs)
+                for r, inter in zip(rois, stimulators)
+            ]
         else:
             raise ValueError("You should have one interactor per ROI")
 
@@ -94,7 +104,7 @@ class Monitor(object):
         """
         self._force_stop = True
 
-    def run(self, result_writer = None, drawer = None, verbose=False):
+    def run(self, result_writer=None, drawer=None, verbose=False):
         """
         Runs the monitor indefinitely.
 
@@ -108,10 +118,11 @@ class Monitor(object):
             logging.info("Monitor starting a run")
             self._is_running = True
 
-            for i,(t, frame) in enumerate(self._camera):
-                
+            for i, (t, frame) in enumerate(self._camera):
+
                 # This is useful feedback when we do offline tracking
-                if verbose and t % 5000 == 0: print ( str(datetime.timedelta(milliseconds=t)), end="\r", flush=True )
+                if verbose and t % 5000 == 0:
+                    print(str(datetime.timedelta(milliseconds=t)), end="\r", flush=True)
 
                 if self._force_stop:
                     logging.info("Monitor object stopped from external request")
@@ -123,8 +134,8 @@ class Monitor(object):
 
                 # Adjust timestamp for database writes when appending
                 t_with_offset = t + self._time_offset
-                
-                for j,track_u in enumerate(self._unit_trackers):
+
+                for j, track_u in enumerate(self._unit_trackers):
                     data_rows = track_u.track(t, frame)
                     if len(data_rows) == 0:
                         self._last_positions[track_u.roi.idx] = []
@@ -142,18 +153,23 @@ class Monitor(object):
                     result_writer.flush(t_with_offset, frame)
 
                 if drawer is not None:
-                    drawer.draw(frame, self._last_positions, self._unit_trackers, self._reference_points)
+                    drawer.draw(
+                        frame,
+                        self._last_positions,
+                        self._unit_trackers,
+                        self._reference_points,
+                    )
                 self._last_t = t
                 time.sleep(0.001)
 
         except Exception as e:
-            logging.error("Monitor closing with an exception: '%s'" % traceback.format_exc())
+            logging.error(
+                "Monitor closing with an exception: '%s'" % traceback.format_exc()
+            )
             raise e
 
         finally:
             self._is_running = False
             logging.info("Monitor closing - processed %s frames" % i)
-            if verbose: print ("Monitor closing - processed %s frames" % i)
-
-
-
+            if verbose:
+                print("Monitor closing - processed %s frames" % i)

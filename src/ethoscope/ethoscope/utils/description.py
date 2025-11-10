@@ -1,4 +1,4 @@
-__author__ = 'quentin'
+__author__ = "quentin"
 
 
 class DescribedObject(object):
@@ -17,11 +17,9 @@ class DescribedObject(object):
 
     Each argument must match a argument in `__init__`.
     """
+
     _description = None
 
     @property
     def description(self):
         return self._description
-
-
-

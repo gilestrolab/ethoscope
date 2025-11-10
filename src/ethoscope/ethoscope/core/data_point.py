@@ -1,7 +1,7 @@
 import collections
 import copy
 
-__author__ = 'quentin'
+__author__ = "quentin"
 
 
 class DataPoint(collections.OrderedDict):

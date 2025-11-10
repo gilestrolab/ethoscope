@@ -305,7 +305,9 @@ class V4L2Camera(BaseCamera):
         # Apply max FPS constraint
         max_fps = pi.get_maxfps_setting()
         if target_fps > max_fps:
-            logging.warning(f"Requested FPS {target_fps} exceeds maximum {max_fps}, using {max_fps}")
+            logging.warning(
+                f"Requested FPS {target_fps} exceeds maximum {max_fps}, using {max_fps}"
+            )
             target_fps = max_fps
 
         if not isinstance(target_fps, int):
@@ -660,20 +662,31 @@ class PiFrameGrabber2(PiFrameGrabber):
         try:
             # Check machine NoIR setting to determine tuning approach
             from ethoscope.utils import pi
+
             use_noir_tuning = pi.get_noir_setting()
 
             if use_noir_tuning:
                 # Force NoIR tuning file for cameras with IR pass-through filters
-                logging.info("Creating Picamera2 instance with forced NoIR tuning for IR pass-through filter")
+                logging.info(
+                    "Creating Picamera2 instance with forced NoIR tuning for IR pass-through filter"
+                )
                 try:
-                    capture = Picamera2(tuning=Picamera2.load_tuning_file("/usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json"))
+                    capture = Picamera2(
+                        tuning=Picamera2.load_tuning_file(
+                            "/usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json"
+                        )
+                    )
                     logging.info("Successfully loaded NoIR tuning file")
                 except Exception as e:
-                    logging.warning(f"Failed to load NoIR tuning file, falling back to automatic detection: {e}")
+                    logging.warning(
+                        f"Failed to load NoIR tuning file, falling back to automatic detection: {e}"
+                    )
                     capture = Picamera2()
             else:
                 # Use automatic tuning detection for dynamic day/night adaptation
-                logging.info("Creating Picamera2 instance with automatic tuning detection for dynamic light adaptation")
+                logging.info(
+                    "Creating Picamera2 instance with automatic tuning detection for dynamic light adaptation"
+                )
                 capture = Picamera2()
 
             with capture:
@@ -689,7 +702,9 @@ class PiFrameGrabber2(PiFrameGrabber):
                     logging.warning(f"Could not get camera info: {info_e}")
 
                 # Log dynamic adaptation approach
-                logging.info("Using automatic tuning detection for optimal day/night light adaptation")
+                logging.info(
+                    "Using automatic tuning detection for optimal day/night light adaptation"
+                )
 
                 # The appropriate size of the image acquisition is tricky and depends on the actual hardware.
                 # With IMX219 640x480 will not return the full FoV. 960x720 does.
@@ -703,9 +718,9 @@ class PiFrameGrabber2(PiFrameGrabber):
                 # Configure camera controls optimized for tracking (prioritize exposure over gain)
                 camera_controls = {
                     "FrameRate": self._target_fps,
-                    "ExposureTime": 0,          # 0 = auto-exposure (libcamera 0.5.0 compatible)
+                    "ExposureTime": 0,  # 0 = auto-exposure (libcamera 0.5.0 compatible)
                     "AnalogueGain": self._gain,  # Fixed gain to avoid tracking artifacts
-                    "AwbEnable": False,         # Disable auto-white balance (NoIR cameras)
+                    "AwbEnable": False,  # Disable auto-white balance (NoIR cameras)
                     # Prioritize exposure adjustments over gain to minimize noise artifacts
                     # that interfere with background subtraction tracking algorithms
                 }
@@ -728,9 +743,15 @@ class PiFrameGrabber2(PiFrameGrabber):
 
                 # Log auto-exposure status for debugging
                 try:
-                    exposure_time = capture.camera_controls.get("ExposureTime", "Unknown")
-                    analogue_gain = capture.camera_controls.get("AnalogueGain", "Unknown")
-                    logging.info(f"Auto-exposure status - ExposureTime: {exposure_time}, AnalogueGain: {analogue_gain}")
+                    exposure_time = capture.camera_controls.get(
+                        "ExposureTime", "Unknown"
+                    )
+                    analogue_gain = capture.camera_controls.get(
+                        "AnalogueGain", "Unknown"
+                    )
+                    logging.info(
+                        f"Auto-exposure status - ExposureTime: {exposure_time}, AnalogueGain: {analogue_gain}"
+                    )
                 except Exception as e:
                     logging.warning(f"Could not check auto-exposure status: {e}")
 
@@ -927,7 +948,9 @@ class OurPiCameraAsync(BaseCamera):
         # Apply max FPS constraint
         max_fps = pi.get_maxfps_setting()
         if target_fps > max_fps:
-            logging.warning(f"Requested FPS {target_fps} exceeds maximum {max_fps}, using {max_fps}")
+            logging.warning(
+                f"Requested FPS {target_fps} exceeds maximum {max_fps}, using {max_fps}"
+            )
             target_fps = max_fps
 
         w, h = target_resolution

@@ -31,25 +31,28 @@ class ImgMaskROIBuilder(BaseROIBuilder):
         """
         self._mask = cv2.imread(mask_path, IMG_READ_FLAG_GREY)
 
-        super(ImgMaskROIBuilder,self).__init__()
-
+        super(ImgMaskROIBuilder, self).__init__()
 
     def _rois_from_img(self, img):
 
         if len(self._mask.shape) == 3:
             self._mask = cv2.cvtColor(self._mask, cv2.COLOR_BGR2GRAY)
         if CV_VERSION == 3:
-            _, contours, hiera = cv2.findContours(np.copy(self._mask), RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)
+            _, contours, hiera = cv2.findContours(
+                np.copy(self._mask), RETR_EXTERNAL, CHAIN_APPROX_SIMPLE
+            )
         else:
-            contours, hiera = cv2.findContours(np.copy(self._mask), RETR_EXTERNAL, CHAIN_APPROX_SIMPLE)
+            contours, hiera = cv2.findContours(
+                np.copy(self._mask), RETR_EXTERNAL, CHAIN_APPROX_SIMPLE
+            )
 
         rois = []
-        for i,c in enumerate(contours):
+        for i, c in enumerate(contours):
             tmp_mask = np.zeros_like(self._mask)
-            cv2.drawContours(tmp_mask, [c],0, 1)
+            cv2.drawContours(tmp_mask, [c], 0, 1)
 
             value = int(np.median(self._mask[tmp_mask > 0]))
 
-            rois.append(ROI(c, i+1, value))
+            rois.append(ROI(c, i + 1, value))
 
         return rois

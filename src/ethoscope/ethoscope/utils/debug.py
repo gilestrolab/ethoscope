@@ -1,11 +1,12 @@
-__author__ = 'quentin'
+__author__ = "quentin"
 
 import cv2
 import numpy as np
 
+
 class EthoscopeException(Exception):
 
-    def __init__(self,value, img=None):
+    def __init__(self, value, img=None):
         """
         A custom exception. It can store an image
 
@@ -19,12 +20,12 @@ class EthoscopeException(Exception):
             self.img = np.copy(img)
         else:
             self.img = None
-            
+
     def __str__(self):
         return repr(self.value)
 
 
-def show(im,t=-1):
+def show(im, t=-1):
     """
     A function to simply display an image and wait. This is for debugging purposes only.
     :param im: the image to show
@@ -33,5 +34,5 @@ def show(im,t=-1):
     :type t: int
     :return:
     """
-    cv2.imshow("debug",im)
+    cv2.imshow("debug", im)
     cv2.waitKey(t)
