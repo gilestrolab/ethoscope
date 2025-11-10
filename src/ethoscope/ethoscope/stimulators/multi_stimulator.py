@@ -96,7 +96,7 @@ class MultiStimulator(BaseStimulator):
             _MULTISTIMULATOR_LOGGED.add(config_key)
         else:
             logging.debug(
-                f"MultiStimulator with same config already logged, creating instance silently"
+                "MultiStimulator with same config already logged, creating instance silently"
             )
         from ethoscope.stimulators.sleep_depriver_stimulators import (
             SleepDepStimulator,
@@ -115,7 +115,7 @@ class MultiStimulator(BaseStimulator):
         from ethoscope.stimulators.optomotor_stimulators import (
             OptoMidlineCrossStimulator,
         )
-        from ethoscope.stimulators.stimulators import DefaultStimulator
+        from ethoscope.stimulators.stimulators import DefaultStimulator  # noqa: F811
 
         # Map class names to actual classes
         stimulator_classes = {

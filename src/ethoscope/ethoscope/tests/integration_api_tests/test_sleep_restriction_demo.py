@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# flake8: noqa: E402
 """
 Demonstration script for the new sleep restriction functionality.
 
@@ -130,7 +131,7 @@ def demo_sleep_restriction_stimulator():
     )
 
     status2 = stimulator2.get_schedule_status()
-    print(f"Configuration: 4h active every 8h")
+    print("Configuration: 4h active every 8h")
     print(f"Fully active: {status2['fully_active']}")
     print(f"Status: {status2['status']}")
 
@@ -172,7 +173,7 @@ def demo_simple_time_restricted_stimulator():
         print(f"Currently active: {status['daily_schedule']['currently_active']}")
 
     # Custom pattern example
-    print(f"\nPattern 5: Custom (10h every 16h)")
+    print("\nPattern 5: Custom (10h every 16h)")
     print("-" * 35)
 
     custom_stimulator = SimpleTimeRestrictedStimulator(
@@ -240,7 +241,7 @@ def main():
         print("• State persistence and error handling")
         print("• Web interface integration ready")
 
-        print(f"\nDemo state files created in: /tmp/ethoscope_demo/")
+        print("\nDemo state files created in: /tmp/ethoscope_demo/")
 
     except Exception as e:
         print(f"\nError during demonstration: {e}")

@@ -553,7 +553,7 @@ class AdaptiveBGModel(BaseTracker):
 
         self._old_pos = pos
 
-        ## This can be use during offline tracking for debug purposes.
+        # This can be use during offline tracking for debug purposes.
         # cv2.imshow(f"ROI_{self._roi.idx}", grey ); cv2.waitKey(1)
 
         return [

@@ -1,4 +1,5 @@
 __author__ = "quentin"
+# flake8: noqa: E402
 from .adaptive_bg_tracker import AdaptiveBGModel, BackgroundModel, ObjectModel
 from collections import deque
 from math import log10

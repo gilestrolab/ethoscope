@@ -44,7 +44,7 @@ class TestCameraTimeoutMechanisms:
         mock_thread = MockControlThread()
         mock_thread._initialization_timeout_handler()
 
-        assert mock_thread.timeout_triggered == True
+        assert mock_thread.timeout_triggered is True
         assert mock_thread._info["status"] == "error"
         assert "Initialization timeout" in mock_thread._info["error"]
 
@@ -67,7 +67,7 @@ class TestCameraTimeoutMechanisms:
         mock_thread._initialization_timeout_handler()
 
         # Should not have triggered since status is not 'initialising'
-        assert mock_thread.timeout_triggered == False
+        assert mock_thread.timeout_triggered is False
         assert mock_thread._info["status"] == "running"
 
     def test_picamera2_allocator_error_detection(self):
@@ -100,10 +100,10 @@ class TestCameraTimeoutMechanisms:
         )
 
         assert (
-            is_camera_error(allocator_exception) == True
+            is_camera_error(allocator_exception) is True
         ), "Should detect as camera error"
         assert (
-            is_specific_allocator_error(allocator_exception) == True
+            is_specific_allocator_error(allocator_exception) is True
         ), "Should detect as specific allocator error"
 
     def test_camera_retry_mechanism_logic(self):
@@ -160,7 +160,7 @@ class TestCameraTimeoutMechanisms:
         result = mock_camera.simulate_retry_with_allocator_error()
 
         assert result == "success"
-        assert mock_camera.fallback_triggered == True
+        assert mock_camera.fallback_triggered is True
         assert mock_camera._initialization_attempts == 2
 
 
@@ -199,22 +199,22 @@ class TestCameraLogicIntegration:
         )
         result = categorize_error(allocator_error)
 
-        assert result["is_hardware_issue"] == True
-        assert result["is_allocator_specific"] == True
+        assert result["is_hardware_issue"] is True
+        assert result["is_allocator_specific"] is True
 
         # Test non-allocator camera error
         camera_error = RuntimeError("Camera not found")
         result = categorize_error(camera_error)
 
-        assert result["is_hardware_issue"] == True
-        assert result["is_allocator_specific"] == False
+        assert result["is_hardware_issue"] is True
+        assert result["is_allocator_specific"] is False
 
         # Test non-camera error
         other_error = ValueError("Some other error")
         result = categorize_error(other_error)
 
-        assert result["is_hardware_issue"] == False
-        assert result["is_allocator_specific"] == False
+        assert result["is_hardware_issue"] is False
+        assert result["is_allocator_specific"] is False
 
     def test_initialization_sequence_structure(self):
         """Test that the camera initialization sequence structure is sound."""
@@ -266,10 +266,10 @@ class TestCameraLogicIntegration:
         mock_init = MockCameraInitialization()
         success = mock_init.simulate_initialization_sequence(should_fail_first=True)
 
-        assert success == True
+        assert success is True
         assert len(mock_init.attempts) == 2
-        assert mock_init.attempts[0]["success"] == False
-        assert mock_init.attempts[1]["success"] == True
+        assert mock_init.attempts[0]["success"] is False
+        assert mock_init.attempts[1]["success"] is True
         assert (
             "'Picamera2' object has no attribute 'allocator'"
             in mock_init.attempts[0]["error"]

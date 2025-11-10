@@ -1,9 +1,12 @@
 _author__ = "quentin"
+# flake8: noqa: E402
+
+import time
+
 from ethoscope.hardware.interfaces.lynx_motion import LynxMotionInterface
 from ethoscope.hardware.interfaces.sleep_depriver_interface import (
     SleepDepriverInterface,
 )
-import time
 
 
 class OdourDelivererInterface(LynxMotionInterface):

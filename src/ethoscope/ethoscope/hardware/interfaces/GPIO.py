@@ -139,7 +139,7 @@ class Button(threading.Thread):
     def run(self):
         while self._listen:
             if GPIO.input(self.channel):  # button released
-                if self._pressed == True:
+                if self._pressed is True:
                     self._pressed = False
 
                     pt = time.time() - self.last_pressed
@@ -150,7 +150,7 @@ class Button(threading.Thread):
                             break
 
             else:  # button pressed
-                if self._pressed == False:
+                if self._pressed is False:
                     self._pressed = True
                     self.last_pressed = time.time()
 

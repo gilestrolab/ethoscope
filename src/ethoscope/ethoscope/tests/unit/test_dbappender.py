@@ -1,4 +1,5 @@
 """
+# flake8: noqa: E402, F811
 Test suite for dbAppender meta-class functionality.
 
 This module tests the dbAppender meta-class which provides unified interface

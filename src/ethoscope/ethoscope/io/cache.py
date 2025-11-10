@@ -904,7 +904,7 @@ class MySQLDatabaseMetadataCache(BaseDatabaseMetadataCache):
                 cursor.execute(
                     """
                     SELECT SUM(size) * @@innodb_page_size as db_size
-                    FROM information_schema.INNODB_SYS_TABLESPACES 
+                    FROM information_schema.INNODB_SYS_TABLESPACES
                     WHERE name LIKE %s
                 """,
                     (f"{self.db_credentials['name']}/%",),
@@ -916,8 +916,8 @@ class MySQLDatabaseMetadataCache(BaseDatabaseMetadataCache):
                 if db_size == 0:
                     cursor.execute(
                         """
-                        SELECT ROUND(SUM(data_length + index_length + data_free)) as db_size 
-                        FROM information_schema.tables 
+                        SELECT ROUND(SUM(data_length + index_length + data_free)) as db_size
+                        FROM information_schema.tables
                         WHERE table_schema = %s
                     """,
                         (self.db_credentials["name"],),
@@ -928,8 +928,8 @@ class MySQLDatabaseMetadataCache(BaseDatabaseMetadataCache):
                 # Fallback to traditional method if InnoDB queries fail
                 cursor.execute(
                     """
-                    SELECT ROUND(SUM(data_length + index_length + data_free)) as db_size 
-                    FROM information_schema.tables 
+                    SELECT ROUND(SUM(data_length + index_length + data_free)) as db_size
+                    FROM information_schema.tables
                     WHERE table_schema = %s
                 """,
                     (self.db_credentials["name"],),
@@ -1054,7 +1054,7 @@ class SQLiteDatabaseMetadataCache(BaseDatabaseMetadataCache):
             # Get list of tables (excluding sqlite_* system tables)
             cursor.execute(
                 """
-                SELECT name FROM sqlite_master 
+                SELECT name FROM sqlite_master
                 WHERE type='table' AND name NOT LIKE 'sqlite_%'
             """
             )

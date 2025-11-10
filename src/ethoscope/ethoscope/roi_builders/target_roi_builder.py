@@ -1,7 +1,7 @@
 __author__ = "quentin"
 
 import cv2
-import logging
+import logging  # noqa: F811
 import time
 from typing import Optional, Tuple, List
 
@@ -18,7 +18,7 @@ except ImportError:
     from cv2 import LINE_AA
 
 import numpy as np
-import logging
+import logging  # noqa: F811
 from ethoscope.roi_builders.roi_builders import BaseROIBuilder
 from ethoscope.core.roi import ROI
 from ethoscope.utils.debug import EthoscopeException
@@ -443,7 +443,7 @@ class TargetGridROIBuilder(BaseROIBuilder):
 
             # Find B (not in AC pair)
             for sp in src_points:
-                if not sp in hypo_vertices:
+                if sp not in hypo_vertices:
                     break
             sorted_b = sp
 
@@ -458,7 +458,7 @@ class TargetGridROIBuilder(BaseROIBuilder):
 
             # A is the remaining point
             sorted_a = [
-                sp for sp in src_points if not sp is sorted_b and not sp is sorted_c
+                sp for sp in src_points if sp is not sorted_b and sp is not sorted_c
             ][0]
             sorted_src_pts = np.array([sorted_a, sorted_b, sorted_c], dtype=np.float32)
 

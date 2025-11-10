@@ -1343,7 +1343,7 @@ class ControlThread(Thread):
                     "run_id": self._info["experimental_info"]["run_id"]
                 }
 
-            if not self._monit is None:
+            if self._monit is not None:
                 self._monit.stop()
                 self._monit = None
 

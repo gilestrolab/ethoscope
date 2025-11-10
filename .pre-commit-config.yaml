@@ -68,6 +68,7 @@ repos:
           '--max-complexity=15'
         ]
         files: ^(src/|scripts/|run_tests\.py).*\.py$
+        exclude: ^(.*docs/conf\.py)$
 
   # ===== Security checks =====
   - repo: https://github.com/PyCQA/bandit

@@ -1108,6 +1108,9 @@ class dbAppender(object):
 
     def _create_sqlite_writer(self):
         """Create SQLite writer with append functionality."""
+        # Lazy import to avoid circular dependency
+        from .sqlite import SQLiteResultWriter
+
         # Update db_credentials to point to the existing database
         sqlite_db_credentials = self.db_credentials.copy()
 
@@ -1135,6 +1138,9 @@ class dbAppender(object):
 
     def _create_mysql_writer(self):
         """Create MySQL writer with append functionality."""
+        # Lazy import to avoid circular dependency
+        from .mysql import MySQLResultWriter
+
         # Update db_credentials to point to the existing database
         mysql_db_credentials = self.db_credentials.copy()
         mysql_db_credentials["name"] = self.database_to_append

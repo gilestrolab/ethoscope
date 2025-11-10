@@ -479,7 +479,7 @@ class NpyAppendableFile:
         """
         content = self.load()
 
-        if filename == None:
+        if filename is None:
             filepath, _ = os.path.splitext(self.fname)
             filename = filepath + ".npy"
 

@@ -46,5 +46,5 @@ class SleepDepriverInterfaceCR(LynxMotionInterface):
 
 
 if __name__ == "__main__":
-    l = SleepDepriverInterface(warmup=True)
+    sd = SleepDepriverInterface(warmup=True)  # noqa: E741
     # l.send(1)

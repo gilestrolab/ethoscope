@@ -240,7 +240,7 @@ def set_WIFI(ssid="ETHOSCOPE_WIFI", wpakey="ETHOSCOPE_1234", useSTATIC=False):
     network_service = get_Network_Service()
 
     if network_service["netctl"]:
-        #### Write the settings for netctl (for images made before 2023/03/07)
+        # Write the settings for netctl (for images made before 2023/03/07)
         netctl_file = "/etc/netctl/wlan"
 
         wlan_settings = (
@@ -261,7 +261,7 @@ def set_WIFI(ssid="ETHOSCOPE_WIFI", wpakey="ETHOSCOPE_1234", useSTATIC=False):
         logging.warning("Wrote new information to %s" % netctl_file)
 
     if network_service["systemd"]:
-        #### Write the settings for systemd-networkd (from images > 2023/03/07)
+        # Write the settings for systemd-networkd (from images > 2023/03/07)
         wpasupplicant_file = "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
         systemd_file = "/etc/systemd/network/25-wireless.network"
 
@@ -613,16 +613,16 @@ def isExperimental(new_value=None):
     """
 
     # If the ethoscope is running on something that is not a pi, it will be always flagged as experimental
-    if new_value == None and not isMachinePI():
+    if new_value is None and not isMachinePI():
         return True
 
     filename = "/etc/ethoscope/isexperimental"
     current_value = os.path.exists(filename)
 
-    if new_value == None:
+    if new_value is None:
         return current_value
 
-    if new_value == True and current_value == False:
+    if new_value is True and current_value is False:
         # create file
         ensure_dir_exists(filename)
         with open(filename, mode="w"):
@@ -631,7 +631,7 @@ def isExperimental(new_value=None):
                 % filename
             )
 
-    elif new_value == False and current_value == True:
+    elif new_value is False and current_value is True:
         # delete file
         os.remove(filename)
         logging.warning("Removed file %s. The machine is not experimental." % filename)
@@ -822,7 +822,7 @@ def SQL_dump(
     Creates a SQL dump of the specified database
     """
 
-    if database_name == None:
+    if database_name is None:
         database_name = get_machine_name() + "_db"
 
     if not os.path.exists(output_dir):
@@ -855,7 +855,7 @@ def loggingStatus(status=None):
     """
     Set or read the current logging status
     """
-    if status == None:
+    if status is None:
         try:
             with os.popen("systemctl is-active systemd-journal-upload.service") as df:
                 status = df.read().split("\n")[2]
@@ -866,7 +866,7 @@ def loggingStatus(status=None):
         except:
             return -1
 
-    elif status == True and not loggingStatus():
+    elif status is True and not loggingStatus():
         try:
             logging.info("User requested to start remote Logging.")
 
@@ -883,7 +883,7 @@ def loggingStatus(status=None):
         except:
             return -1
 
-    elif status == False and loggingStatus():
+    elif status is False and loggingStatus():
         try:
             with os.popen(
                 "sleep 1 && systemctl disable --now systemd-journal-upload.service && sleep 2"

@@ -98,7 +98,7 @@ class BaseCamera:
                 break
 
     @property
-    def resolution(self):
+    def resolution(self):  # noqa: F811
         """
 
         :return: The resolution of the camera W x H.
@@ -515,7 +515,7 @@ class PiFrameGrabber(threading.Thread):
         # this should now be fixed in Python 3.8.2 (6/5/2020)
 
         try:
-            import picamera
+            import picamera  # noqa: F811
             import picamera.array
         except (ImportError, OSError) as e:
             logging.error(f"Failed to import picamera: {e}")
