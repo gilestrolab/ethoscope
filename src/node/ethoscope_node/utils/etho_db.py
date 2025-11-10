@@ -606,14 +606,11 @@ class ExperimentalDB(multiprocessing.Process):
         """
 
         if run_id == "all":
-            sql_get_experiment = "SELECT * FROM %s" % (self._runs_table_name)
+            sql_get_experiment = f"SELECT * FROM {self._runs_table_name}"
+            row = self.executeSQL(sql_get_experiment)
         else:
-            sql_get_experiment = "SELECT * FROM %s WHERE run_id = '%s'" % (
-                self._runs_table_name,
-                run_id,
-            )
-
-        row = self.executeSQL(sql_get_experiment)
+            sql_get_experiment = f"SELECT * FROM {self._runs_table_name} WHERE run_id = ?"
+            row = self.executeSQL(sql_get_experiment, (run_id,))
 
         if row == 0:
             return {}
@@ -667,27 +664,25 @@ class ExperimentalDB(multiprocessing.Process):
 
         problems = ""
 
-        sql_enter_new_experiment = (
-            "INSERT INTO %s VALUES( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')"
-            % (
-                self._runs_table_name,
-                run_id,
-                experiment_type,
-                ethoscope_name,
-                ethoscope_id,
-                username,
-                user_id,
-                location,
-                start_time,
-                end_time,
-                alert,
-                problems,
-                experimental_data,
-                comments,
-                status,
-            )
-        )
-        return self.executeSQL(sql_enter_new_experiment)
+        sql_enter_new_experiment = f"""INSERT INTO {self._runs_table_name}
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+
+        return self.executeSQL(sql_enter_new_experiment, (
+            run_id,
+            experiment_type,
+            ethoscope_name,
+            ethoscope_id,
+            username,
+            user_id,
+            location,
+            start_time,
+            end_time,
+            alert,
+            problems,
+            experimental_data,
+            comments,
+            status,
+        ))
 
     def stopRun(self, run_id):
         """
@@ -699,11 +694,8 @@ class ExperimentalDB(multiprocessing.Process):
         end_time = datetime.datetime.now()
         status = "stopped"
 
-        sql_update_experiment = (
-            "UPDATE %s SET end_time = '%s', status = '%s' WHERE run_id = '%s'"
-            % (self._runs_table_name, end_time, status, run_id)
-        )
-        self.executeSQL(sql_update_experiment)
+        sql_update_experiment = f"UPDATE {self._runs_table_name} SET end_time = ?, status = ? WHERE run_id = ?"
+        self.executeSQL(sql_update_experiment, (end_time, status, run_id))
         return self.getRun(run_id)[0]["status"]
 
     def flagProblem(self, run_id, message=""):
@@ -713,12 +705,8 @@ class ExperimentalDB(multiprocessing.Process):
         problems = self.getRun(run_id)[0]["problems"]
         problems = "%s, %s;" % (ct, message) + problems  # append in front
 
-        sql_update_experiment = "UPDATE %s SET problems = '%s' WHERE run_id = '%s'" % (
-            self._runs_table_name,
-            problems,
-            run_id,
-        )
-        return self.executeSQL(sql_update_experiment)
+        sql_update_experiment = f"UPDATE {self._runs_table_name} SET problems = ? WHERE run_id = ?"
+        return self.executeSQL(sql_update_experiment, (problems, run_id))
 
     def addToExperiment(
         self, experiment_id=None, runs=None, metadata=None, comments=None
@@ -728,10 +716,8 @@ class ExperimentalDB(multiprocessing.Process):
             runs = ";".join(runs)
 
         if experiment_id == None:
-            sql_enter_new_experiment = (
-                "INSERT INTO %s VALUES( NULL, '%s', '%s', '%s')"
-                % (self._experiments_table_name, runs, metadata, comments)
-            )
+            sql_enter_new_experiment = f"INSERT INTO {self._experiments_table_name} VALUES (NULL, ?, ?, ?)"
+            return self.executeSQL(sql_enter_new_experiment, (runs, metadata, comments))
         else:
             updates = {
                 name: value
@@ -740,20 +726,16 @@ class ExperimentalDB(multiprocessing.Process):
                 )
                 if value != None
             }
-            values = " , ".join(
-                ["%s = '%s'" % (name, updates[name]) for name in updates.keys()]
-            )
-            sql_enter_new_experiment = (
-                "UPDATE "
-                + self._experiments_table_name
-                + " SET "
-                + values
-                + " WHERE experiment_id = '"
-                + str(experiment_id)
-                + "'"
-            )
+            set_clauses = [f"{name} = ?" for name in updates.keys()]
+            params = list(updates.values())
 
-        return self.executeSQL(sql_enter_new_experiment)
+            sql_enter_new_experiment = (
+                f"UPDATE {self._experiments_table_name} "
+                f"SET {', '.join(set_clauses)} "
+                f"WHERE experiment_id = ?"
+            )
+            params.append(experiment_id)
+            return self.executeSQL(sql_enter_new_experiment, tuple(params))
 
     def getExperiment(self, experiment_id, asdict=False):
         """
@@ -764,14 +746,11 @@ class ExperimentalDB(multiprocessing.Process):
         """
 
         if experiment_id == "all":
-            sql_get_experiment = "SELECT * FROM %s" % (self._experiments_table_name)
+            sql_get_experiment = f"SELECT * FROM {self._experiments_table_name}"
+            row = self.executeSQL(sql_get_experiment)
         else:
-            sql_get_experiment = "SELECT * FROM %s WHERE run_id = '%s'" % (
-                self._experiments_table_name,
-                experiment_id,
-            )
-
-        row = self.executeSQL(sql_get_experiment)
+            sql_get_experiment = f"SELECT * FROM {self._experiments_table_name} WHERE run_id = ?"
+            row = self.executeSQL(sql_get_experiment, (experiment_id,))
 
         if row == 0:
             return {}
@@ -796,15 +775,13 @@ class ExperimentalDB(multiprocessing.Process):
         """
 
         if ethoscope_id == "all":
-            sql_get_ethoscope = "SELECT * FROM %s" % (self._ethoscopes_table_name)
+            sql_get_ethoscope = f"SELECT * FROM {self._ethoscopes_table_name}"
+            row = self.executeSQL(sql_get_ethoscope)
         else:
-            sql_get_ethoscope = "SELECT * FROM %s WHERE ethoscope_id = '%s'" % (
-                self._ethoscopes_table_name,
-                ethoscope_id,
-            )
+            sql_get_ethoscope = f"SELECT * FROM {self._ethoscopes_table_name} WHERE ethoscope_id = ?"
+            row = self.executeSQL(sql_get_ethoscope, (ethoscope_id,))
 
         # this returns a row if the query is successful, a 0 if no entry was found and -1 if there is an issue connecting to the db
-        row = self.executeSQL(sql_get_ethoscope)
 
         if type(row) != list and row <= 0:
             return {}
@@ -843,10 +820,8 @@ class ExperimentalDB(multiprocessing.Process):
         if ethoscope_name in blacklist:
             return
 
-        if machineinfo:
-            machineinfo = machineinfo.replace("'", "''")
-
         if type(e) is dict and e != {}:
+            # UPDATE existing ethoscope
             updates = {
                 name: value
                 for (name, value) in zip(
@@ -871,22 +846,19 @@ class ExperimentalDB(multiprocessing.Process):
                 )
                 if value is not None
             }
-            values = " , ".join(
-                ["%s = '%s'" % (name, updates[name]) for name in updates.keys()]
-            )
+            set_clauses = [f"{name} = ?" for name in updates.keys()]
+            params = list(updates.values())
+
             sql_update_ethoscope = (
-                "UPDATE "
-                + self._ethoscopes_table_name
-                + " SET last_seen = '"
-                + str(now)
-                + "', "
-                + values
-                + " WHERE ethoscope_id = '"
-                + str(ethoscope_id)
-                + "'"
+                f"UPDATE {self._ethoscopes_table_name} "
+                f"SET last_seen = ?, {', '.join(set_clauses)} "
+                f"WHERE ethoscope_id = ?"
             )
+            params = [now] + params + [ethoscope_id]
+            return self.executeSQL(sql_update_ethoscope, tuple(params))
 
         else:
+            # INSERT new ethoscope
             # Don't create new ethoscope entries without a valid name
             if (
                 not ethoscope_name
@@ -900,28 +872,24 @@ class ExperimentalDB(multiprocessing.Process):
                 return None
 
             active = 1
-            sql_update_ethoscope = (
-                "INSERT INTO %s VALUES( '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')"
-                % (
-                    self._ethoscopes_table_name,
-                    ethoscope_id,
-                    ethoscope_name,
-                    now,
-                    now,
-                    active,
-                    last_ip,
-                    machineinfo,
-                    problems,
-                    comments,
-                    status,
-                )
-            )
+            sql_update_ethoscope = f"""INSERT INTO {self._ethoscopes_table_name}
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
             logging.warning(
                 "Adding a new ethoscope to the db. Welcome %s with id %s"
                 % (ethoscope_name, ethoscope_id)
             )
-
-        return self.executeSQL(sql_update_ethoscope)
+            return self.executeSQL(sql_update_ethoscope, (
+                ethoscope_id,
+                ethoscope_name,
+                now,
+                now,
+                active,
+                last_ip,
+                machineinfo,
+                problems,
+                comments,
+                status,
+            ))
 
     def getUserByName(self, username: str, asdict: bool = False):
         """
@@ -934,12 +902,8 @@ class ExperimentalDB(multiprocessing.Process):
         Returns:
             User data from database or empty dict if not found
         """
-        sql_get_user = "SELECT * FROM %s WHERE username = '%s'" % (
-            self._users_table_name,
-            username,
-        )
-
-        row = self.executeSQL(sql_get_user)
+        sql_get_user = f"SELECT * FROM {self._users_table_name} WHERE username = ?"
+        row = self.executeSQL(sql_get_user, (username,))
 
         if type(row) != list or len(row) == 0:
             return {}
@@ -960,12 +924,8 @@ class ExperimentalDB(multiprocessing.Process):
         Returns:
             User data from database or empty dict if not found
         """
-        sql_get_user = "SELECT * FROM %s WHERE email = '%s'" % (
-            self._users_table_name,
-            email,
-        )
-
-        row = self.executeSQL(sql_get_user)
+        sql_get_user = f"SELECT * FROM {self._users_table_name} WHERE email = ?"
+        row = self.executeSQL(sql_get_user, (email,))
 
         if type(row) != list or len(row) == 0:
             return {}
@@ -987,15 +947,12 @@ class ExperimentalDB(multiprocessing.Process):
             User data from database or empty dict if not found
         """
         sql_get_user = (
-            "SELECT u.* FROM %s u JOIN %s r ON u.username = r.user_name WHERE r.run_id = '%s'"
-            % (
-                self._users_table_name,
-                self._runs_table_name,
-                run_id,
-            )
+            f"SELECT u.* FROM {self._users_table_name} u "
+            f"JOIN {self._runs_table_name} r ON u.username = r.user_name "
+            f"WHERE r.run_id = ?"
         )
 
-        row = self.executeSQL(sql_get_user)
+        row = self.executeSQL(sql_get_user, (run_id,))
 
         if type(row) != list or len(row) == 0:
             return {}
@@ -1019,20 +976,18 @@ class ExperimentalDB(multiprocessing.Process):
         Returns:
             List of user data for users who have used this device
         """
-        conditions = ["r.ethoscope_id = '%s'" % device_id, "u.active = 1"]
+        conditions = ["r.ethoscope_id = ?", "u.active = 1"]
+        params = [device_id]
         if running_only:
             conditions.append("r.status = 'running'")
 
         sql_get_users = (
-            "SELECT DISTINCT u.* FROM %s u JOIN %s r ON u.username = r.user_name WHERE %s"
-            % (
-                self._users_table_name,
-                self._runs_table_name,
-                " AND ".join(conditions),
-            )
+            f"SELECT DISTINCT u.* FROM {self._users_table_name} u "
+            f"JOIN {self._runs_table_name} r ON u.username = r.user_name "
+            f"WHERE {' AND '.join(conditions)}"
         )
 
-        rows = self.executeSQL(sql_get_users)
+        rows = self.executeSQL(sql_get_users, tuple(params))
 
         if type(rows) != list or len(rows) == 0:
             return []
@@ -1443,12 +1398,8 @@ class ExperimentalDB(multiprocessing.Process):
         Returns:
             Incubator data from database or empty dict if not found
         """
-        sql_get_incubator = "SELECT * FROM %s WHERE name = '%s'" % (
-            self._incubators_table_name,
-            name,
-        )
-
-        row = self.executeSQL(sql_get_incubator)
+        sql_get_incubator = f"SELECT * FROM {self._incubators_table_name} WHERE name = ?"
+        row = self.executeSQL(sql_get_incubator, (name,))
 
         if type(row) != list or len(row) == 0:
             return {}
@@ -1598,27 +1549,27 @@ class ExperimentalDB(multiprocessing.Process):
             List of alert log entries
         """
         sql_conditions = []
+        params = []
 
         if device_id:
-            sql_conditions.append("device_id = '%s'" % device_id)
+            sql_conditions.append("device_id = ?")
+            params.append(device_id)
 
         if alert_type:
-            sql_conditions.append("alert_type = '%s'" % alert_type)
+            sql_conditions.append("alert_type = ?")
+            params.append(alert_type)
 
         where_clause = ""
         if sql_conditions:
             where_clause = " WHERE " + " AND ".join(sql_conditions)
 
-        sql_get_alerts = """
-        SELECT * FROM alert_logs%s
+        sql_get_alerts = f"""
+        SELECT * FROM alert_logs{where_clause}
         ORDER BY created_at DESC
-        LIMIT %d
-        """ % (
-            where_clause,
-            limit,
-        )
+        LIMIT {limit}
+        """
 
-        rows = self.executeSQL(sql_get_alerts)
+        rows = self.executeSQL(sql_get_alerts, tuple(params) if params else None)
 
         if type(rows) != list:
             return []
@@ -1700,12 +1651,8 @@ class ExperimentalDB(multiprocessing.Process):
         # Retire the devices
         retired_count = 0
         for ethoscope_id in devices_to_retire:
-            sql_retire = "UPDATE %s SET active = 0 WHERE ethoscope_id = '%s'" % (
-                self._ethoscopes_table_name,
-                ethoscope_id,
-            )
-
-            result = self.executeSQL(sql_retire)
+            sql_retire = f"UPDATE {self._ethoscopes_table_name} SET active = 0 WHERE ethoscope_id = ?"
+            result = self.executeSQL(sql_retire, (ethoscope_id,))
             if result != -1:
                 retired_count += 1
             else:
@@ -1797,12 +1744,8 @@ class ExperimentalDB(multiprocessing.Process):
         # Purge the devices
         purged_count = 0
         for ethoscope_id in devices_to_purge:
-            sql_purge = "DELETE FROM %s WHERE ethoscope_id = '%s'" % (
-                self._ethoscopes_table_name,
-                ethoscope_id,
-            )
-
-            result = self.executeSQL(sql_purge)
+            sql_purge = f"DELETE FROM {self._ethoscopes_table_name} WHERE ethoscope_id = ?"
+            result = self.executeSQL(sql_purge, (ethoscope_id,))
             if result != -1:
                 purged_count += 1
             else:
@@ -1888,12 +1831,8 @@ class ExperimentalDB(multiprocessing.Process):
         # Clean up the devices by marking them as offline
         cleaned_count = 0
         for ethoscope_id in devices_to_cleanup:
-            sql_cleanup = (
-                "UPDATE %s SET status = 'offline' WHERE ethoscope_id = '%s'"
-                % (self._ethoscopes_table_name, ethoscope_id)
-            )
-
-            result = self.executeSQL(sql_cleanup)
+            sql_cleanup = f"UPDATE {self._ethoscopes_table_name} SET status = 'offline' WHERE ethoscope_id = ?"
+            result = self.executeSQL(sql_cleanup, (ethoscope_id,))
             if result != -1:
                 cleaned_count += 1
             else:
@@ -1991,12 +1930,8 @@ class ExperimentalDB(multiprocessing.Process):
         unreached_count = 0
 
         for ethoscope_id, ethoscope_name, status in devices_to_cleanup:
-            sql_cleanup = (
-                "UPDATE %s SET status = 'offline' WHERE ethoscope_id = '%s'"
-                % (self._ethoscopes_table_name, ethoscope_id)
-            )
-
-            result = self.executeSQL(sql_cleanup)
+            sql_cleanup = f"UPDATE {self._ethoscopes_table_name} SET status = 'offline' WHERE ethoscope_id = ?"
+            result = self.executeSQL(sql_cleanup, (ethoscope_id,))
             if result != -1:
                 cleaned_count += 1
                 if status == "busy":
