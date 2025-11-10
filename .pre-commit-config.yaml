@@ -1,19 +1,108 @@
+# Pre-commit hooks for Ethoscope project
+# See https://pre-commit.com for more information
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+default_language_version:
+  python: python3
+
 repos:
+  # ===== General file checks =====
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(.*\.md|.*\.txt)$
+      - id: end-of-file-fixer
+        exclude: ^(.*\.txt|.*\.csv|.*\.dat)$
+      - id: check-yaml
+        args: ['--unsafe']  # Allow custom YAML tags
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: ['--maxkb=2000']
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-docstring-first
+      - id: check-executables-have-shebangs
+      - id: debug-statements
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+      - id: name-tests-test
+        args: ['--pytest-test-first']
+        exclude: ^(.*fixtures.*|.*conftest\.py|.*helpers\.py|.*mocks\.py)$
+
+  # ===== Python code formatting =====
   - repo: https://github.com/psf/black
-    rev: 23.12.1
+    rev: 24.1.1
     hooks:
       - id: black
         language_version: python3
-        args: [--line-length=88]
+        args: ['--line-length=88']
         files: ^(src/|scripts/|run_tests\.py).*\.py$
 
+  # ===== Import sorting =====
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ['--profile', 'black', '--line-length', '88']
+        files: ^(src/|scripts/|run_tests\.py).*\.py$
+
+  # ===== Modern Python linting with ruff =====
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.8
+    rev: v0.1.14
     hooks:
       - id: ruff
-        args: [--fix, --exit-zero]  # Don't fail on unfixable issues
+        args: ['--fix', '--exit-non-zero-on-fix']
         files: ^(src/|scripts/|run_tests\.py).*\.py$
 
+  # ===== Traditional Python linting with flake8 =====
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args: [
+          '--max-line-length=88',
+          '--extend-ignore=E203,W503,E501',
+          '--max-complexity=15'
+        ]
+        files: ^(src/|scripts/|run_tests\.py).*\.py$
+
+  # ===== Security checks =====
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.6
+    hooks:
+      - id: bandit
+        args: ['-ll', '-i']  # Low-low severity
+        files: ^src/.*\.py$
+        exclude: ^(.*test.*\.py|.*conftest\.py)$
+
+  # ===== Detect secrets =====
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: (package.lock.json|.*\.ipynb)
+
+  # ===== YAML linting =====
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.33.0
+    hooks:
+      - id: yamllint
+        args: ['-d', '{extends: default, rules: {line-length: {max: 120}, document-start: disable}}']
+        files: \.(yaml|yml)$
+
+  # ===== Shell script linting =====
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.9.0.6
+    hooks:
+      - id: shellcheck
+        args: ['--severity=warning']
+        files: \.(sh|bash)$
+
+  # ===== Local custom hooks =====
   - repo: local
     hooks:
       - id: python-check-syntax
@@ -22,32 +111,37 @@ repos:
         language: system
         args: [-m, py_compile]
         files: \.py$
-        
+
       - id: python-import-check
-        name: Check Python imports
+        name: Check Python imports (requires venv)
         entry: bash
         language: system
         args:
           - -c
           - |
-            source .venv/bin/activate
-            python -c "
-            import sys
-            import importlib.util
-            for file in sys.argv[1:]:
-                spec = importlib.util.spec_from_file_location('module', file)
-                try:
-                    module = importlib.util.module_from_spec(spec)
-                    spec.loader.exec_module(module)
-                    print(f'✓ {file}')
-                except Exception as e:
-                    print(f'✗ {file}: {e}')
-                    sys.exit(1)
-            " 
-        files: \.py$
+            if [ -f .venv/bin/activate ]; then
+              source .venv/bin/activate
+              python -c "
+              import sys
+              import importlib.util
+              for file in sys.argv[1:]:
+                  spec = importlib.util.spec_from_file_location('module', file)
+                  try:
+                      module = importlib.util.module_from_spec(spec)
+                      spec.loader.exec_module(module)
+                      print(f'✓ {file}')
+                  except Exception as e:
+                      print(f'✗ {file}: {e}')
+                      sys.exit(1)
+              "
+            else
+              echo "⚠ Skipping import check (venv not found)"
+            fi
+        files: ^(src/|scripts/).*\.py$
         pass_filenames: true
-        
-      # Optional: Run quick tests only for critical files
+        # Only run manually to avoid slowing down commits
+        stages: [manual]
+
       - id: critical-tests
         name: Run tests for critical changes
         entry: bash
@@ -57,10 +151,45 @@ repos:
           - |
             if echo "$PRE_COMMIT_FROM_REF $PRE_COMMIT_TO_REF" | grep -E "(monitor|tracker|stimulator)"; then
               echo "Critical files changed, running relevant tests..."
-              cd src/ethoscope && source ../../.venv/bin/activate && python -m pytest ethoscope/tests/unittests/test_multi_stimulator.py -v --tb=short
+              if [ -f .venv/bin/activate ]; then
+                cd src/ethoscope && source ../../.venv/bin/activate && python -m pytest ethoscope/tests/unittests/ -v --tb=short -x
+              else
+                echo "⚠ Skipping tests (venv not found)"
+              fi
             else
               echo "No critical files changed, skipping tests"
             fi
         files: ^src/ethoscope/ethoscope/(core|trackers|stimulators)/.*\.py$
         pass_filenames: false
-        stages: [manual]  # Only run when explicitly called with --hook-stage manual
+        stages: [manual]  # Only run when explicitly called
+
+      - id: update-copyright
+        name: Update copyright year
+        entry: bash
+        language: system
+        args:
+          - -c
+          - |
+            YEAR=$(date +%Y)
+            for file in "$@"; do
+              if grep -q "Copyright.*Giorgio Gilestro" "$file"; then
+                sed -i "s/Copyright \(.*\) Giorgio Gilestro/Copyright (c) $YEAR Giorgio Gilestro/" "$file"
+                echo "Updated copyright in $file"
+              fi
+            done
+        files: ^src/.*\.py$
+        pass_filenames: true
+        stages: [manual]
+
+# CI configuration for pre-commit.ci
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: 'dev'
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: monthly
+  skip: [python-import-check, critical-tests, update-copyright]
+  submodules: false

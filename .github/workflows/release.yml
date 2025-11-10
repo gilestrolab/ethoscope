@@ -1,0 +1,252 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  build:
+    name: Build Distribution Packages
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine wheel setuptools
+
+    - name: Build device package
+      run: |
+        cd src/ethoscope
+        python -m build
+        twine check dist/*
+
+    - name: Build node package
+      run: |
+        cd src/node
+        python -m build
+        twine check dist/*
+
+    - name: Upload device package artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: device-dist
+        path: src/ethoscope/dist/
+        retention-days: 90
+
+    - name: Upload node package artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: node-dist
+        path: src/node/dist/
+        retention-days: 90
+
+  test-installation:
+    name: Test Package Installation
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+
+    steps:
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Download device package
+      uses: actions/download-artifact@v4
+      with:
+        name: device-dist
+        path: device-dist/
+
+    - name: Download node package
+      uses: actions/download-artifact@v4
+      with:
+        name: node-dist
+        path: node-dist/
+
+    - name: Install and test device package
+      run: |
+        pip install device-dist/*.whl
+        python -c "import ethoscope; print(f'Device package version: {ethoscope.__version__ if hasattr(ethoscope, \"__version__\") else \"imported successfully\"}')"
+
+    - name: Install and test node package
+      run: |
+        pip install node-dist/*.whl
+        python -c "import ethoscope_node; print('Node package imported successfully')"
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build, test-installation]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download device package artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: device-dist
+        path: device-dist/
+
+    - name: Download node package artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: node-dist
+        path: node-dist/
+
+    - name: Get tag name
+      id: get_version
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        else
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Get the previous tag
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+        if [ -z "$PREV_TAG" ]; then
+          # First release - get all commits
+          CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges)
+        else
+          # Get commits since previous tag
+          CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+        fi
+
+        # Save to file for multi-line content
+        echo "$CHANGELOG" > changelog.txt
+
+        # Count commits
+        COMMIT_COUNT=$(echo "$CHANGELOG" | wc -l)
+        echo "COMMIT_COUNT=$COMMIT_COUNT" >> $GITHUB_OUTPUT
+
+    - name: Create Release Notes
+      run: |
+        cat > release-notes.md << 'EOF'
+        ## Ethoscope Platform Release ${{ steps.get_version.outputs.VERSION }}
+
+        This release includes updates to both the device and node packages of the Ethoscope platform.
+
+        ### 📦 Packages Included
+
+        - **ethoscope** (Device Package): Core tracking and monitoring functionality
+        - **ethoscope_node** (Node Package): Central management and data collection
+
+        ### 📝 Changes in this Release
+
+        EOF
+        cat changelog.txt >> release-notes.md
+        cat >> release-notes.md << 'EOF'
+
+        ### 🚀 Installation
+
+        **Device Package:**
+        ```bash
+        pip install ethoscope-${{ steps.get_version.outputs.VERSION }}-py3-none-any.whl
+        ```
+
+        **Node Package:**
+        ```bash
+        pip install ethoscope_node-${{ steps.get_version.outputs.VERSION }}-py3-none-any.whl
+        ```
+
+        ### 📚 Documentation
+
+        For detailed documentation, visit [https://lab.gilest.ro/ethoscope-manual](https://lab.gilest.ro/ethoscope-manual)
+
+        ### 🐛 Bug Reports
+
+        Please report issues at [https://github.com/gilestrolab/ethoscope/issues](https://github.com/gilestrolab/ethoscope/issues)
+        EOF
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.get_version.outputs.VERSION }}
+        name: Release ${{ steps.get_version.outputs.VERSION }}
+        body_path: release-notes.md
+        draft: false
+        prerelease: false
+        files: |
+          device-dist/*
+          node-dist/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: create-release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: pypi
+      url: https://pypi.org/project/ethoscope/
+    permissions:
+      id-token: write
+
+    steps:
+    - name: Download device package artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: device-dist
+        path: device-dist/
+
+    - name: Download node package artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: node-dist
+        path: node-dist/
+
+    # Uncomment the following steps when ready to publish to PyPI
+    # You'll need to set up PyPI trusted publishing first
+
+    # - name: Publish device package to PyPI
+    #   uses: pypa/gh-action-pypi-publish@release/v1
+    #   with:
+    #     packages-dir: device-dist/
+
+    # - name: Publish node package to PyPI
+    #   uses: pypa/gh-action-pypi-publish@release/v1
+    #   with:
+    #     packages-dir: node-dist/
+
+    - name: PyPI Publishing (Placeholder)
+      run: |
+        echo "PyPI publishing is currently disabled."
+        echo "To enable:"
+        echo "  1. Set up PyPI trusted publishing for this repository"
+        echo "  2. Uncomment the publish steps in release.yml"
+        echo "  3. Configure the 'pypi' environment in GitHub repository settings"
+        echo ""
+        echo "Packages are ready for manual upload if needed:"
+        ls -lh device-dist/
+        ls -lh node-dist/

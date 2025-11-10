@@ -166,7 +166,68 @@ On the node:
 1. **Device Development**: Work in `src/ethoscope/` for tracking algorithms, hardware interfaces, and device-specific features
 2. **Node Development**: Work in `src/node/` for web interface, device management, and data collection
 3. **Testing**: Always run tests before committing changes
-4. **Branching**: Use `dev` branch for development, `master` for stable releases
+4. **Branching**: Use `dev` branch for development, `main` for stable releases
+5. **Code Quality**: Use pre-commit hooks to ensure code quality before commits
+6. **CI/CD**: All changes are automatically tested via GitHub Actions
+
+## CI/CD Pipeline
+
+The project uses GitHub Actions for continuous integration and deployment:
+
+**Workflows:**
+- **CI Workflow** (`.github/workflows/ci.yml`): Runs tests across Python 3.8-3.12, generates coverage reports
+- **Code Quality** (`.github/workflows/quality.yml`): Linting, type checking, security scanning
+- **Release** (`.github/workflows/release.yml`): Automated releases from version tags
+
+**Status:** View workflow runs and badges in README.md
+
+**Documentation:** See `.github/CICD.md` for detailed CI/CD documentation
+
+## Pre-Commit Hooks
+
+The project uses pre-commit hooks to enforce code quality standards locally before pushing to GitHub.
+
+**Installation:**
+```bash
+# Activate your venv first
+source .venv/bin/activate
+
+# Run the setup script
+./scripts/setup_pre_commit.sh
+
+# Or manually
+pip install pre-commit
+pre-commit install
+```
+
+**Hooks Included:**
+- **Formatting**: black, isort
+- **Linting**: flake8, ruff
+- **Security**: bandit, detect-secrets
+- **File checks**: trailing whitespace, YAML/JSON validation, etc.
+- **Custom checks**: Python syntax, import validation
+
+**Usage:**
+```bash
+# Runs automatically on git commit
+git commit -m "Your message"
+
+# Run manually on all files
+pre-commit run --all-files
+
+# Run manually on staged files
+pre-commit run
+
+# Skip hooks (not recommended)
+git commit --no-verify
+```
+
+**Manual-only hooks** (run with `--hook-stage manual`):
+- `python-import-check`: Verify imports work in venv
+- `critical-tests`: Run tests for critical file changes
+- `update-copyright`: Update copyright years
+
+**Configuration:** `.pre-commit-config.yaml`
 
 ## Database Structure
 

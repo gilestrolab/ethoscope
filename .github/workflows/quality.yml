@@ -1,0 +1,272 @@
+name: Code Quality
+
+on:
+  pull_request:
+    branches: [ dev, main ]
+  push:
+    branches: [ dev, main ]
+  workflow_dispatch:
+
+jobs:
+  lint-device:
+    name: Lint Device Package
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install linting tools
+      run: |
+        pip install --upgrade pip
+        pip install flake8 ruff black mypy bandit
+
+    - name: Run flake8 on device package
+      run: |
+        cd src/ethoscope
+        flake8 ethoscope/ \
+          --max-line-length=88 \
+          --extend-ignore=E203,W503 \
+          --count \
+          --statistics \
+          --show-source
+
+    - name: Run ruff on device package
+      run: |
+        cd src/ethoscope
+        ruff check ethoscope/ --output-format=github
+
+    - name: Check code formatting with black
+      run: |
+        cd src/ethoscope
+        black --check --diff ethoscope/
+
+  lint-node:
+    name: Lint Node Package
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install linting tools
+      run: |
+        pip install --upgrade pip
+        pip install flake8 ruff black mypy bandit
+
+    - name: Run flake8 on node package
+      run: |
+        cd src/node
+        flake8 ethoscope_node/ \
+          --max-line-length=88 \
+          --extend-ignore=E203,W503 \
+          --count \
+          --statistics \
+          --show-source
+
+    - name: Run ruff on node package
+      run: |
+        cd src/node
+        ruff check ethoscope_node/ --output-format=github
+
+    - name: Check code formatting with black
+      run: |
+        cd src/node
+        black --check --diff ethoscope_node/
+
+  type-check-device:
+    name: Type Check Device Package
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libopencv-dev \
+          python3-opencv \
+          libatlas-base-dev
+
+    - name: Install device package with dev dependencies
+      run: |
+        cd src/ethoscope
+        pip install --upgrade pip setuptools wheel
+        pip install -e .[dev]
+        pip install mypy
+
+    - name: Run mypy type checking
+      run: |
+        cd src/ethoscope
+        mypy ethoscope/ \
+          --ignore-missing-imports \
+          --no-strict-optional \
+          --warn-unused-configs \
+          --disallow-any-generics \
+          --disallow-untyped-calls \
+          --disallow-untyped-defs \
+          --disallow-incomplete-defs \
+          --check-untyped-defs \
+          --warn-redundant-casts \
+          --warn-unused-ignores \
+          --warn-return-any \
+          --no-implicit-reexport \
+          --strict-equality || true
+
+  type-check-node:
+    name: Type Check Node Package
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libopencv-dev \
+          python3-opencv \
+          libatlas-base-dev
+
+    - name: Install node package with dev dependencies
+      run: |
+        cd src/node
+        pip install --upgrade pip setuptools wheel
+        pip install -e .[dev]
+        pip install mypy
+
+    - name: Run mypy type checking
+      run: |
+        cd src/node
+        mypy ethoscope_node/ \
+          --ignore-missing-imports \
+          --no-strict-optional \
+          --warn-unused-configs \
+          --disallow-any-generics \
+          --disallow-untyped-calls \
+          --disallow-untyped-defs \
+          --disallow-incomplete-defs \
+          --check-untyped-defs \
+          --warn-redundant-casts \
+          --warn-unused-ignores \
+          --warn-return-any \
+          --no-implicit-reexport \
+          --strict-equality || true
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install bandit
+      run: |
+        pip install --upgrade pip
+        pip install bandit[toml]
+
+    - name: Run bandit security scan on device package
+      run: |
+        cd src/ethoscope
+        bandit -r ethoscope/ \
+          -f json \
+          -o bandit-device-report.json \
+          --severity-level medium || true
+        bandit -r ethoscope/ \
+          -f screen \
+          --severity-level medium
+
+    - name: Run bandit security scan on node package
+      run: |
+        cd src/node
+        bandit -r ethoscope_node/ \
+          -f json \
+          -o bandit-node-report.json \
+          --severity-level medium || true
+        bandit -r ethoscope_node/ \
+          -f screen \
+          --severity-level medium
+
+    - name: Upload security reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-reports
+        path: |
+          src/ethoscope/bandit-device-report.json
+          src/node/bandit-node-report.json
+        retention-days: 30
+
+  dependency-check:
+    name: Dependency Security Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install pip-audit
+      run: |
+        pip install --upgrade pip
+        pip install pip-audit
+
+    - name: Check device package dependencies
+      run: |
+        cd src/ethoscope
+        pip-audit --desc --format json --output device-audit.json || true
+        pip-audit --desc --format markdown
+
+    - name: Check node package dependencies
+      run: |
+        cd src/node
+        pip-audit --desc --format json --output node-audit.json || true
+        pip-audit --desc --format markdown
+
+    - name: Upload dependency audit reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: dependency-audit-reports
+        path: |
+          src/ethoscope/device-audit.json
+          src/node/node-audit.json
+        retention-days: 30
