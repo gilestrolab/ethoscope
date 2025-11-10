@@ -4,6 +4,16 @@
 
 The CI/CD pipeline enforces code quality standards with some temporary exceptions for legacy code.
 
+### Recent Fixes (2025-01)
+
+**Fixed Dependency Version Issues:**
+- Fixed `numpy>=2.3.1` → `numpy>=1.21.0,<2.1.0` (numpy 2.3.1 doesn't exist for Python 3.9)
+- Fixed `scipy>=1.16.0` → `scipy>=1.7.0` (scipy 1.16.0 doesn't exist)
+- Fixed `opencv-python>=4.11.0.86` → `opencv-python>=4.8.0` (opencv 4.11 doesn't exist)
+- Fixed `mysql-connector-python>=9.3.0` → `mysql-connector-python>=8.0.16` (9.3.0 doesn't exist)
+
+All dependencies now use versions compatible with Python 3.8-3.12.
+
 ### Current Formatting Status
 
 ✅ **All Code Formatted with Black**
