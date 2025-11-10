@@ -2185,6 +2185,9 @@ class ExperimentalDB(multiprocessing.Process):
             age_days,
             reason,
         ) in orphans_to_cleanup:
+            # Escape single quotes in reason string for SQL
+            escaped_reason = reason.replace("'", "''")
+
             sql_cleanup = """
                 UPDATE %s
                 SET status = 'stopped', end_time = '%s',
@@ -2197,9 +2200,9 @@ class ExperimentalDB(multiprocessing.Process):
                 self._runs_table_name,
                 current_time,
                 age_days,
-                reason,
+                escaped_reason,
                 age_days,
-                reason,
+                escaped_reason,
                 run_id,
             )
 
