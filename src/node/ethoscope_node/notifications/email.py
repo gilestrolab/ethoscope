@@ -193,27 +193,33 @@ class EmailNotificationService(NotificationAnalyzer):
             self.logger.error(f"Failed to send email: {e}")
             return False
     
-    def send_device_stopped_alert(self, device_id: str, device_name: str, 
+    def send_device_stopped_alert(self, device_id: str, device_name: str,
                                  run_id: str, last_seen: datetime.datetime) -> bool:
         """
         Send enhanced alert when device stops unexpectedly.
-        
+
         Args:
             device_id: Device identifier
             device_name: Human-readable device name
             run_id: Run ID that was interrupted
             last_seen: When device was last seen
-            
+
         Returns:
             True if alert was sent
         """
         self.logger.info(f"send_device_stopped_alert: device_id={device_id}, run_id={run_id}")
-        
+
         if not self._should_send_alert(device_id, 'device_stopped', run_id):
             return False
-        
+
         # Get comprehensive device failure analysis
         failure_analysis = self.analyze_device_failure(device_id)
+
+        # Don't send alert if the run completed normally
+        failure_type = failure_analysis.get('failure_type', '')
+        if failure_type == 'completed_normally':
+            self.logger.info(f"Suppressing alert for device {device_id} - run {run_id} completed normally")
+            return False
 
         # Get recipients: user whose experiment stopped + admins
         stopped_user = self.get_stopped_experiment_user(run_id)

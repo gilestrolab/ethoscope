@@ -270,20 +270,21 @@ class TestEmailNotificationService:
     @patch.object(EmailNotificationService, '_send_email')
     @patch.object(EmailNotificationService, 'get_device_logs')
     @patch.object(EmailNotificationService, 'analyze_device_failure')
-    @patch.object(EmailNotificationService, 'get_device_users')
+    @patch.object(EmailNotificationService, 'get_stopped_experiment_user')
     @patch.object(EmailNotificationService, 'get_admin_emails')
-    def test_send_device_stopped_alert_success(self, mock_get_admin, mock_get_users, 
+    def test_send_device_stopped_alert_success(self, mock_get_admin, mock_get_stopped_user,
                                              mock_analyze, mock_get_logs, mock_send, email_service):
         """Test successful device stopped alert."""
         device_id = 'device_001'
         device_name = 'Test Device'
         run_id = 'run_123'
         last_seen = datetime.datetime.now()
-        
+
         # Mock return values
-        mock_get_users.return_value = ['user@example.com']
+        mock_get_stopped_user.return_value = ['user@example.com']
         mock_get_admin.return_value = ['admin@example.com']
         mock_analyze.return_value = {
+            'failure_type': 'crashed_during_tracking',
             'user': 'test_user',
             'location': 'Incubator_A',
             'experiment_duration_str': '2.5 hours',
@@ -295,14 +296,14 @@ class TestEmailNotificationService:
         }
         mock_get_logs.return_value = 'Log line 1\nLog line 2\nError occurred'
         mock_send.return_value = True
-        
+
         # Mock database methods
         with patch.object(email_service.db, 'hasAlertBeenSent', return_value=False), \
              patch.object(email_service.db, 'logAlert', return_value=1):
             result = email_service.send_device_stopped_alert(device_id, device_name, run_id, last_seen)
-            
+
             assert result == True
-            mock_get_users.assert_called_once_with(device_id)
+            mock_get_stopped_user.assert_called_once_with(run_id)
             mock_get_admin.assert_called_once()
             mock_analyze.assert_called_once_with(device_id)
             mock_get_logs.assert_called_once_with(device_id, max_lines=500)
@@ -323,12 +324,32 @@ class TestEmailNotificationService:
     def test_send_device_stopped_alert_cooldown(self, mock_should_send, email_service):
         """Test device stopped alert blocked by cooldown."""
         mock_should_send.return_value = False
-        
+
         result = email_service.send_device_stopped_alert('device_001', 'Test Device', 'run_123', datetime.datetime.now())
-        
+
         assert result == False
         mock_should_send.assert_called_once_with('device_001', 'device_stopped', 'run_123')
-    
+
+    @patch.object(EmailNotificationService, 'analyze_device_failure')
+    @patch.object(EmailNotificationService, '_should_send_alert')
+    def test_send_device_stopped_alert_completed_normally(self, mock_should_send, mock_analyze, email_service):
+        """Test device stopped alert suppressed for normally completed runs."""
+        mock_should_send.return_value = True
+        mock_analyze.return_value = {
+            'failure_type': 'completed_normally',
+            'status': 'Completed normally',
+            'user': 'test_user',
+            'location': 'Incubator_A',
+            'experiment_duration_str': '3.1 days',
+            'experiment_type': 'tracking'
+        }
+
+        result = email_service.send_device_stopped_alert('device_001', 'Test Device', 'run_123', datetime.datetime.now())
+
+        assert result == False
+        mock_should_send.assert_called_once_with('device_001', 'device_stopped', 'run_123')
+        mock_analyze.assert_called_once_with('device_001')
+
     @patch.object(EmailNotificationService, 'get_device_users')
     @patch.object(EmailNotificationService, 'get_admin_emails')
     def test_send_device_stopped_alert_no_recipients(self, mock_get_admin, mock_get_users, email_service):
@@ -447,6 +468,7 @@ class TestEmailNotificationService:
     def test_send_device_stopped_alert_without_logs(self, mock_analyze, mock_get_logs, email_service):
         """Test device stopped alert when logs are not available."""
         mock_analyze.return_value = {
+            'failure_type': 'crashed_during_tracking',
             'user': 'test_user',
             'location': 'Incubator_A',
             'experiment_duration_str': '2.5 hours',
