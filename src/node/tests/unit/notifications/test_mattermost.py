@@ -7,9 +7,13 @@ Unit tests for the Mattermost notification service.
 import datetime
 import json
 import time
-from unittest.mock import MagicMock, Mock, call, patch
+from unittest.mock import MagicMock
+from unittest.mock import Mock
+from unittest.mock import call
+from unittest.mock import patch
 
 import pytest
+
 from ethoscope_node.notifications.mattermost import MattermostNotificationService
 
 

@@ -11,7 +11,8 @@ import os
 
 import bottle
 
-from .base import BaseAPI, error_decorator
+from .base import BaseAPI
+from .base import error_decorator
 
 
 class ROITemplateAPI(BaseAPI):

@@ -5,9 +5,12 @@ Unit tests for the unified notification manager.
 """
 
 import datetime
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import pytest
+
 from ethoscope_node.notifications.manager import NotificationManager
 
 

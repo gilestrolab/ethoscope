@@ -53,13 +53,11 @@ def run_test_suite(test_type="all", verbose=False):
         # Unit tests
         unit_suite = unittest.TestSuite()
         try:
-            from unit.test_backup_helpers import (
-                TestBytesFormatting,
-                TestCachePerformance,
-                TestDeviceBackupInfo,
-                TestRsyncEnhancement,
-                TestVideoCacheSystem,
-            )
+            from unit.test_backup_helpers import TestBytesFormatting
+            from unit.test_backup_helpers import TestCachePerformance
+            from unit.test_backup_helpers import TestDeviceBackupInfo
+            from unit.test_backup_helpers import TestRsyncEnhancement
+            from unit.test_backup_helpers import TestVideoCacheSystem
 
             unit_classes = [
                 TestVideoCacheSystem,
@@ -99,10 +97,8 @@ def run_test_suite(test_type="all", verbose=False):
         # Integration tests
         integration_suite = unittest.TestSuite()
         try:
-            from test_backup_api_integration import (
-                TestBackupAPIErrorHandling,
-                TestBackupAPIIntegration,
-            )
+            from test_backup_api_integration import TestBackupAPIErrorHandling
+            from test_backup_api_integration import TestBackupAPIIntegration
 
             integration_classes = [TestBackupAPIIntegration, TestBackupAPIErrorHandling]
 
@@ -136,10 +132,8 @@ def run_test_suite(test_type="all", verbose=False):
         # Performance tests
         performance_suite = unittest.TestSuite()
         try:
-            from test_backup_cache_performance import (
-                TestCachePerformanceRealistic,
-                TestCacheRobustness,
-            )
+            from test_backup_cache_performance import TestCachePerformanceRealistic
+            from test_backup_cache_performance import TestCacheRobustness
 
             performance_classes = [TestCachePerformanceRealistic, TestCacheRobustness]
 

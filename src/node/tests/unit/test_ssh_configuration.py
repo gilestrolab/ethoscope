@@ -10,14 +10,16 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, call, mock_open, patch
+from unittest.mock import Mock
+from unittest.mock import call
+from unittest.mock import mock_open
+from unittest.mock import patch
 
 import pytest
-from ethoscope_node.utils.configuration import (
-    ConfigurationError,
-    _setup_system_ssh_config,
-    ensure_ssh_keys,
-)
+
+from ethoscope_node.utils.configuration import ConfigurationError
+from ethoscope_node.utils.configuration import _setup_system_ssh_config
+from ethoscope_node.utils.configuration import ensure_ssh_keys
 
 
 class TestEnsureSshKeys:

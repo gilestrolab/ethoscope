@@ -12,7 +12,9 @@ import os
 import shutil
 import tempfile
 import unittest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 # Configure logging for tests
 logging.basicConfig(level=logging.INFO)
@@ -23,7 +25,9 @@ import sys
 sys.path.insert(0, "/home/gg/Data/ethoscope_project/ethoscope/src/ethoscope")
 
 # Import the actual classes we're testing
-from ethoscope.io import MySQLResultWriter, SQLiteResultWriter, dbAppender
+from ethoscope.io import MySQLResultWriter
+from ethoscope.io import SQLiteResultWriter
+from ethoscope.io import dbAppender
 
 
 class TestDbAppender(unittest.TestCase):

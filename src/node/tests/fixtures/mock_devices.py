@@ -7,8 +7,12 @@ components for use in tests.
 
 import datetime
 import json
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, Mock
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from unittest.mock import MagicMock
+from unittest.mock import Mock
 
 
 class MockEthoscopeDevice:

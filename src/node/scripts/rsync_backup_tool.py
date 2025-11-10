@@ -7,9 +7,11 @@ import sys
 import time
 import traceback
 from dataclasses import asdict
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler
+from http.server import HTTPServer
 
-from ethoscope_node.backup.helpers import GenericBackupWrapper, UnifiedRsyncBackupClass
+from ethoscope_node.backup.helpers import GenericBackupWrapper
+from ethoscope_node.backup.helpers import UnifiedRsyncBackupClass
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
 
 gbw = None  # This will be initialized later

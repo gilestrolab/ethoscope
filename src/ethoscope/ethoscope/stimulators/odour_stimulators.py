@@ -5,10 +5,15 @@ import logging
 from ethoscope.hardware.interfaces.interfaces import DefaultInterface
 from ethoscope.hardware.interfaces.odour_delivery_device import (  # noqa: F811
     OdourDelivererFlushedInterface,
+)
+from ethoscope.hardware.interfaces.odour_delivery_device import (  # noqa: F811
     OdourDelivererInterface,
+)
+from ethoscope.hardware.interfaces.odour_delivery_device import (  # noqa: F811
     OdourDepriverInterface,
 )
-from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVariable
+from ethoscope.stimulators.stimulators import BaseStimulator
+from ethoscope.stimulators.stimulators import HasInteractedVariable
 from ethoscope.utils.scheduler import Scheduler
 
 from . import sleep_depriver_stimulators

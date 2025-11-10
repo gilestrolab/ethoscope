@@ -10,16 +10,16 @@ import json
 import os
 import tempfile
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import numpy as np
 
 from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
-from ethoscope.roi_builders.template import ROITemplate, ROITemplateValidationError
-from ethoscope.utils.roi_template_manager import (
-    ROITemplateManager,
-    convert_legacy_to_template,
-)
+from ethoscope.roi_builders.template import ROITemplate
+from ethoscope.roi_builders.template import ROITemplateValidationError
+from ethoscope.utils.roi_template_manager import ROITemplateManager
+from ethoscope.utils.roi_template_manager import convert_legacy_to_template
 
 
 class TestROITemplate(unittest.TestCase):

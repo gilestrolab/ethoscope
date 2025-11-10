@@ -4,7 +4,8 @@ import sqlite3
 import time
 import traceback
 
-from .base import BaseAsyncSQLWriter, BaseResultWriter
+from .base import BaseAsyncSQLWriter
+from .base import BaseResultWriter
 from .helpers import Null
 
 

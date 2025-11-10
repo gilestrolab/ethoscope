@@ -7,8 +7,13 @@ like cameras, stimulators, and sensors for use in tests.
 
 import threading
 import time
-from typing import Any, Dict, List, Optional, Tuple
-from unittest.mock import MagicMock, Mock
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
+from unittest.mock import MagicMock
+from unittest.mock import Mock
 
 import numpy as np
 

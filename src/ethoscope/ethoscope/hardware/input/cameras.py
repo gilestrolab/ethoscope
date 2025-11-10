@@ -646,7 +646,8 @@ class PiFrameGrabber2(PiFrameGrabber):
         """
 
         try:
-            from picamera2 import MappedArray, Picamera2
+            from picamera2 import MappedArray
+            from picamera2 import Picamera2
 
             logging.info(
                 f"Successfully imported picamera2 version: {getattr(Picamera2, '__version__', 'unknown')}"

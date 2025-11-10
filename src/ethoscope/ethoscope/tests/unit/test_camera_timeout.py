@@ -11,12 +11,16 @@ import queue
 import tempfile
 import threading
 import time
-from unittest.mock import MagicMock, Mock, PropertyMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import Mock
+from unittest.mock import PropertyMock
+from unittest.mock import patch
 
 import pytest
 
 from ethoscope.control.tracking import ControlThread
-from ethoscope.hardware.input.cameras import OurPiCameraAsync, PiFrameGrabber2
+from ethoscope.hardware.input.cameras import OurPiCameraAsync
+from ethoscope.hardware.input.cameras import PiFrameGrabber2
 from ethoscope.utils.debug import EthoscopeException
 
 

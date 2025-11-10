@@ -10,8 +10,13 @@ import json
 import os
 import sqlite3
 import tempfile
-from typing import Any, Dict, List, Optional, Tuple
-from unittest.mock import MagicMock, Mock
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
+from unittest.mock import MagicMock
+from unittest.mock import Mock
 
 
 class MockDatabase:

@@ -1,7 +1,9 @@
 __author__ = "quentin"
 
 from collections import deque
-from math import log10, pi, sqrt
+from math import log10
+from math import pi
+from math import sqrt
 
 import cv2
 
@@ -17,15 +19,14 @@ import numpy as np
 from scipy import ndimage
 
 from ethoscope.core.data_point import DataPoint
-from ethoscope.core.variables import (
-    HeightVariable,
-    PhiVariable,
-    WidthVariable,
-    XPosVariable,
-    XYDistance,
-    YPosVariable,
-)
-from ethoscope.trackers.trackers import BaseTracker, NoPositionError
+from ethoscope.core.variables import HeightVariable
+from ethoscope.core.variables import PhiVariable
+from ethoscope.core.variables import WidthVariable
+from ethoscope.core.variables import XPosVariable
+from ethoscope.core.variables import XYDistance
+from ethoscope.core.variables import YPosVariable
+from ethoscope.trackers.trackers import BaseTracker
+from ethoscope.trackers.trackers import NoPositionError
 
 
 class ObjectModel:

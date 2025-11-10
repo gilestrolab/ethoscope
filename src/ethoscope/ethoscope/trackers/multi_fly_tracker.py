@@ -16,14 +16,13 @@ import numpy as np
 from scipy.spatial import distance
 
 from ethoscope.core.data_point import DataPoint
-from ethoscope.core.variables import (
-    HeightVariable,
-    PhiVariable,
-    WidthVariable,
-    XPosVariable,
-    YPosVariable,
-)
-from ethoscope.trackers.trackers import BaseTracker, NoPositionError
+from ethoscope.core.variables import HeightVariable
+from ethoscope.core.variables import PhiVariable
+from ethoscope.core.variables import WidthVariable
+from ethoscope.core.variables import XPosVariable
+from ethoscope.core.variables import YPosVariable
+from ethoscope.trackers.trackers import BaseTracker
+from ethoscope.trackers.trackers import NoPositionError
 
 
 class ForegroundModel:

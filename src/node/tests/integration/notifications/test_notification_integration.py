@@ -10,9 +10,12 @@ import json
 import os
 import tempfile
 import time
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import pytest
+
 from ethoscope_node.notifications.base import NotificationAnalyzer
 from ethoscope_node.notifications.email import EmailNotificationService
 

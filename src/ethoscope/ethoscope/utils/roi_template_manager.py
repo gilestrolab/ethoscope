@@ -9,9 +9,14 @@ ROI builders to template format.
 import json
 import os
 import warnings
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Union
 
-from ethoscope.roi_builders.template import ROITemplate, ROITemplateValidationError
+from ethoscope.roi_builders.template import ROITemplate
+from ethoscope.roi_builders.template import ROITemplateValidationError
 
 
 class ROITemplateManager:

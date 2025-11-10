@@ -1,4 +1,7 @@
 __author__ = "quentin"
 
 
-from . import debug, description, img_proc, video
+from . import debug
+from . import description
+from . import img_proc
+from . import video

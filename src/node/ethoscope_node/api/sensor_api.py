@@ -7,7 +7,8 @@ Handles sensor management including discovery, configuration, and data visualiza
 import json
 import os
 
-from .base import BaseAPI, error_decorator
+from .base import BaseAPI
+from .base import error_decorator
 
 
 class SensorAPI(BaseAPI):

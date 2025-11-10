@@ -6,10 +6,16 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from functools import wraps
-from threading import RLock, Thread
-from typing import Any, Dict, List, Optional
+from threading import RLock
+from threading import Thread
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
-from zeroconf import IPVersion, ServiceBrowser, Zeroconf
+from zeroconf import IPVersion
+from zeroconf import ServiceBrowser
+from zeroconf import Zeroconf
 
 DEFAULT_TIMEOUT = 5
 MAX_RETRIES = 2

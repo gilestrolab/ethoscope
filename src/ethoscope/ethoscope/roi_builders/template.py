@@ -7,7 +7,10 @@ from external JSON files, replacing hardcoded parameters in ROI builders.
 
 import json
 import os
-from typing import Any, Dict, List, Union
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Union
 
 import numpy as np
 

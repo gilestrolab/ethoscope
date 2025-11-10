@@ -6,12 +6,16 @@ correct timing behavior for both single and multi-stimulator configurations.
 
 import time
 import unittest
-from datetime import datetime, timedelta
-from unittest.mock import Mock, patch
+from datetime import datetime
+from datetime import timedelta
+from unittest.mock import Mock
+from unittest.mock import patch
 
 from ethoscope.stimulators.multi_stimulator import MultiStimulator
-from ethoscope.stimulators.stimulators import DefaultStimulator, HasInteractedVariable
-from ethoscope.utils.scheduler import DateRangeError, Scheduler
+from ethoscope.stimulators.stimulators import DefaultStimulator
+from ethoscope.stimulators.stimulators import HasInteractedVariable
+from ethoscope.utils.scheduler import DateRangeError
+from ethoscope.utils.scheduler import Scheduler
 
 # Optional imports for specific stimulator tests
 try:

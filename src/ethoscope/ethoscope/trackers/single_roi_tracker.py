@@ -13,15 +13,14 @@ except:
 import numpy as np
 
 from ethoscope.core.data_point import DataPoint
-from ethoscope.core.variables import (
-    HeightVariable,
-    PhiVariable,
-    WidthVariable,
-    XPosVariable,
-    YPosVariable,
-)
+from ethoscope.core.variables import HeightVariable
+from ethoscope.core.variables import PhiVariable
+from ethoscope.core.variables import WidthVariable
+from ethoscope.core.variables import XPosVariable
+from ethoscope.core.variables import YPosVariable
 from ethoscope.trackers.adaptive_bg_tracker import BackgroundModel
-from ethoscope.trackers.trackers import BaseTracker, NoPositionError
+from ethoscope.trackers.trackers import BaseTracker
+from ethoscope.trackers.trackers import NoPositionError
 from ethoscope.utils.img_proc import merge_blobs
 
 

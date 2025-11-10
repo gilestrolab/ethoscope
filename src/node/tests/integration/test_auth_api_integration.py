@@ -9,12 +9,16 @@ import json
 import os
 import tempfile
 import time
-from datetime import datetime, timedelta
-from unittest.mock import MagicMock, Mock, patch
+from datetime import datetime
+from datetime import timedelta
+from unittest.mock import MagicMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import bottle
 import pytest
 from bottle import HTTPError
+
 from ethoscope_node.api.auth_api import AuthAPI
 from ethoscope_node.auth.middleware import AuthMiddleware
 from ethoscope_node.utils.etho_db import ExperimentalDB

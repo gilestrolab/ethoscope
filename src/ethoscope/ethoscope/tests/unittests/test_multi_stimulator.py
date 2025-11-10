@@ -1,9 +1,12 @@
 import time
 import unittest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 from ethoscope.stimulators.multi_stimulator import MultiStimulator
-from ethoscope.stimulators.stimulators import DefaultStimulator, HasInteractedVariable
+from ethoscope.stimulators.stimulators import DefaultStimulator
+from ethoscope.stimulators.stimulators import HasInteractedVariable
 
 # Optional imports for specific stimulator tests
 try:

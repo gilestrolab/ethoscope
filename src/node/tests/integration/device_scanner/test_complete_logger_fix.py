@@ -10,7 +10,8 @@ import json
 import logging
 import os
 import sys
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
+from unittest.mock import patch
 
 # Add the src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))

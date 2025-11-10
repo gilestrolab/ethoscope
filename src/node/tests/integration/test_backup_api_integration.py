@@ -16,7 +16,8 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 # Add the source path for imports
 sys.path.insert(

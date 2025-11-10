@@ -11,7 +11,9 @@ import sqlite3
 import tempfile
 import time
 import unittest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import pytest
 
@@ -19,7 +21,8 @@ from ethoscope.core.monitor import Monitor
 from ethoscope.core.roi import ROI
 
 # Import the classes we're testing
-from ethoscope.io import MySQLResultWriter, SQLiteResultWriter
+from ethoscope.io import MySQLResultWriter
+from ethoscope.io import SQLiteResultWriter
 
 
 @pytest.fixture

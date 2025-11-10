@@ -13,7 +13,8 @@ from ethoscope.hardware.interfaces.sleep_depriver_interface import (
 from ethoscope.io import SQLiteResultWriter
 from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
 from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator
-from ethoscope.tests.integration_api_tests._constants import DRAW_FRAMES, VIDEO
+from ethoscope.tests.integration_api_tests._constants import DRAW_FRAMES
+from ethoscope.tests.integration_api_tests._constants import VIDEO
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 
 

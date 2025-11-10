@@ -6,9 +6,12 @@ import time
 import urllib.parse
 import urllib.request
 from threading import RLock
-from typing import Any, Dict
+from typing import Any
+from typing import Dict
 
-from ethoscope_node.scanner.base_scanner import BaseDevice, DeviceScanner, ScanException
+from ethoscope_node.scanner.base_scanner import BaseDevice
+from ethoscope_node.scanner.base_scanner import DeviceScanner
+from ethoscope_node.scanner.base_scanner import ScanException
 
 
 class Sensor(BaseDevice):

@@ -5,9 +5,11 @@ from ethoscope.core.monitor import Monitor
 from ethoscope.drawers.drawers import DefaultDrawer
 from ethoscope.hardware.input.cameras import MovieVirtualCamera
 from ethoscope.hardware.interfaces.interfaces import HardwareConnection
-from ethoscope.io import ResultWriter, SQLiteResultWriter
+from ethoscope.io import ResultWriter
+from ethoscope.io import SQLiteResultWriter
 from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
-from ethoscope.tests.integration_api_tests._constants import DRAW_FRAMES, VIDEO
+from ethoscope.tests.integration_api_tests._constants import DRAW_FRAMES
+from ethoscope.tests.integration_api_tests._constants import VIDEO
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 
 

@@ -1,21 +1,19 @@
 import logging
 import os
 import traceback
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed
 from optparse import OptionParser
 
 import bottle
-from helpers import (
-    WrongMachineID,
-    assert_node,
-    generate_new_device_map,
-    get_commit_version,
-    reload_device_daemon,
-    reload_node_daemon,
-    updates_api_wrapper,
-)
-
 import updater
+from helpers import WrongMachineID
+from helpers import assert_node
+from helpers import generate_new_device_map
+from helpers import get_commit_version
+from helpers import reload_device_daemon
+from helpers import reload_node_daemon
+from helpers import updates_api_wrapper
 
 
 class UnexpectedAction(Exception):

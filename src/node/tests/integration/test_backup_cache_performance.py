@@ -12,19 +12,18 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 # Add the source path for imports
 sys.path.insert(
     0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "ethoscope_node")
 )
 
-from ethoscope_node.backup.helpers import (
-    _enhance_databases_with_rsync_info,
-    _format_bytes_simple,
-    _load_video_cache,
-    _save_video_cache,
-)
+from ethoscope_node.backup.helpers import _enhance_databases_with_rsync_info
+from ethoscope_node.backup.helpers import _format_bytes_simple
+from ethoscope_node.backup.helpers import _load_video_cache
+from ethoscope_node.backup.helpers import _save_video_cache
 
 
 class TestCachePerformanceRealistic(unittest.TestCase):

@@ -11,8 +11,10 @@ from optparse import OptionParser
 
 import bottle
 import netifaces as ni
-from ethoclient import listenerIsAlive, send_command
-from zeroconf import ServiceInfo, Zeroconf
+from ethoclient import listenerIsAlive
+from ethoclient import send_command
+from zeroconf import ServiceInfo
+from zeroconf import Zeroconf
 
 from ethoscope.control.record import ControlThreadVideoRecording
 from ethoscope.control.tracking import ControlThread

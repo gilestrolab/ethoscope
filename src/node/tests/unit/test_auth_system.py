@@ -8,10 +8,14 @@ user verification, session management, and rate limiting.
 import os
 import tempfile
 import time
-from datetime import datetime, timedelta
-from unittest.mock import MagicMock, Mock, patch
+from datetime import datetime
+from datetime import timedelta
+from unittest.mock import MagicMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import pytest
+
 from ethoscope_node.auth.middleware import AuthMiddleware
 from ethoscope_node.auth.session import SessionManager
 from ethoscope_node.utils.etho_db import ExperimentalDB

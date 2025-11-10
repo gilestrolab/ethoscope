@@ -11,17 +11,17 @@ import sqlite3
 import tempfile
 import time
 import unittest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import pytest
 
 # Import the classes we're testing
-from ethoscope.io import (
-    DatabasesInfo,
-    MySQLDatabaseMetadataCache,
-    SQLiteDatabaseMetadataCache,
-    create_metadata_cache,
-)
+from ethoscope.io import DatabasesInfo
+from ethoscope.io import MySQLDatabaseMetadataCache
+from ethoscope.io import SQLiteDatabaseMetadataCache
+from ethoscope.io import create_metadata_cache
 
 
 # Helper functions to wrap DatabasesInfo API for testing

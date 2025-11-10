@@ -6,7 +6,8 @@ Handles database queries for runs and experiments and cached database informatio
 
 import json
 
-from .base import BaseAPI, error_decorator
+from .base import BaseAPI
+from .base import error_decorator
 
 
 class DatabaseAPI(BaseAPI):

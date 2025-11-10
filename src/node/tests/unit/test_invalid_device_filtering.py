@@ -7,10 +7,14 @@ are properly filtered out and do not appear in the device list.
 
 import time
 from threading import Lock
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import pytest
-from ethoscope_node.scanner.ethoscope_scanner import Ethoscope, EthoscopeScanner
+
+from ethoscope_node.scanner.ethoscope_scanner import Ethoscope
+from ethoscope_node.scanner.ethoscope_scanner import EthoscopeScanner
 from ethoscope_node.utils.etho_db import ExperimentalDB
 
 

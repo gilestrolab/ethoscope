@@ -12,8 +12,10 @@ import queue
 import socket
 import struct
 import time
-from threading import RLock, Thread
-from typing import Iterator, Tuple
+from threading import RLock
+from threading import Thread
+from typing import Iterator
+from typing import Tuple
 
 # Import the streaming port constant
 STREAMING_PORT = 8887

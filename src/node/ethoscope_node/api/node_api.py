@@ -11,7 +11,8 @@ import subprocess
 
 import netifaces
 
-from .base import BaseAPI, error_decorator
+from .base import BaseAPI
+from .base import error_decorator
 
 # System daemons configuration
 SYSTEM_DAEMONS = {

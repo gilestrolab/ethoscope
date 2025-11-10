@@ -8,7 +8,8 @@ __author__ = "giorgio"
 import logging
 
 from ethoscope.hardware.interfaces.interfaces import DefaultInterface
-from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVariable
+from ethoscope.stimulators.stimulators import BaseStimulator
+from ethoscope.stimulators.stimulators import HasInteractedVariable
 from ethoscope.utils.scheduler import Scheduler
 
 # Global flag to track if MultiStimulator has been logged before
@@ -95,23 +96,31 @@ class MultiStimulator(BaseStimulator):
             logging.debug(
                 "MultiStimulator with same config already logged, creating instance silently"
             )
+        from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver
         from ethoscope.stimulators.odour_stimulators import (
-            DynamicOdourSleepDepriver,
             MiddleCrossingOdourStimulator,
+        )
+        from ethoscope.stimulators.odour_stimulators import (
             MiddleCrossingOdourStimulatorFlushed,
         )
         from ethoscope.stimulators.optomotor_stimulators import (
             OptoMidlineCrossStimulator,
         )
+        from ethoscope.stimulators.sleep_depriver_stimulators import AGO
         from ethoscope.stimulators.sleep_depriver_stimulators import (
-            AGO,
             ExperimentalSleepDepStimulator,
-            MiddleCrossingStimulator,
-            OptomotorSleepDepriver,
-            OptomotorSleepDepriverSystematic,
-            SleepDepStimulator,
-            mAGO,
         )
+        from ethoscope.stimulators.sleep_depriver_stimulators import (
+            MiddleCrossingStimulator,
+        )
+        from ethoscope.stimulators.sleep_depriver_stimulators import (
+            OptomotorSleepDepriver,
+        )
+        from ethoscope.stimulators.sleep_depriver_stimulators import (
+            OptomotorSleepDepriverSystematic,
+        )
+        from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator
+        from ethoscope.stimulators.sleep_depriver_stimulators import mAGO
         from ethoscope.stimulators.stimulators import DefaultStimulator  # noqa: F811
 
         # Map class names to actual classes

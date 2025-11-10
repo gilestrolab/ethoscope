@@ -7,11 +7,16 @@ scenarios, particularly when ETHOSCOPE_000 devices are renamed to proper names.
 
 import time
 from threading import Lock
-from unittest.mock import MagicMock, Mock, call, patch
+from unittest.mock import MagicMock
+from unittest.mock import Mock
+from unittest.mock import call
+from unittest.mock import patch
 
 import pytest
+
 from ethoscope_node.scanner.base_scanner import ScanException
-from ethoscope_node.scanner.ethoscope_scanner import Ethoscope, EthoscopeScanner
+from ethoscope_node.scanner.ethoscope_scanner import Ethoscope
+from ethoscope_node.scanner.ethoscope_scanner import EthoscopeScanner
 from ethoscope_node.utils.etho_db import ExperimentalDB
 
 

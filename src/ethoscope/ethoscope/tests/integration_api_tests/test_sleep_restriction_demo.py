@@ -17,9 +17,10 @@ sys.path.insert(0, "src/ethoscope")
 
 from ethoscope.stimulators.sleep_restriction_stimulators import (
     SimpleTimeRestrictedStimulator,
-    mAGOSleepRestriction,
 )
-from ethoscope.utils.scheduler import DailyScheduleError, DailyScheduler
+from ethoscope.stimulators.sleep_restriction_stimulators import mAGOSleepRestriction
+from ethoscope.utils.scheduler import DailyScheduleError
+from ethoscope.utils.scheduler import DailyScheduler
 
 
 def demo_daily_scheduler():

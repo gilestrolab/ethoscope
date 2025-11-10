@@ -2,9 +2,12 @@ import logging
 import os
 import subprocess
 import traceback
-from typing import Dict, Tuple
+from typing import Dict
+from typing import Tuple
 
-from git import GitCommandError, Remote, Repo
+from git import GitCommandError
+from git import Remote
+from git import Repo
 
 
 class DeviceUpdateError(Exception):

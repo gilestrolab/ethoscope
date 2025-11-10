@@ -5,7 +5,8 @@ Tests specifically for the boundary validation and size compatibility fixes
 to prevent OpenCV size mismatch crashes.
 """
 
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
+from unittest.mock import patch
 
 import cv2
 import numpy as np
