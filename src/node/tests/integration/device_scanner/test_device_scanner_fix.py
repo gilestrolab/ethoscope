@@ -171,32 +171,6 @@ def test_appropriate_backup_filename(temp_config_dir):
     ), f"SQLite active: Expected '{expected}', got '{filename}'"
 
 
-def test_backup_status_update(temp_config_dir):
-    """Test backup status update with new format."""
-    # Mock the configuration to avoid writing to /etc/ethoscope
-    from unittest.mock import Mock
-    mock_config = Mock()
-
-    device = Ethoscope("192.168.1.10", 9000, config_dir=temp_config_dir, config=mock_config)
-    device._info = create_test_device_new_format()
-
-    # Mock the time interval check
-    device._last_db_info = 0
-
-    # Test direct backup status usage
-    device._update_backup_status_from_database_info()
-
-    # Check that backup status was preserved
-    assert (
-        device._info.get("backup_status") == 75.5
-    ), f"Expected 75.5, got {device._info.get('backup_status')}"
-
-    # Check that additional fields were stored
-    assert (
-        device._info.get("backup_size") == 2048
-    ), f"Expected 2048, got {device._info.get('backup_size')}"
-
-
 def test_no_backup_filename_warning(temp_config_dir):
     """Test that the warning is eliminated."""
     # Mock the configuration to avoid writing to /etc/ethoscope

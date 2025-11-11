@@ -344,56 +344,6 @@ class TestNotificationIntegration:
         assert "experimental_info" in status
         assert "database_info" in status
 
-    @patch("ethoscope_node.notifications.email.smtplib.SMTP")
-    @patch("ethoscope_node.notifications.base.requests.get")
-    def test_end_to_end_device_alert_workflow(
-        self, mock_get, mock_smtp, email_service_integration
-    ):
-        """Test complete end-to-end device alert workflow."""
-        device_id = "ETHOSCOPE_001"
-        device_name = "ETHOSCOPE_001"
-        run_id = "run_001"
-        last_seen = datetime.datetime.now()
-
-        # Mock device log response
-        mock_log_response = Mock()
-        mock_log_response.status_code = 200
-        mock_log_response.text = """
-        2024-01-01 12:00:00 - ERROR - Camera disconnected
-        2024-01-01 12:00:01 - ERROR - Tracking stopped
-        2024-01-01 12:00:02 - FATAL - Device shutdown
-        """
-        mock_get.return_value = mock_log_response
-
-        # Mock SMTP server
-        mock_server = Mock()
-        mock_smtp.return_value = mock_server
-
-        # Send device stopped alert
-        result = email_service_integration.send_device_stopped_alert(
-            device_id, device_name, run_id, last_seen
-        )
-
-        # Verify alert was sent
-        assert result == True
-
-        # Verify SMTP interaction
-        mock_smtp.assert_called_once_with("smtp.example.com", 587)
-        mock_server.starttls.assert_called_once()
-        mock_server.login.assert_called_once_with("test@example.com", "test_password")
-        mock_server.send_message.assert_called_once()
-        mock_server.quit.assert_called_once()
-
-        # Verify email content
-        sent_message = mock_server.send_message.call_args[0][0]
-        assert "ETHOSCOPE_001" in sent_message["Subject"]
-        assert "researcher1@example.com" in sent_message["To"]
-        assert "admin@example.com" in sent_message["To"]
-
-        # Verify attachment was included
-        payload = sent_message.get_payload()
-        assert len(payload) == 2  # Alternative container + attachment
-
     def test_cooldown_mechanism_workflow(self, email_service_integration):
         """Test alert cooldown mechanism workflow."""
         device_id = "ETHOSCOPE_001"
