@@ -104,7 +104,7 @@ class SensorDataHelper:
             self._last_tick = tick
             return cmd, None
 
-        except:
+        except Exception:
             logging.error("The sensor data are not available")
             self._last_tick = tick
             return
@@ -208,7 +208,7 @@ class ImgSnapshotHelper:
         """Cleanup temporary file on object destruction."""
         try:
             os.remove(self._tmp_file)
-        except:
+        except Exception:
             logging.error(f"Could not remove temp file: {self._tmp_file}")
 
     def flush(self, t, img):
@@ -282,7 +282,7 @@ class DAMFileHelper:
             "time CHAR(100)",
         ]
         for r in range(1, self._n_rois + 1):
-            fields.append("ROI_%d SMALLINT" % r)
+            fields.append(f"ROI_{r} SMALLINT")
         fields = ",".join(fields)
         return fields
 
@@ -540,7 +540,7 @@ class RawDataWriter:
         self.entities = entities
         self.files = [
             NpyAppendableFile(
-                os.path.join("%s_%03d" % (self._basename, n_rois) + ".anpy"),
+                os.path.join(f"{self._basename}_{n_rois:03d}.anpy"),
                 newfile=True,
             )
             for r in range(n_rois)

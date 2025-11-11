@@ -464,11 +464,11 @@ class BareRepoUpdater:
             raise BranchUpdateError(
                 f"Failed to add safe.directory: {e.stderr.strip()}"
             ) from e
-        except FileNotFoundError:
+        except FileNotFoundError as e:
             logging.error("Git is not installed or not found in the system PATH.")
             raise BranchUpdateError(
                 "Git is not installed or not found in the system PATH."
-            )
+            ) from e
         except Exception as e:
             logging.error(
                 f"An unexpected error occurred while adding safe.directory: {e}"

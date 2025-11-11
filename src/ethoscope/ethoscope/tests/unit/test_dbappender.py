@@ -20,14 +20,14 @@ from unittest.mock import patch
 logging.basicConfig(level=logging.INFO)
 
 # Mock imports to avoid hardware dependencies during testing
-import sys
+import sys  # noqa: E402
 
 sys.path.insert(0, "/home/gg/Data/ethoscope_project/ethoscope/src/ethoscope")
 
 # Import the actual classes we're testing
-from ethoscope.io import MySQLResultWriter
-from ethoscope.io import SQLiteResultWriter
-from ethoscope.io import dbAppender
+from ethoscope.io import MySQLResultWriter  # noqa: E402
+from ethoscope.io import SQLiteResultWriter  # noqa: E402
+from ethoscope.io import dbAppender  # noqa: E402
 
 
 class TestDbAppender(unittest.TestCase):

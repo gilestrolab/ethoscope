@@ -69,7 +69,7 @@ class TestAPI(unittest.TestCase):
             print("Making a tmp db: " + tmp)
             with SQLiteResultWriter(tmp, rois) as rw:
                 mon.run(result_writer=rw, drawer=drawer)
-        except:
+        except Exception:
             self.fail("testAPI raised ExceptionType unexpectedly!")
         finally:
             hc.stop()

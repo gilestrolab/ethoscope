@@ -393,7 +393,7 @@ class SessionManager:
 
             # Fall back to REMOTE_ADDR
             return bottle.request.environ.get("REMOTE_ADDR", "unknown")
-        except:
+        except Exception:
             return "unknown"
 
     def _update_session_access(self, session_token: str, current_time: float):

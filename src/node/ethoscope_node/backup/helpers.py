@@ -219,7 +219,7 @@ def backup_file_lock(backup_path: str):
         try:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError as e:
-            raise BackupLockError(f"Cannot acquire lock for {backup_path}: {e}")
+            raise BackupLockError(f"Cannot acquire lock for {backup_path}: {e}") from e
 
         # Write process info to lock file
         lock_file.write(f"PID: {os.getpid()}\nTimestamp: {datetime.datetime.now()}\n")
@@ -506,7 +506,7 @@ class BackupClass(BaseBackupClass):
             self._logger.error(
                 f"[{self._device_id}] Error getting MariaDB backup path: {e}"
             )
-            raise BackupError(f"Failed to get MariaDB backup path: {e}")
+            raise BackupError(f"Failed to get MariaDB backup path: {e}") from e
 
     def _get_backup_path(self) -> str:
         """Get and validate backup path (legacy method - use _get_mariadb_backup_path instead)."""
@@ -580,7 +580,7 @@ class BackupClass(BaseBackupClass):
             backup_stats["error"] = str(e)
             self._logger.error(f"[{self._device_id}] Database backup failed: {e}")
             self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
-            raise BackupError(f"Database backup failed: {e}")
+            raise BackupError(f"Database backup failed: {e}") from e
 
     def _check_data_duplication(self, backup_path: str) -> bool:
         """

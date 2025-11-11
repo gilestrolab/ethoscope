@@ -124,7 +124,7 @@ class Scheduler:
                 datetime.datetime.strptime(datestr, "%Y-%m-%d %H:%M:%S").timetuple()
             )
         except (ValueError, OverflowError) as e:
-            raise DateRangeError(f"Invalid date format: {datestr} ({str(e)})")
+            raise DateRangeError(f"Invalid date format: {datestr} ({str(e)})") from e
 
 
 class DailyScheduler:
@@ -197,10 +197,10 @@ class DailyScheduler:
         try:
             time_obj = datetime.time.fromisoformat(time_str)
             return time_obj.hour * 3600 + time_obj.minute * 60 + time_obj.second
-        except ValueError:
+        except ValueError as e:
             raise DailyScheduleError(
                 f"Invalid time format: {time_str}. Expected HH:MM:SS"
-            )
+            ) from e
 
     def _load_state(self):
         """Load scheduler state from file."""

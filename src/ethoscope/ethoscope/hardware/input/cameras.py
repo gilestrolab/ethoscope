@@ -1,4 +1,5 @@
 import gc
+import importlib.util
 import logging
 import os
 import queue
@@ -26,25 +27,20 @@ except ImportError:
 from ethoscope.utils import pi
 from ethoscope.utils.debug import EthoscopeException
 
-try:
-    import picamera2
-
+# Check for picamera2 availability
+if importlib.util.find_spec("picamera2") is not None:
     USE_PICAMERA2 = True
     CAMERA_AVAILABLE = True
-except (ImportError, OSError) as e:
-    logging.warning(f"Failed to import picamera2: {e}")
-    try:
-        import picamera
-
-        USE_PICAMERA2 = False
-        CAMERA_AVAILABLE = True
-        logging.info("Using picamera instead of picamera2")
-    except (ImportError, OSError) as e:
-        USE_PICAMERA2 = None  # None or some other value to indicate both imports failed
-        CAMERA_AVAILABLE = False
-        logging.warning(
-            f"No camera library available (picamera also failed: {e}). Camera functionality will be disabled."
-        )
+elif importlib.util.find_spec("picamera") is not None:
+    USE_PICAMERA2 = False
+    CAMERA_AVAILABLE = True
+    logging.info("Using picamera instead of picamera2")
+else:
+    USE_PICAMERA2 = None
+    CAMERA_AVAILABLE = False
+    logging.warning(
+        "No camera library available (neither picamera2 nor picamera found). Camera functionality will be disabled."
+    )
 
 
 class BaseCamera:
@@ -489,13 +485,8 @@ class PiFrameGrabber(threading.Thread):
         self._file_index += 1
         fps = fps or 0
         w, h = self._target_resolution
-        video_info = "%ix%i@%ifps-%iq" % (w, h, fps, self.video_quality)
-        chunk_file_name = "%s_%s_%05d.%s" % (
-            self._video_prefix,
-            video_info,
-            self._file_index,
-            ext,
-        )
+        video_info = f"{w}x{h}@{fps}fps-{self.video_quality}q"
+        chunk_file_name = f"{self._video_prefix}_{video_info}_{self._file_index:05d}.{ext}"
         self._last_computed_filename = chunk_file_name
         return chunk_file_name
 
@@ -981,8 +972,8 @@ class OurPiCameraAsync(BaseCamera):
                     target_resolution,
                     self._queue,
                     self._stop_queue,
-                    video_prefix=video_prefix,
                     *args,
+                    video_prefix=video_prefix,
                     **kwargs,
                 )
 
@@ -1017,7 +1008,7 @@ class OurPiCameraAsync(BaseCamera):
                     logging.info("Successfully received first frame from camera")
                     break  # Success - exit retry loop
 
-                except queue.Empty:
+                except queue.Empty as e:
                     logging.error(
                         "Timeout waiting for first frame from camera (30 seconds expired)"
                     )
@@ -1029,7 +1020,7 @@ class OurPiCameraAsync(BaseCamera):
                     ):
                         raise EthoscopeException(
                             "Camera initialization timeout: No frames received within 30 seconds. This may indicate a camera hardware issue or picamera2 compatibility problem."
-                        )
+                        ) from e
                     continue  # Try again
 
             except Exception as e:
@@ -1159,10 +1150,10 @@ class OurPiCameraAsync(BaseCamera):
         try:
             return self._queue.get(timeout=30)
 
-        except Exception:
+        except Exception as e:
             raise EthoscopeException(
                 "Could not get frame from camera\n%s", traceback.format_exc()
-            )
+            ) from e
 
 
 if __name__ == "__main__":

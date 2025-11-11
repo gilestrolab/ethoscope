@@ -749,7 +749,7 @@ Ethoscope Node Setup Wizard
                 if server:
                     try:
                         server.quit()
-                    except:
+                    except Exception:
                         pass  # Ignore quit errors
 
             return {

@@ -293,7 +293,7 @@ class ROITemplateManager:
                 ROITemplate(template_data)
             return True
         except Exception as e:
-            raise ROITemplateValidationError(f"Template validation failed: {e}")
+            raise ROITemplateValidationError(f"Template validation failed: {e}") from e
 
     def save_template(
         self, name: str, template_data: Dict[str, Any], template_type: str = "custom"

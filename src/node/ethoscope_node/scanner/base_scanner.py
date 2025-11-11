@@ -489,16 +489,16 @@ class BaseDevice(Thread):
                 try:
                     return json.loads(message)
                 except json.JSONDecodeError as e:
-                    raise ScanException(f"Invalid JSON from {url}: {e}")
+                    raise ScanException(f"Invalid JSON from {url}: {e}") from e
 
         except urllib.error.HTTPError as e:
-            raise NetworkError(f"HTTP {e.code} error from {url}")
+            raise NetworkError(f"HTTP {e.code} error from {url}") from e
         except urllib.error.URLError as e:
-            raise NetworkError(f"URL error from {url}: {e.reason}")
-        except socket.timeout:
-            raise NetworkError(f"Timeout connecting to {url}")
+            raise NetworkError(f"URL error from {url}: {e.reason}") from e
+        except socket.timeout as e:
+            raise NetworkError(f"Timeout connecting to {url}") from e
         except Exception as e:
-            raise ScanException(f"Unexpected error from {url}: {e}")
+            raise ScanException(f"Unexpected error from {url}: {e}") from e
 
     def run(self):
         """Main device monitoring loop"""
@@ -630,7 +630,7 @@ class BaseDevice(Thread):
         except ScanException:
             raise
         except Exception as e:
-            raise ScanException(f"Failed to update device ID: {e}")
+            raise ScanException(f"Failed to update device ID: {e}") from e
 
     def _update_device_status(
         self,

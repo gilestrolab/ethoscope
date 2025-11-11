@@ -47,9 +47,9 @@ class LynxMotionInterface(SimpleSerialInterface):
         min_a, min_p = self._min_angle_pulse
         max_a, max_p = self._max_angle_pulse
         if angle > max_a:
-            raise Exception("Angle too wide: %i" % angle)
+            raise Exception(f"Angle too wide: {angle}")
         if angle < min_a:
-            raise Exception("Angle too narrow: %i" % angle)
+            raise Exception(f"Angle too narrow: {angle}")
         slope = (max_p - min_p) / (max_a - min_a)
         pulse = min_p + (angle - min_a) * slope
         return pulse
@@ -109,8 +109,7 @@ class LynxMotionInterface(SimpleSerialInterface):
 
         if speed < min_speed or speed > max_speed:
             raise Exception(
-                "Speed value not valid: must be between %i and %i"
-                % (min_speed, max_speed)
+                f"Speed value not valid: must be between {min_speed} and {max_speed}"
             )
 
         pulse = (speed / 100.0) * (max_pulse - mid_pulse) + mid_pulse

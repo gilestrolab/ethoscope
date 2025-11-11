@@ -2,7 +2,7 @@ __author__ = "quentin"
 
 from collections import deque
 
-from ethoscope.core.variables import *
+from ethoscope.core.variables import IsInferredVariable
 from ethoscope.utils.description import DescribedObject
 
 

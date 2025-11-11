@@ -160,7 +160,7 @@ class NotificationAnalyzer:
                     import json
 
                     experimental_data = json.loads(experimental_data)
-                except:
+                except Exception:
                     experimental_data = {}
 
             return {

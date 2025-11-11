@@ -2,7 +2,7 @@ import cv2
 
 try:
     CV_VERSION = int(cv2.__version__.split(".")[0])
-except:
+except Exception:
     CV_VERSION = 2
 
 try:

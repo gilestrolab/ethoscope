@@ -5,7 +5,7 @@ from ethoscope.utils.debug import EthoscopeException
 
 try:
     CV_VERSION = int(cv2.__version__.split(".")[0])
-except:
+except Exception:
     CV_VERSION = 2
 
 __author__ = "quentin"
@@ -182,7 +182,7 @@ class ROI:
             raise EthoscopeException(
                 f"Error whilst slicing region of interest {str(self.get_feature_dict())}: {str(e)}",
                 img,
-            )
+            ) from e
 
         # Ensure output dimensions match expected clamped dimensions
         if out.shape[0:2] != (h_clamped, w_clamped):

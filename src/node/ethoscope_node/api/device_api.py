@@ -302,6 +302,7 @@ class DeviceAPI(BaseAPI):
         """Force backup on device with specified id."""
         from ethoscope_node.backup.helpers import BackupClass
 
+        device = self.validate_device_exists(id)
         device_info = device.info().copy()
 
         try:

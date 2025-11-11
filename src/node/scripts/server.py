@@ -77,8 +77,8 @@ class CherootServer(bottle.ServerAdapter):
             except ImportError:
                 # cheroot < 6.0.0
                 pass
-        except ImportError:
-            raise ImportError("Cheroot server requires 'cheroot' package")
+        except ImportError as e:
+            raise ImportError("Cheroot server requires 'cheroot' package") from e
 
         # Only use supported parameters
         server_options = {

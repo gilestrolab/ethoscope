@@ -259,7 +259,7 @@ class DefaultDrawer(BaseDrawer):
                     markerType=cv2.MARKER_CROSS,
                     thickness=2,
                 )
-        except:
+        except Exception:
             # noreferencepoints
             pass
 
@@ -397,12 +397,12 @@ class DefaultDrawer(BaseDrawer):
                 # Use our enhanced error drawing method
                 try:
                     self._draw_stimulator_indicator(img, track_u.roi, "error")
-                except:
+                except Exception:
                     # Last resort - simple red dot
                     try:
                         x, y = track_u.roi.offset
                         cv2.circle(img, (int(x + 25), int(y + 25)), 5, (0, 0, 255), -1)
-                    except:
+                    except Exception:
                         pass
             # cv2.drawContours(img,track_u.roi.regions, -1, sub_roi_colour, 1, LINE_AA)
             try:

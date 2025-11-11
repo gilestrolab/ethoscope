@@ -501,7 +501,7 @@ class BaseDatabaseMetadataCache:
                                 ),
                                 "cache_file": cache_file_path,
                             }
-                except:
+                except Exception:
                     continue  # Try next cache file
 
         except Exception as e:
@@ -559,7 +559,7 @@ class BaseDatabaseMetadataCache:
                         experiments.append(experiment_data)
                 else:
                     break  # No more cache files
-            except:
+            except Exception:
                 break  # Error reading cache file
 
         return experiments

@@ -34,7 +34,17 @@ from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver
 from ethoscope.stimulators.odour_stimulators import MiddleCrossingOdourStimulator
 from ethoscope.stimulators.odour_stimulators import MiddleCrossingOdourStimulatorFlushed
 from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulator
-from ethoscope.stimulators.sleep_depriver_stimulators import *  # importing all stimulators - remember to add the allowed ones to line 84
+from ethoscope.stimulators.sleep_depriver_stimulators import AGO
+from ethoscope.stimulators.sleep_depriver_stimulators import (
+    ExperimentalSleepDepStimulator,
+)
+from ethoscope.stimulators.sleep_depriver_stimulators import MiddleCrossingStimulator
+from ethoscope.stimulators.sleep_depriver_stimulators import OptomotorSleepDepriver
+from ethoscope.stimulators.sleep_depriver_stimulators import (
+    OptomotorSleepDepriverSystematic,
+)
+from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator
+from ethoscope.stimulators.sleep_depriver_stimulators import mAGO
 from ethoscope.stimulators.sleep_restriction_stimulators import (
     SimpleTimeRestrictedStimulator,
 )
@@ -658,10 +668,10 @@ class ControlThread(Thread):
             camera,
             TrackerClass,
             rois,
+            *self._monit_args,
             reference_points=reference_points,
             stimulators=stimulators,
             time_offset=time_offset,
-            *self._monit_args,
         )
 
         self._info["status"] = "running"
@@ -756,7 +766,7 @@ class ControlThread(Thread):
                 logging.error("Cannot start tracking: No camera hardware detected")
                 raise EthoscopeException(
                     "Tracking disabled: No camera hardware available. This ethoscope cannot perform video tracking or recording without camera hardware."
-                )
+                ) from e
             else:
                 raise e
 
@@ -1312,13 +1322,13 @@ class ControlThread(Thread):
                 if cam is not None:
                     cam._close()
 
-            except:
+            except Exception:
                 logging.warning("Could not close camera properly")
                 pass
             try:
                 if hardware_connection is not None:
                     hardware_connection.stop()
-            except:
+            except Exception:
                 logging.warning("Could not close hardware connection properly")
                 pass
 
@@ -1346,7 +1356,7 @@ class ControlThread(Thread):
 
                 if self._auto_SQL_backup_at_stop:
                     logging.info("Performing a SQL dump of the database.")
-                    t = Thread(target=SQL_dump)
+                    t = Thread(target=pi.SQL_dump)
                     t.start()
 
             self._info["status"] = "stopped"

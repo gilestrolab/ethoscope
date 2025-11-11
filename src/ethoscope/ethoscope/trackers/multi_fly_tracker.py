@@ -166,7 +166,7 @@ class MultiFlyTracker(BaseTracker):
             self._fg_model = ForegroundModel(
                 fg_data=data["fg_data"], visualise=self._visualise
             )
-        except:
+        except Exception:
             # we roll to the default values
             self._fg_model = ForegroundModel()
 
@@ -331,9 +331,9 @@ class MultiFlyTracker(BaseTracker):
         grey = self._pre_process_input_minimal(img, mask, t)
         try:
             return self._track(img, grey, mask, t)
-        except NoPositionError:
+        except NoPositionError as e:
             self._bg_model.update(grey, t)
-            raise NoPositionError
+            raise NoPositionError from e
 
     def _track(self, img, grey, mask, t):
         """

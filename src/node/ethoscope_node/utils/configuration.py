@@ -90,7 +90,7 @@ def migrate_conf_file(file_path: str, destination: str = "/etc/ethoscope") -> bo
         return True
 
     except Exception as e:
-        raise ConfigurationError(f"Failed to migrate configuration file: {e}")
+        raise ConfigurationError(f"Failed to migrate configuration file: {e}") from e
 
 
 class EthoscopeConfiguration:
@@ -361,7 +361,7 @@ class EthoscopeConfiguration:
         except Exception as e:
             raise ConfigurationError(
                 f"Failed to write configuration file {self._config_file}: {e}"
-            )
+            ) from e
 
     def load(self) -> Dict[str, Any]:
         """
@@ -391,7 +391,7 @@ class EthoscopeConfiguration:
                 try:
                     loaded_config = json.loads(content)
                 except json.JSONDecodeError as e:
-                    raise ConfigurationError(f"Invalid JSON in configuration file: {e}")
+                    raise ConfigurationError(f"Invalid JSON in configuration file: {e}") from e
 
             # Merge with defaults first to ensure all sections are present
             self._settings = self._merge_with_defaults(loaded_config)
@@ -413,7 +413,7 @@ class EthoscopeConfiguration:
             else:
                 raise ConfigurationError(
                     f"Failed to load configuration file {self._config_file}: {e}"
-                )
+                ) from e
 
     def add_section(self, section: str) -> None:
         """
@@ -522,7 +522,7 @@ class EthoscopeConfiguration:
         except Exception as e:
             error_msg = f"Failed to add user '{name}': {e}"
             self._logger.error(error_msg)
-            raise ValueError(error_msg)
+            raise ValueError(error_msg) from e
 
     def add_incubator(self, incubatordata: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -577,7 +577,7 @@ class EthoscopeConfiguration:
         except Exception as e:
             error_msg = f"Failed to add incubator '{name}': {e}"
             self._logger.error(error_msg)
-            raise ValueError(error_msg)
+            raise ValueError(error_msg) from e
 
     def add_sensor(self, sensordata: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -611,7 +611,7 @@ class EthoscopeConfiguration:
         except Exception as e:
             error_msg = f"Failed to add sensor '{name}': {e}"
             self._logger.error(error_msg)
-            raise ValueError(error_msg)
+            raise ValueError(error_msg) from e
 
     def get_custom(self, name: Optional[str] = None) -> Any:
         """
@@ -1105,7 +1105,7 @@ class EthoscopeConfiguration:
         except Exception as e:
             error_msg = f"PIN migration failed: {e}"
             self._logger.error(error_msg)
-            raise ConfigurationError(error_msg)
+            raise ConfigurationError(error_msg) from e
 
 
 def _setup_system_ssh_config(private_key_path: str) -> None:
@@ -1260,17 +1260,17 @@ def ensure_ssh_keys(keys_dir: str = "/etc/ethoscope/keys") -> Tuple[str, str]:
     except subprocess.CalledProcessError as e:
         error_msg = f"Failed to generate SSH keys: {e.stderr}"
         logger.error(error_msg)
-        raise ConfigurationError(error_msg)
+        raise ConfigurationError(error_msg) from e
 
     except PermissionError as e:
         error_msg = f"Permission denied creating SSH keys in {keys_dir}: {e}"
         logger.error(error_msg)
-        raise ConfigurationError(error_msg)
+        raise ConfigurationError(error_msg) from e
 
     except Exception as e:
         error_msg = f"Unexpected error ensuring SSH keys: {e}"
         logger.error(error_msg)
-        raise ConfigurationError(error_msg)
+        raise ConfigurationError(error_msg) from e
 
 
 def main():

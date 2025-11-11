@@ -16,6 +16,7 @@ from typing import Union
 
 from ethoscope_node.notifications.manager import NotificationManager
 from ethoscope_node.scanner.base_scanner import BaseDevice
+from ethoscope_node.scanner.base_scanner import DeviceError
 from ethoscope_node.scanner.base_scanner import DeviceScanner
 from ethoscope_node.scanner.base_scanner import DeviceStatus
 from ethoscope_node.scanner.base_scanner import ScanException
@@ -162,13 +163,13 @@ class Ethoscope(BaseDevice):
         post_url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['controls']}/{self._id}/{instruction}"
         try:
             self._get_json(post_url, timeout=3, post_data=json_data)
-        except ScanException:
+        except ScanException as e:
             if instruction in ["poweroff", "reboot", "restart"]:
                 pass  # Expected for power operations
             else:
                 raise DeviceError(
                     "Cannot send '{instruction}' to device in status '{current_status}'"
-                )
+                ) from e
 
         self._update_info()
 

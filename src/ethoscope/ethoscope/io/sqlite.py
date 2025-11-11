@@ -60,7 +60,7 @@ class AsyncSQLiteWriter(BaseAsyncSQLWriter):
         except sqlite3.Error as e:
             raise Exception(
                 f"Failed to connect to SQLite database {self._db_name}: {e}"
-            )
+            ) from e
 
     # Implementation of abstract methods from BaseAsyncSQLWriter
     def _initialize_database(self):
@@ -68,7 +68,7 @@ class AsyncSQLiteWriter(BaseAsyncSQLWriter):
         if self._erase_old_db:
             try:
                 os.remove(self._db_name)
-            except:
+            except Exception:
                 pass
 
             # Ensure directory exists before creating database connection
@@ -374,7 +374,7 @@ class SQLiteResultWriter(BaseResultWriter):
                 sqlite_type = "TEXT"  # Default fallback
             fields.append(f"{dt.header_name} {sqlite_type}")
         fields = ", ".join(fields)
-        table_name = "ROI_%i" % roi.idx
+        table_name = f"ROI_{roi.idx}"
         self._create_table(table_name, fields, engine=None)
 
     def _add(self, t, roi, data_rows):

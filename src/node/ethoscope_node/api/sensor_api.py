@@ -39,7 +39,7 @@ class SensorAPI(BaseAPI):
             # Fallback for malformed JSON - but this is risky
             try:
                 data = eval(input_string)  # This should eventually be removed
-            except:
+            except Exception:
                 return {"error": "Invalid data format"}
 
         if self.sensor_scanner:

@@ -9,7 +9,7 @@ import cv2
 
 try:
     CV_VERSION = int(cv2.__version__.split(".")[0])
-except:
+except Exception:
     CV_VERSION = 2
 
 
@@ -440,8 +440,8 @@ class AdaptiveBGModel(BaseTracker):
 
         try:
             scale = 128.0 / mean[0]
-        except ZeroDivisionError:
-            raise NoPositionError
+        except ZeroDivisionError as e:
+            raise NoPositionError from e
 
         cv2.multiply(buff_img, scale, dst=buff_img)
         cv2.bitwise_and(buff_img, mask, buff_img)
@@ -460,9 +460,9 @@ class AdaptiveBGModel(BaseTracker):
         try:
             return self._track(img, pre_processed_image, mask, t)
 
-        except NoPositionError:
+        except NoPositionError as e:
             self._bg_model.update(pre_processed_image, t)
-            raise NoPositionError
+            raise NoPositionError from e
 
     def _track(self, img, grey, mask, t):
         """

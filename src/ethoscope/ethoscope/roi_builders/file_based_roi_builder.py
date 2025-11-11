@@ -108,7 +108,7 @@ class FileBasedROIBuilder(BaseROIBuilder):
                 self.template = manager.load_template(self.template_name)
 
         except Exception as e:
-            raise ROITemplateValidationError(f"Failed to load ROI template: {str(e)}")
+            raise ROITemplateValidationError(f"Failed to load ROI template: {str(e)}") from e
 
     def build(self, camera):
         """
@@ -147,7 +147,7 @@ class FileBasedROIBuilder(BaseROIBuilder):
         except Exception as e:
             raise ROITemplateValidationError(
                 f"Failed to generate ROIs from template: {str(e)}"
-            )
+            ) from e
 
     def _generate_basic_reference_points(self, camera):
         """Generate basic reference points as fallback when target detection is not available."""

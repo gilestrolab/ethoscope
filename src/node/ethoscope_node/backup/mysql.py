@@ -349,16 +349,16 @@ def get_backup_path_from_database(host, ethoscope_number=None):
             raise ValueError(f"No backup_filename found in METADATA table on {host}")
 
     except mysql.connector.Error as e:
-        raise ConnectionError(f"Failed to connect to database on {host}: {e}")
+        raise ConnectionError(f"Failed to connect to database on {host}: {e}") from e
     except Exception as e:
-        raise RuntimeError(f"Error querying METADATA table on {host}: {e}")
+        raise RuntimeError(f"Error querying METADATA table on {host}: {e}") from e
     finally:
         try:
             if "cursor" in locals():
                 cursor.close()
             if "connection" in locals():
                 connection.close()
-        except:
+        except Exception:
             pass
 
 
@@ -721,7 +721,7 @@ class MySQLdbToSQLite(BaseSQLConnector):
                     logging.info(
                         f"Restored {table_name} from backup after migration failure"
                     )
-            except:
+            except Exception:
                 pass
             return False
 

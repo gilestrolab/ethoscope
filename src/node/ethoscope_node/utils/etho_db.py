@@ -1623,7 +1623,7 @@ class ExperimentalDB(multiprocessing.Process):
                             last_seen_dt = datetime.datetime.fromtimestamp(
                                 float(last_seen)
                             )
-                        except:
+                        except Exception:
                             # If all parsing fails, consider it for retirement
                             devices_to_retire.append(ethoscope_id)
                             continue
@@ -1724,10 +1724,10 @@ class ExperimentalDB(multiprocessing.Process):
                                     datetime.datetime.fromtimestamp(
                                         float(timestamp_field)
                                     )
-                                except:
+                                except Exception:
                                     should_purge = True
                                     break
-                        except:
+                        except Exception:
                             should_purge = True
                             break
 
@@ -1801,7 +1801,7 @@ class ExperimentalDB(multiprocessing.Process):
                             last_seen_dt = datetime.datetime.fromtimestamp(
                                 float(last_seen)
                             )
-                        except:
+                        except Exception:
                             # If all parsing fails, consider it for cleanup
                             devices_to_cleanup.append(ethoscope_id)
                             continue
@@ -1894,7 +1894,7 @@ class ExperimentalDB(multiprocessing.Process):
                             last_seen_dt = datetime.datetime.fromtimestamp(
                                 float(last_seen)
                             )
-                        except:
+                        except Exception:
                             # If all parsing fails, consider it for cleanup
                             devices_to_cleanup.append(
                                 (ethoscope_id, ethoscope_name, status)
@@ -2113,23 +2113,15 @@ class ExperimentalDB(multiprocessing.Process):
             # Escape single quotes in reason string for SQL
             escaped_reason = reason.replace("'", "''")
 
-            sql_cleanup = """
-                UPDATE %s
-                SET status = 'stopped', end_time = '%s',
+            sql_cleanup = f"""
+                UPDATE {self._runs_table_name}
+                SET status = 'stopped', end_time = '{current_time}',
                     problems = CASE
-                        WHEN problems IS NULL OR problems = '' THEN 'Orphaned session cleanup (age: %d days) - %s'
-                        ELSE problems || '; Orphaned session cleanup (age: %d days) - %s'
+                        WHEN problems IS NULL OR problems = '' THEN 'Orphaned session cleanup (age: {age_days} days) - {escaped_reason}'
+                        ELSE problems || '; Orphaned session cleanup (age: {age_days} days) - {escaped_reason}'
                     END
-                WHERE run_id = '%s'
-            """ % (
-                self._runs_table_name,
-                current_time,
-                age_days,
-                escaped_reason,
-                age_days,
-                escaped_reason,
-                run_id,
-            )
+                WHERE run_id = '{run_id}'
+            """
 
             result = self.executeSQL(sql_cleanup)
             if result != -1:
@@ -2177,7 +2169,7 @@ class ExperimentalDB(multiprocessing.Process):
                 # Try parsing as timestamp
                 try:
                     return datetime.datetime.fromtimestamp(float(start_time))
-                except:
+                except Exception:
                     pass
             elif isinstance(start_time, (int, float)):
                 return datetime.datetime.fromtimestamp(float(start_time))
@@ -2449,7 +2441,7 @@ class simpleDB:
             with open(self._db_file, "wb") as file:
                 pickle.dump(self._db, file, pickle.HIGHEST_PROTOCOL)
             return True
-        except:
+        except Exception:
             return False
 
     def load(self):
@@ -2459,7 +2451,7 @@ class simpleDB:
                 try:
                     self._db = pickle.load(file)
                     return True
-                except:
+                except Exception:
                     return False
 
 
@@ -2501,7 +2493,7 @@ def createRandomRuns(number):
     edb = ExperimentalDB()
     users = ["ggilestro", "afrench", "hjones", "mjoyce", "ebeckwith", "qgeissmann"]
     ethoscopes = {
-        "ETHOSCOPE_%03d" % num: eid
+        f"ETHOSCOPE_{num:03d}": eid
         for (num, eid) in zip(range(1, 150), [secrets.token_hex(8) for i in range(149)])
     }
 
@@ -2510,7 +2502,7 @@ def createRandomRuns(number):
         user_id = users.index(user)
         ethoscope_name = random.choice(list(ethoscopes.keys()))
         ethoscope_id = ethoscopes[ethoscope_name]
-        location = random.choice(["Incubator_%02d" % i for i in range(1, 11)])
+        location = random.choice([f"Incubator_{i:02d}" for i in range(1, 11)])
         date = random_date(
             datetime.datetime(2020, 1, 1), datetime.datetime(2020, 12, 31)
         ).strftime("%Y-%m-%d_%H-%M-%S")
@@ -2534,7 +2526,7 @@ def createRandomRuns(number):
 def createRandomEthoscopes(number):
     edb = ExperimentalDB()
     ethoscopes = {
-        "ETHOSCOPE_%03d" % num: eid
+        f"ETHOSCOPE_{num:03d}": eid
         for (num, eid) in zip(
             range(1, number + 1), [secrets.token_hex(8) for i in range(number)]
         )

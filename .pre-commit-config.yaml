@@ -67,7 +67,7 @@ repos:
       - id: flake8
         args: [
           '--max-line-length=88',
-          '--extend-ignore=E203,W503',  # Conflicts with black formatter
+          '--extend-ignore=E203,W503,E501',  # E203/W503: black formatter conflicts, E501: line length handled by black
           '--max-complexity=15'
         ]
         files: ^(src/|scripts/|run_tests\.py).*\.py$

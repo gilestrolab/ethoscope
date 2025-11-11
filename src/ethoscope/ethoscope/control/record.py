@@ -82,7 +82,7 @@ class cameraCaptureThread(threading.Thread):
             if "Camera hardware not available" in str(e):
                 raise EthoscopeException(
                     "Recording disabled: No camera hardware available."
-                )
+                ) from e
             else:
                 raise e
 
@@ -104,17 +104,8 @@ class cameraCaptureThread(threading.Thread):
 
         self.video_file_index += 1
         w, h = self._resolution
-        video_info = "%ix%i@%i" % (
-            w,
-            h,
-            self.camera.fps,
-        )  # uses effective FPS count, not the desired number
-        video_filename = "%s_%s_%05d.%s" % (
-            self._video_prefix,
-            video_info,
-            self.video_file_index,
-            ext,
-        )
+        video_info = f"{w}x{h}@{self.camera.fps}"  # uses effective FPS count, not the desired number
+        video_filename = f"{self._video_prefix}_{video_info}_{self.video_file_index:05d}.{ext}"
         return video_filename
 
     def _create_recording_folder(self):
@@ -340,7 +331,7 @@ class GeneralVideoRecorder(DescribedObject):
         if self._stream:
             try:
                 self._p.connection.close()
-            except:
+            except Exception:
                 pass
 
         self._p.join(10)
@@ -466,10 +457,10 @@ class timedStop(DescribedObject):
             total_seconds = days * 86400 + hours * 3600 + minutes * 60
             return total_seconds
 
-        except ValueError:
+        except ValueError as e:
             raise ValueError(
                 "Error in countdown format. Use DD:HH:MM (days, hours, minutes)"
-            )
+            ) from e
 
 
 class ControlThreadVideoRecording(ControlThread):
@@ -640,7 +631,7 @@ class ControlThreadVideoRecording(ControlThread):
                     logging.error("Cannot start recording: No camera hardware detected")
                     raise EthoscopeException(
                         "Recording disabled: No camera hardware available. This ethoscope cannot perform video recording without camera hardware."
-                    )
+                    ) from e
                 else:
                     raise e
 

@@ -95,7 +95,7 @@ def set_machine_name(id, path="/etc/machine-name"):
     :param id: integer
     """
 
-    machine_name = "ETHOSCOPE_%03d" % id
+    machine_name = f"ETHOSCOPE_{id:03d}"
     try:
         ensure_dir_exists(path)
         with open(path, "w") as f:
@@ -106,7 +106,7 @@ def set_machine_name(id, path="/etc/machine-name"):
             f.write(machine_name)
         logging.warning(f"Changed the machine hostname to: {machine_name}")
 
-    except:
+    except Exception:
         raise
 
 
@@ -118,14 +118,14 @@ def set_machine_id(id, path="/etc/machine-id"):
     :param id: integer
     """
 
-    new_uuid = "%03d" % id + uuid4().hex[3:]
+    new_uuid = f"{id:03d}" + uuid4().hex[3:]
 
     try:
         with open(path, "w") as f:
             f.write(new_uuid)
         logging.warning(f"Wrote new information in file: {path}")
 
-    except:
+    except Exception:
         raise
 
 
@@ -297,7 +297,7 @@ def set_etc_hostname(ip_address, nodename="node", path="/etc/hosts"):
             f.write("127.0.0.1\tlocalhost\n")
             f.write(f"{ip_address}\t{nodename}\n")
         logging.warning(f"Wrote new information in file: {path}")
-    except:
+    except Exception:
         raise
 
 
@@ -334,8 +334,8 @@ def get_git_version():
 
 
 def file_in_dir_r(file, dir):
-    file_dir_path = os.path.dirname(file).rstrip("//")
-    dir_path = dir.rstrip("//")
+    file_dir_path = os.path.dirname(file).rstrip("/")
+    dir_path = dir.rstrip("/")
     if file_dir_path == dir_path:
         return True
     elif file_dir_path == "":
@@ -663,7 +663,7 @@ def get_machine_id(path="/etc/machine-id"):
 
         else:
             return f"VIR{get_container_id()}"
-    except:
+    except Exception:
         return "NO_ID_AVAILABLE"
 
 
@@ -709,7 +709,7 @@ def get_core_temperature():
                     "".join(filter(lambda d: str.isdigit(d) or d == ".", df.read()))
                 )
             return temp
-        except:
+        except Exception:
             return 0
     else:
         return 0
@@ -735,7 +735,7 @@ def get_SD_CARD_AGE():
     try:
         return time.time() - os.path.getmtime("/etc/machine-id")
 
-    except:
+    except Exception:
         return
 
 
@@ -751,7 +751,7 @@ def get_SD_CARD_NAME():
             name = f.read()
         return name.rstrip()
 
-    except:
+    except Exception:
         return "N/A"
 
 
@@ -799,7 +799,7 @@ def set_datetime(time_on_node):
 
         return True
 
-    except:
+    except Exception:
         return False
 
 
@@ -839,7 +839,7 @@ def SQL_dump(
 
         return True
 
-    except:
+    except Exception:
         return False
 
 
@@ -855,7 +855,7 @@ def loggingStatus(status=None):
                 return True
             else:
                 return False
-        except:
+        except Exception:
             return -1
 
     elif status is True and not loggingStatus():
@@ -872,7 +872,7 @@ def loggingStatus(status=None):
                 po.read()
 
             return loggingStatus()
-        except:
+        except Exception:
             return -1
 
     elif status is False and loggingStatus():
@@ -882,7 +882,7 @@ def loggingStatus(status=None):
             ) as po:
                 po.read()
             return loggingStatus()
-        except:
+        except Exception:
             return -1
 
 

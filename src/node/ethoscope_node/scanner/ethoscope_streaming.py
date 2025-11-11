@@ -143,7 +143,7 @@ class EthoscopeStreamManager:
             if self._shared_socket:
                 try:
                     self._shared_socket.settimeout(None)
-                except:
+                except Exception:
                     pass
 
     def _start_shared_streaming(self):

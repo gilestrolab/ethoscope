@@ -6,7 +6,7 @@ import cv2
 
 try:
     CV_VERSION = int(cv2.__version__.split(".")[0])
-except:
+except Exception:
     CV_VERSION = 2
 
 
@@ -68,9 +68,9 @@ class AdaptiveBGModelOneObject(BaseTracker):
 
         try:
             return self._track(img, grey, mask, t)
-        except NoPositionError:
+        except NoPositionError as e:
             self._bg_model.update(grey, t)
-            raise NoPositionError
+            raise NoPositionError from e
 
     def _exclude_incorrect_hull(self, hulls):
 

@@ -103,7 +103,7 @@ def connectedUSB(optional_file="/etc/ethoscope/modules.json"):
             )
             for dev in usb.core.find(find_all=True)
         ]
-    except:
+    except Exception:
         devices = ["0000:0000"]
 
     # matchmaking
@@ -148,7 +148,7 @@ class HardwareConnection(Thread):
                 instruc = self._instructions.popleft()
                 try:
                     self._interface.send(**instruc)
-                except:
+                except Exception:
                     logging.error(
                         f"Could not send the following instruction to the module. Instruction: {instruc}"
                     )
@@ -212,7 +212,7 @@ class SimpleSerialInterface:
 
             if warmup:
                 self._warm_up()
-        except:
+        except Exception:
             pass
 
     def _find_port(self):
@@ -372,20 +372,20 @@ class EthoscopeSensor:
             try:
                 resp = json.loads(message)
                 return resp
-            except ValueError:
+            except ValueError as e:
                 # logging.error("Could not parse response from %s as JSON object" % self._id_url)
-                raise ScanException("Could not parse Json object")
+                raise ScanException("Could not parse Json object") from e
 
         except urllib.error.HTTPError as e:
-            raise ScanException("Error" + str(e.code))
+            raise ScanException("Error" + str(e.code)) from e
             # return e
 
         except urllib.error.URLError as e:
-            raise ScanException("Error" + str(e.reason))
+            raise ScanException("Error" + str(e.reason)) from e
             # return e
 
         except Exception as e:
-            raise ScanException("Unexpected error" + str(e))
+            raise ScanException("Unexpected error" + str(e)) from e
 
     def _update(self, force=False, freq=5):
         """
@@ -451,7 +451,7 @@ def getModuleCapabilities(test=False, shallow=False, command=""):
             dev_info.update({"Smart": True, "Connected": True})
             return dev_info
 
-        except:
+        except Exception:
             found = False if "noUSB" in found else found
             return {
                 "Error": "A known device is connected but could not open a connection with it.",

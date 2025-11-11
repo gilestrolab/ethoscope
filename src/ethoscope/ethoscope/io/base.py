@@ -581,7 +581,7 @@ class BaseResultWriter:
         for dr in data_rows:
             tp = (self._null, t) + tuple(dr.values())
             if roi_id not in self._insert_dict or self._insert_dict[roi_id] == "":
-                command = "INSERT INTO ROI_%i VALUES %s" % (roi_id, str(tp))
+                command = f"INSERT INTO ROI_{roi_id} VALUES {str(tp)}"
                 self._insert_dict[roi_id] = command
             else:
                 self._insert_dict[roi_id] += "," + str(tp)
@@ -606,7 +606,7 @@ class BaseResultWriter:
         for dt in list(data_row.values()):
             fields.append(f"{dt.header_name} {dt.sql_data_type}")
         fields = ", ".join(fields)
-        table_name = "ROI_%i" % roi.idx
+        table_name = f"ROI_{roi.idx}"
         self._create_table(table_name, fields)
 
     def _write_async_command(self, command, args=None):
@@ -1118,13 +1118,13 @@ class dbAppender:
         # Create SQlite writer with erase_old_db=False for append functionality
         self.kwargs.update({"erase_old_db": False})
         self._writer = SQLiteResultWriter(
-            db_credentials=sqlite_db_credentials,
-            rois=self.rois,
+            sqlite_db_credentials,
+            self.rois,
+            *self.args,
             metadata=self.metadata,
             make_dam_like_table=self.make_dam_like_table,
             take_frame_shots=self.take_frame_shots,
             sensor=self.sensor,
-            *self.args,
             **self.kwargs,
         )
 
@@ -1140,14 +1140,14 @@ class dbAppender:
         # Create MySQL writer with erase_old_db=False for append functionality
         self.kwargs.update({"erase_old_db": False})
         self._writer = MySQLResultWriter(
-            db_credentials=mysql_db_credentials,
-            rois=self.rois,
+            mysql_db_credentials,
+            self.rois,
+            *self.args,
             metadata=self.metadata,
             make_dam_like_table=self.make_dam_like_table,
             take_frame_shots=self.take_frame_shots,
             sensor=self.sensor,
             db_host=self.db_host,
-            *self.args,
             **self.kwargs,
         )
 

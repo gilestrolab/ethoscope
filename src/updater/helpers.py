@@ -155,9 +155,9 @@ def update_dev_map_wrapped(
                 devices_map[id].update(data)
                 return data
 
-            except KeyError:
+            except KeyError as e:
                 logging.error("Device %s is not detected" % id)
-                raise KeyError("Device %s is not detected" % id)
+                raise KeyError("Device %s is not detected" % id) from e
 
     except http.client.BadStatusLine as e:
         logging.error("BadlineSatus, most probably due to update device and auto-reset")

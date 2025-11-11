@@ -123,7 +123,7 @@ def send_command(
             )
             raise json.JSONDecodeError(
                 f"Invalid JSON response: {e}", response_str, e.pos
-            )
+            ) from e
 
     # Handle cases where response doesn't have expected structure
     if not isinstance(r, dict) or "response" not in r:

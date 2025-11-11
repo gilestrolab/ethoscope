@@ -243,7 +243,7 @@ class ROITemplate:
         except Exception as e:
             if isinstance(e, ROITemplateValidationError):
                 raise
-            raise ROITemplateValidationError(f"Template validation failed: {str(e)}")
+            raise ROITemplateValidationError(f"Template validation failed: {str(e)}") from e
 
     def _validate_grid_template(self, roi_def: Dict):
         """Validate grid-based template."""
