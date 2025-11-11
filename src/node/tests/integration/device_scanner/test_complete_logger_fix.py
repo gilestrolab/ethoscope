@@ -34,8 +34,12 @@ def temp_config_dir():
 
 def test_complete_logger_name_workflow(temp_config_dir):
     """Test complete workflow of logger name updates."""
+    # Mock the configuration to avoid writing to /etc/ethoscope
+    from unittest.mock import Mock
+    mock_config = Mock()
+
     # Create device
-    device = Ethoscope("192.168.1.65", 9000, config_dir=temp_config_dir)
+    device = Ethoscope("192.168.1.65", 9000, config_dir=temp_config_dir, config=mock_config)
 
     # Initial logger name should be IP-based
     initial_name = device._logger.name
@@ -77,8 +81,12 @@ def test_complete_logger_name_workflow(temp_config_dir):
 
 def test_logger_name_in_warning_messages(temp_config_dir):
     """Test that warning messages now show proper device names."""
+    # Mock the configuration to avoid writing to /etc/ethoscope
+    from unittest.mock import Mock
+    mock_config = Mock()
+
     # Create device and update its info
-    device = Ethoscope("192.168.1.65", 9000, config_dir=temp_config_dir)
+    device = Ethoscope("192.168.1.65", 9000, config_dir=temp_config_dir, config=mock_config)
     device._info = {
         "name": "ETHOSCOPE_065",
         "id": "test_device_065",

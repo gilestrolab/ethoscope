@@ -32,8 +32,12 @@ def temp_config_dir():
 
 def test_logger_name_update(temp_config_dir):
     """Test that logger name is updated properly."""
+    # Mock the configuration to avoid writing to /etc/ethoscope
+    from unittest.mock import Mock
+    mock_config = Mock()
+
     # Create a mock device with proper name
-    device = Ethoscope("192.168.1.65", 9000, config_dir=temp_config_dir)
+    device = Ethoscope("192.168.1.65", 9000, config_dir=temp_config_dir, config=mock_config)
 
     # Check initial logger name (should be based on IP)
     initial_logger_name = device._logger.name
@@ -57,7 +61,11 @@ def test_logger_name_update(temp_config_dir):
 
 def test_logger_name_no_update_for_invalid_names(temp_config_dir):
     """Test that logger name is not updated for invalid names."""
-    device = Ethoscope("192.168.1.65", 9000, config_dir=temp_config_dir)
+    # Mock the configuration to avoid writing to /etc/ethoscope
+    from unittest.mock import Mock
+    mock_config = Mock()
+
+    device = Ethoscope("192.168.1.65", 9000, config_dir=temp_config_dir, config=mock_config)
     initial_logger_name = device._logger.name
 
     # Try with empty name
@@ -79,6 +87,9 @@ def test_logger_name_no_update_for_invalid_names(temp_config_dir):
 
 def test_logger_name_format_variations(temp_config_dir):
     """Test different device name formats."""
+    # Mock the configuration to avoid writing to /etc/ethoscope
+    from unittest.mock import Mock
+
     test_cases = [
         ("ETHOSCOPE_001", "ETHOSCOPE_001"),
         ("ETHOSCOPE_065", "ETHOSCOPE_065"),
@@ -86,7 +97,8 @@ def test_logger_name_format_variations(temp_config_dir):
     ]
 
     for device_name, expected_logger_name in test_cases:
-        device = Ethoscope("192.168.1.65", 9000, config_dir=temp_config_dir)
+        mock_config = Mock()
+        device = Ethoscope("192.168.1.65", 9000, config_dir=temp_config_dir, config=mock_config)
         device._info = {"name": device_name}
         device._update_logger_name()
 
