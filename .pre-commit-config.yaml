@@ -218,6 +218,36 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: run-device-integration-tests
+        name: Run device integration tests
+        entry: bash
+        language: system
+        args:
+          - -c
+          - |
+            echo "Running device integration tests..."
+            if [ -f .venv/bin/activate ]; then
+              source .venv/bin/activate
+              cd src/ethoscope
+              python -m pytest ethoscope/tests/integration_api_tests/ -v --tb=short --strict-markers --strict-config --no-cov -x
+              EXIT_CODE=$?
+              if [ $EXIT_CODE -ne 0 ]; then
+                echo ""
+                echo "❌ Device integration tests FAILED"
+                echo "   Fix the failing tests before committing"
+                exit 1
+              else
+                echo "✓ Device integration tests passed"
+              fi
+            else
+              echo "⚠ Skipping tests (venv not found at .venv)"
+              echo "  Run: python -m venv .venv && source .venv/bin/activate && pip install -e src/ethoscope[dev]"
+              exit 1
+            fi
+        files: ^src/ethoscope/(ethoscope/tests/integration_api_tests/|ethoscope/(core|hardware|control|trackers|stimulators|drawers)/).*\.py$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: critical-tests
         name: Run tests for critical changes
         entry: bash
