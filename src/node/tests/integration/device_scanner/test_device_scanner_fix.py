@@ -93,13 +93,24 @@ def test_mariadb_backup_filename(temp_config_dir):
 
     assert filename == expected, f"New format: Expected '{expected}', got '{filename}'"
 
-    # Test with old format
+    # Test with old format fallback (requires mocking databases_info HTTP call)
     device._info = create_test_device_old_format()
-    filename = device._get_backup_filename_for_db_type("MariaDB")
 
-    assert (
-        filename == expected
-    ), f"Old format fallback: Expected '{expected}', got '{filename}'"
+    # Mock the databases_info method to return the old format structure
+    mock_databases_info = {
+        "mariadb": {
+            "exists": True,
+            "current": {
+                "backup_filename": "2024-01-01_12-00-00_test_device_001.db"
+            }
+        }
+    }
+
+    with patch.object(device, 'databases_info', return_value=mock_databases_info):
+        filename = device._get_backup_filename_for_db_type("MariaDB")
+        assert (
+            filename == expected
+        ), f"Old format fallback: Expected '{expected}', got '{filename}'"
 
 
 def test_sqlite_backup_filename(temp_config_dir):
