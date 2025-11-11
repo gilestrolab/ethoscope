@@ -1,6 +1,8 @@
 __author__ = "quentin"
 
 import os
+import shutil
+import tempfile
 import unittest
 
 import cv2
@@ -28,11 +30,23 @@ LOG_DIR = "./test_logs/"
 class TestTargetROIBuilder(unittest.TestCase):
 
     def setUp(self):
+        # Create temporary directory for diagnostic data
+        self.temp_dir = tempfile.mkdtemp(prefix="test_target_roi_")
+
         # Test with different configurations
         self.roi_builder_basic = TargetGridROIBuilder(n_rows=2, n_cols=1)
         self.roi_builder_diagnostic = TargetGridROIBuilder(
-            n_rows=2, n_cols=1, enable_diagnostics=True, device_id="test_device"
+            n_rows=2,
+            n_cols=1,
+            enable_diagnostics=True,
+            device_id="test_device",
+            diagnostic_base_path=self.temp_dir,
         )
+
+    def tearDown(self):
+        """Clean up temporary directory."""
+        if hasattr(self, "temp_dir") and os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir)
 
     def _draw_rois(self, img, rois):
         """Draw ROIs on image for visual verification"""

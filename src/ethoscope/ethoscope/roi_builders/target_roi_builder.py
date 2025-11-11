@@ -138,6 +138,7 @@ class TargetGridROIBuilder(BaseROIBuilder):
         save_success_images=False,
         max_detection_attempts=5,
         enable_frame_averaging=True,
+        diagnostic_base_path=None,
     ):
         """
         This roi builder uses three black circles drawn on the arena (targets) to align a grid layout:
@@ -170,6 +171,8 @@ class TargetGridROIBuilder(BaseROIBuilder):
         :type max_detection_attempts: int
         :param enable_frame_averaging: Whether to use frame averaging for noise reduction.
         :type enable_frame_averaging: bool
+        :param diagnostic_base_path: Base directory for storing diagnostic data (defaults to /ethoscope_data/various/target_detection_logs).
+        :type diagnostic_base_path: str
         """
 
         self._n_rows = n_rows
@@ -194,7 +197,12 @@ class TargetGridROIBuilder(BaseROIBuilder):
         self._previous_frame = None  # Simple previous frame storage
 
         if self._enable_diagnostics:
-            self._diagnostics = TargetDetectionDiagnostics(device_id=device_id)
+            if diagnostic_base_path:
+                self._diagnostics = TargetDetectionDiagnostics(
+                    device_id=device_id, base_path=diagnostic_base_path
+                )
+            else:
+                self._diagnostics = TargetDetectionDiagnostics(device_id=device_id)
             logging.info(f"Target detection diagnostics enabled for device {device_id}")
 
         # if self._vertical_fill is None:

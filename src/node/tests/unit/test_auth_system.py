@@ -6,6 +6,7 @@ user verification, session management, and rate limiting.
 """
 
 import os
+import shutil
 import tempfile
 import time
 from datetime import datetime
@@ -26,17 +27,15 @@ class TestPINAuthentication:
 
     def setup_method(self):
         """Setup test database."""
-        self.temp_db = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
-        self.temp_db.close()
-        self.db = ExperimentalDB()
-        # Mock the database path
-        self.db._db_path = self.temp_db.name
+        # Create temporary directory for database
+        self.temp_dir = tempfile.mkdtemp(prefix="test_auth_")
+        self.db = ExperimentalDB(self.temp_dir)
 
     def teardown_method(self):
         """Clean up test database."""
-        if hasattr(self, "temp_db"):
+        if hasattr(self, "temp_dir"):
             try:
-                os.unlink(self.temp_db.name)
+                shutil.rmtree(self.temp_dir)
             except (OSError, FileNotFoundError):
                 pass
 

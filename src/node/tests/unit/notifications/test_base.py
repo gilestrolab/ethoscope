@@ -358,25 +358,25 @@ class TestNotificationAnalyzer:
         """Test successful device user retrieval."""
         device_id = "test_device_001"
 
-        runs_data = {
-            "run_123": {"ethoscope_id": device_id, "user_name": "test_user"},
-            "run_456": {"ethoscope_id": device_id, "user_name": "another_user"},
-            "run_789": {"ethoscope_id": "other_device", "user_name": "test_user"},
-        }
+        # Mock getUsersForDevice to return user data with emails
+        users_data = [
+            {"username": "test_user", "email": "test@example.com"},
+            {"username": "another_user", "email": "another@example.com"},
+        ]
 
-        analyzer.db.getRun.return_value = runs_data
+        analyzer.db.getUsersForDevice.return_value = users_data
 
         result = analyzer.get_device_users(device_id)
 
         assert "test@example.com" in result
-        # another_user doesn't exist in config, so shouldn't be in result
-        assert len(result) == 1
+        assert "another@example.com" in result
+        assert len(result) == 2
 
     def test_get_device_users_no_runs(self, analyzer):
         """Test device user retrieval when no runs exist."""
         device_id = "test_device_001"
 
-        analyzer.db.getRun.return_value = {}
+        analyzer.db.getUsersForDevice.return_value = []
 
         result = analyzer.get_device_users(device_id)
 
@@ -386,7 +386,7 @@ class TestNotificationAnalyzer:
         """Test device user retrieval when exception occurs."""
         device_id = "test_device_001"
 
-        analyzer.db.getRun.side_effect = Exception("Database error")
+        analyzer.db.getUsersForDevice.side_effect = Exception("Database error")
 
         result = analyzer.get_device_users(device_id)
 
@@ -394,6 +394,13 @@ class TestNotificationAnalyzer:
 
     def test_get_admin_emails_success(self, analyzer):
         """Test successful admin email retrieval."""
+        # Mock getAllUsers to return admin users
+        users_data = {
+            "admin_user": {"username": "admin_user", "email": "admin@example.com", "isAdmin": True},
+        }
+
+        analyzer.db.getAllUsers.return_value = users_data
+
         result = analyzer.get_admin_emails()
 
         assert "admin@example.com" in result
@@ -402,8 +409,7 @@ class TestNotificationAnalyzer:
 
     def test_get_admin_emails_no_admins(self, analyzer):
         """Test admin email retrieval when no admins exist."""
-        # Override config to have no admins
-        analyzer.config.content = {"users": {}}
+        analyzer.db.getAllUsers.return_value = {}
 
         result = analyzer.get_admin_emails()
 
@@ -411,7 +417,7 @@ class TestNotificationAnalyzer:
 
     def test_get_admin_emails_exception(self, analyzer):
         """Test admin email retrieval when exception occurs."""
-        analyzer.config.content = None
+        analyzer.db.getAllUsers.side_effect = Exception("Database error")
 
         result = analyzer.get_admin_emails()
 
