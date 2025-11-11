@@ -6,12 +6,14 @@ This tests the complete flow of logger name updates from IP-based to
 device-name-based when device info is fetched.
 """
 
-import json
 import logging
 import os
+import shutil
 import sys
-from unittest.mock import Mock
+import tempfile
 from unittest.mock import patch
+
+import pytest
 
 # Add the src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
@@ -19,20 +21,28 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "..
 from ethoscope_node.scanner.ethoscope_scanner import Ethoscope
 
 
-def test_complete_logger_name_workflow():
-    """Test complete workflow of logger name updates."""
-    print("Testing complete logger name workflow...")
+@pytest.fixture
+def temp_config_dir():
+    """Create temporary config directory for tests."""
+    temp_dir = tempfile.mkdtemp(prefix="test_ethoscope_logger_")
+    yield temp_dir
+    try:
+        shutil.rmtree(temp_dir)
+    except (OSError, FileNotFoundError):
+        pass
 
+
+def test_complete_logger_name_workflow(temp_config_dir):
+    """Test complete workflow of logger name updates."""
     # Create device
-    device = Ethoscope("192.168.1.65", 9000, "/tmp")
+    device = Ethoscope("192.168.1.65", 9000, config_dir=temp_config_dir)
 
     # Initial logger name should be IP-based
     initial_name = device._logger.name
-    print(f"Initial logger name: {initial_name}")
 
-    if not initial_name.endswith("192.168.1.65"):
-        print("✗ Initial logger name should be IP-based")
-        return False
+    assert initial_name.endswith(
+        "192.168.1.65"
+    ), f"Initial logger name should be IP-based, got: {initial_name}"
 
     # Mock the device response with proper ethoscope data
     mock_response = {
@@ -49,37 +59,26 @@ def test_complete_logger_name_workflow():
             # This should trigger logger name update
             success = device._fetch_device_info()
 
-            if not success:
-                print("✗ Failed to fetch device info")
-                return False
+            assert success, "Failed to fetch device info"
 
             # Check that logger name was updated
             final_name = device._logger.name
-            print(f"Final logger name: {final_name}")
+            expected_name = "ETHOSCOPE_065"
 
-            expected_name = "Ethoscope_ETHOSCOPE_065"
-            if final_name == expected_name:
-                print("✓ Logger name updated correctly during fetch")
-            else:
-                print(f"✗ Expected '{expected_name}', got '{final_name}'")
-                return False
+            assert (
+                final_name == expected_name
+            ), f"Expected '{expected_name}', got '{final_name}'"
 
             # Verify the info was updated
-            if device._info.get("name") == "ETHOSCOPE_065":
-                print("✓ Device info updated correctly")
-            else:
-                print(f"✗ Device info not updated correctly: {device._info}")
-                return False
-
-    return True
+            assert (
+                device._info.get("name") == "ETHOSCOPE_065"
+            ), f"Device info not updated correctly: {device._info}"
 
 
-def test_logger_name_in_warning_messages():
+def test_logger_name_in_warning_messages(temp_config_dir):
     """Test that warning messages now show proper device names."""
-    print("Testing logger name in warning messages...")
-
     # Create device and update its info
-    device = Ethoscope("192.168.1.65", 9000, "/tmp")
+    device = Ethoscope("192.168.1.65", 9000, config_dir=temp_config_dir)
     device._info = {
         "name": "ETHOSCOPE_065",
         "id": "test_device_065",
@@ -104,53 +103,4 @@ def test_logger_name_in_warning_messages():
     device._logger.warning("No backup filename available for auto backup")
 
     # Check that the log message contains proper device name
-    if log_messages:
-        message = log_messages[0]
-        print(f"Log message: {message}")
-
-        # The logger name should now be used in the log format
-        # This will depend on the logging configuration, but the logger name is now correct
-        print("✓ Warning message generated with proper logger name")
-        return True
-    else:
-        print("✗ No log messages captured")
-        return False
-
-
-def main():
-    """Run all tests."""
-    print("=== Testing Complete Logger Name Fix ===")
-
-    tests = [test_complete_logger_name_workflow, test_logger_name_in_warning_messages]
-
-    passed = 0
-    total = len(tests)
-
-    for test in tests:
-        print(f"\n{'-' * 50}")
-        try:
-            if test():
-                passed += 1
-            else:
-                print("Test failed!")
-        except Exception as e:
-            print(f"Test failed with exception: {e}")
-
-    print(f"\n{'-' * 50}")
-    print(f"Results: {passed}/{total} tests passed")
-
-    if passed == total:
-        print(
-            "🎉 All tests passed! Logger names should now show proper device names in logs."
-        )
-        print(
-            "    Instead of 'Ethoscope_192.168.1.65', you should see 'Ethoscope_ETHOSCOPE_065'"
-        )
-        return 0
-    else:
-        print("❌ Some tests failed!")
-        return 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+    assert len(log_messages) > 0, "No log messages captured"
