@@ -7,6 +7,7 @@ PIN changes, and API endpoint protection.
 
 import json
 import os
+import shutil
 import tempfile
 import time
 from datetime import datetime
@@ -29,14 +30,9 @@ class TestAuthAPIIntegration:
 
     def setup_method(self):
         """Setup test environment with real database and API."""
-        # Create temporary database
-        self.temp_db = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
-        self.temp_db.close()
-
-        # Initialize database with test data
-        self.db = ExperimentalDB()
-        # Mock the database path
-        self.db._db_path = self.temp_db.name
+        # Create temporary directory for database
+        self.temp_dir = tempfile.mkdtemp(prefix="test_auth_api_")
+        self.db = ExperimentalDB(self.temp_dir)
         self._setup_test_users()
 
         # Initialize authentication middleware and API
@@ -50,9 +46,9 @@ class TestAuthAPIIntegration:
 
     def teardown_method(self):
         """Clean up test environment."""
-        if hasattr(self, "temp_db"):
+        if hasattr(self, "temp_dir"):
             try:
-                os.unlink(self.temp_db.name)
+                shutil.rmtree(self.temp_dir)
             except (OSError, FileNotFoundError):
                 pass
 
@@ -342,21 +338,17 @@ class TestEndToEndAuthentication:
 
     def setup_method(self):
         """Setup complete authentication system."""
-        self.temp_db = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
-        self.temp_db.close()
-
-        self.db = ExperimentalDB()
-        # Mock the database path
-        self.db._db_path = self.temp_db.name
+        self.temp_dir = tempfile.mkdtemp(prefix="test_e2e_auth_")
+        self.db = ExperimentalDB(self.temp_dir)
         self.config = {"session_timeout": 3600}
         self.auth_middleware = AuthMiddleware(self.db, self.config)
         self.auth_api = AuthAPI(self.db, self.auth_middleware)
 
     def teardown_method(self):
         """Clean up test environment."""
-        if hasattr(self, "temp_db"):
+        if hasattr(self, "temp_dir"):
             try:
-                os.unlink(self.temp_db.name)
+                shutil.rmtree(self.temp_dir)
             except (OSError, FileNotFoundError):
                 pass
 
