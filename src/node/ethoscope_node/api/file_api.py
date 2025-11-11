@@ -35,7 +35,7 @@ class FileAPI(BaseAPI):
             pattern = f"*.{type}"
 
         matches = []
-        for root, dirnames, filenames in os.walk(self.results_dir):
+        for root, _dirnames, filenames in os.walk(self.results_dir):
             for f in fnmatch.filter(filenames, pattern):
                 matches.append(os.path.join(root, f))
 
@@ -47,7 +47,7 @@ class FileAPI(BaseAPI):
         directory = self.results_dir if folder == "null" else f"/{folder}"
         files = {}
 
-        for dirpath, dirnames, filenames in os.walk(directory):
+        for dirpath, _dirnames, filenames in os.walk(directory):
             for name in filenames:
                 abs_path = os.path.join(dirpath, name)
                 try:

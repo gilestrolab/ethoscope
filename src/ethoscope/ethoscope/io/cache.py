@@ -1007,8 +1007,7 @@ class MySQLDatabaseMetadataCache(BaseDatabaseMetadataCache):
 
                 # Query the metadata table for the backup filename
                 cursor.execute(
-                    "SELECT DISTINCT value FROM METADATA WHERE field = '%s' AND value IS NOT NULL"
-                    % field
+                    f"SELECT DISTINCT value FROM METADATA WHERE field = '{field}' AND value IS NOT NULL"
                 )
                 result = cursor.fetchone()
 
@@ -1156,7 +1155,7 @@ class SQLiteDatabaseMetadataCache(BaseDatabaseMetadataCache):
                 cursor = conn.cursor()
 
                 # Get date_time from METADATA table
-                cursor.execute("SELECT value FROM METADATA WHERE field = '%s'" % field)
+                cursor.execute(f"SELECT value FROM METADATA WHERE field = '{field}'")
                 result = cursor.fetchone()
 
                 if result:
@@ -1523,7 +1522,7 @@ class DatabasesInfo:
                     continue
 
                 try:
-                    for root, dirs, files in os.walk(search_path):
+                    for root, _dirs, files in os.walk(search_path):
                         for file in files:
                             if (
                                 file.endswith(".db")

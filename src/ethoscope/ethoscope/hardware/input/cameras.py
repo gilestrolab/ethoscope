@@ -185,7 +185,7 @@ class MovieVirtualCamera(BaseCamera):
         if not (isinstance(path, str) or isinstance(path, str)):
             raise EthoscopeException("path to video must be a string")
         if not os.path.exists(path):
-            raise EthoscopeException("'%s' does not exist. No such file" % path)
+            raise EthoscopeException(f"'{path}' does not exist. No such file")
 
         self.capture = cv2.VideoCapture(path)
         w = self.capture.get(CAP_PROP_FRAME_WIDTH)
@@ -198,7 +198,7 @@ class MovieVirtualCamera(BaseCamera):
 
         self._resolution = (int(w), int(h))
 
-        super(MovieVirtualCamera, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         # emulates v4l2 (real time camera) from video file
         if self._use_wall_clock:
@@ -335,21 +335,20 @@ class V4L2Camera(BaseCamera):
         if self._resolution != target_resolution:
             if w > 0 and h > 0:
                 logging.warning(
-                    'Target resolution "%s" could NOT be achieved. Effective resolution is "%s"'
-                    % (target_resolution, self._resolution)
+                    f'Target resolution "{target_resolution}" could NOT be achieved. Effective resolution is "{self._resolution}"'
                 )
             else:
                 logging.info(
-                    'Maximal effective resolution is "%s"' % str(self._resolution)
+                    f'Maximal effective resolution is "{str(self._resolution)}"'
                 )
 
         self._frame = first_frame
 
-        super(V4L2Camera, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._start_time = time.time()
 
     def _warm_up(self):
-        logging.info("%s is warming up" % (str(self)))
+        logging.info(f"{str(self)} is warming up")
         time.sleep(2)
 
     def restart(self):
@@ -389,8 +388,7 @@ class V4L2Camera(BaseCamera):
             if to_sleep < 0:
                 if self._frame_idx % 5000 == 0:
                     logging.warning(
-                        "The target FPS (%f) could not be reached. Effective FPS is about %f"
-                        % (self._target_fps, self._frame_idx / (now - self._start_time))
+                        f"The target FPS ({self._target_fps:f}) could not be reached. Effective FPS is about {self._frame_idx / (now - self._start_time):f}"
                     )
                 self.capture.grab()
 
@@ -459,7 +457,7 @@ class PiFrameGrabber(threading.Thread):
         # (20-25 is usually a reasonable range for H.264 encoding)
         self.video_quality = quality
 
-        super(PiFrameGrabber, self).__init__()
+        super().__init__()
 
     def _save_camera_info(self, camera_info, save_path="/etc/picamera-version"):
         """
@@ -1067,15 +1065,14 @@ class OurPiCameraAsync(BaseCamera):
         if self._resolution != target_resolution:
             if w > 0 and h > 0:
                 logging.warning(
-                    'Target resolution "%s" could NOT be achieved. Effective resolution is "%s"'
-                    % (target_resolution, self._resolution)
+                    f'Target resolution "{target_resolution}" could NOT be achieved. Effective resolution is "{self._resolution}"'
                 )
             else:
                 logging.info(
-                    'Maximal effective resolution is "%s"' % str(self._resolution)
+                    f'Maximal effective resolution is "{str(self._resolution)}"'
                 )
 
-        super(OurPiCameraAsync, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._start_time = time.time()
         logging.info("Camera initialised")
 

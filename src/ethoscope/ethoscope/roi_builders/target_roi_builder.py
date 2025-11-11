@@ -204,7 +204,7 @@ class TargetGridROIBuilder(BaseROIBuilder):
         # if self._bottom_margin is None:
         #     self._bottom_margin = self._top_margin
 
-        super(TargetGridROIBuilder, self).__init__()
+        super().__init__()
 
     def _find_blobs(self, im, scoring_fun):
 

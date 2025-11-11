@@ -52,7 +52,7 @@ class MultiStimulator(BaseStimulator):
             roi_template_config: ROI template configuration
         """
         # Initialize with empty date_range since we manage our own scheduling
-        super(MultiStimulator, self).__init__(
+        super().__init__(
             hardware_connection, date_range="", roi_template_config=roi_template_config
         )
 
@@ -202,7 +202,7 @@ class MultiStimulator(BaseStimulator):
         Args:
             tracker: The tracker object to bind
         """
-        super(MultiStimulator, self).bind_tracker(tracker)
+        super().bind_tracker(tracker)
 
         # Bind tracker to all individual stimulators
         for stimulator_info in self._stimulators:

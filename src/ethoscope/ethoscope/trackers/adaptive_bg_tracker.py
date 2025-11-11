@@ -166,7 +166,7 @@ class ObjectModel:
 
         (_, _), (width, height), angle = cv2.minAreaRect(contour)
         width, height = max(width, height), min(width, height)
-        ar = (height + 1) / (width + 1)
+        (height + 1) / (width + 1)
         # todo speed should use time
         #
         # if len(self.positions) > 2:
@@ -361,7 +361,7 @@ class AdaptiveBGModel(BaseTracker):
 
         self._roi = roi
 
-        super(AdaptiveBGModel, self).__init__(roi, data)
+        super().__init__(roi, data)
 
     def _calculate_blur_radius(self, img_shape):
         """

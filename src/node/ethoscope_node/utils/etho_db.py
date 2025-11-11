@@ -129,7 +129,7 @@ class ExperimentalDB(multiprocessing.Process):
         """
 
         sql_create_runs_table = (
-            """CREATE TABLE IF NOT EXISTS %s (
+            f"""CREATE TABLE IF NOT EXISTS {self._runs_table_name} (
                                 run_id TEXT PRIMARY KEY,
                                 type TEXT NOT NULL,
                                 ethoscope_name TEXT NOT NULL,
@@ -145,24 +145,22 @@ class ExperimentalDB(multiprocessing.Process):
                                 comments TEXT,
                                 status TEXT
                             );"""
-            % self._runs_table_name
         )
 
         # self.executeSQL ( "DROP TABLE ethoscopes;" )
 
         sql_create_experiments_table = (
-            """CREATE TABLE IF NOT EXISTS %s (
+            f"""CREATE TABLE IF NOT EXISTS {self._experiments_table_name} (
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 runs TEXT,
                                 metadata BLOB,
                                 tags TEXT,
                                 comments TEXT
                             );"""
-            % self._experiments_table_name
         )
 
         sql_create_users_table = (
-            """CREATE TABLE IF NOT EXISTS %s (
+            f"""CREATE TABLE IF NOT EXISTS {self._users_table_name} (
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 username TEXT NOT NULL,
                                 fullname TEXT NOT NULL,
@@ -173,11 +171,10 @@ class ExperimentalDB(multiprocessing.Process):
                                 isadmin INTEGER,
                                 created TIMESTAMP
                             );"""
-            % self._users_table_name
         )
 
         sql_create_ethoscopes_table = (
-            """CREATE TABLE IF NOT EXISTS %s (
+            f"""CREATE TABLE IF NOT EXISTS {self._ethoscopes_table_name} (
                                 ethoscope_id TEXT PRIMARY KEY,
                                 ethoscope_name TEXT NOT NULL,
                                 first_seen TIMESTAMP NOT NULL,
@@ -189,7 +186,6 @@ class ExperimentalDB(multiprocessing.Process):
                                 comments TEXT,
                                 status TEXT
                             );"""
-            % self._ethoscopes_table_name
         )
 
         sql_create_alert_logs_table = """CREATE TABLE IF NOT EXISTS alert_logs (
@@ -204,7 +200,7 @@ class ExperimentalDB(multiprocessing.Process):
                             );"""
 
         sql_create_incubators_table = (
-            """CREATE TABLE IF NOT EXISTS %s (
+            f"""CREATE TABLE IF NOT EXISTS {self._incubators_table_name} (
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 name TEXT NOT NULL UNIQUE,
                                 location TEXT,
@@ -213,7 +209,6 @@ class ExperimentalDB(multiprocessing.Process):
                                 created TIMESTAMP NOT NULL,
                                 active INTEGER DEFAULT 1
                             );"""
-            % self._incubators_table_name
         )
 
         self.executeSQL(sql_create_runs_table)
@@ -619,7 +614,7 @@ class ExperimentalDB(multiprocessing.Process):
             keys = row[0].keys()
             # return [dict([(key, value) for key, value in zip(keys, line)]) for line in row]
             return {
-                line["run_id"]: {key: value for key, value in zip(keys, line)}
+                line["run_id"]: dict(zip(keys, line))
                 for line in row
             }
 
@@ -703,7 +698,7 @@ class ExperimentalDB(multiprocessing.Process):
         ct = datetime.datetime.now()
 
         problems = self.getRun(run_id)[0]["problems"]
-        problems = "%s, %s;" % (ct, message) + problems  # append in front
+        problems = f"{ct}, {message};" + problems  # append in front
 
         sql_update_experiment = f"UPDATE {self._runs_table_name} SET problems = ? WHERE run_id = ?"
         return self.executeSQL(sql_update_experiment, (problems, run_id))
@@ -759,7 +754,7 @@ class ExperimentalDB(multiprocessing.Process):
             keys = row[0].keys()
             # return [dict([(key, value) for key, value in zip(keys, line)]) for line in row]
             return {
-                line["id"]: {key: value for key, value in zip(keys, line)}
+                line["id"]: dict(zip(keys, line))
                 for line in row
             }
 
@@ -807,13 +802,15 @@ class ExperimentalDB(multiprocessing.Process):
         machineinfo=None,
         comments=None,
         status=None,
-        blacklist=["ETHOSCOPE_000"],
+        blacklist=None,
     ):
         """
         Updates the parameters of a given ethoscope
         if an ethoscope with the same ID is not found in the current database
         it will create a new entry for it
         """
+        if blacklist is None:
+            blacklist = ["ETHOSCOPE_000"]
         e = self.getEthoscope(ethoscope_id, True)
         now = datetime.datetime.now()
 
@@ -866,8 +863,7 @@ class ExperimentalDB(multiprocessing.Process):
                 or ethoscope_name is None
             ):
                 logging.warning(
-                    "Refusing to create new ethoscope entry without valid name. ID: %s, Name: %s"
-                    % (ethoscope_id, ethoscope_name)
+                    f"Refusing to create new ethoscope entry without valid name. ID: {ethoscope_id}, Name: {ethoscope_name}"
                 )
                 return None
 
@@ -875,8 +871,7 @@ class ExperimentalDB(multiprocessing.Process):
             sql_update_ethoscope = f"""INSERT INTO {self._ethoscopes_table_name}
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
             logging.warning(
-                "Adding a new ethoscope to the db. Welcome %s with id %s"
-                % (ethoscope_name, ethoscope_id)
+                f"Adding a new ethoscope to the db. Welcome {ethoscope_name} with id {ethoscope_id}"
             )
             return self.executeSQL(sql_update_ethoscope, (
                 ethoscope_id,
@@ -1595,8 +1590,7 @@ class ExperimentalDB(multiprocessing.Process):
         # Get all active devices and check their timestamps manually
         # This handles different timestamp formats more robustly
         sql_get_active = (
-            "SELECT ethoscope_id, last_seen FROM %s WHERE active = 1"
-            % self._ethoscopes_table_name
+            f"SELECT ethoscope_id, last_seen FROM {self._ethoscopes_table_name} WHERE active = 1"
         )
 
         active_devices = self.executeSQL(sql_get_active)
@@ -1678,8 +1672,7 @@ class ExperimentalDB(multiprocessing.Process):
         """
         # Get all devices and check them manually for better detection
         sql_get_all = (
-            "SELECT ethoscope_id, ethoscope_name, last_seen, first_seen FROM %s"
-            % self._ethoscopes_table_name
+            f"SELECT ethoscope_id, ethoscope_name, last_seen, first_seen FROM {self._ethoscopes_table_name}"
         )
 
         all_devices = self.executeSQL(sql_get_all)
@@ -1775,8 +1768,7 @@ class ExperimentalDB(multiprocessing.Process):
 
         # Get all devices with status 'busy'
         sql_get_busy = (
-            "SELECT ethoscope_id, last_seen FROM %s WHERE status = 'busy'"
-            % self._ethoscopes_table_name
+            f"SELECT ethoscope_id, last_seen FROM {self._ethoscopes_table_name} WHERE status = 'busy'"
         )
 
         busy_devices = self.executeSQL(sql_get_busy)
@@ -1867,8 +1859,7 @@ class ExperimentalDB(multiprocessing.Process):
 
         # Get all devices with status 'busy' or 'unreached'
         sql_get_devices = (
-            "SELECT ethoscope_id, ethoscope_name, last_seen, status FROM %s WHERE status IN ('busy', 'unreached')"
-            % self._ethoscopes_table_name
+            f"SELECT ethoscope_id, ethoscope_name, last_seen, status FROM {self._ethoscopes_table_name} WHERE status IN ('busy', 'unreached')"
         )
 
         devices = self.executeSQL(sql_get_devices)
@@ -1984,14 +1975,13 @@ class ExperimentalDB(multiprocessing.Process):
 
         # Query for all running sessions with end_time='0'
         sql_get_running = (
-            """
+            f"""
             SELECT run_id, ethoscope_id, ethoscope_name, start_time, user_name
-            FROM %s
+            FROM {self._runs_table_name}
             WHERE status = 'running'
             AND (end_time = '0' OR end_time = 0 OR end_time IS NULL)
             ORDER BY ethoscope_id, start_time DESC
         """
-            % self._runs_table_name
         )
 
         running_sessions = self.executeSQL(sql_get_running)
@@ -2023,7 +2013,7 @@ class ExperimentalDB(multiprocessing.Process):
 
         # Get current device statuses from ethoscopes table
         sql_device_status = (
-            "SELECT ethoscope_id, status FROM %s" % self._ethoscopes_table_name
+            f"SELECT ethoscope_id, status FROM {self._ethoscopes_table_name}"
         )
         device_statuses = self.executeSQL(sql_device_status)
         device_status_map = {}
@@ -2407,7 +2397,9 @@ class ExperimentalDB(multiprocessing.Process):
 class simpleDB:
     """ """
 
-    def __init__(self, dbfile, keys=[]):
+    def __init__(self, dbfile, keys=None):
+        if keys is None:
+            keys = []
         self._db = []
         self._db_file = dbfile
         self._keys = ["id"] + keys
@@ -2475,7 +2467,7 @@ class UsersDB(simpleDB):
     def __init__(self, dbfile):
         """ """
         keys = ["name", "email", "laboratory"]
-        super(UsersDB, self).__init__(dbfile, keys)
+        super().__init__(dbfile, keys)
 
 
 class Incubators(simpleDB):
@@ -2491,7 +2483,7 @@ class Incubators(simpleDB):
             "lat_light",
             "lat_reading",
         ]
-        super(Incubators, self).__init__(dbfile, keys)
+        super().__init__(dbfile, keys)
 
 
 def random_date(start, end):
@@ -2516,19 +2508,14 @@ def createRandomRuns(number):
     for run in [secrets.token_hex(8) for i in range(number)]:
         user = random.choice(users)
         user_id = users.index(user)
-        ethoscope_name = random.choice([n for n in ethoscopes.keys()])
+        ethoscope_name = random.choice(list(ethoscopes.keys()))
         ethoscope_id = ethoscopes[ethoscope_name]
         location = random.choice(["Incubator_%02d" % i for i in range(1, 11)])
         date = random_date(
             datetime.datetime(2020, 1, 1), datetime.datetime(2020, 12, 31)
         ).strftime("%Y-%m-%d_%H-%M-%S")
-        database = "%s_%s.db" % (date, ethoscope_id)
-        filepath = "/ethoscope_data/results/%s/%s/%s/%s" % (
-            ethoscope_id,
-            ethoscope_name,
-            date,
-            database,
-        )
+        database = f"{date}_{ethoscope_id}.db"
+        filepath = f"/ethoscope_data/results/{ethoscope_id}/{ethoscope_name}/{date}/{database}"
         r = edb.addRun(
             run,
             "tracking",
@@ -2553,7 +2540,7 @@ def createRandomEthoscopes(number):
         )
     }
 
-    for etho in [name for name in ethoscopes.keys()]:
+    for etho in list(ethoscopes.keys()):
         print(edb.updateEthoscopes(ethoscopes[etho], etho))
 
 

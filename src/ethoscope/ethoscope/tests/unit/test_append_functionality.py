@@ -151,11 +151,11 @@ class TestMonitorTimeOffset:
         )
 
         # Mock result writer to capture timestamps
-        mock_result_writer = Mock()
+        Mock()
 
         # Run monitor for a few frames
         frames_processed = 0
-        for i, (t, frame) in enumerate(mock_camera):
+        for i, (t, _frame) in enumerate(mock_camera):
             if frames_processed >= 2:  # Process only 2 frames
                 break
 

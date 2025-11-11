@@ -142,7 +142,7 @@ class TestTargetROIBuilder(unittest.TestCase):
         img = cv2.imread(img_path)
 
         # This should trigger diagnostic logging
-        target_points = self.roi_builder_diagnostic._find_target_coordinates(img)
+        self.roi_builder_diagnostic._find_target_coordinates(img)
 
         # Should complete without errors regardless of detection success
         # (diagnostics should handle both success and failure cases)
@@ -162,7 +162,7 @@ class TestTargetROIBuilder(unittest.TestCase):
         self.assertIsNone(roi_builder._previous_frame)
 
         # Run detection - this will either succeed or fail and store frame
-        target_points1 = roi_builder._find_target_coordinates(img)
+        roi_builder._find_target_coordinates(img)
 
         # After first detection attempt, previous frame should be set if frame averaging is enabled
         # (Note: only stored if detection failed completely, but we test the mechanism works)
@@ -178,7 +178,7 @@ class TestTargetROIBuilder(unittest.TestCase):
         self.assertIsNotNone(roi_builder._previous_frame)
 
         # Test that subsequent detection with frame averaging doesn't crash
-        target_points2 = roi_builder._find_target_coordinates(blank_img)
+        roi_builder._find_target_coordinates(blank_img)
 
         # Should complete without errors
         self.assertTrue(True, "Frame averaging completed without exceptions")

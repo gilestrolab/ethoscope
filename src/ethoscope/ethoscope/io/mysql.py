@@ -41,7 +41,7 @@ class AsyncMySQLWriter(BaseAsyncSQLWriter):
             erase_old_db (bool): Whether to drop and recreate database
             db_host (str): Database server hostname or IP address
         """
-        super(AsyncMySQLWriter, self).__init__(queue, erase_old_db)
+        super().__init__(queue, erase_old_db)
         self._db_name = db_credentials["name"]
         self._db_user_name = db_credentials["user"]
         self._db_user_pass = db_credentials["password"]
@@ -70,7 +70,7 @@ class AsyncMySQLWriter(BaseAsyncSQLWriter):
 
         except mysql.connector.errors.OperationalError:
             logging.warning(
-                "Database %s does not exist. Cannot delete it" % self._db_name
+                f"Database {self._db_name} does not exist. Cannot delete it"
             )
             return
 
@@ -95,7 +95,7 @@ class AsyncMySQLWriter(BaseAsyncSQLWriter):
 
         # Drop the entire database directly (no need to truncate tables first)
         logging.info("Dropping entire database")
-        command = "DROP DATABASE IF EXISTS %s" % self._db_name
+        command = f"DROP DATABASE IF EXISTS {self._db_name}"
         c.execute(command)
         db.commit()
         db.close()
@@ -124,13 +124,13 @@ class AsyncMySQLWriter(BaseAsyncSQLWriter):
             logging.error(f"Failed to connect to MySQL: {str(e)}")
             raise
         c = db.cursor()
-        cmd = "CREATE DATABASE %s" % self._db_name
+        cmd = f"CREATE DATABASE {self._db_name}"
         c.execute(cmd)
         logging.info("Database created")
 
         # create a read-only node user that the node will use to get data from
         # it's better to have a second user for remote operation for reasons of debug and have better control
-        cmd = "GRANT SELECT ON %s.* to 'node' identified by 'node'" % self._db_name
+        cmd = f"GRANT SELECT ON {self._db_name}.* to 'node' identified by 'node'"
         c.execute(cmd)
         logging.info("Node user created")
 
@@ -277,7 +277,7 @@ class MySQLResultWriter(BaseResultWriter):
         # Store MySQL-specific parameters for async writer creation
         self._db_host = db_host
         # Call parent initialization with all common logic
-        super(MySQLResultWriter, self).__init__(
+        super().__init__(
             db_credentials,
             rois,
             metadata,
@@ -325,7 +325,7 @@ class MySQLResultWriter(BaseResultWriter):
 
     def __getstate__(self):
         """Extend base pickle state with MySQL-specific parameters."""
-        state = super(MySQLResultWriter, self).__getstate__()
+        state = super().__getstate__()
         # Store MySQL-specific parameters
         state["_pickle_extra_kwargs"] = {
             "db_host": getattr(self, "_db_host", "localhost")
@@ -353,9 +353,9 @@ class MySQLResultWriter(BaseResultWriter):
             )
             for r in self._rois:
                 fd = r.get_feature_dict()
-                command = "INSERT INTO ROI_MAP VALUES %s" % str(
+                command = "INSERT INTO ROI_MAP VALUES {}".format(str(
                     (fd["idx"], fd["value"], fd["x"], fd["y"], fd["w"], fd["h"])
-                )
+                ))
                 self._write_async_command(command)
 
             logging.info("Creating variable map table 'VAR_MAP'")

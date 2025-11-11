@@ -106,8 +106,7 @@ class Scheduler:
             raise Exception("Unexpected date string")
         if out[0] >= out[1]:
             raise DateRangeError(
-                "Error in date %s, the end date appears to be in the past"
-                % date_range_str
+                f"Error in date {date_range_str}, the end date appears to be in the past"
             )
         return out
 
@@ -118,14 +117,14 @@ class Scheduler:
         if re.match(r"^\s*$", date_str):
             return None
         if not re.match(pattern, date_str):
-            raise DateRangeError("%s not match the expected pattern" % date_str)
+            raise DateRangeError(f"{date_str} not match the expected pattern")
         datestr = re.match(pattern, date_str).groupdict()["date"]
         try:
             return time.mktime(
                 datetime.datetime.strptime(datestr, "%Y-%m-%d %H:%M:%S").timetuple()
             )
         except (ValueError, OverflowError) as e:
-            raise DateRangeError("Invalid date format: %s (%s)" % (datestr, str(e)))
+            raise DateRangeError(f"Invalid date format: {datestr} ({str(e)})")
 
 
 class DailyScheduler:
@@ -242,7 +241,7 @@ class DailyScheduler:
 
         # Get current time components
         dt = datetime.datetime.fromtimestamp(t)
-        current_seconds = dt.hour * 3600 + dt.minute * 60 + dt.second
+        dt.hour * 3600 + dt.minute * 60 + dt.second
 
         # Calculate time since the most recent start time
         days_since_epoch = int(t // 86400)  # 86400 seconds per day

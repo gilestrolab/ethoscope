@@ -41,7 +41,7 @@ class AsyncSQLiteWriter(BaseAsyncSQLWriter):
             erase_old_db (bool): Whether to delete existing database (typically False since
                                 filenames are unique per experiment)
         """
-        super(AsyncSQLiteWriter, self).__init__(queue, erase_old_db)
+        super().__init__(queue, erase_old_db)
         self._db_name = db_name
 
     def _get_connection(self):
@@ -81,7 +81,7 @@ class AsyncSQLiteWriter(BaseAsyncSQLWriter):
             c = conn.cursor()
             logging.info("Setting DB parameters")
             for k, v in list(self._pragmas.items()):
-                command = "PRAGMA %s = %s" % (str(k), str(v))
+                command = f"PRAGMA {str(k)} = {str(v)}"
                 c.execute(command)
             conn.close()
 
@@ -171,7 +171,7 @@ class SQLiteResultWriter(BaseResultWriter):
         # SQLite databases are unique per experiment, don't erase them
 
         # Call parent initialization with all common logic
-        super(SQLiteResultWriter, self).__init__(
+        super().__init__(
             db_credentials,
             rois,
             metadata,
@@ -303,7 +303,7 @@ class SQLiteResultWriter(BaseResultWriter):
 
     def __getstate__(self):
         """Extend base pickle state with SQLite-specific parameters."""
-        state = super(SQLiteResultWriter, self).__getstate__()
+        state = super().__getstate__()
         # SQLite doesn't need extra kwargs, but we set empty dict for consistency
         state["_pickle_extra_kwargs"] = {}
         return state
@@ -353,7 +353,7 @@ class SQLiteResultWriter(BaseResultWriter):
             engine: Ignored for SQLite
         """
         # Don't modify fields for SQLite - they should already be SQLite-compatible
-        command = "CREATE TABLE IF NOT EXISTS %s (%s)" % (name, fields)
+        command = f"CREATE TABLE IF NOT EXISTS {name} ({fields})"
         logging.info("Creating database table with: " + command)
         self._write_async_command(command)
 
@@ -372,7 +372,7 @@ class SQLiteResultWriter(BaseResultWriter):
                 sqlite_type = "TEXT"
             else:
                 sqlite_type = "TEXT"  # Default fallback
-            fields.append("%s %s" % (dt.header_name, sqlite_type))
+            fields.append(f"{dt.header_name} {sqlite_type}")
         fields = ", ".join(fields)
         table_name = "ROI_%i" % roi.idx
         self._create_table(table_name, fields, engine=None)
@@ -475,7 +475,7 @@ class SQLiteResultWriter(BaseResultWriter):
                 self._insert_dict[roi_id] = []
 
         # Call parent close method
-        super(SQLiteResultWriter, self).close()
+        super().close()
 
     def _create_all_tables(self):
         """

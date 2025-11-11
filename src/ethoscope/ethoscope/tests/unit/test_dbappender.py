@@ -200,7 +200,7 @@ class TestDbAppender(unittest.TestCase):
         mock_writer_instance = Mock()
         mock_sqlite_writer.return_value = mock_writer_instance
 
-        appender = dbAppender(
+        dbAppender(
             db_credentials=self.sqlite_credentials,
             rois=self.rois,
             metadata=self.metadata,
@@ -225,7 +225,7 @@ class TestDbAppender(unittest.TestCase):
         mock_writer_instance = Mock()
         mock_mysql_writer.return_value = mock_writer_instance
 
-        appender = dbAppender(
+        dbAppender(
             db_credentials=self.mysql_credentials,
             rois=self.rois,
             metadata=self.metadata,
@@ -264,7 +264,7 @@ class TestDbAppender(unittest.TestCase):
                 "name": os.path.join(self.temp_dir, "results", "test_database.db")
             }
 
-            appender = dbAppender(
+            dbAppender(
                 db_credentials=credentials,
                 rois=self.rois,
                 metadata=self.metadata,

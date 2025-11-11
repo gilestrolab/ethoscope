@@ -194,7 +194,7 @@ class FileBasedROIBuilder(BaseROIBuilder):
             _, frame = next(iter(camera))
         except (StopIteration, Exception):
             # Can't validate without frame, but don't fail
-            warnings.warn("Could not capture frame for ROI validation")
+            warnings.warn("Could not capture frame for ROI validation", stacklevel=2)
             return
 
         img_height, img_width = frame.shape[:2]
@@ -209,12 +209,12 @@ class FileBasedROIBuilder(BaseROIBuilder):
             # Check ROI is within image bounds
             x, y, w, h = roi.rectangle
             if x < 0 or y < 0 or x + w > img_width or y + h > img_height:
-                warnings.warn(f"ROI {i} extends outside image bounds")
+                warnings.warn(f"ROI {i} extends outside image bounds", stacklevel=2)
 
             # Check minimum area (calculate from rectangle dimensions)
             roi_area = w * h
             if roi_area < min_area:
-                warnings.warn(f"ROI {i} area ({roi_area}) below minimum ({min_area})")
+                warnings.warn(f"ROI {i} area ({roi_area}) below minimum ({min_area})", stacklevel=2)
 
         # Check overlap if specified
         if max_overlap < 1.0:
@@ -229,8 +229,8 @@ class FileBasedROIBuilder(BaseROIBuilder):
 
         # Get image dimensions from first ROI
         x, y, w, h = rois[0].rectangle
-        img_height = max(roi.rectangle[1] + roi.rectangle[3] for roi in rois)
-        img_width = max(roi.rectangle[0] + roi.rectangle[2] for roi in rois)
+        max(roi.rectangle[1] + roi.rectangle[3] for roi in rois)
+        max(roi.rectangle[0] + roi.rectangle[2] for roi in rois)
 
         for i in range(len(rois)):
             for j in range(i + 1, len(rois)):
@@ -255,7 +255,7 @@ class FileBasedROIBuilder(BaseROIBuilder):
 
                     if overlap_ratio > max_overlap:
                         warnings.warn(
-                            f"ROI {i} and {j} overlap ratio ({overlap_ratio:.3f}) exceeds maximum ({max_overlap})"
+                            f"ROI {i} and {j} overlap ratio ({overlap_ratio:.3f}) exceeds maximum ({max_overlap})", stacklevel=2
                         )
 
     def get_template_info(self) -> Dict[str, Any]:

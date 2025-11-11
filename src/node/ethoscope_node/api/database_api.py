@@ -44,7 +44,7 @@ class DatabaseAPI(BaseAPI):
         try:
             # Get the specific ethoscope device from the scanner
             device_info = None
-            for device_id, device_data in self.devices.items():
+            for _device_id, device_data in self.devices.items():
                 if device_data.get("name") == device_name:
                     device_info = device_data
                     break

@@ -147,7 +147,7 @@ class SensorDataHelper:
     def create_command(self):
         """Generate SQL CREATE TABLE command for sensor data."""
         return ",".join(
-            ["%s %s" % (key, self._table_headers[key]) for key in self._table_headers]
+            [f"{key} {self._table_headers[key]}" for key in self._table_headers]
         )
 
 
@@ -201,7 +201,7 @@ class ImgSnapshotHelper:
     def create_command(self):
         """Generate SQL CREATE TABLE command for image snapshots."""
         return ",".join(
-            ["%s %s" % (key, self._table_headers[key]) for key in self._table_headers]
+            [f"{key} {self._table_headers[key]}" for key in self._table_headers]
         )
 
     def __del__(self):
@@ -209,7 +209,7 @@ class ImgSnapshotHelper:
         try:
             os.remove(self._tmp_file)
         except:
-            logging.error("Could not remove temp file: %s" % self._tmp_file)
+            logging.error(f"Could not remove temp file: {self._tmp_file}")
 
     def flush(self, t, img):
         """
@@ -342,7 +342,7 @@ class DAMFileHelper:
         command = (
             """INSERT INTO CSV_DAM_ACTIVITY (date, time, """
             + ", ".join([f"ROI_{i}" for i in range(1, self._n_rois + 1)])
-            + """) VALUES %s""" % str(tuple(values))
+            + f""") VALUES {str(tuple(values))}"""
         )
         return command
 
@@ -489,8 +489,7 @@ class NpyAppendableFile:
             np.save(fh, content)
 
         print(
-            "New .npy compatible file saved with name %s. Use numpy.load to load data from it. The array has a shape of %s"
-            % (filename, content.shape)
+            f"New .npy compatible file saved with name {filename}. Use numpy.load to load data from it. The array has a shape of {content.shape}"
         )
 
     @property
@@ -547,7 +546,7 @@ class RawDataWriter:
             for r in range(n_rois)
         ]
 
-        self.data = dict()
+        self.data = {}
 
     def flush(self, t, frame):
         """

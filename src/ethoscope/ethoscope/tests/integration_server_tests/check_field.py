@@ -16,4 +16,4 @@ if __name__ == "__main__":
             exit()
         value = str(sys.argv[3])
         if data[field] != value:
-            raise Exception("%s != %s" % (data[field], value))
+            raise Exception(f"{data[field]} != {value}")

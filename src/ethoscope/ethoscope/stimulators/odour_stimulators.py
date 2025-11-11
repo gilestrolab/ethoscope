@@ -33,7 +33,7 @@ class HasChangedSideStimulator(BaseStimulator):
         """
         self._middle_line = middle_line
         # self._last_active = 0
-        super(HasChangedSideStimulator, self).__init__(
+        super().__init__(
             hardware_connection, roi_template_config=roi_template_config
         )
 
@@ -107,7 +107,7 @@ class DynamicOdourDeliverer(HasChangedSideStimulator):
 
         self._t0 = None
         self._scheduler = Scheduler(date_range)
-        super(DynamicOdourDeliverer, self).__init__(
+        super().__init__(
             hardware_connection, roi_template_config=roi_template_config
         )
 
@@ -198,7 +198,7 @@ class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
         :return:
         """
         self._stimulus_duration = stimulus_duration
-        super(DynamicOdourSleepDepriver, self).__init__(
+        super().__init__(
             hardware_connection,
             velocity_correction_coef,
             min_inactive_time,
@@ -207,7 +207,7 @@ class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
         )
 
     def _decide(self):
-        decide, args = super(DynamicOdourSleepDepriver, self)._decide()
+        decide, args = super()._decide()
         args["stimulus_duration"] = self._stimulus_duration
 
         return decide, args
@@ -269,7 +269,7 @@ class MiddleCrossingOdourStimulator(
         roi_template_config=None,
     ):
 
-        super(MiddleCrossingOdourStimulator, self).__init__(
+        super().__init__(
             hardware_connection,
             p=p,
             date_range=date_range,
@@ -279,7 +279,7 @@ class MiddleCrossingOdourStimulator(
         self._stimulus_duration = stimulus_duration
 
     def _decide(self):
-        decide, args = super(MiddleCrossingOdourStimulator, self)._decide()
+        decide, args = super()._decide()
         args["stimulus_duration"] = self._stimulus_duration
 
         return decide, args

@@ -26,7 +26,7 @@ class BaseIntVariable(int):
             )
         if cls.header_name is None:
             raise NotImplementedError("Variables must have a header name")
-        return super(BaseIntVariable, cls).__new__(cls, value)
+        return super().__new__(cls, value)
 
 
 class BaseBoolVariable(BaseIntVariable):

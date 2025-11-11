@@ -100,11 +100,11 @@ def set_machine_name(id, path="/etc/machine-name"):
         ensure_dir_exists(path)
         with open(path, "w") as f:
             f.write(machine_name)
-        logging.warning("Wrote new information in file: %s" % path)
+        logging.warning(f"Wrote new information in file: {path}")
 
         with open("/etc/hostname", "w") as f:
             f.write(machine_name)
-        logging.warning("Changed the machine hostname to: %s" % machine_name)
+        logging.warning(f"Changed the machine hostname to: {machine_name}")
 
     except:
         raise
@@ -123,7 +123,7 @@ def set_machine_id(id, path="/etc/machine-id"):
     try:
         with open(path, "w") as f:
             f.write(new_uuid)
-        logging.warning("Wrote new information in file: %s" % path)
+        logging.warning(f"Wrote new information in file: {path}")
 
     except:
         raise
@@ -243,44 +243,37 @@ def set_WIFI(ssid="ETHOSCOPE_WIFI", wpakey="ETHOSCOPE_1234", useSTATIC=False):
         netctl_file = "/etc/netctl/wlan"
 
         wlan_settings = (
-            "Description=ethoscope_wifi network\nInterface=wlan0\nConnection=wireless\nSecurity=wpa\nESSID=%s\nKey=%s"
-            % (ssid, wpakey)
+            f"Description=ethoscope_wifi network\nInterface=wlan0\nConnection=wireless\nSecurity=wpa\nESSID={ssid}\nKey={wpakey}"
         )
 
         if useSTATIC:
-            wlan_settings += "IP=static\nAddress=('%s/24')\nGateway='%s'" % (
-                ip_address,
-                gateway,
-            )
+            wlan_settings += f"IP=static\nAddress=('{ip_address}/24')\nGateway='{gateway}'"
         else:
             wlan_settings += "IP=dhcp\nTimeoutDHCP=60"
 
         with open(netctl_file, "w") as f:
             f.write(wlan_settings)
-        logging.warning("Wrote new information to %s" % netctl_file)
+        logging.warning(f"Wrote new information to {netctl_file}")
 
     if network_service["systemd"]:
         # Write the settings for systemd-networkd (from images > 2023/03/07)
         wpasupplicant_file = "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
         systemd_file = "/etc/systemd/network/25-wireless.network"
 
-        wpa_cmd = "wpa_passphrase %s %s > %s" % (ssid, wpakey, wpasupplicant_file)
+        wpa_cmd = f"wpa_passphrase {ssid} {wpakey} > {wpasupplicant_file}"
         with os.popen(wpa_cmd) as cmd:
             logging.info(cmd.read())
 
         wlan_settings_systemd = "[Match]\nName=wlan0\n\n[DHCPv4]\nRouteMetric=20\n"
 
         if useSTATIC:
-            wlan_settings_systemd += "[Network]\nAddress=%s/24\nGateway=%s\nDHCP=no" % (
-                ip_address,
-                gateway,
-            )
+            wlan_settings_systemd += f"[Network]\nAddress={ip_address}/24\nGateway={gateway}\nDHCP=no"
         else:
             wlan_settings_systemd += "[Network]\nDHCP=yes"
 
         with open(systemd_file, "w") as f:
             f.write(wlan_settings_systemd)
-        logging.warning("Wrote new information to %s" % systemd_file)
+        logging.warning(f"Wrote new information to {systemd_file}")
 
 
 def get_connection_status():
@@ -302,8 +295,8 @@ def set_etc_hostname(ip_address, nodename="node", path="/etc/hosts"):
     try:
         with open(path, "w") as f:
             f.write("127.0.0.1\tlocalhost\n")
-            f.write("%s\t%s\n" % (ip_address, nodename))
-        logging.warning("Wrote new information in file: %s" % path)
+            f.write(f"{ip_address}\t{nodename}\n")
+        logging.warning(f"Wrote new information in file: {path}")
     except:
         raise
 
@@ -432,7 +425,7 @@ def _legacy_camera_detection():
 
             for loc in vcgencmd_possible_locations:
                 if os.path.isfile(loc):
-                    vcgencmd = "%s get_camera" % loc
+                    vcgencmd = f"{loc} get_camera"
                     break
 
             if vcgencmd:
@@ -626,14 +619,13 @@ def isExperimental(new_value=None):
         ensure_dir_exists(filename)
         with open(filename, mode="w"):
             logging.warning(
-                "Created a new empty file in %s. The machine is now experimental."
-                % filename
+                f"Created a new empty file in {filename}. The machine is now experimental."
             )
 
     elif new_value is False and current_value is True:
         # delete file
         os.remove(filename)
-        logging.warning("Removed file %s. The machine is not experimental." % filename)
+        logging.warning(f"Removed file {filename}. The machine is not experimental.")
 
 
 def was_interrupted():
@@ -670,7 +662,7 @@ def get_machine_id(path="/etc/machine-id"):
             return info
 
         else:
-            return "VIR%s" % get_container_id()
+            return f"VIR{get_container_id()}"
     except:
         return "NO_ID_AVAILABLE"
 
@@ -707,7 +699,7 @@ def get_core_temperature():
     vcgencmd_possible_locations = ["/opt/vc/bin/vcgencmd", "/usr/bin/vcgencmd"]
     for loc in vcgencmd_possible_locations:
         if os.path.isfile(loc):
-            vcgencmd = "%s measure_temp" % loc
+            vcgencmd = f"{loc} measure_temp"
             break
 
     if isMachinePI():
@@ -797,9 +789,9 @@ def set_datetime(time_on_node):
     time_on_node is the time to be set in the datetime format
     """
 
-    cmd = 'date -s "%s"' % time_on_node.strftime(
+    cmd = 'date -s "{}"'.format(time_on_node.strftime(
         "%d %b %Y %H:%M:%S"
-    )  # 26 Jun 2020 15:04:25
+    ))  # 26 Jun 2020 15:04:25
 
     try:
         with os.popen(cmd, "r") as c:
@@ -813,7 +805,7 @@ def set_datetime(time_on_node):
 
 def SQL_dump(
     database_name=None,
-    credentials={"username": "ethoscope", "password": "ethoscope"},
+    credentials=None,
     output_dir="/ethoscope_data/backup",
     outputfile=None,
 ):
@@ -821,6 +813,8 @@ def SQL_dump(
     Creates a SQL dump of the specified database
     """
 
+    if credentials is None:
+        credentials = {"username": "ethoscope", "password": "ethoscope"}
     if database_name is None:
         database_name = get_machine_name() + "_db"
 
@@ -829,20 +823,19 @@ def SQL_dump(
 
     if outputfile is None:
         formatted_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        outputfile = "%s_%s.sql" % (database_name, formatted_time)
+        outputfile = f"{database_name}_{formatted_time}.sql"
 
     fullpath = os.path.join(output_dir, outputfile)
 
     cmd = (
-        "mysqldump -alv --compatible=ansi --skip-extended-insert --compact --user=%s --password=%s %s > %s"
-        % (credentials["username"], credentials["password"], database_name, fullpath)
+        "mysqldump -alv --compatible=ansi --skip-extended-insert --compact --user={} --password={} {} > {}".format(credentials["username"], credentials["password"], database_name, fullpath)
     )
 
     try:
         # Exporting the database can take some time
         # I am not really sure if there is a way to get a real time feedback of the process
         with os.popen(cmd, "r") as c:
-            verbose = c.read()
+            c.read()
 
         return True
 
@@ -876,7 +869,7 @@ def loggingStatus(status=None):
             with os.popen(
                 "sleep 1 && systemctl enable --now systemd-journal-upload.service && sleep 2"
             ) as po:
-                r = po.read()
+                po.read()
 
             return loggingStatus()
         except:
@@ -887,7 +880,7 @@ def loggingStatus(status=None):
             with os.popen(
                 "sleep 1 && systemctl disable --now systemd-journal-upload.service && sleep 2"
             ) as po:
-                r = po.read()
+                po.read()
             return loggingStatus()
         except:
             return -1

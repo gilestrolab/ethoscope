@@ -144,7 +144,7 @@ class BackupAPI(BaseAPI):
 
         # Legacy format - look for current file in progress data
         if isinstance(service_status, dict):
-            for device_id, device_data in service_status.items():
+            for _device_id, device_data in service_status.items():
                 if isinstance(device_data, dict) and device_data.get(
                     "processing", False
                 ):

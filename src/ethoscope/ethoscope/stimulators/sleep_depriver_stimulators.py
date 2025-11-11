@@ -39,7 +39,7 @@ class IsMovingStimulator(BaseStimulator):
         """
         self._velocity_correction_coef = velocity_correction_coef
         self._last_active = 0
-        super(IsMovingStimulator, self).__init__(
+        super().__init__(
             hardware_connection, date_range, roi_template_config
         )
 
@@ -161,7 +161,7 @@ class SleepDepStimulator(IsMovingStimulator):
         else:
             raise ValueError("Probability must be between 0.0 and 1.0")
 
-        super(SleepDepStimulator, self).__init__(
+        super().__init__(
             hardware_connection,
             velocity_correction_coef,
             date_range=date_range,
@@ -187,11 +187,11 @@ class SleepDepStimulator(IsMovingStimulator):
 
                 if random.uniform(0, 1) <= self._p:
                     self._t0 = None
-                    logging.info("real stimulation on channel %s" % channel)
+                    logging.info(f"real stimulation on channel {channel}")
                     return HasInteractedVariable(1), {"channel": channel}
                 else:
                     self._t0 = None
-                    logging.info("ghost stimulation on channel %s" % channel)
+                    logging.info(f"ghost stimulation on channel {channel}")
                     return HasInteractedVariable(2), {}
         else:
             self._t0 = now
@@ -366,7 +366,7 @@ class OptomotorSleepDepriver(SleepDepStimulator):
         self._t0 = None
 
         # the inactive time depends on the chanel here
-        super(OptomotorSleepDepriver, self).__init__(
+        super().__init__(
             hardware_connection,
             velocity_correction_coef,
             min_inactive_time,
@@ -383,7 +383,7 @@ class OptomotorSleepDepriver(SleepDepStimulator):
         self._pulse_duration = pulse_duration
 
     def _decide(self):
-        out, dic = super(OptomotorSleepDepriver, self)._decide()
+        out, dic = super()._decide()
         dic["duration"] = self._pulse_duration
         return out, dic
 
@@ -434,7 +434,7 @@ class ExperimentalSleepDepStimulator(SleepDepStimulator):
         self._t0 = None
 
         # the inactive time depends on the chanel here
-        super(ExperimentalSleepDepStimulator, self).__init__(
+        super().__init__(
             hardware_connection,
             velocity_correction_coef,
             0,
@@ -503,7 +503,7 @@ class MiddleCrossingStimulator(BaseStimulator):
         else:
             raise ValueError("Probability must be between 0.0 and 1.0")
 
-        super(MiddleCrossingStimulator, self).__init__(
+        super().__init__(
             hardware_connection,
             date_range=date_range,
             roi_template_config=roi_template_config,
@@ -626,7 +626,7 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
 
         self._interval = interval * 1000  # ms used internally
 
-        super(OptomotorSleepDepriverSystematic, self).__init__(
+        super().__init__(
             hardware_connection,
             0,
             0,
@@ -761,7 +761,7 @@ class mAGO(SleepDepStimulator):
         self._t0 = None
 
         # the inactive time depends on the chanel here
-        super(mAGO, self).__init__(
+        super().__init__(
             hardware_connection,
             velocity_correction_coef,
             min_inactive_time,
@@ -778,7 +778,7 @@ class mAGO(SleepDepStimulator):
         self._pulse_duration = pulse_duration
 
     def _decide(self):
-        out, dic = super(mAGO, self)._decide()
+        out, dic = super()._decide()
         dic["duration"] = self._pulse_duration
         return out, dic
 
@@ -886,7 +886,7 @@ class AGO(SleepDepStimulator):
         logging.info(f"num stim {self._number_of_stimuli} at start")
 
         # the inactive time depends on the chanel here
-        super(AGO, self).__init__(
+        super().__init__(
             hardware_connection,
             velocity_correction_coef,
             min_inactive_time,
@@ -929,14 +929,14 @@ class AGO(SleepDepStimulator):
                     # increase the count by one
                     self._count_roi_stim[roi_id] += 1
 
-                    logging.info("real stimulation on channel %s" % channel)
+                    logging.info(f"real stimulation on channel {channel}")
                     return HasInteractedVariable(1), {
                         "channel": channel,
                         "duration": self._pulse_duration,
                     }
                 else:
                     self._t0 = None
-                    logging.info("ghost stimulation on channel %s" % channel)
+                    logging.info(f"ghost stimulation on channel {channel}")
                     return HasInteractedVariable(2), {}
         else:
             self._t0 = now

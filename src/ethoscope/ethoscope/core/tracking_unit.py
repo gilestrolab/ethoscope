@@ -65,7 +65,7 @@ class TrackingUnit:
         out = []
         for last_pos in last_positions:
             tmp_out = []
-            for k, i in list(last_pos.items()):
+            for _k, i in list(last_pos.items()):
                 if isinstance(i, BaseRelativeVariable):
                     tmp_out.append(i.to_absolute(self.roi))
                 else:

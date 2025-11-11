@@ -120,8 +120,8 @@ class TargetDetectionAnalyzer:
         success_rate = len(success_data) / total_attempts if total_attempts > 0 else 0
 
         # Device counts
-        failed_devices = set(d.get("device_id", "unknown") for d in failed_data)
-        success_devices = set(d.get("device_id", "unknown") for d in success_data)
+        failed_devices = {d.get("device_id", "unknown") for d in failed_data}
+        success_devices = {d.get("device_id", "unknown") for d in success_data}
         all_devices = failed_devices | success_devices
 
         return {
@@ -132,7 +132,7 @@ class TargetDetectionAnalyzer:
             "devices_with_failures": len(failed_devices),
             "devices_with_successes": len(success_devices),
             "total_devices": len(all_devices),
-            "devices_analyzed": sorted(list(all_devices)),
+            "devices_analyzed": sorted(all_devices),
         }
 
     def _analyze_failure_patterns(self, failed_data: List[Dict]) -> Dict[str, Any]:

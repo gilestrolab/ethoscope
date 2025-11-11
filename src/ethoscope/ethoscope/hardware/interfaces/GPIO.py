@@ -65,8 +65,7 @@ class GPIOButtons:
             if int(b) in self._ALLOWED_GPIOS
         ]
         logging.info(
-            "Listening for buttons: %s. Press CTRL+C to exit."
-            % ",".join([str(B.channel) for B in self.BTN])
+            "Listening for buttons: {}. Press CTRL+C to exit.".format(",".join([str(B.channel) for B in self.BTN]))
         )
 
     def exit(self):
@@ -74,7 +73,7 @@ class GPIOButtons:
         for B in self.BTN:
             B.stop()
 
-    def json_create(self, content={}, filename="/etc/gpio.conf"):
+    def json_create(self, content=None, filename="/etc/gpio.conf"):
         """
         Shows how to create a json file that can be used to specify GPIOs and associated commands
         The top level values in the dictionary specify the GPIO number (BOARD format) and for each GPIO
@@ -84,6 +83,8 @@ class GPIOButtons:
         https://www.notion.so/giorgiogilestro/GPIO-PCB-9665d6c670e34f5eab229cf2d18c569d
         """
 
+        if content is None:
+            content = {}
         if content == {}:
             content = {
                 33: {0: "systemctl restart ethoscope_device", 3: "reboot"},
@@ -110,7 +111,9 @@ class GPIOButtons:
 
 
 class Button(threading.Thread):
-    def __init__(self, channel, commands={"0": "", "5": ""}):
+    def __init__(self, channel, commands=None):
+        if commands is None:
+            commands = {"0": "", "5": ""}
         threading.Thread.__init__(self)
 
         self._pressed = False
@@ -133,7 +136,7 @@ class Button(threading.Thread):
 
     def action(self, command):
         """ """
-        logging.info("Executing external command: %s" % command)
+        logging.info(f"Executing external command: {command}")
         os.system(command)
 
     def stop(self):
@@ -201,7 +204,7 @@ if __name__ == "__main__":
     # meant for testing purposes only. Use a LED but blink it fast.
     if option_dict["blink"]:
         led = Output(int(option_dict["blink"]))
-        for i in range(10):
+        for _i in range(10):
             led.on(sleep=0.2)
             led.off(sleep=0.5)
         GPIO.cleanup()

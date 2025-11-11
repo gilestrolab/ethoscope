@@ -208,7 +208,7 @@ def demo_error_handling():
 
     for duration, interval, start_time, error_desc in invalid_configs:
         try:
-            scheduler = DailyScheduler(duration, interval, start_time)
+            DailyScheduler(duration, interval, start_time)
             print(f"✗ {error_desc}: Should have failed but didn't!")
         except (DailyScheduleError, ValueError) as e:
             print(f"✓ {error_desc}: Correctly caught - {e}")

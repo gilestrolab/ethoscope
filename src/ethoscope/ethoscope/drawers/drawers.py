@@ -120,7 +120,7 @@ class NullDrawer(BaseDrawer):
 
         :return:
         """
-        super(NullDrawer, self).__init__(draw_frames=False)
+        super().__init__(draw_frames=False)
 
     def _annotate_frame(self, img, positions, tracking_units):
         pass
@@ -138,7 +138,7 @@ class DefaultDrawer(BaseDrawer):
         :param draw_frames: Whether frames should be displayed on the screen (a new window will be created).
         :type draw_frames: bool
         """
-        super(DefaultDrawer, self).__init__(
+        super().__init__(
             video_out=video_out, draw_frames=draw_frames, **kwargs
         )
 
@@ -181,7 +181,6 @@ class DefaultDrawer(BaseDrawer):
             center = (center_x, center_y)
 
             # Make indicator larger and more prominent
-            outer_radius = 15
             inner_radius = 12
 
             # Visual indicators according to user specifications
@@ -308,7 +307,6 @@ class DefaultDrawer(BaseDrawer):
             # draw the shape of the ROI
             black_colour = (0, 0, 0)
             roi_colour = (0, 255, 0)
-            sub_roi_colour = (255, 0, 0)
             cv2.drawContours(img, [track_u.roi.polygon], -1, black_colour, 3, LINE_AA)
             cv2.drawContours(img, [track_u.roi.polygon], -1, roi_colour, 1, LINE_AA)
 

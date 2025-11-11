@@ -279,7 +279,7 @@ class TestFallbackDatabaseDiscovery:
         assert len(sqlite_dbs) >= 1  # At least one database should be found
 
         # Verify database properties
-        for db_name, db_info in sqlite_dbs.items():
+        for _db_name, db_info in sqlite_dbs.items():
             assert db_info["file_exists"] is True
             assert db_info["version"] == "SQLite 3.x"
             assert db_info["db_status"] == "discovered"

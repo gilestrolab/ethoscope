@@ -42,7 +42,7 @@ class AdaptiveBGModelOneObject(BaseTracker):
         self._buff_fg = None
         self._buff_convolved_mask = None
         self._erode_kern = np.ones((7, 7), np.uint8)
-        super(AdaptiveBGModelOneObject, self).__init__(roi, data)
+        super().__init__(roi, data)
 
     def _pre_process_input_minimal(self, img, mask, t, darker_fg=True):
         if self._buff_grey is None:

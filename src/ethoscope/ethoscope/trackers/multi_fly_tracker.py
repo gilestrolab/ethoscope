@@ -29,7 +29,7 @@ class ForegroundModel:
 
     def __init__(
         self,
-        fg_data={"sample_size": 400, "normal_limits": (50, 200), "tolerance": 0.8},
+        fg_data=None,
         visualise=False,
     ):
         """
@@ -46,6 +46,8 @@ class ForegroundModel:
         :return:
         """
 
+        if fg_data is None:
+            fg_data = {"sample_size": 400, "normal_limits": (50, 200), "tolerance": 0.8}
         self.sample_size = fg_data["sample_size"]
         self.normal_limits = fg_data["normal_limits"]
         self.tolerance = fg_data["tolerance"]
@@ -58,8 +60,7 @@ class ForegroundModel:
             plt.ion()
             self.fig, (self.ax1, self.ax2) = plt.subplots(1, 2)
             self.fig.suptitle(
-                "Live analysis of contours - sample size %s - tolerance %s"
-                % (self.sample_size, self.tolerance)
+                f"Live analysis of contours - sample size {self.sample_size} - tolerance {self.tolerance}"
             )
 
     def _is_outlier(self, value, tolerance=0.7):
@@ -75,8 +76,8 @@ class ForegroundModel:
 
         area = cv2.contourArea(contour)
 
-        mean = np.mean(self.limited_pool)
-        std = np.std(self.limited_pool)
+        np.mean(self.limited_pool)
+        np.std(self.limited_pool)
 
         self.total_pool.append(area)
 
@@ -122,18 +123,7 @@ class MultiFlyTracker(BaseTracker):
     def __init__(
         self,
         roi,
-        data={
-            "maxN": 50,
-            "visualise": False,
-            "fg_data": {
-                "sample_size": 400,
-                "normal_limits": (50, 200),
-                "tolerance": 0.8,
-            },
-            "adaptive_threshold": True,
-            "min_fg_threshold": 10,
-            "max_fg_threshold": 50,
-        },
+        data=None,
     ):
         """
         An adaptive background subtraction model to find position of multiple animals in one roi.
@@ -146,6 +136,8 @@ class MultiFlyTracker(BaseTracker):
         :return:
         """
 
+        if data is None:
+            data = {"maxN": 50, "visualise": False, "fg_data": {"sample_size": 400, "normal_limits": (50, 200), "tolerance": 0.8}, "adaptive_threshold": True, "min_fg_threshold": 10, "max_fg_threshold": 50}
         self.maxN = data["maxN"]
         self._visualise = data["visualise"]
 
@@ -197,7 +189,7 @@ class MultiFlyTracker(BaseTracker):
             self.multi_fly_tracker_window = "tracking_preview"
             cv2.namedWindow(self.multi_fly_tracker_window, cv2.WINDOW_AUTOSIZE)
 
-        super(MultiFlyTracker, self).__init__(roi, data)
+        super().__init__(roi, data)
 
     def _pre_process_input_minimal(self, img, mask, t, darker_fg=True):
         """
@@ -433,7 +425,7 @@ class MultiFlyTracker(BaseTracker):
 
         out_pos = []
 
-        for n_vc, vc in enumerate(valid_contours):
+        for _n_vc, vc in enumerate(valid_contours):
 
             # calculates the parameters to draw the centroid
             (x, y), (w, h), angle = cv2.minAreaRect(vc)
@@ -518,22 +510,15 @@ class HaarTracker(BaseTracker):
     def __init__(
         self,
         roi,
-        data={
-            "maxN": 50,
-            "cascade": "cascade.xml",
-            "scaleFactor": 1.1,
-            "minNeighbors": 3,
-            "flags": 0,
-            "minSize": (15, 15),
-            "maxSize": (20, 20),
-            "visualise": False,
-        },
+        data=None,
     ):
         """
         An adaptive background subtraction model to find position of one animal in one roi using a Haar Cascade.
         example of data
         """
 
+        if data is None:
+            data = {"maxN": 50, "cascade": "cascade.xml", "scaleFactor": 1.1, "minNeighbors": 3, "flags": 0, "minSize": (15, 15), "maxSize": (20, 20), "visualise": False}
         if not os.path.exists(data["cascade"]):
             print("A valid xml cascade file could not be found.")
             raise
@@ -554,7 +539,7 @@ class HaarTracker(BaseTracker):
             self._multi_fly_tracker_window = "tracking_preview"
             cv2.namedWindow(self._multi_fly_tracker_window, cv2.WINDOW_AUTOSIZE)
 
-        super(HaarTracker, self).__init__(roi, data)
+        super().__init__(roi, data)
 
     def _pre_process_input(self, img, mask=None):
         """ """

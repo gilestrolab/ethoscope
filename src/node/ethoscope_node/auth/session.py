@@ -187,7 +187,7 @@ class SessionManager:
             #              u.username(4), u.fullname(5), u.email(6), u.telephone(7),
             #              u.labname(8), u.active as user_active(9), u.isadmin(10)
 
-            session_username = session_data[0]
+            session_data[0]
             user_id = session_data[1]
             username = session_data[4]
             fullname = session_data[5]

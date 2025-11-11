@@ -125,7 +125,7 @@ class ROITemplateManager:
                     }
                 )
             except Exception as e:
-                warnings.warn(f"Could not load template {filepath}: {e}")
+                warnings.warn(f"Could not load template {filepath}: {e}", stacklevel=2)
 
         return templates
 

@@ -226,7 +226,7 @@ class TestFileBasedROIBuilder(unittest.TestCase):
         mock_manager.load_template.return_value = mock_template
         mock_manager_class.return_value = mock_manager
 
-        builder = FileBasedROIBuilder(template_name="test_template")
+        FileBasedROIBuilder(template_name="test_template")
         mock_manager.load_template.assert_called_once_with("test_template")
 
     def test_create_with_invalid_file(self):

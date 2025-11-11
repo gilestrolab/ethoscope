@@ -148,7 +148,7 @@ class mAGOSleepRestriction(mAGO):
         """
 
         # Initialize parent mAGO stimulator
-        super(mAGOSleepRestriction, self).__init__(
+        super().__init__(
             hardware_connection=hardware_connection,
             velocity_correction_coef=velocity_correction_coef,
             min_inactive_time=min_inactive_time,
@@ -195,7 +195,7 @@ class mAGOSleepRestriction(mAGO):
             tracker: Tracker object providing animal position data
         """
         # Call parent bind_tracker first
-        super(mAGOSleepRestriction, self).bind_tracker(tracker)
+        super().bind_tracker(tracker)
 
         # Set up ROI-specific state file
         if tracker and hasattr(tracker, "_roi") and tracker._roi:
@@ -231,7 +231,7 @@ class mAGOSleepRestriction(mAGO):
             return HasInteractedVariable(False), {}
 
         # Execute normal mAGO stimulation logic during active periods
-        return super(mAGOSleepRestriction, self).apply()
+        return super().apply()
 
     def get_schedule_status(self):
         """
@@ -413,7 +413,7 @@ class SimpleTimeRestrictedStimulator(mAGOSleepRestriction):
         logging.info(f"Using restriction pattern {restriction_pattern}: {description}")
 
         # Initialize parent with pattern parameters
-        super(SimpleTimeRestrictedStimulator, self).__init__(
+        super().__init__(
             hardware_connection=hardware_connection,
             velocity_correction_coef=velocity_correction_coef,
             min_inactive_time=min_inactive_time,

@@ -172,8 +172,7 @@ class ROI:
 
         if w_clamped <= 0 or h_clamped <= 0:
             raise EthoscopeException(
-                "Error whilst slicing region of interest. Clamped region has zero or negative width/height: %s"
-                % str(self.get_feature_dict()),
+                f"Error whilst slicing region of interest. Clamped region has zero or negative width/height: {str(self.get_feature_dict())}",
                 img,
             )
 
@@ -181,16 +180,14 @@ class ROI:
             out = img[y1:y2, x1:x2]
         except Exception as e:
             raise EthoscopeException(
-                "Error whilst slicing region of interest %s: %s"
-                % (str(self.get_feature_dict()), str(e)),
+                f"Error whilst slicing region of interest {str(self.get_feature_dict())}: {str(e)}",
                 img,
             )
 
         # Ensure output dimensions match expected clamped dimensions
         if out.shape[0:2] != (h_clamped, w_clamped):
             raise EthoscopeException(
-                "Error whilst slicing region of interest. Output shape mismatch after clamping: %s"
-                % str(self.get_feature_dict()),
+                f"Error whilst slicing region of interest. Output shape mismatch after clamping: {str(self.get_feature_dict())}",
                 img,
             )
 

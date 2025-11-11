@@ -33,7 +33,7 @@ class ImgMaskROIBuilder(BaseROIBuilder):
         """
         self._mask = cv2.imread(mask_path, IMG_READ_FLAG_GREY)
 
-        super(ImgMaskROIBuilder, self).__init__()
+        super().__init__()
 
     def _rois_from_img(self, img):
 

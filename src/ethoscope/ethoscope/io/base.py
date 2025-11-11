@@ -107,7 +107,7 @@ class BaseAsyncSQLWriter(multiprocessing.Process):
         self._queue = queue
         self._erase_old_db = erase_old_db
         self._ready_event = multiprocessing.Event()
-        super(BaseAsyncSQLWriter, self).__init__()
+        super().__init__()
 
     def run(self):
         """
@@ -167,13 +167,13 @@ class BaseAsyncSQLWriter(multiprocessing.Process):
                             f"Failed to run {self._get_db_type_name().lower()} command:\n%s"
                             % command
                         )
-                        logging.error("Error details: %s" % str(e))
+                        logging.error(f"Error details: {str(e)}")
                         logging.error(
-                            "Arguments: %s" % str(args)
+                            f"Arguments: {str(args)}"
                             if "args" in locals()
                             else "None"
                         )
-                        logging.error("Traceback: %s" % traceback.format_exc())
+                        logging.error(f"Traceback: {traceback.format_exc()}")
 
                         # Allow subclasses to handle specific error types
                         self._handle_command_error(
@@ -182,7 +182,7 @@ class BaseAsyncSQLWriter(multiprocessing.Process):
 
                     except Exception as log_error:
                         logging.error(
-                            "Failed to log error details: %s" % str(log_error)
+                            f"Failed to log error details: {str(log_error)}"
                         )
                         logging.error(
                             "Did not retrieve queue value or failed to log command"
@@ -520,7 +520,6 @@ class BaseResultWriter:
 
         # Check if this ROI's table exists, create if needed
         roi_id = roi.idx
-        table_name = f"ROI_{roi_id}"
         if not hasattr(self, "_initialized_rois"):
             self._initialized_rois = set()
 
@@ -605,7 +604,7 @@ class BaseResultWriter:
         """Initialize ROI-specific database table (MySQL version)."""
         fields = ["id INT  NOT NULL AUTO_INCREMENT PRIMARY KEY", "t INT"]
         for dt in list(data_row.values()):
-            fields.append("%s %s" % (dt.header_name, dt.sql_data_type))
+            fields.append(f"{dt.header_name} {dt.sql_data_type}")
         fields = ", ".join(fields)
         table_name = "ROI_%i" % roi.idx
         self._create_table(table_name, fields)
@@ -888,13 +887,9 @@ class BaseResultWriter:
             engine (str): Storage engine (default: InnoDB)
         """
         if engine:
-            command = "CREATE TABLE IF NOT EXISTS %s (%s) ENGINE=%s" % (
-                name,
-                fields,
-                engine,
-            )
+            command = f"CREATE TABLE IF NOT EXISTS {name} ({fields}) ENGINE={engine}"
         else:
-            command = "CREATE TABLE IF NOT EXISTS %s (%s)" % (name, fields)
+            command = f"CREATE TABLE IF NOT EXISTS {name} ({fields})"
         logging.info("Creating database table with: " + command)
         self._write_async_command(command)
 
@@ -1184,7 +1179,7 @@ class dbAppender:
                 continue
 
             try:
-                for root, dirs, files in os.walk(search_root):
+                for root, _dirs, files in os.walk(search_root):
                     if db_basename in files:
                         full_path = os.path.join(root, db_basename)
                         logging.info(f"Found SQLite database at: {full_path}")

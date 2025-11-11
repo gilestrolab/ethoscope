@@ -818,7 +818,6 @@ class VideoBackupClass(BaseBackupClass):
             )
 
             files_transferred = 0
-            bytes_transferred = 0
             current_file = ""
 
             for line in iter(process.stdout.readline, ""):
@@ -833,7 +832,7 @@ class VideoBackupClass(BaseBackupClass):
                     # Progress line format: "1,234,567  67%   123.45kB/s    0:00:12"
                     match = re.search(r"(\d{1,3}(?:,\d{3})*)\s+(\d+)%\s+(.+?/s)", line)
                     if match:
-                        bytes_so_far = int(match.group(1).replace(",", ""))
+                        int(match.group(1).replace(",", ""))
                         percentage = int(match.group(2))
                         speed = match.group(3)
 
@@ -1225,7 +1224,7 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
                     if match:
                         final_bytes = int(match.group(1).replace(",", ""))
                         speed = match.group(2)
-                        transfer_number = int(match.group(3))
+                        int(match.group(3))
 
                         # Update the most recently processed file with final size
                         if current_file and current_file in file_details:
@@ -1385,7 +1384,7 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
             total_size_bytes = 0
 
             if os.path.exists(local_dir):
-                for root, dirs, files in os.walk(local_dir):
+                for root, _dirs, files in os.walk(local_dir):
                     local_file_count += len(files)
                     for file in files:
                         try:
@@ -1926,12 +1925,10 @@ class GenericBackupWrapper(threading.Thread):
                         f"=== Starting backup cycle #{self._cycle_count} ==="
                     )
 
-                    cycle_success = False
                     try:
                         # Execute backup cycle with comprehensive fault tolerance
                         self._execute_backup_cycle_with_recovery(executor)
 
-                        cycle_success = True
                         consecutive_failures = 0
                         last_successful_cycle = time.time()
 
@@ -1944,7 +1941,6 @@ class GenericBackupWrapper(threading.Thread):
                         )
 
                     except Exception as e:
-                        cycle_success = False
                         consecutive_failures += 1
                         cycle_duration = time.time() - cycle_start_time
 
@@ -2583,7 +2579,7 @@ def _fallback_database_discovery(device_id: str) -> dict:
     results_dir = os.path.join(data_dir, "results", device_id)
 
     if os.path.exists(results_dir):
-        for root, dirs, files in os.walk(results_dir):
+        for root, _dirs, files in os.walk(results_dir):
             for file in files:
                 if file.endswith(".db"):
                     file_path = os.path.join(root, file)

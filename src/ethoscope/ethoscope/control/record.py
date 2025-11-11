@@ -94,7 +94,7 @@ class cameraCaptureThread(threading.Thread):
 
         self.video_file_index = 0
 
-        super(cameraCaptureThread, self).__init__()
+        super().__init__()
 
     def _get_video_chunk_filename(self, ext="h264"):
         """
@@ -125,7 +125,7 @@ class cameraCaptureThread(threading.Thread):
             video_dirname = os.path.dirname(self._video_prefix)
             if not os.path.exists(video_dirname):
                 os.makedirs(video_dirname)
-                logging.info("Created folder: %s" % video_dirname)
+                logging.info(f"Created folder: {video_dirname}")
 
         except OSError as e:
             raise e
@@ -359,7 +359,7 @@ class HDVideoRecorder(GeneralVideoRecorder):
     status = "recording"
 
     def __init__(self, cameraClass, camera_kwargs, video_prefix, img_path):
-        super(HDVideoRecorder, self).__init__(
+        super().__init__(
             cameraClass,
             camera_kwargs,
             img_path,
@@ -380,7 +380,7 @@ class StandardVideoRecorder(GeneralVideoRecorder):
     status = "recording"
 
     def __init__(self, cameraClass, camera_kwargs, video_prefix, img_path):
-        super(StandardVideoRecorder, self).__init__(
+        super().__init__(
             cameraClass,
             camera_kwargs,
             img_path,
@@ -402,7 +402,7 @@ class Streamer(GeneralVideoRecorder):
 
     def __init__(self, cameraClass, camera_kwargs, video_prefix, img_path):
         logging.info(f"video_prefix_streamer: {video_prefix}")
-        super(Streamer, self).__init__(
+        super().__init__(
             cameraClass,
             camera_kwargs,
             img_path="",
@@ -578,7 +578,7 @@ class ControlThreadVideoRecording(ControlThread):
         try:
             subdata = data[field]
         except KeyError:
-            logging.warning("No field %s, using default" % field)
+            logging.warning(f"No field {field}, using default")
             return None, {}
 
         Class = eval(subdata["name"])
@@ -610,7 +610,7 @@ class ControlThreadVideoRecording(ControlThread):
                 code = "NA"
                 logging.warning("No code field in experimental info")
 
-            file_prefix = "%s_%s_%s" % (formatted_time, self._machine_id, code)
+            file_prefix = f"{formatted_time}_{self._machine_id}_{code}"
             self._output_video_full_prefix = os.path.join(
                 self._video_root_dir,
                 self._machine_id,
@@ -645,7 +645,7 @@ class ControlThreadVideoRecording(ControlThread):
                     raise e
 
             self._info["status"] = self._recorder.status  # "recording" or "streaming"
-            logging.info("Started %s" % self._recorder.status)
+            logging.info(f"Started {self._recorder.status}")
 
             self._recorder.start_recording()
 

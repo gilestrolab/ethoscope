@@ -33,7 +33,7 @@ class LynxMotionInterface(SimpleSerialInterface):
         """
 
         logging.info("Connecting to Lynx motion serial port...")
-        super(LynxMotionInterface, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def _angle_to_pulse(self, angle):
         """
@@ -105,7 +105,7 @@ class LynxMotionInterface(SimpleSerialInterface):
         :rtype: int
         """
         min_speed, max_speed = (-100, 100)
-        min_pulse, mid_pulse, max_pulse = (700, 1500, 2300)
+        _min_pulse, mid_pulse, max_pulse = (700, 1500, 2300)
 
         if speed < min_speed or speed > max_speed:
             raise Exception(

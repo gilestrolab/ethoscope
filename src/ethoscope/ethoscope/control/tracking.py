@@ -97,7 +97,7 @@ class ExperimentalInformation(DescribedObject):
         clean_code = r.sub("", code)
         if len(code) != len(clean_code):
             logging.error(
-                "The provided string contains unallowed characters: %s" % code
+                f"The provided string contains unallowed characters: {code}"
             )
             raise Exception(
                 "Code contains special characters. Please use only letters, digits or -"
@@ -207,7 +207,7 @@ class ControlThread(Thread):
     # give the database an ethoscope specific name
     # future proof in case we want to use a remote server
     _db_credentials = {
-        "name": "%s_db" % pi.get_machine_name(),
+        "name": f"{pi.get_machine_name()}_db",
         "user": "ethoscope",
         "password": "ethoscope",
     }
@@ -397,7 +397,7 @@ class ControlThread(Thread):
         self._parse_user_options(data)
 
         logging.info("Starting a new monitor control thread")
-        super(ControlThread, self).__init__()
+        super().__init__()
 
     def _create_backup_filename(self):
         current_time = self.info["time"]
@@ -510,7 +510,7 @@ class ControlThread(Thread):
         try:
             subdata = data[field]
         except KeyError:
-            logging.warning("No field %s, using default" % field)
+            logging.warning(f"No field {field}, using default")
             return None, {}
 
         Class = eval(subdata["name"])
@@ -631,7 +631,7 @@ class ControlThread(Thread):
         logging.info(f"Number of ROIs: {len(rois)}")
 
         stimulators = []
-        for i, roi in enumerate(rois):
+        for i, _roi in enumerate(rois):
             try:
                 stimulator = StimulatorClass(hardware_connection, **stimulator_kwargs)
                 logging.info(
@@ -665,7 +665,7 @@ class ControlThread(Thread):
         )
 
         self._info["status"] = "running"
-        logging.info("Setting monitor status as running: '%s'" % self._info["status"])
+        logging.info("Setting monitor status as running: '{}'".format(self._info["status"]))
 
         # Set tracking start time for database metadata
         # Use the original experiment start time from metadata/backup filename, not current time
@@ -805,7 +805,7 @@ class ControlThread(Thread):
             # if is URL:
             sensor = EthoscopeSensor(self._info["experimental_info"]["sensor"])
             logging.info(
-                "Using sensor with URL %s" % self._info["experimental_info"]["sensor"]
+                "Using sensor with URL {}".format(self._info["experimental_info"]["sensor"])
             )
         else:
             sensor = None

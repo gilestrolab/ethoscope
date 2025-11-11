@@ -123,7 +123,7 @@ class BaseSQLConnector:
                 """
                 cursor.execute(query, ("ETHOSCOPE%",))
                 tables = cursor.fetchall()
-                return {table_name: row_count for table_name, row_count in tables}
+                return dict(tables)
 
     def _get_remote_db_info_slow(self) -> Dict[str, Dict[str, int]]:
         """Accurate method using direct table queries."""
@@ -452,7 +452,7 @@ class MySQLdbToSQLite(BaseSQLConnector):
         Ensure SQLite table exists with proper schema including PRIMARY KEY constraints.
         Handles both new table creation and migration of existing tables.
         """
-        mysql_cursor = mysql_conn.cursor(buffered=True)
+        mysql_conn.cursor(buffered=True)
         sqlite_cursor = sqlite_conn.cursor()
 
         try:

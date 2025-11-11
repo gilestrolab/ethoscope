@@ -97,8 +97,7 @@ def connectedUSB(optional_file="/etc/ethoscope/modules.json"):
         import usb
 
         devices = [
-            "%s:%s"
-            % (
+            "{}:{}".format(
                 f"{dev.idVendor:x}".zfill(4),
                 f"{dev.idProduct:x}".zfill(4),
             )
@@ -135,7 +134,7 @@ class HardwareConnection(Thread):
         self._interface = interface_class(*args, **kwargs)
         self._instructions = collections.deque()
         self._connection_open = True
-        super(HardwareConnection, self).__init__()
+        super().__init__()
         self.start()
 
     def run(self):
@@ -148,11 +147,10 @@ class HardwareConnection(Thread):
             while len(self._instructions) > 0 and self._connection_open:
                 instruc = self._instructions.popleft()
                 try:
-                    ret = self._interface.send(**instruc)
+                    self._interface.send(**instruc)
                 except:
                     logging.error(
-                        "Could not send the following instruction to the module. Instruction: %s"
-                        % instruc
+                        f"Could not send the following instruction to the module. Instruction: {instruc}"
                     )
 
     def send_instruction(self, instruction=None):

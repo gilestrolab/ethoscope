@@ -39,7 +39,7 @@ class OptoMotor(SimpleSerialInterface):
         self._serial = serial.Serial(self._port, self._baud, timeout=2)
         time.sleep(2)
         self._test_serial_connection()
-        super(OptoMotor, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def activate(self, channel, duration, intensity):
         """

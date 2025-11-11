@@ -135,15 +135,12 @@ class Ethoscope(BaseDevice):
             post_data: Optional data to send with instruction (can be Dict or bytes)
         """
         self._check_instruction_status(instruction)
-        current_status = self._device_status.status_name
 
         # Determine trigger source and type
-        is_user_triggered = True
-        trigger_source = "user"
 
         # Check if this is a graceful operation
         if instruction in DeviceStatus.GRACEFUL_OPERATIONS:
-            trigger_source = "graceful"
+            pass
 
         # Track user action timestamp for later status updates
         self._last_user_action = time.time()
@@ -1075,7 +1072,7 @@ class Ethoscope(BaseDevice):
             threshold = alert_config.get("storage_warning_threshold", 80)
 
             # Check each mounted filesystem
-            for mount_point, usage_info in disk_usage.items():
+            for _mount_point, usage_info in disk_usage.items():
                 if isinstance(usage_info, dict):
                     used_percent = usage_info.get("used_percent", 0)
                     available_space = usage_info.get("available", "unknown")
@@ -1270,7 +1267,7 @@ class Ethoscope(BaseDevice):
             # Look for active databases by checking db_status = "tracking"
             for db_type in ["SQLite", "MariaDB"]:
                 db_type_databases = databases.get(db_type, {})
-                for db_name, db_info in db_type_databases.items():
+                for _db_name, db_info in db_type_databases.items():
                     if db_info.get("db_status") == "tracking":
                         backup_filename = db_info.get("backup_filename")
                         if backup_filename:
@@ -1668,7 +1665,7 @@ class EthoscopeScanner(DeviceScanner):
                         self._edb.updateEthoscopes(ethoscope_id=old_id, active=0)
 
                         # Create new device entry, preserving relevant info from old entry
-                        old_info = old_device_data[old_id]
+                        old_device_data[old_id]
                         self._edb.updateEthoscopes(
                             ethoscope_id=new_id,
                             ethoscope_name=device_name,

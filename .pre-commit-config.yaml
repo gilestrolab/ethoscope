@@ -56,10 +56,7 @@ repos:
     rev: v0.1.14
     hooks:
       - id: ruff
-        args: [
-          '--fix',
-          '--ignore=B904,B007,UP008,UP031,UP022,B028,F841,B006,C416,C401,C414,E722,E721,E712,E714,E711,F403,F405,B026,F401,C408,B005,E402,F811,F821'  # Ignore legacy code patterns
-        ]
+        args: ['--fix']
         files: ^(src/|scripts/|run_tests\.py).*\.py$
         exclude: ^(.*docs/conf\.py)$
 
@@ -70,8 +67,8 @@ repos:
       - id: flake8
         args: [
           '--max-line-length=88',
-          '--extend-ignore=E203,W503,E501,F401,F403,F405,E401,E402,E722,E712,E714,E721,E711,E266,F841,C901,F811,F821',
-          '--max-complexity=50'  # Raised from 15 to accommodate legacy code
+          '--extend-ignore=E203,W503',  # Conflicts with black formatter
+          '--max-complexity=15'
         ]
         files: ^(src/|scripts/|run_tests\.py).*\.py$
         exclude: ^(.*docs/conf\.py)$

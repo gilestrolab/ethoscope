@@ -25,7 +25,7 @@ class ArenaMaskROIBuilder(BaseROIBuilder):
 
         self._mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
 
-        super(ArenaMaskROIBuilder, self).__init__()
+        super().__init__()
 
     def _find_target_coordinates(self, img):
         params = cv2.SimpleBlobDetector_Params()

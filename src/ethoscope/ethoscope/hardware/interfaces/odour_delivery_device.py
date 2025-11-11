@@ -12,7 +12,7 @@ class OdourDelivererInterface(LynxMotionInterface):
 
     def __init__(self, *args, **kwargs):
         self._current_pos = [3] * 10
-        super(OdourDelivererInterface, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def _warm_up(self):
         for i in range(1, 1 + self._n_channels):

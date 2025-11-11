@@ -328,7 +328,7 @@ class ROITemplate:
         fill_ratios = positioning.get("fill_ratios", {})
 
         # Extract alignment parameters with defaults
-        alignment = roi_def.get("alignment", {})
+        roi_def.get("alignment", {})
 
         # Create legacy TargetGridROIBuilder with template parameters
         builder_params = {

@@ -135,7 +135,7 @@ class Monitor:
                 # Adjust timestamp for database writes when appending
                 t_with_offset = t + self._time_offset
 
-                for j, track_u in enumerate(self._unit_trackers):
+                for _j, track_u in enumerate(self._unit_trackers):
                     data_rows = track_u.track(t, frame)
                     if len(data_rows) == 0:
                         self._last_positions[track_u.roi.idx] = []
@@ -164,12 +164,12 @@ class Monitor:
 
         except Exception as e:
             logging.error(
-                "Monitor closing with an exception: '%s'" % traceback.format_exc()
+                f"Monitor closing with an exception: '{traceback.format_exc()}'"
             )
             raise e
 
         finally:
             self._is_running = False
-            logging.info("Monitor closing - processed %s frames" % i)
+            logging.info(f"Monitor closing - processed {i} frames")
             if verbose:
-                print("Monitor closing - processed %s frames" % i)
+                print(f"Monitor closing - processed {i} frames")
