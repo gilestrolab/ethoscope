@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Test Script for PRIMARY KEY Backup Implementation
+Validation Script for PRIMARY KEY Backup Implementation
 
-This script tests the new PRIMARY KEY constraint preservation in the MySQL backup system.
+This standalone script validates the PRIMARY KEY constraint preservation in the MySQL backup system.
 It validates:
 1. Proper schema detection and constraint preservation
 2. Table migration for existing databases
@@ -10,7 +10,10 @@ It validates:
 4. Backward compatibility with existing code
 
 Usage:
-    python test_primary_key_backup.py [--verbose]
+    python validate_primary_key_backup.py [--verbose]
+
+Note: This is a standalone validation script, not a pytest test.
+      Run it directly from the command line.
 """
 
 import logging
@@ -22,14 +25,14 @@ from pathlib import Path
 
 # Add the source directory to the path so we can import the backup modules
 sys.path.insert(
-    0, str(Path(__file__).parent.parent / "src" / "node" / "ethoscope_node" / "utils")
+    0, str(Path(__file__).parent.parent.parent.parent)
 )
 
 try:
-    from mysql_backup import MySQLdbToSQLite
+    from ethoscope_node.backup.mysql import MySQLdbToSQLite
 except ImportError as e:
     print(f"Error importing backup modules: {e}")
-    print("Make sure you're running this from the ethoscope root directory")
+    print("Make sure the ethoscope_node package is installed")
     sys.exit(1)
 
 
