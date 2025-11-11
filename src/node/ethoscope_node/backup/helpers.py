@@ -1014,14 +1014,6 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
                 "At least one of backup_results or backup_videos must be True"
             )
 
-    def _format_bytes(self, bytes_size: int) -> str:
-        """Format bytes into human readable format."""
-        for unit in ["B", "KB", "MB", "GB", "TB"]:
-            if bytes_size < 1024.0:
-                return f"{bytes_size:.1f} {unit}"
-            bytes_size /= 1024.0
-        return f"{bytes_size:.1f} PB"
-
     def backup(self) -> Iterator[str]:
         """
         Performs unified rsync backup for SQLite results and videos.

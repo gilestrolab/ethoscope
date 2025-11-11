@@ -712,10 +712,10 @@ class ExperimentalDB(multiprocessing.Process):
         self, experiment_id=None, runs=None, metadata=None, comments=None
     ):
         """ """
-        if type(runs) == list:
+        if isinstance(runs, list):
             runs = ";".join(runs)
 
-        if experiment_id == None:
+        if experiment_id is None:
             sql_enter_new_experiment = f"INSERT INTO {self._experiments_table_name} VALUES (NULL, ?, ?, ?)"
             return self.executeSQL(sql_enter_new_experiment, (runs, metadata, comments))
         else:
@@ -724,7 +724,7 @@ class ExperimentalDB(multiprocessing.Process):
                 for (name, value) in zip(
                     ["runs", "metadata", "comments"], [runs, metadata, comments]
                 )
-                if value != None
+                if value is not None
             }
             set_clauses = [f"{name} = ?" for name in updates.keys()]
             params = list(updates.values())
@@ -783,7 +783,7 @@ class ExperimentalDB(multiprocessing.Process):
 
         # this returns a row if the query is successful, a 0 if no entry was found and -1 if there is an issue connecting to the db
 
-        if type(row) != list and row <= 0:
+        if not isinstance(row, list) and row <= 0:
             return {}
 
         if asdict:
@@ -905,7 +905,7 @@ class ExperimentalDB(multiprocessing.Process):
         sql_get_user = f"SELECT * FROM {self._users_table_name} WHERE username = ?"
         row = self.executeSQL(sql_get_user, (username,))
 
-        if type(row) != list or len(row) == 0:
+        if not isinstance(row, list) or len(row) == 0:
             return {}
 
         if asdict:
@@ -927,7 +927,7 @@ class ExperimentalDB(multiprocessing.Process):
         sql_get_user = f"SELECT * FROM {self._users_table_name} WHERE email = ?"
         row = self.executeSQL(sql_get_user, (email,))
 
-        if type(row) != list or len(row) == 0:
+        if not isinstance(row, list) or len(row) == 0:
             return {}
 
         if asdict:
@@ -954,7 +954,7 @@ class ExperimentalDB(multiprocessing.Process):
 
         row = self.executeSQL(sql_get_user, (run_id,))
 
-        if type(row) != list or len(row) == 0:
+        if not isinstance(row, list) or len(row) == 0:
             return {}
 
         if asdict:
@@ -989,7 +989,7 @@ class ExperimentalDB(multiprocessing.Process):
 
         rows = self.executeSQL(sql_get_users, tuple(params))
 
-        if type(rows) != list or len(rows) == 0:
+        if not isinstance(rows, list) or len(rows) == 0:
             return []
 
         if asdict:
@@ -1170,7 +1170,7 @@ class ExperimentalDB(multiprocessing.Process):
 
         row = self.executeSQL(sql_get_user)
 
-        if type(row) != list or len(row) == 0:
+        if not isinstance(row, list) or len(row) == 0:
             return {}
 
         if asdict:
@@ -1207,7 +1207,7 @@ class ExperimentalDB(multiprocessing.Process):
 
         rows = self.executeSQL(sql_get_users)
 
-        if type(rows) != list:
+        if not isinstance(rows, list):
             return {} if asdict else []
 
         if asdict:
@@ -1379,7 +1379,7 @@ class ExperimentalDB(multiprocessing.Process):
 
         row = self.executeSQL(sql_get_incubator)
 
-        if type(row) != list or len(row) == 0:
+        if not isinstance(row, list) or len(row) == 0:
             return {}
 
         if asdict:
@@ -1401,7 +1401,7 @@ class ExperimentalDB(multiprocessing.Process):
         sql_get_incubator = f"SELECT * FROM {self._incubators_table_name} WHERE name = ?"
         row = self.executeSQL(sql_get_incubator, (name,))
 
-        if type(row) != list or len(row) == 0:
+        if not isinstance(row, list) or len(row) == 0:
             return {}
 
         if asdict:
@@ -1429,7 +1429,7 @@ class ExperimentalDB(multiprocessing.Process):
 
         rows = self.executeSQL(sql_get_incubators)
 
-        if type(rows) != list:
+        if not isinstance(rows, list):
             return {} if asdict else []
 
         if asdict:
@@ -1571,7 +1571,7 @@ class ExperimentalDB(multiprocessing.Process):
 
         rows = self.executeSQL(sql_get_alerts, tuple(params) if params else None)
 
-        if type(rows) != list:
+        if not isinstance(rows, list):
             return []
 
         if asdict:
@@ -2442,7 +2442,7 @@ class simpleDB:
 
     def list(self, onlyfield=None, active=False):
         """ """
-        if onlyfield == None:
+        if onlyfield is None:
             return [u for u in self._db if (u["active"] or not active)]
 
         elif onlyfield in self._keys:
