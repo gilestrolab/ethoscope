@@ -108,7 +108,9 @@ class FileBasedROIBuilder(BaseROIBuilder):
                 self.template = manager.load_template(self.template_name)
 
         except Exception as e:
-            raise ROITemplateValidationError(f"Failed to load ROI template: {str(e)}") from e
+            raise ROITemplateValidationError(
+                f"Failed to load ROI template: {str(e)}"
+            ) from e
 
     def build(self, camera):
         """
@@ -214,7 +216,10 @@ class FileBasedROIBuilder(BaseROIBuilder):
             # Check minimum area (calculate from rectangle dimensions)
             roi_area = w * h
             if roi_area < min_area:
-                warnings.warn(f"ROI {i} area ({roi_area}) below minimum ({min_area})", stacklevel=2)
+                warnings.warn(
+                    f"ROI {i} area ({roi_area}) below minimum ({min_area})",
+                    stacklevel=2,
+                )
 
         # Check overlap if specified
         if max_overlap < 1.0:
@@ -255,7 +260,8 @@ class FileBasedROIBuilder(BaseROIBuilder):
 
                     if overlap_ratio > max_overlap:
                         warnings.warn(
-                            f"ROI {i} and {j} overlap ratio ({overlap_ratio:.3f}) exceeds maximum ({max_overlap})", stacklevel=2
+                            f"ROI {i} and {j} overlap ratio ({overlap_ratio:.3f}) exceeds maximum ({max_overlap})",
+                            stacklevel=2,
                         )
 
     def get_template_info(self) -> Dict[str, Any]:

@@ -138,9 +138,7 @@ class DefaultDrawer(BaseDrawer):
         :param draw_frames: Whether frames should be displayed on the screen (a new window will be created).
         :type draw_frames: bool
         """
-        super().__init__(
-            video_out=video_out, draw_frames=draw_frames, **kwargs
-        )
+        super().__init__(video_out=video_out, draw_frames=draw_frames, **kwargs)
 
     def _draw_stimulator_indicator(self, img, roi, stimulator_state):
         """

@@ -486,7 +486,9 @@ class PiFrameGrabber(threading.Thread):
         fps = fps or 0
         w, h = self._target_resolution
         video_info = f"{w}x{h}@{fps}fps-{self.video_quality}q"
-        chunk_file_name = f"{self._video_prefix}_{video_info}_{self._file_index:05d}.{ext}"
+        chunk_file_name = (
+            f"{self._video_prefix}_{video_info}_{self._file_index:05d}.{ext}"
+        )
         self._last_computed_filename = chunk_file_name
         return chunk_file_name
 

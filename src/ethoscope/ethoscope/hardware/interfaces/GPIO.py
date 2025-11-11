@@ -65,7 +65,9 @@ class GPIOButtons:
             if int(b) in self._ALLOWED_GPIOS
         ]
         logging.info(
-            "Listening for buttons: {}. Press CTRL+C to exit.".format(",".join([str(B.channel) for B in self.BTN]))
+            "Listening for buttons: {}. Press CTRL+C to exit.".format(
+                ",".join([str(B.channel) for B in self.BTN])
+            )
         )
 
     def exit(self):

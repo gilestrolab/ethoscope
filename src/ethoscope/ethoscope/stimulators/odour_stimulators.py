@@ -33,9 +33,7 @@ class HasChangedSideStimulator(BaseStimulator):
         """
         self._middle_line = middle_line
         # self._last_active = 0
-        super().__init__(
-            hardware_connection, roi_template_config=roi_template_config
-        )
+        super().__init__(hardware_connection, roi_template_config=roi_template_config)
 
     def _has_changed_side(self):
         positions = self._tracker.positions
@@ -107,9 +105,7 @@ class DynamicOdourDeliverer(HasChangedSideStimulator):
 
         self._t0 = None
         self._scheduler = Scheduler(date_range)
-        super().__init__(
-            hardware_connection, roi_template_config=roi_template_config
-        )
+        super().__init__(hardware_connection, roi_template_config=roi_template_config)
 
     def _decide(self):
         roi_id = self._tracker._roi.idx

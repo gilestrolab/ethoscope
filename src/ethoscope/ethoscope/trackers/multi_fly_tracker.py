@@ -137,7 +137,18 @@ class MultiFlyTracker(BaseTracker):
         """
 
         if data is None:
-            data = {"maxN": 50, "visualise": False, "fg_data": {"sample_size": 400, "normal_limits": (50, 200), "tolerance": 0.8}, "adaptive_threshold": True, "min_fg_threshold": 10, "max_fg_threshold": 50}
+            data = {
+                "maxN": 50,
+                "visualise": False,
+                "fg_data": {
+                    "sample_size": 400,
+                    "normal_limits": (50, 200),
+                    "tolerance": 0.8,
+                },
+                "adaptive_threshold": True,
+                "min_fg_threshold": 10,
+                "max_fg_threshold": 50,
+            }
         self.maxN = data["maxN"]
         self._visualise = data["visualise"]
 
@@ -518,7 +529,16 @@ class HaarTracker(BaseTracker):
         """
 
         if data is None:
-            data = {"maxN": 50, "cascade": "cascade.xml", "scaleFactor": 1.1, "minNeighbors": 3, "flags": 0, "minSize": (15, 15), "maxSize": (20, 20), "visualise": False}
+            data = {
+                "maxN": 50,
+                "cascade": "cascade.xml",
+                "scaleFactor": 1.1,
+                "minNeighbors": 3,
+                "flags": 0,
+                "minSize": (15, 15),
+                "maxSize": (20, 20),
+                "visualise": False,
+            }
         if not os.path.exists(data["cascade"]):
             print("A valid xml cascade file could not be found.")
             raise

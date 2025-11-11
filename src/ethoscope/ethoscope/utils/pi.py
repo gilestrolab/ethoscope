@@ -242,12 +242,12 @@ def set_WIFI(ssid="ETHOSCOPE_WIFI", wpakey="ETHOSCOPE_1234", useSTATIC=False):
         # Write the settings for netctl (for images made before 2023/03/07)
         netctl_file = "/etc/netctl/wlan"
 
-        wlan_settings = (
-            f"Description=ethoscope_wifi network\nInterface=wlan0\nConnection=wireless\nSecurity=wpa\nESSID={ssid}\nKey={wpakey}"
-        )
+        wlan_settings = f"Description=ethoscope_wifi network\nInterface=wlan0\nConnection=wireless\nSecurity=wpa\nESSID={ssid}\nKey={wpakey}"
 
         if useSTATIC:
-            wlan_settings += f"IP=static\nAddress=('{ip_address}/24')\nGateway='{gateway}'"
+            wlan_settings += (
+                f"IP=static\nAddress=('{ip_address}/24')\nGateway='{gateway}'"
+            )
         else:
             wlan_settings += "IP=dhcp\nTimeoutDHCP=60"
 
@@ -267,7 +267,9 @@ def set_WIFI(ssid="ETHOSCOPE_WIFI", wpakey="ETHOSCOPE_1234", useSTATIC=False):
         wlan_settings_systemd = "[Match]\nName=wlan0\n\n[DHCPv4]\nRouteMetric=20\n"
 
         if useSTATIC:
-            wlan_settings_systemd += f"[Network]\nAddress={ip_address}/24\nGateway={gateway}\nDHCP=no"
+            wlan_settings_systemd += (
+                f"[Network]\nAddress={ip_address}/24\nGateway={gateway}\nDHCP=no"
+            )
         else:
             wlan_settings_systemd += "[Network]\nDHCP=yes"
 
@@ -789,9 +791,9 @@ def set_datetime(time_on_node):
     time_on_node is the time to be set in the datetime format
     """
 
-    cmd = 'date -s "{}"'.format(time_on_node.strftime(
-        "%d %b %Y %H:%M:%S"
-    ))  # 26 Jun 2020 15:04:25
+    cmd = 'date -s "{}"'.format(
+        time_on_node.strftime("%d %b %Y %H:%M:%S")
+    )  # 26 Jun 2020 15:04:25
 
     try:
         with os.popen(cmd, "r") as c:
@@ -827,8 +829,8 @@ def SQL_dump(
 
     fullpath = os.path.join(output_dir, outputfile)
 
-    cmd = (
-        "mysqldump -alv --compatible=ansi --skip-extended-insert --compact --user={} --password={} {} > {}".format(credentials["username"], credentials["password"], database_name, fullpath)
+    cmd = "mysqldump -alv --compatible=ansi --skip-extended-insert --compact --user={} --password={} {} > {}".format(
+        credentials["username"], credentials["password"], database_name, fullpath
     )
 
     try:

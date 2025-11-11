@@ -326,14 +326,10 @@ class TargetDetectionDiagnostics:
         success_dir = self.base_path / "success"
 
         failed_count = (
-            len(list(failed_dir.glob("*_original.png")))
-            if failed_dir.exists()
-            else 0
+            len(list(failed_dir.glob("*_original.png"))) if failed_dir.exists() else 0
         )
         success_count = (
-            len(list(success_dir.glob("*_original.png")))
-            if success_dir.exists()
-            else 0
+            len(list(success_dir.glob("*_original.png"))) if success_dir.exists() else 0
         )
 
         return {

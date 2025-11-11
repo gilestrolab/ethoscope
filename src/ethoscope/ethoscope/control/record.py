@@ -105,7 +105,9 @@ class cameraCaptureThread(threading.Thread):
         self.video_file_index += 1
         w, h = self._resolution
         video_info = f"{w}x{h}@{self.camera.fps}"  # uses effective FPS count, not the desired number
-        video_filename = f"{self._video_prefix}_{video_info}_{self.video_file_index:05d}.{ext}"
+        video_filename = (
+            f"{self._video_prefix}_{video_info}_{self.video_file_index:05d}.{ext}"
+        )
         return video_filename
 
     def _create_recording_folder(self):

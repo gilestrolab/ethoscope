@@ -391,7 +391,9 @@ class EthoscopeConfiguration:
                 try:
                     loaded_config = json.loads(content)
                 except json.JSONDecodeError as e:
-                    raise ConfigurationError(f"Invalid JSON in configuration file: {e}") from e
+                    raise ConfigurationError(
+                        f"Invalid JSON in configuration file: {e}"
+                    ) from e
 
             # Merge with defaults first to ensure all sections are present
             self._settings = self._merge_with_defaults(loaded_config)

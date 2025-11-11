@@ -153,9 +153,7 @@ class EmailNotificationService(NotificationAnalyzer):
             for attachment in attachments:
                 filename = attachment.get("filename", "attachment")
                 content = attachment.get("content", "")
-                attachment.get(
-                    "content_type", "application/octet-stream"
-                )
+                attachment.get("content_type", "application/octet-stream")
 
                 if content:
                     # Create attachment

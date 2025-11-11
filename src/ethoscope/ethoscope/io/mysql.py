@@ -353,9 +353,9 @@ class MySQLResultWriter(BaseResultWriter):
             )
             for r in self._rois:
                 fd = r.get_feature_dict()
-                command = "INSERT INTO ROI_MAP VALUES {}".format(str(
-                    (fd["idx"], fd["value"], fd["x"], fd["y"], fd["w"], fd["h"])
-                ))
+                command = "INSERT INTO ROI_MAP VALUES {}".format(
+                    str((fd["idx"], fd["value"], fd["x"], fd["y"], fd["w"], fd["h"]))
+                )
                 self._write_async_command(command)
 
             logging.info("Creating variable map table 'VAR_MAP'")

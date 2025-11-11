@@ -169,9 +169,7 @@ class BaseAsyncSQLWriter(multiprocessing.Process):
                         )
                         logging.error(f"Error details: {str(e)}")
                         logging.error(
-                            f"Arguments: {str(args)}"
-                            if "args" in locals()
-                            else "None"
+                            f"Arguments: {str(args)}" if "args" in locals() else "None"
                         )
                         logging.error(f"Traceback: {traceback.format_exc()}")
 
@@ -181,9 +179,7 @@ class BaseAsyncSQLWriter(multiprocessing.Process):
                         )
 
                     except Exception as log_error:
-                        logging.error(
-                            f"Failed to log error details: {str(log_error)}"
-                        )
+                        logging.error(f"Failed to log error details: {str(log_error)}")
                         logging.error(
                             "Did not retrieve queue value or failed to log command"
                         )

@@ -106,9 +106,7 @@ class ExperimentalInformation(DescribedObject):
         r = re.compile(r"[^a-zA-Z0-9-]")
         clean_code = r.sub("", code)
         if len(code) != len(clean_code):
-            logging.error(
-                f"The provided string contains unallowed characters: {code}"
-            )
+            logging.error(f"The provided string contains unallowed characters: {code}")
             raise Exception(
                 "Code contains special characters. Please use only letters, digits or -"
             )
@@ -675,7 +673,9 @@ class ControlThread(Thread):
         )
 
         self._info["status"] = "running"
-        logging.info("Setting monitor status as running: '{}'".format(self._info["status"]))
+        logging.info(
+            "Setting monitor status as running: '{}'".format(self._info["status"])
+        )
 
         # Set tracking start time for database metadata
         # Use the original experiment start time from metadata/backup filename, not current time
@@ -815,7 +815,9 @@ class ControlThread(Thread):
             # if is URL:
             sensor = EthoscopeSensor(self._info["experimental_info"]["sensor"])
             logging.info(
-                "Using sensor with URL {}".format(self._info["experimental_info"]["sensor"])
+                "Using sensor with URL {}".format(
+                    self._info["experimental_info"]["sensor"]
+                )
             )
         else:
             sensor = None

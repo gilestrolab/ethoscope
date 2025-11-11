@@ -39,9 +39,7 @@ class IsMovingStimulator(BaseStimulator):
         """
         self._velocity_correction_coef = velocity_correction_coef
         self._last_active = 0
-        super().__init__(
-            hardware_connection, date_range, roi_template_config
-        )
+        super().__init__(hardware_connection, date_range, roi_template_config)
 
     def _has_moved(self):
 
