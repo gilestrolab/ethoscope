@@ -67,7 +67,7 @@ class TestAPI(unittest.TestCase):
         tmp = tempfile.mkstemp(suffix="_ethoscope_test.db")[1]
         try:
             print("Making a tmp db: " + tmp)
-            with SQLiteResultWriter(tmp, rois) as rw:
+            with SQLiteResultWriter({"name": tmp}, rois) as rw:
                 mon.run(result_writer=rw, drawer=drawer)
         except Exception:
             self.fail("testAPI raised ExceptionType unexpectedly!")
