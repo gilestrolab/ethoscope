@@ -54,6 +54,7 @@ jobs:
           --tb=short \
           --strict-markers \
           --strict-config \
+          --no-cov \
           --junit-xml=junit-device-unit-${{ matrix.python-version }}.xml
 
     - name: Run device integration tests
@@ -64,6 +65,7 @@ jobs:
           --tb=short \
           --strict-markers \
           --strict-config \
+          --no-cov \
           --junit-xml=junit-device-integration-${{ matrix.python-version }}.xml
 
     - name: Upload test results

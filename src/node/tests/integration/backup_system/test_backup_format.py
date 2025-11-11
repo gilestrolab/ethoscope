@@ -14,7 +14,7 @@ from pathlib import Path
 # Add the src directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
-from ethoscope_node.utils.backups_helpers import BackupClass
+from ethoscope_node.backup.helpers import BackupClass
 
 
 def create_test_device_info():
