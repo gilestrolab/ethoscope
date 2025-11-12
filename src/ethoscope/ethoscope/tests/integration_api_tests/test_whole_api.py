@@ -73,6 +73,9 @@ class TestAPI(unittest.TestCase):
             self.fail("testAPI raised ExceptionType unexpectedly!")
         finally:
             hc.stop()
+            hc.join(timeout=5.0)  # Wait for hardware thread to finish
+            if hc.is_alive():
+                print("Warning: Hardware thread did not terminate cleanly")
             cam._close()
             print("Removing temp db (" + tmp + ")")
             os.remove(tmp)
