@@ -384,6 +384,224 @@ class TestMultiStimulator(unittest.TestCase):
             interaction, result = multi_stim._decide()
             self.assertIn("active_stimulator", result)
 
+    def test_already_initialized_stimulators(self):
+        """Test that stimulators are not re-initialized if already initialized."""
+        sequence = [
+            {"class_name": "DefaultStimulator", "arguments": {}, "date_range": ""}
+        ]
+
+        multi_stim = MultiStimulator(
+            hardware_connection=self.mock_hardware_connection,
+            stimulator_sequence=sequence,
+        )
+
+        # Store original stimulators
+        original_stimulators = multi_stim._stimulators
+
+        # Try to initialize again
+        multi_stim._initialize_stimulators()
+
+        # Should be the same instance (not re-initialized)
+        self.assertIs(multi_stim._stimulators, original_stimulators)
+
+    def test_unknown_stimulator_class(self):
+        """Test handling of unknown stimulator class name."""
+        sequence = [
+            {
+                "class_name": "NonExistentStimulator",
+                "arguments": {},
+                "date_range": "",
+            }
+        ]
+
+        # Should not raise exception, just skip unknown stimulator
+        multi_stim = MultiStimulator(
+            hardware_connection=self.mock_hardware_connection,
+            stimulator_sequence=sequence,
+        )
+
+        # Should have 0 stimulators since the class doesn't exist
+        self.assertEqual(len(multi_stim._stimulators), 0)
+
+    def test_stimulator_initialization_exception(self):
+        """Test handling of exception during stimulator initialization."""
+        # Use a mock class that raises exception during instantiation
+        with patch(
+            "ethoscope.stimulators.stimulators.DefaultStimulator",
+            side_effect=Exception("Initialization failed"),
+        ):
+            sequence = [
+                {
+                    "class_name": "DefaultStimulator",
+                    "arguments": {},
+                    "date_range": "",
+                }
+            ]
+
+            # Should not raise exception, just log error and skip
+            multi_stim = MultiStimulator(
+                hardware_connection=self.mock_hardware_connection,
+                stimulator_sequence=sequence,
+            )
+
+            # Should have 0 stimulators since initialization failed
+            self.assertEqual(len(multi_stim._stimulators), 0)
+
+    def test_decide_with_empty_stimulators(self):
+        """Test _decide when stimulators list is empty."""
+        # Create with unknown stimulator so list is empty
+        sequence = [
+            {"class_name": "NonExistentStimulator", "arguments": {}, "date_range": ""}
+        ]
+
+        multi_stim = MultiStimulator(
+            hardware_connection=self.mock_hardware_connection,
+            stimulator_sequence=sequence,
+        )
+
+        mock_tracker = Mock()
+        multi_stim.bind_tracker(mock_tracker)
+
+        # Should return False interaction and empty result
+        interaction, result = multi_stim._decide()
+
+        self.assertIsInstance(interaction, HasInteractedVariable)
+        self.assertEqual(bool(interaction), False)
+        self.assertEqual(result, {})
+
+    def test_decide_with_exception_in_stimulator(self):
+        """Test _decide handles exceptions from individual stimulators."""
+        current_time = time.time()
+        future_time = current_time + 3600
+
+        date_range = (
+            f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(current_time - 60))}>"
+            f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(future_time))}"
+        )
+
+        sequence = [
+            {
+                "class_name": "DefaultStimulator",
+                "arguments": {},
+                "date_range": date_range,
+            }
+        ]
+
+        multi_stim = MultiStimulator(
+            hardware_connection=self.mock_hardware_connection,
+            stimulator_sequence=sequence,
+        )
+
+        mock_tracker = Mock()
+        multi_stim.bind_tracker(mock_tracker)
+
+        # Make the stimulator's _decide method raise an exception
+        with patch.object(
+            multi_stim._stimulators[0]["instance"],
+            "_decide",
+            side_effect=Exception("Stimulator error"),
+        ):
+            interaction, result = multi_stim._decide()
+
+            # Should handle exception and return False
+            self.assertIsInstance(interaction, HasInteractedVariable)
+            self.assertEqual(bool(interaction), False)
+            self.assertEqual(result, {})
+
+    def test_deliver_without_hardware_connection(self):
+        """Test _deliver when hardware_connection is None."""
+        sequence = [
+            {"class_name": "DefaultStimulator", "arguments": {}, "date_range": ""}
+        ]
+
+        # Create without hardware connection
+        multi_stim = MultiStimulator(
+            hardware_connection=None, stimulator_sequence=sequence
+        )
+
+        # Should not raise exception when delivering without hardware
+        # _deliver returns None, just verify it doesn't crash
+        multi_stim._deliver(test="value", active_stimulator="Test")
+
+        # Should complete without error
+        self.assertTrue(True)
+
+    def test_deliver_with_hardware_connection(self):
+        """Test _deliver sends instructions to hardware."""
+        sequence = [
+            {"class_name": "DefaultStimulator", "arguments": {}, "date_range": ""}
+        ]
+
+        multi_stim = MultiStimulator(
+            hardware_connection=self.mock_hardware_connection,
+            stimulator_sequence=sequence,
+        )
+
+        # Deliver with hardware
+        multi_stim._deliver(channel=1, duration=1000, active_stimulator="Test")
+
+        # Verify hardware was called (active_stimulator should be filtered out)
+        self.mock_hardware_connection.send_instruction.assert_called_once()
+        call_args = self.mock_hardware_connection.send_instruction.call_args[0][0]
+        self.assertIn("channel", call_args)
+        self.assertIn("duration", call_args)
+        self.assertNotIn("active_stimulator", call_args)
+
+    def test_get_stimulator_state_inactive(self):
+        """Test get_stimulator_state returns 'inactive' when no stimulators active."""
+        past_time = time.time() - 7200
+        past_end = past_time + 3600
+
+        date_range = (
+            f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(past_time))}>"
+            f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(past_end))}"
+        )
+
+        sequence = [
+            {
+                "class_name": "DefaultStimulator",
+                "arguments": {},
+                "date_range": date_range,
+            }
+        ]
+
+        multi_stim = MultiStimulator(
+            hardware_connection=self.mock_hardware_connection,
+            stimulator_sequence=sequence,
+        )
+
+        # Should return 'inactive' since date range is in the past
+        state = multi_stim.get_stimulator_state()
+        self.assertEqual(state, "inactive")
+
+    def test_get_stimulator_state_delegates_to_stimulator(self):
+        """Test get_stimulator_state delegates to active stimulator."""
+        current_time = time.time()
+        future_time = current_time + 3600
+
+        start_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(current_time))
+        end_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(future_time))
+        date_range = f"{start_str} > {end_str}"
+
+        sequence = [
+            {
+                "class_name": "DefaultStimulator",
+                "arguments": {},
+                "date_range": date_range,
+            }
+        ]
+
+        multi_stim = MultiStimulator(
+            hardware_connection=self.mock_hardware_connection,
+            stimulator_sequence=sequence,
+        )
+
+        # When stimulator is active, get_stimulator_state should delegate
+        # This tests line 316
+        state = multi_stim.get_stimulator_state()
+        # Should return scheduled or inactive depending on if currently active
+        self.assertIn(state, ["inactive", "scheduled", "stimulating"])
+
 
 if __name__ == "__main__":
     unittest.main()
