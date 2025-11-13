@@ -40,9 +40,10 @@ skip_empty = False
 
 # Minimum coverage thresholds
 # Lowered from 70% to account for hardware-specific code exclusions
-# Current coverage: 38.45% - setting baseline to current level
-# Incremental improvement plan: 38% → 45% → 50% → 55% → 60% → 65% → 70%
-fail_under = 38
+# Current coverage: 41.15% after Phase 1 testing improvements
+# Progress: 38.45% (baseline) → 41.15% (+2.7%, +175 lines covered)
+# Incremental improvement plan: 41% → 45% → 50% → 55% → 60% → 65% → 70%
+fail_under = 41
 
 [html]
 directory = htmlcov
