@@ -183,7 +183,7 @@ jobs:
     - name: Run device tests with coverage
       run: |
         cd src/ethoscope
-        python -m pytest ethoscope/tests/ \
+        timeout 600 python -m pytest ethoscope/tests/ \
           --cov=ethoscope \
           --cov-report=xml:coverage-device.xml \
           --cov-report=html:htmlcov-device \
@@ -192,7 +192,7 @@ jobs:
     - name: Run node tests with coverage
       run: |
         cd src/node
-        python -m pytest tests/ \
+        timeout 300 python -m pytest tests/ \
           --cov=ethoscope_node \
           --cov-report=xml:coverage-node.xml \
           --cov-report=html:htmlcov-node \
