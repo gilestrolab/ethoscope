@@ -7,6 +7,7 @@ Tests ROI generation from grayscale image masks where each contour becomes an RO
 import os
 import pathlib
 import unittest
+from unittest.mock import patch
 
 import cv2
 import numpy as np
@@ -89,6 +90,70 @@ class TestImgMaskROIBuilder(unittest.TestCase):
             # Cleanup
             if os.path.exists(color_mask_path):
                 os.remove(color_mask_path)
+
+    def test_cv_version_4_compatibility(self):
+        """Test that builder works with OpenCV 4.x API (same as 2.x)."""
+        # Test the OpenCV 4.x code path (same as 2.x - line 46-48)
+        from ethoscope import roi_builders
+
+        # Temporarily mock CV_VERSION to test cv4 compatibility (uses 2.x API)
+        original_cv_version = roi_builders.img_roi_builder.CV_VERSION
+        try:
+            roi_builders.img_roi_builder.CV_VERSION = 4
+
+            builder = ImgMaskROIBuilder(TEST_MASK_PATH)
+            dummy_img = np.zeros((480, 640), dtype=np.uint8)
+
+            rois = builder._rois_from_img(dummy_img)
+
+            # Should work with OpenCV 4.x code path
+            self.assertGreater(len(rois), 0)
+
+        finally:
+            # Restore original CV_VERSION
+            roi_builders.img_roi_builder.CV_VERSION = original_cv_version
+
+    def test_cv_version_exception_handling(self):
+        """Test CV_VERSION exception handling at import time."""
+        # This tests lines 5-6 (exception handling)
+        # We can't directly test import-time exceptions, but we can verify
+        # that CV_VERSION is set correctly in the module
+        from ethoscope.roi_builders import img_roi_builder
+
+        # CV_VERSION should be an integer
+        self.assertIsInstance(img_roi_builder.CV_VERSION, int)
+        # Should be 2, 3, or 4 (current OpenCV versions)
+        self.assertIn(img_roi_builder.CV_VERSION, [2, 3, 4])
+
+    def test_opencv_import_compatibility(self):
+        """Test that OpenCV constants are imported correctly."""
+        # This tests lines 10-11 and 13-14 (import compatibility)
+        from ethoscope.roi_builders import img_roi_builder
+
+        # Verify that the constants were imported successfully
+        self.assertTrue(hasattr(img_roi_builder, "CHAIN_APPROX_SIMPLE"))
+        self.assertTrue(hasattr(img_roi_builder, "RETR_EXTERNAL"))
+        self.assertTrue(hasattr(img_roi_builder, "IMG_READ_FLAG_GREY"))
+
+    def test_rois_from_img_with_3channel_mask(self):
+        """Test _rois_from_img properly converts 3-channel masks to grayscale."""
+        # This specifically tests line 40 (color conversion)
+        builder = ImgMaskROIBuilder(TEST_MASK_PATH)
+
+        # Create a 3-channel mask to force color conversion
+        three_channel_mask = cv2.cvtColor(builder._mask, cv2.COLOR_GRAY2BGR)
+        builder._mask = three_channel_mask
+
+        # Verify mask is 3-channel
+        self.assertEqual(len(builder._mask.shape), 3)
+
+        dummy_img = np.zeros((480, 640), dtype=np.uint8)
+        rois = builder._rois_from_img(dummy_img)
+
+        # After conversion, mask should be grayscale
+        self.assertEqual(len(builder._mask.shape), 2)
+        # Should still generate ROIs
+        self.assertGreater(len(rois), 0)
 
 
 if __name__ == "__main__":
