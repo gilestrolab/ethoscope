@@ -9,7 +9,6 @@ Tests helper classes for periodic data collection and storage:
 """
 
 import os
-import tempfile
 import unittest
 from collections import OrderedDict
 from unittest.mock import Mock

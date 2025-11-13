@@ -9,19 +9,16 @@ Tests SQLiteResultWriter and AsyncSQLiteWriter operations including:
 - Placeholder conversion (MySQL %s to SQLite ?)
 """
 
-import json
 import os
 import shutil
 import sqlite3
 import tempfile
-import time
 import unittest
 from multiprocessing import Queue
 from unittest.mock import Mock, patch
 
 from ethoscope.core.roi import ROI
 from ethoscope.io.sqlite import AsyncSQLiteWriter, SQLiteResultWriter
-from ethoscope.trackers.trackers import BaseTracker
 
 
 class TestAsyncSQLiteWriter(unittest.TestCase):
