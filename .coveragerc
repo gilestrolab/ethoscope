@@ -29,8 +29,8 @@ exclude_lines =
     @(abc\.)?abstractmethod
 
 # Fail if coverage falls below this threshold
-# Current coverage: 32.12% after io/helpers tests
-# Progress: 25.18% (CI) → 29.84% → 31.00% → 31.44% → 32.12%
+# Current coverage: 32.14% after img_roi_builder tests
+# Progress: 25.18% (CI) → 29.84% → 31.00% → 31.44% → 32.12% → 32.14%
 # Target: 42% → 70%
 fail_under = 32
 
