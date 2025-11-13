@@ -29,20 +29,38 @@ class TestAsyncSQLiteWriter(unittest.TestCase):
         self.db_fd, self.db_path = tempfile.mkstemp(suffix=".db")
         os.close(self.db_fd)
         self.queue = Mock(spec=Queue)
+        # Track all writer instances for cleanup
+        self.writers = []
+
+    def _create_writer(self, db_path=None, erase_old_db=False):
+        """Helper to create and track AsyncSQLiteWriter instances for cleanup."""
+        writer = AsyncSQLiteWriter(
+            db_path or self.db_path, self.queue, erase_old_db=erase_old_db
+        )
+        self.writers.append(writer)
+        return writer
 
     def tearDown(self):
-        """Clean up temporary files."""
+        """Clean up temporary files and multiprocessing resources."""
+        # Clean up all AsyncSQLiteWriter instances to release multiprocessing resources
+        for writer in self.writers:
+            try:
+                # Close the Process to release resources (Event, etc.)
+                writer.close()
+            except Exception:
+                pass  # Ignore errors during cleanup
+
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
 
     def test_init_stores_db_name(self):
         """Test initialization stores database name."""
-        writer = AsyncSQLiteWriter(self.db_path, self.queue, erase_old_db=False)
+        writer = self._create_writer()
         self.assertEqual(writer._db_name, self.db_path)
 
     def test_get_connection_succeeds(self):
         """Test _get_connection creates valid connection."""
-        writer = AsyncSQLiteWriter(self.db_path, self.queue, erase_old_db=False)
+        writer = self._create_writer()
         conn = writer._get_connection()
 
         self.assertIsNotNone(conn)
@@ -53,7 +71,7 @@ class TestAsyncSQLiteWriter(unittest.TestCase):
         """Test _get_connection raises exception for invalid path."""
         # Use a path that cannot be created (invalid characters on some systems)
         invalid_path = "/invalid/\x00/path.db"
-        writer = AsyncSQLiteWriter(invalid_path, self.queue, erase_old_db=False)
+        writer = self._create_writer(db_path=invalid_path)
 
         with self.assertRaises((ValueError, sqlite3.Error)):
             writer._get_connection()
@@ -69,7 +87,7 @@ class TestAsyncSQLiteWriter(unittest.TestCase):
         conn.close()
 
         # Initialize with erase flag
-        writer = AsyncSQLiteWriter(self.db_path, self.queue, erase_old_db=True)
+        writer = self._create_writer(erase_old_db=True)
         writer._initialize_database()
 
         # Verify database was erased and recreated
@@ -92,7 +110,7 @@ class TestAsyncSQLiteWriter(unittest.TestCase):
         conn.close()
 
         # Initialize without erase flag
-        writer = AsyncSQLiteWriter(self.db_path, self.queue, erase_old_db=False)
+        writer = self._create_writer()
         writer._initialize_database()
 
         # Verify database was preserved
@@ -110,7 +128,7 @@ class TestAsyncSQLiteWriter(unittest.TestCase):
         try:
             db_path = os.path.join(temp_dir, "subdir", "test.db")
 
-            writer = AsyncSQLiteWriter(db_path, self.queue, erase_old_db=True)
+            writer = self._create_writer(db_path=db_path, erase_old_db=True)
             writer._initialize_database()
 
             # Verify directory was created
@@ -121,7 +139,7 @@ class TestAsyncSQLiteWriter(unittest.TestCase):
 
     def test_initialize_database_sets_pragmas(self):
         """Test _initialize_database sets SQLite PRAGMAs correctly."""
-        writer = AsyncSQLiteWriter(self.db_path, self.queue, erase_old_db=True)
+        writer = self._create_writer(erase_old_db=True)
         writer._initialize_database()
 
         # Verify PRAGMAs were set
@@ -145,26 +163,26 @@ class TestAsyncSQLiteWriter(unittest.TestCase):
 
     def test_get_db_type_name(self):
         """Test _get_db_type_name returns correct string."""
-        writer = AsyncSQLiteWriter(self.db_path, self.queue, erase_old_db=False)
+        writer = self._create_writer()
         self.assertEqual(writer._get_db_type_name(), "SQLite")
 
     def test_should_retry_on_locked_error(self):
         """Test _should_retry_on_error returns True for locked database."""
-        writer = AsyncSQLiteWriter(self.db_path, self.queue, erase_old_db=False)
+        writer = self._create_writer()
 
         error = sqlite3.OperationalError("database is locked")
         self.assertTrue(writer._should_retry_on_error(error))
 
     def test_should_retry_on_busy_error(self):
         """Test _should_retry_on_error returns True for busy database."""
-        writer = AsyncSQLiteWriter(self.db_path, self.queue, erase_old_db=False)
+        writer = self._create_writer()
 
         error = sqlite3.OperationalError("database is busy")
         self.assertTrue(writer._should_retry_on_error(error))
 
     def test_should_not_retry_on_critical_error(self):
         """Test _should_retry_on_error returns False for critical errors."""
-        writer = AsyncSQLiteWriter(self.db_path, self.queue, erase_old_db=False)
+        writer = self._create_writer()
 
         # Test various critical errors
         error = sqlite3.DatabaseError("database disk image is malformed")
@@ -198,17 +216,44 @@ class TestSQLiteResultWriter(unittest.TestCase):
             "machine_id": "TEST_001",
             "date_time": "2025_01_15_120000",
         }
+        # Track all result writer instances for cleanup
+        self.result_writers = []
+
+    def _create_result_writer(self, **kwargs):
+        """Helper to create and track SQLiteResultWriter instances for cleanup."""
+        # Merge default arguments with kwargs
+        args = {
+            "db_credentials": self.db_credentials,
+            "rois": self.rois,
+            "metadata": self.metadata,
+            "erase_old_db": False,
+        }
+        args.update(kwargs)
+
+        writer = SQLiteResultWriter(**args)
+        self.result_writers.append(writer)
+        return writer
 
     def tearDown(self):
-        """Clean up temporary files."""
+        """Clean up temporary files and multiprocessing resources."""
+        # Clean up all SQLiteResultWriter instances to properly shutdown async writers
+        for writer in self.result_writers:
+            try:
+                # Properly shutdown the async writer process
+                if hasattr(writer, "_queue") and hasattr(writer, "_async_writer"):
+                    writer._queue.put("DONE")
+                    writer._queue.cancel_join_thread()
+                    if writer._async_writer.is_alive():
+                        writer._async_writer.join(timeout=2)
+            except Exception:
+                pass  # Ignore errors during cleanup
+
         if os.path.exists(self.db_path):
             os.remove(self.db_path)
 
     def test_init_creates_writer(self):
         """Test initialization creates writer instance."""
-        writer = SQLiteResultWriter(
-            self.db_credentials,
-            self.rois,
+        writer = self._create_result_writer(
             metadata=self.metadata,
             erase_old_db=False,
         )
@@ -221,9 +266,7 @@ class TestSQLiteResultWriter(unittest.TestCase):
         # Remove database file
         os.remove(self.db_path)
 
-        writer = SQLiteResultWriter(
-            self.db_credentials,
-            self.rois,
+        writer = self._create_result_writer(
             metadata=self.metadata,
             erase_old_db=False,
         )
@@ -236,9 +279,7 @@ class TestSQLiteResultWriter(unittest.TestCase):
         # Create empty database file
         open(self.db_path, "w").close()
 
-        writer = SQLiteResultWriter(
-            self.db_credentials,
-            self.rois,
+        writer = self._create_result_writer(
             metadata=self.metadata,
             erase_old_db=False,
         )
@@ -254,9 +295,7 @@ class TestSQLiteResultWriter(unittest.TestCase):
         conn.commit()
         conn.close()
 
-        writer = SQLiteResultWriter(
-            self.db_credentials,
-            self.rois,
+        writer = self._create_result_writer(
             metadata=self.metadata,
             erase_old_db=False,
         )
@@ -273,9 +312,7 @@ class TestSQLiteResultWriter(unittest.TestCase):
         conn.commit()
         conn.close()
 
-        writer = SQLiteResultWriter(
-            self.db_credentials,
-            self.rois,
+        writer = self._create_result_writer(
             metadata=self.metadata,
             erase_old_db=False,
         )
@@ -299,9 +336,7 @@ class TestSQLiteResultWriter(unittest.TestCase):
         conn.commit()
         conn.close()
 
-        writer = SQLiteResultWriter(
-            self.db_credentials,
-            self.rois,
+        writer = self._create_result_writer(
             metadata=self.metadata,
             erase_old_db=False,
         )
@@ -319,9 +354,7 @@ class TestSQLiteResultWriter(unittest.TestCase):
         conn.commit()
         conn.close()
 
-        writer = SQLiteResultWriter(
-            self.db_credentials,
-            self.rois,
+        writer = self._create_result_writer(
             metadata=self.metadata,
             erase_old_db=False,
         )
@@ -339,9 +372,7 @@ class TestSQLiteResultWriter(unittest.TestCase):
         conn.commit()
         conn.close()
 
-        writer = SQLiteResultWriter(
-            self.db_credentials,
-            self.rois,
+        writer = self._create_result_writer(
             metadata=self.metadata,
             erase_old_db=False,
         )
@@ -352,9 +383,7 @@ class TestSQLiteResultWriter(unittest.TestCase):
 
     def test_write_async_command_converts_placeholders(self):
         """Test _write_async_command converts MySQL placeholders to SQLite."""
-        writer = SQLiteResultWriter(
-            self.db_credentials,
-            self.rois,
+        writer = self._create_result_writer(
             metadata=self.metadata,
             erase_old_db=False,
         )
@@ -375,9 +404,7 @@ class TestSQLiteResultWriter(unittest.TestCase):
 
     def test_write_async_command_handles_no_args(self):
         """Test _write_async_command works without arguments."""
-        writer = SQLiteResultWriter(
-            self.db_credentials,
-            self.rois,
+        writer = self._create_result_writer(
             metadata=self.metadata,
             erase_old_db=False,
         )
@@ -394,9 +421,7 @@ class TestSQLiteResultWriter(unittest.TestCase):
 
     def test_create_table(self):
         """Test _create_table creates table correctly."""
-        writer = SQLiteResultWriter(
-            self.db_credentials,
-            self.rois,
+        writer = self._create_result_writer(
             metadata=self.metadata,
             erase_old_db=False,
         )
@@ -411,9 +436,7 @@ class TestSQLiteResultWriter(unittest.TestCase):
 
     def test_initialise_roi_table_converts_types(self):
         """Test _initialise_roi_table converts MySQL types to SQLite."""
-        writer = SQLiteResultWriter(
-            self.db_credentials,
-            self.rois,
+        writer = self._create_result_writer(
             metadata=self.metadata,
             erase_old_db=False,
         )
