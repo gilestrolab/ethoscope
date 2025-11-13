@@ -40,10 +40,10 @@ skip_empty = False
 
 # Minimum coverage thresholds
 # Lowered from 70% to account for hardware-specific code exclusions
-# Current coverage: 41.15% after Phase 1 testing improvements
-# Progress: 38.45% (baseline) → 41.15% (+2.7%, +175 lines covered)
-# Incremental improvement plan: 41% → 45% → 50% → 55% → 60% → 65% → 70%
-fail_under = 41
+# Current coverage: 42.36% after SQLite writer tests
+# Progress: 38.45% (baseline) → 41.15% (Phase 1) → 42.36% (SQLite tests, +78 lines)
+# Incremental improvement plan: 42% → 45% → 50% → 55% → 60% → 65% → 70%
+fail_under = 42
 
 [html]
 directory = htmlcov
