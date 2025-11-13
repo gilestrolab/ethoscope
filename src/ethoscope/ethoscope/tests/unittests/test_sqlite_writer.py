@@ -55,9 +55,9 @@ class TestAsyncSQLiteWriter(unittest.TestCase):
         invalid_path = "/invalid/\x00/path.db"
         writer = AsyncSQLiteWriter(invalid_path, self.queue, erase_old_db=False)
 
-        with self.assertRaises(Exception):
+        with self.assertRaises((ValueError, sqlite3.Error)):
             writer._get_connection()
-        # Note: Error message may vary ("embedded null byte" or "Failed to connect")
+        # Note: Error can be ValueError ("embedded null byte") or sqlite3.Error
 
     def test_initialize_database_erases_old_db(self):
         """Test _initialize_database erases old database when flag set."""
@@ -137,7 +137,9 @@ class TestAsyncSQLiteWriter(unittest.TestCase):
         synchronous = cursor.fetchone()[0]
         # synchronous can be 0 (OFF), 1 (NORMAL), 2 (FULL), or 3 (EXTRA)
         # Just verify it was set (not default DELETE)
-        self.assertIn(str(synchronous), ["0", "1", "2", "3", "OFF", "NORMAL", "FULL", "EXTRA"])
+        self.assertIn(
+            str(synchronous), ["0", "1", "2", "3", "OFF", "NORMAL", "FULL", "EXTRA"]
+        )
 
         conn.close()
 

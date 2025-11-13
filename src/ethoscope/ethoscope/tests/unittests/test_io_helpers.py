@@ -63,9 +63,7 @@ class TestSensorDataHelper(unittest.TestCase):
 
     def test_init_with_sqlite(self):
         """Test initialization with SQLite database type."""
-        helper = SensorDataHelper(
-            self.mock_sensor, period=60, database_type="SQLite3"
-        )
+        helper = SensorDataHelper(self.mock_sensor, period=60, database_type="SQLite3")
 
         self.assertEqual(helper._period, 60)
         self.assertEqual(helper._database_type, "SQLite3")
@@ -148,9 +146,7 @@ class TestSensorDataHelper(unittest.TestCase):
 
     def test_flush_sqlite_generates_correct_command(self):
         """Test flush generates correct SQLite INSERT command."""
-        helper = SensorDataHelper(
-            self.mock_sensor, period=60, database_type="SQLite3"
-        )
+        helper = SensorDataHelper(self.mock_sensor, period=60, database_type="SQLite3")
 
         result = helper.flush(120000)
 
@@ -306,9 +302,7 @@ class TestDAMFileHelper(unittest.TestCase):
     def test_compute_distance_returns_zero_on_first_call(self):
         """Test _compute_distance_for_roi returns 0 for first position."""
         helper = DAMFileHelper()
-        roi = ROI(
-            polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1
-        )
+        roi = ROI(polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1)
         data = {"x": 50, "y": 50}
 
         distance = helper._compute_distance_for_roi(roi, data)
@@ -319,9 +313,7 @@ class TestDAMFileHelper(unittest.TestCase):
     def test_compute_distance_calculates_normalized_movement(self):
         """Test _compute_distance_for_roi calculates correct normalized distance."""
         helper = DAMFileHelper()
-        roi = ROI(
-            polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1
-        )
+        roi = ROI(polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1)
 
         # First position
         data1 = {"x": 0, "y": 0}
@@ -338,9 +330,7 @@ class TestDAMFileHelper(unittest.TestCase):
     def test_input_roi_data_accumulates_activity(self):
         """Test input_roi_data accumulates activity data."""
         helper = DAMFileHelper(period=60)
-        roi = ROI(
-            polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1
-        )
+        roi = ROI(polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1)
 
         # Input data at t=120000ms (tick=2)
         data = {"x": 50, "y": 50}
@@ -361,9 +351,7 @@ class TestDAMFileHelper(unittest.TestCase):
     def test_flush_generates_sql_commands(self):
         """Test flush generates SQL INSERT commands for accumulated data."""
         helper = DAMFileHelper(period=60, n_rois=2)
-        roi = ROI(
-            polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1
-        )
+        roi = ROI(polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1)
 
         # Add activity data
         data1 = {"x": 0, "y": 0}
@@ -385,9 +373,7 @@ class TestDAMFileHelper(unittest.TestCase):
     def test_flush_clears_accumulated_data(self):
         """Test flush clears accumulated activity data."""
         helper = DAMFileHelper(period=60)
-        roi = ROI(
-            polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1
-        )
+        roi = ROI(polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1)
 
         # Add and flush
         helper.input_roi_data(60000, roi, {"x": 0, "y": 0})

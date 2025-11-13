@@ -63,12 +63,8 @@ class TestSQLiteDatabaseMetadataCache(unittest.TestCase):
         )
 
         # Insert metadata
-        cursor.execute(
-            "INSERT INTO METADATA VALUES ('machine_name', 'test_device')"
-        )
-        cursor.execute(
-            "INSERT INTO METADATA VALUES ('machine_id', 'ETHOSCOPE_000')"
-        )
+        cursor.execute("INSERT INTO METADATA VALUES ('machine_name', 'test_device')")
+        cursor.execute("INSERT INTO METADATA VALUES ('machine_id', 'ETHOSCOPE_000')")
         cursor.execute("INSERT INTO METADATA VALUES ('date_time', '2025_01_15_120000')")
 
         # Create sample data table
@@ -91,7 +87,7 @@ class TestSQLiteDatabaseMetadataCache(unittest.TestCase):
     def test_init_creates_cache_dir(self):
         """Test that initialization creates cache directory."""
         new_cache_dir = os.path.join(self.cache_dir, "subdir")
-        cache = SQLiteDatabaseMetadataCache(
+        SQLiteDatabaseMetadataCache(
             self.db_credentials, device_name="test", cache_dir=new_cache_dir
         )
 
@@ -120,7 +116,9 @@ class TestSQLiteDatabaseMetadataCache(unittest.TestCase):
         # Check values
         self.assertGreater(metadata["db_size_bytes"], 0)
         self.assertIn("DATA", metadata["table_counts"])
-        self.assertEqual(metadata["table_counts"]["DATA"], 11)  # 10 rows + 1 (MAX(id)+1)
+        self.assertEqual(
+            metadata["table_counts"]["DATA"], 11
+        )  # 10 rows + 1 (MAX(id)+1)
         self.assertTrue(metadata["db_version"].startswith("SQLite"))
 
     def test_get_metadata_queries_database(self):

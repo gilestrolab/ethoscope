@@ -69,4 +69,3 @@ exclude = [
 
 [tool.ruff.isort]
 known-first-party = ["ethoscope", "ethoscope_node"]
-force-single-line = true
