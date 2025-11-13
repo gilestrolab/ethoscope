@@ -9,10 +9,7 @@ about which specific services are configured or enabled.
 """
 
 import datetime
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from ..utils.configuration import EthoscopeConfiguration
 from ..utils.etho_db import ExperimentalDB

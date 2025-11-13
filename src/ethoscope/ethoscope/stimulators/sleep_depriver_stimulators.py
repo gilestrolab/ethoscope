@@ -12,12 +12,9 @@ from ethoscope.hardware.interfaces.interfaces import DefaultInterface
 from ethoscope.hardware.interfaces.optomotor import OptoMotor
 from ethoscope.hardware.interfaces.sleep_depriver_interface import (
     SleepDepriverInterface,
-)
-from ethoscope.hardware.interfaces.sleep_depriver_interface import (
     SleepDepriverInterfaceCR,
 )
-from ethoscope.stimulators.stimulators import BaseStimulator
-from ethoscope.stimulators.stimulators import HasInteractedVariable
+from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVariable
 
 
 class IsMovingStimulator(BaseStimulator):

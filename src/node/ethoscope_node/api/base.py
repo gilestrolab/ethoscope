@@ -8,8 +8,7 @@ import json
 import logging
 import traceback
 from functools import wraps
-from typing import Any
-from typing import Dict
+from typing import Any, Dict
 
 import bottle
 

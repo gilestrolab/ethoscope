@@ -8,8 +8,7 @@ try:
     from cv2.cv import CV_AA as LINE_AA
     from cv2.cv import CV_FOURCC as VideoWriter_fourcc
 except ImportError:
-    from cv2 import LINE_AA
-    from cv2 import VideoWriter_fourcc
+    from cv2 import LINE_AA, VideoWriter_fourcc
 
 import os
 

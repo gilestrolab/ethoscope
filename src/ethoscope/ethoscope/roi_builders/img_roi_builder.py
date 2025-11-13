@@ -10,9 +10,8 @@ try:
     from cv import CV_RETR_EXTERNAL as RETR_EXTERNAL
     from cv2 import CV_LOAD_IMAGE_GRAYSCALE as IMG_READ_FLAG_GREY
 except ImportError:
-    from cv2 import CHAIN_APPROX_SIMPLE
+    from cv2 import CHAIN_APPROX_SIMPLE, RETR_EXTERNAL
     from cv2 import IMREAD_GRAYSCALE as IMG_READ_FLAG_GREY
-    from cv2 import RETR_EXTERNAL
 
 import numpy as np
 

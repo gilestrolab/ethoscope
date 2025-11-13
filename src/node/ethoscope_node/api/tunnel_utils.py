@@ -5,11 +5,9 @@ Provides utilities for tunnel configuration and URL management.
 """
 
 import os
-from typing import Any
-from typing import Dict
+from typing import Any, Dict
 
-from .base import BaseAPI
-from .base import error_decorator
+from .base import BaseAPI, error_decorator
 
 
 class TunnelUtils(BaseAPI):

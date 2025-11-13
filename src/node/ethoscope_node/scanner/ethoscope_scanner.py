@@ -7,22 +7,18 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any
-from typing import Dict
-from typing import Iterator
-from typing import List
-from typing import Optional
-from typing import Union
+from typing import Any, Dict, Iterator, List, Optional, Union
 
 from ethoscope_node.notifications.manager import NotificationManager
-from ethoscope_node.scanner.base_scanner import BaseDevice
-from ethoscope_node.scanner.base_scanner import DeviceError
-from ethoscope_node.scanner.base_scanner import DeviceScanner
-from ethoscope_node.scanner.base_scanner import DeviceStatus
-from ethoscope_node.scanner.base_scanner import ScanException
+from ethoscope_node.scanner.base_scanner import (
+    BaseDevice,
+    DeviceError,
+    DeviceScanner,
+    DeviceStatus,
+    ScanException,
+)
 from ethoscope_node.scanner.ethoscope_streaming import EthoscopeStreamManager
-from ethoscope_node.utils.configuration import EthoscopeConfiguration
-from ethoscope_node.utils.configuration import ensure_ssh_keys
+from ethoscope_node.utils.configuration import EthoscopeConfiguration, ensure_ssh_keys
 from ethoscope_node.utils.etho_db import ExperimentalDB
 
 # Constants

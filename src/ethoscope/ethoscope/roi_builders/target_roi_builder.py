@@ -14,8 +14,7 @@ try:
     from cv2.cv import CV_AA as LINE_AA
     from cv2.cv import CV_CHAIN_APPROX_SIMPLE as CHAIN_APPROX_SIMPLE
 except ImportError:
-    from cv2 import CHAIN_APPROX_SIMPLE
-    from cv2 import LINE_AA
+    from cv2 import CHAIN_APPROX_SIMPLE, LINE_AA
 
 import itertools
 import logging  # noqa: F811

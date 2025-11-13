@@ -15,10 +15,8 @@ from collections import OrderedDict
 # from cv2 import VideoWriter, VideoWriter_fourcc, imwrite
 import cv2
 
-from ethoscope.control.tracking import ControlThread
-from ethoscope.control.tracking import ExperimentalInformation
-from ethoscope.hardware.input.cameras import OurPiCameraAsync
-from ethoscope.hardware.input.cameras import V4L2Camera
+from ethoscope.control.tracking import ControlThread, ExperimentalInformation
+from ethoscope.hardware.input.cameras import OurPiCameraAsync, V4L2Camera
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.description import DescribedObject
 

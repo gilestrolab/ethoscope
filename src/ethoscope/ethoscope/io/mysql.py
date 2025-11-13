@@ -4,8 +4,7 @@ import traceback
 
 import mysql.connector
 
-from .base import BaseAsyncSQLWriter
-from .base import BaseResultWriter
+from .base import BaseAsyncSQLWriter, BaseResultWriter
 
 # Character encoding for MariaDB/MySQL connections
 SQL_CHARSET = "latin1"

@@ -9,8 +9,7 @@ import json
 import time
 import urllib.request
 
-from .base import BaseAPI
-from .base import error_decorator
+from .base import BaseAPI, error_decorator
 
 
 class BackupAPI(BaseAPI):

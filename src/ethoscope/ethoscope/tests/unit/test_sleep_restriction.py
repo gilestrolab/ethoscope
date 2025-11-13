@@ -9,19 +9,16 @@ import os
 import tempfile
 import time
 import unittest
-from unittest.mock import MagicMock
-from unittest.mock import Mock
-from unittest.mock import patch
+from unittest.mock import MagicMock, Mock, patch
 
 from ethoscope.stimulators.sleep_restriction_stimulators import (
     SimpleTimeRestrictedStimulator,
+    mAGOSleepRestriction,
 )
-from ethoscope.stimulators.sleep_restriction_stimulators import mAGOSleepRestriction
 from ethoscope.stimulators.stimulators import HasInteractedVariable
 
 # Import the classes we're testing
-from ethoscope.utils.scheduler import DailyScheduleError
-from ethoscope.utils.scheduler import DailyScheduler
+from ethoscope.utils.scheduler import DailyScheduleError, DailyScheduler
 
 
 class TestDailyScheduler(unittest.TestCase):

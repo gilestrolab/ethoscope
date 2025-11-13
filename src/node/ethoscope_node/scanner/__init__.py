@@ -12,16 +12,16 @@ Main components:
 """
 
 # Import main classes for easy access
-from .base_scanner import BaseDevice
-from .base_scanner import DeviceError
-from .base_scanner import DeviceScanner
-from .base_scanner import NetworkError
-from .base_scanner import ScanException
-from .ethoscope_scanner import Ethoscope
-from .ethoscope_scanner import EthoscopeScanner
+from .base_scanner import (
+    BaseDevice,
+    DeviceError,
+    DeviceScanner,
+    NetworkError,
+    ScanException,
+)
+from .ethoscope_scanner import Ethoscope, EthoscopeScanner
 from .ethoscope_streaming import EthoscopeStreamManager
-from .sensor_scanner import Sensor
-from .sensor_scanner import SensorScanner
+from .sensor_scanner import Sensor, SensorScanner
 
 __all__ = [
     "BaseDevice",

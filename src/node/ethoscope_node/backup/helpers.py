@@ -70,14 +70,9 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Dict
-from typing import Iterator
-from typing import List
-from typing import Optional
-from typing import Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
-from ethoscope_node.backup.mysql import DBNotReadyError
-from ethoscope_node.backup.mysql import MySQLdbToSQLite
+from ethoscope_node.backup.mysql import DBNotReadyError, MySQLdbToSQLite
 from ethoscope_node.utils.configuration import ensure_ssh_keys
 from ethoscope_node.utils.video_helpers import list_local_video_files
 

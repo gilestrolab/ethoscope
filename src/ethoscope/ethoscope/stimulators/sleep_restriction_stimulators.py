@@ -12,8 +12,7 @@ import os
 
 from ethoscope.stimulators.sleep_depriver_stimulators import mAGO
 from ethoscope.stimulators.stimulators import HasInteractedVariable
-from ethoscope.utils.scheduler import DailyScheduleError
-from ethoscope.utils.scheduler import DailyScheduler
+from ethoscope.utils.scheduler import DailyScheduleError, DailyScheduler
 
 
 class mAGOSleepRestriction(mAGO):

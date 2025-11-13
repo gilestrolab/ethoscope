@@ -48,7 +48,7 @@ class TestImgMaskROIBuilder(unittest.TestCase):
         self.assertLessEqual(len(rois), 3)  # Allow some tolerance for contour detection
 
         # Check ROI properties
-        for i, roi in enumerate(rois):
+        for roi in rois:
             self.assertIsNotNone(roi)
             self.assertGreater(roi.idx, 0)
             # ROI value should match the grayscale value from mask

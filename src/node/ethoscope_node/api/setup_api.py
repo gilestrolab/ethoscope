@@ -11,8 +11,7 @@ import bottle
 
 from ethoscope_node.utils.etho_db import ExperimentalDB
 
-from .base import BaseAPI
-from .base import error_decorator
+from .base import BaseAPI, error_decorator
 
 
 class SetupAPI(BaseAPI):

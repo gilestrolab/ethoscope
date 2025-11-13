@@ -7,8 +7,7 @@ and managing network interfaces and IP ranges.
 
 import ipaddress
 import logging
-from typing import List
-from typing import Optional
+from typing import List, Optional
 
 import netifaces
 

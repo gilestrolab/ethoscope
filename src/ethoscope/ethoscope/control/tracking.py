@@ -16,39 +16,41 @@ from threading import Thread
 import cv2
 
 from ethoscope.core.monitor import Monitor
-from ethoscope.drawers.drawers import DefaultDrawer
-from ethoscope.drawers.drawers import NullDrawer
-from ethoscope.hardware.input.cameras import MovieVirtualCamera
-from ethoscope.hardware.input.cameras import OurPiCameraAsync
-from ethoscope.hardware.input.cameras import V4L2Camera
-from ethoscope.hardware.interfaces.interfaces import EthoscopeSensor
-from ethoscope.hardware.interfaces.interfaces import HardwareConnection
-from ethoscope.io import MySQLResultWriter
-from ethoscope.io import SQLiteResultWriter
-from ethoscope.io import create_metadata_cache
-from ethoscope.io import dbAppender
+from ethoscope.drawers.drawers import DefaultDrawer, NullDrawer
+from ethoscope.hardware.input.cameras import (
+    MovieVirtualCamera,
+    OurPiCameraAsync,
+    V4L2Camera,
+)
+from ethoscope.hardware.interfaces.interfaces import EthoscopeSensor, HardwareConnection
+from ethoscope.io import (
+    MySQLResultWriter,
+    SQLiteResultWriter,
+    create_metadata_cache,
+    dbAppender,
+)
 from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
 from ethoscope.roi_builders.target_roi_builder import TargetGridROIBuilder
 from ethoscope.stimulators.multi_stimulator import MultiStimulator
-from ethoscope.stimulators.odour_stimulators import DynamicOdourSleepDepriver
-from ethoscope.stimulators.odour_stimulators import MiddleCrossingOdourStimulator
-from ethoscope.stimulators.odour_stimulators import MiddleCrossingOdourStimulatorFlushed
+from ethoscope.stimulators.odour_stimulators import (
+    DynamicOdourSleepDepriver,
+    MiddleCrossingOdourStimulator,
+    MiddleCrossingOdourStimulatorFlushed,
+)
 from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulator
-from ethoscope.stimulators.sleep_depriver_stimulators import AGO
 from ethoscope.stimulators.sleep_depriver_stimulators import (
+    AGO,
     ExperimentalSleepDepStimulator,
-)
-from ethoscope.stimulators.sleep_depriver_stimulators import MiddleCrossingStimulator
-from ethoscope.stimulators.sleep_depriver_stimulators import OptomotorSleepDepriver
-from ethoscope.stimulators.sleep_depriver_stimulators import (
+    MiddleCrossingStimulator,
+    OptomotorSleepDepriver,
     OptomotorSleepDepriverSystematic,
+    SleepDepStimulator,
+    mAGO,
 )
-from ethoscope.stimulators.sleep_depriver_stimulators import SleepDepStimulator
-from ethoscope.stimulators.sleep_depriver_stimulators import mAGO
 from ethoscope.stimulators.sleep_restriction_stimulators import (
     SimpleTimeRestrictedStimulator,
+    mAGOSleepRestriction,
 )
-from ethoscope.stimulators.sleep_restriction_stimulators import mAGOSleepRestriction
 from ethoscope.stimulators.stimulators import DefaultStimulator
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.utils import pi

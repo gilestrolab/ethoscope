@@ -7,15 +7,11 @@ with external template files, allowing users to create and modify ROI configurat
 
 import os
 import warnings
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from ethoscope.core.roi import ROI
 from ethoscope.roi_builders.roi_builders import BaseROIBuilder
-from ethoscope.roi_builders.template import ROITemplate
-from ethoscope.roi_builders.template import ROITemplateValidationError
+from ethoscope.roi_builders.template import ROITemplate, ROITemplateValidationError
 
 
 class FileBasedROIBuilder(BaseROIBuilder):

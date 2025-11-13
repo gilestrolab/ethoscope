@@ -8,8 +8,7 @@ import tempfile
 import time
 import unittest
 
-from _constants import DRAW_FRAMES
-from _constants import VIDEO
+from _constants import DRAW_FRAMES, VIDEO
 
 from ethoscope.core.monitor import Monitor
 from ethoscope.drawers.drawers import DefaultDrawer
@@ -20,8 +19,7 @@ from ethoscope.hardware.interfaces.interfaces import (
 )
 from ethoscope.io import SQLiteResultWriter
 from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
-from ethoscope.stimulators.stimulators import BaseStimulator
-from ethoscope.stimulators.stimulators import HasInteractedVariable
+from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVariable
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 
 

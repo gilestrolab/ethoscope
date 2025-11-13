@@ -6,8 +6,7 @@ import time
 from collections import OrderedDict
 
 import numpy as np
-from cv2 import IMWRITE_JPEG_QUALITY
-from cv2 import imwrite
+from cv2 import IMWRITE_JPEG_QUALITY, imwrite
 
 # Constants from base.py
 SENSOR_DEFAULT_PERIOD = 120.0  # Default sensor sampling period in seconds

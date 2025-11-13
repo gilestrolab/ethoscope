@@ -3,10 +3,7 @@
 import datetime
 import logging
 import time
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 
