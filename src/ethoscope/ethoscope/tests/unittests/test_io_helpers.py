@@ -5,10 +5,13 @@ Tests helper classes for periodic data collection and storage:
 - SensorDataHelper: Environmental sensor data collection
 - ImgSnapshotHelper: Image snapshot storage
 - DAMFileHelper: DAM-compatible activity monitoring
+- NpyAppendableFile: Appendable numpy file format
+- RawDataWriter: Raw tracking data writer
 - Null: SQLite NULL representation
 """
 
 import os
+import tempfile
 import unittest
 from collections import OrderedDict
 from unittest.mock import Mock
@@ -19,7 +22,9 @@ from ethoscope.core.roi import ROI
 from ethoscope.io.helpers import (
     DAMFileHelper,
     ImgSnapshotHelper,
+    NpyAppendableFile,
     Null,
+    RawDataWriter,
     SensorDataHelper,
 )
 
@@ -103,6 +108,54 @@ class TestSensorDataHelper(unittest.TestCase):
         sensor_types = helper._get_sensor_types_for_database()
 
         self.assertEqual(sensor_types, {})
+
+    def test_get_sensor_types_converts_varchar_to_text(self):
+        """Test _get_sensor_types_for_database converts VARCHAR to TEXT for SQLite."""
+        mock_sensor = Mock()
+        mock_sensor.sensor_types = {
+            "device_id": "VARCHAR(50)",
+            "status": "VARCHAR(100)",
+        }
+        helper = SensorDataHelper(mock_sensor, database_type="SQLite3")
+
+        sensor_types = helper._get_sensor_types_for_database()
+
+        self.assertEqual(sensor_types["device_id"], "TEXT")
+        self.assertEqual(sensor_types["status"], "TEXT")
+
+    def test_get_sensor_types_converts_char_to_text(self):
+        """Test _get_sensor_types_for_database converts CHAR to TEXT for SQLite."""
+        mock_sensor = Mock()
+        mock_sensor.sensor_types = {"code": "CHAR(10)", "flag": "CHAR"}
+        helper = SensorDataHelper(mock_sensor, database_type="SQLite3")
+
+        sensor_types = helper._get_sensor_types_for_database()
+
+        self.assertEqual(sensor_types["code"], "TEXT")
+        self.assertEqual(sensor_types["flag"], "TEXT")
+
+    def test_get_sensor_types_converts_text_to_text(self):
+        """Test _get_sensor_types_for_database handles TEXT type for SQLite."""
+        mock_sensor = Mock()
+        mock_sensor.sensor_types = {"description": "TEXT", "notes": "LONGTEXT"}
+        helper = SensorDataHelper(mock_sensor, database_type="SQLite3")
+
+        sensor_types = helper._get_sensor_types_for_database()
+
+        self.assertEqual(sensor_types["description"], "TEXT")
+        self.assertEqual(sensor_types["notes"], "TEXT")
+
+    def test_get_sensor_types_fallback_to_text(self):
+        """Test _get_sensor_types_for_database falls back to TEXT for unknown types."""
+        mock_sensor = Mock()
+        mock_sensor.sensor_types = {"data": "BLOB", "other": "UNKNOWN_TYPE"}
+        helper = SensorDataHelper(mock_sensor, database_type="SQLite3")
+
+        sensor_types = helper._get_sensor_types_for_database()
+
+        # Unknown types should default to TEXT
+        self.assertEqual(sensor_types["data"], "TEXT")
+        self.assertEqual(sensor_types["other"], "TEXT")
 
     def test_create_command_generates_sql(self):
         """Test create_command property generates valid SQL."""
@@ -397,6 +450,256 @@ class TestDAMFileHelper(unittest.TestCase):
         # Check scaled integer values
         self.assertIn("50", command)  # 0.5 * 100
         self.assertIn("120", command)  # 1.2 * 100
+
+
+class TestNpyAppendableFile(unittest.TestCase):
+    """Test suite for NpyAppendableFile."""
+
+    def setUp(self):
+        """Create temporary directory for test files."""
+        self.temp_dir = tempfile.mkdtemp()
+        self.test_file = os.path.join(self.temp_dir, "test_data.txt")
+
+    def tearDown(self):
+        """Clean up temporary files."""
+        import shutil
+
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir)
+
+    def test_init_changes_extension_to_anpy(self):
+        """Test initialization converts file extension to .anpy."""
+        npyfile = NpyAppendableFile(self.test_file, newfile=True)
+
+        expected_name = os.path.join(self.temp_dir, "test_data.anpy")
+        self.assertEqual(npyfile.fname, expected_name)
+
+    def test_init_preserves_anpy_extension(self):
+        """Test initialization preserves .anpy extension if already present."""
+        anpy_file = os.path.join(self.temp_dir, "test.anpy")
+        npyfile = NpyAppendableFile(anpy_file, newfile=True)
+
+        self.assertEqual(npyfile.fname, anpy_file)
+
+    def test_write_creates_new_file(self):
+        """Test write creates new file when newfile=True on first write."""
+        npyfile = NpyAppendableFile(self.test_file, newfile=True)
+        data = np.array([1, 2, 3])
+
+        result = npyfile.write(data)
+
+        self.assertTrue(result)
+        self.assertTrue(os.path.exists(npyfile.fname))
+
+    def test_write_appends_to_existing_file(self):
+        """Test write appends to existing file on subsequent writes."""
+        npyfile = NpyAppendableFile(self.test_file, newfile=True)
+
+        # First write
+        data1 = np.array([1, 2, 3])
+        npyfile.write(data1)
+
+        # Second write should append
+        data2 = np.array([4, 5, 6])
+        result = npyfile.write(data2)
+
+        self.assertTrue(result)
+
+    def test_write_appends_when_newfile_false(self):
+        """Test write appends immediately when newfile=False."""
+        # Create initial file
+        npyfile1 = NpyAppendableFile(self.test_file, newfile=True)
+        npyfile1.write(np.array([1, 2, 3]))
+
+        # Open with newfile=False to append
+        npyfile2 = NpyAppendableFile(self.test_file, newfile=False)
+        result = npyfile2.write(np.array([4, 5, 6]))
+
+        self.assertTrue(result)
+
+    def test_load_reads_single_array(self):
+        """Test load reads single array from file."""
+        npyfile = NpyAppendableFile(self.test_file, newfile=True)
+        data = np.array([[1, 2], [3, 4]])
+        npyfile.write(data)
+
+        loaded = npyfile.load(axis=0)
+
+        np.testing.assert_array_equal(loaded, data)
+
+    def test_load_concatenates_multiple_arrays(self):
+        """Test load concatenates multiple appended arrays."""
+        npyfile = NpyAppendableFile(self.test_file, newfile=True)
+
+        # Write multiple arrays
+        data1 = np.array([[1, 2]])
+        data2 = np.array([[3, 4]])
+        data3 = np.array([[5, 6]])
+
+        npyfile.write(data1)
+        npyfile.write(data2)
+        npyfile.write(data3)
+
+        loaded = npyfile.load(axis=0)
+
+        expected = np.array([[1, 2], [3, 4], [5, 6]])
+        np.testing.assert_array_equal(loaded, expected)
+
+    def test_convert_creates_npy_file(self):
+        """Test convert creates standard .npy file."""
+        npyfile = NpyAppendableFile(self.test_file, newfile=True)
+        data = np.array([[1, 2], [3, 4]])
+        npyfile.write(data)
+
+        # Convert to .npy
+        npy_filename = os.path.join(self.temp_dir, "output.npy")
+        npyfile.convert(filename=npy_filename)
+
+        # Verify .npy file was created and can be loaded
+        self.assertTrue(os.path.exists(npy_filename))
+        loaded = np.load(npy_filename)
+        np.testing.assert_array_equal(loaded, data)
+
+    def test_convert_uses_default_filename(self):
+        """Test convert uses default filename when none provided."""
+        npyfile = NpyAppendableFile(self.test_file, newfile=True)
+        data = np.array([1, 2, 3])
+        npyfile.write(data)
+
+        npyfile.convert()
+
+        # Should create test_data.npy
+        expected_name = os.path.join(self.temp_dir, "test_data.npy")
+        self.assertTrue(os.path.exists(expected_name))
+
+    def test_dtype_property(self):
+        """Test _dtype property returns correct data type."""
+        npyfile = NpyAppendableFile(self.test_file, newfile=True)
+        data = np.array([1.5, 2.5, 3.5], dtype=np.float32)
+        npyfile.write(data)
+
+        dtype = npyfile._dtype
+
+        self.assertEqual(dtype, np.float32)
+
+    def test_actual_shape_property(self):
+        """Test _actual_shape property returns correct shape."""
+        npyfile = NpyAppendableFile(self.test_file, newfile=True)
+        # Use 3D arrays to match default axis=2 in load()
+        data1 = np.array([[[1], [2]]])  # shape (1, 2, 1)
+        data2 = np.array([[[3], [4]]])  # shape (1, 2, 1)
+        npyfile.write(data1)
+        npyfile.write(data2)
+
+        shape = npyfile._actual_shape
+
+        self.assertEqual(shape, (1, 2, 2))  # Concatenated along axis 2
+
+    def test_header_property_reads_numpy_header(self):
+        """Test header property reads numpy file format information."""
+        npyfile = NpyAppendableFile(self.test_file, newfile=True)
+        data = np.array([[1, 2], [3, 4]], dtype=np.int32)
+        npyfile.write(data)
+
+        version, header = npyfile.header
+
+        self.assertIsNotNone(version)
+        self.assertIn("descr", header)
+        self.assertIn("fortran_order", header)
+        self.assertIn("shape", header)
+        self.assertEqual(header["shape"], (2, 2))
+
+
+class TestRawDataWriter(unittest.TestCase):
+    """Test suite for RawDataWriter."""
+
+    def setUp(self):
+        """Create temporary directory for test files."""
+        self.temp_dir = tempfile.mkdtemp()
+        self.test_basename = os.path.join(self.temp_dir, "raw_data.db")
+
+    def tearDown(self):
+        """Clean up temporary files."""
+        import shutil
+
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir)
+
+    def test_init_creates_files_for_rois(self):
+        """Test initialization creates NpyAppendableFile for each ROI."""
+        writer = RawDataWriter(self.test_basename, n_rois=3)
+
+        self.assertEqual(len(writer.files), 3)
+        for npy_file in writer.files:
+            self.assertIsInstance(npy_file, NpyAppendableFile)
+
+    def test_init_strips_extension_from_basename(self):
+        """Test initialization strips extension from basename."""
+        writer = RawDataWriter(self.test_basename, n_rois=2)
+
+        # Files should be named with _basename (no .db extension)
+        expected_basename = os.path.join(self.temp_dir, "raw_data")
+        for npy_file in writer.files:
+            self.assertTrue(npy_file.fname.startswith(expected_basename))
+
+    def test_init_sets_entities(self):
+        """Test initialization sets maximum entities."""
+        writer = RawDataWriter(self.test_basename, n_rois=2, entities=50)
+
+        self.assertEqual(writer.entities, 50)
+
+    def test_init_default_entities(self):
+        """Test initialization uses default entities=40."""
+        writer = RawDataWriter(self.test_basename, n_rois=2)
+
+        self.assertEqual(writer.entities, 40)
+
+    def test_write_stores_data_in_data_dict(self):
+        """Test write stores tracking data in internal data dictionary."""
+        writer = RawDataWriter(self.test_basename, n_rois=2)
+        roi = ROI(polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1)
+
+        data_rows = [
+            {"x": 10, "y": 20, "w": 5, "h": 5, "phi": 0.5},
+            {"x": 30, "y": 40, "w": 6, "h": 6, "phi": 1.2},
+        ]
+
+        writer.write(t=1000, roi=roi, data_rows=data_rows)
+
+        self.assertIn(roi.idx, writer.data)
+        self.assertIsInstance(writer.data[roi.idx], np.ndarray)
+
+    def test_write_creates_fixed_shape_array(self):
+        """Test write creates array with fixed shape based on entities."""
+        writer = RawDataWriter(self.test_basename, n_rois=2, entities=10)
+        roi = ROI(polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1)
+
+        data_rows = [{"x": 10, "y": 20, "w": 5, "h": 5, "phi": 0.5}]
+
+        writer.write(t=1000, roi=roi, data_rows=data_rows)
+
+        # Array should have shape (entities, 6, 1) where 6 is (t, x, y, w, h, phi)
+        self.assertEqual(writer.data[roi.idx].shape, (10, 6, 1))
+
+    def test_flush_writes_data_to_files(self):
+        """Test flush writes accumulated data to NpyAppendableFile instances."""
+        writer = RawDataWriter(self.test_basename, n_rois=2)
+        roi1 = ROI(polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=0, value=1)
+        roi2 = ROI(polygon=((100, 0), (200, 0), (200, 100), (100, 100)), idx=1, value=2)
+
+        # Write data for both ROIs
+        data_rows1 = [{"x": 10, "y": 20, "w": 5, "h": 5, "phi": 0.5}]
+        data_rows2 = [{"x": 30, "y": 40, "w": 6, "h": 6, "phi": 1.2}]
+
+        writer.write(t=1000, roi=roi1, data_rows=data_rows1)
+        writer.write(t=1000, roi=roi2, data_rows=data_rows2)
+
+        # Flush should write to files
+        writer.flush(t=1000, frame=None)
+
+        # Verify files were created
+        for npy_file in writer.files:
+            self.assertTrue(os.path.exists(npy_file.fname))
 
 
 if __name__ == "__main__":
