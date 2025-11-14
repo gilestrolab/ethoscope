@@ -29,9 +29,9 @@ exclude_lines =
     @(abc\.)?abstractmethod
 
 # Fail if coverage falls below this threshold
-# Current coverage: 32.82% after multi_stimulator tests
-# Progress: 25.18% (CI) → 29.84% → 31.00% → 31.44% → 32.12% → 32.14% → 32.48% → 32.82%
-# Target: 42% → 70%
+# Current coverage: 32.85% after utils and roi_builder tests
+# Progress: 25.18% (CI) → 29.84% → 31.00% → 31.44% → 32.12% → 32.14% → 32.48% → 32.82% → 32.85%
+# Target: 50% → 70%
 fail_under = 32
 
 ignore_errors = True

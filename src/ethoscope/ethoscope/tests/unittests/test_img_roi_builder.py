@@ -91,6 +91,36 @@ class TestImgMaskROIBuilder(unittest.TestCase):
             if os.path.exists(color_mask_path):
                 os.remove(color_mask_path)
 
+    def test_cv_version_3_compatibility(self):
+        """Test that builder works with OpenCV 3.x API (line 42-44)."""
+        # Test the OpenCV 3.x code path which has different findContours return value
+        from ethoscope import roi_builders
+
+        # Temporarily mock CV_VERSION to test cv3 compatibility
+        original_cv_version = roi_builders.img_roi_builder.CV_VERSION
+        try:
+            roi_builders.img_roi_builder.CV_VERSION = 3
+
+            builder = ImgMaskROIBuilder(TEST_MASK_PATH)
+            dummy_img = np.zeros((480, 640), dtype=np.uint8)
+
+            # Mock cv2.findContours to return 3 values like CV3 does
+            original_findContours = cv2.findContours
+
+            def mock_findContours_cv3(*args, **kwargs):
+                contours, hierarchy = original_findContours(*args, **kwargs)
+                return (None, contours, hierarchy)  # CV3 returns 3 values
+
+            with patch("cv2.findContours", side_effect=mock_findContours_cv3):
+                rois = builder._rois_from_img(dummy_img)
+
+            # Should work with OpenCV 3.x code path
+            self.assertGreater(len(rois), 0)
+
+        finally:
+            # Restore original CV_VERSION
+            roi_builders.img_roi_builder.CV_VERSION = original_cv_version
+
     def test_cv_version_4_compatibility(self):
         """Test that builder works with OpenCV 4.x API (same as 2.x)."""
         # Test the OpenCV 4.x code path (same as 2.x - line 46-48)
