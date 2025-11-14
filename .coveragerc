@@ -29,8 +29,8 @@ exclude_lines =
     @(abc\.)?abstractmethod
 
 # Fail if coverage falls below this threshold
-# Current coverage: 33.32% after core module tests (variables, data_point)
-# Progress: 25.18% (CI) → 32.48% (session start) → 33.10% → 33.24% → 33.32%
+# Current coverage: 33.43% after debug tests
+# Progress: 25.18% (CI) → 32.48% (session start) → 33.43% (current, +0.95 session)
 # Target: 50% → 70%
 fail_under = 33
 
