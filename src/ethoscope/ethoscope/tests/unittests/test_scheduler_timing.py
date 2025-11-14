@@ -870,6 +870,77 @@ class TestDailyScheduler(unittest.TestCase):
         self.assertIsInstance(remaining, (int, float))
         self.assertGreaterEqual(remaining, 0)
 
+    def test_save_state_without_file_path(self):
+        """Test _save_state returns early when no file path set (line 220)."""
+        from ethoscope.utils.scheduler import DailyScheduler
+
+        # Create without state file
+        scheduler = DailyScheduler(8, 24, state_file_path=None)
+        scheduler._state["test"] = "value"
+
+        # Should return early, no exception
+        scheduler._save_state()
+        # No assertion needed, just verifying it doesn't crash
+
+    def test_save_state_successful_write(self):
+        """Test _save_state successfully writes to file (lines 224-225)."""
+        import json
+        import tempfile
+
+        from ethoscope.utils.scheduler import DailyScheduler
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = os.path.join(tmpdir, "subdir", "state.json")
+            scheduler = DailyScheduler(8, 24, state_file_path=state_file)
+
+            # Add some state
+            scheduler._state["test_key"] = "test_value"
+
+            # Save state
+            scheduler._save_state()
+
+            # Verify file was created and contains correct data
+            self.assertTrue(os.path.exists(state_file))
+
+            with open(state_file) as f:
+                saved_state = json.load(f)
+
+            self.assertEqual(saved_state["test_key"], "test_value")
+
+    def test_state_tracking_with_new_period(self):
+        """Test state tracking creates new period entry (lines 269-276)."""
+        import tempfile
+
+        from ethoscope.utils.scheduler import DailyScheduler
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = os.path.join(tmpdir, "state.json")
+
+            # Create scheduler that's currently active
+            scheduler = DailyScheduler(
+                24, 24, daily_start_time="00:00:00", state_file_path=state_file
+            )
+
+            # Clear any existing state to force new period creation
+            scheduler._state = {}
+
+            # Get current time and check if active
+            current_time = time.time()
+            is_active = scheduler.is_active_period(current_time)
+
+            if is_active:
+                # State should have been updated with new period
+                self.assertGreater(len(scheduler._state), 0)
+
+                # Verify state file was created
+                self.assertTrue(os.path.exists(state_file))
+
+                # Check that period info was saved
+                period_keys = [
+                    k for k in scheduler._state.keys() if k.startswith("period_")
+                ]
+                self.assertGreater(len(period_keys), 0)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
