@@ -29,8 +29,8 @@ exclude_lines =
     @(abc\.)?abstractmethod
 
 # Fail if coverage falls below this threshold
-# Current coverage: 33.43% after debug tests
-# Progress: 25.18% (CI) → 32.48% (session start) → 33.43% (current, +0.95 session)
+# Current coverage: 33.54% after scheduler state tests
+# Progress: 25.18% (CI) → 32.48% (session start) → 33.54% (current, +1.06 session)
 # Target: 50% → 70%
 fail_under = 33
 
