@@ -35,11 +35,11 @@ skip_covered = False
 skip_empty = False
 
 # Minimum coverage thresholds
-# Previous: 52.35%
-# Current: 56.93% (+4.58 points from setup_api module tests)
-# Includes comprehensive Setup API testing (77.58% coverage, 60 tests)
-# Covers user management, incubators, notifications, tunnel config, virtual sensors
-fail_under = 56.93
+# Previous: 56.93%
+# Current: 59.69% (+2.76 points from backup helpers module tests)
+# Includes comprehensive Backup Helpers testing (40.04% coverage, 76 tests)
+# Covers BackupClass, VideoBackupClass, backup orchestration, error handling
+fail_under = 59.69
 
 [html]
 directory = htmlcov
