@@ -222,14 +222,21 @@ class TestTargetROIBuilder(unittest.TestCase):
         self.assertTrue(hasattr(target_roi_builder, "CHAIN_APPROX_SIMPLE"))
 
     def test_diagnostics_without_base_path(self):
-        """Test diagnostic initialization without base path"""
-        roi_builder = TargetGridROIBuilder(
-            n_rows=1, n_cols=1, enable_diagnostics=True, device_id="test"
-        )
+        """Test diagnostic initialization with temporary base path"""
+        import tempfile
 
-        # Should initialize diagnostics without error
-        self.assertTrue(roi_builder._enable_diagnostics)
-        self.assertIsNotNone(roi_builder._diagnostics)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            roi_builder = TargetGridROIBuilder(
+                n_rows=1,
+                n_cols=1,
+                enable_diagnostics=True,
+                device_id="test",
+                diagnostic_base_path=temp_dir,
+            )
+
+            # Should initialize diagnostics without error
+            self.assertTrue(roi_builder._enable_diagnostics)
+            self.assertIsNotNone(roi_builder._diagnostics)
 
     def test_grayscale_image_input(self):
         """Test that builder handles grayscale images correctly"""
