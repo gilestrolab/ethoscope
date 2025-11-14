@@ -35,11 +35,11 @@ skip_covered = False
 skip_empty = False
 
 # Minimum coverage thresholds
-# Previous: 56.93%
-# Current: 59.69% (+2.76 points from backup helpers module tests)
-# Includes comprehensive Backup Helpers testing (40.04% coverage, 76 tests)
-# Covers BackupClass, VideoBackupClass, backup orchestration, error handling
-fail_under = 59.69
+# Previous: 59.69%
+# Current: 61.63% (+1.94 points from etho_db module tests)
+# Includes comprehensive Database Helpers testing (79.09% coverage, 117 tests)
+# Covers migrations, user/incubator CRUD, PIN security, cleanup operations, simpleDB
+fail_under = 61.63
 
 [html]
 directory = htmlcov
