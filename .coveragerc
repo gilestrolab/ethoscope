@@ -29,10 +29,11 @@ exclude_lines =
     @(abc\.)?abstractmethod
 
 # Fail if coverage falls below this threshold
-# Current coverage: 33.54% after scheduler state tests
-# Progress: 25.18% (CI) → 32.48% (session start) → 33.54% (current, +1.06 session)
-# Target: 50% → 70%
-fail_under = 33
+# Current coverage: 42.45% after diagnostics tests (ALL tests including integration)
+# Progress: 25.18% (CI) → 32.48% (session) → 42.45% (current, +9.97 overall)
+# Unit tests only: 31.55% | All tests: 42.45%
+# Milestone: 40% ✓ | Target: 50% (need +7.55)
+fail_under = 42
 
 ignore_errors = True
 show_missing = True
