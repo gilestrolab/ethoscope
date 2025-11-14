@@ -728,23 +728,24 @@ class TestDailyScheduler(unittest.TestCase):
 
     def test_date_range_single_start_date_with_value(self):
         """Test date range parsing with single non-None start date (line 93)."""
+        # Use a date string WITHOUT ">" to get len(date_strs) == 1
         start_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
-        date_range = f"{start_str} >"
 
-        scheduler = Scheduler(date_range)
+        scheduler = Scheduler(start_str)
         # Should be active from start_str to infinity
         self.assertTrue(scheduler.check_time_range(time.time() + 3600))
 
     def test_date_range_two_none_dates_error(self):
         """Test that two None dates raise DateRangeError (line 99)."""
-        # This would be "> >" which should raise an error
+        # Empty string on both sides of ">" gives two None dates
         with self.assertRaises(DateRangeError):
-            Scheduler("> >")
+            Scheduler(" > ")
 
     def test_date_range_unexpected_format_error(self):
         """Test that unexpected date formats raise Exception (line 106)."""
-        # More than 2 date parts should raise exception
-        with self.assertRaises((Exception, DateRangeError)):
+        # Line 106 is unreachable in normal usage (line 82-83 catches > 2 dates)
+        # Test the precondition at line 82-83 instead
+        with self.assertRaises(DateRangeError):
             Scheduler("2025-01-01 > 2025-02-01 > 2025-03-01")
 
     def test_state_file_io_error_on_load(self):
