@@ -15,8 +15,10 @@ import fcntl
 import json
 import os
 import sqlite3
+import subprocess
 import tempfile
 import time
+import urllib.error
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, call, mock_open, patch
 
@@ -937,3 +939,662 @@ class TestGetDeviceBackupInfo:
         # Should handle gracefully and report no databases
         assert info["backup_status"]["mysql"]["available"] is False
         assert info["backup_status"]["total_databases"] == 0
+
+
+class TestBaseBackupClass:
+    """Test BaseBackupClass common functionality."""
+
+    def test_base_backup_initialization(self):
+        """Test BaseBackupClass initialization."""
+        from ethoscope_node.backup.helpers import BaseBackupClass
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+        }
+        results_dir = "/tmp/results"
+
+        backup = BaseBackupClass(device_info, results_dir)
+
+        assert backup._device_id == "device_001"
+        assert backup._device_name == "ETHOSCOPE_001"
+        assert backup._ip == "192.168.1.100"
+        assert backup._results_dir == results_dir
+
+    def test_base_backup_yield_status(self):
+        """Test _yield_status helper method."""
+        from ethoscope_node.backup.helpers import BaseBackupClass
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+        }
+        backup = BaseBackupClass(device_info, "/tmp/results")
+
+        result = backup._yield_status("success", "Test message")
+
+        assert '"status": "success"' in result
+        assert '"message": "Test message"' in result
+
+    def test_base_backup_not_implemented_methods(self):
+        """Test that abstract methods raise NotImplementedError."""
+        from ethoscope_node.backup.helpers import BaseBackupClass
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+        }
+        backup = BaseBackupClass(device_info, "/tmp/results")
+
+        with pytest.raises(NotImplementedError):
+            list(backup.backup())
+
+        with pytest.raises(NotImplementedError):
+            backup.check_sync_status()
+
+
+class TestBackupClassBackupMethod:
+    """Test BackupClass.backup() method and related operations."""
+
+    @patch("ethoscope_node.backup.helpers.MySQLdbToSQLite")
+    def test_backup_success(self, mock_mysql, tmp_path):
+        """Test successful backup operation."""
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+            "databases": {
+                "MariaDB": {
+                    "ethoscope_db": {"path": "ETHOSCOPE_001/ETHOSCOPE_001_db.db"}
+                }
+            },
+        }
+        results_dir = str(tmp_path / "results")
+
+        # Mock MySQLdbToSQLite instance
+        mock_mirror = Mock()
+        mock_mirror.compare_databases.return_value = 98.5
+        mock_mysql.return_value = mock_mirror
+
+        backup = BackupClass(device_info, results_dir)
+
+        # Execute backup and collect all status messages
+        status_messages = list(backup.backup())
+
+        # Verify status messages were yielded
+        assert len(status_messages) > 0
+
+        # Verify backup directory was created
+        expected_path = os.path.join(results_dir, "ETHOSCOPE_001/ETHOSCOPE_001_db.db")
+        assert os.path.exists(os.path.dirname(expected_path))
+
+        # Verify MySQLdbToSQLite was called correctly
+        mock_mysql.assert_called_once()
+        mock_mirror.update_all_tables.assert_called_once()
+        mock_mirror.compare_databases.assert_called_once()
+
+    @patch("ethoscope_node.backup.helpers.MySQLdbToSQLite")
+    def test_backup_no_mariadb_database(self, mock_mysql, tmp_path):
+        """Test backup when device has no MariaDB database."""
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+            "databases": {},  # No databases
+        }
+        results_dir = str(tmp_path / "results")
+
+        backup = BackupClass(device_info, results_dir)
+        status_messages = list(backup.backup())
+
+        # Should yield warning about no MariaDB
+        assert any("does not have a MariaDB database" in msg for msg in status_messages)
+
+        # MySQLdbToSQLite should not be called
+        mock_mysql.assert_not_called()
+
+    @patch("ethoscope_node.backup.helpers.MySQLdbToSQLite")
+    def test_backup_db_not_ready_error(self, mock_mysql, tmp_path):
+        """Test backup handling of DBNotReadyError."""
+        from ethoscope_node.backup.mysql import DBNotReadyError
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+            "databases": {
+                "MariaDB": {
+                    "ethoscope_db": {"path": "ETHOSCOPE_001/ETHOSCOPE_001_db.db"}
+                }
+            },
+        }
+        results_dir = str(tmp_path / "results")
+
+        # Mock MySQLdbToSQLite to raise DBNotReadyError
+        mock_mysql.side_effect = DBNotReadyError("Database not ready")
+
+        backup = BackupClass(device_info, results_dir)
+        status_messages = list(backup.backup())
+
+        # Should yield warning about database not ready
+        assert any("not ready" in msg for msg in status_messages)
+
+    @patch("ethoscope_node.backup.helpers.MySQLdbToSQLite")
+    def test_backup_generic_exception(self, mock_mysql, tmp_path):
+        """Test backup handling of unexpected exceptions."""
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+            "databases": {
+                "MariaDB": {
+                    "ethoscope_db": {"path": "ETHOSCOPE_001/ETHOSCOPE_001_db.db"}
+                }
+            },
+        }
+        results_dir = str(tmp_path / "results")
+
+        # Mock MySQLdbToSQLite to raise generic exception
+        mock_mysql.side_effect = Exception("Connection timeout")
+
+        backup = BackupClass(device_info, results_dir)
+        status_messages = list(backup.backup())
+
+        # Should yield error message
+        assert any("error" in msg.lower() for msg in status_messages)
+
+    @patch("ethoscope_node.backup.helpers.MySQLdbToSQLite")
+    def test_backup_low_comparison_percentage(self, mock_mysql, tmp_path):
+        """Test backup with low database comparison percentage."""
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+            "databases": {
+                "MariaDB": {
+                    "ethoscope_db": {"path": "ETHOSCOPE_001/ETHOSCOPE_001_db.db"}
+                }
+            },
+        }
+        results_dir = str(tmp_path / "results")
+
+        # Mock MySQLdbToSQLite with low comparison
+        mock_mirror = Mock()
+        mock_mirror.compare_databases.return_value = 0.0  # 0% match
+        mock_mysql.return_value = mock_mirror
+
+        backup = BackupClass(device_info, results_dir)
+        status_messages = list(backup.backup())
+
+        # Should still complete but log warning
+        assert len(status_messages) > 0
+
+
+class TestBackupClassCheckDataDuplication:
+    """Test BackupClass._check_data_duplication() method."""
+
+    def test_check_duplication_no_duplicates(self, tmp_path):
+        """Test duplication check when no duplicates exist."""
+        db_path = tmp_path / "test.db"
+
+        # Create database with unique data
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+        cursor.execute("CREATE TABLE METADATA (field TEXT, value TEXT)")
+        cursor.execute(
+            "CREATE TABLE VAR_MAP (var_name TEXT, sql_type TEXT, functional_type TEXT)"
+        )
+        cursor.execute("INSERT INTO METADATA VALUES ('field1', 'value1')")
+        cursor.execute("INSERT INTO METADATA VALUES ('field2', 'value2')")
+        cursor.execute("INSERT INTO VAR_MAP VALUES ('var1', 'TEXT', 'func1')")
+        conn.commit()
+        conn.close()
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+            "databases": {},
+        }
+        backup = BackupClass(device_info, "/tmp/results")
+
+        result = backup._check_data_duplication(str(db_path))
+        assert result is False
+
+    def test_check_duplication_with_duplicates(self, tmp_path):
+        """Test duplication check when duplicates exist."""
+        db_path = tmp_path / "test.db"
+
+        # Create database with duplicate data
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+        cursor.execute("CREATE TABLE METADATA (field TEXT, value TEXT)")
+        cursor.execute("INSERT INTO METADATA VALUES ('field1', 'value1')")
+        cursor.execute("INSERT INTO METADATA VALUES ('field1', 'value1')")  # Duplicate
+        conn.commit()
+        conn.close()
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+            "databases": {},
+        }
+        backup = BackupClass(device_info, "/tmp/results")
+
+        result = backup._check_data_duplication(str(db_path))
+        assert result is True
+
+    def test_check_duplication_missing_tables(self, tmp_path):
+        """Test duplication check when tables don't exist."""
+        db_path = tmp_path / "test.db"
+
+        # Create empty database
+        conn = sqlite3.connect(str(db_path))
+        conn.close()
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+            "databases": {},
+        }
+        backup = BackupClass(device_info, "/tmp/results")
+
+        result = backup._check_data_duplication(str(db_path))
+        # Should return False (no duplicates) even though tables don't exist
+        assert result is False
+
+    def test_check_duplication_database_error(self, tmp_path):
+        """Test duplication check handles database errors."""
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+            "databases": {},
+        }
+        backup = BackupClass(device_info, "/tmp/results")
+
+        # Try to check non-existent database
+        result = backup._check_data_duplication("/nonexistent/path.db")
+        assert result is False
+
+
+class TestBackupClassGetSqliteTableCounts:
+    """Test BackupClass.get_sqlite_table_counts() method."""
+
+    def test_get_table_counts_method(self, tmp_path):
+        """Test get_sqlite_table_counts instance method."""
+        db_path = tmp_path / "test.db"
+
+        # Create database with tables
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+        cursor.execute("CREATE TABLE table1 (id INTEGER PRIMARY KEY)")
+        cursor.execute("CREATE TABLE table2 (id INTEGER PRIMARY KEY)")
+        cursor.execute("INSERT INTO table1 (id) VALUES (1)")
+        cursor.execute("INSERT INTO table1 (id) VALUES (2)")
+        cursor.execute("INSERT INTO table2 (id) VALUES (1)")
+        conn.commit()
+        conn.close()
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+            "databases": {},
+        }
+        backup = BackupClass(device_info, "/tmp/results")
+
+        counts = backup.get_sqlite_table_counts(str(db_path))
+
+        assert counts["table1"] == 2
+        assert counts["table2"] == 1
+
+    def test_check_sync_status(self):
+        """Test check_sync_status method."""
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+            "databases": {},
+        }
+        backup = BackupClass(device_info, "/tmp/results")
+
+        result = backup.check_sync_status()
+
+        # Should return dict with tracking_db key
+        assert isinstance(result, dict)
+        assert "tracking_db" in result
+
+
+class TestVideoBackupClass:
+    """Test VideoBackupClass initialization and operations."""
+
+    def test_video_backup_initialization(self):
+        """Test VideoBackupClass initialization."""
+        from ethoscope_node.backup.helpers import VideoBackupClass
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+        }
+        results_dir = "/tmp/videos"
+
+        backup = VideoBackupClass(device_info, results_dir)
+
+        assert backup._device_id == "device_001"
+        assert backup._port == 9000
+        assert backup._device_url == "http://192.168.1.100:9000"
+
+    def test_video_backup_custom_port(self):
+        """Test VideoBackupClass with custom port."""
+        from ethoscope_node.backup.helpers import VideoBackupClass
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+        }
+        backup = VideoBackupClass(device_info, "/tmp/videos", port=8080)
+
+        assert backup._port == 8080
+        assert backup._device_url == "http://192.168.1.100:8080"
+
+    @patch("ethoscope_node.backup.helpers.urllib.request.urlopen")
+    def test_get_video_list_json_success(self, mock_urlopen):
+        """Test successful video list retrieval."""
+        from ethoscope_node.backup.helpers import VideoBackupClass
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+        }
+        backup = VideoBackupClass(device_info, "/tmp/videos")
+
+        # Mock video list response
+        mock_response = Mock()
+        mock_response.__enter__ = Mock(return_value=mock_response)
+        mock_response.__exit__ = Mock(return_value=False)
+        video_data = {
+            "video_files": {
+                "video1.h264": {"path": "/path/to/video1.h264"},
+                "video2.h264": {"path": "/path/to/video2.h264"},
+            },
+            "metadata": {
+                "total_files": 2,
+                "disk_usage_bytes": 1024000,
+                "videos_directory": "/ethoscope_data/videos",
+                "device_ip": "192.168.1.100",
+            },
+        }
+        mock_response.read.return_value = json.dumps(video_data).encode()
+        mock_urlopen.return_value = mock_response
+
+        result = backup.get_video_list_json()
+
+        assert result is not None
+        assert len(result["video_files"]) == 2
+        assert result["metadata"]["total_files"] == 2
+
+    @patch("ethoscope_node.backup.helpers.urllib.request.urlopen")
+    def test_get_video_list_json_http_error(self, mock_urlopen):
+        """Test video list retrieval with HTTP error."""
+        from ethoscope_node.backup.helpers import VideoBackupClass
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+        }
+        backup = VideoBackupClass(device_info, "/tmp/videos")
+
+        # Mock HTTP error
+        mock_urlopen.side_effect = urllib.error.HTTPError(
+            "http://test", 404, "Not Found", {}, None
+        )
+
+        result = backup.get_video_list_json()
+
+        assert result is None
+
+    @patch("ethoscope_node.backup.helpers.urllib.request.urlopen")
+    def test_get_video_list_json_invalid_response(self, mock_urlopen):
+        """Test video list retrieval with invalid JSON."""
+        from ethoscope_node.backup.helpers import VideoBackupClass
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+        }
+        backup = VideoBackupClass(device_info, "/tmp/videos")
+
+        # Mock invalid JSON response
+        mock_response = Mock()
+        mock_response.__enter__ = Mock(return_value=mock_response)
+        mock_response.__exit__ = Mock(return_value=False)
+        mock_response.read.return_value = b"not valid json"
+        mock_urlopen.return_value = mock_response
+
+        result = backup.get_video_list_json()
+
+        assert result is None
+
+    @patch("ethoscope_node.backup.helpers.urllib.request.urlopen")
+    def test_get_video_list_json_not_dict(self, mock_urlopen):
+        """Test video list retrieval when response is not a dict."""
+        from ethoscope_node.backup.helpers import VideoBackupClass
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+        }
+        backup = VideoBackupClass(device_info, "/tmp/videos")
+
+        # Mock response that's not a dict
+        mock_response = Mock()
+        mock_response.__enter__ = Mock(return_value=mock_response)
+        mock_response.__exit__ = Mock(return_value=False)
+        mock_response.read.return_value = json.dumps(["not", "a", "dict"]).encode()
+        mock_urlopen.return_value = mock_response
+
+        result = backup.get_video_list_json()
+
+        assert result is None
+
+    @patch("subprocess.Popen")
+    @patch("ethoscope_node.backup.helpers.ensure_ssh_keys")
+    @patch("ethoscope_node.backup.helpers.VideoBackupClass.get_video_list_json")
+    def test_backup_success(self, mock_get_videos, mock_ssh_keys, mock_popen, tmp_path):
+        """Test successful video backup operation."""
+        from ethoscope_node.backup.helpers import VideoBackupClass
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+        }
+        results_dir = str(tmp_path / "videos")
+
+        # Mock video list
+        mock_get_videos.return_value = {
+            "video_files": {
+                "video1.h264": {},
+                "video2.h264": {},
+            },
+            "metadata": {
+                "total_files": 2,
+                "disk_usage_bytes": 2048000,
+                "videos_directory": "/ethoscope_data/videos",
+                "device_ip": "192.168.1.100",
+            },
+        }
+
+        # Mock SSH keys
+        mock_ssh_keys.return_value = ("/path/to/key", "/path/to/pub")
+
+        # Mock rsync process
+        mock_process = Mock()
+        mock_process.stdout.readline.side_effect = ["", ""]  # Empty output
+        mock_process.wait.return_value = 0  # Success
+        mock_popen.return_value = mock_process
+
+        backup = VideoBackupClass(device_info, results_dir)
+        status_messages = list(backup.backup())
+
+        # Should have success message
+        assert any("success" in msg.lower() for msg in status_messages)
+
+    @patch("ethoscope_node.backup.helpers.VideoBackupClass.get_video_list_json")
+    def test_backup_no_videos(self, mock_get_videos, tmp_path):
+        """Test backup when no videos are found."""
+        from ethoscope_node.backup.helpers import VideoBackupClass
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+        }
+        results_dir = str(tmp_path / "videos")
+
+        # Mock empty video list
+        mock_get_videos.return_value = {
+            "video_files": {},
+            "metadata": {
+                "total_files": 0,
+                "disk_usage_bytes": 0,
+                "videos_directory": "/ethoscope_data/videos",
+            },
+        }
+
+        backup = VideoBackupClass(device_info, results_dir)
+        status_messages = list(backup.backup())
+
+        # Should have warning about no videos
+        assert any("No videos" in msg for msg in status_messages)
+
+    @patch("ethoscope_node.backup.helpers.VideoBackupClass.get_video_list_json")
+    def test_backup_failed_to_get_video_info(self, mock_get_videos, tmp_path):
+        """Test backup when video info retrieval fails."""
+        from ethoscope_node.backup.helpers import VideoBackupClass
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+        }
+        results_dir = str(tmp_path / "videos")
+
+        # Mock failed video list retrieval
+        mock_get_videos.return_value = None
+
+        backup = VideoBackupClass(device_info, results_dir)
+        status_messages = list(backup.backup())
+
+        # Should have error message
+        assert any(
+            "Failed to retrieve video information" in msg for msg in status_messages
+        )
+
+    @patch("subprocess.Popen")
+    @patch("ethoscope_node.backup.helpers.ensure_ssh_keys")
+    @patch("ethoscope_node.backup.helpers.VideoBackupClass.get_video_list_json")
+    def test_backup_rsync_failure(
+        self, mock_get_videos, mock_ssh_keys, mock_popen, tmp_path
+    ):
+        """Test backup when rsync fails."""
+        from ethoscope_node.backup.helpers import VideoBackupClass
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+        }
+        results_dir = str(tmp_path / "videos")
+
+        # Mock video list
+        mock_get_videos.return_value = {
+            "video_files": {"video1.h264": {}},
+            "metadata": {
+                "total_files": 1,
+                "disk_usage_bytes": 1024000,
+                "videos_directory": "/ethoscope_data/videos",
+                "device_ip": "192.168.1.100",
+            },
+        }
+
+        # Mock SSH keys
+        mock_ssh_keys.return_value = ("/path/to/key", "/path/to/pub")
+
+        # Mock rsync process with failure
+        mock_process = Mock()
+        mock_process.stdout.readline.side_effect = ["", ""]
+        mock_process.wait.return_value = 1  # Failure
+        mock_popen.return_value = mock_process
+
+        backup = VideoBackupClass(device_info, results_dir)
+        status_messages = list(backup.backup())
+
+        # Should have error message
+        assert any("failed" in msg.lower() for msg in status_messages)
+
+    @patch("ethoscope_node.backup.helpers.list_local_video_files")
+    @patch("ethoscope_node.backup.helpers.VideoBackupClass.get_video_list_json")
+    def test_check_sync_status_success(self, mock_get_videos, mock_local_videos):
+        """Test check_sync_status with partial sync."""
+        from ethoscope_node.backup.helpers import VideoBackupClass
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+        }
+        backup = VideoBackupClass(device_info, "/tmp/videos")
+
+        # Mock remote videos
+        mock_get_videos.return_value = {
+            "video_files": {
+                "video1.h264": {},
+                "video2.h264": {},
+                "video3.h264": {},
+            },
+            "metadata": {},
+        }
+
+        # Mock local videos (only 2 of 3)
+        mock_local_videos.return_value = {
+            "video1.h264": {},
+            "video2.h264": {},
+        }
+
+        result = backup.check_sync_status()
+
+        assert result is not None
+        assert result["video_files"]["present"] == 2
+        assert result["video_files"]["total"] == 3
+
+    @patch("ethoscope_node.backup.helpers.VideoBackupClass.get_video_list_json")
+    def test_check_sync_status_failed_to_get_videos(self, mock_get_videos):
+        """Test check_sync_status when video retrieval fails."""
+        from ethoscope_node.backup.helpers import VideoBackupClass
+
+        device_info = {
+            "id": "device_001",
+            "name": "ETHOSCOPE_001",
+            "ip": "192.168.1.100",
+        }
+        backup = VideoBackupClass(device_info, "/tmp/videos")
+
+        # Mock failed video retrieval
+        mock_get_videos.return_value = None
+
+        result = backup.check_sync_status()
+
+        assert result is None
