@@ -726,6 +726,150 @@ class TestDailyScheduler(unittest.TestCase):
             # Should return empty dict for nonexistent file
             self.assertEqual(scheduler._state, {})
 
+    def test_date_range_single_start_date_with_value(self):
+        """Test date range parsing with single non-None start date (line 93)."""
+        start_str = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
+        date_range = f"{start_str} >"
+
+        scheduler = Scheduler(date_range)
+        # Should be active from start_str to infinity
+        self.assertTrue(scheduler.check_time_range(time.time() + 3600))
+
+    def test_date_range_two_none_dates_error(self):
+        """Test that two None dates raise DateRangeError (line 99)."""
+        # This would be "> >" which should raise an error
+        with self.assertRaises(DateRangeError):
+            Scheduler("> >")
+
+    def test_date_range_unexpected_format_error(self):
+        """Test that unexpected date formats raise Exception (line 106)."""
+        # More than 2 date parts should raise exception
+        with self.assertRaises((Exception, DateRangeError)):
+            Scheduler("2025-01-01 > 2025-02-01 > 2025-03-01")
+
+    def test_state_file_io_error_on_load(self):
+        """Test _load_state handles file I/O errors gracefully (lines 210-215)."""
+        import tempfile
+
+        from ethoscope.utils.scheduler import DailyScheduler
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = os.path.join(tmpdir, "corrupted.json")
+            # Create corrupted JSON file
+            with open(state_file, "w") as f:
+                f.write("{invalid json content")
+
+            scheduler = DailyScheduler(8, 24, state_file_path=state_file)
+            # Should handle corrupted file and return empty dict
+            self.assertEqual(scheduler._state, {})
+
+    def test_state_file_io_error_on_save(self):
+        """Test _save_state handles file I/O errors gracefully (lines 219-227)."""
+        from ethoscope.utils.scheduler import DailyScheduler
+
+        # Use invalid path to trigger OSError
+        state_file = "/nonexistent_dir/cannot_write/state.json"
+        scheduler = DailyScheduler(8, 24, state_file_path=state_file)
+
+        # Force a save attempt (should handle error gracefully)
+        scheduler._state["test"] = "value"
+        scheduler._save_state()  # Should not raise exception
+
+    def test_is_active_period_before_start_time(self):
+        """Test is_active_period when t < start_timestamp (line 257)."""
+        from ethoscope.utils.scheduler import DailyScheduler
+
+        # Create scheduler: 8 hours active starting at 10:00
+        scheduler = DailyScheduler(8, 24, daily_start_time="10:00:00")
+
+        # Test at 08:00 (before start time)
+        days_since_epoch = int(time.time() // 86400)
+        test_time = days_since_epoch * 86400 + (8 * 3600)  # 08:00 today
+
+        is_active = scheduler.is_active_period(test_time)
+        # Should be inactive before start time
+        self.assertFalse(is_active)
+
+    def test_state_tracking_during_active_period(self):
+        """Test state file updates during active period (lines 269-276)."""
+        import tempfile
+
+        from ethoscope.utils.scheduler import DailyScheduler
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_file = os.path.join(tmpdir, "state.json")
+
+            # Create scheduler: 30-min duration, 1-hour intervals, starting at midnight
+            scheduler = DailyScheduler(
+                0.5,
+                interval_hours=1,
+                daily_start_time="00:00:00",
+                state_file_path=state_file,
+            )
+
+            # Check during an active period
+            current_time = time.time()
+            is_active = scheduler.is_active_period(current_time)
+
+            if is_active:
+                # State file should be updated
+                self.assertTrue(os.path.exists(state_file))
+                # State should contain period information
+                self.assertGreater(len(scheduler._state), 0)
+
+    def test_get_next_active_period_with_none(self):
+        """Test get_next_active_period with t=None (line 291)."""
+        from ethoscope.utils.scheduler import DailyScheduler
+
+        scheduler = DailyScheduler(8, 24, daily_start_time="10:00:00")
+
+        # Call with t=None (should use current time)
+        next_start, next_end = scheduler.get_next_active_period(t=None)
+
+        self.assertIsInstance(next_start, (int, float))
+        self.assertIsInstance(next_end, (int, float))
+        self.assertGreater(next_end, next_start)
+
+    def test_get_next_active_period_before_start(self):
+        """Test get_next_active_period when t < start_timestamp (line 305)."""
+        from ethoscope.utils.scheduler import DailyScheduler
+
+        scheduler = DailyScheduler(8, 24, daily_start_time="12:00:00")
+
+        # Test at 08:00 (before start time)
+        days_since_epoch = int(time.time() // 86400)
+        test_time = days_since_epoch * 86400 + (8 * 3600)  # 08:00 today
+
+        next_start, next_end = scheduler.get_next_active_period(test_time)
+
+        # Next period should be at 12:00 today
+        expected_start = days_since_epoch * 86400 + (12 * 3600)
+        self.assertEqual(next_start, expected_start)
+
+    def test_get_time_until_next_period_with_none(self):
+        """Test get_time_until_next_period with t=None (line 322)."""
+        from ethoscope.utils.scheduler import DailyScheduler
+
+        scheduler = DailyScheduler(8, 24, daily_start_time="10:00:00")
+
+        # Call with t=None (should use current time)
+        time_until = scheduler.get_time_until_next_period(t=None)
+
+        self.assertIsInstance(time_until, (int, float))
+        self.assertGreaterEqual(time_until, 0)
+
+    def test_get_remaining_active_time_with_none(self):
+        """Test get_remaining_active_time with t=None (line 341)."""
+        from ethoscope.utils.scheduler import DailyScheduler
+
+        scheduler = DailyScheduler(24, 24, daily_start_time="00:00:00")
+
+        # Call with t=None during active period
+        remaining = scheduler.get_remaining_active_time(t=None)
+
+        self.assertIsInstance(remaining, (int, float))
+        self.assertGreaterEqual(remaining, 0)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
