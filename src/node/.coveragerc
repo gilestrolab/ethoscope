@@ -35,10 +35,10 @@ skip_covered = False
 skip_empty = False
 
 # Minimum coverage thresholds
-# Current: 25.18% (baseline)
-# Device package achieved: 46.34% (from 25.18%)
-# Setting realistic threshold for node package
-fail_under = 25
+# Previous: 47.58%
+# Current: 48.61% (+1.03 points from backup helpers tests)
+# Includes comprehensive backup helpers testing (+8.12% coverage on helpers.py)
+fail_under = 48.61
 
 [html]
 directory = htmlcov
