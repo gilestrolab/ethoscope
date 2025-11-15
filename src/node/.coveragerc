@@ -73,7 +73,10 @@ skip_empty = False
 #   - Intelligent recommendation generation
 #   - Report generation and dataset export
 #   - Old log cleanup and error handling
-fail_under = 76.57
+# - video_helpers.py: 80.00% coverage (6 tests)
+#   Video file listing and management utilities
+#   Remaining 3 uncovered lines are defensive exception handling
+fail_under = 76.78
 
 [html]
 directory = htmlcov
