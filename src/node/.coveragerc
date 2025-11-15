@@ -35,16 +35,25 @@ skip_covered = False
 skip_empty = False
 
 # Minimum coverage thresholds
-# Previous: 70.76%
-# Current: 71.26% (+0.50 points from notification base module tests)
+# Previous: 71.26%
+# Current: 72.51% (+1.25 points from ethoscope scanner tests)
+# Scanner modules (expanded coverage):
+# - ethoscope_scanner.py: 65.30% coverage (77 tests, +45 new tests)
+#   Improved from 32.19% with comprehensive coverage of:
+#   - Device control operations (start, stop, poweroff, reboot)
+#   - Device information retrieval (connected_module, images, logs)
+#   - Streaming functionality (relay_stream manager lifecycle)
+#   - Backup filename logic (priority-based selection with fallbacks)
+#   - SSH authentication (success, failure, timeout handling)
+#   - Device state management (coming online, unreachable states)
+#   - Scanner device management (add, ID changes, retirement)
 # Notification modules (comprehensive coverage):
 # - Base analyzer module: 100.00% coverage (50 tests)
 # - Slack notification module: 98.51% coverage (40 tests)
 # - Manager notification module: 97.66% coverage (31 tests)
 # - Email notification module: 100.00% coverage (31 tests)
 # - Mattermost notification module: 99.35% coverage (36 tests)
-# Comprehensive edge case coverage including error paths, exceptions, timestamp parsing, and service initialization
-fail_under = 71.26
+fail_under = 72.51
 
 [html]
 directory = htmlcov
