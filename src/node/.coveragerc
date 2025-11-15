@@ -35,11 +35,11 @@ skip_covered = False
 skip_empty = False
 
 # Minimum coverage thresholds
-# Previous: 62.76%
-# Current: 63.48% (+0.72 points from auth_api module tests)
-# Includes comprehensive Authentication API testing (100.00% coverage, 46 tests total)
-# Covers login/logout, session mgmt, PIN changes, authorization checks, admin operations
-fail_under = 63.48
+# Previous: 63.48%
+# Current: 65.36% (+1.88 points from tunnel_utils module tests)
+# Includes comprehensive Tunnel Utils API testing (100.00% coverage, 42 tests total)
+# Covers tunnel config/validation, service mgmt, status monitoring, URL generation, error handling
+fail_under = 65.36
 
 [html]
 directory = htmlcov
