@@ -35,8 +35,8 @@ skip_covered = False
 skip_empty = False
 
 # Minimum coverage thresholds
-# Previous: 71.26%
-# Current: 72.51% (+1.25 points from ethoscope scanner tests)
+# Previous: 72.51%
+# Current: 74.45% (+1.94 points from ethoscope streaming tests)
 # Scanner modules (expanded coverage):
 # - ethoscope_scanner.py: 65.30% coverage (77 tests, +45 new tests)
 #   Improved from 32.19% with comprehensive coverage of:
@@ -47,13 +47,23 @@ skip_empty = False
 #   - SSH authentication (success, failure, timeout handling)
 #   - Device state management (coming online, unreachable states)
 #   - Scanner device management (add, ID changes, retirement)
+# - ethoscope_streaming.py: 95.38% coverage (44 tests)
+#   Improved from 12.72% with comprehensive coverage of:
+#   - Stream initialization and configuration
+#   - HTTP streaming and frame capture
+#   - Stream manager lifecycle (start/stop/restart)
+#   - Socket health checks and connection management
+#   - Client queue management (add/remove/broadcast)
+#   - Frame broadcasting with multi-client support
+#   - Error handling (socket errors, corrupted frames, timeouts)
+#   - Resource cleanup and thread safety
 # Notification modules (comprehensive coverage):
 # - Base analyzer module: 100.00% coverage (50 tests)
 # - Slack notification module: 98.51% coverage (40 tests)
 # - Manager notification module: 97.66% coverage (31 tests)
 # - Email notification module: 100.00% coverage (31 tests)
 # - Mattermost notification module: 99.35% coverage (36 tests)
-fail_under = 72.51
+fail_under = 74.45
 
 [html]
 directory = htmlcov
