@@ -35,9 +35,12 @@ skip_covered = False
 skip_empty = False
 
 # Minimum coverage thresholds
-# Previous: 79.41%
-# Current: 79.97% (crossed the 80% barrier!)
+# Previous: 79.97%
+# Current: 80.16% (CROSSED THE 80% BARRIER! 🎯)
 # Latest improvements:
+# - middleware.py: 90.91% -> 100.00% (47 tests, +9 edge case tests)
+#   New tests cover: IP cleaning, decorator error paths, config fallbacks, exception handling
+#   Security-critical authentication middleware now has complete test coverage
 # - device_api.py: 95.67% -> 100.00% (52 tests, +5 edge case tests)
 #   New tests cover: JSON parsing fallbacks, debug logging, batch exception handling
 # Scanner modules (expanded coverage):
@@ -90,6 +93,15 @@ skip_empty = False
 #   Video file listing and management utilities
 #   Remaining 3 uncovered lines are defensive exception handling
 # Auth modules (security-critical coverage):
+# - middleware.py: 100.00% coverage (47 tests)
+#   Complete coverage of authentication middleware with tests for:
+#   - Session management and user authentication
+#   - Rate limiting (username and IP-based)
+#   - PIN validation with bcrypt hashing
+#   - Role-based access control (admin vs regular users)
+#   - Decorator error handling (@require_auth, @require_admin)
+#   - Configuration fallback mechanisms
+#   - Comprehensive exception handling for all edge cases
 # - session.py: 100.00% coverage (39 tests)
 #   Complete coverage of session management with tests for:
 #   - Session creation, validation, and destruction
@@ -127,7 +139,7 @@ skip_empty = False
 #   - Device control (instructions, logs, SQL dumps, retirement)
 #   - Batch endpoints (full and critical data batching)
 #   - Exception handling (JSON parsing, API failures, SSH errors)
-fail_under = 79.97
+fail_under = 80.16
 
 [html]
 directory = htmlcov
