@@ -349,6 +349,100 @@ class TestNodeAPI(unittest.TestCase):
 
         self.assertIn("not available", result["RDIR"])
 
+    @patch("os.path.exists")
+    @patch("os.popen")
+    @patch("ethoscope_node.api.node_api.netifaces")
+    def test_get_node_system_info_network_exception(
+        self, mock_netifaces, mock_popen, mock_exists
+    ):
+        """Test system info when network interface retrieval fails."""
+
+        # Create mock file objects with proper context manager support
+        def create_mock_file(content):
+            mock_file = MagicMock()
+            mock_file.read.return_value = content
+            mock_file.__enter__.return_value = mock_file
+            mock_file.__exit__.return_value = False
+            return mock_file
+
+        # Mock all os.popen calls in order
+        mock_popen.side_effect = [
+            create_mock_file(
+                "Filesystem     Size  Used Avail Use%\n/dev/sda1      100G   50G   50G  50%\n"
+            ),  # df
+            create_mock_file("main\n"),  # git branch
+            create_mock_file("abc123\n"),  # git commit
+            create_mock_file("2024-01-01 12:00:00\n"),  # git date
+            create_mock_file(""),  # git status (no changes)
+            create_mock_file(
+                "line1\nline2\nActive: active (running) since Mon 2024-01-01\n"
+            ),  # systemctl status
+        ]
+
+        # Trigger exception in network interface processing (lines 192-193)
+        mock_netifaces.interfaces.side_effect = Exception("Network error")
+
+        mock_exists.return_value = True
+
+        result = self.api._get_node_system_info()
+
+        # Should handle exception gracefully
+        self.assertIsInstance(result["CARDS"], dict)
+        self.assertIsInstance(result["IPs"], list)
+        self.assertEqual(len(result["CARDS"]), 0)  # Empty due to exception
+        self.assertEqual(len(result["IPs"]), 0)  # Empty due to exception
+        # Other fields should still be populated
+        self.assertEqual(result["GIT_BRANCH"], "main")
+
+    @patch("os.path.exists")
+    @patch("os.popen")
+    @patch("ethoscope_node.api.node_api.netifaces")
+    def test_get_node_system_info_git_exception(
+        self, mock_netifaces, mock_popen, mock_exists
+    ):
+        """Test system info when git commands fail."""
+
+        # Create mock file objects with proper context manager support
+        def create_mock_file(content):
+            mock_file = MagicMock()
+            mock_file.read.return_value = content
+            mock_file.__enter__.return_value = mock_file
+            mock_file.__exit__.return_value = False
+            return mock_file
+
+        # Mock disk usage command, then trigger exception for git commands
+        mock_popen.side_effect = [
+            create_mock_file(
+                "Filesystem     Size  Used Avail Use%\n/dev/sda1      100G   50G   50G  50%\n"
+            ),  # df
+            Exception("Git not found"),  # git branch fails (lines 208-212)
+        ]
+
+        # Mock network interfaces to work correctly
+        mock_netifaces.interfaces.return_value = ["eth0"]
+
+        def mock_ifaddresses(iface):
+            if iface == "eth0":
+                return {
+                    17: [{"addr": "aa:bb:cc:dd:ee:ff"}],
+                    2: [{"addr": "192.168.1.100"}],
+                }
+            return {}
+
+        mock_netifaces.ifaddresses.side_effect = mock_ifaddresses
+
+        mock_exists.return_value = True
+
+        result = self.api._get_node_system_info()
+
+        # Should handle git exception gracefully (lines 208-212)
+        self.assertEqual(result["GIT_BRANCH"], "Not detected")
+        self.assertEqual(result["GIT_COMMIT"], "Not detected")
+        self.assertEqual(result["GIT_DATE"], "Not detected")
+        self.assertFalse(result["NEEDS_UPDATE"])
+        # Other fields should still be populated
+        self.assertEqual(result["IPs"], ["192.168.1.100"])
+
     @patch("os.popen")
     def test_get_daemon_status_all_active(self, mock_popen):
         """Test getting daemon status when all active."""
