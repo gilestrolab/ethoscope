@@ -411,6 +411,29 @@ class TestAuthMiddleware(unittest.TestCase):
         # Recent attempt should remain
         self.assertIn("newuser", self.middleware._login_attempts)
 
+    @patch("ethoscope_node.auth.middleware.time.time")
+    def test_clean_old_attempts_ip_cleaning(self, mock_time):
+        """Test cleaning expired IP attempts (covers lines 284, 287)."""
+        mock_time.return_value = 2000.0
+
+        # Add old IP attempt (2 hours ago, past lockout duration)
+        self.middleware._ip_attempts["10.0.0.1"] = {
+            "count": 16,
+            "last_attempt": 2000.0 - (2 * 60 * 60),
+        }
+        # Add recent IP attempt
+        self.middleware._ip_attempts["10.0.0.2"] = {
+            "count": 5,
+            "last_attempt": 1990.0,
+        }
+
+        self.middleware._clean_old_attempts(2000.0)
+
+        # Old IP attempt should be removed (lines 284, 287)
+        self.assertNotIn("10.0.0.1", self.middleware._ip_attempts)
+        # Recent IP attempt should remain
+        self.assertIn("10.0.0.2", self.middleware._ip_attempts)
+
 
 class TestAuthDecorators(unittest.TestCase):
     """Test suite for authentication decorators."""
@@ -476,6 +499,69 @@ class TestAuthDecorators(unittest.TestCase):
 
     @patch("bottle.app")
     @patch("bottle.abort")
+    def test_require_auth_no_middleware(self, mock_abort, mock_app):
+        """Test require_auth aborts when middleware not available (line 306)."""
+        mock_app_without_auth = Mock()
+        # Set auth_middleware to None instead of not having the attribute
+        mock_app_without_auth.auth_middleware = None
+        mock_app.return_value = mock_app_without_auth
+
+        # Make abort raise an exception to stop execution
+        mock_abort.side_effect = RuntimeError("Abort")
+
+        @require_auth
+        def protected_route():
+            return "success"
+
+        with self.assertRaises(RuntimeError):
+            protected_route()
+
+        mock_abort.assert_called_once_with(
+            500, "Authentication middleware not available"
+        )
+
+    @patch("bottle.app")
+    def test_require_auth_config_method2_fallback(self, mock_app):
+        """Test require_auth using get_authentication_config method (lines 319-321)."""
+        mock_app.return_value = self.mock_app
+        self.mock_middleware.is_authenticated.return_value = True
+
+        # Remove _settings to force Method 2
+        delattr(self.mock_config, "_settings")
+        self.mock_config.get_authentication_config.return_value = {"enabled": True}
+
+        @require_auth
+        def protected_route():
+            return "success"
+
+        result = protected_route()
+
+        self.assertEqual(result, "success")
+        self.mock_config.get_authentication_config.assert_called_once()
+
+    @patch("bottle.app")
+    def test_require_auth_config_exception_handling(self, mock_app):
+        """Test require_auth exception handling defaults to disabled (lines 322-323)."""
+        mock_app.return_value = self.mock_app
+
+        # Remove _settings and make get_authentication_config raise exception
+        delattr(self.mock_config, "_settings")
+        self.mock_config.get_authentication_config.side_effect = Exception(
+            "Config error"
+        )
+
+        @require_auth
+        def protected_route():
+            return "success"
+
+        result = protected_route()
+
+        # Should default to disabled (allow access without checking auth)
+        self.assertEqual(result, "success")
+        self.mock_middleware.is_authenticated.assert_not_called()
+
+    @patch("bottle.app")
+    @patch("bottle.abort")
     def test_require_admin_authenticated_admin(self, mock_abort, mock_app):
         """Test require_admin allows admin user."""
         mock_app.return_value = self.mock_app
@@ -508,6 +594,103 @@ class TestAuthDecorators(unittest.TestCase):
         admin_route()
 
         mock_abort.assert_called_once_with(403, "Admin privileges required")
+
+    @patch("bottle.app")
+    @patch("bottle.abort")
+    def test_require_admin_not_authenticated(self, mock_abort, mock_app):
+        """Test require_admin blocks unauthenticated user (line 383)."""
+        mock_app.return_value = self.mock_app
+        self.mock_middleware.is_authenticated.return_value = False
+        self.mock_config._settings = {"authentication": {"enabled": True}}
+
+        @require_admin
+        def admin_route():
+            return "admin success"
+
+        admin_route()
+
+        mock_abort.assert_called_once_with(401, "Authentication required")
+
+    @patch("bottle.app")
+    @patch("bottle.abort")
+    def test_require_admin_no_middleware(self, mock_abort, mock_app):
+        """Test require_admin aborts when middleware not available (line 356)."""
+        mock_app_without_auth = Mock()
+        mock_app_without_auth.auth_middleware = None
+        mock_app.return_value = mock_app_without_auth
+
+        # Make abort raise an exception to stop execution
+        mock_abort.side_effect = RuntimeError("Abort")
+
+        @require_admin
+        def admin_route():
+            return "admin success"
+
+        with self.assertRaises(RuntimeError):
+            admin_route()
+
+        mock_abort.assert_called_once_with(
+            500, "Authentication middleware not available"
+        )
+
+    @patch("bottle.app")
+    def test_require_admin_disabled(self, mock_app):
+        """Test require_admin allows access when auth disabled (line 379)."""
+        mock_app.return_value = self.mock_app
+        self.mock_config._settings = {"authentication": {"enabled": False}}
+
+        @require_admin
+        def admin_route():
+            return "admin success"
+
+        result = admin_route()
+
+        self.assertEqual(result, "admin success")
+        # Should not check authentication or admin status
+        self.mock_middleware.is_authenticated.assert_not_called()
+        self.mock_middleware.is_admin.assert_not_called()
+
+    @patch("bottle.app")
+    def test_require_admin_config_method2_fallback(self, mock_app):
+        """Test require_admin using get_authentication_config method (lines 369-371)."""
+        mock_app.return_value = self.mock_app
+        self.mock_middleware.is_authenticated.return_value = True
+        self.mock_middleware.is_admin.return_value = True
+
+        # Remove _settings to force Method 2
+        delattr(self.mock_config, "_settings")
+        self.mock_config.get_authentication_config.return_value = {"enabled": True}
+
+        @require_admin
+        def admin_route():
+            return "admin success"
+
+        result = admin_route()
+
+        self.assertEqual(result, "admin success")
+        self.mock_config.get_authentication_config.assert_called_once()
+
+    @patch("bottle.app")
+    def test_require_admin_config_exception_handling(self, mock_app):
+        """Test require_admin exception handling defaults to disabled (lines 372-373)."""
+        mock_app.return_value = self.mock_app
+
+        # Remove _settings and make get_authentication_config raise exception
+        delattr(self.mock_config, "_settings")
+        self.mock_config.get_authentication_config.side_effect = Exception(
+            "Config error"
+        )
+
+        @require_admin
+        def admin_route():
+            return "admin success"
+
+        result = admin_route()
+
+        # Should default to disabled (allow access without checking auth)
+        self.assertEqual(result, "admin success")
+        self.mock_middleware.is_authenticated.assert_not_called()
+        self.mock_middleware.is_admin.assert_not_called()
 
     @patch("bottle.app")
     def test_get_current_user_helper(self, mock_app):
