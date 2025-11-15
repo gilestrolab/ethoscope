@@ -213,6 +213,17 @@ class TestDeviceAPI(unittest.TestCase):
         self.assertEqual(result["threshold_hours"], 2)  # Default value
 
     @patch("ethoscope_node.api.device_api.BaseAPI.get_request_data")
+    def test_cleanup_busy_devices_invalid_json(self, mock_get_data):
+        """Test cleanup busy devices with invalid JSON."""
+        mock_get_data.return_value = b"not valid json"
+        self.api.database.cleanup_offline_busy_devices.return_value = 1
+
+        result = self.api._cleanup_busy_devices()
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["threshold_hours"], 2)  # Falls back to default
+
+    @patch("ethoscope_node.api.device_api.BaseAPI.get_request_data")
     def test_cleanup_busy_devices_exception(self, mock_get_data):
         """Test cleanup busy devices handles exceptions."""
         mock_get_data.return_value = b""
@@ -587,6 +598,43 @@ class TestDeviceAPI(unittest.TestCase):
         self.assertEqual(call_args[0][0], "start")
 
     @patch("ethoscope_node.api.device_api.BaseAPI.get_request_data")
+    def test_post_device_instructions_start_missing_database(self, mock_get_data):
+        """Test posting start instruction without database_to_append."""
+        post_data = {"experimental_info": {"arguments": {}}}  # No database_to_append
+        mock_get_data.return_value = json.dumps(post_data).encode("utf-8")
+
+        mock_device = Mock()
+        mock_device.info.return_value = {"id": "device1", "status": "started"}
+        self.api.device_scanner.get_device.return_value = mock_device
+
+        with patch("logging.warning") as mock_log:
+            result = self.api._post_device_instructions("device1", "start")
+
+            self.assertEqual(result["status"], "started")
+            # Should log warning about missing database_to_append
+            mock_log.assert_called()
+            call_str = str(mock_log.call_args)
+            self.assertIn("database_to_append NOT found", call_str)
+
+    @patch("ethoscope_node.api.device_api.BaseAPI.get_request_data")
+    def test_post_device_instructions_start_invalid_json(self, mock_get_data):
+        """Test posting start instruction with invalid JSON."""
+        mock_get_data.return_value = b"not valid json"  # Invalid JSON
+
+        mock_device = Mock()
+        mock_device.info.return_value = {"id": "device1", "status": "started"}
+        self.api.device_scanner.get_device.return_value = mock_device
+
+        with patch("logging.error") as mock_log:
+            result = self.api._post_device_instructions("device1", "start")
+
+            self.assertEqual(result["status"], "started")
+            # Should log error about parsing
+            mock_log.assert_called()
+            call_str = str(mock_log.call_args)
+            self.assertIn("Error parsing post data", call_str)
+
+    @patch("ethoscope_node.api.device_api.BaseAPI.get_request_data")
     def test_post_device_instructions_stop(self, mock_get_data):
         """Test posting stop instruction to device."""
         mock_get_data.return_value = b""
@@ -640,6 +688,46 @@ class TestDeviceAPI(unittest.TestCase):
             self.assertEqual(result["user_options"]["option1"], "value1")
             # Should log error
             mock_log.assert_called_once()
+
+    def test_get_device_batch_info_failure(self):
+        """Test getting batched device data when device.info() fails."""
+        mock_device = Mock()
+        mock_device.info.side_effect = Exception("Device info error")
+        mock_device.machine_info.return_value = {"hardware": "RaspberryPi"}
+        mock_device.user_options.return_value = {"option1": "value1"}
+        self.api.device_scanner.get_device.return_value = mock_device
+
+        with patch.object(self.api.logger, "error") as mock_log:
+            result = self.api._get_device_batch("device1")
+
+            self.assertIsNone(result["data"])  # Failed
+            self.assertEqual(result["machineinfo"]["hardware"], "RaspberryPi")
+            self.assertEqual(result["user_options"]["option1"], "value1")
+            # Should log error
+            error_calls = list(mock_log.call_args_list)
+            self.assertTrue(
+                any("Failed to get device info" in str(call) for call in error_calls)
+            )
+
+    def test_get_device_batch_user_options_failure(self):
+        """Test getting batched device data when user_options fails."""
+        mock_device = Mock()
+        mock_device.info.return_value = {"id": "device1"}
+        mock_device.machine_info.return_value = {"hardware": "RaspberryPi"}
+        mock_device.user_options.side_effect = Exception("Options error")
+        self.api.device_scanner.get_device.return_value = mock_device
+
+        with patch.object(self.api.logger, "error") as mock_log:
+            result = self.api._get_device_batch("device1")
+
+            self.assertEqual(result["data"]["id"], "device1")
+            self.assertEqual(result["machineinfo"]["hardware"], "RaspberryPi")
+            self.assertIsNone(result["user_options"])  # Failed
+            # Should log error
+            error_calls = list(mock_log.call_args_list)
+            self.assertTrue(
+                any("Failed to get user options" in str(call) for call in error_calls)
+            )
 
     def test_get_device_batch_critical_success(self):
         """Test getting critical batched device data."""
