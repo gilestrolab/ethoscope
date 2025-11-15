@@ -76,7 +76,17 @@ skip_empty = False
 # - video_helpers.py: 80.00% coverage (6 tests)
 #   Video file listing and management utilities
 #   Remaining 3 uncovered lines are defensive exception handling
-fail_under = 76.78
+# Auth modules (security-critical coverage):
+# - session.py: 100.00% coverage (39 tests)
+#   Complete coverage of session management with tests for:
+#   - Session creation, validation, and destruction
+#   - Session token generation (secure 256-bit tokens)
+#   - Session expiration and periodic cleanup
+#   - Concurrent session limiting per user
+#   - Client IP detection and user agent tracking
+#   - Database session persistence and indexes
+#   - Comprehensive exception handling for all operations
+fail_under = 77.52
 
 [html]
 directory = htmlcov

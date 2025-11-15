@@ -494,6 +494,126 @@ class TestSessionManager(unittest.TestCase):
             self.assertEqual(len(sessions[0]["user_agent"]), 103)
             self.assertTrue(sessions[0]["user_agent"].endswith("..."))
 
+    def test_ensure_sessions_table_exception(self):
+        """Test exception handling in sessions table creation."""
+        mock_db = Mock()
+        mock_db.executeSQL.side_effect = Exception("Database error")
+
+        with patch.object(SessionManager, "__init__", lambda x, y, z: None):
+            manager = SessionManager.__new__(SessionManager)
+            manager.database = mock_db
+            manager.logger = Mock()
+
+            manager._ensure_sessions_table()
+
+            # Should log error
+            manager.logger.error.assert_called()
+            error_call = manager.logger.error.call_args[0][0]
+            self.assertIn("Error ensuring sessions table", error_call)
+
+    @patch("ethoscope_node.auth.session.time.time")
+    @patch("bottle.request")
+    def test_create_session_exception(self, mock_request, mock_time):
+        """Test exception handling in session creation."""
+        mock_time.return_value = 1000.0
+        mock_request.environ = {"HTTP_USER_AGENT": "Test", "REMOTE_ADDR": "127.0.0.1"}
+
+        # Cause exception by making database raise
+        self.mock_db.executeSQL.side_effect = Exception("Database error")
+
+        user = {"username": "testuser", "id": 1}
+        token = self.manager.create_session(user)
+
+        # Should return None and log error
+        self.assertIsNone(token)
+
+    @patch("ethoscope_node.auth.session.time.time")
+    def test_get_user_from_session_exception(self, mock_time):
+        """Test exception handling in session validation."""
+        mock_time.return_value = 1000.0
+
+        # Cause exception
+        self.mock_db.executeSQL.side_effect = Exception("Database error")
+
+        user = self.manager.get_user_from_session("test_token")
+
+        # Should return None
+        self.assertIsNone(user)
+
+    def test_destroy_session_exception(self):
+        """Test exception handling in session destruction."""
+        self.mock_db.executeSQL.side_effect = Exception("Database error")
+
+        result = self.manager.destroy_session("test_token")
+
+        # Should return False
+        self.assertFalse(result)
+
+    def test_destroy_user_sessions_exception(self):
+        """Test exception handling in user sessions destruction."""
+        self.mock_db.executeSQL.side_effect = Exception("Database error")
+
+        result = self.manager.destroy_user_sessions("testuser")
+
+        # Should return False
+        self.assertFalse(result)
+
+    @patch("ethoscope_node.auth.session.time.time")
+    def test_get_active_sessions_exception(self, mock_time):
+        """Test exception handling in get active sessions."""
+        mock_time.return_value = 1000.0
+
+        self.mock_db.executeSQL.side_effect = Exception("Database error")
+
+        sessions = self.manager.get_active_sessions()
+
+        # Should return empty list
+        self.assertEqual(sessions, [])
+
+    @patch("ethoscope_node.auth.session.time.time")
+    def test_cleanup_expired_sessions_exception(self, mock_time):
+        """Test exception handling in cleanup."""
+        mock_time.return_value = 1000.0
+
+        self.mock_db.executeSQL.side_effect = Exception("Database error")
+
+        count = self.manager.cleanup_expired_sessions()
+
+        # Should return 0
+        self.assertEqual(count, 0)
+
+    def test_get_client_ip_exception(self):
+        """Test exception handling in get client IP."""
+        with patch("bottle.request") as mock_request:
+            # Cause exception when accessing environ
+            mock_request.environ.get.side_effect = Exception("Request error")
+
+            ip = self.manager._get_client_ip()
+
+            # Should return "unknown"
+            self.assertEqual(ip, "unknown")
+
+    def test_update_session_access_exception(self):
+        """Test exception handling in session access update."""
+        self.mock_db.executeSQL.side_effect = Exception("Database error")
+
+        # Should not raise exception
+        self.manager._update_session_access("test_token", 1500.0)
+
+        # Method should complete without error (exception is logged)
+
+    @patch("ethoscope_node.auth.session.time.time")
+    def test_limit_user_sessions_exception(self, mock_time):
+        """Test exception handling in session limiting."""
+        mock_time.return_value = 1000.0
+
+        self.mock_db.executeSQL.side_effect = Exception("Database error")
+
+        # Should not raise exception
+        self.manager._limit_user_sessions("testuser")
+
+        # Method should complete without error (exception is logged)
+
 
 if __name__ == "__main__":
     unittest.main()
