@@ -35,8 +35,8 @@ skip_covered = False
 skip_empty = False
 
 # Minimum coverage thresholds
-# Previous: 72.51%
-# Current: 74.45% (+1.94 points from ethoscope streaming tests)
+# Previous: 74.45%
+# Current: 76.57% (+2.12 points from target detection analysis tests)
 # Scanner modules (expanded coverage):
 # - ethoscope_scanner.py: 65.30% coverage (77 tests, +45 new tests)
 #   Improved from 32.19% with comprehensive coverage of:
@@ -63,7 +63,17 @@ skip_empty = False
 # - Manager notification module: 97.66% coverage (31 tests)
 # - Email notification module: 100.00% coverage (31 tests)
 # - Mattermost notification module: 99.35% coverage (36 tests)
-fail_under = 74.45
+# Utils modules (comprehensive coverage):
+# - target_detection_analysis.py: 100.00% coverage (60 tests)
+#   Complete coverage of target detection analysis with tests for:
+#   - Detection log loading and JSON parsing
+#   - Statistical analysis of failures and successes
+#   - Device performance tracking and identification
+#   - Lighting conditions analysis (brightness/contrast)
+#   - Intelligent recommendation generation
+#   - Report generation and dataset export
+#   - Old log cleanup and error handling
+fail_under = 76.57
 
 [html]
 directory = htmlcov
