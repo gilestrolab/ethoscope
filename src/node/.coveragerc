@@ -35,9 +35,11 @@ skip_covered = False
 skip_empty = False
 
 # Minimum coverage thresholds
-# Previous: 79.75%
-# Current: 79.41% (apparent decrease due to additional test code measurement)
-# Note: Individual module coverage improved (node_api.py: 95.86% -> 100.00%)
+# Previous: 79.41%
+# Current: 79.97% (crossed the 80% barrier!)
+# Latest improvements:
+# - device_api.py: 95.67% -> 100.00% (52 tests, +5 edge case tests)
+#   New tests cover: JSON parsing fallbacks, debug logging, batch exception handling
 # Scanner modules (expanded coverage):
 # - base_scanner.py: 93.94% coverage (90 tests, +47 new tests)
 #   Improved from 67.68% with comprehensive coverage of:
@@ -114,7 +116,18 @@ skip_empty = False
 #   - Template upload and format validation
 #   - Template deployment to devices
 #   - Error handling for both builtin and custom templates
-fail_under = 79.41
+# - device_api.py: 100.00% coverage (52 tests)
+#   Complete coverage of device management with tests for:
+#   - Device discovery and listing (active/inactive filters)
+#   - Device cleanup operations (retire inactive, cleanup busy)
+#   - Manual device addition and management
+#   - Device information retrieval (data, machine info, modules, options, videos)
+#   - Image and stream operations (last image, debug image, streaming)
+#   - Backup operations (info retrieval, forced backup)
+#   - Device control (instructions, logs, SQL dumps, retirement)
+#   - Batch endpoints (full and critical data batching)
+#   - Exception handling (JSON parsing, API failures, SSH errors)
+fail_under = 79.97
 
 [html]
 directory = htmlcov
