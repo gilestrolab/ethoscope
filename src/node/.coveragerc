@@ -35,11 +35,12 @@ skip_covered = False
 skip_empty = False
 
 # Minimum coverage thresholds
-# Previous: 65.36%
-# Current: 69.33% (+3.97 points from MySQL backup module tests)
-# Includes comprehensive MySQL backup testing (77.73% coverage, 47 tests total)
-# Covers MySQL→SQLite replication, schema migration, incremental backups, data type conversion
-fail_under = 69.33
+# Previous: 69.33%
+# Current: 70.14% (+0.81 points from notification module tests)
+# Email notification module: 100.00% coverage (31 tests)
+# Mattermost notification module: 99.35% coverage (36 tests)
+# Comprehensive edge case coverage including error paths, cooldowns, and recipient handling
+fail_under = 70.14
 
 [html]
 directory = htmlcov
