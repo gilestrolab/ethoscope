@@ -5,9 +5,7 @@ Unit tests for the unified notification manager.
 """
 
 import datetime
-from unittest.mock import MagicMock
-from unittest.mock import Mock
-from unittest.mock import patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -215,11 +213,14 @@ class TestNotificationManager:
 
     def test_get_active_services(self, mock_config_both_enabled, mock_db):
         """Test getting list of active services."""
-        with patch(
-            "ethoscope_node.notifications.manager.EmailNotificationService"
-        ) as mock_email_cls, patch(
-            "ethoscope_node.notifications.manager.MattermostNotificationService"
-        ) as mock_mattermost_cls:
+        with (
+            patch(
+                "ethoscope_node.notifications.manager.EmailNotificationService"
+            ) as mock_email_cls,
+            patch(
+                "ethoscope_node.notifications.manager.MattermostNotificationService"
+            ) as mock_mattermost_cls,
+        ):
 
             manager = NotificationManager(config=mock_config_both_enabled, db=mock_db)
             active_services = manager.get_active_services()
@@ -232,11 +233,14 @@ class TestNotificationManager:
         self, mock_config_both_enabled, mock_db
     ):
         """Test device stopped alert with both services succeeding."""
-        with patch(
-            "ethoscope_node.notifications.manager.EmailNotificationService"
-        ) as mock_email_cls, patch(
-            "ethoscope_node.notifications.manager.MattermostNotificationService"
-        ) as mock_mattermost_cls:
+        with (
+            patch(
+                "ethoscope_node.notifications.manager.EmailNotificationService"
+            ) as mock_email_cls,
+            patch(
+                "ethoscope_node.notifications.manager.MattermostNotificationService"
+            ) as mock_mattermost_cls,
+        ):
 
             mock_email_service = Mock()
             mock_mattermost_service = Mock()
@@ -262,11 +266,14 @@ class TestNotificationManager:
         self, mock_config_both_enabled, mock_db
     ):
         """Test device stopped alert with one service failing."""
-        with patch(
-            "ethoscope_node.notifications.manager.EmailNotificationService"
-        ) as mock_email_cls, patch(
-            "ethoscope_node.notifications.manager.MattermostNotificationService"
-        ) as mock_mattermost_cls:
+        with (
+            patch(
+                "ethoscope_node.notifications.manager.EmailNotificationService"
+            ) as mock_email_cls,
+            patch(
+                "ethoscope_node.notifications.manager.MattermostNotificationService"
+            ) as mock_mattermost_cls,
+        ):
 
             mock_email_service = Mock()
             mock_mattermost_service = Mock()
@@ -292,11 +299,14 @@ class TestNotificationManager:
         self, mock_config_both_enabled, mock_db
     ):
         """Test device stopped alert with all services failing."""
-        with patch(
-            "ethoscope_node.notifications.manager.EmailNotificationService"
-        ) as mock_email_cls, patch(
-            "ethoscope_node.notifications.manager.MattermostNotificationService"
-        ) as mock_mattermost_cls:
+        with (
+            patch(
+                "ethoscope_node.notifications.manager.EmailNotificationService"
+            ) as mock_email_cls,
+            patch(
+                "ethoscope_node.notifications.manager.MattermostNotificationService"
+            ) as mock_mattermost_cls,
+        ):
 
             mock_email_service = Mock()
             mock_mattermost_service = Mock()
@@ -337,11 +347,14 @@ class TestNotificationManager:
         self, mock_config_both_enabled, mock_db
     ):
         """Test storage warning alert with both services succeeding."""
-        with patch(
-            "ethoscope_node.notifications.manager.EmailNotificationService"
-        ) as mock_email_cls, patch(
-            "ethoscope_node.notifications.manager.MattermostNotificationService"
-        ) as mock_mattermost_cls:
+        with (
+            patch(
+                "ethoscope_node.notifications.manager.EmailNotificationService"
+            ) as mock_email_cls,
+            patch(
+                "ethoscope_node.notifications.manager.MattermostNotificationService"
+            ) as mock_mattermost_cls,
+        ):
 
             mock_email_service = Mock()
             mock_mattermost_service = Mock()
@@ -367,11 +380,14 @@ class TestNotificationManager:
         self, mock_config_both_enabled, mock_db
     ):
         """Test device unreachable alert with both services succeeding."""
-        with patch(
-            "ethoscope_node.notifications.manager.EmailNotificationService"
-        ) as mock_email_cls, patch(
-            "ethoscope_node.notifications.manager.MattermostNotificationService"
-        ) as mock_mattermost_cls:
+        with (
+            patch(
+                "ethoscope_node.notifications.manager.EmailNotificationService"
+            ) as mock_email_cls,
+            patch(
+                "ethoscope_node.notifications.manager.MattermostNotificationService"
+            ) as mock_mattermost_cls,
+        ):
 
             mock_email_service = Mock()
             mock_mattermost_service = Mock()
@@ -394,11 +410,14 @@ class TestNotificationManager:
 
     def test_test_all_configurations(self, mock_config_both_enabled, mock_db):
         """Test configuration testing for all services."""
-        with patch(
-            "ethoscope_node.notifications.manager.EmailNotificationService"
-        ) as mock_email_cls, patch(
-            "ethoscope_node.notifications.manager.MattermostNotificationService"
-        ) as mock_mattermost_cls:
+        with (
+            patch(
+                "ethoscope_node.notifications.manager.EmailNotificationService"
+            ) as mock_email_cls,
+            patch(
+                "ethoscope_node.notifications.manager.MattermostNotificationService"
+            ) as mock_mattermost_cls,
+        ):
 
             mock_email_service = Mock()
             mock_mattermost_service = Mock()
@@ -422,11 +441,14 @@ class TestNotificationManager:
 
     def test_service_exception_handling(self, mock_config_both_enabled, mock_db):
         """Test that exceptions in one service don't affect others."""
-        with patch(
-            "ethoscope_node.notifications.manager.EmailNotificationService"
-        ) as mock_email_cls, patch(
-            "ethoscope_node.notifications.manager.MattermostNotificationService"
-        ) as mock_mattermost_cls:
+        with (
+            patch(
+                "ethoscope_node.notifications.manager.EmailNotificationService"
+            ) as mock_email_cls,
+            patch(
+                "ethoscope_node.notifications.manager.MattermostNotificationService"
+            ) as mock_mattermost_cls,
+        ):
 
             mock_email_service = Mock()
             mock_mattermost_service = Mock()
@@ -453,11 +475,14 @@ class TestNotificationManager:
 
     def test_reload_configuration(self, mock_config_both_enabled, mock_db):
         """Test configuration reloading."""
-        with patch(
-            "ethoscope_node.notifications.manager.EmailNotificationService"
-        ) as mock_email_cls, patch(
-            "ethoscope_node.notifications.manager.MattermostNotificationService"
-        ) as mock_mattermost_cls:
+        with (
+            patch(
+                "ethoscope_node.notifications.manager.EmailNotificationService"
+            ) as mock_email_cls,
+            patch(
+                "ethoscope_node.notifications.manager.MattermostNotificationService"
+            ) as mock_mattermost_cls,
+        ):
 
             manager = NotificationManager(config=mock_config_both_enabled, db=mock_db)
             initial_service_count = len(manager._services)
@@ -548,13 +573,17 @@ class TestNotificationManager:
         self, mock_config_all_enabled, mock_db
     ):
         """Test device stopped alert with all three services succeeding."""
-        with patch(
-            "ethoscope_node.notifications.manager.EmailNotificationService"
-        ) as mock_email_cls, patch(
-            "ethoscope_node.notifications.manager.MattermostNotificationService"
-        ) as mock_mattermost_cls, patch(
-            "ethoscope_node.notifications.manager.SlackNotificationService"
-        ) as mock_slack_cls:
+        with (
+            patch(
+                "ethoscope_node.notifications.manager.EmailNotificationService"
+            ) as mock_email_cls,
+            patch(
+                "ethoscope_node.notifications.manager.MattermostNotificationService"
+            ) as mock_mattermost_cls,
+            patch(
+                "ethoscope_node.notifications.manager.SlackNotificationService"
+            ) as mock_slack_cls,
+        ):
 
             mock_email_service = Mock()
             mock_mattermost_service = Mock()
@@ -608,13 +637,17 @@ class TestNotificationManager:
         self, mock_config_all_enabled, mock_db
     ):
         """Test storage warning alert with mixed success/failure across services."""
-        with patch(
-            "ethoscope_node.notifications.manager.EmailNotificationService"
-        ) as mock_email_cls, patch(
-            "ethoscope_node.notifications.manager.MattermostNotificationService"
-        ) as mock_mattermost_cls, patch(
-            "ethoscope_node.notifications.manager.SlackNotificationService"
-        ) as mock_slack_cls:
+        with (
+            patch(
+                "ethoscope_node.notifications.manager.EmailNotificationService"
+            ) as mock_email_cls,
+            patch(
+                "ethoscope_node.notifications.manager.MattermostNotificationService"
+            ) as mock_mattermost_cls,
+            patch(
+                "ethoscope_node.notifications.manager.SlackNotificationService"
+            ) as mock_slack_cls,
+        ):
 
             mock_email_service = Mock()
             mock_mattermost_service = Mock()
@@ -643,13 +676,17 @@ class TestNotificationManager:
 
     def test_test_all_configurations_with_slack(self, mock_config_all_enabled, mock_db):
         """Test configuration testing for all services including Slack."""
-        with patch(
-            "ethoscope_node.notifications.manager.EmailNotificationService"
-        ) as mock_email_cls, patch(
-            "ethoscope_node.notifications.manager.MattermostNotificationService"
-        ) as mock_mattermost_cls, patch(
-            "ethoscope_node.notifications.manager.SlackNotificationService"
-        ) as mock_slack_cls:
+        with (
+            patch(
+                "ethoscope_node.notifications.manager.EmailNotificationService"
+            ) as mock_email_cls,
+            patch(
+                "ethoscope_node.notifications.manager.MattermostNotificationService"
+            ) as mock_mattermost_cls,
+            patch(
+                "ethoscope_node.notifications.manager.SlackNotificationService"
+            ) as mock_slack_cls,
+        ):
 
             mock_email_service = Mock()
             mock_mattermost_service = Mock()
@@ -681,13 +718,17 @@ class TestNotificationManager:
         self, mock_config_all_enabled, mock_db
     ):
         """Test that exceptions in Slack service don't affect others."""
-        with patch(
-            "ethoscope_node.notifications.manager.EmailNotificationService"
-        ) as mock_email_cls, patch(
-            "ethoscope_node.notifications.manager.MattermostNotificationService"
-        ) as mock_mattermost_cls, patch(
-            "ethoscope_node.notifications.manager.SlackNotificationService"
-        ) as mock_slack_cls:
+        with (
+            patch(
+                "ethoscope_node.notifications.manager.EmailNotificationService"
+            ) as mock_email_cls,
+            patch(
+                "ethoscope_node.notifications.manager.MattermostNotificationService"
+            ) as mock_mattermost_cls,
+            patch(
+                "ethoscope_node.notifications.manager.SlackNotificationService"
+            ) as mock_slack_cls,
+        ):
 
             mock_email_service = Mock()
             mock_mattermost_service = Mock()
@@ -715,3 +756,246 @@ class TestNotificationManager:
             mock_email_service.send_device_stopped_alert.assert_called_once()
             mock_mattermost_service.send_device_stopped_alert.assert_called_once()
             mock_slack_service.send_device_stopped_alert.assert_called_once()
+
+    @patch("ethoscope_node.notifications.manager.EmailNotificationService")
+    def test_initialize_services_email_exception(
+        self, mock_email_cls, mock_config_email_only, mock_db
+    ):
+        """Test that email service initialization exception is handled."""
+        mock_email_cls.side_effect = Exception("Failed to initialize email")
+
+        manager = NotificationManager(config=mock_config_email_only, db=mock_db)
+
+        # Should handle exception gracefully and have no services
+        assert len(manager._services) == 0
+
+    @patch("ethoscope_node.notifications.manager.EmailNotificationService")
+    @patch("ethoscope_node.notifications.manager.MattermostNotificationService")
+    def test_initialize_services_mattermost_exception(
+        self, mock_mattermost_cls, mock_email_cls, mock_config_both_enabled, mock_db
+    ):
+        """Test that Mattermost service initialization exception is handled."""
+        mock_email_service = Mock()
+        mock_email_cls.return_value = mock_email_service
+        mock_mattermost_cls.side_effect = Exception("Failed to initialize Mattermost")
+
+        manager = NotificationManager(config=mock_config_both_enabled, db=mock_db)
+
+        # Should have email service but not Mattermost
+        assert len(manager._services) == 1
+        service_names = [name for name, _ in manager._services]
+        assert "email" in service_names
+        assert "mattermost" not in service_names
+
+    @patch("ethoscope_node.notifications.manager.EmailNotificationService")
+    @patch("ethoscope_node.notifications.manager.MattermostNotificationService")
+    @patch("ethoscope_node.notifications.manager.SlackNotificationService")
+    def test_initialize_services_slack_exception(
+        self,
+        mock_slack_cls,
+        mock_mattermost_cls,
+        mock_email_cls,
+        mock_config_all_enabled,
+        mock_db,
+    ):
+        """Test that Slack service initialization exception is handled."""
+        mock_email_service = Mock()
+        mock_mattermost_service = Mock()
+        mock_email_cls.return_value = mock_email_service
+        mock_mattermost_cls.return_value = mock_mattermost_service
+        mock_slack_cls.side_effect = Exception("Failed to initialize Slack")
+
+        manager = NotificationManager(config=mock_config_all_enabled, db=mock_db)
+
+        # Should have email and Mattermost but not Slack
+        assert len(manager._services) == 2
+        service_names = [name for name, _ in manager._services]
+        assert "email" in service_names
+        assert "mattermost" in service_names
+        assert "slack" not in service_names
+
+    @patch("ethoscope_node.notifications.manager.EmailNotificationService")
+    @patch("ethoscope_node.notifications.manager.MattermostNotificationService")
+    @patch("ethoscope_node.notifications.manager.SlackNotificationService")
+    def test_initialize_services_general_exception(
+        self,
+        mock_slack_cls,
+        mock_mattermost_cls,
+        mock_email_cls,
+        mock_config_all_enabled,
+        mock_db,
+    ):
+        """Test that general exceptions during initialization are handled."""
+        # Simulate accessing config.content raising exception
+        type(mock_config_all_enabled).content = property(
+            lambda self: (_ for _ in ()).throw(Exception("Config error"))
+        )
+
+        manager = NotificationManager(config=mock_config_all_enabled, db=mock_db)
+
+        # Should handle exception and have no services
+        assert len(manager._services) == 0
+
+    def test_send_storage_warning_alert_no_services(
+        self, mock_config_none_enabled, mock_db
+    ):
+        """Test storage warning alert with no services enabled."""
+        manager = NotificationManager(config=mock_config_none_enabled, db=mock_db)
+
+        result = manager.send_storage_warning_alert(
+            device_id="test_device",
+            device_name="Test Device",
+            storage_percent=85.5,
+            available_space="2.1 GB",
+        )
+
+        assert result == False
+
+    def test_send_storage_warning_alert_exception_handling(
+        self, mock_config_both_enabled, mock_db
+    ):
+        """Test storage warning alert with exception in service."""
+        with (
+            patch(
+                "ethoscope_node.notifications.manager.EmailNotificationService"
+            ) as mock_email_cls,
+            patch(
+                "ethoscope_node.notifications.manager.MattermostNotificationService"
+            ) as mock_mattermost_cls,
+        ):
+
+            mock_email_service = Mock()
+            mock_mattermost_service = Mock()
+            # Email throws exception, Mattermost succeeds
+            mock_email_service.send_storage_warning_alert.side_effect = Exception(
+                "SMTP error"
+            )
+            mock_mattermost_service.send_storage_warning_alert.return_value = True
+            mock_email_cls.return_value = mock_email_service
+            mock_mattermost_cls.return_value = mock_mattermost_service
+
+            manager = NotificationManager(config=mock_config_both_enabled, db=mock_db)
+
+            result = manager.send_storage_warning_alert(
+                device_id="test_device",
+                device_name="Test Device",
+                storage_percent=85.5,
+                available_space="2.1 GB",
+            )
+
+            assert result == True  # Should succeed because Mattermost worked
+
+    def test_send_device_unreachable_alert_no_services(
+        self, mock_config_none_enabled, mock_db
+    ):
+        """Test device unreachable alert with no services enabled."""
+        manager = NotificationManager(config=mock_config_none_enabled, db=mock_db)
+
+        result = manager.send_device_unreachable_alert(
+            device_id="test_device",
+            device_name="Test Device",
+            last_seen=datetime.datetime.now(),
+        )
+
+        assert result == False
+
+    def test_send_device_unreachable_alert_exception_handling(
+        self, mock_config_both_enabled, mock_db
+    ):
+        """Test device unreachable alert with exception in service."""
+        with (
+            patch(
+                "ethoscope_node.notifications.manager.EmailNotificationService"
+            ) as mock_email_cls,
+            patch(
+                "ethoscope_node.notifications.manager.MattermostNotificationService"
+            ) as mock_mattermost_cls,
+        ):
+
+            mock_email_service = Mock()
+            mock_mattermost_service = Mock()
+            # Both throw exceptions
+            mock_email_service.send_device_unreachable_alert.side_effect = Exception(
+                "SMTP error"
+            )
+            mock_mattermost_service.send_device_unreachable_alert.side_effect = (
+                Exception("Mattermost error")
+            )
+            mock_email_cls.return_value = mock_email_service
+            mock_mattermost_cls.return_value = mock_mattermost_service
+
+            manager = NotificationManager(config=mock_config_both_enabled, db=mock_db)
+
+            result = manager.send_device_unreachable_alert(
+                device_id="test_device",
+                device_name="Test Device",
+                last_seen=datetime.datetime.now(),
+            )
+
+            assert result == False  # Should fail because both services failed
+
+    def test_test_all_configurations_exception_handling(
+        self, mock_config_both_enabled, mock_db
+    ):
+        """Test configuration testing with exception in service."""
+        with (
+            patch(
+                "ethoscope_node.notifications.manager.EmailNotificationService"
+            ) as mock_email_cls,
+            patch(
+                "ethoscope_node.notifications.manager.MattermostNotificationService"
+            ) as mock_mattermost_cls,
+        ):
+
+            mock_email_service = Mock()
+            mock_mattermost_service = Mock()
+            mock_email_service.test_email_configuration.side_effect = Exception(
+                "Test error"
+            )
+            mock_mattermost_service.test_mattermost_configuration.return_value = {
+                "success": True
+            }
+            mock_email_cls.return_value = mock_email_service
+            mock_mattermost_cls.return_value = mock_mattermost_service
+
+            manager = NotificationManager(config=mock_config_both_enabled, db=mock_db)
+
+            results = manager.test_all_configurations()
+
+            assert "email" in results
+            assert "mattermost" in results
+            assert results["email"]["success"] == False
+            assert "Test error" in results["email"]["error"]
+            assert results["mattermost"]["success"] == True
+
+    def test_test_all_configurations_no_test_method(
+        self, mock_config_both_enabled, mock_db
+    ):
+        """Test configuration testing when service has no test method."""
+        with (
+            patch(
+                "ethoscope_node.notifications.manager.EmailNotificationService"
+            ) as mock_email_cls,
+            patch(
+                "ethoscope_node.notifications.manager.MattermostNotificationService"
+            ) as mock_mattermost_cls,
+        ):
+
+            mock_email_service = Mock()
+            mock_mattermost_service = Mock()
+            # Remove test methods
+            del mock_email_service.test_email_configuration
+            del mock_mattermost_service.test_mattermost_configuration
+            mock_email_cls.return_value = mock_email_service
+            mock_mattermost_cls.return_value = mock_mattermost_service
+
+            manager = NotificationManager(config=mock_config_both_enabled, db=mock_db)
+
+            results = manager.test_all_configurations()
+
+            assert "email" in results
+            assert "mattermost" in results
+            assert results["email"]["success"] == False
+            assert "No test method available" in results["email"]["error"]
+            assert results["mattermost"]["success"] == False
+            assert "No test method available" in results["mattermost"]["error"]

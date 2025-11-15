@@ -7,10 +7,7 @@ Unit tests for the Slack notification service.
 import datetime
 import json
 import time
-from unittest.mock import MagicMock
-from unittest.mock import Mock
-from unittest.mock import call
-from unittest.mock import patch
+from unittest.mock import MagicMock, Mock, call, patch
 
 import pytest
 
@@ -583,3 +580,202 @@ class TestSlackNotificationService:
             )
 
             assert result == False
+
+    @patch("requests.post")
+    def test_send_via_webhook_missing_url(
+        self, mock_post, mock_config_webhook, mock_db
+    ):
+        """Test webhook message sending with missing URL."""
+        mock_config_webhook.content["slack"]["webhook_url"] = ""
+        service = SlackNotificationService(config=mock_config_webhook, db=mock_db)
+
+        blocks = [
+            {"type": "section", "text": {"type": "mrkdwn", "text": "Test message"}}
+        ]
+        result = service._send_via_webhook(blocks, "Test fallback")
+
+        assert result == False
+        mock_post.assert_not_called()
+
+    @patch("requests.post")
+    def test_send_via_webhook_request_exception(self, mock_post, slack_service_webhook):
+        """Test webhook with requests.RequestException."""
+        import requests
+
+        mock_post.side_effect = requests.RequestException("Network timeout")
+
+        blocks = [
+            {"type": "section", "text": {"type": "mrkdwn", "text": "Test message"}}
+        ]
+        result = slack_service_webhook._send_via_webhook(blocks, "Test fallback")
+
+        assert result == False
+
+    @patch("requests.post")
+    def test_send_via_bot_token_missing_token(
+        self, mock_post, mock_config_bot_token, mock_db
+    ):
+        """Test bot token message sending with missing token."""
+        mock_config_bot_token.content["slack"]["bot_token"] = ""
+        service = SlackNotificationService(config=mock_config_bot_token, db=mock_db)
+
+        blocks = [
+            {"type": "section", "text": {"type": "mrkdwn", "text": "Test message"}}
+        ]
+        result = service._send_via_bot_token(blocks, "Test fallback")
+
+        assert result == False
+        mock_post.assert_not_called()
+
+    @patch("requests.post")
+    def test_send_via_bot_token_request_exception(
+        self, mock_post, slack_service_bot_token
+    ):
+        """Test bot token with requests.RequestException."""
+        import requests
+
+        mock_post.side_effect = requests.RequestException("Connection refused")
+
+        blocks = [
+            {"type": "section", "text": {"type": "mrkdwn", "text": "Test message"}}
+        ]
+        result = slack_service_bot_token._send_via_bot_token(blocks, "Test fallback")
+
+        assert result == False
+
+    @patch("requests.post")
+    def test_send_via_bot_token_generic_exception(
+        self, mock_post, slack_service_bot_token
+    ):
+        """Test bot token with generic exception."""
+        mock_post.side_effect = Exception("Unexpected error")
+
+        blocks = [
+            {"type": "section", "text": {"type": "mrkdwn", "text": "Test message"}}
+        ]
+        result = slack_service_bot_token._send_via_bot_token(blocks, "Test fallback")
+
+        assert result == False
+
+    @patch("ethoscope_node.notifications.slack.SlackNotificationService._send_message")
+    @patch(
+        "ethoscope_node.notifications.slack.SlackNotificationService.analyze_device_failure"
+    )
+    def test_send_device_stopped_alert_completed_normally(
+        self, mock_analyze, mock_send, slack_service_webhook
+    ):
+        """Test device stopped alert suppressed when run completed normally."""
+        mock_analyze.return_value = {
+            "user": "test_user",
+            "status": "Completed",
+            "failure_type": "completed_normally",
+        }
+
+        result = slack_service_webhook.send_device_stopped_alert(
+            device_id="device_001",
+            device_name="Test Device",
+            run_id="run123",
+            last_seen=datetime.datetime.now(),
+        )
+
+        assert result == False
+        mock_analyze.assert_called_once_with("device_001")
+        mock_send.assert_not_called()
+
+    @patch("ethoscope_node.notifications.slack.SlackNotificationService._send_message")
+    @patch(
+        "ethoscope_node.notifications.slack.SlackNotificationService.analyze_device_failure"
+    )
+    @patch(
+        "ethoscope_node.notifications.slack.SlackNotificationService.get_device_logs"
+    )
+    def test_send_device_stopped_alert_db_log_failure(
+        self, mock_get_logs, mock_analyze, mock_send, slack_service_webhook, mock_db
+    ):
+        """Test device stopped alert with database logging failure."""
+        mock_analyze.return_value = {
+            "user": "test_user",
+            "status": "Failed",
+            "failure_type": "error",
+        }
+        mock_get_logs.return_value = "ERROR: Test"
+        mock_send.return_value = True
+        mock_db.logAlert.side_effect = Exception("Database error")
+
+        result = slack_service_webhook.send_device_stopped_alert(
+            device_id="device_001",
+            device_name="Test Device",
+            run_id="run123",
+            last_seen=datetime.datetime.now(),
+        )
+
+        # Should still succeed even if DB logging fails
+        assert result == True
+        mock_send.assert_called_once()
+
+    @patch("ethoscope_node.notifications.slack.SlackNotificationService._send_message")
+    def test_send_storage_warning_alert_exception(
+        self, mock_send, slack_service_webhook
+    ):
+        """Test storage warning alert with exception."""
+        mock_send.side_effect = Exception("Unexpected error")
+
+        result = slack_service_webhook.send_storage_warning_alert(
+            device_id="device_001",
+            device_name="Test Device",
+            storage_percent=85.5,
+            available_space="2.1 GB",
+        )
+
+        assert result == False
+
+    @patch("ethoscope_node.notifications.slack.SlackNotificationService._send_message")
+    def test_send_device_unreachable_alert_exception(
+        self, mock_send, slack_service_webhook
+    ):
+        """Test device unreachable alert with exception."""
+        mock_send.side_effect = Exception("Unexpected error")
+
+        result = slack_service_webhook.send_device_unreachable_alert(
+            device_id="device_001",
+            device_name="Test Device",
+            last_seen=datetime.datetime.now(),
+        )
+
+        assert result == False
+
+    def test_test_slack_configuration_exception(self, slack_service_webhook):
+        """Test Slack configuration test with exception."""
+        with patch.object(slack_service_webhook, "_get_slack_config") as mock_config:
+            mock_config.side_effect = Exception("Config error")
+
+            result = slack_service_webhook.test_slack_configuration()
+
+            assert result["success"] == False
+            assert "Exception during test" in result["error"]
+
+    def test_send_message_via_webhook_path(self, slack_service_webhook):
+        """Test _send_message chooses webhook path correctly."""
+        # Webhook is enabled by default in slack_service_webhook
+        blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": "Test"}}]
+
+        with patch.object(
+            slack_service_webhook, "_send_via_webhook", return_value=True
+        ) as mock_webhook:
+            result = slack_service_webhook._send_message(blocks, "Test")
+
+            assert result == True
+            mock_webhook.assert_called_once_with(blocks, "Test")
+
+    def test_send_message_via_bot_token_path(self, slack_service_bot_token):
+        """Test _send_message chooses bot token path correctly."""
+        # Bot token is configured for slack_service_bot_token
+        blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": "Test"}}]
+
+        with patch.object(
+            slack_service_bot_token, "_send_via_bot_token", return_value=True
+        ) as mock_bot_token:
+            result = slack_service_bot_token._send_message(blocks, "Test")
+
+            assert result == True
+            mock_bot_token.assert_called_once_with(blocks, "Test")
