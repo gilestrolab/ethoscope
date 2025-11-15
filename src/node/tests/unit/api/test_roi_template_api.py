@@ -303,8 +303,8 @@ class TestROITemplateAPI(unittest.TestCase):
 
     @patch("builtins.open")
     @patch("os.path.exists")
-    def test_get_roi_template_read_error(self, mock_exists, mock_file):
-        """Test handling file read errors."""
+    def test_get_roi_template_read_error_builtin(self, mock_exists, mock_file):
+        """Test handling file read errors in builtin directory."""
         mock_exists.return_value = True
         mock_file.side_effect = OSError("Read error")
 
@@ -312,6 +312,25 @@ class TestROITemplateAPI(unittest.TestCase):
 
         # error_decorator catches abort and returns error dict
         self.assertIn("error", result)
+        self.assertIn("Error loading builtin template", result["error"])
+
+    @patch("builtins.open")
+    @patch("os.path.exists")
+    def test_get_roi_template_read_error_custom(self, mock_exists, mock_file):
+        """Test handling file read errors in custom directory."""
+
+        def exists_side_effect(path):
+            # Builtin doesn't exist, custom does
+            return "builtin" not in path
+
+        mock_exists.side_effect = exists_side_effect
+        mock_file.side_effect = OSError("Read error")
+
+        result = self.api._get_roi_template("bad_custom_template")
+
+        # error_decorator catches abort and returns error dict
+        self.assertIn("error", result)
+        self.assertIn("Error loading custom template", result["error"])
 
     @patch("os.remove")
     @patch("os.makedirs")
