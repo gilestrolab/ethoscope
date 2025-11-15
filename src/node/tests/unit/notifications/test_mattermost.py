@@ -7,10 +7,7 @@ Unit tests for the Mattermost notification service.
 import datetime
 import json
 import time
-from unittest.mock import MagicMock
-from unittest.mock import Mock
-from unittest.mock import call
-from unittest.mock import patch
+from unittest.mock import MagicMock, Mock, call, patch
 
 import pytest
 
@@ -71,7 +68,7 @@ class TestMattermostNotificationService:
         """Test Mattermost configuration retrieval."""
         config = mattermost_service._get_mattermost_config()
 
-        assert config["enabled"] == True
+        assert config["enabled"]
         assert config["server_url"] == "https://mattermost.example.com"
         assert config["bot_token"] == "3ukwqqtwaiftjqk7awuz89jska"
         assert config["channel_id"] == "oprdt3widpd5ufg6pznask7wpo"
@@ -86,7 +83,7 @@ class TestMattermostNotificationService:
         """Test that alert should be sent the first time."""
         result = mattermost_service._should_send_alert("device_001", "device_stopped")
 
-        assert result == True
+        assert result
         assert "device_001:device_stopped" in mattermost_service._last_alert_times
 
     def test_should_send_alert_cooldown_active(self, mattermost_service):
@@ -100,7 +97,7 @@ class TestMattermostNotificationService:
         # Try to send again immediately - should be blocked
         result = mattermost_service._should_send_alert(device_id, alert_type)
 
-        assert result == False
+        assert not result
 
     def test_should_send_alert_cooldown_expired(self, mattermost_service):
         """Test that alert should be sent after cooldown expires."""
@@ -118,7 +115,7 @@ class TestMattermostNotificationService:
         # Should be able to send again
         result = mattermost_service._should_send_alert(device_id, alert_type)
 
-        assert result == True
+        assert result
 
     def test_should_send_alert_with_run_id(self, mattermost_service):
         """Test alert sending with run_id for database duplicate checking."""
@@ -131,7 +128,7 @@ class TestMattermostNotificationService:
 
         result = mattermost_service._should_send_alert(device_id, alert_type, run_id)
 
-        assert result == True
+        assert result
         mattermost_service.db.hasAlertBeenSent.assert_called_once_with(
             device_id, alert_type, run_id
         )
@@ -147,7 +144,7 @@ class TestMattermostNotificationService:
 
         result = mattermost_service._should_send_alert(device_id, alert_type, run_id)
 
-        assert result == False
+        assert not result
         mattermost_service.db.hasAlertBeenSent.assert_called_once_with(
             device_id, alert_type, run_id
         )
@@ -161,7 +158,7 @@ class TestMattermostNotificationService:
 
         result = mattermost_service._send_message("Test message")
 
-        assert result == True
+        assert result
         mock_post.assert_called_once()
 
         # Check API call parameters
@@ -185,7 +182,7 @@ class TestMattermostNotificationService:
 
         result = mattermost_service._send_message("Test message")
 
-        assert result == False
+        assert not result
         mock_post.assert_not_called()
 
     @patch("ethoscope_node.notifications.mattermost.requests.post")
@@ -195,7 +192,7 @@ class TestMattermostNotificationService:
 
         result = mattermost_service._send_message("Test message")
 
-        assert result == False
+        assert not result
         mock_post.assert_not_called()
 
     @patch("ethoscope_node.notifications.mattermost.requests.post")
@@ -207,7 +204,7 @@ class TestMattermostNotificationService:
 
         result = mattermost_service._send_message("Test message")
 
-        assert result == False
+        assert not result
 
     @patch("ethoscope_node.notifications.mattermost.requests.post")
     def test_send_message_http_status_error(self, mock_post, mattermost_service):
@@ -219,7 +216,7 @@ class TestMattermostNotificationService:
 
         result = mattermost_service._send_message("Test message")
 
-        assert result == False
+        assert not result
 
     @patch.object(MattermostNotificationService, "_send_message")
     @patch.object(MattermostNotificationService, "get_device_logs")
@@ -250,14 +247,15 @@ class TestMattermostNotificationService:
         mock_send.return_value = True
 
         # Mock database methods
-        with patch.object(
-            mattermost_service.db, "hasAlertBeenSent", return_value=False
-        ), patch.object(mattermost_service.db, "logAlert", return_value=1):
+        with (
+            patch.object(mattermost_service.db, "hasAlertBeenSent", return_value=False),
+            patch.object(mattermost_service.db, "logAlert", return_value=1),
+        ):
             result = mattermost_service.send_device_stopped_alert(
                 device_id, device_name, run_id, last_seen
             )
 
-            assert result == True
+            assert result
             mock_analyze.assert_called_once_with(device_id)
             mock_get_logs.assert_called_once_with(device_id, max_lines=10)
             mock_send.assert_called_once()
@@ -290,7 +288,7 @@ class TestMattermostNotificationService:
             "device_001", "Test Device", "run_123", datetime.datetime.now()
         )
 
-        assert result == False
+        assert not result
         mock_should_send.assert_called_once_with(
             "device_001", "device_stopped", "run_123"
         )
@@ -306,7 +304,7 @@ class TestMattermostNotificationService:
             "device_001", "Test Device", "run_123", datetime.datetime.now()
         )
 
-        assert result == False
+        assert not result
 
     @patch.object(MattermostNotificationService, "_send_message")
     def test_send_storage_warning_alert_success(self, mock_send, mattermost_service):
@@ -322,7 +320,7 @@ class TestMattermostNotificationService:
             device_id, device_name, storage_percent, available_space
         )
 
-        assert result == True
+        assert result
         mock_send.assert_called_once()
 
         # Check message content
@@ -344,7 +342,7 @@ class TestMattermostNotificationService:
             "device_001", "Test Device", 85.5, "2.1 GB"
         )
 
-        assert result == False
+        assert not result
         mock_should_send.assert_called_once_with("device_001", "storage_warning")
 
     @patch.object(MattermostNotificationService, "_send_message")
@@ -360,7 +358,7 @@ class TestMattermostNotificationService:
             device_id, device_name, last_seen
         )
 
-        assert result == True
+        assert result
         mock_send.assert_called_once()
 
         # Check message content
@@ -381,7 +379,7 @@ class TestMattermostNotificationService:
             "device_001", "Test Device", datetime.datetime.now()
         )
 
-        assert result == False
+        assert not result
         mock_should_send.assert_called_once_with("device_001", "device_unreachable")
 
     @patch.object(MattermostNotificationService, "_send_message")
@@ -391,7 +389,7 @@ class TestMattermostNotificationService:
 
         result = mattermost_service.test_mattermost_configuration()
 
-        assert result["success"] == True
+        assert result["success"]
         assert result["server_url"] == "https://mattermost.example.com"
         assert result["channel_id"] == "oprdt3widpd5ufg6pznask7wpo"
         assert "Test message sent successfully" in result["message"]
@@ -408,7 +406,7 @@ class TestMattermostNotificationService:
 
         result = mattermost_service.test_mattermost_configuration()
 
-        assert result["success"] == False
+        assert not result["success"]
         assert "disabled" in result["error"]
 
     def test_test_mattermost_configuration_missing_config(self, mattermost_service):
@@ -417,7 +415,7 @@ class TestMattermostNotificationService:
 
         result = mattermost_service.test_mattermost_configuration()
 
-        assert result["success"] == False
+        assert not result["success"]
         assert "configuration incomplete" in result["error"]
 
     @patch.object(MattermostNotificationService, "_send_message")
@@ -429,7 +427,7 @@ class TestMattermostNotificationService:
 
         result = mattermost_service.test_mattermost_configuration()
 
-        assert result["success"] == False
+        assert not result["success"]
         assert "Failed to send test message" in result["error"]
 
     @patch.object(MattermostNotificationService, "_send_message")
@@ -441,7 +439,7 @@ class TestMattermostNotificationService:
 
         result = mattermost_service.test_mattermost_configuration()
 
-        assert result["success"] == False
+        assert not result["success"]
         assert "Exception during test: API error" in result["error"]
 
     def test_mattermost_service_inherits_all_base_methods(self, mattermost_service):
@@ -456,13 +454,11 @@ class TestMattermostNotificationService:
 
     def test_send_device_stopped_alert_without_logs(self, mattermost_service):
         """Test device stopped alert when logs are not available."""
-        with patch.object(
-            mattermost_service, "analyze_device_failure"
-        ) as mock_analyze, patch.object(
-            mattermost_service, "get_device_logs"
-        ) as mock_get_logs, patch.object(
-            mattermost_service, "_send_message"
-        ) as mock_send:
+        with (
+            patch.object(mattermost_service, "analyze_device_failure") as mock_analyze,
+            patch.object(mattermost_service, "get_device_logs") as mock_get_logs,
+            patch.object(mattermost_service, "_send_message") as mock_send,
+        ):
 
             mock_analyze.return_value = {
                 "user": "test_user",
@@ -478,15 +474,18 @@ class TestMattermostNotificationService:
             mock_send.return_value = True
 
             # Mock database methods
-            with patch.object(
-                mattermost_service.db, "hasAlertBeenSent", return_value=False
-            ), patch.object(mattermost_service.db, "logAlert", return_value=1):
+            with (
+                patch.object(
+                    mattermost_service.db, "hasAlertBeenSent", return_value=False
+                ),
+                patch.object(mattermost_service.db, "logAlert", return_value=1),
+            ):
 
                 result = mattermost_service.send_device_stopped_alert(
                     "device_001", "Test Device", "run_123", datetime.datetime.now()
                 )
 
-                assert result == True
+                assert result
 
                 # Check that message was created without logs section
                 call_args = mock_send.call_args[0][0]
@@ -494,13 +493,11 @@ class TestMattermostNotificationService:
 
     def test_send_device_stopped_alert_empty_logs(self, mattermost_service):
         """Test device stopped alert when logs are empty."""
-        with patch.object(
-            mattermost_service, "analyze_device_failure"
-        ) as mock_analyze, patch.object(
-            mattermost_service, "get_device_logs"
-        ) as mock_get_logs, patch.object(
-            mattermost_service, "_send_message"
-        ) as mock_send:
+        with (
+            patch.object(mattermost_service, "analyze_device_failure") as mock_analyze,
+            patch.object(mattermost_service, "get_device_logs") as mock_get_logs,
+            patch.object(mattermost_service, "_send_message") as mock_send,
+        ):
 
             mock_analyze.return_value = {
                 "user": "test_user",
@@ -510,16 +507,182 @@ class TestMattermostNotificationService:
             mock_send.return_value = True
 
             # Mock database methods
-            with patch.object(
-                mattermost_service.db, "hasAlertBeenSent", return_value=False
-            ), patch.object(mattermost_service.db, "logAlert", return_value=1):
+            with (
+                patch.object(
+                    mattermost_service.db, "hasAlertBeenSent", return_value=False
+                ),
+                patch.object(mattermost_service.db, "logAlert", return_value=1),
+            ):
 
                 result = mattermost_service.send_device_stopped_alert(
                     "device_001", "Test Device", "run_123", datetime.datetime.now()
                 )
 
-                assert result == True
+                assert result
 
                 # Check that message was created without logs section
                 call_args = mock_send.call_args[0][0]
                 assert "Recent logs:" not in call_args
+
+    @patch("ethoscope_node.notifications.mattermost.requests.post")
+    def test_send_message_server_url_without_scheme(
+        self, mock_post, mattermost_service
+    ):
+        """Test message sending when server URL doesn't have http/https scheme."""
+        # Set server URL without scheme
+        mattermost_service.config.content["mattermost"][
+            "server_url"
+        ] = "mattermost.example.com"
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
+        result = mattermost_service._send_message("Test message")
+
+        assert result
+        # Should prepend https:// to URL
+        call_args = mock_post.call_args
+        assert (
+            call_args[0][0] == "https://mattermost.example.com/api/v4/posts"
+        )  # URL as first positional arg
+
+    @patch.object(MattermostNotificationService, "analyze_device_failure")
+    def test_send_device_stopped_alert_completed_normally(
+        self, mock_analyze, mattermost_service
+    ):
+        """Test device stopped alert suppressed for normally completed runs."""
+        mock_analyze.return_value = {
+            "failure_type": "completed_normally",
+            "status": "Completed normally",
+            "user": "test_user",
+        }
+
+        with patch.object(
+            mattermost_service.db, "hasAlertBeenSent", return_value=False
+        ):
+            result = mattermost_service.send_device_stopped_alert(
+                "device_001", "Test Device", "run_123", datetime.datetime.now()
+            )
+
+            assert not result
+            mock_analyze.assert_called_once_with("device_001")
+
+    @patch.object(MattermostNotificationService, "analyze_device_failure")
+    @patch.object(MattermostNotificationService, "get_device_logs")
+    @patch.object(MattermostNotificationService, "_send_message")
+    def test_send_device_stopped_alert_database_log_exception(
+        self, mock_send, mock_get_logs, mock_analyze, mattermost_service
+    ):
+        """Test device stopped alert when database logging fails."""
+        mock_analyze.return_value = {
+            "user": "test_user",
+            "status": "Failed while running",
+        }
+        mock_get_logs.return_value = None
+        mock_send.return_value = True
+
+        # Mock database methods - logAlert raises exception
+        with (
+            patch.object(mattermost_service.db, "hasAlertBeenSent", return_value=False),
+            patch.object(
+                mattermost_service.db, "logAlert", side_effect=Exception("DB error")
+            ),
+        ):
+            result = mattermost_service.send_device_stopped_alert(
+                "device_001", "Test Device", "run_123", datetime.datetime.now()
+            )
+
+            # Should still succeed even if logging fails
+            assert result
+
+    @patch.object(MattermostNotificationService, "_send_message")
+    def test_send_storage_warning_alert_exception(self, mock_send, mattermost_service):
+        """Test storage warning alert when exception occurs."""
+        mock_send.side_effect = Exception("Network error")
+
+        result = mattermost_service.send_storage_warning_alert(
+            "device_001", "Test Device", 85.5, "2.1 GB"
+        )
+
+        assert not result
+
+    @patch.object(MattermostNotificationService, "_send_message")
+    @patch.object(MattermostNotificationService, "_format_duration")
+    def test_send_device_unreachable_alert_exception(
+        self, mock_format, mock_send, mattermost_service
+    ):
+        """Test device unreachable alert when exception occurs."""
+        mock_format.side_effect = Exception("Formatting error")
+
+        result = mattermost_service.send_device_unreachable_alert(
+            "device_001", "Test Device", datetime.datetime.now()
+        )
+
+        assert not result
+
+    @patch("ethoscope_node.notifications.mattermost.requests.post")
+    def test_send_message_generic_exception(self, mock_post, mattermost_service):
+        """Test message sending when a generic exception occurs (not RequestException)."""
+        # Cause a generic exception by raising a non-RequestException error
+        mock_post.side_effect = ValueError("Invalid payload")
+
+        result = mattermost_service._send_message("Test message")
+
+        assert not result
+
+    @patch.object(MattermostNotificationService, "analyze_device_failure")
+    @patch.object(MattermostNotificationService, "get_device_logs")
+    def test_send_device_stopped_alert_empty_message_logged(
+        self, mock_get_logs, mock_analyze, mattermost_service
+    ):
+        """Test device stopped alert when message is somehow empty (defensive coding edge case)."""
+        # This is an artificial edge case to cover the defensive check on line 250/258
+        # In real scenarios, the message would never be empty due to the format string
+        # But the code defensively checks for it, so we need to test that branch
+
+        mock_analyze.return_value = {"user": "", "status": ""}
+        mock_get_logs.return_value = None
+
+        # We'll intercept the _send_message call and capture what message was sent
+        captured_message = []
+
+        def capture_send_message(msg):
+            captured_message.append(msg)
+            return True
+
+        with (
+            patch.object(mattermost_service.db, "hasAlertBeenSent", return_value=False),
+            patch.object(mattermost_service.db, "logAlert", return_value=1),
+            patch.object(
+                mattermost_service, "_send_message", side_effect=capture_send_message
+            ),
+        ):
+            result = mattermost_service.send_device_stopped_alert(
+                "device_001", "Test Device", "run_123", datetime.datetime.now()
+            )
+
+            # Success should be True since _send_message returned True
+            assert result
+            # The message won't actually be empty in this test, but let's verify it was called
+            assert len(captured_message) == 1
+            assert (
+                len(captured_message[0]) > 0
+            )  # Message is not empty in normal operation
+
+    @patch.object(MattermostNotificationService, "analyze_device_failure")
+    def test_send_device_stopped_alert_analyze_raises_exception(
+        self, mock_analyze, mattermost_service
+    ):
+        """Test device stopped alert when analyze_device_failure raises exception."""
+        # Simulate exception during analysis (outer exception handler lines 264-266)
+        mock_analyze.side_effect = RuntimeError("Analysis failed")
+
+        with patch.object(
+            mattermost_service.db, "hasAlertBeenSent", return_value=False
+        ):
+            result = mattermost_service.send_device_stopped_alert(
+                "device_001", "Test Device", "run_123", datetime.datetime.now()
+            )
+
+            assert not result

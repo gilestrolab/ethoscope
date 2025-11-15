@@ -10,10 +10,7 @@ import time
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from unittest.mock import MagicMock
-from unittest.mock import Mock
-from unittest.mock import call
-from unittest.mock import patch
+from unittest.mock import MagicMock, Mock, call, patch
 
 import pytest
 
@@ -77,7 +74,7 @@ class TestEmailNotificationService:
         """Test SMTP configuration retrieval."""
         config = email_service._get_smtp_config()
 
-        assert config["enabled"] == True
+        assert config["enabled"]
         assert config["host"] == "smtp.example.com"
         assert config["port"] == 587
         assert config["username"] == "test@example.com"
@@ -92,7 +89,7 @@ class TestEmailNotificationService:
         """Test that alert should be sent the first time."""
         result = email_service._should_send_alert("device_001", "device_stopped")
 
-        assert result == True
+        assert result
         assert "device_001:device_stopped" in email_service._last_alert_times
 
     def test_should_send_alert_cooldown_active(self, email_service):
@@ -106,7 +103,7 @@ class TestEmailNotificationService:
         # Try to send again immediately - should be blocked
         result = email_service._should_send_alert(device_id, alert_type)
 
-        assert result == False
+        assert not result
 
     def test_should_send_alert_cooldown_expired(self, email_service):
         """Test that alert should be sent after cooldown expires."""
@@ -122,7 +119,7 @@ class TestEmailNotificationService:
         # Should be able to send again
         result = email_service._should_send_alert(device_id, alert_type)
 
-        assert result == True
+        assert result
 
     def test_create_email_message_basic(self, email_service):
         """Test basic email message creation."""
@@ -200,7 +197,7 @@ class TestEmailNotificationService:
 
         result = email_service._send_email(msg)
 
-        assert result == True
+        assert result
         mock_smtp.assert_called_once_with("smtp.example.com", 587)
         mock_server.starttls.assert_called_once()
         mock_server.login.assert_called_once_with("test@example.com", "test_password")
@@ -222,7 +219,7 @@ class TestEmailNotificationService:
 
         result = email_service._send_email(msg)
 
-        assert result == True
+        assert result
         mock_smtp_ssl.assert_called_once_with("smtp.example.com", 465)
         mock_server.starttls.assert_not_called()  # SSL doesn't use STARTTLS
         mock_server.login.assert_called_once_with("test@example.com", "test_password")
@@ -240,7 +237,7 @@ class TestEmailNotificationService:
 
         result = email_service._send_email(msg)
 
-        assert result == False
+        assert not result
         mock_smtp.assert_not_called()
 
     @patch("ethoscope_node.notifications.email.smtplib.SMTP")
@@ -254,7 +251,7 @@ class TestEmailNotificationService:
 
         result = email_service._send_email(msg)
 
-        assert result == False
+        assert not result
 
     @patch("ethoscope_node.notifications.email.smtplib.SMTP")
     def test_send_email_no_credentials(self, mock_smtp, email_service):
@@ -272,7 +269,7 @@ class TestEmailNotificationService:
 
         result = email_service._send_email(msg)
 
-        assert result == True
+        assert result
         mock_server.login.assert_not_called()  # No login without credentials
         mock_server.send_message.assert_called_once_with(msg)
 
@@ -314,14 +311,15 @@ class TestEmailNotificationService:
         mock_send.return_value = True
 
         # Mock database methods
-        with patch.object(
-            email_service.db, "hasAlertBeenSent", return_value=False
-        ), patch.object(email_service.db, "logAlert", return_value=1):
+        with (
+            patch.object(email_service.db, "hasAlertBeenSent", return_value=False),
+            patch.object(email_service.db, "logAlert", return_value=1),
+        ):
             result = email_service.send_device_stopped_alert(
                 device_id, device_name, run_id, last_seen
             )
 
-            assert result == True
+            assert result
             mock_get_stopped_user.assert_called_once_with(run_id)
             mock_get_admin.assert_called_once()
             mock_analyze.assert_called_once_with(device_id)
@@ -348,7 +346,7 @@ class TestEmailNotificationService:
             "device_001", "Test Device", "run_123", datetime.datetime.now()
         )
 
-        assert result == False
+        assert not result
         mock_should_send.assert_called_once_with(
             "device_001", "device_stopped", "run_123"
         )
@@ -373,7 +371,7 @@ class TestEmailNotificationService:
             "device_001", "Test Device", "run_123", datetime.datetime.now()
         )
 
-        assert result == False
+        assert not result
         mock_should_send.assert_called_once_with(
             "device_001", "device_stopped", "run_123"
         )
@@ -392,7 +390,7 @@ class TestEmailNotificationService:
             "device_001", "Test Device", "run_123", datetime.datetime.now()
         )
 
-        assert result == False
+        assert not result
 
     @patch.object(EmailNotificationService, "_send_email")
     @patch.object(EmailNotificationService, "get_device_users")
@@ -414,7 +412,7 @@ class TestEmailNotificationService:
             device_id, device_name, storage_percent, available_space
         )
 
-        assert result == True
+        assert result
         mock_send.assert_called_once()
 
         # Check email content
@@ -440,7 +438,7 @@ class TestEmailNotificationService:
             device_id, device_name, last_seen
         )
 
-        assert result == True
+        assert result
         mock_send.assert_called_once()
 
         # Check email content
@@ -459,7 +457,7 @@ class TestEmailNotificationService:
 
         result = email_service.test_email_configuration()
 
-        assert result["success"] == True
+        assert result["success"]
         assert result["recipients"] == ["admin@example.com"]
         assert result["smtp_host"] == "smtp.example.com"
         assert result["smtp_port"] == 587
@@ -471,7 +469,7 @@ class TestEmailNotificationService:
 
         result = email_service.test_email_configuration()
 
-        assert result["success"] == False
+        assert not result["success"]
         assert "disabled" in result["error"]
 
     @patch.object(EmailNotificationService, "get_admin_emails")
@@ -481,7 +479,7 @@ class TestEmailNotificationService:
 
         result = email_service.test_email_configuration()
 
-        assert result["success"] == False
+        assert not result["success"]
         assert "No admin email addresses" in result["error"]
 
     @patch.object(EmailNotificationService, "_send_email")
@@ -495,7 +493,7 @@ class TestEmailNotificationService:
 
         result = email_service.test_email_configuration()
 
-        assert result["success"] == False
+        assert not result["success"]
         assert "SMTP error" in result["error"]
 
     def test_email_service_inherits_all_base_methods(self, email_service):
@@ -528,25 +526,110 @@ class TestEmailNotificationService:
         mock_get_logs.return_value = None  # No logs available
 
         # Mock other dependencies
-        with patch.object(
-            email_service, "get_device_users", return_value=["user@example.com"]
-        ), patch.object(
-            email_service, "get_admin_emails", return_value=["admin@example.com"]
-        ), patch.object(
-            email_service, "_send_email", return_value=True
-        ) as mock_send, patch.object(
-            email_service.db, "hasAlertBeenSent", return_value=False
-        ), patch.object(
-            email_service.db, "logAlert", return_value=1
+        with (
+            patch.object(
+                email_service, "get_device_users", return_value=["user@example.com"]
+            ),
+            patch.object(
+                email_service, "get_admin_emails", return_value=["admin@example.com"]
+            ),
+            patch.object(email_service, "_send_email", return_value=True) as mock_send,
+            patch.object(email_service.db, "hasAlertBeenSent", return_value=False),
+            patch.object(email_service.db, "logAlert", return_value=1),
         ):
 
             result = email_service.send_device_stopped_alert(
                 "device_001", "Test Device", "run_123", datetime.datetime.now()
             )
 
-            assert result == True
+            assert result
 
             # Check that email was created without attachments
             call_args = mock_send.call_args[0][0]
             payload = call_args.get_payload()
             assert len(payload) == 1  # Only alternative container, no attachments
+
+    @patch.object(EmailNotificationService, "analyze_device_failure")
+    @patch.object(EmailNotificationService, "get_stopped_experiment_user")
+    @patch.object(EmailNotificationService, "get_admin_emails")
+    def test_send_device_stopped_alert_no_stopped_user_recipients(
+        self, mock_get_admin, mock_get_stopped_user, mock_analyze, email_service
+    ):
+        """Test device stopped alert when only stopped user email exists (no admins)."""
+        mock_analyze.return_value = {
+            "failure_type": "crashed_during_tracking",
+            "user": "test_user",
+            "status": "Failed",
+        }
+        mock_get_stopped_user.return_value = []  # No stopped user email
+        mock_get_admin.return_value = []  # No admin emails
+
+        with patch.object(email_service.db, "hasAlertBeenSent", return_value=False):
+            result = email_service.send_device_stopped_alert(
+                "device_001", "Test Device", "run_123", datetime.datetime.now()
+            )
+
+            assert not result
+
+    @patch.object(EmailNotificationService, "_should_send_alert")
+    @patch.object(EmailNotificationService, "get_device_users")
+    @patch.object(EmailNotificationService, "get_admin_emails")
+    def test_send_storage_warning_alert_cooldown_active(
+        self, mock_get_admin, mock_get_users, mock_should_send, email_service
+    ):
+        """Test storage warning alert blocked by cooldown."""
+        mock_should_send.return_value = False
+
+        result = email_service.send_storage_warning_alert(
+            "device_001", "Test Device", 85.5, "2.1 GB"
+        )
+
+        assert not result
+        mock_should_send.assert_called_once_with("device_001", "storage_warning")
+
+    @patch.object(EmailNotificationService, "_should_send_alert")
+    @patch.object(EmailNotificationService, "get_device_users")
+    @patch.object(EmailNotificationService, "get_admin_emails")
+    def test_send_storage_warning_alert_no_recipients(
+        self, mock_get_admin, mock_get_users, mock_should_send, email_service
+    ):
+        """Test storage warning alert with no recipients."""
+        mock_should_send.return_value = True
+        mock_get_users.return_value = []
+        mock_get_admin.return_value = []
+
+        result = email_service.send_storage_warning_alert(
+            "device_001", "Test Device", 85.5, "2.1 GB"
+        )
+
+        assert not result
+
+    @patch.object(EmailNotificationService, "_should_send_alert")
+    @patch.object(EmailNotificationService, "get_admin_emails")
+    def test_send_device_unreachable_alert_cooldown_active(
+        self, mock_get_admin, mock_should_send, email_service
+    ):
+        """Test device unreachable alert blocked by cooldown."""
+        mock_should_send.return_value = False
+
+        result = email_service.send_device_unreachable_alert(
+            "device_001", "Test Device", datetime.datetime.now()
+        )
+
+        assert not result
+        mock_should_send.assert_called_once_with("device_001", "device_unreachable")
+
+    @patch.object(EmailNotificationService, "_should_send_alert")
+    @patch.object(EmailNotificationService, "get_admin_emails")
+    def test_send_device_unreachable_alert_no_admin_recipients(
+        self, mock_get_admin, mock_should_send, email_service
+    ):
+        """Test device unreachable alert with no admin recipients."""
+        mock_should_send.return_value = True
+        mock_get_admin.return_value = []
+
+        result = email_service.send_device_unreachable_alert(
+            "device_001", "Test Device", datetime.datetime.now()
+        )
+
+        assert not result
