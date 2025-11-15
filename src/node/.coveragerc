@@ -35,9 +35,19 @@ skip_covered = False
 skip_empty = False
 
 # Minimum coverage thresholds
-# Previous: 74.45%
-# Current: 76.57% (+2.12 points from target detection analysis tests)
+# Previous: 77.71%
+# Current: 79.07% (+1.36 points from base_scanner tests)
 # Scanner modules (expanded coverage):
+# - base_scanner.py: 93.94% coverage (90 tests, +47 new tests)
+#   Improved from 67.68% with comprehensive coverage of:
+#   - Device lifecycle (run loop, threading, error recovery)
+#   - Error handling (connection refused, max errors, progressive logging)
+#   - Device ID updates (data URL fallback, change detection)
+#   - Status transitions (user-triggered, graceful operations, initial discovery)
+#   - Scanner operations (Zeroconf callbacks, device add/remove/reactivate)
+#   - DeviceStatus class (alert logic, interrupted session detection)
+#   - Retry decorator (exponential backoff, max delay enforcement)
+#   Only 30/495 lines remain uncovered (minor edge cases)
 # - ethoscope_scanner.py: 65.30% coverage (77 tests, +45 new tests)
 #   Improved from 32.19% with comprehensive coverage of:
 #   - Device control operations (start, stop, poweroff, reboot)
@@ -86,7 +96,7 @@ skip_empty = False
 #   - Client IP detection and user agent tracking
 #   - Database session persistence and indexes
 #   - Comprehensive exception handling for all operations
-fail_under = 77.71
+fail_under = 79.07
 
 [html]
 directory = htmlcov
