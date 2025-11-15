@@ -86,7 +86,7 @@ skip_empty = False
 #   - Client IP detection and user agent tracking
 #   - Database session persistence and indexes
 #   - Comprehensive exception handling for all operations
-fail_under = 77.52
+fail_under = 77.71
 
 [html]
 directory = htmlcov
