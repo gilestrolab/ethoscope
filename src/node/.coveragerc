@@ -35,11 +35,11 @@ skip_covered = False
 skip_empty = False
 
 # Minimum coverage thresholds
-# Previous: 61.63%
-# Current: 62.76% (+1.13 points from backup_api module tests)
-# Includes comprehensive Backup API testing (100.00% coverage, 36 tests)
-# Covers status aggregation, caching, service monitoring, device backup info
-fail_under = 62.76
+# Previous: 62.76%
+# Current: 63.48% (+0.72 points from auth_api module tests)
+# Includes comprehensive Authentication API testing (100.00% coverage, 46 tests total)
+# Covers login/logout, session mgmt, PIN changes, authorization checks, admin operations
+fail_under = 63.48
 
 [html]
 directory = htmlcov
