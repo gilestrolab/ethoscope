@@ -30,6 +30,7 @@ from ethoscope_node.utils.configuration import (
     ConfigurationError,
     ConfigurationValidationError,
     EthoscopeConfiguration,
+    _setup_system_ssh_config,
     ensure_ssh_keys,
     migrate_conf_file,
     set_default_config_file,
@@ -138,6 +139,25 @@ class TestMigrateConfFile:
                     migrate_conf_file(str(source_file), "/invalid/path")
 
                 assert "Failed to migrate configuration file" in str(exc_info.value)
+
+
+class TestMigrateLegacyFiles:
+    """Test legacy file migration during initialization."""
+
+    def test_migrate_legacy_files_handles_error(self):
+        """Test that migration errors are logged as warnings."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_file = Path(tmpdir) / "test.conf"
+
+            # Mock migrate_conf_file to raise an error
+            with patch(
+                "ethoscope_node.utils.configuration.migrate_conf_file",
+                side_effect=ConfigurationError("Migration failed"),
+            ):
+                # Should not raise, just log warning
+                config = EthoscopeConfiguration(str(config_file))
+                # Config should still be created
+                assert config.file_exists
 
 
 class TestEthoscopeConfigurationInit:
@@ -644,6 +664,19 @@ class TestEthoscopeConfigurationUsers:
 
         assert result is False
 
+    def test_remove_user_handles_exception(self):
+        """Test remove_user handles exceptions gracefully."""
+        config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+        config._logger = MagicMock()
+
+        with patch(
+            "ethoscope_node.utils.etho_db.ExperimentalDB",
+            side_effect=Exception("DB error"),
+        ):
+            result = config.remove_user("testuser")
+
+        assert result is False
+
 
 class TestEthoscopeConfigurationIncubators:
     """Test incubator management functionality."""
@@ -740,6 +773,20 @@ class TestEthoscopeConfigurationSensors:
                 config.add_sensor({"name": "sensor1"})
 
             assert "sensors" in config._settings
+
+    def test_add_sensor_handles_exception(self):
+        """Test add_sensor handles exceptions properly."""
+        config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+        config._config_file = Path("/tmp/test.conf")
+        config._settings = {"sensors": {}}
+        config._logger = MagicMock()
+
+        # Mock save to raise exception
+        with patch.object(config, "save", side_effect=Exception("Save failed")):
+            with pytest.raises(ValueError) as exc_info:
+                config.add_sensor({"name": "sensor1"})
+
+            assert "Failed to add sensor" in str(exc_info.value)
 
 
 class TestEthoscopeConfigurationCustom:
@@ -900,6 +947,43 @@ class TestEthoscopeConfigurationSetup:
 
         assert result is True
 
+    def test_is_setup_required_handles_exception(self):
+        """Test is_setup_required returns True when exception occurs."""
+        config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+        config._settings = {"setup": {"completed": False}}
+        config._logger = MagicMock()
+
+        with patch(
+            "ethoscope_node.utils.etho_db.ExperimentalDB",
+            side_effect=Exception("DB error"),
+        ):
+            result = config.is_setup_required()
+
+        # Should default to True when exception occurs
+        assert result is True
+
+    def test_is_setup_required_with_non_default_admin(self):
+        """Test is_setup_required returns False with properly configured admin."""
+        config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+        config._settings = {"setup": {"completed": False}}
+        config._logger = MagicMock()
+
+        mock_db = MagicMock()
+        # Non-default admin user with proper credentials
+        mock_db.getAllUsers.return_value = {
+            "realadmin": {
+                "username": "realadmin",
+                "isadmin": 1,
+                "email": "realadmin@example.com",
+            }
+        }
+
+        with patch("ethoscope_node.utils.etho_db.ExperimentalDB", return_value=mock_db):
+            result = config.is_setup_required()
+
+        # Should return False since proper admin exists
+        assert result is False
+
     def test_get_setup_status(self):
         """Test getting detailed setup status."""
         config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
@@ -943,6 +1027,38 @@ class TestEthoscopeConfigurationSetup:
 
             assert "step2" in config._settings["setup"]["steps_completed"]
             assert config._settings["setup"]["setup_started"] is not None
+
+    def test_mark_setup_step_completed_creates_setup_section(self):
+        """Test mark_setup_step_completed creates setup section if missing."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_file = Path(tmpdir) / "test.conf"
+
+            config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+            config._config_file = config_file
+            config._settings = {}
+            config._logger = MagicMock()
+
+            with patch.object(config, "save"):
+                config.mark_setup_step_completed("first_step")
+
+            assert "setup" in config._settings
+            assert "first_step" in config._settings["setup"]["steps_completed"]
+
+    def test_complete_setup_creates_setup_section(self):
+        """Test complete_setup creates setup section if missing."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_file = Path(tmpdir) / "test.conf"
+
+            config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+            config._config_file = config_file
+            config._settings = {}
+            config._logger = MagicMock()
+
+            with patch.object(config, "save"):
+                config.complete_setup()
+
+            assert "setup" in config._settings
+            assert config._settings["setup"]["completed"] is True
 
     def test_complete_setup(self):
         """Test marking setup as completed."""
@@ -1032,6 +1148,24 @@ class TestEthoscopeConfigurationTunnel:
 
         assert node_id == "node-test-host"
 
+    def test_get_tunnel_node_id_auto_exception_fallback(self):
+        """Test automatic node ID handles database exception."""
+        config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+        config._settings = {"tunnel": {"node_id": "auto"}}
+        config._logger = MagicMock()
+
+        with patch(
+            "ethoscope_node.utils.etho_db.ExperimentalDB",
+            side_effect=Exception("DB error"),
+        ):
+            with patch(
+                "ethoscope_node.utils.configuration.socket.gethostname",
+                return_value="fallback-host",
+            ):
+                node_id = config.get_tunnel_node_id()
+
+        assert node_id == "node-fallback-host"
+
     def test_update_tunnel_config(self):
         """Test updating tunnel configuration."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1065,6 +1199,38 @@ class TestEthoscopeConfigurationTunnel:
                 config.update_tunnel_config({"status": "connected"})
 
             assert config._settings["tunnel"]["last_connected"] is not None
+
+    def test_update_tunnel_config_warns_on_unknown_key(self):
+        """Test tunnel config update warns about unknown keys."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_file = Path(tmpdir) / "test.conf"
+
+            config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+            config._config_file = config_file
+            config._settings = {"tunnel": {}}
+            config._logger = MagicMock()
+
+            with patch.object(config, "save"):
+                config.update_tunnel_config({"unknown_key": "value"})
+
+            # Should log warning about unknown key
+            config._logger.warning.assert_called()
+
+    def test_update_tunnel_config_creates_tunnel_section(self):
+        """Test update_tunnel_config creates tunnel section if missing."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_file = Path(tmpdir) / "test.conf"
+
+            config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+            config._config_file = config_file
+            config._settings = {}
+            config._logger = MagicMock()
+
+            with patch.object(config, "save"):
+                result = config.update_tunnel_config({"enabled": True})
+
+            assert "tunnel" in config._settings
+            assert result["enabled"] is True
 
     def test_get_tunnel_config_paid_mode(self):
         """Test getting tunnel config in paid mode."""
@@ -1124,6 +1290,38 @@ class TestEthoscopeConfigurationAuthentication:
 
             assert result["enabled"] is True
 
+    def test_update_authentication_config_creates_section(self):
+        """Test update_authentication_config creates section if missing."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_file = Path(tmpdir) / "test.conf"
+
+            config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+            config._config_file = config_file
+            config._settings = {}
+            config._logger = MagicMock()
+
+            with patch.object(config, "save"):
+                result = config.update_authentication_config({"enabled": True})
+
+            assert "authentication" in config._settings
+            assert result["enabled"] is True
+
+    def test_update_authentication_config_warns_on_unknown_key(self):
+        """Test authentication config update warns about unknown keys."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_file = Path(tmpdir) / "test.conf"
+
+            config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+            config._config_file = config_file
+            config._settings = {"authentication": {}}
+            config._logger = MagicMock()
+
+            with patch.object(config, "save"):
+                config.update_authentication_config({"unknown_key": "value"})
+
+            # Should log warning about unknown key
+            config._logger.warning.assert_called()
+
 
 class TestEthoscopeConfigurationPINMigration:
     """Test PIN migration functionality."""
@@ -1173,6 +1371,75 @@ class TestEthoscopeConfigurationPINMigration:
         assert count == 1
         assert "pin_migration" in config._settings["setup"].get("steps_completed", [])
 
+    def test_migrate_user_pins_no_plaintext_pins(self):
+        """Test PIN migration when all PINs are already secure."""
+        config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+        config._logger = MagicMock()
+
+        mock_db = MagicMock()
+        # User with bcrypt hash
+        mock_db.getAllUsers.return_value = {
+            "user1": {
+                "pin": "$2b$12$hashedhashhashedhashhashedhashedhashhashedhashhashedha"
+            }
+        }
+
+        with patch("ethoscope_node.utils.etho_db.ExperimentalDB", return_value=mock_db):
+            count = config.migrate_user_pins()
+
+        assert count == 0
+
+    def test_migrate_user_pins_with_hex_hash(self):
+        """Test PIN migration detects hex hashes as already secure."""
+        config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+        config._logger = MagicMock()
+
+        mock_db = MagicMock()
+        # User with SHA256 hex hash (64 chars)
+        mock_db.getAllUsers.return_value = {
+            "user1": {"pin": "a" * 64}  # 64 hex characters - should be detected as hash
+        }
+
+        with patch("ethoscope_node.utils.etho_db.ExperimentalDB", return_value=mock_db):
+            count = config.migrate_user_pins()
+
+        assert count == 0
+
+    def test_migrate_user_pins_zero_migrated(self):
+        """Test PIN migration when database returns 0 migrated."""
+        config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+        config._logger = MagicMock()
+        config._settings = {"setup": {}}
+        config._config_file = Path("/tmp/test.conf")
+
+        mock_db = MagicMock()
+        mock_db.getAllUsers.return_value = {"user1": {"pin": "1234"}}
+        mock_db.migrate_plaintext_pins.return_value = 0  # No PINs migrated
+
+        with patch("ethoscope_node.utils.etho_db.ExperimentalDB", return_value=mock_db):
+            with patch.object(config, "save"):
+                count = config.migrate_user_pins()
+
+        assert count == 0
+
+    def test_migrate_user_pins_with_non_hex_string(self):
+        """Test PIN migration with non-hex string (not a hash)."""
+        config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+        config._logger = MagicMock()
+        config._settings = {"setup": {}}
+        config._config_file = Path("/tmp/test.conf")
+
+        mock_db = MagicMock()
+        # User with non-hex string PIN (will fail int(pin, 16))
+        mock_db.getAllUsers.return_value = {"user1": {"pin": "notahexstring1234"}}
+        mock_db.migrate_plaintext_pins.return_value = 1
+
+        with patch("ethoscope_node.utils.etho_db.ExperimentalDB", return_value=mock_db):
+            with patch.object(config, "save"):
+                count = config.migrate_user_pins()
+
+        assert count == 1
+
 
 class TestEthoscopeConfigurationReload:
     """Test configuration reload functionality."""
@@ -1187,6 +1454,87 @@ class TestEthoscopeConfigurationReload:
 
         assert result == {"test": "data"}
         mock_load.assert_called_once()
+
+
+class TestSetupSystemSSHConfig:
+    """Test system SSH configuration setup."""
+
+    def test_setup_system_ssh_config_creates_new_file(self):
+        """Test creating new SSH config file."""
+        with patch(
+            "ethoscope_node.utils.configuration.os.path.exists",
+            return_value=False,
+        ):
+            with patch("builtins.open", mock_open()) as mock_file:
+                with patch("ethoscope_node.utils.configuration.os.chmod"):
+                    with patch(
+                        "ethoscope_node.utils.network.get_private_ip_pattern",
+                        return_value="192.168.*",
+                    ):
+                        _setup_system_ssh_config("/tmp/id_rsa")
+
+                        mock_file.assert_called()
+
+    def test_setup_system_ssh_config_skips_if_exists(self):
+        """Test skipping setup if config already exists."""
+        with patch(
+            "ethoscope_node.utils.configuration.os.path.exists",
+            return_value=True,
+        ):
+            with patch(
+                "builtins.open",
+                mock_open(read_data="# Ethoscope SSH configuration\n"),
+            ):
+                with patch(
+                    "ethoscope_node.utils.network.get_private_ip_pattern",
+                    return_value="192.168.*",
+                ):
+                    _setup_system_ssh_config("/tmp/id_rsa")
+                    # Should not write if already exists
+
+    def test_setup_system_ssh_config_appends_to_existing(self):
+        """Test appending to existing SSH config."""
+        with patch(
+            "ethoscope_node.utils.configuration.os.path.exists",
+            return_value=True,
+        ):
+            with patch(
+                "builtins.open",
+                mock_open(read_data="# Other config\nHost somehost\n"),
+            ) as mock_file:
+                with patch("ethoscope_node.utils.configuration.os.chmod"):
+                    with patch(
+                        "ethoscope_node.utils.network.get_private_ip_pattern",
+                        return_value="192.168.*",
+                    ):
+                        _setup_system_ssh_config("/tmp/id_rsa")
+                        mock_file.assert_called()
+
+    def test_setup_system_ssh_config_handles_permission_error(self):
+        """Test handling permission errors gracefully."""
+        with patch(
+            "ethoscope_node.utils.configuration.os.path.exists", return_value=False
+        ):
+            with patch("builtins.open", side_effect=PermissionError("Access denied")):
+                with patch(
+                    "ethoscope_node.utils.network.get_private_ip_pattern",
+                    return_value="192.168.*",
+                ):
+                    # Should not raise, just log warning
+                    _setup_system_ssh_config("/tmp/id_rsa")
+
+    def test_setup_system_ssh_config_handles_general_exception(self):
+        """Test handling general exceptions gracefully."""
+        with patch(
+            "ethoscope_node.utils.configuration.os.path.exists", return_value=False
+        ):
+            with patch("builtins.open", side_effect=Exception("Unexpected error")):
+                with patch(
+                    "ethoscope_node.utils.network.get_private_ip_pattern",
+                    return_value="192.168.*",
+                ):
+                    # Should not raise, just log error
+                    _setup_system_ssh_config("/tmp/id_rsa")
 
 
 class TestSSHKeyManagement:
@@ -1288,6 +1636,44 @@ class TestSSHKeyManagement:
 
             assert "Permission denied" in str(exc_info.value)
 
+    def test_ensure_ssh_keys_hostname_exception(self):
+        """Test ensure_ssh_keys handles hostname exception gracefully."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            keys_dir = Path(tmpdir) / "keys"
+
+            def mock_ssh_keygen(*args, **kwargs):
+                # Create the key files that ssh-keygen would create
+                private_key_file = keys_dir / "id_rsa"
+                public_key_file = keys_dir / "id_rsa.pub"
+                private_key_file.write_text("fake private key")
+                public_key_file.write_text("fake public key")
+                return Mock(stdout="Key generated")
+
+            with patch("subprocess.run", side_effect=mock_ssh_keygen):
+                with patch(
+                    "ethoscope_node.utils.configuration._setup_system_ssh_config"
+                ):
+                    with patch(
+                        "ethoscope_node.utils.configuration.socket.gethostname",
+                        side_effect=Exception("Hostname error"),
+                    ):
+                        private_key, public_key = ensure_ssh_keys(str(keys_dir))
+
+                        # Should still succeed with default hostname
+                        assert private_key == str(keys_dir / "id_rsa")
+                        assert public_key == str(keys_dir / "id_rsa.pub")
+
+    def test_ensure_ssh_keys_handles_general_exception(self):
+        """Test ensure_ssh_keys handles unexpected exceptions."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            keys_dir = Path(tmpdir) / "keys"
+
+            with patch("pathlib.Path.mkdir", side_effect=Exception("Unexpected error")):
+                with pytest.raises(ConfigurationError) as exc_info:
+                    ensure_ssh_keys(str(keys_dir))
+
+                assert "Unexpected error ensuring SSH keys" in str(exc_info.value)
+
 
 class TestConfigurationEdgeCases:
     """Test edge cases and error conditions."""
@@ -1358,6 +1744,39 @@ class TestConfigurationEdgeCases:
                 config.migrate_user_pins()
 
             assert "PIN migration failed" in str(exc_info.value)
+
+
+class TestMainFunction:
+    """Test the main() function."""
+
+    def test_main_function_success(self):
+        """Test main() function executes successfully."""
+        from ethoscope_node.utils.configuration import main
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_file = Path(tmpdir) / "test_main.conf"
+
+            with patch(
+                "ethoscope_node.utils.configuration._default_config_file",
+                str(config_file),
+            ):
+                # Should not raise
+                main()
+
+                # Verify config was created
+                assert config_file.exists()
+
+    def test_main_function_handles_error(self):
+        """Test main() function handles errors."""
+        from ethoscope_node.utils.configuration import main
+
+        with patch(
+            "ethoscope_node.utils.configuration.EthoscopeConfiguration",
+            side_effect=ConfigurationError("Test error"),
+        ):
+            # Should raise ConfigurationError
+            with pytest.raises(ConfigurationError):
+                main()
 
 
 class TestConfigurationIntegration:
