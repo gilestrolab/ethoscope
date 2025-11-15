@@ -35,11 +35,11 @@ skip_covered = False
 skip_empty = False
 
 # Minimum coverage thresholds
-# Previous: 63.48%
-# Current: 65.36% (+1.88 points from tunnel_utils module tests)
-# Includes comprehensive Tunnel Utils API testing (100.00% coverage, 42 tests total)
-# Covers tunnel config/validation, service mgmt, status monitoring, URL generation, error handling
-fail_under = 65.36
+# Previous: 65.36%
+# Current: 69.33% (+3.97 points from MySQL backup module tests)
+# Includes comprehensive MySQL backup testing (77.73% coverage, 47 tests total)
+# Covers MySQL→SQLite replication, schema migration, incremental backups, data type conversion
+fail_under = 69.33
 
 [html]
 directory = htmlcov
