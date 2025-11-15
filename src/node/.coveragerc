@@ -35,8 +35,8 @@ skip_covered = False
 skip_empty = False
 
 # Minimum coverage thresholds
-# Previous: 77.71%
-# Current: 79.07% (+1.36 points from base_scanner tests)
+# Previous: 79.07%
+# Current: 79.75% (+0.68 points from roi_template_api test)
 # Scanner modules (expanded coverage):
 # - base_scanner.py: 93.94% coverage (90 tests, +47 new tests)
 #   Improved from 67.68% with comprehensive coverage of:
@@ -96,7 +96,16 @@ skip_empty = False
 #   - Client IP detection and user agent tracking
 #   - Database session persistence and indexes
 #   - Comprehensive exception handling for all operations
-fail_under = 79.07
+# API modules (high coverage):
+# - roi_template_api.py: 100.00% coverage (24 tests)
+#   Complete coverage of ROI template management with tests for:
+#   - Template listing (builtin and custom directories)
+#   - Template parsing and validation
+#   - Template retrieval with fallback logic
+#   - Template upload and format validation
+#   - Template deployment to devices
+#   - Error handling for both builtin and custom templates
+fail_under = 79.75
 
 [html]
 directory = htmlcov
