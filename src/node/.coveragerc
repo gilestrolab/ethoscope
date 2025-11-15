@@ -35,12 +35,14 @@ skip_covered = False
 skip_empty = False
 
 # Minimum coverage thresholds
-# Previous: 69.33%
-# Current: 70.14% (+0.81 points from notification module tests)
+# Previous: 70.14%
+# Current: 70.76% (+0.62 points from slack/manager notification tests)
+# Slack notification module: 98.51% coverage (40 tests)
+# Manager notification module: 97.66% coverage (31 tests)
 # Email notification module: 100.00% coverage (31 tests)
 # Mattermost notification module: 99.35% coverage (36 tests)
-# Comprehensive edge case coverage including error paths, cooldowns, and recipient handling
-fail_under = 70.14
+# Comprehensive edge case coverage including error paths, exceptions, and service initialization
+fail_under = 70.76
 
 [html]
 directory = htmlcov
