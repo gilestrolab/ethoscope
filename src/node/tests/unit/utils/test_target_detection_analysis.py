@@ -33,19 +33,11 @@ class TestTargetDetectionAnalyzerInit:
     def test_init_default_path(self):
         """Test initialization with default path."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Mock the default path to use temp directory
-            with patch(
-                "ethoscope_node.utils.target_detection_analysis.Path"
-            ) as mock_path:
-                # Create a real Path for the temp directory
-                temp_path = Path(tmpdir)
-                mock_path.return_value = temp_path
+            # The analyzer will use the provided tmpdir
+            analyzer = TargetDetectionAnalyzer(tmpdir)
 
-                # The analyzer will use temp_path instead of the hardcoded default
-                analyzer = TargetDetectionAnalyzer(tmpdir)
-
-                assert analyzer.base_path == temp_path
-                assert analyzer.logger is not None
+            assert analyzer.base_path == Path(tmpdir)
+            assert analyzer.logger is not None
 
     def test_init_custom_path(self):
         """Test initialization with custom path."""

@@ -332,11 +332,7 @@ class TestSetupAPI(unittest.TestCase):
         mock_db.getUserByName.return_value = None
         mock_db.addUser.return_value = 1
 
-        # Patch config_dir to use temp directory
-        with patch(
-            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
-        ):
-            result = self.api._setup_admin_user()
+        result = self.api._setup_admin_user()
 
         self.assertEqual(result["result"], "success")
         self.assertEqual(result["user_id"], 1)
@@ -361,10 +357,7 @@ class TestSetupAPI(unittest.TestCase):
         mock_db.getUserByName.return_value = {"id": 1, "username": "admin"}
         mock_db.updateUser.return_value = 1
 
-        with patch(
-            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
-        ):
-            result = self.api._setup_admin_user()
+        result = self.api._setup_admin_user()
 
         self.assertEqual(result["result"], "success")
         self.assertEqual(result["user_id"], 1)
@@ -392,10 +385,7 @@ class TestSetupAPI(unittest.TestCase):
         ]
         mock_db.addUser.return_value = 2
 
-        with patch(
-            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
-        ):
-            result = self.api._setup_admin_user()
+        result = self.api._setup_admin_user()
 
         self.assertEqual(result["result"], "success")
         self.assertEqual(result["user_id"], 2)
@@ -403,7 +393,8 @@ class TestSetupAPI(unittest.TestCase):
         mock_db.addUser.assert_called_once()
 
     @patch("bottle.request")
-    def test_setup_admin_user_missing_username(self, mock_request):
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_setup_admin_user_missing_username(self, mock_db_class, mock_request):
         """Test admin user setup with missing username."""
         mock_request.json = {"email": "admin@test.com"}
 
@@ -413,7 +404,8 @@ class TestSetupAPI(unittest.TestCase):
         self.assertIn("Username is required", result["message"])
 
     @patch("bottle.request")
-    def test_setup_admin_user_missing_email(self, mock_request):
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_setup_admin_user_missing_email(self, mock_db_class, mock_request):
         """Test admin user setup with missing email."""
         mock_request.json = {"username": "admin"}
 
@@ -433,10 +425,7 @@ class TestSetupAPI(unittest.TestCase):
 
         mock_db_class.side_effect = Exception("Database error")
 
-        with patch(
-            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
-        ):
-            result = self.api._setup_admin_user()
+        result = self.api._setup_admin_user()
 
         self.assertEqual(result["result"], "error")
         self.assertIn("Database error", result["message"])
@@ -460,10 +449,8 @@ class TestSetupAPI(unittest.TestCase):
         mock_db_class.return_value = mock_db
         mock_db.addUser.return_value = 2
 
-        with patch(
-            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
-        ):
-            result = self.api._setup_add_user()
+        # Removed unnecessary patch - ExperimentalDB is mocked
+        result = self.api._setup_add_user()
 
         self.assertEqual(result["result"], "success")
         self.assertEqual(result["user_id"], 2)
@@ -484,10 +471,8 @@ class TestSetupAPI(unittest.TestCase):
         mock_db_class.return_value = mock_db
         mock_db.addUser.return_value = 2
 
-        with patch(
-            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
-        ):
-            result = self.api._setup_add_user()
+        # Removed unnecessary patch - ExperimentalDB is mocked
+        result = self.api._setup_add_user()
 
         self.assertEqual(result["result"], "success")
         call_args = mock_db.addUser.call_args[1]
@@ -511,17 +496,16 @@ class TestSetupAPI(unittest.TestCase):
         mock_db_class.return_value = mock_db
         mock_db.updateUser.return_value = 1
 
-        with patch(
-            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
-        ):
-            result = self.api._setup_update_user()
+        # Removed unnecessary patch - ExperimentalDB is mocked
+        result = self.api._setup_update_user()
 
         self.assertEqual(result["result"], "success")
         call_args = mock_db.updateUser.call_args[1]
         self.assertEqual(call_args["fullname"], "Updated Name")
 
     @patch("bottle.request")
-    def test_setup_update_user_missing_original(self, mock_request):
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_setup_update_user_missing_original(self, mock_db_class, mock_request):
         """Test updating user without original username."""
         mock_request.json = {"fullname": "Updated Name"}
 
@@ -543,10 +527,8 @@ class TestSetupAPI(unittest.TestCase):
         mock_db_class.return_value = mock_db
         mock_db.updateUser.return_value = 1
 
-        with patch(
-            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
-        ):
-            result = self.api._setup_update_user()
+        # Removed unnecessary patch - ExperimentalDB is mocked
+        result = self.api._setup_update_user()
 
         self.assertEqual(result["result"], "success")
         call_args = mock_db.updateUser.call_args[1]
@@ -571,10 +553,8 @@ class TestSetupAPI(unittest.TestCase):
         mock_db_class.return_value = mock_db
         mock_db.addIncubator.return_value = 1
 
-        with patch(
-            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
-        ):
-            result = self.api._setup_add_incubator()
+        # Removed unnecessary patch - ExperimentalDB is mocked
+        result = self.api._setup_add_incubator()
 
         self.assertEqual(result["result"], "success")
         self.assertEqual(result["incubator_id"], 1)
@@ -583,7 +563,8 @@ class TestSetupAPI(unittest.TestCase):
         self.assertEqual(call_args["active"], 1)
 
     @patch("bottle.request")
-    def test_setup_add_incubator_missing_name(self, mock_request):
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_setup_add_incubator_missing_name(self, mock_db_class, mock_request):
         """Test adding incubator without name."""
         mock_request.json = {"location": "Room 101"}
 
@@ -605,17 +586,16 @@ class TestSetupAPI(unittest.TestCase):
         mock_db_class.return_value = mock_db
         mock_db.updateIncubator.return_value = 1
 
-        with patch(
-            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
-        ):
-            result = self.api._setup_update_incubator()
+        # Removed unnecessary patch - ExperimentalDB is mocked
+        result = self.api._setup_update_incubator()
 
         self.assertEqual(result["result"], "success")
         call_args = mock_db.updateIncubator.call_args[1]
         self.assertEqual(call_args["location"], "Room 102")
 
     @patch("bottle.request")
-    def test_setup_update_incubator_missing_original(self, mock_request):
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_setup_update_incubator_missing_original(self, mock_db_class, mock_request):
         """Test updating incubator without original name."""
         mock_request.json = {"location": "Room 102"}
 
