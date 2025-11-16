@@ -198,83 +198,88 @@ class TestGenerateSummaryStats:
 
     def test_generate_summary_stats_empty_data(self):
         """Test summary stats with no data."""
-        analyzer = TargetDetectionAnalyzer()
-        stats = analyzer._generate_summary_stats([], [])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            stats = analyzer._generate_summary_stats([], [])
 
-        assert stats["total_detection_attempts"] == 0
-        assert stats["successful_detections"] == 0
-        assert stats["failed_detections"] == 0
-        assert stats["overall_success_rate"] == 0
-        assert stats["total_devices"] == 0
+            assert stats["total_detection_attempts"] == 0
+            assert stats["successful_detections"] == 0
+            assert stats["failed_detections"] == 0
+            assert stats["overall_success_rate"] == 0
+            assert stats["total_devices"] == 0
 
     def test_generate_summary_stats_only_failures(self):
         """Test summary stats with only failures."""
-        analyzer = TargetDetectionAnalyzer()
-        failed_data = [
-            {"device_id": "device1"},
-            {"device_id": "device2"},
-            {"device_id": "device1"},
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            failed_data = [
+                {"device_id": "device1"},
+                {"device_id": "device2"},
+                {"device_id": "device1"},
+            ]
 
-        stats = analyzer._generate_summary_stats(failed_data, [])
+            stats = analyzer._generate_summary_stats(failed_data, [])
 
-        assert stats["total_detection_attempts"] == 3
-        assert stats["successful_detections"] == 0
-        assert stats["failed_detections"] == 3
-        assert stats["overall_success_rate"] == 0
-        assert stats["devices_with_failures"] == 2
-        assert stats["total_devices"] == 2
+            assert stats["total_detection_attempts"] == 3
+            assert stats["successful_detections"] == 0
+            assert stats["failed_detections"] == 3
+            assert stats["overall_success_rate"] == 0
+            assert stats["devices_with_failures"] == 2
+            assert stats["total_devices"] == 2
 
     def test_generate_summary_stats_only_successes(self):
         """Test summary stats with only successes."""
-        analyzer = TargetDetectionAnalyzer()
-        success_data = [
-            {"device_id": "device1"},
-            {"device_id": "device2"},
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            success_data = [
+                {"device_id": "device1"},
+                {"device_id": "device2"},
+            ]
 
-        stats = analyzer._generate_summary_stats([], success_data)
+            stats = analyzer._generate_summary_stats([], success_data)
 
-        assert stats["total_detection_attempts"] == 2
-        assert stats["successful_detections"] == 2
-        assert stats["failed_detections"] == 0
-        assert stats["overall_success_rate"] == 1.0
-        assert stats["devices_with_successes"] == 2
+            assert stats["total_detection_attempts"] == 2
+            assert stats["successful_detections"] == 2
+            assert stats["failed_detections"] == 0
+            assert stats["overall_success_rate"] == 1.0
+            assert stats["devices_with_successes"] == 2
 
     def test_generate_summary_stats_mixed_data(self):
         """Test summary stats with mixed success and failure data."""
-        analyzer = TargetDetectionAnalyzer()
-        failed_data = [
-            {"device_id": "device1"},
-            {"device_id": "device2"},
-        ]
-        success_data = [
-            {"device_id": "device1"},
-            {"device_id": "device3"},
-            {"device_id": "device3"},
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            failed_data = [
+                {"device_id": "device1"},
+                {"device_id": "device2"},
+            ]
+            success_data = [
+                {"device_id": "device1"},
+                {"device_id": "device3"},
+                {"device_id": "device3"},
+            ]
 
-        stats = analyzer._generate_summary_stats(failed_data, success_data)
+            stats = analyzer._generate_summary_stats(failed_data, success_data)
 
-        assert stats["total_detection_attempts"] == 5
-        assert stats["successful_detections"] == 3
-        assert stats["failed_detections"] == 2
-        assert stats["overall_success_rate"] == 0.6
-        assert stats["total_devices"] == 3
+            assert stats["total_detection_attempts"] == 5
+            assert stats["successful_detections"] == 3
+            assert stats["failed_detections"] == 2
+            assert stats["overall_success_rate"] == 0.6
+            assert stats["total_devices"] == 3
 
     def test_generate_summary_stats_handles_missing_device_id(self):
         """Test summary stats handles missing device_id fields."""
-        analyzer = TargetDetectionAnalyzer()
-        failed_data = [
-            {"device_id": "device1"},
-            {},  # Missing device_id
-        ]
-        success_data = [{"device_id": "device1"}]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            failed_data = [
+                {"device_id": "device1"},
+                {},  # Missing device_id
+            ]
+            success_data = [{"device_id": "device1"}]
 
-        stats = analyzer._generate_summary_stats(failed_data, success_data)
+            stats = analyzer._generate_summary_stats(failed_data, success_data)
 
-        # Should use "unknown" for missing device_id
-        assert "unknown" in stats["devices_analyzed"]
+            # Should use "unknown" for missing device_id
+            assert "unknown" in stats["devices_analyzed"]
 
 
 class TestAnalyzeFailurePatterns:
@@ -282,75 +287,80 @@ class TestAnalyzeFailurePatterns:
 
     def test_analyze_failure_patterns_no_failures(self):
         """Test failure pattern analysis with no failures."""
-        analyzer = TargetDetectionAnalyzer()
-        patterns = analyzer._analyze_failure_patterns([])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            patterns = analyzer._analyze_failure_patterns([])
 
-        assert patterns["no_failures"] is True
+            assert patterns["no_failures"] is True
 
     def test_analyze_failure_patterns_targets_found_distribution(self):
         """Test failure patterns tracks targets found distribution."""
-        analyzer = TargetDetectionAnalyzer()
-        failed_data = [
-            {"targets_found": 0, "image_quality": {}},
-            {"targets_found": 1, "image_quality": {}},
-            {"targets_found": 0, "image_quality": {}},
-            {"targets_found": 2, "image_quality": {}},
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            failed_data = [
+                {"targets_found": 0, "image_quality": {}},
+                {"targets_found": 1, "image_quality": {}},
+                {"targets_found": 0, "image_quality": {}},
+                {"targets_found": 2, "image_quality": {}},
+            ]
 
-        patterns = analyzer._analyze_failure_patterns(failed_data)
+            patterns = analyzer._analyze_failure_patterns(failed_data)
 
-        assert patterns["total_failures"] == 4
-        assert patterns["targets_found_distribution"][0] == 2
-        assert patterns["targets_found_distribution"][1] == 1
-        assert patterns["targets_found_distribution"][2] == 1
-        assert patterns["most_common_targets_found"] == 0
+            assert patterns["total_failures"] == 4
+            assert patterns["targets_found_distribution"][0] == 2
+            assert patterns["targets_found_distribution"][1] == 1
+            assert patterns["targets_found_distribution"][2] == 1
+            assert patterns["most_common_targets_found"] == 0
 
     def test_analyze_failure_patterns_brightness_categorization(self):
         """Test failure patterns categorizes brightness correctly."""
-        analyzer = TargetDetectionAnalyzer()
-        failed_data = [
-            {"image_quality": {"mean_brightness": 10}},  # very_dark
-            {"image_quality": {"mean_brightness": 50}},  # dark
-            {"image_quality": {"mean_brightness": 100}},  # normal
-            {"image_quality": {"mean_brightness": 190}},  # bright
-            {"image_quality": {"mean_brightness": 230}},  # very_bright
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            failed_data = [
+                {"image_quality": {"mean_brightness": 10}},  # very_dark
+                {"image_quality": {"mean_brightness": 50}},  # dark
+                {"image_quality": {"mean_brightness": 100}},  # normal
+                {"image_quality": {"mean_brightness": 190}},  # bright
+                {"image_quality": {"mean_brightness": 230}},  # very_bright
+            ]
 
-        patterns = analyzer._analyze_failure_patterns(failed_data)
+            patterns = analyzer._analyze_failure_patterns(failed_data)
 
-        assert patterns["brightness_distribution"]["very_dark"] == 1
-        assert patterns["brightness_distribution"]["dark"] == 1
-        assert patterns["brightness_distribution"]["normal"] == 1
-        assert patterns["brightness_distribution"]["bright"] == 1
-        assert patterns["brightness_distribution"]["very_bright"] == 1
+            assert patterns["brightness_distribution"]["very_dark"] == 1
+            assert patterns["brightness_distribution"]["dark"] == 1
+            assert patterns["brightness_distribution"]["normal"] == 1
+            assert patterns["brightness_distribution"]["bright"] == 1
+            assert patterns["brightness_distribution"]["very_bright"] == 1
 
     def test_analyze_failure_patterns_low_contrast_detection(self):
         """Test failure patterns detects low contrast issues."""
-        analyzer = TargetDetectionAnalyzer()
-        failed_data = [
-            {"image_quality": {"contrast_rms": 10}},  # Low contrast
-            {"image_quality": {"contrast_rms": 15}},  # Low contrast
-            {"image_quality": {"contrast_rms": 30}},  # Good contrast
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            failed_data = [
+                {"image_quality": {"contrast_rms": 10}},  # Low contrast
+                {"image_quality": {"contrast_rms": 15}},  # Low contrast
+                {"image_quality": {"contrast_rms": 30}},  # Good contrast
+            ]
 
-        patterns = analyzer._analyze_failure_patterns(failed_data)
+            patterns = analyzer._analyze_failure_patterns(failed_data)
 
-        assert patterns["low_contrast_failures"] == 2
-        assert patterns["low_contrast_percentage"] == pytest.approx(66.67, rel=0.01)
+            assert patterns["low_contrast_failures"] == 2
+            assert patterns["low_contrast_percentage"] == pytest.approx(66.67, rel=0.01)
 
     def test_analyze_failure_patterns_handles_missing_image_quality(self):
         """Test failure patterns handles missing image_quality data."""
-        analyzer = TargetDetectionAnalyzer()
-        failed_data = [
-            {},  # No image_quality
-            {"image_quality": {}},  # Empty image_quality
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            failed_data = [
+                {},  # No image_quality
+                {"image_quality": {}},  # Empty image_quality
+            ]
 
-        patterns = analyzer._analyze_failure_patterns(failed_data)
+            patterns = analyzer._analyze_failure_patterns(failed_data)
 
-        # Should use defaults (128 brightness, 0 contrast)
-        assert patterns["brightness_distribution"]["normal"] == 2
-        assert patterns["low_contrast_failures"] == 2
+            # Should use defaults (128 brightness, 0 contrast)
+            assert patterns["brightness_distribution"]["normal"] == 2
+            assert patterns["low_contrast_failures"] == 2
 
 
 class TestAnalyzeDevicePerformance:
@@ -358,111 +368,127 @@ class TestAnalyzeDevicePerformance:
 
     def test_analyze_device_performance_empty_data(self):
         """Test device performance analysis with no data."""
-        analyzer = TargetDetectionAnalyzer()
-        performance = analyzer._analyze_device_performance([], [])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            performance = analyzer._analyze_device_performance([], [])
 
-        assert performance["device_performance"] == {}
-        assert performance["problematic_devices"] == []
-        assert performance["total_devices_analyzed"] == 0
+            assert performance["device_performance"] == {}
+            assert performance["problematic_devices"] == []
+            assert performance["total_devices_analyzed"] == 0
 
     def test_analyze_device_performance_single_device(self):
         """Test device performance analysis for single device."""
-        analyzer = TargetDetectionAnalyzer()
-        failed_data = [{"device_id": "device1"}]
-        success_data = [
-            {"device_id": "device1"},
-            {"device_id": "device1"},
-            {"device_id": "device1"},
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            failed_data = [{"device_id": "device1"}]
+            success_data = [
+                {"device_id": "device1"},
+                {"device_id": "device1"},
+                {"device_id": "device1"},
+            ]
 
-        performance = analyzer._analyze_device_performance(failed_data, success_data)
+            performance = analyzer._analyze_device_performance(
+                failed_data, success_data
+            )
 
-        assert "device1" in performance["device_performance"]
-        assert performance["device_performance"]["device1"]["total_attempts"] == 4
-        assert performance["device_performance"]["device1"]["failed"] == 1
-        assert performance["device_performance"]["device1"]["successful"] == 3
-        assert performance["device_performance"]["device1"]["success_rate"] == 0.75
+            assert "device1" in performance["device_performance"]
+            assert performance["device_performance"]["device1"]["total_attempts"] == 4
+            assert performance["device_performance"]["device1"]["failed"] == 1
+            assert performance["device_performance"]["device1"]["successful"] == 3
+            assert performance["device_performance"]["device1"]["success_rate"] == 0.75
 
     def test_analyze_device_performance_multiple_devices(self):
         """Test device performance analysis for multiple devices."""
-        analyzer = TargetDetectionAnalyzer()
-        failed_data = [
-            {"device_id": "device1"},
-            {"device_id": "device2"},
-        ]
-        success_data = [
-            {"device_id": "device1"},
-            {"device_id": "device3"},
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            failed_data = [
+                {"device_id": "device1"},
+                {"device_id": "device2"},
+            ]
+            success_data = [
+                {"device_id": "device1"},
+                {"device_id": "device3"},
+            ]
 
-        performance = analyzer._analyze_device_performance(failed_data, success_data)
+            performance = analyzer._analyze_device_performance(
+                failed_data, success_data
+            )
 
-        assert len(performance["device_performance"]) == 3
-        assert performance["total_devices_analyzed"] == 3
+            assert len(performance["device_performance"]) == 3
+            assert performance["total_devices_analyzed"] == 3
 
     def test_analyze_device_performance_identifies_problematic_devices(self):
         """Test device performance identifies devices with low success rates."""
-        analyzer = TargetDetectionAnalyzer()
-        # Device with < 80% success rate and >= 5 attempts
-        failed_data = [
-            {"device_id": "bad_device"},
-            {"device_id": "bad_device"},
-            {"device_id": "bad_device"},
-            {"device_id": "bad_device"},
-        ]
-        success_data = [{"device_id": "bad_device"}]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            # Device with < 80% success rate and >= 5 attempts
+            failed_data = [
+                {"device_id": "bad_device"},
+                {"device_id": "bad_device"},
+                {"device_id": "bad_device"},
+                {"device_id": "bad_device"},
+            ]
+            success_data = [{"device_id": "bad_device"}]
 
-        performance = analyzer._analyze_device_performance(failed_data, success_data)
+            performance = analyzer._analyze_device_performance(
+                failed_data, success_data
+            )
 
-        assert len(performance["problematic_devices"]) == 1
-        assert performance["problematic_devices"][0]["device_id"] == "bad_device"
-        assert performance["problematic_devices"][0]["success_rate"] == 0.2
+            assert len(performance["problematic_devices"]) == 1
+            assert performance["problematic_devices"][0]["device_id"] == "bad_device"
+            assert performance["problematic_devices"][0]["success_rate"] == 0.2
 
     def test_analyze_device_performance_ignores_insufficient_data(self):
         """Test device performance ignores devices with < 5 attempts."""
-        analyzer = TargetDetectionAnalyzer()
-        # Device with low success but < 5 total attempts
-        failed_data = [
-            {"device_id": "device1"},
-            {"device_id": "device1"},
-        ]
-        success_data = [{"device_id": "device1"}]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            # Device with low success but < 5 total attempts
+            failed_data = [
+                {"device_id": "device1"},
+                {"device_id": "device1"},
+            ]
+            success_data = [{"device_id": "device1"}]
 
-        performance = analyzer._analyze_device_performance(failed_data, success_data)
+            performance = analyzer._analyze_device_performance(
+                failed_data, success_data
+            )
 
-        # Should not be flagged as problematic (only 3 attempts)
-        assert performance["problematic_devices"] == []
+            # Should not be flagged as problematic (only 3 attempts)
+            assert performance["problematic_devices"] == []
 
     def test_analyze_device_performance_sorts_problematic_devices(self):
         """Test device performance sorts problematic devices by success rate."""
-        analyzer = TargetDetectionAnalyzer()
-        # Create two problematic devices with different success rates
-        failed_data = [
-            {"device_id": "device1"},  # 1 fail, 4 success = 0.8 (not flagged)
-            {"device_id": "device2"},  # 3 fail, 2 success = 0.4
-            {"device_id": "device2"},
-            {"device_id": "device2"},
-            {"device_id": "device3"},  # 4 fail, 1 success = 0.2
-            {"device_id": "device3"},
-            {"device_id": "device3"},
-            {"device_id": "device3"},
-        ]
-        success_data = [
-            {"device_id": "device1"},
-            {"device_id": "device1"},
-            {"device_id": "device1"},
-            {"device_id": "device1"},
-            {"device_id": "device2"},
-            {"device_id": "device2"},
-            {"device_id": "device3"},
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            # Create two problematic devices with different success rates
+            failed_data = [
+                {"device_id": "device1"},  # 1 fail, 4 success = 0.8 (not flagged)
+                {"device_id": "device2"},  # 3 fail, 2 success = 0.4
+                {"device_id": "device2"},
+                {"device_id": "device2"},
+                {"device_id": "device3"},  # 4 fail, 1 success = 0.2
+                {"device_id": "device3"},
+                {"device_id": "device3"},
+                {"device_id": "device3"},
+            ]
+            success_data = [
+                {"device_id": "device1"},
+                {"device_id": "device1"},
+                {"device_id": "device1"},
+                {"device_id": "device1"},
+                {"device_id": "device2"},
+                {"device_id": "device2"},
+                {"device_id": "device3"},
+            ]
 
-        performance = analyzer._analyze_device_performance(failed_data, success_data)
+            performance = analyzer._analyze_device_performance(
+                failed_data, success_data
+            )
 
-        # Should be sorted by success rate (lowest first)
-        assert len(performance["problematic_devices"]) == 2
-        assert performance["problematic_devices"][0]["device_id"] == "device3"
-        assert performance["problematic_devices"][1]["device_id"] == "device2"
+            # Should be sorted by success rate (lowest first)
+            assert len(performance["problematic_devices"]) == 2
+            assert performance["problematic_devices"][0]["device_id"] == "device3"
+            assert performance["problematic_devices"][1]["device_id"] == "device2"
 
 
 class TestAnalyzeLightingConditions:
@@ -470,100 +496,106 @@ class TestAnalyzeLightingConditions:
 
     def test_analyze_lighting_conditions_empty_data(self):
         """Test lighting analysis with no data."""
-        analyzer = TargetDetectionAnalyzer()
-        lighting = analyzer._analyze_lighting_conditions([], [])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            lighting = analyzer._analyze_lighting_conditions([], [])
 
-        assert lighting["successful_detections"]["brightness"]["count"] == 0
-        assert lighting["failed_detections"]["brightness"]["count"] == 0
-        assert lighting["optimal_brightness_range"] is None
-        assert lighting["optimal_contrast_range"] is None
+            assert lighting["successful_detections"]["brightness"]["count"] == 0
+            assert lighting["failed_detections"]["brightness"]["count"] == 0
+            assert lighting["optimal_brightness_range"] is None
+            assert lighting["optimal_contrast_range"] is None
 
     def test_analyze_lighting_conditions_brightness_stats(self):
         """Test lighting analysis calculates brightness statistics."""
-        analyzer = TargetDetectionAnalyzer()
-        success_data = [
-            {"image_quality": {"mean_brightness": 100, "contrast_rms": 30}},
-            {"image_quality": {"mean_brightness": 120, "contrast_rms": 35}},
-            {"image_quality": {"mean_brightness": 110, "contrast_rms": 32}},
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            success_data = [
+                {"image_quality": {"mean_brightness": 100, "contrast_rms": 30}},
+                {"image_quality": {"mean_brightness": 120, "contrast_rms": 35}},
+                {"image_quality": {"mean_brightness": 110, "contrast_rms": 32}},
+            ]
 
-        lighting = analyzer._analyze_lighting_conditions([], success_data)
+            lighting = analyzer._analyze_lighting_conditions([], success_data)
 
-        brightness_stats = lighting["successful_detections"]["brightness"]
-        assert brightness_stats["count"] == 3
-        assert brightness_stats["mean"] == pytest.approx(110, rel=0.01)
-        assert brightness_stats["min"] == 100
-        assert brightness_stats["max"] == 120
+            brightness_stats = lighting["successful_detections"]["brightness"]
+            assert brightness_stats["count"] == 3
+            assert brightness_stats["mean"] == pytest.approx(110, rel=0.01)
+            assert brightness_stats["min"] == 100
+            assert brightness_stats["max"] == 120
 
     def test_analyze_lighting_conditions_contrast_stats(self):
         """Test lighting analysis calculates contrast statistics."""
-        analyzer = TargetDetectionAnalyzer()
-        failed_data = [
-            {"image_quality": {"mean_brightness": 100, "contrast_rms": 10}},
-            {"image_quality": {"mean_brightness": 100, "contrast_rms": 20}},
-            {"image_quality": {"mean_brightness": 100, "contrast_rms": 15}},
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            failed_data = [
+                {"image_quality": {"mean_brightness": 100, "contrast_rms": 10}},
+                {"image_quality": {"mean_brightness": 100, "contrast_rms": 20}},
+                {"image_quality": {"mean_brightness": 100, "contrast_rms": 15}},
+            ]
 
-        lighting = analyzer._analyze_lighting_conditions(failed_data, [])
+            lighting = analyzer._analyze_lighting_conditions(failed_data, [])
 
-        contrast_stats = lighting["failed_detections"]["contrast"]
-        assert contrast_stats["count"] == 3
-        assert contrast_stats["mean"] == pytest.approx(15, rel=0.01)
-        assert contrast_stats["min"] == 10
-        assert contrast_stats["max"] == 20
+            contrast_stats = lighting["failed_detections"]["contrast"]
+            assert contrast_stats["count"] == 3
+            assert contrast_stats["mean"] == pytest.approx(15, rel=0.01)
+            assert contrast_stats["min"] == 10
+            assert contrast_stats["max"] == 20
 
     def test_analyze_lighting_conditions_optimal_ranges(self):
         """Test lighting analysis calculates optimal ranges from success data."""
-        analyzer = TargetDetectionAnalyzer()
-        success_data = [
-            {"image_quality": {"mean_brightness": 100, "contrast_rms": 30}},
-            {"image_quality": {"mean_brightness": 120, "contrast_rms": 40}},
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            success_data = [
+                {"image_quality": {"mean_brightness": 100, "contrast_rms": 30}},
+                {"image_quality": {"mean_brightness": 120, "contrast_rms": 40}},
+            ]
 
-        lighting = analyzer._analyze_lighting_conditions([], success_data)
+            lighting = analyzer._analyze_lighting_conditions([], success_data)
 
-        # Should calculate mean ± std
-        brightness_range = lighting["optimal_brightness_range"]
-        assert brightness_range is not None
-        assert "min" in brightness_range
-        assert "max" in brightness_range
-        assert brightness_range["min"] >= 0
-        assert brightness_range["max"] <= 255
+            # Should calculate mean ± std
+            brightness_range = lighting["optimal_brightness_range"]
+            assert brightness_range is not None
+            assert "min" in brightness_range
+            assert "max" in brightness_range
+            assert brightness_range["min"] >= 0
+            assert brightness_range["max"] <= 255
 
-        contrast_range = lighting["optimal_contrast_range"]
-        assert contrast_range is not None
-        assert "min" in contrast_range
-        assert "max" in contrast_range
+            contrast_range = lighting["optimal_contrast_range"]
+            assert contrast_range is not None
+            assert "min" in contrast_range
+            assert "max" in contrast_range
 
     def test_analyze_lighting_conditions_handles_missing_values(self):
         """Test lighting analysis handles missing image quality values."""
-        analyzer = TargetDetectionAnalyzer()
-        data = [
-            {"image_quality": {}},  # No brightness or contrast
-            {"image_quality": {"mean_brightness": 100}},  # No contrast
-            {},  # No image_quality
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            data = [
+                {"image_quality": {}},  # No brightness or contrast
+                {"image_quality": {"mean_brightness": 100}},  # No contrast
+                {},  # No image_quality
+            ]
 
-        lighting = analyzer._analyze_lighting_conditions(data, [])
+            lighting = analyzer._analyze_lighting_conditions(data, [])
 
-        # Should only count records with valid data
-        assert lighting["failed_detections"]["brightness"]["count"] == 1
-        assert lighting["failed_detections"]["contrast"]["count"] == 0
+            # Should only count records with valid data
+            assert lighting["failed_detections"]["brightness"]["count"] == 1
+            assert lighting["failed_detections"]["contrast"]["count"] == 0
 
     def test_analyze_lighting_conditions_clips_brightness_range(self):
         """Test lighting analysis clips brightness range to valid values."""
-        analyzer = TargetDetectionAnalyzer()
-        # Very low brightness with high std could produce negative min
-        success_data = [
-            {"image_quality": {"mean_brightness": 10, "contrast_rms": 30}},
-            {"image_quality": {"mean_brightness": 50, "contrast_rms": 30}},
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            # Very low brightness with high std could produce negative min
+            success_data = [
+                {"image_quality": {"mean_brightness": 10, "contrast_rms": 30}},
+                {"image_quality": {"mean_brightness": 50, "contrast_rms": 30}},
+            ]
 
-        lighting = analyzer._analyze_lighting_conditions([], success_data)
+            lighting = analyzer._analyze_lighting_conditions([], success_data)
 
-        brightness_range = lighting["optimal_brightness_range"]
-        assert brightness_range["min"] >= 0
-        assert brightness_range["max"] <= 255
+            brightness_range = lighting["optimal_brightness_range"]
+            assert brightness_range["min"] >= 0
+            assert brightness_range["max"] <= 255
 
 
 class TestGenerateRecommendations:
@@ -571,94 +603,105 @@ class TestGenerateRecommendations:
 
     def test_generate_recommendations_no_failures(self):
         """Test recommendations with no failures."""
-        analyzer = TargetDetectionAnalyzer()
-        recommendations = analyzer._generate_recommendations([], [{"device_id": "d1"}])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            recommendations = analyzer._generate_recommendations(
+                [], [{"device_id": "d1"}]
+            )
 
-        assert len(recommendations) == 1
-        assert "No failures detected" in recommendations[0]
+            assert len(recommendations) == 1
+            assert "No failures detected" in recommendations[0]
 
     def test_generate_recommendations_high_failure_rate(self):
         """Test recommendations for high failure rate."""
-        analyzer = TargetDetectionAnalyzer()
-        failed_data = [{"image_quality": {}} for _ in range(4)]
-        success_data = [{"image_quality": {}} for _ in range(6)]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            failed_data = [{"image_quality": {}} for _ in range(4)]
+            success_data = [{"image_quality": {}} for _ in range(6)]
 
-        recommendations = analyzer._generate_recommendations(failed_data, success_data)
+            recommendations = analyzer._generate_recommendations(
+                failed_data, success_data
+            )
 
-        # 40% failure rate should trigger recommendation
-        assert any("High failure rate" in r for r in recommendations)
+            # 40% failure rate should trigger recommendation
+            assert any("High failure rate" in r for r in recommendations)
 
     def test_generate_recommendations_low_lighting(self):
         """Test recommendations for low lighting issues."""
-        analyzer = TargetDetectionAnalyzer()
-        failed_data = [
-            {"image_quality": {"mean_brightness": 50}},  # Dark
-            {"image_quality": {"mean_brightness": 60}},  # Dark
-            {"image_quality": {"mean_brightness": 70}},  # Dark
-            {"image_quality": {"mean_brightness": 100}},  # Normal
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            failed_data = [
+                {"image_quality": {"mean_brightness": 50}},  # Dark
+                {"image_quality": {"mean_brightness": 60}},  # Dark
+                {"image_quality": {"mean_brightness": 70}},  # Dark
+                {"image_quality": {"mean_brightness": 100}},  # Normal
+            ]
 
-        recommendations = analyzer._generate_recommendations(failed_data, [])
+            recommendations = analyzer._generate_recommendations(failed_data, [])
 
-        # > 30% dark failures should trigger recommendation
-        assert any("low lighting" in r for r in recommendations)
+            # > 30% dark failures should trigger recommendation
+            assert any("low lighting" in r for r in recommendations)
 
     def test_generate_recommendations_excessive_brightness(self):
         """Test recommendations for excessive brightness."""
-        analyzer = TargetDetectionAnalyzer()
-        failed_data = [
-            {"image_quality": {"mean_brightness": 210}},
-            {"image_quality": {"mean_brightness": 220}},
-            {"image_quality": {"mean_brightness": 100}},
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            failed_data = [
+                {"image_quality": {"mean_brightness": 210}},
+                {"image_quality": {"mean_brightness": 220}},
+                {"image_quality": {"mean_brightness": 100}},
+            ]
 
-        recommendations = analyzer._generate_recommendations(failed_data, [])
+            recommendations = analyzer._generate_recommendations(failed_data, [])
 
-        # > 30% bright failures should trigger recommendation
-        assert any("excessive brightness" in r for r in recommendations)
+            # > 30% bright failures should trigger recommendation
+            assert any("excessive brightness" in r for r in recommendations)
 
     def test_generate_recommendations_low_contrast(self):
         """Test recommendations for low contrast issues."""
-        analyzer = TargetDetectionAnalyzer()
-        failed_data = [
-            {"image_quality": {"contrast_rms": 10}},
-            {"image_quality": {"contrast_rms": 15}},
-            {"image_quality": {"contrast_rms": 30}},
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            failed_data = [
+                {"image_quality": {"contrast_rms": 10}},
+                {"image_quality": {"contrast_rms": 15}},
+                {"image_quality": {"contrast_rms": 30}},
+            ]
 
-        recommendations = analyzer._generate_recommendations(failed_data, [])
+            recommendations = analyzer._generate_recommendations(failed_data, [])
 
-        # > 30% low contrast should trigger recommendation
-        assert any("Low contrast" in r for r in recommendations)
+            # > 30% low contrast should trigger recommendation
+            assert any("Low contrast" in r for r in recommendations)
 
     def test_generate_recommendations_partial_detections(self):
         """Test recommendations for partial detections pattern."""
-        analyzer = TargetDetectionAnalyzer()
-        failed_data = [
-            {"targets_found": 1, "image_quality": {}},
-            {"targets_found": 2, "image_quality": {}},
-            {"targets_found": 1, "image_quality": {}},
-            {"targets_found": 0, "image_quality": {}},
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            failed_data = [
+                {"targets_found": 1, "image_quality": {}},
+                {"targets_found": 2, "image_quality": {}},
+                {"targets_found": 1, "image_quality": {}},
+                {"targets_found": 0, "image_quality": {}},
+            ]
 
-        recommendations = analyzer._generate_recommendations(failed_data, [])
+            recommendations = analyzer._generate_recommendations(failed_data, [])
 
-        # > 50% partial detections should trigger recommendation
-        assert any("partial detections" in r for r in recommendations)
+            # > 50% partial detections should trigger recommendation
+            assert any("partial detections" in r for r in recommendations)
 
     def test_generate_recommendations_zero_detections(self):
         """Test recommendations for complete detection failures."""
-        analyzer = TargetDetectionAnalyzer()
-        failed_data = [
-            {"targets_found": 0, "image_quality": {}},
-            {"targets_found": 0, "image_quality": {}},
-            {"targets_found": 1, "image_quality": {}},
-        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            analyzer = TargetDetectionAnalyzer(tmpdir)
+            failed_data = [
+                {"targets_found": 0, "image_quality": {}},
+                {"targets_found": 0, "image_quality": {}},
+                {"targets_found": 1, "image_quality": {}},
+            ]
 
-        recommendations = analyzer._generate_recommendations(failed_data, [])
+            recommendations = analyzer._generate_recommendations(failed_data, [])
 
-        # > 30% zero detections should trigger recommendation
-        assert any("complete detection failures" in r for r in recommendations)
+            # > 30% zero detections should trigger recommendation
+            assert any("complete detection failures" in r for r in recommendations)
 
 
 class TestAnalyzeDetectionLogs:
