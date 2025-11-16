@@ -41,92 +41,101 @@ class TestSensor:
 
     def test_url_setup(self):
         """Test sensor-specific URL setup."""
-        sensor = Sensor("192.168.1.200", port=80)
-        assert sensor._data_url == "http://192.168.1.200:80/"
-        assert sensor._id_url == "http://192.168.1.200:80/id"
-        assert sensor._post_url == "http://192.168.1.200:80/set"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sensor = Sensor(
+                "192.168.1.200", port=80, results_dir=tmpdir, save_to_csv=False
+            )
+            assert sensor._data_url == "http://192.168.1.200:80/"
+            assert sensor._id_url == "http://192.168.1.200:80/id"
+            assert sensor._post_url == "http://192.168.1.200:80/set"
 
     def test_sensor_fields_constant(self):
         """Test SENSOR_FIELDS constant."""
-        sensor = Sensor("192.168.1.200")
-        assert "Time" in sensor.SENSOR_FIELDS
-        assert "Temperature" in sensor.SENSOR_FIELDS
-        assert "Humidity" in sensor.SENSOR_FIELDS
-        assert "Pressure" in sensor.SENSOR_FIELDS
-        assert "Light" in sensor.SENSOR_FIELDS
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sensor = Sensor("192.168.1.200", results_dir=tmpdir, save_to_csv=False)
+            assert "Time" in sensor.SENSOR_FIELDS
+            assert "Temperature" in sensor.SENSOR_FIELDS
+            assert "Humidity" in sensor.SENSOR_FIELDS
+            assert "Pressure" in sensor.SENSOR_FIELDS
+            assert "Light" in sensor.SENSOR_FIELDS
 
     @patch("urllib.request.urlopen")
     def test_set_with_json(self, mock_urlopen):
         """Test setting sensor variables with JSON."""
-        sensor = Sensor("192.168.1.200")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sensor = Sensor("192.168.1.200", results_dir=tmpdir, save_to_csv=False)
 
-        mock_response = MagicMock()
-        mock_response.__enter__.return_value = mock_response
-        mock_response.read.return_value = json.dumps({"status": "ok"}).encode()
-        mock_urlopen.return_value = mock_response
+            mock_response = MagicMock()
+            mock_response.__enter__.return_value = mock_response
+            mock_response.read.return_value = json.dumps({"status": "ok"}).encode()
+            mock_urlopen.return_value = mock_response
 
-        with patch.object(sensor, "_update_info"):
-            result = sensor.set({"key": "value"}, use_json=True)
-            assert result == {"status": "ok"}
+            with patch.object(sensor, "_update_info"):
+                result = sensor.set({"key": "value"}, use_json=True)
+                assert result == {"status": "ok"}
 
     @patch("urllib.request.urlopen")
     def test_set_without_json(self, mock_urlopen):
         """Test setting sensor variables without JSON."""
-        sensor = Sensor("192.168.1.200")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sensor = Sensor("192.168.1.200", results_dir=tmpdir, save_to_csv=False)
 
-        mock_response = MagicMock()
-        mock_response.__enter__.return_value = mock_response
-        mock_response.read.return_value = b"OK"
-        mock_urlopen.return_value = mock_response
+            mock_response = MagicMock()
+            mock_response.__enter__.return_value = mock_response
+            mock_response.read.return_value = b"OK"
+            mock_urlopen.return_value = mock_response
 
-        with patch.object(sensor, "_update_info"):
-            result = sensor.set({"key": "value"}, use_json=False)
-            assert result == b"OK"
+            with patch.object(sensor, "_update_info"):
+                result = sensor.set({"key": "value"}, use_json=False)
+                assert result == b"OK"
 
     @patch("urllib.request.urlopen")
     def test_set_error_handling(self, mock_urlopen):
         """Test error handling in set method."""
-        sensor = Sensor("192.168.1.200")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sensor = Sensor("192.168.1.200", results_dir=tmpdir, save_to_csv=False)
 
-        mock_urlopen.side_effect = Exception("Connection error")
+            mock_urlopen.side_effect = Exception("Connection error")
 
-        with pytest.raises(Exception, match="Connection error"):
-            sensor.set({"key": "value"})
+            with pytest.raises(Exception, match="Connection error"):
+                sensor.set({"key": "value"})
 
     def test_extract_sensor_data(self):
         """Test sensor data extraction."""
-        sensor = Sensor("192.168.1.200")
-        sensor._info = {
-            "id": "sensor_001",
-            "ip": "192.168.1.200",
-            "name": "Test Sensor",
-            "location": "Lab 1",
-            "temperature": 22.5,
-            "humidity": 45.2,
-            "pressure": 1013.25,
-            "light": 500,
-        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sensor = Sensor("192.168.1.200", results_dir=tmpdir, save_to_csv=False)
+            sensor._info = {
+                "id": "sensor_001",
+                "ip": "192.168.1.200",
+                "name": "Test Sensor",
+                "location": "Lab 1",
+                "temperature": 22.5,
+                "humidity": 45.2,
+                "pressure": 1013.25,
+                "light": 500,
+            }
 
-        data = sensor._extract_sensor_data()
+            data = sensor._extract_sensor_data()
 
-        assert data["id"] == "sensor_001"
-        assert data["name"] == "Test Sensor"
-        assert data["temperature"] == 22.5
-        assert data["humidity"] == 45.2
-        assert data["pressure"] == 1013.25
-        assert data["light"] == 500
+            assert data["id"] == "sensor_001"
+            assert data["name"] == "Test Sensor"
+            assert data["temperature"] == 22.5
+            assert data["humidity"] == 45.2
+            assert data["pressure"] == 1013.25
+            assert data["light"] == 500
 
     def test_extract_sensor_data_with_defaults(self):
         """Test sensor data extraction with missing fields."""
-        sensor = Sensor("192.168.1.200")
-        sensor._info = {}
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sensor = Sensor("192.168.1.200", results_dir=tmpdir, save_to_csv=False)
+            sensor._info = {}
 
-        data = sensor._extract_sensor_data()
+            data = sensor._extract_sensor_data()
 
-        assert data["id"] == "unknown_id"
-        assert data["name"] == "unknown_sensor"
-        assert data["temperature"] == "N/A"
-        assert data["humidity"] == "N/A"
+            assert data["id"] == "unknown_id"
+            assert data["name"] == "unknown_sensor"
+            assert data["temperature"] == "N/A"
+            assert data["humidity"] == "N/A"
 
     def test_get_csv_filename(self):
         """Test CSV filename generation."""

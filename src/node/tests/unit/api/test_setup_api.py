@@ -7,6 +7,7 @@ incubator configuration, notifications, tunnel setup, and virtual sensors.
 
 import json
 import socket
+import tempfile
 import unittest
 from unittest.mock import MagicMock, Mock, call, mock_open, patch
 
@@ -20,6 +21,9 @@ class TestSetupAPI(unittest.TestCase):
 
     def setUp(self):
         """Create mock server instance and SetupAPI for testing."""
+        # Create a temporary directory for test files
+        self.temp_dir = tempfile.TemporaryDirectory()
+
         self.mock_server = Mock()
         self.mock_server.app = Mock()
         self.mock_server.config = Mock()
@@ -36,15 +40,19 @@ class TestSetupAPI(unittest.TestCase):
         self.mock_server.device_scanner = Mock()
         self.mock_server.sensor_scanner = Mock()
         self.mock_server.database = Mock()
-        self.mock_server.results_dir = "/tmp/results"
-        self.mock_server.sensors_dir = "/tmp/sensors"
-        self.mock_server.roi_templates_dir = "/tmp/templates"
-        self.mock_server.tmp_imgs_dir = "/tmp/imgs"
+        self.mock_server.results_dir = f"{self.temp_dir.name}/results"
+        self.mock_server.sensors_dir = f"{self.temp_dir.name}/sensors"
+        self.mock_server.roi_templates_dir = f"{self.temp_dir.name}/templates"
+        self.mock_server.tmp_imgs_dir = f"{self.temp_dir.name}/imgs"
 
         self.api = SetupAPI(self.mock_server)
 
         # Add db attribute that some methods use
         self.api.db = self.mock_server.database
+
+    def tearDown(self):
+        """Clean up temporary directory."""
+        self.temp_dir.cleanup()
 
     def test_register_routes(self):
         """Test that all setup routes are registered."""
@@ -324,7 +332,11 @@ class TestSetupAPI(unittest.TestCase):
         mock_db.getUserByName.return_value = None
         mock_db.addUser.return_value = 1
 
-        result = self.api._setup_admin_user()
+        # Patch config_dir to use temp directory
+        with patch(
+            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
+        ):
+            result = self.api._setup_admin_user()
 
         self.assertEqual(result["result"], "success")
         self.assertEqual(result["user_id"], 1)
@@ -349,7 +361,10 @@ class TestSetupAPI(unittest.TestCase):
         mock_db.getUserByName.return_value = {"id": 1, "username": "admin"}
         mock_db.updateUser.return_value = 1
 
-        result = self.api._setup_admin_user()
+        with patch(
+            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
+        ):
+            result = self.api._setup_admin_user()
 
         self.assertEqual(result["result"], "success")
         self.assertEqual(result["user_id"], 1)
@@ -377,7 +392,10 @@ class TestSetupAPI(unittest.TestCase):
         ]
         mock_db.addUser.return_value = 2
 
-        result = self.api._setup_admin_user()
+        with patch(
+            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
+        ):
+            result = self.api._setup_admin_user()
 
         self.assertEqual(result["result"], "success")
         self.assertEqual(result["user_id"], 2)
@@ -415,7 +433,10 @@ class TestSetupAPI(unittest.TestCase):
 
         mock_db_class.side_effect = Exception("Database error")
 
-        result = self.api._setup_admin_user()
+        with patch(
+            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
+        ):
+            result = self.api._setup_admin_user()
 
         self.assertEqual(result["result"], "error")
         self.assertIn("Database error", result["message"])
@@ -439,7 +460,10 @@ class TestSetupAPI(unittest.TestCase):
         mock_db_class.return_value = mock_db
         mock_db.addUser.return_value = 2
 
-        result = self.api._setup_add_user()
+        with patch(
+            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
+        ):
+            result = self.api._setup_add_user()
 
         self.assertEqual(result["result"], "success")
         self.assertEqual(result["user_id"], 2)
@@ -460,7 +484,10 @@ class TestSetupAPI(unittest.TestCase):
         mock_db_class.return_value = mock_db
         mock_db.addUser.return_value = 2
 
-        result = self.api._setup_add_user()
+        with patch(
+            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
+        ):
+            result = self.api._setup_add_user()
 
         self.assertEqual(result["result"], "success")
         call_args = mock_db.addUser.call_args[1]
@@ -484,7 +511,10 @@ class TestSetupAPI(unittest.TestCase):
         mock_db_class.return_value = mock_db
         mock_db.updateUser.return_value = 1
 
-        result = self.api._setup_update_user()
+        with patch(
+            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
+        ):
+            result = self.api._setup_update_user()
 
         self.assertEqual(result["result"], "success")
         call_args = mock_db.updateUser.call_args[1]
@@ -513,7 +543,10 @@ class TestSetupAPI(unittest.TestCase):
         mock_db_class.return_value = mock_db
         mock_db.updateUser.return_value = 1
 
-        result = self.api._setup_update_user()
+        with patch(
+            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
+        ):
+            result = self.api._setup_update_user()
 
         self.assertEqual(result["result"], "success")
         call_args = mock_db.updateUser.call_args[1]
@@ -538,7 +571,10 @@ class TestSetupAPI(unittest.TestCase):
         mock_db_class.return_value = mock_db
         mock_db.addIncubator.return_value = 1
 
-        result = self.api._setup_add_incubator()
+        with patch(
+            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
+        ):
+            result = self.api._setup_add_incubator()
 
         self.assertEqual(result["result"], "success")
         self.assertEqual(result["incubator_id"], 1)
@@ -569,7 +605,10 @@ class TestSetupAPI(unittest.TestCase):
         mock_db_class.return_value = mock_db
         mock_db.updateIncubator.return_value = 1
 
-        result = self.api._setup_update_incubator()
+        with patch(
+            "ethoscope_node.utils.etho_db._default_config_dir", self.temp_dir.name
+        ):
+            result = self.api._setup_update_incubator()
 
         self.assertEqual(result["result"], "success")
         call_args = mock_db.updateIncubator.call_args[1]
