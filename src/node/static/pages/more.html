@@ -352,11 +352,22 @@
               </span>
 
               <span ng-if="!entry.not_available">
-                  <label class="toggle-check">{{key}}
-                      <input type="checkbox" class="toggle-check-input" ng-model="isActive" ng-checked="entry.active == 'active'" ng-click="nodeManagement.toggleDaemon(key, isActive != undefined ? isActive : entry.active == 'inactive')">
+                  <label class="toggle-check" ng-class="{'text-muted': nodeManagement.isDisabledByConflict(key)}">{{key}}
+                      <input type="checkbox" class="toggle-check-input"
+                             ng-model="isActive"
+                             ng-checked="entry.active == 'active'"
+                             ng-disabled="nodeManagement.isDisabledByConflict(key)"
+                             ng-click="nodeManagement.toggleDaemon(key, isActive != undefined ? isActive : entry.active == 'inactive')">
                       <span class="toggle-check-text"></span>
                   </label>
                   <p>{{entry.description}}</p>
+                  <p ng-if="nodeManagement.isDisabledByConflict(key)" class="text-warning">
+                      <i class="fa fa-exclamation-triangle"></i>
+                      Disabled due to conflict with active service:
+                      <span ng-repeat="conflict in entry.conflicts_with">
+                          <strong ng-if="daemons[conflict].active == 'active'">{{conflict}}</strong>
+                      </span>
+                  </p>
               </span>
             </li>
         </ul>

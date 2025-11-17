@@ -2,6 +2,7 @@
 Description=Ethoscope video-only backup service using rsync
 Wants=ntpd.service clock.service network-online.target
 After=ntpd.service clock.service network-online.target
+Conflicts=ethoscope_backup_unified.service
 
 
 [Service]

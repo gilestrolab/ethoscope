@@ -2,6 +2,7 @@
 Description=Ethoscope unified backup service (videos + results) using rsync
 Wants=ntpd.service clock.service network-online.target
 After=ntpd.service clock.service network-online.target
+Conflicts=ethoscope_backup_video.service ethoscope_backup_sqlite.service
 
 
 [Service]

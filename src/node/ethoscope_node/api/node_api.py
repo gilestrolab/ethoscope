@@ -18,50 +18,62 @@ SYSTEM_DAEMONS = {
     "ethoscope_backup_mysql": {
         "description": "The service that collects data from the ethoscope mariadb and syncs them with the node.",
         "available_on_docker": True,
+        "conflicts_with": [],
     },
     "ethoscope_backup_video": {
         "description": "The service that collects videos in h264 chunks from the ethoscopes and syncs them with the node",
         "available_on_docker": True,
+        "conflicts_with": ["ethoscope_backup_unified"],
     },
     "ethoscope_backup_unified": {
         "description": "The service that collects videos and SQLite dbs from the ethoscopes and syncs them with the node",
         "available_on_docker": True,
+        "conflicts_with": ["ethoscope_backup_video", "ethoscope_backup_sqlite"],
     },
     "ethoscope_backup_sqlite": {
         "description": "The service that collects SQLite db from the ethoscopes and syncs them with the node",
         "available_on_docker": True,
+        "conflicts_with": ["ethoscope_backup_unified"],
     },
     "ethoscope_update_node": {
         "description": "The service used to update the nodes and the ethoscopes.",
         "available_on_docker": True,
+        "conflicts_with": [],
     },
     "git-daemon.socket": {
         "description": "The GIT server that handles git updates for the node and ethoscopes.",
         "available_on_docker": False,
+        "conflicts_with": [],
     },
     "ntpd": {
         "description": "The NTPd service is syncing time with the ethoscopes.",
         "available_on_docker": False,
+        "conflicts_with": [],
     },
     "sshd": {
         "description": "The SSH daemon allows power users to access the node terminal from remote.",
         "available_on_docker": False,
+        "conflicts_with": [],
     },
     "vsftpd": {
         "description": "The FTP server on the node, used to access the local ethoscope data",
         "available_on_docker": False,
+        "conflicts_with": [],
     },
     "ethoscope_virtuascope": {
         "description": "A virtual ethoscope running on the node. Useful for offline tracking",
         "available_on_docker": False,
+        "conflicts_with": [],
     },
     "ethoscope_tunnel": {
         "description": "Cloudflare tunnel service for remote access to this node via the internet. Requires token.",
         "available_on_docker": False,
+        "conflicts_with": [],
     },
     "ethoscope_sensor_virtual": {
         "description": "A virtual sensor collecting real world data about. Requires token.",
         "available_on_docker": False,
+        "conflicts_with": [],
     },
 }
 
@@ -344,9 +356,28 @@ class NodeAPI(BaseAPI):
             yield f"Error executing command: {e}"
 
     def _toggle_daemon(self, daemon_name, status):
-        """Toggle system daemon on/off."""
+        """Toggle system daemon on/off, enforcing service conflicts."""
         systemctl = self.server.systemctl
+        result = []
 
+        # If starting a daemon, check for and stop conflicting services
+        if status and daemon_name in SYSTEM_DAEMONS:
+            conflicts = SYSTEM_DAEMONS[daemon_name].get("conflicts_with", [])
+            for conflicting_service in conflicts:
+                # Check if conflicting service is running
+                with os.popen(f"{systemctl} is-active {conflicting_service}") as df:
+                    is_active = df.read().strip()
+
+                if is_active == "active":
+                    self.logger.info(
+                        f"Stopping conflicting service {conflicting_service} "
+                        f"before starting {daemon_name}"
+                    )
+                    with os.popen(f"{systemctl} stop {conflicting_service}") as po:
+                        stop_result = po.read()
+                        result.append(f"Stopped {conflicting_service}: {stop_result}")
+
+        # Now start or stop the requested daemon
         if status:
             cmd = f"{systemctl} start {daemon_name}"
             self.logger.info(f"Starting daemon {daemon_name}")
@@ -355,4 +386,6 @@ class NodeAPI(BaseAPI):
             self.logger.info(f"Stopping daemon {daemon_name}")
 
         with os.popen(cmd) as po:
-            return po.read()
+            main_result = po.read()
+            result.append(main_result)
+            return "\n".join(result) if result else main_result

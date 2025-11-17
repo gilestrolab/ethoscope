@@ -21,12 +21,12 @@ class WrongMachineID(Exception):
 
 try:
     pass
-except:
+except Exception:
     logging.warning("Could not load netifaces. This is needed for node stuff")
 try:
     import concurrent
     import concurrent.futures as futures
-except:
+except Exception:
     logging.warning("Could not load concurrent. This is needed for node stuff")
 
 
@@ -194,7 +194,7 @@ def receive_device_IPs():
             if js[key]["status"] != "offline" and "ip" in js[key]:
                 devices.append("http://%s" % js[key]["ip"])
         # devices = [ "http://" + js[key]['ip'] for key in js.keys() if js[key]['status'] != "offline" ]
-    except:
+    except Exception:
         logging.error(
             "The node ethoscope server is not running or cannot be reached. A list of available ethoscopes could not be found."
         )
@@ -369,12 +369,101 @@ def _reload_daemon(name):
     subprocess.call(["systemctl", "restart", name])
 
 
+def _get_active_backup_services():
+    """
+    Detect which backup services are currently running.
+
+    Returns:
+        list: Names of active backup services
+    """
+    backup_services = [
+        "ethoscope_backup_mysql",
+        "ethoscope_backup_video",
+        "ethoscope_backup_sqlite",
+        "ethoscope_backup_unified",
+    ]
+
+    active_services = []
+    for service in backup_services:
+        try:
+            result = subprocess.run(
+                ["systemctl", "is-active", service],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.stdout.strip() == "active":
+                active_services.append(service)
+                logging.info(f"Detected active backup service: {service}")
+        except Exception as e:
+            logging.warning(f"Failed to check status of {service}: {e}")
+
+    return active_services
+
+
 def reload_node_daemon():
+    """
+    Reload node services after an update.
+
+    This includes:
+    - systemctl daemon-reload (to pick up any service file changes)
+    - ethoscope_node (main node server)
+    - ethoscope_update_node (update daemon)
+    - Any active backup services (ethoscope_backup_*)
+    """
+    logging.info("Reloading node services after update")
+
+    # Reload systemd daemon to pick up any service file changes
+    logging.info("Running systemctl daemon-reload")
+    subprocess.call(["systemctl", "daemon-reload"])
+
+    # Restart main node service
+    logging.info("Restarting ethoscope_node service")
     _reload_daemon("ethoscope_node")
+
+    # Restart update service
+    logging.info("Restarting ethoscope_update_node service")
+    _reload_daemon("ethoscope_update_node")
+
+    # Restart any active backup services
+    active_backup_services = _get_active_backup_services()
+    for service in active_backup_services:
+        logging.info(f"Restarting active backup service: {service}")
+        _reload_daemon(service)
+
+    logging.info("Node service reload complete")
 
 
 def reload_device_daemon():
+    """
+    Reload device services after an update.
+
+    This includes:
+    - systemctl daemon-reload (to pick up any service file changes)
+    - ethoscope_listener (main listener service)
+    - ethoscope_GPIO_listener (GPIO handler)
+    - ethoscope_device (device web server)
+    """
+    logging.info("Reloading device services after update")
+
+    # Reload systemd daemon to pick up any service file changes
+    logging.info("Running systemctl daemon-reload")
+    subprocess.call(["systemctl", "daemon-reload"])
+
+    # Restart device services
+    logging.info("Restarting ethoscope_listener service")
     _reload_daemon("ethoscope_listener")
+
+    logging.info("Restarting ethoscope_GPIO_listener service")
     _reload_daemon("ethoscope_GPIO_listener")
+
     time.sleep(3)
+
+    logging.info("Restarting ethoscope_device service")
     _reload_daemon("ethoscope_device")
+
+    # Restart update service
+    logging.info("Restarting ethoscope_update service")
+    _reload_daemon("ethoscope_update")
+
+    logging.info("Device service reload complete")

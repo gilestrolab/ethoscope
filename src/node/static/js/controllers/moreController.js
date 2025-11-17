@@ -214,9 +214,33 @@ function maxLengthCheck(object) {
             var spinner= new Spinner(opts).spin();
             $http.post('/node-actions', data = {'action': 'toggledaemon', 'daemon_name': daemon_name, 'status': status} )
                 .then(function(response) { var data = response.data;
-                    //$scope.daemons = data;
+                    // Refresh daemon status to reflect changes (including stopped conflicting services)
+                    $http.get('/node/daemons')
+                        .then(function(response) { var data = response.data;
+                            $scope.daemons = data;
+                        });
             });
             spinner.stop();
+        };
+
+        // Helper function to check if a daemon is disabled due to conflicts
+        $scope.nodeManagement.isDisabledByConflict = function(daemon_name) {
+            if (!$scope.daemons || !$scope.daemons[daemon_name]) {
+                return false;
+            }
+
+            var daemon = $scope.daemons[daemon_name];
+            var conflicts = daemon.conflicts_with || [];
+
+            // Check if any conflicting service is currently active
+            for (var i = 0; i < conflicts.length; i++) {
+                var conflicting_daemon = $scope.daemons[conflicts[i]];
+                if (conflicting_daemon && conflicting_daemon.active === 'active') {
+                    return true;
+                }
+            }
+
+            return false;
         };
 
         $scope.nodeManagement.saveFolders = function(){
