@@ -170,7 +170,7 @@ class NodeAPI(BaseAPI):
             # Disk usage
             with os.popen(f"df {self.results_dir} -h") as df:
                 disk_free = df.read()
-            disk_usage = disk_free.split("\\n")[1].split()
+            disk_usage = disk_free.split("\n")[1].split()
         except Exception:
             disk_usage = []
 
@@ -227,7 +227,7 @@ class NodeAPI(BaseAPI):
         try:
             systemctl = self.server.systemctl
             with os.popen(f"{systemctl} status ethoscope_node.service") as df:
-                active_since = df.read().split("\\n")[2]
+                active_since = df.read().split("\n")[2]
         except Exception:
             active_since = "N/A. Probably not running through systemd"
 
