@@ -2580,7 +2580,7 @@ def _fallback_database_discovery(device_id: str) -> dict:
                     file_path = os.path.join(root, file)
                     try:
                         file_size = os.path.getsize(file_path)
-                        file_stat = os.path.stat(file_path)
+                        file_stat = os.stat(file_path)
 
                         databases["SQLite"][file] = {
                             "filesize": file_size,
