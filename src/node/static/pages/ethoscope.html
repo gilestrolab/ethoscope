@@ -29,6 +29,14 @@
             <span ng-if="device.used_space === undefined || device.used_space === null" class="fa-solid fa-question-circle fa-3x" title="Disk usage information not available" style="color: gray;">
             </span>
 
+            <!-- SSH Key Icon - Green when configured -->
+            <span ng-if="device.ssh_key_installed === true" class="fa fa-key fa-3x" title="Passwordless SSH configured" style="color: #4CAF50; transform: scale(0.9);">
+            </span>
+
+            <!-- SSH Key Icon - Orange/Red when not configured -->
+            <span ng-if="device.ssh_key_installed === false" class="fa fa-key fa-3x" title="Passwordless SSH not configured" style="color: #ff9966; transform: scale(0.9);">
+            </span>
+
             <!-- Response Time Icon -->
             <span ng-if="device.response_time !== undefined && device.response_time !== null" ng-class="{'fa fa-smile': device.response_time < 500.0, 'fa fa-face-dizzy': device.response_time >= 500.0}" class="fa-3x" title="Response time: {{device.response_time}} ms" style="color: var(--medium-gray); transform: scale(0.9);">
             </span>

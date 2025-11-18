@@ -1346,3 +1346,184 @@ class TestEthoscopeScannerDeviceIDChange:
         # First call should retire old device
         assert update_calls[0][1]["ethoscope_id"] == "old_device_id"
         assert update_calls[0][1]["active"] == 0
+
+
+class TestEthoscopeSSHKeyManagement:
+    """Test SSH key management functionality."""
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    @patch("subprocess.run")
+    def test_check_ssh_key_installed_success(
+        self, mock_subprocess, mock_config_class, mock_db_class
+    ):
+        """Test successful SSH key check."""
+        # Mock successful SSH connection
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_result.stdout = "test\n"
+        mock_subprocess.return_value = mock_result
+
+        device = Ethoscope("192.168.1.100")
+        result = device.check_ssh_key_installed()
+
+        assert result is True
+        mock_subprocess.assert_called_once()
+        call_args = mock_subprocess.call_args[0][0]
+        assert "ssh" in call_args
+        assert "BatchMode=yes" in call_args
+        assert "ethoscope@192.168.1.100" in call_args
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    @patch("subprocess.run")
+    def test_check_ssh_key_installed_failure(
+        self, mock_subprocess, mock_config_class, mock_db_class
+    ):
+        """Test failed SSH key check."""
+        # Mock failed SSH connection
+        mock_result = Mock()
+        mock_result.returncode = 255
+        mock_result.stderr = "Permission denied"
+        mock_subprocess.return_value = mock_result
+
+        device = Ethoscope("192.168.1.100")
+        result = device.check_ssh_key_installed()
+
+        assert result is False
+        mock_subprocess.assert_called_once()
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    @patch("subprocess.run")
+    def test_check_ssh_key_installed_timeout(
+        self, mock_subprocess, mock_config_class, mock_db_class
+    ):
+        """Test SSH key check timeout."""
+        # Mock timeout
+        mock_subprocess.side_effect = subprocess.TimeoutExpired("ssh", 10)
+
+        device = Ethoscope("192.168.1.100")
+        result = device.check_ssh_key_installed()
+
+        assert result is False
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    @patch("subprocess.run")
+    def test_check_ssh_key_installed_exception(
+        self, mock_subprocess, mock_config_class, mock_db_class
+    ):
+        """Test SSH key check handles exceptions."""
+        # Mock exception
+        mock_subprocess.side_effect = Exception("Network error")
+
+        device = Ethoscope("192.168.1.100")
+        result = device.check_ssh_key_installed()
+
+        assert result is False
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    @patch.object(Ethoscope, "setup_ssh_authentication")
+    @patch.object(Ethoscope, "machine_info")
+    @patch("time.sleep")
+    def test_handle_device_coming_online_ssh_not_installed(
+        self,
+        mock_sleep,
+        mock_machine_info,
+        mock_setup_ssh,
+        mock_config_class,
+        mock_db_class,
+    ):
+        """Test auto-transfer SSH key when device comes online without key."""
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+
+        # Mock machine info response
+        mock_machine_info.return_value = {"kernel": "5.10", "pi_version": "3"}
+
+        # Mock successful SSH setup
+        mock_setup_ssh.return_value = True
+
+        device = Ethoscope("192.168.1.100")
+        device._id = "test_device_id"
+        device._info = {"name": "ETHOSCOPE_001", "ssh_key_installed": False}
+
+        device._handle_device_coming_online()
+
+        # Verify stabilization delay was called
+        mock_sleep.assert_called_once_with(10)
+
+        # Verify SSH setup was attempted
+        mock_setup_ssh.assert_called_once()
+
+        # Verify SSH key status was updated to True
+        assert device._info["ssh_key_installed"] is True
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    @patch.object(Ethoscope, "setup_ssh_authentication")
+    @patch.object(Ethoscope, "machine_info")
+    @patch("time.sleep")
+    def test_handle_device_coming_online_ssh_already_installed(
+        self,
+        mock_sleep,
+        mock_machine_info,
+        mock_setup_ssh,
+        mock_config_class,
+        mock_db_class,
+    ):
+        """Test device coming online when SSH key already installed."""
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+
+        # Mock machine info response
+        mock_machine_info.return_value = {"kernel": "5.10", "pi_version": "3"}
+
+        device = Ethoscope("192.168.1.100")
+        device._id = "test_device_id"
+        device._info = {"name": "ETHOSCOPE_001", "ssh_key_installed": True}
+
+        device._handle_device_coming_online()
+
+        # Verify stabilization delay was called
+        mock_sleep.assert_called_once_with(10)
+
+        # Verify SSH setup was NOT attempted (already installed)
+        mock_setup_ssh.assert_not_called()
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    @patch.object(Ethoscope, "setup_ssh_authentication")
+    @patch.object(Ethoscope, "machine_info")
+    @patch("time.sleep")
+    def test_handle_device_coming_online_ssh_setup_fails(
+        self,
+        mock_sleep,
+        mock_machine_info,
+        mock_setup_ssh,
+        mock_config_class,
+        mock_db_class,
+    ):
+        """Test auto-transfer when SSH key setup fails."""
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+
+        # Mock machine info response
+        mock_machine_info.return_value = {"kernel": "5.10", "pi_version": "3"}
+
+        # Mock failed SSH setup
+        mock_setup_ssh.return_value = False
+
+        device = Ethoscope("192.168.1.100")
+        device._id = "test_device_id"
+        device._info = {"name": "ETHOSCOPE_001", "ssh_key_installed": False}
+
+        device._handle_device_coming_online()
+
+        # Verify SSH setup was attempted
+        mock_setup_ssh.assert_called_once()
+
+        # Verify SSH key status remains False
+        assert device._info["ssh_key_installed"] is False

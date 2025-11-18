@@ -386,6 +386,19 @@ class Ethoscope(BaseDevice):
                 )
                 self.cleanup_stream_manager()
 
+            # Check SSH key status when device becomes accessible
+            # Only check when transitioning to an accessible state (not offline, unreached, or initialising)
+            accessible_states = ["stopped", "running", "recording", "streaming", "busy"]
+            if (
+                new_status in accessible_states
+                and previous_status not in accessible_states
+            ):
+                with self._lock:
+                    self._info["ssh_key_installed"] = self.check_ssh_key_installed()
+                    self._logger.debug(
+                        f"SSH key status for {self._id}: {self._info.get('ssh_key_installed', False)}"
+                    )
+
         # Handle device states
         if previous_status == "offline" and new_status != "offline":
             self._handle_device_coming_online()
@@ -786,10 +799,16 @@ class Ethoscope(BaseDevice):
         self._reset_info()
 
     def _handle_device_coming_online(self):
-        """Handle device coming online."""
+        """Handle device coming online with SSH key setup."""
         device_name = self._info.get("name", "")
         if "ETHOSCOPE_OOO" in device_name.upper():
             return
+
+        # Wait 10 seconds for device to stabilize before attempting SSH operations
+        self._logger.debug(
+            f"Device {device_name} coming online, waiting 10s for stabilization"
+        )
+        time.sleep(10)
 
         try:
             machine_info_dict = self.machine_info()
@@ -804,6 +823,31 @@ class Ethoscope(BaseDevice):
                 last_ip=self._ip,
                 machineinfo=machine_info,
             )
+
+            # Auto-transfer SSH key if not already installed
+            ssh_key_installed = self._info.get("ssh_key_installed", False)
+            if not ssh_key_installed:
+                self._logger.info(
+                    f"SSH key not installed on {device_name}, attempting auto-transfer"
+                )
+                ssh_success = self.setup_ssh_authentication()
+
+                with self._lock:
+                    if ssh_success:
+                        self._logger.info(
+                            f"SSH key successfully installed on {device_name}"
+                        )
+                        self._info["ssh_key_installed"] = True
+                    else:
+                        self._logger.warning(
+                            f"Failed to install SSH key on {device_name}. Will retry on next status change."
+                        )
+                        self._info["ssh_key_installed"] = False
+            else:
+                self._logger.debug(
+                    f"SSH key already installed on {device_name}, skipping auto-transfer"
+                )
+
         except Exception as e:
             self._logger.error(f"Error updating device info: {e}")
 
@@ -1370,6 +1414,50 @@ class Ethoscope(BaseDevice):
             self._logger.error(
                 f"Failed to setup SSH key authentication for {self._ip}: {e}"
             )
+            return False
+
+    def check_ssh_key_installed(self) -> bool:
+        """
+        Check if node's SSH key is installed on ethoscope for passwordless access.
+
+        Tests SSH connection using BatchMode to disable password prompts.
+        If the connection succeeds, passwordless SSH is configured correctly.
+
+        Returns:
+            bool: True if passwordless SSH works, False otherwise
+        """
+        try:
+            # Test SSH connection without password using BatchMode
+            cmd = [
+                "ssh",
+                "-o",
+                "BatchMode=yes",  # Disable password prompts
+                "-o",
+                "StrictHostKeyChecking=no",  # Auto-accept host keys
+                "-o",
+                "ConnectTimeout=5",  # 5 second timeout
+                f"ethoscope@{self._ip}",
+                "echo test",  # Simple command to test connection
+            ]
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+
+            if result.returncode == 0:
+                self._logger.debug(
+                    f"SSH key authentication working for ethoscope@{self._ip}"
+                )
+                return True
+            else:
+                self._logger.debug(
+                    f"SSH key authentication not working for ethoscope@{self._ip}"
+                )
+                return False
+
+        except subprocess.TimeoutExpired:
+            self._logger.debug(f"SSH key check timed out for {self._ip}")
+            return False
+        except Exception as e:
+            self._logger.debug(f"Error checking SSH key for {self._ip}: {e}")
             return False
 
 

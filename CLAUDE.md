@@ -192,6 +192,76 @@ On the node:
 - `ethoscope_sensor_virtual.service` - Provides a virtual sensor that gives real life weather info about a specified location
 - `ethoscope_virtuascope.service` - Starts a virtual ethoscope on the node
 
+## SSH Key Management
+
+The node automatically manages passwordless SSH authentication to ethoscope devices for rsync-based backup operations.
+
+### Overview
+
+- **Purpose**: Enable passwordless rsync backups from ethoscope devices to the node
+- **Key Location**: `/etc/ethoscope/keys/` (RSA 2048-bit key pair)
+- **Target User**: `ethoscope` user on ethoscope devices
+- **Password**: Default password is "ethoscope" (used only for initial key transfer)
+
+### Automatic Key Transfer
+
+The system automatically transfers SSH keys when:
+
+1. **Device Discovery**: When an ethoscope first comes online, the node waits 10 seconds for device stabilization, then automatically transfers its SSH public key
+2. **Status Changes**: When a device transitions from offline/unreachable to an accessible state (stopped, running, recording, streaming, busy)
+3. **Manual Configuration**: When device machine settings are updated via the web interface
+
+### Visual Indicator
+
+The ethoscope detail page displays an SSH key icon in the status bar:
+
+- **Green Key** (🔑): Passwordless SSH is configured and working
+- **Orange/Red Key** (🔑): Passwordless SSH is not configured or failing
+
+The icon appears in the top-right status area, near the hard drive and response time icons.
+
+**Location**: `src/node/static/pages/ethoscope.html:32`
+
+### Implementation Details
+
+**Backend** (`src/node/ethoscope_node/scanner/ethoscope_scanner.py`):
+- `check_ssh_key_installed()` - Tests passwordless SSH using BatchMode (line 1375)
+- `setup_ssh_authentication()` - Transfers public key using sshpass and ssh-copy-id (line 1314)
+- `_handle_device_coming_online()` - Auto-transfers keys with 10s stabilization delay (line 798)
+- Status tracked in `device._info["ssh_key_installed"]` field
+
+**Retry Behavior**:
+- If initial transfer fails, the system retries on the next device status change
+- No continuous retries to avoid excessive SSH connection attempts
+- Failures are logged for troubleshooting
+
+### Manual SSH Key Transfer
+
+If automatic transfer fails, you can manually transfer the key:
+
+```bash
+# On the node
+sshpass -p "ethoscope" ssh-copy-id -i /etc/ethoscope/keys/id_rsa.pub ethoscope@<device-ip>
+
+# Or without sshpass (will prompt for password)
+ssh-copy-id -i /etc/ethoscope/keys/id_rsa.pub ethoscope@<device-ip>
+```
+
+### Troubleshooting
+
+**SSH key icon shows orange/red:**
+1. Check network connectivity to ethoscope device
+2. Verify ethoscope user password is "ethoscope"
+3. Check `/etc/ethoscope/keys/` exists on node with proper permissions
+4. Review node logs for SSH transfer errors
+5. Try manual SSH key transfer (see above)
+
+**Passwordless SSH not working despite green icon:**
+1. SSH status may be cached - wait for next device status change
+2. Check `/home/ethoscope/.ssh/authorized_keys` on ethoscope device
+3. Verify SSH daemon is running on ethoscope
+4. Check firewall rules if applicable
+
 ## Development Workflow
 
 1. **Device Development**: Work in `src/ethoscope/` for tracking algorithms, hardware interfaces, and device-specific features
