@@ -29,17 +29,31 @@ except ImportError:
 from ethoscope.utils import pi
 from ethoscope.utils.debug import EthoscopeException
 
-# Check for picamera2 availability
+# Check for picamera2 availability and import if available
 if importlib.util.find_spec("picamera2") is not None:
     USE_PICAMERA2 = True
     CAMERA_AVAILABLE = True
+    try:
+        from picamera2 import MappedArray, Picamera2
+
+        logging.info("Successfully imported picamera2")
+    except (ImportError, OSError) as e:
+        logging.error(f"Failed to import picamera2: {e}")
+        USE_PICAMERA2 = False
+        CAMERA_AVAILABLE = False
+        Picamera2 = None
+        MappedArray = None
 elif importlib.util.find_spec("picamera") is not None:
     USE_PICAMERA2 = False
     CAMERA_AVAILABLE = True
     logging.info("Using picamera instead of picamera2")
+    Picamera2 = None
+    MappedArray = None
 else:
     USE_PICAMERA2 = None
     CAMERA_AVAILABLE = False
+    Picamera2 = None
+    MappedArray = None
     logging.warning(
         "No camera library available (neither picamera2 nor picamera found). Camera functionality will be disabled."
     )
@@ -638,16 +652,15 @@ class PiFrameGrabber2(PiFrameGrabber):
         Run stops if the _stop_queue is not empty.
         """
 
-        try:
-            from picamera2 import MappedArray, Picamera2
-
-            logging.info(
-                f"Successfully imported picamera2 version: {getattr(Picamera2, '__version__', 'unknown')}"
-            )
-        except (ImportError, OSError) as e:
-            logging.error(f"Failed to import picamera2: {e}")
+        # Check if picamera2 was successfully imported at module level
+        if Picamera2 is None:
+            logging.error("picamera2 not available - cannot start camera")
             self._queue.task_done()
             return
+
+        logging.info(
+            f"Using picamera2 version: {getattr(Picamera2, '__version__', 'unknown')}"
+        )
 
         Picamera2.set_logging(logging.ERROR)
 
