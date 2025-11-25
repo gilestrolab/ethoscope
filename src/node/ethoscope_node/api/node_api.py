@@ -161,6 +161,7 @@ class NodeAPI(BaseAPI):
                 if self.sensor_scanner
                 else {}
             ),
+            "device_options": self.config.get_device_options(),
             "timestamp": datetime.datetime.now().timestamp(),
         }
 

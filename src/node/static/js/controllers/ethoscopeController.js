@@ -134,6 +134,7 @@
                 $scope.node.users = nodeConfigCache.data.users;
                 $scope.node.incubators = nodeConfigCache.data.incubators;
                 $scope.node.sensors = nodeConfigCache.data.sensors;
+                $scope.node.device_options = nodeConfigCache.data.device_options;
                 $scope.node.timestamp = nodeConfigCache.data.timestamp;
                 return;
             }
@@ -149,6 +150,7 @@
                     $scope.node.users = response.data.users;
                     $scope.node.incubators = response.data.incubators;
                     $scope.node.sensors = response.data.sensors;
+                    $scope.node.device_options = response.data.device_options;
                     $scope.node.timestamp = response.data.timestamp;
 
                     // Cache the node timestamp for time sync operations
@@ -261,6 +263,20 @@
                         recording: userOptions.recording || {},
                         update_machine: userOptions.update_machine || {}
                     };
+
+                    // Filter MySQLResultWriter if disabled in node configuration
+                    if ($scope.node.device_options &&
+                        !$scope.node.device_options.enable_mysql_result_writer &&
+                        $scope.user_options.tracking &&
+                        $scope.user_options.tracking.result_writer) {
+
+                        $scope.user_options.tracking.result_writer =
+                            $scope.user_options.tracking.result_writer.filter(function(writer) {
+                                return writer.name !== 'MySQLResultWriter';
+                            });
+
+                        console.log('MySQLResultWriter hidden (disabled in node configuration)');
+                    }
 
                     // Initialize selected options with default values using service
                     ethoscopeFormService.initializeSelectedOptions('tracking', userOptions.tracking || {}, $scope);

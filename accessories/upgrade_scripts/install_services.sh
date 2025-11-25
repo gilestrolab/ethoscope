@@ -126,7 +126,7 @@ case "$1" in
         NODE_ENABLE_SERVICES=(
             "ethoscope_node"
             "ethoscope_backup_unified"
-            "ethoscope_backup_mysql"
+            # "ethoscope_backup_mysql"  # Not enabled by default (only needed if using MySQL result writer)
             "ethoscope_update_node"
             "ethoscope_sensor_virtual"
         )

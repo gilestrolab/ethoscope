@@ -337,6 +337,73 @@ git commit --no-verify
 - Node server aggregates data from multiple devices
 - Backup system rsyncs databases to central storage
 
+### Result Writer Options
+
+The system supports multiple result writer backends for storing tracking data:
+
+1. **SQLiteResultWriter** (Default, Recommended)
+   - Stores data in local SQLite databases
+   - No additional setup required
+   - Backed up via rsync to node server
+   - Best performance and reliability
+
+2. **MySQLResultWriter** (Optional, Hidden by Default)
+   - Stores data in MariaDB/MySQL database server
+   - Requires manual configuration and service setup
+   - Hidden from web UI by default (since v1.5)
+   - Enable only if you have specific need for centralized database
+
+3. **dbAppender**
+   - Appends data to existing database
+   - Used for resuming interrupted experiments
+
+### Enabling MySQL/MariaDB Result Writer
+
+By default, MySQLResultWriter is hidden from the web UI to simplify the user experience. Most users should use SQLiteResultWriter. If you have a specific need for MySQL/MariaDB:
+
+**1. Enable in Configuration**
+
+Edit `/etc/ethoscope/ethoscope.conf` and set:
+
+```json
+{
+  "device_options": {
+    "enable_mysql_result_writer": true
+  }
+}
+```
+
+**2. Enable Backup Service**
+
+The MariaDB backup service is not enabled by default. To enable it:
+
+```bash
+sudo systemctl enable --now ethoscope_backup_mysql.service
+```
+
+**3. Restart Node Server**
+
+After changing the configuration, restart the node server for changes to take effect:
+
+```bash
+sudo systemctl restart ethoscope_node.service
+```
+
+**4. Verify in Web UI**
+
+Open the ethoscope detail page and start tracking. MySQLResultWriter should now appear in the "Result Writer" dropdown.
+
+**Note**: You may need to clear your browser cache if the option doesn't appear immediately.
+
+### MariaDB Credentials
+
+If using MySQLResultWriter, the default credentials are:
+- **Database**: `{machine_name}_db`
+- **User**: `ethoscope`
+- **Password**: `ethoscope`
+
+**Location**: `src/ethoscope/ethoscope/control/tracking.py:219`
+
 ## Hardware Integration
 
 - Camera interfaces support PiCamera and generic OpenCV cameras
