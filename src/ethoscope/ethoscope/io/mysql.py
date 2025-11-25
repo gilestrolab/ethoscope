@@ -103,8 +103,9 @@ class AsyncMySQLWriter(BaseAsyncSQLWriter):
         """
         Create a new MySQL database and configure database settings.
 
-        This method creates the database, sets up a read-only 'node' user for
-        remote access, and configures InnoDB settings for optimal performance.
+        This method creates the database, sets up both 'ethoscope'@'localhost'
+        user for full local access and 'node'@'%' user for read-only remote
+        access, and configures InnoDB settings for optimal performance.
         """
         logging.info(
             f"Connecting to MySQL host {self._db_host} as user {self._db_user_name}"
@@ -127,11 +128,31 @@ class AsyncMySQLWriter(BaseAsyncSQLWriter):
         c.execute(cmd)
         logging.info("Database created")
 
-        # create a read-only node user that the node will use to get data from
-        # it's better to have a second user for remote operation for reasons of debug and have better control
-        cmd = f"GRANT SELECT ON {self._db_name}.* to 'node' identified by 'node'"
+        # Create database users for local and remote access
+        # ethoscope@localhost - full local access for experiment control
+        try:
+            cmd = "CREATE USER IF NOT EXISTS 'ethoscope'@'localhost' IDENTIFIED BY 'ethoscope'"
+            c.execute(cmd)
+            cmd = "GRANT ALL PRIVILEGES ON *.* TO 'ethoscope'@'localhost' WITH GRANT OPTION"
+            c.execute(cmd)
+            logging.info("Ethoscope user configured with full local access")
+        except Exception as e:
+            logging.warning(f"Ethoscope user configuration: {e}")
+
+        # node@% - read-only remote access for backups from node server
+        try:
+            cmd = "CREATE USER IF NOT EXISTS 'node'@'%' IDENTIFIED BY 'node'"
+            c.execute(cmd)
+            cmd = "GRANT SELECT ON *.* TO 'node'@'%'"
+            c.execute(cmd)
+            logging.info("Node user configured with remote read-only access")
+        except Exception as e:
+            logging.warning(f"Node user configuration: {e}")
+
+        # Apply privilege changes
+        cmd = "FLUSH PRIVILEGES"
         c.execute(cmd)
-        logging.info("Node user created")
+        logging.info("Database users configured successfully")
 
         # set some innodb specific values that cannot be set on the config file
         cmd = "SET GLOBAL innodb_file_per_table=1"

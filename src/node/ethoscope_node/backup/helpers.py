@@ -321,8 +321,8 @@ class BackupClass(BaseBackupClass):
 
     DB_CREDENTIALS = {
         "name": "ethoscope_db",
-        "user": "ethoscope",
-        "password": "ethoscope",
+        "user": "node",
+        "password": "node",
     }
 
     # Database connection timeout (seconds)
