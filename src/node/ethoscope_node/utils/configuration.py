@@ -1157,9 +1157,7 @@ class EthoscopeConfiguration:
                 self._logger.warning(f"Unknown device option key: {key}")
 
         self.save()
-        self._logger.info(
-            f"Updated device options: {list(config_data.keys())}"
-        )
+        self._logger.info(f"Updated device options: {list(config_data.keys())}")
 
         return self._settings["device_options"]
 
