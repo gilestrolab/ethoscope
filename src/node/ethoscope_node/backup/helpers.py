@@ -1059,6 +1059,14 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
                     "info",
                     f"Starting results backup ({completed_operations + 1}/{total_operations})",
                 )
+
+                # Checkpoint SQLite databases before rsync to ensure WAL data is flushed
+                # This ensures the .db files are complete and consistent for backup
+                yield from self._checkpoint_sqlite_databases(
+                    private_key_path=private_key_path,
+                    source_dir="/ethoscope_data/results/",
+                )
+
                 success = yield from self._rsync_directory(
                     source_dir="/ethoscope_data/results/",
                     destination_dir=self._results_dir,
@@ -1331,6 +1339,117 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
             self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
             yield self._yield_status("error", error_msg)
             return False
+
+    def _checkpoint_sqlite_databases(
+        self, private_key_path: str, source_dir: str = "/ethoscope_data/results/"
+    ) -> Iterator[bool]:
+        """
+        Checkpoint all SQLite databases before rsync to ensure WAL data is flushed.
+
+        SQLite WAL (Write-Ahead Logging) mode keeps recent writes in a separate .db-wal
+        file. Without checkpointing, the main .db file may be incomplete. This method
+        runs PRAGMA wal_checkpoint(TRUNCATE) on all databases to:
+        1. Write all WAL content to the main database file
+        2. Truncate the WAL file to zero bytes
+        3. Ensure the .db file is complete and consistent for backup
+
+        This is safe to run while tracking is active - SQLite handles concurrent access.
+
+        Args:
+            private_key_path: Path to SSH private key for authentication
+            source_dir: Directory containing SQLite databases on the ethoscope
+
+        Yields:
+            str: Status messages
+
+        Returns:
+            bool: True if checkpoint succeeded (or no databases found), False on error
+        """
+        import subprocess
+
+        try:
+            self._logger.info(
+                f"[{self._device_id}] Checkpointing SQLite databases before backup"
+            )
+            yield self._yield_status(
+                "info", "Checkpointing SQLite databases for consistent backup"
+            )
+
+            # Build SSH command to checkpoint all .db files
+            # The command finds all .db files and runs wal_checkpoint(TRUNCATE) on each
+            # TRUNCATE mode: checkpoint and truncate WAL to zero bytes
+            # 2>/dev/null suppresses errors for databases not in WAL mode
+            checkpoint_script = (
+                f"for db in {source_dir}*/*.db; do "
+                f'[ -f "$db" ] && sqlite3 "$db" "PRAGMA wal_checkpoint(TRUNCATE);" 2>/dev/null; '
+                f"done"
+            )
+
+            ssh_command = [
+                "ssh",
+                "-i",
+                private_key_path,
+                "-o",
+                "StrictHostKeyChecking=no",
+                "-o",
+                "ConnectTimeout=10",
+                "-o",
+                "BatchMode=yes",
+                f"ethoscope@{self._ip}",
+                checkpoint_script,
+            ]
+
+            self._logger.debug(
+                f"[{self._device_id}] Checkpoint command: {' '.join(ssh_command)}"
+            )
+
+            # Execute checkpoint with timeout
+            result = subprocess.run(
+                ssh_command,
+                capture_output=True,
+                text=True,
+                timeout=60,  # 60 second timeout for checkpoint operation
+            )
+
+            if result.returncode == 0:
+                self._logger.info(
+                    f"[{self._device_id}] SQLite checkpoint completed successfully"
+                )
+                yield self._yield_status(
+                    "info", "SQLite checkpoint completed - databases ready for backup"
+                )
+                return True
+            else:
+                # Log warning but don't fail - partial backup is better than no backup
+                self._logger.warning(
+                    f"[{self._device_id}] SQLite checkpoint returned code {result.returncode}: {result.stderr}"
+                )
+                yield self._yield_status(
+                    "warning",
+                    f"SQLite checkpoint warning (code {result.returncode}) - proceeding with backup",
+                )
+                # Return True to continue with backup anyway
+                return True
+
+        except subprocess.TimeoutExpired:
+            self._logger.warning(
+                f"[{self._device_id}] SQLite checkpoint timed out - proceeding with backup"
+            )
+            yield self._yield_status(
+                "warning", "SQLite checkpoint timed out - proceeding with backup"
+            )
+            # Return True to continue with backup anyway
+            return True
+
+        except Exception as e:
+            self._logger.warning(
+                f"[{self._device_id}] SQLite checkpoint failed: {e} - proceeding with backup"
+            )
+            yield self._yield_status(
+                "warning", f"SQLite checkpoint failed ({e}) - proceeding with backup"
+            )
+            # Return True to continue with backup anyway - partial backup better than none
+            return True
 
     def check_sync_status(self) -> Optional[Dict]:
         """
