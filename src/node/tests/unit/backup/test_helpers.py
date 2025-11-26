@@ -570,8 +570,8 @@ class TestBackupClass:
     def test_backup_class_db_credentials(self):
         """Test BackupClass has correct database credentials."""
         assert BackupClass.DB_CREDENTIALS["name"] == "ethoscope_db"
-        assert BackupClass.DB_CREDENTIALS["user"] == "ethoscope"
-        assert BackupClass.DB_CREDENTIALS["password"] == "ethoscope"
+        assert BackupClass.DB_CREDENTIALS["user"] == "node"
+        assert BackupClass.DB_CREDENTIALS["password"] == "node"
 
     def test_backup_class_db_timeouts(self):
         """Test BackupClass has defined timeouts."""
