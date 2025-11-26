@@ -14,22 +14,22 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import MagicMock
-from unittest.mock import mock_open
-from unittest.mock import patch
+from unittest.mock import MagicMock, mock_open, patch
 
 # Add the source path for imports
 sys.path.insert(
     0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "ethoscope_node")
 )
 
-from ethoscope_node.backup.helpers import _enhance_databases_with_rsync_info
-from ethoscope_node.backup.helpers import _format_bytes_simple
-from ethoscope_node.backup.helpers import _get_video_cache_path
-from ethoscope_node.backup.helpers import _is_file_older_than_week
-from ethoscope_node.backup.helpers import _load_video_cache
-from ethoscope_node.backup.helpers import _save_video_cache
-from ethoscope_node.backup.helpers import get_device_backup_info
+from ethoscope_node.backup.helpers import (  # noqa: E402
+    _enhance_databases_with_rsync_info,
+    _format_bytes_simple,
+    _get_video_cache_path,
+    _is_file_older_than_week,
+    _load_video_cache,
+    _save_video_cache,
+    get_device_backup_info,
+)
 
 
 class TestVideoCacheSystem(unittest.TestCase):
@@ -357,11 +357,14 @@ class TestDeviceBackupInfo(unittest.TestCase):
             },
         }
 
-        with patch(
-            "ethoscope_node.backup.helpers._enhance_databases_with_rsync_info"
-        ) as mock_enhance, patch(
-            "ethoscope_node.backup.helpers._get_device_backup_sizes_cached"
-        ) as mock_get_device_sizes:
+        with (
+            patch(
+                "ethoscope_node.backup.helpers._enhance_databases_with_rsync_info"
+            ) as mock_enhance,
+            patch(
+                "ethoscope_node.backup.helpers._get_device_backup_sizes_cached"
+            ) as mock_get_device_sizes,
+        ):
             mock_enhance.return_value = databases
             mock_get_device_sizes.return_value = {
                 "videos_size": 0,
@@ -407,11 +410,14 @@ class TestDeviceBackupInfo(unittest.TestCase):
             }
         }
 
-        with patch(
-            "ethoscope_node.backup.helpers._enhance_databases_with_rsync_info"
-        ) as mock_enhance, patch(
-            "ethoscope_node.backup.helpers._get_device_backup_sizes_cached"
-        ) as mock_get_device_sizes:
+        with (
+            patch(
+                "ethoscope_node.backup.helpers._enhance_databases_with_rsync_info"
+            ) as mock_enhance,
+            patch(
+                "ethoscope_node.backup.helpers._get_device_backup_sizes_cached"
+            ) as mock_get_device_sizes,
+        ):
             mock_enhance.return_value = databases
             mock_get_device_sizes.return_value = {
                 "videos_size": 5242880,  # 5MB for videos
@@ -441,13 +447,17 @@ class TestDeviceBackupInfo(unittest.TestCase):
         """Test backup info extraction with empty databases."""
         databases = {}
 
-        with patch(
-            "ethoscope_node.backup.helpers._fallback_database_discovery"
-        ) as mock_fallback, patch(
-            "ethoscope_node.backup.helpers._enhance_databases_with_rsync_info"
-        ) as mock_enhance, patch(
-            "ethoscope_node.backup.helpers._get_device_backup_sizes_cached"
-        ) as mock_get_device_sizes:
+        with (
+            patch(
+                "ethoscope_node.backup.helpers._fallback_database_discovery"
+            ) as mock_fallback,
+            patch(
+                "ethoscope_node.backup.helpers._enhance_databases_with_rsync_info"
+            ) as mock_enhance,
+            patch(
+                "ethoscope_node.backup.helpers._get_device_backup_sizes_cached"
+            ) as mock_get_device_sizes,
+        ):
             mock_fallback.return_value = {}
             mock_enhance.return_value = {}
             mock_get_device_sizes.return_value = {
@@ -546,6 +556,177 @@ class TestCachePerformance(unittest.TestCase):
         self.assertGreater(cache_size, 0, "Cache file should not be empty")
 
 
+class TestSQLiteCheckpoint(unittest.TestCase):
+    """Test SQLite WAL checkpoint functionality for safe backups."""
+
+    def setUp(self):
+        """Set up test environment."""
+        self.device_id = "test_device_checkpoint"
+        self.device_ip = "192.168.1.100"
+        self.test_dir = tempfile.mkdtemp()
+        self.results_dir = os.path.join(self.test_dir, "results")
+        self.videos_dir = os.path.join(self.test_dir, "videos")
+        os.makedirs(self.results_dir, exist_ok=True)
+        os.makedirs(self.videos_dir, exist_ok=True)
+
+        # Create mock device info
+        self.device_info = {
+            "id": self.device_id,
+            "name": "ETHOSCOPE_TEST",
+            "ip": self.device_ip,
+            "status": "recording",
+        }
+
+    def tearDown(self):
+        """Clean up test environment."""
+        shutil.rmtree(self.test_dir)
+
+    def _create_backup_instance(self):
+        """Create a UnifiedRsyncBackupClass instance for testing."""
+        from ethoscope_node.backup.helpers import UnifiedRsyncBackupClass
+
+        return UnifiedRsyncBackupClass(
+            self.device_info,
+            self.results_dir,
+            self.videos_dir,
+            backup_results=True,
+            backup_videos=False,
+        )
+
+    @patch("subprocess.run")
+    def test_checkpoint_success(self, mock_run):
+        """Test successful SQLite checkpoint."""
+        # Mock successful SSH command
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+
+        backup_instance = self._create_backup_instance()
+
+        # Execute checkpoint (consume generator to trigger execution)
+        list(
+            backup_instance._checkpoint_sqlite_databases(
+                private_key_path="/path/to/key",
+                source_dir="/ethoscope_data/results/",
+            )
+        )
+
+        # Verify SSH command was called
+        mock_run.assert_called_once()
+        call_args = mock_run.call_args
+
+        # Verify command structure
+        ssh_command = call_args[0][0]
+        self.assertEqual(ssh_command[0], "ssh")
+        self.assertIn("-i", ssh_command)
+        self.assertIn("/path/to/key", ssh_command)
+        self.assertIn(f"ethoscope@{self.device_ip}", ssh_command)
+
+        # Verify checkpoint script contains PRAGMA wal_checkpoint
+        checkpoint_script = ssh_command[-1]
+        self.assertIn("PRAGMA wal_checkpoint(TRUNCATE)", checkpoint_script)
+        self.assertIn("/ethoscope_data/results/", checkpoint_script)
+
+    @patch("subprocess.run")
+    def test_checkpoint_ssh_failure_continues(self, mock_run):
+        """Test that SSH failure doesn't stop backup (graceful degradation)."""
+        # Mock SSH command failure
+        mock_run.return_value = MagicMock(returncode=255, stderr="Connection refused")
+
+        backup_instance = self._create_backup_instance()
+
+        # Execute checkpoint - should not raise exception
+        statuses = list(
+            backup_instance._checkpoint_sqlite_databases(
+                private_key_path="/path/to/key",
+                source_dir="/ethoscope_data/results/",
+            )
+        )
+
+        # Should have yielded warning status but returned True to continue backup
+        # The method always returns True to allow backup to proceed
+        self.assertTrue(len(statuses) > 0)
+
+    @patch("subprocess.run")
+    def test_checkpoint_timeout_continues(self, mock_run):
+        """Test that checkpoint timeout doesn't stop backup."""
+        import subprocess
+
+        # Mock timeout
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="ssh", timeout=60)
+
+        backup_instance = self._create_backup_instance()
+
+        # Execute checkpoint - should not raise exception
+        statuses = list(
+            backup_instance._checkpoint_sqlite_databases(
+                private_key_path="/path/to/key",
+                source_dir="/ethoscope_data/results/",
+            )
+        )
+
+        # Should have yielded warning status
+        self.assertTrue(len(statuses) > 0)
+
+    @patch("subprocess.run")
+    def test_checkpoint_exception_continues(self, mock_run):
+        """Test that unexpected exceptions don't stop backup."""
+        # Mock unexpected exception
+        mock_run.side_effect = Exception("Unexpected error")
+
+        backup_instance = self._create_backup_instance()
+
+        # Execute checkpoint - should not raise exception
+        statuses = list(
+            backup_instance._checkpoint_sqlite_databases(
+                private_key_path="/path/to/key",
+                source_dir="/ethoscope_data/results/",
+            )
+        )
+
+        # Should have yielded warning status
+        self.assertTrue(len(statuses) > 0)
+
+    @patch("subprocess.run")
+    def test_checkpoint_uses_batch_mode(self, mock_run):
+        """Test that SSH uses BatchMode to avoid password prompts."""
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+
+        backup_instance = self._create_backup_instance()
+
+        # Execute checkpoint
+        list(
+            backup_instance._checkpoint_sqlite_databases(
+                private_key_path="/path/to/key",
+                source_dir="/ethoscope_data/results/",
+            )
+        )
+
+        # Verify BatchMode is set
+        call_args = mock_run.call_args
+        ssh_command = call_args[0][0]
+        self.assertIn("BatchMode=yes", " ".join(ssh_command))
+
+    @patch("subprocess.run")
+    def test_checkpoint_custom_source_dir(self, mock_run):
+        """Test checkpoint with custom source directory."""
+        mock_run.return_value = MagicMock(returncode=0, stderr="")
+
+        backup_instance = self._create_backup_instance()
+
+        # Execute checkpoint with custom directory
+        custom_dir = "/custom/data/path/"
+        list(
+            backup_instance._checkpoint_sqlite_databases(
+                private_key_path="/path/to/key",
+                source_dir=custom_dir,
+            )
+        )
+
+        # Verify custom directory is used in checkpoint script
+        call_args = mock_run.call_args
+        checkpoint_script = call_args[0][0][-1]
+        self.assertIn(custom_dir, checkpoint_script)
+
+
 if __name__ == "__main__":
     # Create test suite
     loader = unittest.TestLoader()
@@ -558,6 +739,7 @@ if __name__ == "__main__":
         TestRsyncEnhancement,
         TestDeviceBackupInfo,
         TestCachePerformance,
+        TestSQLiteCheckpoint,
     ]
 
     for test_class in test_classes:
