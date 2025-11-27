@@ -36,7 +36,7 @@ repos:
 
   # ===== Python code formatting =====
   - repo: https://github.com/psf/black
-    rev: 24.1.1
+    rev: 24.10.0
     hooks:
       - id: black
         language_version: python3
@@ -228,6 +228,63 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: run-backup-config-tests
+        name: Run backup configuration tests
+        entry: bash
+        language: system
+        args:
+          - -c
+          - |
+            echo "Running backup configuration tests..."
+            if [ -f .venv/bin/activate ]; then
+              source .venv/bin/activate
+              cd src/node
+              python -m pytest tests/unit/backup/test_helpers.py::TestBackupClass -v --tb=short -x
+              EXIT_CODE=$?
+              if [ $EXIT_CODE -ne 0 ]; then
+                echo ""
+                echo "❌ Backup configuration tests FAILED"
+                echo "   This likely means DB_CREDENTIALS or other constants were changed without updating tests."
+                exit 1
+              else
+                echo "✓ Backup configuration tests passed"
+              fi
+            else
+              echo "⚠ Skipping tests (venv not found at .venv)"
+              exit 1
+            fi
+        files: ^src/node/ethoscope_node/backup/helpers\.py$
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: run-mysql-config-tests
+        name: Run MySQL configuration tests
+        entry: bash
+        language: system
+        args:
+          - -c
+          - |
+            echo "Running MySQL configuration tests..."
+            if [ -f .venv/bin/activate ]; then
+              source .venv/bin/activate
+              cd src/node
+              python -m pytest tests/unit/backup/test_mysql.py::TestDatabaseConnectionManager -v --tb=short -x
+              EXIT_CODE=$?
+              if [ $EXIT_CODE -ne 0 ]; then
+                echo ""
+                echo "❌ MySQL configuration tests FAILED"
+                exit 1
+              else
+                echo "✓ MySQL configuration tests passed"
+              fi
+            else
+              echo "⚠ Skipping tests (venv not found at .venv)"
+              exit 1
+            fi
+        files: ^src/node/ethoscope_node/backup/(helpers|mysql_backup)\.py$
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: critical-tests
         name: Run tests for critical changes
         entry: bash
@@ -277,5 +334,5 @@ ci:
   autoupdate_branch: 'dev'
   autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
   autoupdate_schedule: monthly
-  skip: [critical-tests, update-copyright]
+  skip: [critical-tests, update-copyright, run-backup-config-tests, run-mysql-config-tests]
   submodules: false
