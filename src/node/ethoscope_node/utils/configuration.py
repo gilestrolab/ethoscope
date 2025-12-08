@@ -160,6 +160,10 @@ class EthoscopeConfiguration:
             "unreachable_timeout_minutes": 20,
             "graceful_shutdown_grace_minutes": 5,
             "user_action_timeout_seconds": 30,
+            # Temperature alert settings
+            "temperature_alerts_enabled": True,
+            "temperature_min_threshold": 18.0,  # Celsius - alert if below
+            "temperature_max_threshold": 28.0,  # Celsius - alert if above
         },
         "setup": {
             "completed": False,
@@ -1160,6 +1164,67 @@ class EthoscopeConfiguration:
         self._logger.info(f"Updated device options: {list(config_data.keys())}")
 
         return self._settings["device_options"]
+
+    def get_temperature_alert_config(self) -> Dict[str, Any]:
+        """
+        Get temperature alert configuration.
+
+        Returns:
+            Dictionary with temperature alert settings:
+            - enabled: Whether temperature alerts are enabled
+            - min_threshold: Minimum temperature threshold (Celsius)
+            - max_threshold: Maximum temperature threshold (Celsius)
+        """
+        alerts = self._settings.get("alerts", self.DEFAULT_SETTINGS["alerts"])
+        return {
+            "enabled": alerts.get("temperature_alerts_enabled", True),
+            "min_threshold": alerts.get("temperature_min_threshold", 18.0),
+            "max_threshold": alerts.get("temperature_max_threshold", 28.0),
+        }
+
+    def update_temperature_alert_config(
+        self, config_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Update temperature alert configuration.
+
+        Args:
+            config_data: Dictionary with temperature alert settings to update.
+                Supported keys: enabled, min_threshold, max_threshold
+
+        Returns:
+            Updated temperature alert configuration
+        """
+        if "alerts" not in self._settings:
+            self._settings["alerts"] = self.DEFAULT_SETTINGS["alerts"].copy()
+
+        # Map external keys to internal config keys
+        key_mapping = {
+            "enabled": "temperature_alerts_enabled",
+            "min_threshold": "temperature_min_threshold",
+            "max_threshold": "temperature_max_threshold",
+        }
+
+        for ext_key, int_key in key_mapping.items():
+            if ext_key in config_data:
+                value = config_data[ext_key]
+                # Validate threshold values
+                if ext_key in ("min_threshold", "max_threshold"):
+                    try:
+                        value = float(value)
+                    except (ValueError, TypeError):
+                        self._logger.warning(
+                            f"Invalid temperature threshold value: {value}"
+                        )
+                        continue
+                self._settings["alerts"][int_key] = value
+
+        self.save()
+        self._logger.info(
+            f"Updated temperature alert config: {list(config_data.keys())}"
+        )
+
+        return self.get_temperature_alert_config()
 
 
 def _setup_system_ssh_config(private_key_path: str) -> None:

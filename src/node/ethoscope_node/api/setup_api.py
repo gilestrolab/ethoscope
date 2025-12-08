@@ -585,6 +585,31 @@ class SetupAPI(BaseAPI):
                 # Store directly under 'slack' key (matching configuration.py structure)
                 self.config._settings["slack"] = slack_settings
 
+            # Update temperature alert settings (stored under 'alerts' key)
+            temp_alerts_config = data.get("temperature_alerts", {})
+            if temp_alerts_config:
+                # Get current alerts settings or use defaults
+                current_alerts = self.config._settings.get(
+                    "alerts", self.config.DEFAULT_SETTINGS.get("alerts", {})
+                ).copy()
+
+                # Update temperature-specific settings
+                current_alerts["temperature_alerts_enabled"] = temp_alerts_config.get(
+                    "enabled", True
+                )
+
+                # Validate and convert threshold values
+                try:
+                    min_threshold = float(temp_alerts_config.get("min_threshold", 18.0))
+                    max_threshold = float(temp_alerts_config.get("max_threshold", 28.0))
+                    current_alerts["temperature_min_threshold"] = min_threshold
+                    current_alerts["temperature_max_threshold"] = max_threshold
+                except (ValueError, TypeError) as e:
+                    self.logger.warning(f"Invalid temperature threshold values: {e}")
+
+                # Store updated alerts settings
+                self.config._settings["alerts"] = current_alerts
+
             # Save configuration
             self.config.save()
             self.config.mark_setup_step_completed("notifications")
@@ -1198,6 +1223,23 @@ Ethoscope Node Setup Wizard
                     )
             except Exception as e:
                 self.logger.warning(f"Could not load notification settings: {e}")
+
+            # Get temperature alert settings from alerts section
+            try:
+                alerts_config = self.config._settings.get("alerts", {})
+                config_data["alerts"] = {
+                    "temperature_alerts_enabled": alerts_config.get(
+                        "temperature_alerts_enabled", True
+                    ),
+                    "temperature_min_threshold": alerts_config.get(
+                        "temperature_min_threshold", 18.0
+                    ),
+                    "temperature_max_threshold": alerts_config.get(
+                        "temperature_max_threshold", 28.0
+                    ),
+                }
+            except Exception as e:
+                self.logger.warning(f"Could not load temperature alert settings: {e}")
 
             # Get virtual sensor settings
             try:

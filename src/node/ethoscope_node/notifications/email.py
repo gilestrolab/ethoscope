@@ -641,6 +641,156 @@ class EmailNotificationService(NotificationAnalyzer):
 
         return success
 
+    def send_temperature_alert(
+        self,
+        sensor_id: str,
+        sensor_name: str,
+        location: str,
+        temperature: float,
+        threshold: float,
+        violation_type: str,
+    ) -> bool:
+        """
+        Send alert when sensor temperature exceeds thresholds.
+
+        Args:
+            sensor_id: Sensor identifier
+            sensor_name: Human-readable sensor name
+            location: Sensor location
+            temperature: Current temperature reading (Celsius)
+            threshold: Threshold that was violated
+            violation_type: "high" or "low"
+
+        Returns:
+            True if alert was sent
+        """
+        alert_key = f"temperature_{violation_type}"
+        if not self._should_send_alert(sensor_id, alert_key):
+            return False
+
+        # Get admin emails for temperature alerts
+        admin_emails = self.get_admin_emails()
+
+        if not admin_emails:
+            self.logger.warning(
+                f"No admin email recipients for temperature alert {sensor_id}"
+            )
+            return False
+
+        # Determine alert type and styling
+        if violation_type == "high":
+            alert_title = "High Temperature Alert"
+            alert_color = "#dc3545"  # Red
+            alert_bg = "#f8d7da"
+            alert_text_color = "#721c24"
+            comparison = "exceeds maximum"
+            icon = "🔥"
+        else:
+            alert_title = "Low Temperature Alert"
+            alert_color = "#007bff"  # Blue
+            alert_bg = "#cce5ff"
+            alert_text_color = "#004085"
+            comparison = "below minimum"
+            icon = "❄️"
+
+        subject = (
+            f"Ethoscope Alert: {sensor_name} - {alert_title} ({temperature:.1f}°C)"
+        )
+
+        html_body = f"""
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; }}
+                .alert {{ background-color: {alert_bg}; color: {alert_text_color}; padding: 15px; border-radius: 5px; margin: 10px 0; border-left: 4px solid {alert_color}; }}
+                .info {{ background-color: #d4edda; color: #155724; padding: 10px; border-radius: 5px; margin: 10px 0; }}
+                .details {{ background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0; }}
+                h1 {{ color: {alert_color}; }}
+                .timestamp {{ font-style: italic; color: #6c757d; }}
+                .temperature {{ font-size: 2em; font-weight: bold; color: {alert_color}; }}
+            </style>
+        </head>
+        <body>
+            <h1>{icon} Ethoscope {alert_title}</h1>
+
+            <div class="alert">
+                <strong>Temperature {comparison} threshold!</strong><br>
+                Sensor <strong>{sensor_name}</strong> is reporting a temperature of
+                <span class="temperature">{temperature:.1f}°C</span>
+                which {comparison} the configured threshold of {threshold:.1f}°C.
+            </div>
+
+            <div class="details">
+                <h3>Sensor Information:</h3>
+                <ul>
+                    <li><strong>Sensor Name:</strong> {sensor_name}</li>
+                    <li><strong>Sensor ID:</strong> {sensor_id}</li>
+                    <li><strong>Location:</strong> {location}</li>
+                    <li><strong>Current Temperature:</strong> {temperature:.1f}°C</li>
+                    <li><strong>Threshold:</strong> {threshold:.1f}°C ({violation_type})</li>
+                </ul>
+            </div>
+
+            <div class="info">
+                <strong>What to do:</strong>
+                <ol>
+                    <li>Check the environmental conditions in the {location}</li>
+                    <li>Verify HVAC/climate control systems are functioning</li>
+                    <li>Check for any doors or windows that may have been left open</li>
+                    <li>Review the sensor data history for trends</li>
+                    <li>Contact the facility manager if temperature doesn't normalize</li>
+                </ol>
+            </div>
+
+            <p><em>Note: This alert will not repeat until the temperature returns to the normal range.</em></p>
+
+            <p class="timestamp">Alert sent at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+        </body>
+        </html>
+        """
+
+        text_body = f"""
+        ETHOSCOPE {alert_title.upper()}
+
+        Temperature {comparison} threshold!
+
+        Sensor {sensor_name} is reporting a temperature of {temperature:.1f}°C
+        which {comparison} the configured threshold of {threshold:.1f}°C.
+
+        Sensor Information:
+        - Sensor Name: {sensor_name}
+        - Sensor ID: {sensor_id}
+        - Location: {location}
+        - Current Temperature: {temperature:.1f}°C
+        - Threshold: {threshold:.1f}°C ({violation_type})
+
+        What to do:
+        1. Check the environmental conditions in the {location}
+        2. Verify HVAC/climate control systems are functioning
+        3. Check for any doors or windows that may have been left open
+        4. Review the sensor data history for trends
+        5. Contact the facility manager if temperature doesn't normalize
+
+        Note: This alert will not repeat until the temperature returns to the normal range.
+
+        Alert sent at {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        """
+
+        msg = self._create_email_message(admin_emails, subject, html_body, text_body)
+        success = self._send_email(msg)
+
+        # Log the alert to database
+        if success:
+            recipients_str = ", ".join(admin_emails)
+            self.db.logAlert(
+                sensor_id,
+                alert_key,
+                f"Temperature {violation_type}: {temperature:.1f}°C (threshold: {threshold:.1f}°C)",
+                recipients_str,
+            )
+
+        return success
+
     def test_email_configuration(self) -> Dict[str, Any]:
         """
         Test email configuration by sending a test message.

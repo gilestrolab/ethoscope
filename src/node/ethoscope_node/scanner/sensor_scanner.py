@@ -6,9 +6,13 @@ import time
 import urllib.parse
 import urllib.request
 from threading import RLock
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
 from ethoscope_node.scanner.base_scanner import BaseDevice, DeviceScanner, ScanException
+
+if TYPE_CHECKING:
+    from ethoscope_node.notifications.temperature_monitor import TemperatureAlertMonitor
+    from ethoscope_node.utils.configuration import EthoscopeConfiguration
 
 
 class Sensor(BaseDevice):
@@ -23,10 +27,23 @@ class Sensor(BaseDevice):
         refresh_period: float = 5,
         results_dir: str = "/ethoscope_data/sensors",
         save_to_csv: bool = True,
+        temperature_callback: Optional[Callable[[str, str, str, float], None]] = None,
     ):
+        """
+        Initialize sensor device.
 
+        Args:
+            ip: Sensor IP address
+            port: Sensor port
+            refresh_period: How often to poll sensor data (seconds)
+            results_dir: Directory for CSV data storage
+            save_to_csv: Whether to save data to CSV files
+            temperature_callback: Optional callback for temperature monitoring.
+                Called with (sensor_id, sensor_name, location, temperature)
+        """
         self.save_to_csv = save_to_csv
         self._csv_lock = RLock()
+        self._temperature_callback = temperature_callback
 
         super().__init__(ip, port, refresh_period, results_dir)
 
@@ -70,6 +87,17 @@ class Sensor(BaseDevice):
             self._logger.error(f"Error setting sensor variables: {e}")
             raise
 
+    def set_temperature_callback(
+        self, callback: Optional[Callable[[str, str, str, float], None]]
+    ) -> None:
+        """
+        Set the temperature monitoring callback.
+
+        Args:
+            callback: Function to call with (sensor_id, sensor_name, location, temperature)
+        """
+        self._temperature_callback = callback
+
     def _update_info(self):
         """Update sensor information and save to CSV if enabled."""
         try:
@@ -87,11 +115,43 @@ class Sensor(BaseDevice):
             if self.save_to_csv:
                 self._save_to_csv()
 
+            # Check temperature thresholds if callback is set
+            if self._temperature_callback:
+                self._check_temperature()
+
         except ScanException:
             self._reset_info()
         except Exception as e:
             self._logger.error(f"Error updating sensor info: {e}")
             self._reset_info()
+
+    def _check_temperature(self) -> None:
+        """Check temperature against thresholds and trigger callback if needed."""
+        if not self._temperature_callback:
+            return
+
+        try:
+            with self._lock:
+                temperature = self._info.get("temperature")
+                if temperature is None:
+                    return
+
+                # Convert to float if needed
+                try:
+                    temp_float = float(temperature)
+                except (ValueError, TypeError):
+                    self._logger.warning(f"Invalid temperature value: {temperature}")
+                    return
+
+                sensor_id = self._info.get("id", self._id or "unknown")
+                sensor_name = self._info.get("name", "Unknown Sensor")
+                location = self._info.get("location", "Unknown")
+
+            # Call the temperature callback (outside lock to avoid deadlocks)
+            self._temperature_callback(sensor_id, sensor_name, location, temp_float)
+
+        except Exception as e:
+            self._logger.error(f"Error checking temperature: {e}")
 
     def _save_to_csv(self):
         """Save sensor data to CSV file with thread safety."""
@@ -160,7 +220,7 @@ class Sensor(BaseDevice):
 
 
 class SensorScanner(DeviceScanner):
-    """Sensor-specific scanner."""
+    """Sensor-specific scanner with temperature alert monitoring."""
 
     SERVICE_TYPE = "_sensor._tcp.local."
     DEVICE_TYPE = "sensor"
@@ -170,6 +230,106 @@ class SensorScanner(DeviceScanner):
         results_dir: str = "/ethoscope_data/sensors",
         device_refresh_period: float = 300,
         device_class=Sensor,
+        config: Optional["EthoscopeConfiguration"] = None,
     ):
+        """
+        Initialize sensor scanner with optional temperature monitoring.
+
+        Args:
+            results_dir: Directory for sensor data CSV files
+            device_refresh_period: How often to poll sensors (seconds)
+            device_class: Device class to use for sensors
+            config: Configuration instance for temperature alert settings
+        """
         super().__init__(device_refresh_period, device_class)
         self.results_dir = results_dir
+
+        # Initialize temperature alert monitoring
+        self._config = config
+        self._temperature_monitor: Optional["TemperatureAlertMonitor"] = None
+
+        # Lazily initialize temperature monitor when config is available
+        if self._config:
+            self._init_temperature_monitor()
+
+    def _init_temperature_monitor(self) -> None:
+        """Initialize the temperature alert monitor."""
+        try:
+            from ethoscope_node.notifications.temperature_monitor import (
+                TemperatureAlertMonitor,
+            )
+
+            self._temperature_monitor = TemperatureAlertMonitor(self._config)
+            self._logger.info("Temperature alert monitor initialized")
+        except Exception as e:
+            self._logger.error(f"Failed to initialize temperature monitor: {e}")
+            self._temperature_monitor = None
+
+    def _get_temperature_callback(self):
+        """
+        Get the temperature callback function for sensors.
+
+        Returns:
+            Callback function or None if monitoring is not enabled
+        """
+        if self._temperature_monitor is None:
+            return None
+
+        def callback(
+            sensor_id: str, sensor_name: str, location: str, temperature: float
+        ):
+            """Check temperature and send alert if needed."""
+            self._temperature_monitor.check_temperature(
+                sensor_id=sensor_id,
+                sensor_name=sensor_name,
+                location=location,
+                temperature=temperature,
+            )
+
+        return callback
+
+    def _add_or_update_device(
+        self, ip: str, port: int, name: str = None, device_id: str = None
+    ):
+        """
+        Add or update a sensor device with temperature monitoring callback.
+
+        Overrides parent to set temperature callback on newly created sensors.
+        """
+        # Track current device count to detect new additions
+        devices_before = len(self.devices)
+
+        # Call parent implementation
+        super()._add_or_update_device(ip, port, name, device_id)
+
+        # If a new device was added, set up temperature callback
+        if len(self.devices) > devices_before:
+            new_device = self.devices[-1]
+            if hasattr(new_device, "set_temperature_callback"):
+                callback = self._get_temperature_callback()
+                if callback:
+                    new_device.set_temperature_callback(callback)
+                    self._logger.debug(
+                        f"Temperature monitoring enabled for sensor: {name or device_id}"
+                    )
+
+    def get_temperature_alert_states(self) -> Dict[str, Any]:
+        """
+        Get temperature alert states for all sensors.
+
+        Returns:
+            Dictionary mapping sensor_id to alert state info
+        """
+        if self._temperature_monitor:
+            return self._temperature_monitor.get_all_alert_states()
+        return {}
+
+    def reset_temperature_alert_state(self, sensor_id: str) -> None:
+        """
+        Reset temperature alert state for a specific sensor.
+
+        Args:
+            sensor_id: Sensor ID to reset
+        """
+        if self._temperature_monitor:
+            self._temperature_monitor.reset_alert_state(sensor_id)

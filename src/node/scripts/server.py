@@ -10,21 +10,22 @@ from typing import Optional
 
 import bottle
 
-from ethoscope_node.api import AuthAPI
-from ethoscope_node.api import BackupAPI
-from ethoscope_node.api import DatabaseAPI
-from ethoscope_node.api import DeviceAPI
-from ethoscope_node.api import FileAPI
-from ethoscope_node.api import NodeAPI
-from ethoscope_node.api import ROITemplateAPI
-from ethoscope_node.api import SensorAPI
-from ethoscope_node.api import SetupAPI
-from ethoscope_node.api import TunnelUtils
+from ethoscope_node.api import (
+    AuthAPI,
+    BackupAPI,
+    DatabaseAPI,
+    DeviceAPI,
+    FileAPI,
+    NodeAPI,
+    ROITemplateAPI,
+    SensorAPI,
+    SetupAPI,
+    TunnelUtils,
+)
 from ethoscope_node.auth import AuthMiddleware
 from ethoscope_node.scanner.ethoscope_scanner import EthoscopeScanner
 from ethoscope_node.scanner.sensor_scanner import SensorScanner
-from ethoscope_node.utils.configuration import EthoscopeConfiguration
-from ethoscope_node.utils.configuration import ensure_ssh_keys
+from ethoscope_node.utils.configuration import EthoscopeConfiguration, ensure_ssh_keys
 from ethoscope_node.utils.etho_db import ExperimentalDB
 
 # Constants
@@ -357,11 +358,14 @@ class EthoscopeNodeServer:
                 self.logger.error(f"Failed to start ethoscope scanner: {e}")
                 raise
 
-            # Initialize sensor scanner
+            # Initialize sensor scanner with temperature monitoring
             try:
-                self.sensor_scanner = SensorScanner(results_dir=self.sensors_dir)
+                self.sensor_scanner = SensorScanner(
+                    results_dir=self.sensors_dir,
+                    config=self.config,
+                )
                 self.sensor_scanner.start()
-                self.logger.info("Sensor scanner started")
+                self.logger.info("Sensor scanner started with temperature monitoring")
             except Exception as e:
                 self.logger.warning(f"Failed to start sensor scanner: {e}")
                 self.logger.warning("Continuing without sensor scanner")

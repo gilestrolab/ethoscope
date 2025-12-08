@@ -75,6 +75,11 @@
                 channel: '',
                 use_webhook: true,
                 use_manual_setup: false  // false = marketplace app, true = manual setup
+            },
+            temperature_alerts: {
+                enabled: true,
+                min_threshold: 18,
+                max_threshold: 28
             }
         };
 
@@ -264,6 +269,16 @@
                                 $scope.notifications.slack.use_webhook = config.notifications.slack.use_webhook !== false; // Default to true
                                 $scope.notifications.slack.use_manual_setup = config.notifications.slack.use_manual_setup || false;
                             }
+                        }
+
+                        // Load temperature alert settings from alerts section
+                        if (config.alerts) {
+                            $scope.notifications.temperature_alerts.enabled =
+                                config.alerts.temperature_alerts_enabled !== false; // Default to true
+                            $scope.notifications.temperature_alerts.min_threshold =
+                                config.alerts.temperature_min_threshold || 18;
+                            $scope.notifications.temperature_alerts.max_threshold =
+                                config.alerts.temperature_max_threshold || 28;
                         }
 
                         // Load existing users

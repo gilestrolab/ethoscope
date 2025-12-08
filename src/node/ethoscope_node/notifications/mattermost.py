@@ -344,6 +344,89 @@ class MattermostNotificationService(NotificationAnalyzer):
             self.logger.error(f"Error sending device unreachable alert: {e}")
             return False
 
+    def send_temperature_alert(
+        self,
+        sensor_id: str,
+        sensor_name: str,
+        location: str,
+        temperature: float,
+        threshold: float,
+        violation_type: str,
+    ) -> bool:
+        """
+        Send alert when sensor temperature exceeds thresholds.
+
+        Args:
+            sensor_id: Sensor identifier
+            sensor_name: Human-readable sensor name
+            location: Sensor location
+            temperature: Current temperature reading (Celsius)
+            threshold: Threshold that was violated
+            violation_type: "high" or "low"
+
+        Returns:
+            True if alert sent successfully
+        """
+        alert_key = f"temperature_{violation_type}"
+        if not self._should_send_alert(sensor_id, alert_key):
+            return False
+
+        try:
+            # Determine alert type and styling
+            if violation_type == "high":
+                emoji = "🔥"
+                title = f"High Temperature Alert: {sensor_name}"
+                status = "🔴 Too Hot"
+                comparison = "exceeds maximum"
+            else:
+                emoji = "❄️"
+                title = f"Low Temperature Alert: {sensor_name}"
+                status = "🔵 Too Cold"
+                comparison = "below minimum"
+
+            message_parts = [
+                f"{emoji} **{title}**",
+                "",
+                f"Temperature {comparison} threshold!",
+                "",
+                f"**Sensor:** {sensor_name}",
+                f"**Sensor ID:** {sensor_id}",
+                f"**Location:** {location}",
+                f"**Current Temperature:** {temperature:.1f}°C",
+                f"**Threshold:** {threshold:.1f}°C",
+                f"**Status:** {status}",
+                "",
+                "**Recommended actions:**",
+                "• Check environmental conditions",
+                "• Verify HVAC/climate control systems",
+                "• Check for open doors or windows",
+                "• Review sensor data history",
+                "• Contact facility manager if needed",
+                "",
+                "_This alert will not repeat until temperature returns to normal range._",
+            ]
+
+            message = "\n".join(message_parts)
+            success = self._send_message(message)
+
+            # Log alert in database if sent successfully
+            if success:
+                try:
+                    self.db.logAlert(
+                        sensor_id,
+                        alert_key,
+                        f"Temperature {violation_type}: {temperature:.1f}°C (threshold: {threshold:.1f}°C)",
+                        "mattermost",
+                    )
+                except Exception as e:
+                    self.logger.warning(f"Failed to log alert in database: {e}")
+
+            return success
+
+        except Exception as e:
+            self.logger.error(f"Error sending temperature alert: {e}")
+            return False
+
     def test_mattermost_configuration(self) -> Dict[str, Any]:
         """
         Test Mattermost configuration by sending a test message.

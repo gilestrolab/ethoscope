@@ -561,6 +561,135 @@ class SlackNotificationService(NotificationAnalyzer):
             self.logger.error(f"Error sending device unreachable alert: {e}")
             return False
 
+    def send_temperature_alert(
+        self,
+        sensor_id: str,
+        sensor_name: str,
+        location: str,
+        temperature: float,
+        threshold: float,
+        violation_type: str,
+    ) -> bool:
+        """
+        Send alert when sensor temperature exceeds thresholds.
+
+        Args:
+            sensor_id: Sensor identifier
+            sensor_name: Human-readable sensor name
+            location: Sensor location
+            temperature: Current temperature reading (Celsius)
+            threshold: Threshold that was violated
+            violation_type: "high" or "low"
+
+        Returns:
+            True if alert sent successfully
+        """
+        alert_key = f"temperature_{violation_type}"
+        if not self._should_send_alert(sensor_id, alert_key):
+            return False
+
+        try:
+            # Determine alert type and styling
+            if violation_type == "high":
+                emoji = "🔥"
+                title = f"{emoji} High Temperature Alert: {sensor_name}"
+                status_text = "🔴 Too Hot"
+                comparison = "exceeds maximum"
+            else:
+                emoji = "❄️"
+                title = f"{emoji} Low Temperature Alert: {sensor_name}"
+                status_text = "🔵 Too Cold"
+                comparison = "below minimum"
+
+            # Create temperature alert blocks
+            blocks = [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": title,
+                        "emoji": True,
+                    },
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"Temperature {comparison} threshold! Current reading: *{temperature:.1f}°C* (threshold: {threshold:.1f}°C)",
+                    },
+                },
+                {
+                    "type": "section",
+                    "fields": [
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Sensor:* {sensor_name}",
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Sensor ID:* {sensor_id}",
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Location:* {location}",
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Status:* {status_text}",
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Temperature:* {temperature:.1f}°C",
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Threshold:* {threshold:.1f}°C",
+                        },
+                    ],
+                },
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": "*Recommended actions:*\n• Check environmental conditions\n• Verify HVAC/climate control systems\n• Check for open doors or windows\n• Review sensor data history\n• Contact facility manager if needed",
+                    },
+                },
+                {
+                    "type": "context",
+                    "elements": [
+                        {
+                            "type": "mrkdwn",
+                            "text": "_This alert will not repeat until temperature returns to normal range._",
+                        }
+                    ],
+                },
+            ]
+
+            fallback_text = (
+                f"{emoji} Temperature Alert: {sensor_name} ({sensor_id}) at {location} - "
+                f"{temperature:.1f}°C {comparison} {threshold:.1f}°C threshold"
+            )
+
+            success = self._send_message(blocks, fallback_text)
+
+            # Log alert in database if sent successfully
+            if success:
+                try:
+                    self.db.logAlert(
+                        sensor_id,
+                        alert_key,
+                        f"Temperature {violation_type}: {temperature:.1f}°C (threshold: {threshold:.1f}°C)",
+                        "slack",
+                    )
+                except Exception as e:
+                    self.logger.warning(f"Failed to log alert in database: {e}")
+
+            return success
+
+        except Exception as e:
+            self.logger.error(f"Error sending temperature alert: {e}")
+            return False
+
     def test_slack_configuration(self) -> Dict[str, Any]:
         """
         Test Slack configuration by sending a test message.

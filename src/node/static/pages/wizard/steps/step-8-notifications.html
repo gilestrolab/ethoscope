@@ -244,6 +244,56 @@
                             </button>
                         </div>
                     </div>
+
+                    <!-- Temperature Alerts Configuration -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <label class="toggle-check mb-0">
+                                <input type="checkbox" class="toggle-check-input" ng-model="notifications.temperature_alerts.enabled">
+                                <span class="toggle-check-text"></span>
+                                <i class="fa fa-thermometer-half ml-2"></i> Temperature Alerts
+                            </label>
+                        </div>
+                        <div class="card-body" ng-if="notifications.temperature_alerts.enabled">
+                            <div class="alert alert-info">
+                                <i class="fa fa-info-circle"></i>
+                                Temperature alerts will be sent through <strong>all enabled notification channels</strong>
+                                (Email, Mattermost, Slack) when sensor readings exceed the configured thresholds.
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Minimum Temperature (&deg;C) *</label>
+                                        <input type="number" class="form-control" step="0.5"
+                                               ng-model="notifications.temperature_alerts.min_threshold"
+                                               placeholder="18">
+                                        <small class="form-text text-muted">
+                                            Alert when temperature falls below this value
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Maximum Temperature (&deg;C) *</label>
+                                        <input type="number" class="form-control" step="0.5"
+                                               ng-model="notifications.temperature_alerts.max_threshold"
+                                               placeholder="28">
+                                        <small class="form-text text-muted">
+                                            Alert when temperature exceeds this value
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="alert alert-light">
+                                <h6><i class="fa fa-lightbulb"></i> Alert Behavior:</h6>
+                                <ul class="mb-0">
+                                    <li>Alerts are sent <strong>once</strong> when a threshold is first crossed</li>
+                                    <li>No repeat alerts until temperature returns to the normal range</li>
+                                    <li>These thresholds apply globally to <strong>all sensors</strong></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-footer">
                     <button class="btn btn-secondary" ng-click="previousStep()">

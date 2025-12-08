@@ -262,6 +262,69 @@ class NotificationManager(NotificationAnalyzer):
             )
             return False
 
+    def send_temperature_alert(
+        self,
+        sensor_id: str,
+        sensor_name: str,
+        location: str,
+        temperature: float,
+        threshold: float,
+        violation_type: str,
+    ) -> bool:
+        """
+        Send temperature alert through all enabled services.
+
+        Args:
+            sensor_id: Sensor identifier
+            sensor_name: Human-readable sensor name
+            location: Sensor location
+            temperature: Current temperature reading (Celsius)
+            threshold: Threshold that was violated
+            violation_type: "high" or "low"
+
+        Returns:
+            True if at least one service sent the alert successfully
+        """
+        if not self._services:
+            self.logger.warning("No notification services enabled")
+            return False
+
+        success_count = 0
+
+        for service_name, service in self._services:
+            try:
+                result = service.send_temperature_alert(
+                    sensor_id=sensor_id,
+                    sensor_name=sensor_name,
+                    location=location,
+                    temperature=temperature,
+                    threshold=threshold,
+                    violation_type=violation_type,
+                )
+                if result:
+                    success_count += 1
+                    self.logger.debug(
+                        f"Temperature alert sent successfully via {service_name}"
+                    )
+                else:
+                    self.logger.warning(f"Temperature alert failed via {service_name}")
+            except Exception as e:
+                self.logger.error(
+                    f"Error sending temperature alert via {service_name}: {e}"
+                )
+
+        total_services = len(self._services)
+        if success_count > 0:
+            self.logger.info(
+                f"Temperature alert sent via {success_count}/{total_services} services"
+            )
+            return True
+        else:
+            self.logger.error(
+                f"Temperature alert failed in all {total_services} services"
+            )
+            return False
+
     def test_all_configurations(self) -> Dict[str, Any]:
         """
         Test all notification service configurations.
