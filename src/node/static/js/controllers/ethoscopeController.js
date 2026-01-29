@@ -1274,17 +1274,85 @@
         // MAINTENANCE FUNCTIONS
         // ===========================
 
+        // Backup configuration state
+        $scope.backupConfig = {
+            type: 'none',
+            backupDatabases: true,
+            backupVideos: false,
+            loading: false
+        };
+        $scope.backupInProgress = false;
+        $scope.backupComplete = false;
+        $scope.backupError = null;
+        $scope.backupProgress = { message: '', percent: 0 };
+
         /**
-         * Create device backup
+         * Initialize backup modal - detect backup type.
+         * Called when backup modal is opened.
          */
         $scope.ethoscope.backup = function() {
-            $http.post('/device/' + device_id + '/backup', {})
+            // Reset state
+            $scope.backupInProgress = false;
+            $scope.backupComplete = false;
+            $scope.backupError = null;
+            $scope.backupProgress = { message: '', percent: 0 };
+            $scope.backupConfig = {
+                type: 'none',
+                backupDatabases: true,
+                backupVideos: false,
+                loading: true
+            };
+
+            // Fetch backup info to detect type
+            $http.get('/device/' + device_id + '/backup')
                 .then(function(response) {
-                    $scope.device = response.data;
+                    $scope.backupConfig = {
+                        type: response.data.recommended_backup_type || 'none',
+                        backupDatabases: true,
+                        backupVideos: false,
+                        loading: false
+                    };
                 })
                 .catch(function(error) {
-                    console.error('Failed to create backup:', error);
+                    console.error('Failed to get backup info:', error);
+                    $scope.backupConfig = {
+                        type: 'none',
+                        backupDatabases: true,
+                        backupVideos: false,
+                        loading: false
+                    };
                 });
+        };
+
+        /**
+         * Execute backup with selected options.
+         * Called when Start Backup button is clicked.
+         */
+        $scope.ethoscope.startBackup = function() {
+            $scope.backupInProgress = true;
+            $scope.backupComplete = false;
+            $scope.backupError = null;
+            $scope.backupProgress = { message: 'Initiating backup...', percent: 10 };
+
+            $http.post('/device/' + device_id + '/backup', {
+                backup_databases: $scope.backupConfig.backupDatabases,
+                backup_videos: $scope.backupConfig.backupVideos
+            })
+            .then(function(response) {
+                if (response.data.success) {
+                    $scope.backupComplete = true;
+                    $scope.backupProgress.message = 'Backup completed!';
+                    $scope.backupProgress.percent = 100;
+                } else {
+                    $scope.backupError = response.data.error || 'Backup failed';
+                }
+                $scope.backupInProgress = false;
+            })
+            .catch(function(error) {
+                console.error('Backup error:', error);
+                $scope.backupError = 'Network error during backup';
+                $scope.backupInProgress = false;
+            });
         };
 
         /**

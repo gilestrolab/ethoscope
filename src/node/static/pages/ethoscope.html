@@ -601,20 +601,82 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h4 class="modal-title" id="myModalLabel">Backup progress</h4>
+                <h4 class="modal-title"><span class="fa fa-database"></span> Backup {{device.name}}</h4>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
             </div>
             <div class="modal-body">
+                <!-- Configuration (before backup starts) -->
+                <div ng-if="!backupInProgress && !backupComplete && !backupError">
+                    <!-- Backup type indicator -->
+                    <div class="alert" ng-class="{'alert-info': backupConfig.type === 'rsync',
+                                                   'alert-warning': backupConfig.type === 'mysql',
+                                                   'alert-danger': backupConfig.type === 'none'}">
+                        <strong>Backup Type:</strong>
+                        <span ng-if="backupConfig.type === 'mysql'"><span class="fa fa-server"></span> MySQL/MariaDB</span>
+                        <span ng-if="backupConfig.type === 'rsync'"><span class="fa fa-file"></span> SQLite (rsync)</span>
+                        <span ng-if="backupConfig.type === 'none'"><span class="fa fa-exclamation-triangle"></span> No databases available</span>
+                        <span ng-if="backupConfig.loading"><span class="fa fa-spinner fa-spin"></span> Detecting...</span>
+                    </div>
 
-                <div class="ProgressBarContainer" style="width: 100%; background-color: grey;">
-                    <div class="ProgressBar" style="width: {{device.backup_status | number : 2}}%; height: 30px; background-color: #4CAF50; text-align: center; line-height: 30px; color: white;">{{device.backup_status | number : 0}}%</div>
+                    <!-- Checkboxes for rsync devices -->
+                    <div ng-if="backupConfig.type === 'rsync'" style="padding: 15px; background: #f8f9fa; border-radius: 4px; margin: 15px 0;">
+                        <h5>Select what to backup:</h5>
+                        <div class="form-check" style="padding: 8px 0;">
+                            <input type="checkbox" class="form-check-input" id="backupDatabases" ng-model="backupConfig.backupDatabases">
+                            <label class="form-check-label" for="backupDatabases">
+                                <span class="fa fa-database"></span> Databases (SQLite)
+                            </label>
+                        </div>
+                        <div class="form-check" style="padding: 8px 0;">
+                            <input type="checkbox" class="form-check-input" id="backupVideos" ng-model="backupConfig.backupVideos">
+                            <label class="form-check-label" for="backupVideos">
+                                <span class="fa fa-video-camera"></span> Videos (h264)
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- MySQL info -->
+                    <div ng-if="backupConfig.type === 'mysql'" style="padding: 15px;">
+                        <p><span class="fa fa-info-circle"></span> MySQL databases will be backed up to SQLite format.</p>
+                        <p class="text-muted"><small>Video backup not available for MySQL devices.</small></p>
+                    </div>
+
+                    <!-- Start button -->
+                    <div class="text-center" style="margin-top: 20px;">
+                        <button type="button" class="btn btn-primary" ng-click="ethoscope.startBackup()"
+                                ng-disabled="backupConfig.type === 'none' || backupConfig.loading ||
+                                           (backupConfig.type === 'rsync' && !backupConfig.backupDatabases && !backupConfig.backupVideos)">
+                            <span class="fa fa-play"></span> Start Backup
+                        </button>
+                    </div>
                 </div>
-                <br>
-                <p ng-if="device.backup_status < 100">Attempting full backup for {{device.name}}.</p>
-                <p ng-if="device.backup_status == 100">Backup terminated with success.</p>
+
+                <!-- Progress (during backup) -->
+                <div ng-if="backupInProgress">
+                    <div class="ProgressBarContainer" style="width: 100%; background-color: grey; border-radius: 4px;">
+                        <div class="ProgressBar" style="width: {{backupProgress.percent || 0}}%; height: 30px; background-color: #4CAF50;
+                                    text-align: center; line-height: 30px; color: white; border-radius: 4px;">
+                            {{backupProgress.percent || 0}}%
+                        </div>
+                    </div>
+                    <p style="margin-top: 15px;"><span class="fa fa-spinner fa-spin"></span> {{backupProgress.message || 'Backing up...'}}</p>
+                </div>
+
+                <!-- Completion -->
+                <div ng-if="backupComplete" class="alert alert-success" style="margin-top: 15px;">
+                    <span class="fa fa-check-circle"></span> Backup completed successfully!
+                </div>
+
+                <!-- Error -->
+                <div ng-if="backupError" class="alert alert-danger" style="margin-top: 15px;">
+                    <span class="fa fa-exclamation-circle"></span> {{backupError}}
+                </div>
 
             </div>
             <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    {{backupComplete || backupError ? 'Close' : 'Cancel'}}
+                </button>
             </div>
         </div>
     </div>
