@@ -32,6 +32,49 @@
         </div>
     </div>
 
+    <!-- Bug Report Section -->
+    <div ng-if="showOption == 'bugReport'" ng-cloak>
+        <div class="row">
+            <div class="col-12">
+                <h2>Generate Bug Report</h2>
+                <p>Collect comprehensive system information for debugging purposes.</p>
+
+                <div class="alert alert-info">
+                    <strong>This report includes:</strong>
+                    <ul class="mb-0 mt-2">
+                        <li>Node system information (disk, memory, network, services)</li>
+                        <li>Git version information</li>
+                        <li>Status of all connected ethoscope devices</li>
+                        <li>Device logs and machine information</li>
+                        <li>Backup service status</li>
+                        <li>Configuration settings</li>
+                    </ul>
+                </div>
+
+                <!-- Status messages -->
+                <div ng-if="bugReportStatus == 'generating'" class="alert alert-warning">
+                    <i class="fa fa-spinner fa-spin"></i> Generating bug report... This may take a moment while collecting information from all devices.
+                </div>
+                <div ng-if="bugReportStatus == 'complete'" class="alert alert-success">
+                    <i class="fa fa-check"></i> Bug report downloaded successfully!
+                </div>
+                <div ng-if="bugReportStatus == 'error'" class="alert alert-danger">
+                    <i class="fa fa-exclamation-triangle"></i> Error: {{bugReportError}}
+                </div>
+
+                <button class="btn btn-warning btn-lg" ng-click="generateBugReport()"
+                        ng-disabled="bugReportStatus == 'generating'">
+                    <i class="fa fa-download"></i> Generate &amp; Download Bug Report
+                </button>
+
+                <p class="mt-3 text-muted">
+                    <small>The downloaded JSON file can be shared with developers for debugging purposes.
+                    It may contain IP addresses and device names from your network.</small>
+                </p>
+            </div>
+        </div>
+    </div>
+
     <!-- Browse Files Section -->
     <div ng-show="showOption == 'browse'" ng-cloak>
         <div class="row">

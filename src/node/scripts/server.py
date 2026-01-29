@@ -13,6 +13,7 @@ import bottle
 from ethoscope_node.api import (
     AuthAPI,
     BackupAPI,
+    BugReportAPI,
     DatabaseAPI,
     DeviceAPI,
     FileAPI,
@@ -238,6 +239,7 @@ class EthoscopeNodeServer:
             SetupAPI,
             TunnelUtils,
             AuthAPI,
+            BugReportAPI,
         ]
 
         for api_class in api_classes:

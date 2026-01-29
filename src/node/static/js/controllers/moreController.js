@@ -67,6 +67,12 @@ function maxLengthCheck(object) {
                            style:"font-size:36px; padding:10px",
                            opt: "setupWizard",
                           },
+                          {name:"Generate Bug Report",
+                           icon:"fa fa-bug",
+                           color:"alert alert-warning",
+                           style:"font-size:36px; padding:10px",
+                           opt: "bugReport",
+                          },
 
                          ];
 
@@ -93,6 +99,9 @@ function maxLengthCheck(object) {
                     break;
                 case "setupWizard":
                     $location.path('/installation-wizard').search('reconfigure', 'true');
+                    break;
+                case "bugReport":
+                    // No pre-fetch needed, handled by generateBugReport function
                     break;
                 case "all":
                     break;
@@ -325,6 +334,38 @@ function maxLengthCheck(object) {
             });
 
 
+        };
+
+/// Generate Bug Report
+        $scope.bugReportStatus = null;
+        $scope.bugReportError = null;
+
+        $scope.generateBugReport = function() {
+            $scope.bugReportStatus = 'generating';
+            $scope.bugReportError = null;
+
+            $http.get('/bugreport/generate')
+                .then(function(response) {
+                    // Create blob and trigger download
+                    var blob = new Blob([JSON.stringify(response.data, null, 2)], {type: 'application/json'});
+                    var url = window.URL.createObjectURL(blob);
+                    var filename = 'ethoscope-bugreport-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json';
+
+                    // Create temporary anchor element for download
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+
+                    $scope.bugReportStatus = 'complete';
+                })
+                .catch(function(error) {
+                    $scope.bugReportStatus = 'error';
+                    $scope.bugReportError = error.data ? (error.data.error || 'Failed to generate bug report') : 'Failed to generate bug report';
+                });
         };
 
 

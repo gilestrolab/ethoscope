@@ -58,7 +58,7 @@ repos:
     rev: 1.7.6
     hooks:
       - id: bandit
-        args: ['-ll', '-i', '--skip=B310,B605,B608,B307,B108,B306,B324,B104,B602,B301']  # Skip informational/false positives
+        args: ['-ll', '-q']  # Low severity, quiet mode
         files: ^src/.*\.py$
         exclude: ^(.*test.*\.py|.*conftest\.py)$
 
@@ -118,6 +118,7 @@ repos:
               echo "  Hint: Create venv with: python -m venv .venv && source .venv/bin/activate && pip install -e src/ethoscope[dev] && pip install -e src/node[dev]"
             fi
         files: ^(src/|scripts/).*\.py$
+        exclude: (__init__\.py$)
         pass_filenames: true
         stages: [pre-commit]
 

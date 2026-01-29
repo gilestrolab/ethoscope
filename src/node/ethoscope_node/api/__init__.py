@@ -21,6 +21,7 @@ Modules:
 from .auth_api import AuthAPI
 from .backup_api import BackupAPI
 from .base import BaseAPI
+from .bugreport_api import BugReportAPI
 from .database_api import DatabaseAPI
 from .device_api import DeviceAPI
 from .file_api import FileAPI
@@ -42,4 +43,5 @@ __all__ = [
     "SetupAPI",
     "TunnelUtils",
     "AuthAPI",
+    "BugReportAPI",
 ]
