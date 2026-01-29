@@ -190,8 +190,8 @@ class TestSensorAPI(unittest.TestCase):
         self.assertEqual(
             result, {"files": ["sensor1.csv", "sensor2.csv", "sensor3.csv"]}
         )
-        mock_exists.assert_called_once_with("/ethoscope_data/sensors/")
-        mock_listdir.assert_called_once_with("/ethoscope_data/sensors/")
+        mock_exists.assert_called_once_with("/tmp/sensors")
+        mock_listdir.assert_called_once_with("/tmp/sensors")
 
     @patch("os.path.exists")
     def test_list_csv_files_directory_not_exists(self, mock_exists):

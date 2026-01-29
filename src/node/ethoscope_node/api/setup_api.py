@@ -91,6 +91,14 @@ class SetupAPI(BaseAPI):
             hostname = "unknown"
             fqdn = "unknown"
 
+        # Get CLI-provided directories (or defaults)
+        cli_data_dir = getattr(self.server, "ethoscope_data_dir", None)
+        cli_config_dir = getattr(self.server, "config_dir", None)
+
+        # Use CLI values or fall back to defaults
+        data_dir = cli_data_dir if cli_data_dir else "/ethoscope_data"
+        config_dir = cli_config_dir if cli_config_dir else "/etc/ethoscope"
+
         # Get disk usage for important paths
         disk_info = {}
         for path_name, path_config in self.config.content.get("folders", {}).items():
@@ -121,12 +129,17 @@ class SetupAPI(BaseAPI):
             memory_info = {}
 
         return {
-            "hostname": hostname,
-            "fqdn": fqdn,
-            "disk_usage": disk_info,
-            "memory": memory_info,
-            "python_version": os.sys.version,
-            "current_user": os.getenv("USER", "unknown"),
+            "result": "success",
+            "info": {
+                "hostname": hostname,
+                "fqdn": fqdn,
+                "data_dir": data_dir,
+                "config_dir": config_dir,
+                "disk_usage": disk_info,
+                "memory": memory_info,
+                "python_version": os.sys.version,
+                "current_user": os.getenv("USER", "unknown"),
+            },
         }
 
     def _validate_folders(self):

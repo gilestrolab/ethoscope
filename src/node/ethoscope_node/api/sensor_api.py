@@ -55,10 +55,10 @@ class SensorAPI(BaseAPI):
 
     @error_decorator
     def _list_csv_files(self):
-        """List CSV files in /ethoscope_data/sensors/."""
-        directory = "/ethoscope_data/sensors/"
+        """List CSV files in sensors directory."""
+        directory = self.sensors_dir
         try:
-            if os.path.exists(directory):
+            if directory and os.path.exists(directory):
                 csv_files = [f for f in os.listdir(directory) if f.endswith(".csv")]
                 return {"files": csv_files}
         except Exception:
@@ -68,7 +68,7 @@ class SensorAPI(BaseAPI):
     @error_decorator
     def _get_csv_data(self, filename):
         """Read CSV file and return data for plotting."""
-        directory = "/ethoscope_data/sensors/"
+        directory = self.sensors_dir
         filepath = os.path.join(directory, filename)
 
         data = []

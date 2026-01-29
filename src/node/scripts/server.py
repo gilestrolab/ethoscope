@@ -141,6 +141,7 @@ class EthoscopeNodeServer:
 
         # Paths and directories
         self.tmp_imgs_dir: Optional[str] = None
+        self.ethoscope_data_dir: Optional[str] = ethoscope_data_dir
         self.results_dir: Optional[str] = os.path.join(ethoscope_data_dir, "results")
         self.sensors_dir: Optional[str] = os.path.join(ethoscope_data_dir, "sensors")
         self.roi_templates_dir: Optional[str] = os.path.join(

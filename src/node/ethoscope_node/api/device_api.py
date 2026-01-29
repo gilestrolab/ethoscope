@@ -290,40 +290,150 @@ class DeviceAPI(BaseAPI):
         # Extract databases information
         databases = device_info.get("databases", {})
 
+        # Get base data directory from server (CLI arg) or default
+        base_directory = getattr(self.server, "ethoscope_data_dir", None)
+        if not base_directory:
+            base_directory = "/ethoscope_data"
+
         # Use backup helpers to analyze the databases and provide backup status
-        backup_info = get_device_backup_info(id, databases)
+        backup_info = get_device_backup_info(id, databases, base_directory)
 
         return backup_info
 
     @error_decorator
     def _force_device_backup(self, id):
-        """Force backup on device with specified id."""
-        from ethoscope_node.backup.helpers import BackupClass
+        """Force backup on device with specified id.
+
+        Auto-detects backup type (MySQL vs SQLite/rsync) and accepts optional
+        parameters to control backup scope.
+
+        Request body (optional JSON):
+            backup_databases (bool): Whether to backup databases (default: True)
+            backup_videos (bool): Whether to backup videos (default: False)
+
+        Returns:
+            dict: Backup result with success status, backup_type, and backup_scope
+        """
+        from ethoscope_node.backup.helpers import (
+            BackupClass,
+            UnifiedRsyncBackupClass,
+            get_device_backup_info,
+        )
 
         device = self.validate_device_exists(id)
         device_info = device.info().copy()
 
+        # Parse request parameters
+        params = {}
         try:
-            self.logger.info(f"Initiating backup for device {device_info['id']}")
-            backup_job = BackupClass(device_info, results_dir=self.results_dir)
+            request_data = self.get_request_data()
+            if request_data:
+                params = json.loads(request_data.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass
 
-            self.logger.info(f"Running backup for device {device_info['id']}")
-            success = False
-            for status_update in backup_job.backup():
-                # Process status updates
-                status = json.loads(status_update)
-                self.logger.info(f"Backup status: {status}")
-                if status.get("status") == "success":
-                    success = True
+        backup_databases = params.get("backup_databases", True)
+        backup_videos = params.get("backup_videos", False)
 
-            if success:
-                self.logger.info(f"Backup done for device {device_info['id']}")
-            else:
-                self.logger.error(
-                    f"Backup for device {device_info['id']} could not be completed"
+        # Get base data directory from server (CLI arg) or default
+        base_directory = getattr(self.server, "ethoscope_data_dir", None)
+        if not base_directory:
+            base_directory = "/ethoscope_data"
+
+        # Detect backup type
+        databases = device_info.get("databases", {})
+        backup_info = get_device_backup_info(id, databases, base_directory)
+        backup_type = backup_info.get("recommended_backup_type", "none")
+
+        if backup_type == "none":
+            return {
+                "success": False,
+                "error": "No databases found on device",
+                "backup_type": "none",
+            }
+
+        try:
+            self.logger.info(
+                f"Initiating {backup_type} backup for device {device_info['id']}"
+            )
+
+            if backup_type == "mysql":
+                # MySQL backup (existing logic)
+                backup_job = BackupClass(device_info, results_dir=self.results_dir)
+                self.logger.info(f"Running MySQL backup for device {device_info['id']}")
+
+                success = False
+                for status_update in backup_job.backup():
+                    status = json.loads(status_update)
+                    self.logger.info(f"Backup status: {status}")
+                    if status.get("status") == "success":
+                        success = True
+
+                if success:
+                    self.logger.info(
+                        f"MySQL backup done for device {device_info['id']}"
+                    )
+                else:
+                    self.logger.error(
+                        f"MySQL backup for device {device_info['id']} could not be completed"
+                    )
+
+                return {"success": success, "backup_type": "mysql"}
+
+            elif backup_type == "rsync":
+                # SQLite/rsync backup with selectable scope
+                if not backup_databases and not backup_videos:
+                    return {
+                        "success": False,
+                        "error": "No backup scope selected",
+                        "backup_type": "rsync",
+                    }
+
+                videos_dir = self.results_dir.replace("/results/", "/videos/")
+                backup_job = UnifiedRsyncBackupClass(
+                    device_info,
+                    results_dir=self.results_dir,
+                    videos_dir=videos_dir,
+                    backup_results=backup_databases,
+                    backup_videos=backup_videos,
                 )
 
-            return {"success": success}
+                self.logger.info(
+                    f"Running rsync backup for device {device_info['id']} "
+                    f"(databases={backup_databases}, videos={backup_videos})"
+                )
+
+                success = False
+                for status_update in backup_job.backup():
+                    status = json.loads(status_update)
+                    self.logger.info(f"Backup status: {status}")
+                    if status.get("status") == "success":
+                        success = True
+
+                if success:
+                    self.logger.info(
+                        f"Rsync backup done for device {device_info['id']}"
+                    )
+                else:
+                    self.logger.error(
+                        f"Rsync backup for device {device_info['id']} could not be completed"
+                    )
+
+                return {
+                    "success": success,
+                    "backup_type": "rsync",
+                    "backup_scope": {
+                        "databases": backup_databases,
+                        "videos": backup_videos,
+                    },
+                }
+
+            else:
+                return {
+                    "success": False,
+                    "error": f"Unknown backup type: {backup_type}",
+                    "backup_type": backup_type,
+                }
 
         except Exception as e:
             self.logger.error(f"Unexpected error in backup: {e}")

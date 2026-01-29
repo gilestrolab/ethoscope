@@ -122,13 +122,21 @@ class TestSetupAPI(unittest.TestCase):
         # Setup folder config
         self.api.config.content = {"folders": {"results": {"path": "/tmp/results"}}}
 
+        # Setup CLI-provided directories on server
+        self.mock_server.ethoscope_data_dir = "/custom/data"
+        self.mock_server.config_dir = "/custom/config"
+
         result = self.api._get_system_info()
 
-        self.assertEqual(result["hostname"], "test-node")
-        self.assertEqual(result["fqdn"], "test-node.local")
-        self.assertIn("results", result["disk_usage"])
-        self.assertEqual(result["memory"]["total"], 8000000000)
-        self.assertEqual(result["memory"]["percent"], 50.0)
+        self.assertEqual(result["result"], "success")
+        info = result["info"]
+        self.assertEqual(info["hostname"], "test-node")
+        self.assertEqual(info["fqdn"], "test-node.local")
+        self.assertEqual(info["data_dir"], "/custom/data")
+        self.assertEqual(info["config_dir"], "/custom/config")
+        self.assertIn("results", info["disk_usage"])
+        self.assertEqual(info["memory"]["total"], 8000000000)
+        self.assertEqual(info["memory"]["percent"], 50.0)
 
     @patch("socket.gethostname")
     def test_get_system_info_socket_error(self, mock_hostname):
@@ -137,8 +145,10 @@ class TestSetupAPI(unittest.TestCase):
 
         result = self.api._get_system_info()
 
-        self.assertEqual(result["hostname"], "unknown")
-        self.assertEqual(result["fqdn"], "unknown")
+        self.assertEqual(result["result"], "success")
+        info = result["info"]
+        self.assertEqual(info["hostname"], "unknown")
+        self.assertEqual(info["fqdn"], "unknown")
 
     @patch("bottle.request")
     @patch("os.access")

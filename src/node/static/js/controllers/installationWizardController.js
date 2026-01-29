@@ -178,6 +178,16 @@
         $http.get('/setup/system-info').then(function(response) {
             if (response.data.result === 'success') {
                 $scope.systemInfo = response.data.info;
+                // Use CLI-provided directories if available (overrides hardcoded defaults)
+                if (response.data.info.data_dir) {
+                    $scope.basicInfo.dataDir = response.data.info.data_dir;
+                }
+                if (response.data.info.config_dir) {
+                    $scope.basicInfo.configDir = response.data.info.config_dir;
+                }
+                if (response.data.info.hostname) {
+                    $scope.basicInfo.hostname = response.data.info.hostname;
+                }
             }
         }).catch(function(error) {
             // Silently fail - system info is optional
