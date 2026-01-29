@@ -2675,13 +2675,16 @@ class GenericBackupWrapper(threading.Thread):
             }
 
 
-def _fallback_database_discovery(device_id: str) -> dict:
+def _fallback_database_discovery(
+    device_id: str, base_directory: str = "/ethoscope_data"
+) -> dict:
     """
     Fallback method to discover databases by scanning local filesystem.
     Used when device is offline and cannot provide database information.
 
     Args:
         device_id: The ethoscope device ID
+        base_directory: Base data directory (e.g., '/ethoscope_data')
 
     Returns:
         dict: Databases dictionary with SQLite and MariaDB information
@@ -2689,7 +2692,7 @@ def _fallback_database_discovery(device_id: str) -> dict:
     databases = {"SQLite": {}, "MariaDB": {}}
 
     # Scan for SQLite files in results directory
-    data_dir = "/ethoscope_data"
+    data_dir = base_directory
     results_dir = os.path.join(data_dir, "results", device_id)
 
     if os.path.exists(results_dir):
@@ -2992,7 +2995,9 @@ def _get_device_backup_sizes_cached(
     }
 
 
-def _enhance_databases_with_rsync_info(device_id: str, databases: dict) -> dict:
+def _enhance_databases_with_rsync_info(
+    device_id: str, databases: dict, base_directory: str = "/ethoscope_data"
+) -> dict:
     """
     Enhance database information with file sizes from rsync backup service.
     Uses file-based caching for video files older than a week to reduce filesystem scanning.
@@ -3000,6 +3005,7 @@ def _enhance_databases_with_rsync_info(device_id: str, databases: dict) -> dict:
     Args:
         device_id: The ethoscope device ID
         databases: The databases dictionary to enhance
+        base_directory: Base data directory (e.g., '/ethoscope_data')
 
     Returns:
         dict: Enhanced databases with actual file sizes from rsync service
@@ -3070,6 +3076,9 @@ def _enhance_databases_with_rsync_info(device_id: str, databases: dict) -> dict:
             if "Video" not in databases:
                 databases["Video"] = {}
 
+            # Define default video directory based on base_directory
+            default_video_dir = os.path.join(base_directory, "videos")
+
             # Extract video files information - prefer detailed_files, fall back to transfer_details
             video_files = {}
 
@@ -3104,7 +3113,7 @@ def _enhance_databases_with_rsync_info(device_id: str, databases: dict) -> dict:
             # If no individual files found from rsync but we have summary data, try cache-aware filesystem fallback
             if not video_files and video_data.get("local_files", 0) > 0:
                 # Try to enumerate video files from filesystem using cache optimization
-                video_directory = video_data.get("directory", "/ethoscope_data/videos")
+                video_directory = video_data.get("directory", default_video_dir)
 
                 # Load cached video file information
                 cache_data = _load_video_cache(device_id, video_directory)
@@ -3164,7 +3173,7 @@ def _enhance_databases_with_rsync_info(device_id: str, databases: dict) -> dict:
 
             # Get device-specific backup sizes using cached du calculation
             # This replaces the problematic disk_usage_bytes which was returning total directory size
-            device_sizes = _get_device_backup_sizes_cached(device_id)
+            device_sizes = _get_device_backup_sizes_cached(device_id, base_directory)
 
             logging.info(
                 f"[ENHANCE] Device {device_id} backup sizes: "
@@ -3192,7 +3201,7 @@ def _enhance_databases_with_rsync_info(device_id: str, databases: dict) -> dict:
                 "total_size_bytes": total_video_size,
                 "size_human": _format_bytes_simple(total_video_size),
                 "files": video_files,
-                "directory": f"{video_data.get('directory', '/ethoscope_data/videos')}/{device_id}",
+                "directory": f"{video_data.get('directory', default_video_dir)}/{device_id}",
                 "rsync_enhanced": len(video_files) > 0,
             }
 
@@ -3204,26 +3213,29 @@ def _enhance_databases_with_rsync_info(device_id: str, databases: dict) -> dict:
         return databases
 
 
-def get_device_backup_info(device_id: str, databases: dict) -> dict:
+def get_device_backup_info(
+    device_id: str, databases: dict, base_directory: str = "/ethoscope_data"
+) -> dict:
     """
     Get backup information for a specific device based on its databases.
 
     Args:
         device_id: The ethoscope device ID
         databases: The databases dictionary from device.info()["databases"]
+        base_directory: Base data directory (e.g., '/ethoscope_data' or '/mnt/ethoscope_data')
 
     Returns:
         dict: Backup information including database types and backup status
     """
     # If databases dict is empty (device offline), use fallback discovery
     if not databases or not any(databases.values()):
-        databases = _fallback_database_discovery(device_id)
+        databases = _fallback_database_discovery(device_id, base_directory)
 
     # Enhance with rsync backup service file sizes if available
-    databases = _enhance_databases_with_rsync_info(device_id, databases)
+    databases = _enhance_databases_with_rsync_info(device_id, databases, base_directory)
 
     # Get device-specific backup sizes for accurate reporting
-    device_sizes = _get_device_backup_sizes_cached(device_id)
+    device_sizes = _get_device_backup_sizes_cached(device_id, base_directory)
 
     backup_info = {
         "device_id": device_id,
@@ -3308,17 +3320,24 @@ def get_device_backup_info(device_id: str, databases: dict) -> dict:
                     "size_human", "0B"
                 )
                 backup_info["backup_status"]["video"]["directory"] = video_backup.get(
-                    "directory", f"/ethoscope_data/videos/{device_id}"
+                    "directory", f"{base_directory}/videos/{device_id}"
                 )
 
     backup_info["backup_status"]["total_databases"] = total_db_count
 
     # Determine recommended backup type
-    if backup_info["backup_status"]["mysql"]["available"]:
-        backup_info["recommended_backup_type"] = "mysql"
-    elif backup_info["backup_status"]["sqlite"]["available"]:
+    # Prioritize SQLite/rsync (modern default) over MySQL (legacy)
+    # Reason: SQLite is the default for new experiments, and rsync also handles videos
+    if backup_info["backup_status"]["sqlite"]["available"]:
         backup_info["recommended_backup_type"] = "rsync"
+    elif backup_info["backup_status"]["mysql"]["available"]:
+        backup_info["recommended_backup_type"] = "mysql"
     else:
         backup_info["recommended_backup_type"] = "none"
+
+    # Video backup is only supported for rsync-based backups
+    backup_info["supports_video_backup"] = (
+        backup_info["recommended_backup_type"] == "rsync"
+    )
 
     return backup_info

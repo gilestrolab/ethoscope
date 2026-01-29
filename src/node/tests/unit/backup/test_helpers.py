@@ -888,8 +888,8 @@ class TestGetDeviceBackupInfo:
         assert info["backup_status"]["mysql"]["database_count"] == 2
         assert info["backup_status"]["sqlite"]["database_count"] == 1
         assert info["backup_status"]["total_databases"] == 3
-        # MariaDB should be preferred
-        assert info["recommended_backup_type"] == "mysql"
+        # SQLite/rsync should be preferred (modern default, also handles videos)
+        assert info["recommended_backup_type"] == "rsync"
 
     @patch("ethoscope_node.backup.helpers._fallback_database_discovery")
     @patch("ethoscope_node.backup.helpers._enhance_databases_with_rsync_info")
@@ -912,8 +912,8 @@ class TestGetDeviceBackupInfo:
         # Call with empty databases
         info = get_device_backup_info("device_001", {})
 
-        # Should have called fallback discovery
-        mock_fallback.assert_called_once_with("device_001")
+        # Should have called fallback discovery with default base_directory
+        mock_fallback.assert_called_once_with("device_001", "/ethoscope_data")
         assert info["backup_status"]["sqlite"]["available"] is True
 
     @patch("ethoscope_node.backup.helpers._fallback_database_discovery")

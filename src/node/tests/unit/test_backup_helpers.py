@@ -395,7 +395,8 @@ class TestDeviceBackupInfo(unittest.TestCase):
 
             # Verify totals
             self.assertEqual(backup_status["total_databases"], 3)
-            self.assertEqual(backup_info["recommended_backup_type"], "mysql")
+            # SQLite/rsync preferred when both available (modern default)
+            self.assertEqual(backup_info["recommended_backup_type"], "rsync")
 
     def test_get_device_backup_info_video_only(self):
         """Test backup info extraction with video files only."""
