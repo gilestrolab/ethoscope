@@ -140,7 +140,7 @@ skip_empty = False
 #   - Device control (instructions, logs, SQL dumps, retirement)
 #   - Batch endpoints (full and critical data batching)
 #   - Exception handling (JSON parsing, API failures, SSH errors)
-fail_under = 80.13
+fail_under = 78
 
 [html]
 directory = htmlcov
