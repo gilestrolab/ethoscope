@@ -178,12 +178,10 @@ class BaseSQLConnector:
                 cursor = conn.cursor()
 
                 # Get all non-system tables
-                cursor.execute(
-                    """
+                cursor.execute("""
                     SELECT name FROM sqlite_master
                     WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
-                """
-                )
+                """)
                 tables = cursor.fetchall()
 
                 table_info = {}

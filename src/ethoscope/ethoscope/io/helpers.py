@@ -511,7 +511,13 @@ class NpyAppendableFile:
         """
         with open(self.fname, "rb") as fh:
             version = np.lib.format.read_magic(fh)
-            shape, fortran, dtype = np.lib.format._read_array_header(fh, version)
+            # Use version-specific public API instead of private _read_array_header
+            if version[0] == 1:
+                shape, fortran, dtype = np.lib.format.read_array_header_1_0(fh)
+            elif version[0] == 2:
+                shape, fortran, dtype = np.lib.format.read_array_header_2_0(fh)
+            else:
+                shape, fortran, dtype = np.lib.format.read_array_header_2_0(fh)
 
         return version, {"descr": dtype, "fortran_order": fortran, "shape": shape}
 
