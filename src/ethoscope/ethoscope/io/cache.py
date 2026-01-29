@@ -1052,12 +1052,10 @@ class SQLiteDatabaseMetadataCache(BaseDatabaseMetadataCache):
             cursor = conn.cursor()
 
             # Get list of tables (excluding sqlite_* system tables)
-            cursor.execute(
-                """
+            cursor.execute("""
                 SELECT name FROM sqlite_master
                 WHERE type='table' AND name NOT LIKE 'sqlite_%'
-            """
-            )
+            """)
             tables = [row[0] for row in cursor.fetchall()]
 
             # Get table counts

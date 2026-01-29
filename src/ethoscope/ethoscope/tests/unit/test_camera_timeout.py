@@ -5,6 +5,7 @@ Unit tests for camera initialization timeout mechanisms.
 Tests the failsafe mechanisms implemented to prevent ethoscope from hanging
 indefinitely during camera initialization, particularly for picamera2 compatibility issues.
 """
+
 import logging
 import os
 import queue

@@ -246,7 +246,7 @@ class SensorScanner(DeviceScanner):
 
         # Initialize temperature alert monitoring
         self._config = config
-        self._temperature_monitor: Optional["TemperatureAlertMonitor"] = None
+        self._temperature_monitor: Optional[TemperatureAlertMonitor] = None
 
         # Lazily initialize temperature monitor when config is available
         if self._config:

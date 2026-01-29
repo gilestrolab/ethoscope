@@ -32,6 +32,7 @@ class TestDeviceAPI(unittest.TestCase):
         self.mock_server.sensors_dir = "/tmp/sensors"
         self.mock_server.roi_templates_dir = "/tmp/templates"
         self.mock_server.tmp_imgs_dir = "/tmp/imgs"
+        self.mock_server.ethoscope_data_dir = "/ethoscope_data"
 
         # Create temp directory for image caching tests
         self.temp_dir = tempfile.mkdtemp()
@@ -501,15 +502,19 @@ class TestDeviceAPI(unittest.TestCase):
 
         self.assertEqual(result["total_databases"], 1)
         mock_get_backup_info.assert_called_once_with(
-            "device1", {"db1": {"status": "active"}}
+            "device1", {"db1": {"status": "active"}}, "/ethoscope_data"
         )
 
+    @patch("ethoscope_node.backup.helpers.get_device_backup_info")
     @patch("ethoscope_node.backup.helpers.BackupClass")
-    def test_force_device_backup_success(self, mock_backup_class):
+    def test_force_device_backup_success(self, mock_backup_class, mock_get_backup_info):
         """Test forcing device backup successfully."""
         mock_device = Mock()
         mock_device.info.return_value = {"id": "device1", "name": "test"}
         self.api.device_scanner.get_device.return_value = mock_device
+
+        # Mock backup info detection
+        mock_get_backup_info.return_value = {"recommended_backup_type": "mysql"}
 
         # Mock backup job
         mock_backup_job = Mock()
@@ -524,12 +529,16 @@ class TestDeviceAPI(unittest.TestCase):
         self.assertTrue(result["success"])
         mock_backup_class.assert_called_once()
 
+    @patch("ethoscope_node.backup.helpers.get_device_backup_info")
     @patch("ethoscope_node.backup.helpers.BackupClass")
-    def test_force_device_backup_failure(self, mock_backup_class):
+    def test_force_device_backup_failure(self, mock_backup_class, mock_get_backup_info):
         """Test forcing device backup with failure."""
         mock_device = Mock()
         mock_device.info.return_value = {"id": "device1", "name": "test"}
         self.api.device_scanner.get_device.return_value = mock_device
+
+        # Mock backup info detection
+        mock_get_backup_info.return_value = {"recommended_backup_type": "mysql"}
 
         # Mock backup job that fails
         mock_backup_job = Mock()
@@ -543,12 +552,18 @@ class TestDeviceAPI(unittest.TestCase):
 
         self.assertFalse(result["success"])
 
+    @patch("ethoscope_node.backup.helpers.get_device_backup_info")
     @patch("ethoscope_node.backup.helpers.BackupClass")
-    def test_force_device_backup_exception(self, mock_backup_class):
+    def test_force_device_backup_exception(
+        self, mock_backup_class, mock_get_backup_info
+    ):
         """Test forcing device backup handles exceptions."""
         mock_device = Mock()
         mock_device.info.return_value = {"id": "device1", "name": "test"}
         self.api.device_scanner.get_device.return_value = mock_device
+
+        # Mock backup info detection
+        mock_get_backup_info.return_value = {"recommended_backup_type": "mysql"}
 
         mock_backup_class.side_effect = Exception("Backup error")
 

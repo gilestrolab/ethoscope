@@ -194,7 +194,7 @@ if __name__ == "__main__":
         help="Blink specified GPIO. Meant to be used as an example only",
     )
 
-    (options, args) = parser.parse_args()
+    options, args = parser.parse_args()
     option_dict = vars(options)
 
     DEBUG = option_dict["debug"]
