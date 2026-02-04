@@ -27,7 +27,6 @@ from ethoscope.io import (
     MySQLResultWriter,
     SQLiteResultWriter,
     create_metadata_cache,
-    dbAppender,
 )
 from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
 from ethoscope.roi_builders.target_roi_builder import TargetGridROIBuilder
@@ -194,7 +193,6 @@ class ControlThread(Thread):
                     "possible_classes": [
                         SQLiteResultWriter,
                         MySQLResultWriter,
-                        dbAppender,
                     ],
                 },
             ),

@@ -264,18 +264,37 @@
                         update_machine: userOptions.update_machine || {}
                     };
 
-                    // Filter MySQLResultWriter if disabled in node configuration
-                    if ($scope.node.device_options &&
-                        !$scope.node.device_options.enable_mysql_result_writer &&
-                        $scope.user_options.tracking &&
-                        $scope.user_options.tracking.result_writer) {
-
+                    // Filter result_writer options based on configuration
+                    if ($scope.user_options.tracking && $scope.user_options.tracking.result_writer) {
+                        // Always remove dbAppender from UI options
                         $scope.user_options.tracking.result_writer =
                             $scope.user_options.tracking.result_writer.filter(function(writer) {
-                                return writer.name !== 'MySQLResultWriter';
+                                return writer.name !== 'dbAppender';
                             });
 
-                        console.log('MySQLResultWriter hidden (disabled in node configuration)');
+                        // Remove MySQLResultWriter if disabled in configuration
+                        if ($scope.node.device_options && !$scope.node.device_options.enable_mysql_result_writer) {
+                            $scope.user_options.tracking.result_writer =
+                                $scope.user_options.tracking.result_writer.filter(function(writer) {
+                                    return writer.name !== 'MySQLResultWriter';
+                                });
+
+                            // Hide result_writer section and auto-select SQLiteResultWriter
+                            $scope.hideResultWriterSection = true;
+
+                            // Set default SQLiteResultWriter with correct arguments
+                            $scope.selected_options.tracking.result_writer = {
+                                name: 'SQLiteResultWriter',
+                                arguments: {
+                                    take_frame_shots: true,
+                                    make_dam_like_table: true
+                                }
+                            };
+
+                            console.log('Result writer section hidden - auto-selected SQLiteResultWriter with DAM table enabled');
+                        } else {
+                            console.log('MySQLResultWriter available (enabled in node configuration)');
+                        }
                     }
 
                     // Initialize selected options with default values using service

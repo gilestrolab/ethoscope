@@ -751,7 +751,8 @@
             </div>
             <div class="modal-body">
                 <form name="trackingoptionsform" class="input">
-                    <div id="user_options" ng-repeat="(name, option) in user_options.tracking">
+                    <div id="user_options" ng-repeat="(name, option) in user_options.tracking"
+                         ng-if="name != 'result_writer' || !hideResultWriterSection">
                         <h4>{{name}}</h4>
 
                         <!-- Special handling for interactor section - use dropdown instead of radio buttons -->

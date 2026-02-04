@@ -135,7 +135,7 @@ class SQLiteResultWriter(BaseResultWriter):
                 "name": "make_dam_like_table",
                 "description": "Create DAM-compatible activity summary table",
                 "type": "boolean",
-                "default": False,
+                "default": True,
             },
         ],
     }
