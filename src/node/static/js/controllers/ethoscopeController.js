@@ -955,6 +955,19 @@
                             manageSpinner('stop');
                         });
                 }
+            } else {
+                // ROI builder without template_name (e.g., TargetGridROIBuilder)
+                console.log('Starting tracking with options (no template):', option);
+
+                $http.post('/device/' + device_id + '/controls/start', option)
+                    .then(function(response) {
+                        $scope.device.status = response.data.status;
+                        refreshDeviceStatus();
+                    })
+                    .catch(function(error) {
+                        console.error('Failed to start tracking:', error);
+                        manageSpinner('stop');
+                    });
             }
         };
 

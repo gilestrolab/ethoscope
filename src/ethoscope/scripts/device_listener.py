@@ -49,7 +49,7 @@ class commandingThread(threading.Thread):
     def __init__(self, ethoscope_info, host="", port=5000):
         self.host = host
         self.port = port
-        self.size = 1024
+        self.size = 1024 * 16  # Match ethoclient's COMM_PACKET_SIZE
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -101,7 +101,18 @@ class commandingThread(threading.Thread):
         """
 
         try:
-            recv = client.recv(self.size)
+            # Receive data in chunks until we have valid JSON
+            recv = b""
+            while True:
+                chunk = client.recv(self.size)
+                if not chunk:
+                    break
+                recv += chunk
+                try:
+                    json.loads(recv.decode("utf-8"))
+                    break  # Valid JSON received
+                except json.JSONDecodeError:
+                    continue  # Keep receiving
 
             if recv:
                 message = json.loads(recv)

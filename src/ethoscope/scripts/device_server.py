@@ -11,10 +11,8 @@ from optparse import OptionParser
 
 import bottle
 import netifaces as ni
-from ethoclient import listenerIsAlive
-from ethoclient import send_command
-from zeroconf import ServiceInfo
-from zeroconf import Zeroconf
+from ethoclient import listenerIsAlive, send_command
+from zeroconf import ServiceInfo, Zeroconf
 
 from ethoscope.control.record import ControlThreadVideoRecording
 from ethoscope.control.tracking import ControlThread
@@ -340,8 +338,12 @@ def controls(id, action):
 
     if action == "start":
         data = bottle.request.json
+        tracking_json_data.clear()
         tracking_json_data.update(data)
-        send_command(action, tracking_json_data)
+        result = send_command(action, tracking_json_data)
+        if isinstance(result, str) and result.startswith("ERROR:"):
+            logging.error(f"Start command failed: {result}")
+            return {"error": result, "status": "stopped", "id": _MACHINE_ID}
         return info(id)
 
     elif action in ["stop", "close", "poweroff", "reboot", "restart"]:
@@ -370,8 +372,12 @@ def controls(id, action):
 
     elif action in ["start_record", "stream"]:
         data = bottle.request.json
+        recording_json_data.clear()
         recording_json_data.update(data)
-        send_command(action, recording_json_data)
+        result = send_command(action, recording_json_data)
+        if isinstance(result, str) and result.startswith("ERROR:"):
+            logging.error(f"{action} command failed: {result}")
+            return {"error": result, "status": "stopped", "id": _MACHINE_ID}
         return info(id)
 
     elif action == "test_module":
@@ -610,7 +616,7 @@ def info(id):
 
 @api.get("/data/databases/<id>")
 @error_decorator
-def info(id):
+def databases_info(id):
     if id != _MACHINE_ID:
         raise WrongMachineID
 
