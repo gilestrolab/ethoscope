@@ -283,6 +283,9 @@
                             $scope.hideResultWriterSection = true;
 
                             // Set default SQLiteResultWriter with correct arguments
+                            if (!$scope.selected_options.tracking) {
+                                $scope.selected_options.tracking = {};
+                            }
                             $scope.selected_options.tracking.result_writer = {
                                 name: 'SQLiteResultWriter',
                                 arguments: {
