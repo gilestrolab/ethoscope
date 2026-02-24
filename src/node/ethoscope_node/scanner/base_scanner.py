@@ -1,6 +1,8 @@
+import fcntl
 import json
 import logging
 import socket
+import struct
 import time
 import urllib.error
 import urllib.request
@@ -9,7 +11,49 @@ from functools import wraps
 from threading import RLock, Thread
 from typing import Any, Dict, List, Optional
 
+import netifaces
 from zeroconf import IPVersion, ServiceBrowser, Zeroconf
+
+# ioctl request code for getting interface flags (SIOCGIFFLAGS)
+_SIOCGIFFLAGS = 0x8913
+_IFF_LOOPBACK = 0x0008
+_IFF_MULTICAST = 0x1000
+
+
+def _get_multicast_interfaces() -> List[str]:
+    """Return IPv4 addresses of interfaces that support multicast.
+
+    Filters out loopback and non-multicast interfaces (e.g. WireGuard/VPN
+    tunnels) which cause errors when used with zeroconf.
+
+    Returns:
+        List of IPv4 address strings suitable for passing to Zeroconf(interfaces=...).
+    """
+    logger = logging.getLogger("ethoscope.scanner")
+    result = []
+    for iface in netifaces.interfaces():
+        addrs = netifaces.ifaddresses(iface)
+        if netifaces.AF_INET not in addrs:
+            continue
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            flags_raw = fcntl.ioctl(
+                sock, _SIOCGIFFLAGS, struct.pack("256s", iface.encode())
+            )
+            sock.close()
+            flags = struct.unpack("H", flags_raw[16:18])[0]
+        except OSError:
+            continue
+        if not (flags & _IFF_MULTICAST) or (flags & _IFF_LOOPBACK):
+            continue
+        for addr in addrs[netifaces.AF_INET]:
+            result.append(addr["addr"])
+    if result:
+        logger.info(f"Zeroconf will use interfaces: {result}")
+    else:
+        logger.warning("No multicast-capable interfaces found, using all interfaces")
+    return result
+
 
 DEFAULT_TIMEOUT = 5
 MAX_RETRIES = 2
@@ -848,7 +892,13 @@ class DeviceScanner:
             return
 
         try:
-            self._zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
+            ifaces = _get_multicast_interfaces()
+            if ifaces:
+                self._zeroconf = Zeroconf(
+                    ip_version=IPVersion.V4Only, interfaces=ifaces
+                )
+            else:
+                self._zeroconf = Zeroconf(ip_version=IPVersion.V4Only)
             self._browser = ServiceBrowser(self._zeroconf, self.SERVICE_TYPE, self)
             self._is_running = True
             self._logger.info(f"Started {self.DEVICE_TYPE} scanner")
