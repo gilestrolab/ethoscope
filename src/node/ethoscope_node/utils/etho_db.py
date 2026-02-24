@@ -814,7 +814,7 @@ class ExperimentalDB(multiprocessing.Process):
         if ethoscope_name in blacklist:
             return
 
-        if type(e) is dict and e != {}:
+        if isinstance(e, dict) and e != {}:
             # UPDATE existing ethoscope
             updates = {
                 name: value
@@ -1185,7 +1185,7 @@ class ExperimentalDB(multiprocessing.Process):
             asdict: Return as dictionary if True
 
         Returns:
-            List of user data or dictionary keyed by username
+            List of user data or dictionary keyed by username (frontend format)
         """
         sql_get_users = f"SELECT * FROM {self._users_table_name}"
 
@@ -1205,15 +1205,35 @@ class ExperimentalDB(multiprocessing.Process):
         if not isinstance(rows, list):
             return {} if asdict else []
 
+        # Convert database format to frontend format
+        def map_user_to_frontend(row_dict):
+            """Map database field names and types to frontend format."""
+            return {
+                "id": row_dict.get("id"),
+                "name": row_dict.get("username"),  # username -> name
+                "fullname": row_dict.get("fullname", ""),
+                "PIN": row_dict.get("pin", ""),
+                "email": row_dict.get("email", ""),
+                "telephone": row_dict.get("telephone", ""),
+                "group": row_dict.get("labname", ""),  # labname -> group
+                "active": bool(row_dict.get("active", 0)),  # int -> bool
+                "isAdmin": bool(
+                    row_dict.get("isadmin", 0)
+                ),  # isadmin -> isAdmin (int -> bool)
+                "created": row_dict.get("created"),
+            }
+
         if asdict:
             # Return dictionary keyed by username like the configuration format
             result = {}
             for row in rows:
                 row_dict = dict(row)
-                result[row_dict["username"]] = row_dict
+                mapped = map_user_to_frontend(row_dict)
+                # Key by 'name' field (which is the username)
+                result[mapped["name"]] = mapped
             return result
         else:
-            return rows
+            return [map_user_to_frontend(dict(row)) for row in rows]
 
     def addIncubator(
         self,

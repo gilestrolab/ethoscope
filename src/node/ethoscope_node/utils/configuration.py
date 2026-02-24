@@ -473,7 +473,7 @@ class EthoscopeConfiguration:
 
     def add_user(self, userdata: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Add a new user using database storage.
+        Add or update a user using database storage.
 
         Args:
             userdata: User data dictionary
@@ -511,22 +511,45 @@ class EthoscopeConfiguration:
                 "created": userdata.get("created", datetime.datetime.now().timestamp()),
             }
 
-            # Add user to database
             db = ExperimentalDB()
-            result = db.addUser(**db_user_data)
 
-            if result > 0:
-                self._logger.info(f"Added user to database: {name}")
-                # Get all users from database to return consistent format
-                all_users = db.getAllUsers(asdict=True)
-                return {"result": "success", "data": all_users}
+            # Check if this is an update (user has id field) or a new user
+            if "id" in userdata and userdata["id"]:
+                # Update existing user
+                user_id = userdata["id"]
+                # Remove fields that shouldn't be updated
+                update_data = {
+                    k: v
+                    for k, v in db_user_data.items()
+                    if k != "username" and k != "created"
+                }
+                result = db.updateUser(user_id=user_id, **update_data)
+
+                if result >= 0:
+                    self._logger.info(f"Updated user in database: {name}")
+                    # Get all users from database to return consistent format
+                    all_users = db.getAllUsers(asdict=True)
+                    return {"result": "success", "data": all_users}
+                else:
+                    error_msg = f"Failed to update user '{name}' in database"
+                    self._logger.error(error_msg)
+                    raise ValueError(error_msg)
             else:
-                error_msg = f"Failed to add user '{name}' to database"
-                self._logger.error(error_msg)
-                raise ValueError(error_msg)
+                # Add new user to database
+                result = db.addUser(**db_user_data)
+
+                if result > 0:
+                    self._logger.info(f"Added user to database: {name}")
+                    # Get all users from database to return consistent format
+                    all_users = db.getAllUsers(asdict=True)
+                    return {"result": "success", "data": all_users}
+                else:
+                    error_msg = f"Failed to add user '{name}' to database"
+                    self._logger.error(error_msg)
+                    raise ValueError(error_msg)
 
         except Exception as e:
-            error_msg = f"Failed to add user '{name}': {e}"
+            error_msg = f"Failed to add/update user '{name}': {e}"
             self._logger.error(error_msg)
             raise ValueError(error_msg) from e
 

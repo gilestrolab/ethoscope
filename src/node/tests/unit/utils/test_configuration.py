@@ -1715,7 +1715,7 @@ class TestConfigurationEdgeCases:
             with pytest.raises(ValueError) as exc_info:
                 config.add_user({"name": "testuser"})
 
-            assert "Failed to add user" in str(exc_info.value)
+            assert "Failed to add/update user" in str(exc_info.value)
 
     def test_get_setup_status_handles_database_error(self):
         """Test get_setup_status handles database errors gracefully."""

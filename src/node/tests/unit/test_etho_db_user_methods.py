@@ -167,15 +167,17 @@ class TestGetAllUsers:
         users = test_db.getAllUsers(admin_only=True, asdict=True)
         assert len(users) == 1
         assert "alice" in users
-        assert users["alice"]["isadmin"] == 1
+        # getAllUsers now returns frontend format with isAdmin (boolean)
+        assert users["alice"]["isAdmin"] is True
 
     def test_get_all_users_active_admin_only(self, test_db):
         """Test getting only active admin users."""
         users = test_db.getAllUsers(active_only=True, admin_only=True, asdict=True)
         assert len(users) == 1
         assert "alice" in users
-        assert users["alice"]["active"] == 1
-        assert users["alice"]["isadmin"] == 1
+        # getAllUsers now returns frontend format with active and isAdmin (booleans)
+        assert users["alice"]["active"] is True
+        assert users["alice"]["isAdmin"] is True
 
     def test_get_all_users_as_list(self, test_db):
         """Test getting users as list instead of dict."""

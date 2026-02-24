@@ -1405,7 +1405,8 @@ class TestAdvancedUserQueries:
 
         assert len(admins) >= 2
         for user in admins:
-            assert user["isadmin"] == 1
+            # getAllUsers now returns frontend format with isAdmin (boolean)
+            assert user["isAdmin"] is True
 
 
 class TestPINMigrationAndLegacyFormats:
