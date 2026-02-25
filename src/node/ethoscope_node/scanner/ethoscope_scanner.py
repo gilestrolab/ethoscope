@@ -25,6 +25,7 @@ from ethoscope_node.utils.etho_db import ExperimentalDB
 STREAMING_PORT = 8887
 ETHOSCOPE_PORT = 9000
 DB_UPDATE_INTERVAL = 30  # seconds
+SSH_RETRY_INTERVAL = 300  # seconds (5 minutes between retry attempts)
 
 
 class Ethoscope(BaseDevice):
@@ -76,6 +77,7 @@ class Ethoscope(BaseDevice):
         self._last_db_info = 0
         self._device_controller_created = time.time()
         self._ping_count = 0  # Initialize ping counter
+        self._last_ssh_attempt = 0  # Timestamp of last SSH key setup attempt
 
         # User action tracking for enhanced status management
         self._last_user_action = None
@@ -457,6 +459,21 @@ class Ethoscope(BaseDevice):
         # Check for storage warnings
         self._check_storage_warnings()
 
+        # Periodic SSH key retry for devices that missed initial transfer
+        accessible_states = ["stopped", "running", "recording", "streaming", "busy"]
+        if (
+            new_status in accessible_states
+            and not self._info.get("ssh_key_installed", False)
+            and time.time() - self._last_ssh_attempt > SSH_RETRY_INTERVAL
+        ):
+            self._last_ssh_attempt = time.time()
+            self._logger.info(
+                f"Retrying SSH key setup for {self._info.get('name', self._ip)}"
+            )
+            ssh_success = self.setup_ssh_authentication()
+            with self._lock:
+                self._info["ssh_key_installed"] = ssh_success
+
         # update comprehensive list of databases - this should not be served here
         self._info.update({"databases": self.databases_info()})
 
@@ -830,6 +847,7 @@ class Ethoscope(BaseDevice):
                 self._logger.info(
                     f"SSH key not installed on {device_name}, attempting auto-transfer"
                 )
+                self._last_ssh_attempt = time.time()
                 ssh_success = self.setup_ssh_authentication()
 
                 with self._lock:
