@@ -1208,11 +1208,16 @@ class ExperimentalDB(multiprocessing.Process):
         # Convert database format to frontend format
         def map_user_to_frontend(row_dict):
             """Map database field names and types to frontend format."""
+            # Normalize PIN: old entries may be stored as int (0 instead of "0000")
+            raw_pin = row_dict.get("pin", "")
+            if isinstance(raw_pin, int):
+                raw_pin = str(raw_pin).zfill(4)
+
             return {
                 "id": row_dict.get("id"),
                 "name": row_dict.get("username"),  # username -> name
                 "fullname": row_dict.get("fullname", ""),
-                "PIN": row_dict.get("pin", ""),
+                "PIN": str(raw_pin),
                 "email": row_dict.get("email", ""),
                 "telephone": row_dict.get("telephone", ""),
                 "group": row_dict.get("labname", ""),  # labname -> group
