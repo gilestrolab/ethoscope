@@ -1127,18 +1127,19 @@ Ethoscope Node Setup Wizard
                         config_data["folders"][folder_name] = folder_info["path"]
 
             # Get admin user information
+            # getAllUsers returns frontend format: name, group, isAdmin (bool), PIN
             try:
                 db = ExperimentalDB()
                 all_users = db.getAllUsers(active_only=False, asdict=True)
                 for username, user_info in all_users.items():
-                    if user_info.get("isadmin") == 1:
+                    if user_info.get("isAdmin"):
                         config_data["admin_user"] = {
-                            "username": username,
+                            "username": user_info.get("name", username),
                             "fullname": user_info.get("fullname", ""),
                             "email": user_info.get("email", ""),
-                            "pin": user_info.get("pin", ""),
+                            "pin": user_info.get("PIN", ""),
                             "telephone": user_info.get("telephone", ""),
-                            "labname": user_info.get("labname", ""),
+                            "labname": user_info.get("group", ""),
                         }
                         break  # Use first admin user found
             except Exception as e:
@@ -1279,21 +1280,22 @@ Ethoscope Node Setup Wizard
                 self.logger.warning(f"Could not load virtual sensor settings: {e}")
 
             # Get existing users (excluding admin user already loaded)
+            # getAllUsers returns frontend format: name, group, isAdmin (bool), PIN
             try:
                 db = ExperimentalDB()
                 all_users = db.getAllUsers(active_only=False, asdict=True)
                 for username, user_info in all_users.items():
                     # Skip the admin user as it's already loaded separately
-                    if user_info.get("isadmin") != 1:
+                    if not user_info.get("isAdmin"):
                         config_data["users"].append(
                             {
-                                "username": username,
+                                "username": user_info.get("name", username),
                                 "fullname": user_info.get("fullname", ""),
                                 "email": user_info.get("email", ""),
-                                "pin": user_info.get("pin", ""),
+                                "pin": user_info.get("PIN", ""),
                                 "telephone": user_info.get("telephone", ""),
-                                "labname": user_info.get("labname", ""),
-                                "isadmin": bool(user_info.get("isadmin", 0)),
+                                "labname": user_info.get("group", ""),
+                                "isadmin": user_info.get("isAdmin", False),
                             }
                         )
             except Exception as e:

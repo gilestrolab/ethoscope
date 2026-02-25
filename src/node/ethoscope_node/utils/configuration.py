@@ -759,10 +759,9 @@ class EthoscopeConfiguration:
             db = ExperimentalDB()
 
             # Get admin users from database
+            # getAllUsers returns frontend format: isAdmin (bool), name (str)
             all_users = db.getAllUsers(active_only=True, asdict=True)
-            admin_users = [
-                user for user in all_users.values() if user.get("isadmin", 0) == 1
-            ]
+            admin_users = [user for user in all_users.values() if user.get("isAdmin")]
 
             # If no admin users exist, setup is required
             if not admin_users:
@@ -773,7 +772,7 @@ class EthoscopeConfiguration:
             default_emails = ["admin@localhost", "test@localhost", "admin@example.com"]
 
             for admin in admin_users:
-                username = admin.get("username", "").lower()
+                username = admin.get("name", "").lower()
                 email = admin.get("email", "").lower()
 
                 # If any admin has default credentials, setup is required
@@ -816,7 +815,7 @@ class EthoscopeConfiguration:
                 [
                     u
                     for u in db.getAllUsers(active_only=True, asdict=True).values()
-                    if u.get("isadmin", 0) == 1
+                    if u.get("isAdmin")
                 ]
             )
             incubator_count = len(db.getAllIncubators(active_only=True))
@@ -1085,7 +1084,7 @@ class EthoscopeConfiguration:
             plaintext_users = []
 
             for username, user_data in all_users.items():
-                pin = user_data.get("pin", "")
+                pin = user_data.get("PIN", "")
                 if pin:
                     # Check if PIN looks like plaintext (not bcrypt hash)
                     if not (pin.startswith("$2b$") or pin.startswith("$2a$")):

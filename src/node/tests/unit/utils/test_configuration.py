@@ -939,7 +939,7 @@ class TestEthoscopeConfigurationSetup:
 
         mock_db = MagicMock()
         mock_db.getAllUsers.return_value = {
-            "admin": {"username": "admin", "isadmin": 1, "email": "admin@localhost"}
+            "admin": {"name": "admin", "isAdmin": True, "email": "admin@localhost"}
         }
 
         with patch("ethoscope_node.utils.etho_db.ExperimentalDB", return_value=mock_db):
@@ -972,8 +972,8 @@ class TestEthoscopeConfigurationSetup:
         # Non-default admin user with proper credentials
         mock_db.getAllUsers.return_value = {
             "realadmin": {
-                "username": "realadmin",
-                "isadmin": 1,
+                "name": "realadmin",
+                "isAdmin": True,
                 "email": "realadmin@example.com",
             }
         }
@@ -1002,7 +1002,7 @@ class TestEthoscopeConfigurationSetup:
         config._logger = MagicMock()
 
         mock_db = MagicMock()
-        mock_db.getAllUsers.return_value = {"user1": {"isadmin": 1}}
+        mock_db.getAllUsers.return_value = {"user1": {"isAdmin": True}}
         mock_db.getAllIncubators.return_value = {"inc1": {}}
 
         with patch("ethoscope_node.utils.etho_db.ExperimentalDB", return_value=mock_db):
@@ -1345,7 +1345,7 @@ class TestEthoscopeConfigurationPINMigration:
         config._logger = MagicMock()
 
         mock_db = MagicMock()
-        mock_db.getAllUsers.return_value = {"user1": {"pin": "1234"}}
+        mock_db.getAllUsers.return_value = {"user1": {"PIN": "1234"}}
 
         with patch("ethoscope_node.utils.etho_db.ExperimentalDB", return_value=mock_db):
             count = config.migrate_user_pins(dry_run=True)
@@ -1361,7 +1361,7 @@ class TestEthoscopeConfigurationPINMigration:
         config._config_file = Path("/tmp/test.conf")
 
         mock_db = MagicMock()
-        mock_db.getAllUsers.return_value = {"user1": {"pin": "1234"}}
+        mock_db.getAllUsers.return_value = {"user1": {"PIN": "1234"}}
         mock_db.migrate_plaintext_pins.return_value = 1
 
         with patch("ethoscope_node.utils.etho_db.ExperimentalDB", return_value=mock_db):
@@ -1380,7 +1380,7 @@ class TestEthoscopeConfigurationPINMigration:
         # User with bcrypt hash
         mock_db.getAllUsers.return_value = {
             "user1": {
-                "pin": "$2b$12$hashedhashhashedhashhashedhashedhashhashedhashhashedha"
+                "PIN": "$2b$12$hashedhashhashedhashhashedhashedhashhashedhashhashedha"
             }
         }
 
@@ -1397,7 +1397,7 @@ class TestEthoscopeConfigurationPINMigration:
         mock_db = MagicMock()
         # User with SHA256 hex hash (64 chars)
         mock_db.getAllUsers.return_value = {
-            "user1": {"pin": "a" * 64}  # 64 hex characters - should be detected as hash
+            "user1": {"PIN": "a" * 64}  # 64 hex characters - should be detected as hash
         }
 
         with patch("ethoscope_node.utils.etho_db.ExperimentalDB", return_value=mock_db):
@@ -1413,7 +1413,7 @@ class TestEthoscopeConfigurationPINMigration:
         config._config_file = Path("/tmp/test.conf")
 
         mock_db = MagicMock()
-        mock_db.getAllUsers.return_value = {"user1": {"pin": "1234"}}
+        mock_db.getAllUsers.return_value = {"user1": {"PIN": "1234"}}
         mock_db.migrate_plaintext_pins.return_value = 0  # No PINs migrated
 
         with patch("ethoscope_node.utils.etho_db.ExperimentalDB", return_value=mock_db):
@@ -1431,7 +1431,7 @@ class TestEthoscopeConfigurationPINMigration:
 
         mock_db = MagicMock()
         # User with non-hex string PIN (will fail int(pin, 16))
-        mock_db.getAllUsers.return_value = {"user1": {"pin": "notahexstring1234"}}
+        mock_db.getAllUsers.return_value = {"user1": {"PIN": "notahexstring1234"}}
         mock_db.migrate_plaintext_pins.return_value = 1
 
         with patch("ethoscope_node.utils.etho_db.ExperimentalDB", return_value=mock_db):
