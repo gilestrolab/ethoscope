@@ -46,8 +46,11 @@ class BackupAPI(BaseAPI):
         mysql_status = self._fetch_backup_service_status(8090, "MySQL")
         rsync_status = self._fetch_backup_service_status(8093, "Rsync")
 
+        # Determine which devices are currently being processed
+        processing_devices = self._get_processing_devices(mysql_status, rsync_status)
+
         # Get device-level backup information for home page icons
-        devices_backup_info = self._get_devices_backup_summary()
+        devices_backup_info = self._get_devices_backup_summary(processing_devices)
 
         # Determine service availability
         mysql_available = "error" not in mysql_status
@@ -76,9 +79,7 @@ class BackupAPI(BaseAPI):
                 },
             },
             "devices": devices_backup_info,
-            "processing_devices": self._get_processing_devices(
-                mysql_status, rsync_status
-            ),
+            "processing_devices": processing_devices,
             "timestamp": current_time,
         }
 
@@ -174,9 +175,18 @@ class BackupAPI(BaseAPI):
 
         return processing
 
-    def _get_devices_backup_summary(self):
+    def _get_devices_backup_summary(self, processing_devices=None):
         """Get backup summary for all devices for home page display."""
         devices_backup = {}
+
+        # Build a lookup of which device names are currently being processed
+        # and by which service (mysql or rsync)
+        processing_by_name = {}
+        for proc in processing_devices or []:
+            name = proc.get("device")
+            service = proc.get("service")
+            if name:
+                processing_by_name.setdefault(name, set()).add(service)
 
         try:
             # Get list of all devices from the device scanner
@@ -210,6 +220,10 @@ class BackupAPI(BaseAPI):
                         sqlite_info = backup_status.get("sqlite", {})
                         video_info = backup_status.get("video", {})
 
+                        # Check if this device is currently being processed
+                        device_name = device_info.get("name", "")
+                        active_services = processing_by_name.get(device_name, set())
+
                         # Calculate overall status
                         available_count = sum(
                             [
@@ -236,7 +250,7 @@ class BackupAPI(BaseAPI):
                                         if mysql_info.get("available", False)
                                         else "not_available"
                                     ),
-                                    "processing": False,
+                                    "processing": "mysql" in active_services,
                                     "size": mysql_info.get("total_size_bytes", 0),
                                     "last_backup": mysql_info.get("last_backup", 0),
                                     "records": mysql_info.get("database_count", 0),
@@ -250,7 +264,7 @@ class BackupAPI(BaseAPI):
                                         if sqlite_info.get("available", False)
                                         else "not_available"
                                     ),
-                                    "processing": False,
+                                    "processing": "rsync" in active_services,
                                     "size": sqlite_info.get("total_size_bytes", 0),
                                     "last_backup": sqlite_info.get("last_backup", 0),
                                     "files": sqlite_info.get("database_count", 0),
@@ -263,7 +277,7 @@ class BackupAPI(BaseAPI):
                                         if video_info.get("available", False)
                                         else "not_available"
                                     ),
-                                    "processing": False,
+                                    "processing": "rsync" in active_services,
                                     "size": video_info.get("total_size_bytes", 0),
                                     "last_backup": video_info.get("last_backup", 0),
                                     "files": video_info.get("file_count", 0),
