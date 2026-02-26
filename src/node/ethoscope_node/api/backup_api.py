@@ -154,24 +154,18 @@ class BackupAPI(BaseAPI):
         return None
 
     def _get_processing_devices(self, mysql_status, rsync_status):
-        """Get list of all currently processing devices."""
+        """Get list of all currently processing devices from backup services."""
         processing = []
 
-        # Extract from MySQL service
-        mysql_device = self._extract_current_device(mysql_status)
-        mysql_file = self._extract_current_file(mysql_status)
-        if mysql_device:
-            processing.append(
-                {"service": "mysql", "device": mysql_device, "current_file": mysql_file}
-            )
-
-        # Extract from rsync service
-        rsync_device = self._extract_current_device(rsync_status)
-        rsync_file = self._extract_current_file(rsync_status)
-        if rsync_device:
-            processing.append(
-                {"service": "rsync", "device": rsync_device, "current_file": rsync_file}
-            )
+        # Extract all processing devices from rsync service
+        # The rsync status nests device data under a "devices" key
+        if isinstance(rsync_status, dict) and "error" not in rsync_status:
+            rsync_devices = rsync_status.get("devices", {})
+            for _dev_id, dev_data in rsync_devices.items():
+                if isinstance(dev_data, dict) and dev_data.get("processing", False):
+                    processing.append(
+                        {"service": "rsync", "device": dev_data.get("name", _dev_id)}
+                    )
 
         return processing
 
