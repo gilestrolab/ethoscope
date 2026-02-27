@@ -16,7 +16,7 @@ class NoValidPortError(Exception):
 
 class OptoMotor(SimpleSerialInterface):
     _baud = 115200
-    _n_channels = 24
+    _n_channels = 20
 
     def __init__(self, port=None, *args, **kwargs):
         """
@@ -63,8 +63,53 @@ class OptoMotor(SimpleSerialInterface):
         o = self._serial.write(instruction)
         return o
 
-    def send(self, channel, duration=10000, intensity=1000):
-        self.activate(channel, duration, intensity)
+    def pulse_train(self, channel, on_ms, off_ms, cycles):
+        """
+        Sends a pulse train command to the LED on the given channel.
+
+        Args:
+            channel (int): The channel index.
+            on_ms (int): ON duration per pulse in milliseconds.
+            off_ms (int): OFF duration per pulse in milliseconds.
+            cycles (int): Number of ON/OFF cycles.
+        """
+        if channel < 0:
+            raise Exception("channel must be greater or equal to zero")
+
+        on_ms = int(on_ms)
+        off_ms = int(off_ms)
+        cycles = int(cycles)
+        instruction = b"W %i %i %i %i\r\n" % (channel, on_ms, off_ms, cycles)
+        o = self._serial.write(instruction)
+        return o
+
+    def send(
+        self,
+        channel,
+        duration=10000,
+        intensity=1000,
+        on_ms=None,
+        off_ms=None,
+        cycles=None,
+    ):
+        """
+        Route to the appropriate command based on kwargs.
+
+        If on_ms, off_ms, and cycles are provided, sends a pulse train (W command).
+        Otherwise sends a simple activate pulse (P command).
+
+        Args:
+            channel (int): The channel index.
+            duration (int): Duration for simple pulse in ms.
+            intensity (int): Duty cycle for simple pulse (0-1000).
+            on_ms (int, optional): ON duration per pulse for pulse train.
+            off_ms (int, optional): OFF duration per pulse for pulse train.
+            cycles (int, optional): Number of cycles for pulse train.
+        """
+        if on_ms is not None and off_ms is not None and cycles is not None:
+            self.pulse_train(channel, on_ms, off_ms, cycles)
+        else:
+            self.activate(channel, duration, intensity)
 
     def _warm_up(self):
         """

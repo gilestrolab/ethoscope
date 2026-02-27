@@ -42,7 +42,7 @@ from ethoscope.stimulators.sleep_depriver_stimulators import (
     ExperimentalSleepDepStimulator,
     MiddleCrossingStimulator,
     OptomotorSleepDepriver,
-    OptomotorSleepDepriverSystematic,
+    OptoSleepDepriver,
     SleepDepStimulator,
     mAGO,
 )
@@ -148,7 +148,7 @@ class ControlThread(Thread):
                         # DynamicOdourDeliverer,
                         DynamicOdourSleepDepriver,
                         OptoMidlineCrossStimulator,
-                        OptomotorSleepDepriverSystematic,
+                        OptoSleepDepriver,
                         MiddleCrossingOdourStimulator,
                         MiddleCrossingOdourStimulatorFlushed,
                         mAGO,

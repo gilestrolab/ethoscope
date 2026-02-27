@@ -108,7 +108,7 @@ class MultiStimulator(BaseStimulator):
             ExperimentalSleepDepStimulator,
             MiddleCrossingStimulator,
             OptomotorSleepDepriver,
-            OptomotorSleepDepriverSystematic,
+            OptoSleepDepriver,
             SleepDepStimulator,
             mAGO,
         )
@@ -123,7 +123,7 @@ class MultiStimulator(BaseStimulator):
             "ExperimentalSleepDepStimulator": ExperimentalSleepDepStimulator,
             "DynamicOdourSleepDepriver": DynamicOdourSleepDepriver,
             "OptoMidlineCrossStimulator": OptoMidlineCrossStimulator,
-            "OptomotorSleepDepriverSystematic": OptomotorSleepDepriverSystematic,
+            "OptoSleepDepriver": OptoSleepDepriver,
             "MiddleCrossingOdourStimulator": MiddleCrossingOdourStimulator,
             "MiddleCrossingOdourStimulatorFlushed": MiddleCrossingOdourStimulatorFlushed,
             "mAGO": mAGO,

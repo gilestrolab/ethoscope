@@ -262,8 +262,17 @@ class SleepDepStimulatorCR(SleepDepStimulator):
 
 
 class OptomotorSleepDepriver(SleepDepStimulator):
+    """
+    MODULE 3: 10 motors (odd channels) + 10 LEDs (even channels).
+
+    Supports three stimulus types:
+    1 = motor only (P command)
+    2 = LED simple pulse (P command on even channel)
+    3 = LED pulse train (W command on even channel)
+    """
+
     _description = {
-        "overview": "A stimulator to sleep deprive an animal using gear motors. See https://github.com/gilestrolab/ethoscope_hardware/tree/master/modules/gear_motor_sleep_depriver",
+        "overview": "A stimulator to sleep deprive using motors and/or LEDs (MODULE 3). Supports motor, LED pulse, and LED pulse train modes.",
         "arguments": [
             {
                 "type": "number",
@@ -294,12 +303,39 @@ class OptomotorSleepDepriver(SleepDepStimulator):
             },
             {
                 "type": "number",
-                "min": 0,
+                "min": 1,
                 "max": 3,
                 "step": 1,
                 "name": "stimulus_type",
-                "description": "1 = opto, 2= moto",
-                "default": 2,
+                "description": "1 = motor, 2 = LED pulse, 3 = LED pulse train",
+                "default": 1,
+            },
+            {
+                "type": "number",
+                "min": 10,
+                "max": 10000,
+                "step": 10,
+                "name": "pulse_on_ms",
+                "description": "LED ON duration per cycle (ms) - pulse train mode only",
+                "default": 100,
+            },
+            {
+                "type": "number",
+                "min": 10,
+                "max": 10000,
+                "step": 10,
+                "name": "pulse_off_ms",
+                "description": "LED OFF duration per cycle (ms) - pulse train mode only",
+                "default": 100,
+            },
+            {
+                "type": "number",
+                "min": 1,
+                "max": 1000,
+                "step": 1,
+                "name": "pulse_cycles",
+                "description": "Number of ON/OFF cycles - pulse train mode only",
+                "default": 5,
             },
             {
                 "type": "number",
@@ -320,30 +356,33 @@ class OptomotorSleepDepriver(SleepDepStimulator):
     }
 
     _HardwareInterfaceClass = OptoMotor
-    _roi_to_channel_opto = {
+
+    # Motors on odd channels (same as mAGO)
+    _roi_to_channel_motor = {
         1: 1,
         3: 3,
         5: 5,
         7: 7,
         9: 9,
-        12: 23,
-        14: 21,
-        16: 19,
+        12: 11,
+        14: 13,
+        16: 15,
         18: 17,
-        20: 15,
+        20: 19,
     }
 
-    _roi_to_channel_moto = {
+    # LEDs on even channels (same layout as mAGO valves)
+    _roi_to_channel_led = {
         1: 0,
         3: 2,
         5: 4,
         7: 6,
         9: 8,
-        12: 22,
-        14: 20,
-        16: 18,
+        12: 10,
+        14: 12,
+        16: 14,
         18: 16,
-        20: 14,
+        20: 18,
     }
 
     def __init__(
@@ -352,15 +391,21 @@ class OptomotorSleepDepriver(SleepDepStimulator):
         velocity_correction_coef=3.0e-3,
         min_inactive_time=120,  # s
         pulse_duration=1000,  # ms
-        stimulus_type=2,  # 1 = opto, 2= moto, 3 = both
+        stimulus_type=1,  # 1 = motor, 2 = LED pulse, 3 = LED pulse train
+        pulse_on_ms=100,
+        pulse_off_ms=100,
+        pulse_cycles=5,
         stimulus_probability=1.0,
         date_range="",
         roi_template_config=None,
     ):
 
         self._t0 = None
+        self._stimulus_type = int(stimulus_type)
+        self._pulse_on_ms = int(pulse_on_ms)
+        self._pulse_off_ms = int(pulse_off_ms)
+        self._pulse_cycles = int(pulse_cycles)
 
-        # the inactive time depends on the chanel here
         super().__init__(
             hardware_connection,
             velocity_correction_coef,
@@ -370,16 +415,27 @@ class OptomotorSleepDepriver(SleepDepStimulator):
             roi_template_config,
         )
 
-        if stimulus_type == 2:
-            self._roi_to_channel = self._roi_to_channel_moto
-        elif stimulus_type == 1:
-            self._roi_to_channel = self._roi_to_channel_opto
+        if self._stimulus_type == 1:
+            self._roi_to_channel = self._roi_to_channel_motor
+        else:
+            # Both LED pulse (2) and LED pulse train (3) use even channels
+            self._roi_to_channel = self._roi_to_channel_led
 
         self._pulse_duration = pulse_duration
 
     def _decide(self):
         out, dic = super()._decide()
-        dic["duration"] = self._pulse_duration
+
+        if dic.get("channel") is not None:
+            if self._stimulus_type == 3:
+                # Pulse train mode: pass W-command parameters
+                dic["on_ms"] = self._pulse_on_ms
+                dic["off_ms"] = self._pulse_off_ms
+                dic["cycles"] = self._pulse_cycles
+            else:
+                # Motor or simple LED pulse: use P command with duration
+                dic["duration"] = self._pulse_duration
+
         return out, dic
 
 
@@ -543,17 +599,36 @@ class MiddleCrossingStimulator(BaseStimulator):
         return HasInteractedVariable(False), {"channel": channel}
 
 
-class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
+class OptoSleepDepriver(SleepDepStimulator):
+    """
+    MODULE 4: 20 LEDs only (no motors).
+
+    Uses mAGO-style ROI numbering across 20 channels.
+    Supports two stimulus types:
+    1 = LED simple pulse (P command)
+    2 = LED pulse train (W command)
+    Per-ROI stimulus counting (like AGO class).
+    """
+
     _description = {
-        "overview": "A stimulator to sleep deprive an animal using gear motors. See https://github.com/gilestrolab/ethoscope_hardware/tree/master/modules/gear_motor_sleep_depriver",
+        "overview": "A stimulator to sleep deprive using LEDs only (MODULE 4). Supports LED pulse and LED pulse train modes.",
         "arguments": [
+            {
+                "type": "number",
+                "min": 0.0,
+                "max": 1.0,
+                "step": 0.0001,
+                "name": "velocity_correction_coef",
+                "description": "Velocity correction coef",
+                "default": 3.0e-3,
+            },
             {
                 "type": "number",
                 "min": 1,
                 "max": 3600 * 12,
                 "step": 1,
-                "name": "interval",
-                "description": "The recurence of the stimulus",
+                "name": "min_inactive_time",
+                "description": "The minimal time after which an inactive animal is awaken(s)",
                 "default": 120,
             },
             {
@@ -567,12 +642,56 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
             },
             {
                 "type": "number",
-                "min": 0,
-                "max": 3,
+                "min": 1,
+                "max": 2,
                 "step": 1,
                 "name": "stimulus_type",
-                "description": "1 = opto, 2= moto",
-                "default": 2,
+                "description": "1 = LED pulse, 2 = LED pulse train",
+                "default": 1,
+            },
+            {
+                "type": "number",
+                "min": 10,
+                "max": 10000,
+                "step": 10,
+                "name": "pulse_on_ms",
+                "description": "LED ON duration per cycle (ms) - pulse train mode only",
+                "default": 100,
+            },
+            {
+                "type": "number",
+                "min": 10,
+                "max": 10000,
+                "step": 10,
+                "name": "pulse_off_ms",
+                "description": "LED OFF duration per cycle (ms) - pulse train mode only",
+                "default": 100,
+            },
+            {
+                "type": "number",
+                "min": 1,
+                "max": 1000,
+                "step": 1,
+                "name": "pulse_cycles",
+                "description": "Number of ON/OFF cycles - pulse train mode only",
+                "default": 5,
+            },
+            {
+                "type": "number",
+                "min": 0.0,
+                "max": 1.0,
+                "step": 0.1,
+                "name": "stimulus_probability",
+                "description": "Probability the stimulus will happen",
+                "default": 1.0,
+            },
+            {
+                "type": "number",
+                "min": 0,
+                "max": 10000,
+                "name": "number_of_stimuli",
+                "description": "The number of stimulus to be given before no more are given. 0 means unlimited.",
+                "default": 0,
             },
             {
                 "type": "date_range",
@@ -584,69 +703,109 @@ class OptomotorSleepDepriverSystematic(OptomotorSleepDepriver):
     }
 
     _HardwareInterfaceClass = OptoMotor
-    _roi_to_channel_opto = {
-        1: 1,
-        3: 3,
-        5: 5,
-        7: 7,
-        9: 9,
-        12: 23,
-        14: 21,
-        16: 19,
-        18: 17,
-        20: 15,
-    }
-    _roi_to_channel_moto = {
+
+    # 10 ROIs mapped across 20 LED channels (mAGO-style numbering)
+    _roi_to_channel = {
         1: 0,
+        2: 10,
         3: 2,
+        4: 12,
         5: 4,
+        6: 14,
         7: 6,
+        8: 16,
         9: 8,
-        12: 22,
-        14: 20,
-        16: 18,
-        18: 16,
-        20: 14,
+        10: 18,
     }
 
     def __init__(
         self,
         hardware_connection,
-        interval=120,  # s
+        velocity_correction_coef=3.0e-3,
+        min_inactive_time=120,  # s
         pulse_duration=1000,  # ms
-        stimulus_type=2,  # 1 = opto, 2= moto, 3 = both
+        stimulus_type=1,  # 1 = LED pulse, 2 = LED pulse train
+        pulse_on_ms=100,
+        pulse_off_ms=100,
+        pulse_cycles=5,
+        stimulus_probability=1.0,
+        number_of_stimuli=0,
         date_range="",
         roi_template_config=None,
     ):
 
-        self._interval = interval * 1000  # ms used internally
+        self._t0 = None
+        self._stimulus_type = int(stimulus_type)
+        self._pulse_on_ms = int(pulse_on_ms)
+        self._pulse_off_ms = int(pulse_off_ms)
+        self._pulse_cycles = int(pulse_cycles)
+        self._pulse_duration = pulse_duration
+
+        self._number_of_stimuli = int(number_of_stimuli)
+        self._count_roi_stim = dict.fromkeys(range(1, 11), 0)
+        self._prob_dict = dict.fromkeys(range(1, 11), stimulus_probability)
+        self._stim_prob = stimulus_probability
 
         super().__init__(
             hardware_connection,
-            0,
-            0,
-            pulse_duration,
-            stimulus_type,
+            velocity_correction_coef,
+            min_inactive_time,
+            stimulus_probability,
             date_range,
             roi_template_config,
         )
 
-        self._t0 = 0
-
     def _decide(self):
         roi_id = self._tracker._roi.idx
+        now = self._tracker.last_time_point
+
         try:
             channel = self._roi_to_channel[roi_id]
         except KeyError:
             return HasInteractedVariable(False), {}
-        now = self._tracker.last_time_point + roi_id * 100
-        if now - self._t0 > self._interval:
-            dic = {"channel": channel}
-            dic["duration"] = self._pulse_duration
-            self._t0 = now
-            return HasInteractedVariable(True), dic
 
-        return HasInteractedVariable(False), {}
+        has_moved = self._has_moved()
+
+        if self._t0 is None:
+            self._t0 = now
+
+        if (
+            self._number_of_stimuli > 0
+            and self._count_roi_stim[roi_id] >= self._number_of_stimuli
+        ):
+            self._prob_dict[roi_id] = 0
+
+        if not has_moved:
+            if float(now - self._t0) > self._inactivity_time_threshold_ms:
+
+                if random.uniform(0, 1) <= self._prob_dict[roi_id]:
+                    self._t0 = None
+                    self._count_roi_stim[roi_id] += 1
+
+                    if self._stimulus_type == 2:
+                        # Pulse train mode
+                        logging.info(f"LED pulse train on channel {channel}")
+                        return HasInteractedVariable(1), {
+                            "channel": channel,
+                            "on_ms": self._pulse_on_ms,
+                            "off_ms": self._pulse_off_ms,
+                            "cycles": self._pulse_cycles,
+                        }
+                    else:
+                        # Simple LED pulse
+                        logging.info(f"LED pulse on channel {channel}")
+                        return HasInteractedVariable(1), {
+                            "channel": channel,
+                            "duration": self._pulse_duration,
+                        }
+                else:
+                    self._t0 = None
+                    logging.info(f"ghost stimulation on channel {channel}")
+                    return HasInteractedVariable(2), {}
+        else:
+            self._t0 = now
+
+        return HasInteractedVariable(0), {}
 
 
 class mAGO(SleepDepStimulator):

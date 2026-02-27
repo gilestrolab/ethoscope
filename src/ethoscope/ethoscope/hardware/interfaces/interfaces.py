@@ -42,14 +42,14 @@ def connectedUSB(optional_file="/etc/ethoscope/modules.json"):
             "name": "Arduino Nano",
             "family": "arduino",
             "model": "nano",
-            "used_for": ["optomotor", "mAGO"],
+            "used_for": ["optomotor", "mAGO", "opto_LED"],
             "id": ["2341:0058"],
         },
         "arduino_micro": {
             "name": "Arduino Micro",
             "family": "arduino",
             "model": "micro",
-            "used_for": ["optomotor", "mAGO"],
+            "used_for": ["optomotor", "mAGO", "opto_LED"],
             "id": ["2341:8037"],
         },
         "arduino_uno": {

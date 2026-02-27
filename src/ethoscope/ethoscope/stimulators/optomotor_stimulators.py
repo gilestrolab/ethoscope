@@ -3,16 +3,21 @@ from ethoscope.stimulators.sleep_depriver_stimulators import MiddleCrossingStimu
 
 
 class OptoMidlineCrossStimulator(MiddleCrossingStimulator):
+    """
+    Shine LED light when animals cross the midline.
+    Uses MODULE 3 LED even-channel mapping (same as OptomotorSleepDepriver LEDs).
+    """
+
     _description = {
-        "overview": "A stimulator to shine light when animals cross the midline",
+        "overview": "A stimulator to shine LED light when animals cross the midline (MODULE 3/4 LED channels)",
         "arguments": [
             {
                 "type": "number",
                 "min": 0.0,
                 "max": 1.0,
                 "step": 0.01,
-                "name": "p",
-                "description": "the probability to move the tube when a beam cross was detected",
+                "name": "stimulus_probability",
+                "description": "the probability to activate the LED when a beam cross was detected",
                 "default": 1.0,
             },
             {
@@ -24,15 +29,17 @@ class OptoMidlineCrossStimulator(MiddleCrossingStimulator):
         ],
     }
     _HardwareInterfaceClass = OptoMotor
+
+    # LEDs on even channels (MODULE 3/4 layout)
     _roi_to_channel = {
-        1: 1,
-        3: 3,
-        5: 5,
-        7: 7,
-        9: 9,
-        12: 23,
-        14: 21,
-        16: 19,
-        18: 17,
-        20: 15,
+        1: 0,
+        3: 2,
+        5: 4,
+        7: 6,
+        9: 8,
+        12: 10,
+        14: 12,
+        16: 14,
+        18: 16,
+        20: 18,
     }
