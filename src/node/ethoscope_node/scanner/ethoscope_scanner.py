@@ -1399,6 +1399,8 @@ class Ethoscope(BaseDevice):
                 "-o",
                 "StrictHostKeyChecking=no",
                 "-o",
+                "UserKnownHostsFile=/dev/null",  # Avoid stale host key issues
+                "-o",
                 "ConnectTimeout=10",
                 f"ethoscope@{self._ip}",
             ]
@@ -1415,7 +1417,7 @@ class Ethoscope(BaseDevice):
                 )
                 return True
             else:
-                self._logger.warning(
+                self._logger.error(
                     f"SSH key setup failed for {self._ip}: {result.stderr}"
                 )
                 return False
@@ -1445,13 +1447,21 @@ class Ethoscope(BaseDevice):
             bool: True if passwordless SSH works, False otherwise
         """
         try:
+            # Get the private key path to explicitly test with the correct key
+            keys_dir = os.path.join(self._config_dir, "keys")
+            private_key_path = os.path.join(keys_dir, "id_rsa")
+
             # Test SSH connection without password using BatchMode
             cmd = [
                 "ssh",
+                "-i",
+                private_key_path,  # Use the ethoscope key explicitly
                 "-o",
                 "BatchMode=yes",  # Disable password prompts
                 "-o",
                 "StrictHostKeyChecking=no",  # Auto-accept host keys
+                "-o",
+                "UserKnownHostsFile=/dev/null",  # Avoid stale host key issues
                 "-o",
                 "ConnectTimeout=5",  # 5 second timeout
                 f"ethoscope@{self._ip}",
@@ -1467,7 +1477,7 @@ class Ethoscope(BaseDevice):
                 return True
             else:
                 self._logger.debug(
-                    f"SSH key authentication not working for ethoscope@{self._ip}"
+                    f"SSH key authentication not working for ethoscope@{self._ip}: {result.stderr.strip()}"
                 )
                 return False
 

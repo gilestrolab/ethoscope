@@ -791,7 +791,7 @@ class VideoBackupClass(BaseBackupClass):
                 "--partial",  # keep partial files
                 "--timeout=300",  # 5 minute timeout
                 "-e",
-                f"ssh -i {private_key_path} -o StrictHostKeyChecking=no",  # SSH key authentication
+                f"ssh -i {private_key_path} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",  # SSH key authentication
                 rsync_source,
                 destination_dir,
             ]
@@ -1156,7 +1156,7 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
                 "--exclude=*.db-journal",  # exclude SQLite rollback journal files (temporary)
                 "--timeout=300",  # 5 minute timeout
                 "-e",
-                f"ssh -i {private_key_path} -o StrictHostKeyChecking=no",  # SSH key authentication
+                f"ssh -i {private_key_path} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",  # SSH key authentication
                 rsync_source,
                 destination_dir,
             ]
@@ -1408,6 +1408,8 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
                 private_key_path,
                 "-o",
                 "StrictHostKeyChecking=no",
+                "-o",
+                "UserKnownHostsFile=/dev/null",
                 "-o",
                 "ConnectTimeout=10",
                 "-o",
