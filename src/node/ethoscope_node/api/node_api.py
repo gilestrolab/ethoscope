@@ -7,6 +7,7 @@ configuration management, and system actions.
 
 import datetime
 import os
+import socket
 import subprocess
 
 import netifaces
@@ -14,66 +15,69 @@ import netifaces
 from .base import BaseAPI, error_decorator
 
 # System daemons configuration
+# docker_container: maps to the companion Docker container's hostname and port
+# on the Docker network. Used for health checks in Docker mode.
+# None means the service has no Docker container equivalent.
 SYSTEM_DAEMONS = {
     "ethoscope_backup_mysql": {
         "description": "The service that collects data from the ethoscope mariadb and syncs them with the node.",
-        "available_on_docker": True,
         "conflicts_with": [],
+        "docker_container": {"host": "ethoscope-node-backup", "port": 8090},
     },
     "ethoscope_backup_video": {
         "description": "The service that collects videos in h264 chunks from the ethoscopes and syncs them with the node",
-        "available_on_docker": True,
         "conflicts_with": ["ethoscope_backup_unified"],
+        "docker_container": None,  # Covered by ethoscope_backup_unified in Docker
     },
     "ethoscope_backup_unified": {
         "description": "The service that collects videos and SQLite dbs from the ethoscopes and syncs them with the node",
-        "available_on_docker": True,
         "conflicts_with": ["ethoscope_backup_video", "ethoscope_backup_sqlite"],
+        "docker_container": {"host": "ethoscope-node-rsync-backup", "port": 8093},
     },
     "ethoscope_backup_sqlite": {
         "description": "The service that collects SQLite db from the ethoscopes and syncs them with the node",
-        "available_on_docker": True,
         "conflicts_with": ["ethoscope_backup_unified"],
+        "docker_container": None,  # Covered by ethoscope_backup_unified in Docker
     },
     "ethoscope_update_node": {
         "description": "The service used to update the nodes and the ethoscopes.",
-        "available_on_docker": True,
         "conflicts_with": [],
+        "docker_container": {"host": "ethoscope-node-update", "port": 8888},
     },
     "git-daemon.socket": {
         "description": "The GIT server that handles git updates for the node and ethoscopes.",
-        "available_on_docker": False,
         "conflicts_with": [],
+        "docker_container": {"host": "ethoscope-git-server", "port": 9418},
     },
     "ntpd": {
         "description": "The NTPd service is syncing time with the ethoscopes.",
-        "available_on_docker": False,
         "conflicts_with": [],
+        "docker_container": None,
     },
     "sshd": {
         "description": "The SSH daemon allows power users to access the node terminal from remote.",
-        "available_on_docker": False,
         "conflicts_with": [],
+        "docker_container": None,
     },
     "vsftpd": {
         "description": "The FTP server on the node, used to access the local ethoscope data",
-        "available_on_docker": False,
         "conflicts_with": [],
+        "docker_container": {"host": "ethoscope-vsftpd", "port": 21},
     },
     "ethoscope_virtuascope": {
         "description": "A virtual ethoscope running on the node. Useful for offline tracking",
-        "available_on_docker": False,
         "conflicts_with": [],
+        "docker_container": None,
     },
     "ethoscope_tunnel": {
         "description": "Cloudflare tunnel service for remote access to this node via the internet. Requires token.",
-        "available_on_docker": False,
         "conflicts_with": [],
+        "docker_container": None,
     },
     "ethoscope_sensor_virtual": {
         "description": "A virtual sensor collecting real world data about. Requires token.",
-        "available_on_docker": False,
         "conflicts_with": [],
+        "docker_container": None,
     },
 }
 
@@ -244,30 +248,66 @@ class NodeAPI(BaseAPI):
             "NEEDS_UPDATE": needs_update,
         }
 
+    def _check_container_health(self, host, port, timeout=2):
+        """Check if a Docker container is reachable via TCP.
+
+        Args:
+            host (str): Container hostname on the Docker network.
+            port (int): Port the container listens on.
+            timeout (int): Connection timeout in seconds.
+
+        Returns:
+            str: "active" if reachable, "inactive" otherwise.
+        """
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return "active"
+        except (ConnectionRefusedError, socket.timeout, OSError):
+            return "inactive"
+
     def _get_daemon_status(self):
-        """Get status of system daemons."""
+        """Get status of system daemons.
+
+        In Docker mode, uses TCP health checks against companion containers
+        instead of systemctl. Services without a docker_container mapping
+        are marked as not_available.
+        """
         daemons = SYSTEM_DAEMONS.copy()
         systemctl = self.server.systemctl
         is_dockerized = self.server.is_dockerized
 
         for daemon_name in daemons.keys():
             try:
-                with os.popen(f"{systemctl} is-active {daemon_name}") as df:
-                    is_active = df.read().strip()
+                container = daemons[daemon_name].get("docker_container")
 
-                is_not_available_on_docker = not daemons[daemon_name][
-                    "available_on_docker"
-                ]
+                if is_dockerized:
+                    if container:
+                        is_active = self._check_container_health(
+                            container["host"], container["port"]
+                        )
+                        not_available = False
+                    else:
+                        is_active = "inactive"
+                        not_available = True
+                else:
+                    with os.popen(f"{systemctl} is-active {daemon_name}") as df:
+                        is_active = df.read().strip()
+                    not_available = False
 
                 daemons[daemon_name].update(
                     {
                         "active": is_active,
-                        "not_available": (is_dockerized and is_not_available_on_docker),
+                        "not_available": not_available,
+                        "docker_managed": is_dockerized and container is not None,
                     }
                 )
             except Exception:
                 daemons[daemon_name].update(
-                    {"active": "unknown", "not_available": False}
+                    {
+                        "active": "unknown",
+                        "not_available": False,
+                        "docker_managed": False,
+                    }
                 )
 
         return daemons
@@ -358,6 +398,9 @@ class NodeAPI(BaseAPI):
 
     def _toggle_daemon(self, daemon_name, status):
         """Toggle system daemon on/off, enforcing service conflicts."""
+        if self.server.is_dockerized:
+            return "Service is managed by Docker Compose. Use docker compose to control it."
+
         systemctl = self.server.systemctl
         result = []
 

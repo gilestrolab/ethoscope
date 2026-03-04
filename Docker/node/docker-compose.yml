@@ -25,7 +25,6 @@ services:
     #network_mode: host                   # Comment out when running in Windows
     ports:
       - "80:80/tcp"
-      - "5353:5353/udp"
 
   ethoscope-node-backup:
     <<: *node-base

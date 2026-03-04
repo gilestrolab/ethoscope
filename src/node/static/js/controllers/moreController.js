@@ -308,6 +308,10 @@ function maxLengthCheck(object) {
             $http.get('/node/daemons')
                  .then(function(response) { var data = response.data;
                     $scope.daemons = data;
+                    // Detect Docker mode from daemon metadata
+                    $scope.isDockerized = Object.keys(data).some(function(k) {
+                        return data[k].docker_managed;
+                    });
             });
 
             $http.get('/node/folders')

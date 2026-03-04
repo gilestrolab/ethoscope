@@ -383,18 +383,23 @@
             <div class="col-lg-8">
                 <h2>Node Administration</h2>
                 <ul class="list-group">
-                    <h3>Backup daemons and settings:</h3>
-                    <!-- <p class="log" ng-repeat="(key,entry) in daemons | toArray |orderBy: 'key'">{{key}}: {{entry}}</p></pre> -->
+                    <h3>Services</h3>
+                    <p ng-if="isDockerized" class="text-muted mb-2"><small><i class="fab fa-docker" style="color: #0db7ed;"></i> Services are managed by Docker Compose. Use <code>docker compose</code> to start/stop them.</small></p>
 
-            <li class="list-group-item" ng-repeat="(key, entry) in daemons">
+            <li class="list-group-item" ng-repeat="(key, entry) in daemons" ng-if="!entry.not_available">
 
-              <span ng-if="entry.not_available">
-                  <label>{{key}}
-                      <i class="fas fa-ban not-available-icon fa-2x" title="Currently not available in a Dockerised instance."></i>
-                  </label>
+              <span ng-if="entry.docker_managed">
+                  <div class="d-flex justify-content-between align-items-center">
+                      <div>
+                          <strong>{{key}}</strong>
+                          <span class="badge ml-2" ng-class="{'badge-success': entry.active == 'active', 'badge-danger': entry.active != 'active'}">{{entry.active}}</span>
+                          <i class="fab fa-docker ml-1" style="color: #0db7ed;" title="Managed by Docker Compose"></i>
+                      </div>
+                  </div>
+                  <small class="text-muted">{{entry.description}}</small>
               </span>
 
-              <span ng-if="!entry.not_available">
+              <span ng-if="!entry.docker_managed">
                   <label class="toggle-check" ng-class="{'text-muted': nodeManagement.isDisabledByConflict(key)}">{{key}}
                       <input type="checkbox" class="toggle-check-input"
                              ng-model="isActive"
@@ -413,18 +418,26 @@
                   </p>
               </span>
             </li>
+
+            <li class="list-group-item text-muted" ng-repeat="(key, entry) in daemons" ng-if="entry.not_available" style="padding: 0.5rem 1.25rem;">
+                <i class="fas fa-ban mr-2" style="color: #ccc;"></i>
+                <span>{{key}}</span>
+                <small class="ml-2" style="color: #aaa;">not available in Docker</small>
+            </li>
         </ul>
 
         <ul class="list-group col-12">
         <h3>Folders</h3>
+            <p ng-if="isDockerized" class="text-info">
+                <small><i class="fab fa-docker"></i> These are container-internal paths. Volume mounts are configured in <code>docker-compose.yml</code>.</small>
+            </p>
             <form>
             <li class="list-group-item input" ng-repeat="(name, entry) in folders">
-<!--                <input type="file" onchange="angular.element(this).scope().nodeManagement.updateFolder(event)" name="{{name}}" id="{{name}}-btn" style="display: visible;" webkitdirectory mozdirectory msdirectory odirectory directory multiple >   -->
-                <label style="display: inline;" title={{entry.description}}>{{name}}</label><input type="text" ng-model="folders[name].path" class="w3-input" style="display: inline-block; position: relative; float: right; width: 260px; bg-color: gray;" size="40" title={{entry.description}}> <!--<button style="display: inline-block; position: relative; float: right;" ng-click="nodeManagement.browseFolder(name);"><i class="fa fa-folder-open-o" ></i></button>-->
+                <label style="display: inline;" title={{entry.description}}>{{name}}</label><input type="text" ng-model="folders[name].path" class="w3-input" style="display: inline-block; position: relative; float: right; width: 260px;" size="40" title={{entry.description}} ng-readonly="isDockerized">
                 <p>{{entry.description}}</p>
             </li>
             <br>
-            <input class="btn btn-success btn-xl" type=submit value="Save" ng-click="nodeManagement.saveFolders()">
+            <input ng-if="!isDockerized" class="btn btn-success btn-xl" type=submit value="Save" ng-click="nodeManagement.saveFolders()">
             </form>
         </ul>
         <ul class="list-group col-12">

@@ -445,7 +445,7 @@ class TestNodeAPI(unittest.TestCase):
 
     @patch("os.popen")
     def test_get_daemon_status_all_active(self, mock_popen):
-        """Test getting daemon status when all active."""
+        """Test getting daemon status when all active on bare metal."""
         mock_file = Mock()
         mock_file.read.return_value = "active\n"
         mock_file.__enter__ = Mock(return_value=mock_file)
@@ -457,25 +457,57 @@ class TestNodeAPI(unittest.TestCase):
         # Check a few daemons
         self.assertEqual(result["ethoscope_backup_mysql"]["active"], "active")
         self.assertFalse(result["ethoscope_backup_mysql"]["not_available"])
+        self.assertFalse(result["ethoscope_backup_mysql"]["docker_managed"])
 
-    @patch("os.popen")
-    def test_get_daemon_status_docker_filtering(self, mock_popen):
-        """Test daemon status filters unavailable daemons in docker."""
+    @patch("ethoscope_node.api.node_api.NodeAPI._check_container_health")
+    def test_get_daemon_status_docker_with_containers(self, mock_health):
+        """Test daemon status uses TCP health checks in Docker mode."""
         self.mock_server.is_dockerized = True
-
-        mock_file = Mock()
-        mock_file.read.return_value = "inactive\n"
-        mock_file.__enter__ = Mock(return_value=mock_file)
-        mock_file.__exit__ = Mock(return_value=False)
-        mock_popen.return_value = mock_file
+        mock_health.return_value = "active"
 
         result = self.api._get_daemon_status()
 
-        # Daemons available in docker should not be marked unavailable
+        # Daemons with docker_container should be active and docker_managed
+        self.assertEqual(result["ethoscope_backup_mysql"]["active"], "active")
         self.assertFalse(result["ethoscope_backup_mysql"]["not_available"])
+        self.assertTrue(result["ethoscope_backup_mysql"]["docker_managed"])
 
-        # Daemons not available in docker should be marked unavailable
+        # git-daemon.socket and vsftpd now have containers
+        self.assertEqual(result["git-daemon.socket"]["active"], "active")
+        self.assertFalse(result["git-daemon.socket"]["not_available"])
+        self.assertTrue(result["git-daemon.socket"]["docker_managed"])
+
+        self.assertEqual(result["vsftpd"]["active"], "active")
+        self.assertTrue(result["vsftpd"]["docker_managed"])
+
+    @patch("ethoscope_node.api.node_api.NodeAPI._check_container_health")
+    def test_get_daemon_status_docker_no_container(self, mock_health):
+        """Test daemons without containers are not_available in Docker."""
+        self.mock_server.is_dockerized = True
+
+        result = self.api._get_daemon_status()
+
+        # Daemons without docker_container should be not_available
         self.assertTrue(result["sshd"]["not_available"])
+        self.assertFalse(result["sshd"]["docker_managed"])
+        self.assertTrue(result["ntpd"]["not_available"])
+        self.assertTrue(result["ethoscope_virtuascope"]["not_available"])
+
+        # backup_video/sqlite have no container (covered by unified)
+        self.assertTrue(result["ethoscope_backup_video"]["not_available"])
+        self.assertTrue(result["ethoscope_backup_sqlite"]["not_available"])
+
+    @patch("ethoscope_node.api.node_api.NodeAPI._check_container_health")
+    def test_get_daemon_status_docker_container_down(self, mock_health):
+        """Test Docker container that is unreachable shows as inactive."""
+        self.mock_server.is_dockerized = True
+        mock_health.return_value = "inactive"
+
+        result = self.api._get_daemon_status()
+
+        self.assertEqual(result["ethoscope_backup_mysql"]["active"], "inactive")
+        self.assertFalse(result["ethoscope_backup_mysql"]["not_available"])
+        self.assertTrue(result["ethoscope_backup_mysql"]["docker_managed"])
 
     @patch("os.popen")
     def test_get_daemon_status_exception(self, mock_popen):
@@ -488,6 +520,39 @@ class TestNodeAPI(unittest.TestCase):
         for daemon in result.values():
             self.assertEqual(daemon["active"], "unknown")
             self.assertFalse(daemon["not_available"])
+            self.assertFalse(daemon["docker_managed"])
+
+    @patch("ethoscope_node.api.node_api.socket.create_connection")
+    def test_check_container_health_active(self, mock_conn):
+        """Test container health check returns active when reachable."""
+        mock_sock = MagicMock()
+        mock_conn.return_value.__enter__ = Mock(return_value=mock_sock)
+        mock_conn.return_value.__exit__ = Mock(return_value=False)
+
+        result = self.api._check_container_health("ethoscope-node-backup", 8090)
+
+        self.assertEqual(result, "active")
+        mock_conn.assert_called_once_with(("ethoscope-node-backup", 8090), timeout=2)
+
+    @patch("ethoscope_node.api.node_api.socket.create_connection")
+    def test_check_container_health_inactive(self, mock_conn):
+        """Test container health check returns inactive when unreachable."""
+        mock_conn.side_effect = ConnectionRefusedError()
+
+        result = self.api._check_container_health("ethoscope-node-backup", 8090)
+
+        self.assertEqual(result, "inactive")
+
+    @patch("ethoscope_node.api.node_api.socket.create_connection")
+    def test_check_container_health_timeout(self, mock_conn):
+        """Test container health check returns inactive on timeout."""
+        import socket as _socket
+
+        mock_conn.side_effect = _socket.timeout()
+
+        result = self.api._check_container_health("ethoscope-node-backup", 8090)
+
+        self.assertEqual(result, "inactive")
 
     @patch("ethoscope_node.api.node_api.BaseAPI.get_request_json")
     @patch("os.popen")
@@ -764,6 +829,14 @@ class TestNodeAPI(unittest.TestCase):
             self.assertEqual(result, "Daemon stopped")
             mock_log.assert_called_once()
             self.assertIn("Stopping", mock_log.call_args[0][0])
+
+    def test_toggle_daemon_blocked_in_docker(self):
+        """Test toggling daemon is blocked in Docker mode."""
+        self.mock_server.is_dockerized = True
+
+        result = self.api._toggle_daemon("ethoscope_backup_mysql", True)
+
+        self.assertIn("Docker Compose", result)
 
 
 if __name__ == "__main__":
