@@ -1146,7 +1146,7 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
             rsync_source = f"ethoscope@{self._ip}:{source_dir}"
             rsync_command = [
                 "rsync",
-                "-avz",  # archive, verbose, compress
+                "-rlptvz",  # recursive, links, perms, times, verbose, compress (no -o/-g to avoid root ownership)
                 "--progress",  # show progress
                 "--partial",  # keep partial files
                 "--stats",  # show detailed transfer statistics
@@ -1258,10 +1258,16 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
                             f"[{self._device_id}] {operation_name} total size: {total_size} bytes"
                         )
 
+                # Log rsync error/warning messages (these explain code 23/24 failures)
+                elif line.startswith("rsync:") or line.startswith("rsync error"):
+                    self._logger.warning(
+                        f"[{self._device_id}] {operation_name} rsync: {line}"
+                    )
+                    continue
+
                 # Skip progress lines and rsync status messages
                 elif (
                     (line.endswith("%") and ("kB/s" in line or "MB/s" in line))
-                    or line.startswith("rsync:")
                     or line.startswith("total size")
                     or "xfr#" in line
                     or "to-chk=" in line
@@ -1325,6 +1331,17 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
                 yield self._yield_status(
                     "info",
                     f"{operation_name.title()} rsync completed successfully - {files_transferred} files",
+                )
+                return True
+            elif return_code == 24:
+                # Code 24: Partial transfer due to vanished source files
+                # Common when ethoscope is running and files are being written/rotated
+                self._logger.warning(
+                    f"[{self._device_id}] {operation_name.title()} rsync completed with vanished source files (code 24) - {files_transferred} files"
+                )
+                yield self._yield_status(
+                    "info",
+                    f"{operation_name.title()} rsync completed (some source files vanished during transfer) - {files_transferred} files",
                 )
                 return True
             else:
@@ -1890,9 +1907,14 @@ class GenericBackupWrapper(threading.Thread):
     def _execute_backup_job(self, device_id: str, backup_job) -> bool:
         """Execute backup job and track progress using new comprehensive device data."""
         try:
+            backup_success = True
             for message in backup_job.backup():
                 with self._lock:
                     progress_data = json.loads(message)
+
+                    # Track error messages to detect backup failures
+                    if progress_data.get("status") == "error":
+                        backup_success = False
 
                     # Check if this is a metadata message
                     if progress_data.get("status") == "metadata":
@@ -1937,7 +1959,7 @@ class GenericBackupWrapper(threading.Thread):
                         current_progress = self.backup_status[device_id].progress.copy()
                         current_progress.update(progress_data)
                         self.backup_status[device_id].progress = current_progress
-            return True
+            return backup_success
 
         except Exception as e:
             self._logger.error(f"Backup execution failed for device {device_id}: {e}")
