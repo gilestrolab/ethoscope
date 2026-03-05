@@ -2,6 +2,26 @@
 
 This directory contains Docker configuration for running the Ethoscope node system in containers.
 
+## Pre-built Images
+
+Pre-built images are automatically published to GitHub Container Registry on every push to `dev` and `main`:
+
+```bash
+# Pull the latest stable image
+docker pull ghcr.io/gilestrolab/ethoscope-node:latest
+
+# Pull a specific branch
+docker pull ghcr.io/gilestrolab/ethoscope-node:dev
+
+# Pull a specific release
+docker pull ghcr.io/gilestrolab/ethoscope-node:v1.0.0
+
+# Git server image
+docker pull ghcr.io/gilestrolab/ethoscope-git-server:latest
+```
+
+Available at: https://github.com/orgs/gilestrolab/packages
+
 ## Quick Start
 
 1. Copy the environment template:

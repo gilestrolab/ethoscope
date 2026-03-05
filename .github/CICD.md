@@ -121,6 +121,39 @@ The Ethoscope project uses GitHub Actions for continuous integration and continu
 - ✅ Package validation
 - 🔄 PyPI publishing (ready to enable)
 
+### 4. Docker Workflow (`.github/workflows/docker.yml`)
+
+**Purpose**: Build and publish Docker images to GitHub Container Registry (GHCR)
+
+**Triggers**:
+- Push to `dev` or `main` branches
+- Push of version tags (`v*.*.*`)
+- Manual workflow dispatch
+
+**Jobs**:
+
+#### `build-node`
+- Builds the ethoscope-node image from `Docker/node/node.dockerfile`
+- Passes the branch/tag name as `ETHOSCOPE_BRANCH` build argument
+- Pushes to `ghcr.io/gilestrolab/ethoscope-node`
+
+#### `build-git-server`
+- Builds the git daemon image from `Docker/node/git-server/git-daemon.dockerfile`
+- Pushes to `ghcr.io/gilestrolab/ethoscope-git-server`
+
+**Tagging Strategy**:
+| Trigger | Tags |
+|---------|------|
+| Push to `dev` | `dev` |
+| Push to `main` | `main`, `latest` |
+| Tag `v1.2.3` | `v1.2.3`, `1.2.3`, `1.2`, `latest` |
+
+**Features**:
+- ✅ Automatic image publishing on push
+- ✅ Semantic version tagging
+- ✅ BuildKit layer caching via GitHub Actions cache
+- ✅ No extra secrets required (uses `GITHUB_TOKEN`)
+
 ## Setup Instructions
 
 ### 1. Enable Workflows
@@ -321,7 +354,7 @@ Consider adding:
 - [ ] Automated dependency updates (Dependabot)
 - [ ] Performance benchmarking
 - [ ] Documentation building and deployment
-- [ ] Docker image building and publishing
+- [x] Docker image building and publishing
 - [ ] Slack/Discord notifications for failures
 - [ ] Code coverage enforcement (fail below threshold)
 

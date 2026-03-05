@@ -2,6 +2,7 @@
 ARG ETHOSCOPE_BRANCH=dev
 # Use the latest Arch Linux base image
 FROM archlinux:latest
+ARG ETHOSCOPE_BRANCH=dev
 
 # Update system and install base-devel and git for building AUR packages
 RUN pacman -Sy \

@@ -10,7 +10,7 @@ services:
       dockerfile: node.dockerfile
       args:
         - ETHOSCOPE_BRANCH=dev
-    image: ggilestro/ethoscope-node:latest
+    image: ghcr.io/gilestrolab/ethoscope-node:latest
     restart: unless-stopped
     volumes:
       - ../../:/opt/ethoscope:ro  # Uncomment if needed - will mount the host ethoscope folder, useful only for development
@@ -75,7 +75,7 @@ services:
       start_period: 15s
 
   ethoscope-git-server:
-    image: ggilestro/ethoscope-git-server:latest
+    image: ghcr.io/gilestrolab/ethoscope-git-server:latest
     build:
       context: ./git-server
       dockerfile: git-daemon.dockerfile
