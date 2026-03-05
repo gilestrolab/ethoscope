@@ -25,6 +25,12 @@ services:
     #network_mode: host                   # Comment out when running in Windows
     ports:
       - "80:80/tcp"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/node/time"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   ethoscope-node-backup:
     <<: *node-base
@@ -32,6 +38,12 @@ services:
     command: "/usr/bin/python /opt/ethoscope/src/node/scripts/backup_tool.py"
     ports:
       - "8090:8090"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   ethoscope-node-rsync-backup:
     <<: *node-base
@@ -39,6 +51,12 @@ services:
     command: "/usr/bin/python /opt/ethoscope/src/node/scripts/rsync_backup_tool.py --unified"
     ports:
       - "8093:8093"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8093/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   ethoscope-node-update:
     <<: *node-base
@@ -49,6 +67,12 @@ services:
       - ethoscope-git-server
     ports:
       - "8888:8888"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/id"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
 
   ethoscope-git-server:
     image: ggilestro/ethoscope-git-server:latest
@@ -63,6 +87,12 @@ services:
       - "9418:9418"
     volumes:
       - /srv/git
+    healthcheck:
+      test: ["CMD-SHELL", "git ls-remote git://localhost/ > /dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   ethoscope-vsftpd:
     image: metabrainz/docker-anon-ftp
@@ -79,6 +109,12 @@ services:
     ports:
       - "21:21"
       - "21100-21110:21100-21110/tcp"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep vsftpd || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
 volumes:
   ethoscope_data:

@@ -159,7 +159,7 @@ class TunnelUtils(BaseAPI):
 
         # Check if tunnel service is running
         try:
-            systemctl = self.server.systemctl
+            systemctl = "/usr/bin/systemctl"
             with os.popen(f"{systemctl} is-active ethoscope_tunnel") as result:
                 service_status = result.read().strip()
 
@@ -205,7 +205,7 @@ class TunnelUtils(BaseAPI):
             if enabled:
                 self.update_tunnel_environment()
 
-            systemctl = self.server.systemctl
+            systemctl = "/usr/bin/systemctl"
 
             if enabled:
                 # Start tunnel service
@@ -256,7 +256,7 @@ class TunnelUtils(BaseAPI):
                 self.update_tunnel_environment()
 
                 # Restart tunnel service to pick up new token
-                systemctl = self.server.systemctl
+                systemctl = "/usr/bin/systemctl"
                 cmd = f"{systemctl} restart ethoscope_tunnel"
 
                 with os.popen(cmd) as result:

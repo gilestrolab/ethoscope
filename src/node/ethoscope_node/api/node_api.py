@@ -7,6 +7,7 @@ configuration management, and system actions.
 
 import datetime
 import os
+import signal
 import socket
 import subprocess
 
@@ -230,9 +231,11 @@ class NodeAPI(BaseAPI):
 
         # Service status
         try:
-            systemctl = self.server.systemctl
-            with os.popen(f"{systemctl} status ethoscope_node.service") as df:
-                active_since = df.read().split("\n")[2]
+            if self.server.is_dockerized:
+                active_since = "Running in Docker container"
+            else:
+                with os.popen("/usr/bin/systemctl status ethoscope_node.service") as df:
+                    active_since = df.read().split("\n")[2]
         except Exception:
             active_since = "N/A. Probably not running through systemd"
 
@@ -273,7 +276,6 @@ class NodeAPI(BaseAPI):
         are marked as not_available.
         """
         daemons = SYSTEM_DAEMONS.copy()
-        systemctl = self.server.systemctl
         is_dockerized = self.server.is_dockerized
 
         for daemon_name in daemons.keys():
@@ -290,7 +292,7 @@ class NodeAPI(BaseAPI):
                         is_active = "inactive"
                         not_available = True
                 else:
-                    with os.popen(f"{systemctl} is-active {daemon_name}") as df:
+                    with os.popen(f"/usr/bin/systemctl is-active {daemon_name}") as df:
                         is_active = df.read().strip()
                     not_available = False
 
@@ -320,9 +322,15 @@ class NodeAPI(BaseAPI):
 
         if action_type == "restart":
             self.logger.info("User requested a service restart.")
-            systemctl = self.server.systemctl
-            with os.popen(f"sleep 1; {systemctl} restart ethoscope_node.service") as po:
-                return po.read()
+            if self.server.is_dockerized:
+                # Send SIGTERM to PID 1; Docker's restart policy will restart the container
+                os.kill(1, signal.SIGTERM)
+                return "Restarting Docker container..."
+            else:
+                with os.popen(
+                    "sleep 1; /usr/bin/systemctl restart ethoscope_node.service"
+                ) as po:
+                    return po.read()
 
         elif action_type == "close":
             self.server._shutdown()
@@ -401,7 +409,6 @@ class NodeAPI(BaseAPI):
         if self.server.is_dockerized:
             return "Service is managed by Docker Compose. Use docker compose to control it."
 
-        systemctl = self.server.systemctl
         result = []
 
         # If starting a daemon, check for and stop conflicting services
@@ -409,7 +416,9 @@ class NodeAPI(BaseAPI):
             conflicts = SYSTEM_DAEMONS[daemon_name].get("conflicts_with", [])
             for conflicting_service in conflicts:
                 # Check if conflicting service is running
-                with os.popen(f"{systemctl} is-active {conflicting_service}") as df:
+                with os.popen(
+                    f"/usr/bin/systemctl is-active {conflicting_service}"
+                ) as df:
                     is_active = df.read().strip()
 
                 if is_active == "active":
@@ -417,16 +426,18 @@ class NodeAPI(BaseAPI):
                         f"Stopping conflicting service {conflicting_service} "
                         f"before starting {daemon_name}"
                     )
-                    with os.popen(f"{systemctl} stop {conflicting_service}") as po:
+                    with os.popen(
+                        f"/usr/bin/systemctl stop {conflicting_service}"
+                    ) as po:
                         stop_result = po.read()
                         result.append(f"Stopped {conflicting_service}: {stop_result}")
 
         # Now start or stop the requested daemon
         if status:
-            cmd = f"{systemctl} start {daemon_name}"
+            cmd = f"/usr/bin/systemctl start {daemon_name}"
             self.logger.info(f"Starting daemon {daemon_name}")
         else:
-            cmd = f"{systemctl} stop {daemon_name}"
+            cmd = f"/usr/bin/systemctl stop {daemon_name}"
             self.logger.info(f"Stopping daemon {daemon_name}")
 
         with os.popen(cmd) as po:

@@ -164,9 +164,6 @@ class EthoscopeNodeServer:
 
         # System configuration
         self.is_dockerized = os.path.exists("/.dockerenv")
-        self.systemctl = (
-            "/usr/bin/systemctl.py" if self.is_dockerized else "/usr/bin/systemctl"
-        )
 
         # Server state
         self._server_running = False
