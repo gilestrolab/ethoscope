@@ -16,7 +16,10 @@ RUN pacman -Sy --needed --noconfirm python-setuptools python-pip python-ifaddr p
                                     python-bottle python-pyserial python-mysql-connector python-netifaces python-cherrypy \
                                     python-eventlet python-dnspython python-greenlet python-monotonic \
                                     python-zeroconf python-cheroot python-gitpython \
+                                    python-requests python-psutil python-scipy python-dateutil \
                                     openssh sshpass rsync curl
+
+RUN pip install --break-system-packages mattermostdriver
 
 
 RUN cd /opt && git clone https://github.com/gilestrolab/ethoscope.git
