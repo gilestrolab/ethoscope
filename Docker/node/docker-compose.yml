@@ -25,6 +25,7 @@ services:
     #network_mode: host                   # Comment out when running in Windows
     ports:
       - "80:80/tcp"
+      - "5353:5353/udp"    # mDNS discovery. May conflict with avahi-daemon on the host.
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/node/time"]
       interval: 30s
