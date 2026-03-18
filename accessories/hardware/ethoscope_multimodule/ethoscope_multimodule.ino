@@ -189,6 +189,8 @@ const float VERSION = 1.3;
 // =============================================================================
 // Libraries and Global Variables
 // =============================================================================
+// Requires Arduino-SerialCommand library: https://github.com/shyd/Arduino-SerialCommand
+// Install via Arduino Library Manager or clone into your Arduino/libraries folder.
 #include <SerialCommand.h>
 SerialCommand SCmd;
 
