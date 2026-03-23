@@ -217,7 +217,8 @@ SerialCommand SCmd;
     uint8_t LED_CHANNELS[LED_COUNT];
 #endif
 
-const uint8_t TOTAL_CHANNELS = MOTOR_COUNT + VALVE_COUNT + LED_COUNT;
+const uint8_t NUM_ACTUATORS = MOTOR_COUNT + VALVE_COUNT + LED_COUNT;
+const uint8_t TOTAL_CHANNELS = 20; // Always 20 physical channels (pins 0-19)
 
 // =============================================================================
 // Structures for Channel State Management
@@ -644,6 +645,8 @@ void teach() {
     Serial.print(LED_COUNT);
     Serial.print(F(",\"total_channels\":"));
     Serial.print(TOTAL_CHANNELS);
+    Serial.print(F(",\"num_actuators\":"));
+    Serial.print(NUM_ACTUATORS);
     Serial.print(F("},\"interface\":{\"test_button\":{\"title\":\"Test Output\",\"description\":\"Run demonstration sequence\",\"command\":\"D\"},\"commands\":["));
     Serial.print(F("{\"name\":\"Pulse\",\"format\":\"P [channel] [ms]\",\"description\":\"Activate single channel\",\"args\":[{\"name\":\"channel\",\"range\":\"0-"));
     Serial.print(TOTAL_CHANNELS-1);
