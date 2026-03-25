@@ -782,27 +782,21 @@
                                         </button>
                                     </div>
 
-                                    <!-- Stimulator type selection -->
-                                    <div class="form-group" style="margin-bottom: 15px;">
-                                        <label style="font-size: 14px; margin-bottom: 5px;">Stimulator Type:</label>
-                                        <select class="form-control" ng-model="stimulator.name" ng-change="updateStimulatorInSequence($index)" style="font-size: 14px;">
-                                            <option value="">-- Choose a stimulator --</option>
-                                            <option ng-repeat="opt in option" value="{{opt.name}}" title="{{opt.overview}}">{{opt.name}}</option>
-                                        </select>
-                                    </div>
-
-                                    <!-- Show description for selected stimulator -->
-                                    <div ng-if="stimulator.name" class="alert alert-info" style="margin-bottom: 15px; font-size: 14px; padding: 8px 12px;">
-                                        <strong>{{getInteractorOptionByName(stimulator.name).name}}:</strong> {{getInteractorOptionByName(stimulator.name).overview}}
-                                    </div>
-
-                                    <!-- Arguments for stimulator -->
-                                    <div ng-if="stimulator.name && stimulator.name != 'MultiStimulator'" class="stimulator-arguments-section" style="background-color: white; border-radius: 4px; padding: 15px; border: 1px solid #dee2e6;">
+                                    <!-- Arguments for stimulator (auto-selected as ComposedStimulator) -->
+                                    <div ng-if="stimulator.name" class="stimulator-arguments-section" style="background-color: white; border-radius: 4px; padding: 15px; border: 1px solid #dee2e6;">
                                         <h6 style="margin-bottom: 15px; color: #495057; font-size: 14px; font-weight: 600;">
                                             <i class="fa fa-cog"></i> Configuration:
                                         </h6>
-                                        <div ng-repeat="arg in getInteractorOptionByName(stimulator.name).arguments" class="form-group" style="margin-bottom: 15px;">
-                                            <label ng-if="arg.type != 'boolean' && arg.type != 'date_range'" style="font-size: 14px; margin-bottom: 5px; font-weight: 500;">{{arg.description}}</label>
+                                        <div ng-repeat="arg in getInteractorOptionByName(stimulator.name).arguments" ng-if="isArgumentVisible(arg, stimulator.arguments)" class="form-group" style="margin-bottom: 15px;">
+                                            <label ng-if="arg.type != 'boolean' && arg.type != 'date_range' && arg.type != 'select'" style="font-size: 14px; margin-bottom: 5px; font-weight: 500;">{{arg.description}}</label>
+
+                                            <!-- Select type (for trigger_type, action_type dropdowns) -->
+                                            <div ng-if="arg.type == 'select'" class="form-group" style="margin-bottom: 15px;">
+                                                <label style="font-size: 14px; margin-bottom: 5px; font-weight: 600; color: #337ab7;">{{arg.description}}</label>
+                                                <select class="form-control" ng-model="stimulator.arguments[arg.name]" style="font-weight: 500;">
+                                                    <option ng-repeat="opt in arg.options" value="{{opt.value}}">{{opt.label}}</option>
+                                                </select>
+                                            </div>
 
                                             <select ng-if="arg.type == 'filepath'" class="form-control" ng-model="stimulator.arguments[arg.name]">
                                                 <option value="">Available Movies</option>
@@ -869,8 +863,16 @@
                                         {{opt.overview}}
                                     </div>
                                     <ul ng-if="selected_options.tracking[name]['name']==opt.name">
-                                        <li ng-repeat="arg in opt.arguments">
-                                            <label ng-if="arg.type != 'boolean' && arg.type != 'date_range'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
+                                        <li ng-repeat="arg in opt.arguments" ng-if="isArgumentVisible(arg, selected_options.tracking[name]['arguments'])">
+                                            <label ng-if="arg.type != 'boolean' && arg.type != 'date_range' && arg.type != 'select'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
+
+                                            <!-- Select type (for ComposedStimulator trigger/action dropdowns) -->
+                                            <div ng-if="arg.type == 'select'" style="margin-bottom: 10px;">
+                                                <label for="input-{{arg.name}}" style="font-weight: 600; color: #337ab7;">{{arg.description}}</label>
+                                                <select id="input-{{arg.name}}" name={{arg.name}} class="form-control" ng-model="selected_options.tracking[name]['arguments'][arg.name]" style="font-weight: 500;">
+                                                    <option ng-repeat="opt in arg.options" value="{{opt.value}}">{{opt.label}}</option>
+                                                </select>
+                                            </div>
 
                                             <select ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
                                                 <option value="">Available Movies</option>

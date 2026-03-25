@@ -1,2 +1,2 @@
 __author__ = "quentin"
-from . import stimulators
+from . import actions, channel_maps, composed_stimulator, stimulators, triggers

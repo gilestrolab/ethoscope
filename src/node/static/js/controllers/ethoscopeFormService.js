@@ -296,9 +296,22 @@
              * @param {Object} $scope - Controller scope
              */
             addStimulatorToSequence: function($scope) {
+                // Auto-select ComposedStimulator and initialize its arguments
+                var stimulatorName = 'ComposedStimulator';
+                var argDefs = this.getStimulatorArguments(stimulatorName, $scope);
+                var newArguments = {};
+
+                for (var i = 0; i < argDefs.length; i++) {
+                    var argDef = argDefs[i];
+                    if (argDef.type === 'date_range' && (argDef.default === '' || !argDef.default)) {
+                        continue;
+                    }
+                    newArguments[argDef.name] = argDef.default || '';
+                }
+
                 var newStimulator = {
-                    name: '',
-                    arguments: {}
+                    name: stimulatorName,
+                    arguments: newArguments
                 };
 
                 $scope.stimulatorSequence.push(newStimulator);
@@ -387,6 +400,29 @@
                     console.log('Moment.js locale configured to: en');
                 }
                 return this.momentLocaleConfigured;
+            },
+
+            /**
+             * Check if an argument should be visible based on its depends_on conditions.
+             * Used by ComposedStimulator to show/hide trigger- and action-specific arguments.
+             * @param {Object} arg - The argument definition (may have a depends_on field)
+             * @param {Object} currentArgValues - Current argument values for the stimulator
+             * @returns {boolean} True if the argument should be shown
+             */
+            isArgumentVisible: function(arg, currentArgValues) {
+                if (!arg || !arg.depends_on) return true;
+                if (!currentArgValues) return false;
+
+                for (var dep in arg.depends_on) {
+                    if (arg.depends_on.hasOwnProperty(dep)) {
+                        var allowedValues = arg.depends_on[dep];
+                        var currentVal = currentArgValues[dep];
+                        if (!currentVal || allowedValues.indexOf(currentVal) === -1) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
             },
 
             /**

@@ -3,21 +3,20 @@
 # You can add them manually by knowing in advance their IP address, although that is not idea.
 # Linux still remains the best way to run this software
 
+x-node-base: &node-base
+  build:
+    context: .
+    dockerfile: node.dockerfile
+    args:
+      - ETHOSCOPE_BRANCH=${ETHOSCOPE_BRANCH:-dev}
+  image: ghcr.io/gilestrolab/ethoscope-node:latest
+  restart: unless-stopped
+  volumes:
+    - ../../:/opt/ethoscope:ro  # Uncomment if needed - will mount the host ethoscope folder, useful only for development
+    - ethoscope_data:/ethoscope_data
+    - ethoscope_config:/etc/ethoscope
+
 services:
-  node-base: &node-base
-    build:
-      context: .
-      dockerfile: node.dockerfile
-      args:
-        - ETHOSCOPE_BRANCH=dev
-    image: ghcr.io/gilestrolab/ethoscope-node:latest
-    restart: unless-stopped
-    volumes:
-      - ../../:/opt/ethoscope:ro  # Uncomment if needed - will mount the host ethoscope folder, useful only for development
-      - ethoscope_data:/ethoscope_data
-      - ethoscope_config:/etc/ethoscope
-
-
   ethoscope-node:
     <<: *node-base
     container_name: ethoscope-node

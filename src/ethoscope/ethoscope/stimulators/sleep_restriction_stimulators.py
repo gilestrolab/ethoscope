@@ -31,6 +31,7 @@ class mAGOSleepRestriction(mAGO):
 
     _description = {
         "overview": "Sleep restriction using mAGO hardware - operates N hours per day at specified intervals",
+        "hidden": True,
         "arguments": [
             # Inherit mAGO base arguments
             {
@@ -291,6 +292,7 @@ class SimpleTimeRestrictedStimulator(mAGOSleepRestriction):
 
     _description = {
         "overview": "Simplified sleep restriction with preset patterns",
+        "hidden": True,
         "arguments": [
             {
                 "type": "number",

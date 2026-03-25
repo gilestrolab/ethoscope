@@ -427,6 +427,10 @@
             return ethoscopeFormService.getInteractorOptionByName(name, $scope);
         };
 
+        $scope.isArgumentVisible = function(arg, currentArgValues) {
+            return ethoscopeFormService.isArgumentVisible(arg, currentArgValues);
+        };
+
         $scope.isRoiTemplateSelected = function() {
             return ethoscopeFormService.isRoiTemplateSelected($scope);
         };

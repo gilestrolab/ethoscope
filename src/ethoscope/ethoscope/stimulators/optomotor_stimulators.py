@@ -10,6 +10,7 @@ class OptoMidlineCrossStimulator(MiddleCrossingStimulator):
 
     _description = {
         "overview": "A stimulator to shine LED light when animals cross the midline (MODULE 3/4 LED channels)",
+        "hidden": True,
         "arguments": [
             {
                 "type": "number",
