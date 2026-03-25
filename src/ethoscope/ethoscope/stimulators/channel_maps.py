@@ -10,6 +10,7 @@ Channel layout reference:
 - Even channels (0,2,4,...,18): LEDs or Valves
 - 10-ROI layout: ROIs {1,3,5,7,9,12,14,16,18,20}
 - 20-ROI interleaved: ROIs {1-10} mapped across all 20 channels
+- 20-ROI all-channel: ROIs {1-20} mapped sequentially to channels 0-19 (MODULE 4)
 """
 
 # 10-ROI layout: motors on odd channels
@@ -68,8 +69,12 @@ _INTERLEAVED_20CH = {
     10: 18,
 }
 
+# 20-ROI all-channel layout for MODULE 4 (20 LEDs on all channels)
+# Each ROI maps sequentially to a channel: ROI n → channel n-1
+_LEDS_ALL_20ROI = {i: i - 1 for i in range(1, 21)}
 
-def get_channel_map(channel_type):
+
+def get_channel_map(channel_type, led_count=None):
     """
     Return ROI-to-channel mapping for the given channel type.
 
@@ -77,8 +82,14 @@ def get_channel_map(channel_type):
     component is being addressed. All modern mAGO modules use one of these
     standard layouts.
 
+    For LEDs, the mapping depends on the module's LED count:
+    - 20 LEDs (MODULE 4): all 20 channels used, ROIs 1-20 → channels 0-19
+    - 10 LEDs (MODULE 3): even channels only, standard 10-ROI layout
+
     Args:
         channel_type (str): One of "motor", "led", "valve"
+        led_count (int, optional): Number of LEDs reported by the module.
+            Used to select the appropriate LED channel map.
 
     Returns:
         dict: Mapping of ROI index to hardware channel number
@@ -89,6 +100,8 @@ def get_channel_map(channel_type):
     if channel_type == "motor":
         return dict(_MOTORS_ODD_10ROI)
     elif channel_type == "led":
+        if led_count is not None and led_count > 10:
+            return dict(_LEDS_ALL_20ROI)
         return dict(_EVEN_10ROI)
     elif channel_type == "valve":
         return dict(_VALVES_MAGO_10ROI)

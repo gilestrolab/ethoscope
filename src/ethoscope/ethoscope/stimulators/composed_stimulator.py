@@ -88,6 +88,7 @@ class ComposedStimulator(BaseStimulator):
                     "trigger_type": [
                         "inactivity",
                         "midline_crossing",
+                        "periodic",
                         "time_restricted",
                     ],
                 },
@@ -254,6 +255,7 @@ class ComposedStimulator(BaseStimulator):
         elif trigger_type == "periodic":
             trigger_kwargs = {
                 "interval_seconds": interval_seconds,
+                "stimulus_probability": stimulus_probability,
             }
         elif trigger_type == "time_restricted":
             trigger_kwargs = {
@@ -287,12 +289,29 @@ class ComposedStimulator(BaseStimulator):
 
         self._action = action_cls(**action_kwargs)
 
-        # Derive channel map from action's channel type
-        self._roi_to_channel = get_channel_map(self._action.channel_type)
+        # Interrogate module to get actual capabilities for channel map selection
+        led_count = None
+        try:
+            module_info = hardware_connection.interrogate()
+            led_count = module_info.get("capabilities", {}).get("leds")
+            logging.info(
+                f"Module reports {led_count} LEDs, "
+                f"{module_info.get('capabilities', {}).get('motors')} motors"
+            )
+        except Exception as e:
+            logging.warning(
+                f"Could not interrogate module: {e}. Using default channel map."
+            )
+
+        # Derive channel map from action's channel type and module capabilities
+        self._roi_to_channel = get_channel_map(
+            self._action.channel_type, led_count=led_count
+        )
 
         logging.info(
             f"ComposedStimulator initialized: trigger={trigger_type}, "
-            f"action={action_type}, channels={self._action.channel_type}"
+            f"action={action_type}, channels={self._action.channel_type}, "
+            f"mapped_rois={len(self._roi_to_channel)}"
         )
 
         super().__init__(hardware_connection, date_range, roi_template_config)

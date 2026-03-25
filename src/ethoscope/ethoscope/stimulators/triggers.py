@@ -168,17 +168,25 @@ class PeriodicTrigger(BaseTrigger):
     Useful for constitutive optogenetic protocols.
     """
 
-    def __init__(self, interval_seconds=60):
+    def __init__(self, interval_seconds=60, stimulus_probability=1.0):
         super().__init__()
         self._interval_ms = float(interval_seconds) * 1000
         self._last_fire_time = 0
+
+        p = float(stimulus_probability)
+        if not 0 <= p <= 1.0:
+            raise ValueError("Probability must be between 0.0 and 1.0")
+        self._p = p
 
     def check(self):
         now = self._tracker.last_time_point
 
         if now - self._last_fire_time >= self._interval_ms:
             self._last_fire_time = now
-            return 1, {}
+            if random.uniform(0, 1) <= self._p:
+                return 1, {}
+            else:
+                return 2, {}
 
         return 0, {}
 
