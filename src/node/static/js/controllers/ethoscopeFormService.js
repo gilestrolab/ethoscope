@@ -403,6 +403,31 @@
             },
 
             /**
+             * Filter action_type options based on detected module capabilities.
+             * Maps each action value to the capability key it requires.
+             * @param {Array} allOptions - The full options array from the argument definition
+             * @param {Object} moduleInfo - Module info from /module endpoint (may be empty)
+             * @returns {Array} Filtered options array
+             */
+            getAvailableActions: function(allOptions, moduleInfo) {
+                if (!allOptions) return [];
+                if (!moduleInfo || !moduleInfo.capabilities) return allOptions;
+
+                var capabilityMap = {
+                    'motor_pulse': 'motors',
+                    'led_pulse': 'leds',
+                    'led_pulse_train': 'leds',
+                    'valve_pulse': 'valves'
+                };
+
+                return allOptions.filter(function(opt) {
+                    var requiredCap = capabilityMap[opt.value];
+                    if (!requiredCap) return true; // Unknown action type, show it
+                    return moduleInfo.capabilities[requiredCap] > 0;
+                });
+            },
+
+            /**
              * Check if an argument should be visible based on its depends_on conditions.
              * Used by ComposedStimulator to show/hide trigger- and action-specific arguments.
              * @param {Object} arg - The argument definition (may have a depends_on field)

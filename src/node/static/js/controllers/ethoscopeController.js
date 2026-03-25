@@ -23,6 +23,7 @@
         $scope.device = {}; // Device information and status
         $scope.ethoscope = {}; // Device control functions
         $scope.machine_info = {}; // Hardware and system information
+        $scope.module_info = {}; // Full module capabilities from serial interrogation
         $scope.user_options = {}; // Available tracking/recording options from server
         $scope.selected_options = {}; // Currently selected options for forms
         $scope.node = { // Node-level data (users, incubators, sensors)
@@ -240,10 +241,21 @@
          * Load non-critical device data in background after critical data is loaded
          */
         function loadNonCriticalDeviceData() {
-            // Load machine info asynchronously
+            // Load machine info asynchronously, then fetch full module capabilities if connected
             $http.get('/device/' + device_id + '/machineinfo')
                 .then(function(response) {
                     $scope.machine_info = response.data;
+
+                    // Fetch full module capabilities via serial interrogation (slower, separate call)
+                    if ($scope.machine_info.Module && $scope.machine_info.Module.Connected) {
+                        $http.get('/device/' + device_id + '/module')
+                            .then(function(modResponse) {
+                                $scope.module_info = modResponse.data;
+                            })
+                            .catch(function(error) {
+                                console.warn('Failed to load module capabilities:', error);
+                            });
+                    }
                 })
                 .catch(function(error) {
                     console.error('Failed to load machine info:', error);
@@ -429,6 +441,15 @@
 
         $scope.isArgumentVisible = function(arg, currentArgValues) {
             return ethoscopeFormService.isArgumentVisible(arg, currentArgValues);
+        };
+
+        /**
+         * Filter action_type options based on detected module capabilities.
+         * Falls back to showing all options if module info is unavailable.
+         */
+        $scope.getFilteredActionOptions = function(arg) {
+            if (arg.name !== 'action_type') return arg.options;
+            return ethoscopeFormService.getAvailableActions(arg.options, $scope.module_info);
         };
 
         $scope.isRoiTemplateSelected = function() {
