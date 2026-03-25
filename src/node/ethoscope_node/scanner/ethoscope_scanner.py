@@ -406,7 +406,10 @@ class Ethoscope(BaseDevice):
             self._handle_device_coming_online()
 
         # Check if backup_filename from API response has changed
-        current_backup_filename = self._info.get("backup_filename")
+        # Note: _reorganize_experimental_info moves backup_filename to latest_cache
+        current_backup_filename = self._info.get("backup_filename") or self._info.get(
+            "latest_cache", {}
+        ).get("backup_filename")
         previous_backup_filename = getattr(self, "_last_backup_filename", None)
         backup_filename_changed = (
             current_backup_filename != previous_backup_filename
@@ -1244,10 +1247,12 @@ class Ethoscope(BaseDevice):
             db_type_databases = databases.get(db_type, {})
 
             if db_type_databases:
-                # For now, take the first database (typically there's only one)
-                db_name = list(db_type_databases.keys())[0]
-                db_info = db_type_databases[db_name]
-                backup_filename = db_info.get("backup_filename")
+                # Pick the most recent database by date timestamp
+                best = max(
+                    db_type_databases.values(),
+                    key=lambda info: info.get("date", 0),
+                )
+                backup_filename = best.get("backup_filename")
                 if backup_filename:
                     return backup_filename
 
@@ -1267,10 +1272,13 @@ class Ethoscope(BaseDevice):
     def _get_appropriate_backup_filename(self) -> str:
         """Get the appropriate backup filename based on the active database type."""
         try:
-            # FIRST PRIORITY: Use the top-level backup_filename from the ethoscope API response
+            # FIRST PRIORITY: Use the backup_filename from the ethoscope API response
             # This field contains the current experiment's backup filename
-            if "backup_filename" in self._info and self._info["backup_filename"]:
-                backup_filename = self._info["backup_filename"]
+            # Note: _reorganize_experimental_info moves this to latest_cache
+            backup_filename = self._info.get("backup_filename") or self._info.get(
+                "latest_cache", {}
+            ).get("backup_filename")
+            if backup_filename:
                 self._logger.debug(
                     f"Device {self._ip}: Using current backup_filename from API: {backup_filename}"
                 )
@@ -1324,16 +1332,31 @@ class Ethoscope(BaseDevice):
             databases = self._info.get("databases", {})
 
             # Look for active databases by checking db_status = "tracking"
+            # If multiple databases have "tracking" status (e.g. old unfinalised ones),
+            # pick the most recent one by date timestamp in the filename
             for db_type in ["SQLite", "MariaDB"]:
                 db_type_databases = databases.get(db_type, {})
+                tracking_candidates = []
                 for _db_name, db_info in db_type_databases.items():
                     if db_info.get("db_status") == "tracking":
                         backup_filename = db_info.get("backup_filename")
                         if backup_filename:
-                            self._logger.debug(
-                                f"Device {self._ip}: Found active {db_type} database: {backup_filename}"
+                            tracking_candidates.append(
+                                (db_info.get("date", 0), backup_filename)
                             )
-                            return backup_filename
+                if tracking_candidates:
+                    # Sort by date descending, pick the most recent
+                    tracking_candidates.sort(key=lambda x: x[0], reverse=True)
+                    best_filename = tracking_candidates[0][1]
+                    self._logger.debug(
+                        f"Device {self._ip}: Found active {db_type} database: {best_filename}"
+                        + (
+                            f" (selected from {len(tracking_candidates)} tracking databases)"
+                            if len(tracking_candidates) > 1
+                            else ""
+                        )
+                    )
+                    return best_filename
 
             # FIFTH PRIORITY: Try SQLite first in the existence check (reverse previous priority)
             # This is because SQLite is more commonly used for new experiments
